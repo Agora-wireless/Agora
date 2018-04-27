@@ -52,7 +52,11 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         fread(IQ_data[i], sizeof(float), OFDM_FRAME_LEN * 2, fp);
         // range [-2,2]
         for(int j = 0; j < OFDM_FRAME_LEN * 2; j++)
+        {
             IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 65536 / 4 + 65536 / 2);
+            // printf("Coded: %d, orignal: %.4f\n", IQ_data_coded[i][j],IQ_data[i][j]);
+        }
+
     }
     fclose(fp);
 
@@ -117,6 +121,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
         memcpy(trans_buffer_[cur_ptr_].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
 
         if ( !task_queue_.enqueue( cur_ptr_ ) ) {
             printf("send message enqueue failed\n");

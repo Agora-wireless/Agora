@@ -675,6 +675,9 @@ void CoMP::doCrop(int tid, int offset)
         for(int j = 0; j < OFDM_CA_NUM; j++)
         {
             csi_buffer_.CSI[ca_offset + j][csi_offset] = divide(fft_buffer_.FFT_outputs[FFT_buffer_target_id][j], pilots_[j]);
+            printf("raw CSI: %.2f+%.2fj, FFT_buffer: %.2f+%.2fj, Pilot: %.2f+%.2fj\n",fft_buffer_.FFT_inputs[FFT_buffer_target_id][j].real,
+                            fft_buffer_.FFT_inputs[FFT_buffer_target_id][j].imag, fft_buffer_.FFT_outputs[FFT_buffer_target_id][j].real,
+                            fft_buffer_.FFT_outputs[FFT_buffer_target_id][j].imag, pilots_[j].real, pilots_[j].imag);
         }       
     }
     else if(isData(subframe_id)) // if it is data part, just transpose
