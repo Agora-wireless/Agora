@@ -66,9 +66,15 @@ CoMP::CoMP()
 
     // read pilots from file
     pilots_.resize(OFDM_CA_NUM);
-    FILE* fp = fopen("../pilots.bin","rb");
-    fread(pilots_.data(), sizeof(float), OFDM_CA_NUM * 2, fp);
+    FILE* fp = fopen("../pilot_f.bin","rb");
+    fread(pilots_.data(), sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
+    cout<<"Pilot data"<<endl;
+    for (int i = 0; i<OFDM_CA_NUM;i++)
+    {
+        cout<<pilots_[i]<<",";
+    }
+    cout<<endl;
     // printf("Pilot data read\n");
 
     printf("new PackageReceiver\n");
@@ -447,6 +453,7 @@ inline complex_float CoMP::divide(complex_float e1, complex_float e2)
     return re;
 }
 
+
 inline imat CoMP::demod_16qam(arma::cx_fmat x)
 {
     imat re;
@@ -672,13 +679,35 @@ void CoMP::doCrop(int tid, int offset)
         int UE_id = subframe_id;
         int ca_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM;
         int csi_offset = ant_id + UE_id * BS_ANT_NUM;
-        for(int j = 0; j < OFDM_CA_NUM; j++)
+        float* cur_fft_buffer_float_output = (float*)fft_buffer_.FFT_outputs[FFT_buffer_target_id];
+        
+        for(int j = 0; j < (OFDM_CA_NUM); j++)
         {
-            csi_buffer_.CSI[ca_offset + j][csi_offset] = divide(fft_buffer_.FFT_outputs[FFT_buffer_target_id][j], pilots_[j]);
-            printf("raw CSI: %.2f+%.2fj, FFT_buffer: %.2f+%.2fj, Pilot: %.2f+%.2fj\n",fft_buffer_.FFT_inputs[FFT_buffer_target_id][j].real,
-                            fft_buffer_.FFT_inputs[FFT_buffer_target_id][j].imag, fft_buffer_.FFT_outputs[FFT_buffer_target_id][j].real,
-                            fft_buffer_.FFT_outputs[FFT_buffer_target_id][j].imag, pilots_[j].real, pilots_[j].imag);
-        }       
+            // divide fft output by pilot data to get CSI estimation
+            float* csi_buffer_ptr = (float*)(csi_buffer_.CSI[ca_offset+j].data())+csi_offset*2;
+            *(csi_buffer_ptr)= cur_fft_buffer_float_output[2*j]* pilots_[j];
+            *(csi_buffer_ptr+1)= cur_fft_buffer_float_output[2*j+1]* pilots_[j];
+
+            // if (csi_buffer_.CSI[ca_offset + j][csi_offset].real!=*(csi_buffer_ptr))
+            // {
+            //     printf("UE: %d, Ant %d, SC: %d, FFT_output: %.2f+%.2fj, CSI1: %.2f+%.2fj, CSI2: %.2f+%.2fj, Pilot: %.1f, Add_diff: %d\n", UE_id, ant_id, j,
+            //         cur_fft_buffer_float_output[2*j], cur_fft_buffer_float_output[2*j+1],
+            //         csi_buffer_.CSI[ca_offset + j][csi_offset].real,csi_buffer_.CSI[ca_offset + j][csi_offset].imag, 
+            //         *(csi_buffer_ptr),*(csi_buffer_ptr+1),pilots_[j],
+            //         (int)((float *)&(csi_buffer_.CSI[ca_offset + j][csi_offset])-(csi_buffer_ptr))
+            //         );
+            // }
+            
+        }
+
+        // for(int j = 0; j < OFDM_CA_NUM; j++)
+        // {
+        //     csi_buffer_.CSI[ca_offset + j][csi_offset] = divide(fft_buffer_.FFT_outputs[FFT_buffer_target_id][j], pilots_[j]);          
+        //     printf("Ant id: %d, SC: %d, raw CSI: %.4f+%.4fj, FFT_buffer: %.2f+%.2fj, Pilot: %d\n", ant_id,j,
+        //                     fft_buffer_.FFT_inputs[FFT_buffer_target_id][j].real,
+        //                     fft_buffer_.FFT_inputs[FFT_buffer_target_id][j].imag, fft_buffer_.FFT_outputs[FFT_buffer_target_id][j].real,
+        //                     fft_buffer_.FFT_outputs[FFT_buffer_target_id][j].imag, pilots_[j]);
+        // }       
     }
     else if(isData(subframe_id)) // if it is data part, just transpose
     {

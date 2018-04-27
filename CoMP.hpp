@@ -120,7 +120,7 @@ private:
     // Second dimension: OFDM_CA_NUM * UE_NUM
     DemulBuffer2 demul_buffer2_;
 
-    std::vector<complex_float> pilots_;
+    std::vector<float> pilots_;
 
     mufft_plan_1d* muplans_[TASK_THREAD_NUM];
    
