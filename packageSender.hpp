@@ -51,6 +51,8 @@ private:
     struct sockaddr_in cliaddr_;    /* server address */
     int* socket_;
 
+    // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
+    // Second dimension: buffer_length (real and imag)
     std::vector<std::vector<char>> trans_buffer_;
     int cur_ptr_;
     int buffer_len_;
@@ -63,6 +65,8 @@ private:
     int frame_id;
     int subframe_id;
 
+    // First dimension: subframe_num_perframe * BS_ANT_NUM
+    // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
     float** IQ_data;
     ushort** IQ_data_coded;
 
