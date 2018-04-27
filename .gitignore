@@ -8,6 +8,7 @@ build/*
 *.exe
 *.o
 *.so
+*.m~
 
 # Packages #
 ############
