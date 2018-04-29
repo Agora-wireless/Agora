@@ -8,7 +8,7 @@ N_OFDM_SYMS = 36*NUM_UE;
 NUM_SUBFRAME = 10;
 N_DATA_SYMS = N_OFDM_SYMS * length(SC_IND_DATA);
 GENERATE_PILOT = 0;
-GENERATE_DATA = 1;
+GENERATE_DATA = 0;
 CP_LEN = 0;
 frmLen = 100;       % frame length
 
@@ -27,6 +27,7 @@ else
     fileID = fopen('pilot_f.bin');
     pilot_f = fread(fileID,[1024,1],'float');
     pilot_t = ifft(pilot_f,1024);
+    fclose(fileID);
 %     fileID = fopen('pilot_t.bin');
 %     pilot_t = fread(fileID,[1024,1],'float');
 end
@@ -35,11 +36,13 @@ end
 %% Generate data
 if GENERATE_DATA
     tx_data = randi(MOD_ORDER, 1, N_DATA_SYMS) - 1;
-    fileID = fopen('orig_data.bin','w');
-    fwrite(fileID,pilot_f,'int');
+    fileID_data = fopen('orig_data.bin','w');
+    fwrite(fileID_data,tx_data,'int');
+    fclose(fileID_data);
 else
-    fileID = fopen('orig_data.bin');
-    tx_data = fread(fileID,[N_DATA_SYMS,1],'int');
+    fileID_data = fopen('orig_data.bin');
+    tx_data = fread(fileID_data,[N_DATA_SYMS,1],'int');
+    fclose(fileID);
 end
 
 %% Modulate data
@@ -72,7 +75,7 @@ end
 % Reshape the symbol vector to a matrix with one column per OFDM symbol
 % size: N_SC \times N_OFDM_SYMS/NUM_UE \times NUM_UE
 tx_syms_mat = reshape(tx_syms, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
-
+tx_data_orig = reshape(tx_data, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
 % Construct the IFFT input matrix
 % ifft_in_mat = zeros(NUM_BS_ANT, N_SC, N_OFDM_SYMS/NUM_BS_ANT);
 
@@ -113,7 +116,13 @@ rx_mat = tx_mat*H;
 rx_mat_all = reshape(rx_mat,size(tx_mat_all,1),size(tx_mat_all,2),NUM_BS_ANT);
 rx_mat_all = permute(rx_mat_all,[1,3,2]);
 rx_vec = reshape(rx_mat_all, 1, numel(rx_mat_all));
+if GENERATE_DATA
+    fileID = fopen('rx_data.bin','w');
+    fwrite(fileID,rx_vec,'float');
+    fclose(fileID);
+end
 
+    
 %% CSI estimation
 CSI_est = zeros(N_SC,NUM_BS_ANT,NUM_UE);
 for i = 1:NUM_UE
@@ -131,10 +140,10 @@ precoder = pinv(H_est);
 rx_mat_data = rx_mat_all(:,:,NUM_UE+1:end);
 % size: NUM_BS_ANT \times N_SC \times N_OFDM_SYMS/NUM_UE
 rx_mat_data = permute(rx_mat_data,[2,1,3]);
-rx_mat_data = reshape(rx_mat_data, NUM_BS_ANT, N_SC*N_OFDM_SYMS/NUM_UE);
-rx_syms = precoder * rx_mat_data;
+rx_data_fft = fft(rx_mat_data,N_SC,2);
+rx_data_fft = reshape(rx_data_fft, NUM_BS_ANT, N_SC*N_OFDM_SYMS/NUM_UE);
+rx_syms = precoder * rx_data_fft;
 rx_syms_mat = reshape(rx_syms, NUM_UE,N_SC,N_OFDM_SYMS/NUM_UE);
-rx_syms_mat = permute(rx_syms_mat,[2,3,1]);
 
 
 demod_fcn_bpsk = @(x) double(real(x)>0);
@@ -151,6 +160,7 @@ switch(MOD_ORDER)
 end
 
 rx_data = reshape(rx_data,NUM_UE,N_SC,N_OFDM_SYMS/NUM_UE);
+
 rx_data = permute(rx_data,[2,3,1]);
 
 % % Reshape to a vector
