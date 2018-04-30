@@ -472,8 +472,7 @@ inline imat CoMP::demod_16qam(arma::cx_fmat x)
     // cout << "x:" << endl;
     // cout << x.st() << endl;
     // cout <<imag(x).st() << endl;
-    // cout << "Re:" << endl;
-    // cout << re.st() << endl;
+    // cout << "Re:" << re.st() << endl;
     return re;
 }
 
@@ -553,6 +552,7 @@ void CoMP::doDemul(int tid, int offset)
         // Equalization
         // calculate mat_demuled for i-th subcarrier in the n-th block
         mat_demuled = mat_precoder * mat_data;
+
 /*
         //debug
         if(ca_id == 640 && i == 9 && frame_id == 4 && data_subframe_id == 0)
@@ -594,6 +594,7 @@ void CoMP::doDemul(int tid, int offset)
         imat  mat_demuled2 = zeros<imat>(UE_NUM,1);
         
         mat_demuled2 = demod_16qam(mat_demuled);
+        cout << "Frame: "<< frame_id<<", subframe: "<< data_subframe_id<<", SC: " << ca_id+i << ", data: " << mat_demuled2.st() << endl;
 
     }
 

@@ -46,7 +46,11 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
     }
     
     // read from file
-    FILE* fp = fopen("../data.bin","rb");
+    FILE* fp = fopen("../rx_data.bin","rb");
+    if (fp==NULL) {
+        printf("open file faild");
+        std::cerr << "Error: " << strerror(errno) << std::endl;
+    }
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
     {
         fread(IQ_data[i], sizeof(float), OFDM_FRAME_LEN * 2, fp);
