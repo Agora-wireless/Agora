@@ -116,11 +116,14 @@ rx_mat = tx_mat*H;
 rx_mat_all = reshape(rx_mat,size(tx_mat_all,1),size(tx_mat_all,2),NUM_BS_ANT);
 rx_mat_all = permute(rx_mat_all,[1,3,2]);
 rx_vec = reshape(rx_mat_all, 1, numel(rx_mat_all));
-if GENERATE_DATA
+% if GENERATE_DATA
+rx_vec_float = zeros(1,size(rx_vec,2)*2);
+rx_vec_float(1:2:end) = real(rx_vec);
+rx_vec_float(2:2:end) = imag(rx_vec);
     fileID = fopen('rx_data.bin','w');
-    fwrite(fileID,rx_vec,'float');
+    fwrite(fileID,rx_vec_float,'float');
     fclose(fileID);
-end
+% end
 
     
 %% CSI estimation
