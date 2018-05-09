@@ -221,9 +221,13 @@ void CoMP::start()
                     {   
                         // check if csi of all UEs are ready
                         int csi_checker_id = frame_id;
+                        if (DEBUG_PRINT)
+                            printf("Main thread: pilot frame id: %d, subframe_id: %d\n", csi_checker_id,subframe_id);
                         csi_checker_[csi_checker_id] ++;
                         if(csi_checker_[csi_checker_id] == UE_NUM)
                         {
+                            if (DEBUG_PRINT)
+                                printf("Main thread: pilot frame: %d, finished collecting pilot frames: %d\n", csi_checker_id,subframe_id);
                             // if CSI from all UEs are ready, do ZF
                             csi_checker_[csi_checker_id] = 0;
                             //if(frame_id == 4)
@@ -250,6 +254,8 @@ void CoMP::start()
                     {
                         // if this subframe is data part
                         int data_checker_id = frame_id;
+                        if (DEBUG_PRINT)
+                            printf("Main thread: data frame id: %d, subframe_id: %d\n", data_checker_id,subframe_id);
                         data_checker_[data_checker_id] ++;
                         if(data_checker_[data_checker_id] == data_subframe_num_perframe)
                         {
@@ -259,6 +265,8 @@ void CoMP::start()
                             
                             //printf("do demul for frame %d\n", frame_id);
                             //printf("frame %d data received\n", frame_id);
+                            if (DEBUG_PRINT)
+                                printf("Main thread: data frame: %d, finished collecting data frames: %d\n", data_checker_id,subframe_id);
                             data_checker_[data_checker_id] = 0;
                             Event_data do_demul_task;
                             do_demul_task.event_type = TASK_DEMUL;
@@ -290,6 +298,10 @@ void CoMP::start()
                 // precoder is ready, do demodulation
                 int ca_id = offset_zf % OFDM_CA_NUM;
                 int frame_id = (offset_zf - ca_id) / OFDM_CA_NUM;
+
+                if (DEBUG_PRINT_TASK_DONE) 
+                    printf("Main thread: ZF done frame: %d, subcarrier: %d\n", frame_id,ca_id);
+
                 precoder_checker_[frame_id] ++;
                 if(precoder_checker_[frame_id] == OFDM_CA_NUM)
                 {
@@ -306,6 +318,10 @@ void CoMP::start()
                 int offset_without_ca = (offset_demul - ca_id) / OFDM_CA_NUM;
                 int data_subframe_id = offset_without_ca % (subframe_num_perframe - UE_NUM);
                 int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
+
+                if (DEBUG_PRINT_TASK_DONE) 
+                    printf("Main thread: Demodulation done frame: %d, subframe: %d, subcarrier: %d\n", frame_id, data_subframe_id, ca_id);
+
                 demul_checker_[frame_id][data_subframe_id] += demul_block_size;
                 // if this subframe is ready
                 if(demul_checker_[frame_id][data_subframe_id] == OFDM_CA_NUM)
@@ -497,6 +513,9 @@ void CoMP::doDemul(int tid, int offset)
     // frame_id = frame_id
     int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
 
+    if (DEBUG_PRINT)
+        printf("In doDemul: frame: %d, subframe: %d, subcarrier: %d \n", frame_id,data_subframe_id,ca_id);
+
     //printf("do demul, %d %d %d\n", frame_id, data_subframe_id, ca_id);
     // see the slides for more details
     // index=[0,32,64,96]
@@ -594,7 +613,26 @@ void CoMP::doDemul(int tid, int offset)
         imat  mat_demuled2 = zeros<imat>(UE_NUM,1);
         
         mat_demuled2 = demod_16qam(mat_demuled);
-        cout << "Frame: "<< frame_id<<", subframe: "<< data_subframe_id<<", SC: " << ca_id+i << ", data: " << mat_demuled2.st() << endl;
+        // cout << "Frame: "<< frame_id<<", subframe: "<< data_subframe_id<<", SC: " << ca_id+i << ", data: " << mat_demuled2.st() << endl;
+
+        if (frame_id==0) 
+        {
+            FILE* fp_debug = fopen("tmpresult.txt", "a");
+            if (fp_debug==NULL) {
+                printf("open file faild");
+                std::cerr << "Error: " << strerror(errno) << std::endl;
+                exit(0);
+            }
+            for(int ii = 0; ii < UE_NUM; ii++)
+            {
+                // printf("User %d: %d, ", ii,mat_demuled2(ii));
+                fprintf(fp_debug, "%d\n", mat_demuled2(ii));
+            }
+            // printf("\n");
+            // fwrite(mat_demuled2.memptr(), sizeof(int),sizeof(mat_demuled), fp_debug);
+            fclose(fp_debug);
+        }
+
 
     }
 
@@ -617,7 +655,8 @@ void CoMP::doZF(int tid, int offset)
 
     int ca_id = offset % OFDM_CA_NUM;
     int frame_id = (offset - ca_id) / OFDM_CA_NUM;
-
+    if (DEBUG_PRINT)
+        printf("In doZF: frame: %d, subcarrier: %d\n", frame_id, ca_id);
 
     cx_float* ptr_in = (cx_float *)csi_buffer_.CSI[offset].data();
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
@@ -682,6 +721,10 @@ void CoMP::doCrop(int tid, int offset)
         int csi_offset = ant_id + UE_id * BS_ANT_NUM;
         float* cur_fft_buffer_float_output = (float*)fft_buffer_.FFT_outputs[FFT_buffer_target_id];
         
+
+        if (DEBUG_PRINT)
+            printf("In doCrop: pilot: frame: %d, subframe: %d, ant: %d\n", frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+
         for(int j = 0; j < (OFDM_CA_NUM); j++)
         {
             // divide fft output by pilot data to get CSI estimation
@@ -716,6 +759,11 @@ void CoMP::doCrop(int tid, int offset)
         int data_subframe_id = subframe_id - UE_NUM;
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + data_subframe_id;
         
+
+        if (DEBUG_PRINT)
+            printf("In doCrop: data: frame: %d, subframe: %d, ant: %d\n", frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+
+
         /* //naive transpose
         for(int j = 0; j < OFDM_CA_NUM; j++)
         {

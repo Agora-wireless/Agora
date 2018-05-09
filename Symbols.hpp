@@ -18,6 +18,9 @@
 #define TASK_ZF 1
 #define TASK_DEMUL 2
 
+#define DEBUG_PRINT 0
+#define DEBUG_PRINT_TASK_DONE 1
+
 
 static const int subframe_num_perframe = 40;
 static const int pilot_subframe_num_perframe = UE_NUM;
