@@ -74,7 +74,7 @@ struct DemulBuffer
 struct DemulBuffer2
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
-    std::vector<std::vector<int>> data;
+    std::vector<std::vector<long long>> data;
 };
 
 

@@ -94,6 +94,10 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         printf("stitch main thread to core %d failed\n", core_offset);
         exit(0);
     }
+    else
+    {
+        printf("stitch main thread to core %d succeeded\n", core_offset);
+    }
 #endif
 
     // create send threads
@@ -103,17 +107,18 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
     while(true)
     {
         pthread_mutex_lock( &lock_ );
-        if(buffer_len_ == max_length_) // full
+        if(buffer_len_ == max_length_-1) // full
         {
             pthread_mutex_unlock( &lock_ );
             // wait some time
             //for(int p = 0; p < 1e4; p++)
             //    rand();
-            //printf("buffer full\n");
+            // printf("buffer full, buffer length: %d\n", buffer_len_);
             continue;
         }
         else // not full
         {
+            // printf("buffer_len_: %d\n", buffer_len_);
             buffer_len_ ++;  // take the place first
         }
         pthread_mutex_unlock( &lock_ );
@@ -131,6 +136,11 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
             printf("send message enqueue failed\n");
             exit(0);
         }
+
+        // if (DEBUG_SENDER) 
+        // {
+        //     printf("Enqueue for frame %d, subframe %d, ant %d, buffer %d\n", frame_id, subframe_id, ant_id,buffer_len_);
+        // }
 
         cur_ptr_ = (cur_ptr_ + 1) % max_length_;
         ant_id++;
@@ -183,6 +193,10 @@ void* PackageSender::loopSend(void *in_context)
         printf("stitch thread %d to core %d failed\n", tid, obj_ptr->core_offset + 1 + tid);
         exit(0);
     }
+    else
+    {
+        printf("stitch thread %d to core %d succeeded\n", tid, obj_ptr->core_offset + 1 + tid);
+    }
 #endif
 
     auto begin = std::chrono::system_clock::now();
@@ -210,8 +224,20 @@ void* PackageSender::loopSend(void *in_context)
             perror("socket sendto failed");
             exit(0);
         }
+
+        if (DEBUG_SENDER) 
+        {
+            int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr].data();
+            printf("Transmit frame %d, subframe %d, ant %d\n", *ptr, *(ptr+1), *(ptr+3));
+        }
         
         package_count++;
+
+        if (package_count % (BS_ANT_NUM) == 0)
+        {
+            usleep(71);
+        }
+
         if(package_count == (int)1e5)
         {
             auto end = std::chrono::system_clock::now();
