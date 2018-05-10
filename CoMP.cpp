@@ -86,6 +86,10 @@ CoMP::CoMP()
     memset(data_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
     memset(precoder_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
     memset(precoder_status_, 0, sizeof(bool) * TASK_BUFFER_FRAME_NUM); 
+
+    memset(demul_status_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
+    memset(cropper_created_checker_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+
     for(int i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
     {
         memset(demul_checker_[i], 0, sizeof(int) * (subframe_num_perframe - UE_NUM));
@@ -148,6 +152,8 @@ void CoMP::start()
     // for task_queue, main thread is producer, it is single-procuder & multiple consumer
     // for task queue
     moodycamel::ProducerToken ptok(task_queue_);
+    moodycamel::ProducerToken ptok_zf(zf_queue_);
+    moodycamel::ProducerToken ptok_demul(demul_queue_);
     // for message_queue, main thread is a comsumer, it is multiple producers
     // & single consumer for message_queue
     moodycamel::ConsumerToken ctok(message_queue_);
@@ -189,6 +195,30 @@ void CoMP::start()
                 Event_data do_crop_task;
                 do_crop_task.event_type = TASK_CROP;
                 do_crop_task.data = offset;
+
+                if (DEBUG_PRINT_ENTER_QUEUE_FFT) 
+                {
+                    int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+                    int buffer_id = offset / buffer_frame_num;
+                    offset = offset - buffer_id * buffer_frame_num;
+                    // read info of one frame
+                    char* cur_ptr_buffer = socket_buffer_[buffer_id].buffer.data() + offset * PackageReceiver::package_length;
+                    int ant_id, frame_id, subframe_id, cell_id;
+                    frame_id = *((int *)cur_ptr_buffer);
+                    subframe_id = *((int *)cur_ptr_buffer + 1);
+                    cell_id = *((int *)cur_ptr_buffer + 2);
+                    ant_id = *((int *)cur_ptr_buffer + 3);
+                    int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM) * subframe_num_perframe + subframe_id;
+                    cropper_created_checker_[cropper_created_checker_id] ++;
+                    // printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+                    if (cropper_created_checker_[cropper_created_checker_id] == BS_ANT_NUM) 
+                    {
+                        printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id);
+                        cropper_created_checker_[cropper_created_checker_id] = 0;
+                    }
+
+                }
+                                
                 if ( !task_queue_.try_enqueue(ptok, do_crop_task ) ) {
                     printf("need more memory\n");
                     if ( !task_queue_.enqueue(ptok, do_crop_task ) ) {
@@ -214,7 +244,9 @@ void CoMP::start()
                 if(cropper_checker_[cropper_checker_id] == BS_ANT_NUM) // this sub-frame is finished
                 {
                     //printf("subframe %d, frame %d\n", subframe_id, frame_id);
-                    
+                    if (DEBUG_PRINT_TASK_DONE)
+                        printf("Main thread: finished FFT for frame: %d, subframe: %d\n", frame_id, subframe_id);
+
                     cropper_checker_[cropper_checker_id] = 0; // this subframe is finished
                     // if this subframe is pilot part
                     if(isPilot(subframe_id))
@@ -235,14 +267,17 @@ void CoMP::start()
                             
                             Event_data do_ZF_task;
                             do_ZF_task.event_type = TASK_ZF;
+                            if (DEBUG_PRINT_ENTER_QUEUE) 
+                                printf("Main thread: created ZF tasks for frame: %d\n", frame_id);
+
                             // add ZF tasks for each sub-carrier
                             for(int i = 0; i < OFDM_CA_NUM; i++)
                             {
                                 int csi_offset_id = frame_id * OFDM_CA_NUM + i;
                                 do_ZF_task.data = csi_offset_id;
-                                if ( !task_queue_.try_enqueue(ptok, do_ZF_task ) ) {
+                                if ( !zf_queue_.try_enqueue(ptok_zf, do_ZF_task ) ) {
                                     printf("need more memory\n");
-                                    if ( !task_queue_.enqueue(ptok, do_ZF_task ) ) {
+                                    if ( !zf_queue_.enqueue(ptok_zf, do_ZF_task ) ) {
                                         printf("ZF task enqueue failed\n");
                                         exit(0);
                                     }
@@ -254,39 +289,38 @@ void CoMP::start()
                     {
                         // if this subframe is data part
                         int data_checker_id = frame_id;
-                        if (DEBUG_PRINT)
-                            printf("Main thread: data frame id: %d, subframe_id: %d\n", data_checker_id,subframe_id);
+                        int data_subframe_id = subframe_id-UE_NUM;
+                        Event_data do_demul_task;
+                        do_demul_task.event_type = TASK_DEMUL;
+
+                        if (DEBUG_PRINT_ENTER_QUEUE)
+                            printf("Main thread: created demodulation task for frame: %d, subframe: %d\n", data_checker_id,subframe_id);
                         data_checker_[data_checker_id] ++;
+
+                        for(int i = 0; i < OFDM_CA_NUM / demul_block_size; i++)
+                        {
+                            int demul_offset_id = frame_id * OFDM_CA_NUM * data_subframe_num_perframe
+                                + data_subframe_id * OFDM_CA_NUM + i * demul_block_size;
+                            do_demul_task.data = demul_offset_id;
+                            if ( !demul_queue_.try_enqueue(ptok_demul, do_demul_task ) ) {
+                                printf("need more memory\n");
+                                if ( !demul_queue_.enqueue(ptok_demul, do_demul_task ) ) {
+                                    printf("Demultiplexing task enqueue failed\n");
+                                    exit(0);
+                                }
+                            }
+                        }
+
+
                         if(data_checker_[data_checker_id] == data_subframe_num_perframe)
                         {
                             // if all data part is ready. TODO: optimize the
                             // logic, do deMul when CSI is ready, do not wait
                             // the entire frame is ready
                             
-                            //printf("do demul for frame %d\n", frame_id);
-                            //printf("frame %d data received\n", frame_id);
-                            if (DEBUG_PRINT)
-                                printf("Main thread: data frame: %d, finished collecting data frames: %d\n", data_checker_id,subframe_id);
+                            if (DEBUG_PRINT_SUMMARY)
+                                printf("Main thread: frame: %d, finished collecting data frames: %d\n", frame_id,subframe_id);
                             data_checker_[data_checker_id] = 0;
-                            Event_data do_demul_task;
-                            do_demul_task.event_type = TASK_DEMUL;
-                            // add deMul tasks
-                            for(int j = 0; j < data_subframe_num_perframe; j++)
-                            {
-                                for(int i = 0; i < OFDM_CA_NUM / demul_block_size; i++)
-                                {
-                                    int demul_offset_id = frame_id * OFDM_CA_NUM * data_subframe_num_perframe
-                                        + j * OFDM_CA_NUM + i * demul_block_size;
-                                    do_demul_task.data = demul_offset_id;
-                                    if ( !task_queue_.try_enqueue(ptok, do_demul_task ) ) {
-                                        printf("need more memory\n");
-                                        if ( !task_queue_.enqueue(ptok, do_demul_task ) ) {
-                                            printf("Demultiplexing task enqueue failed\n");
-                                            exit(0);
-                                        }
-                                    }
-                                }
-                            }
                         }     
                     }
                 }
@@ -299,12 +333,13 @@ void CoMP::start()
                 int ca_id = offset_zf % OFDM_CA_NUM;
                 int frame_id = (offset_zf - ca_id) / OFDM_CA_NUM;
 
-                if (DEBUG_PRINT_TASK_DONE) 
-                    printf("Main thread: ZF done frame: %d, subcarrier: %d\n", frame_id,ca_id);
+                
 
                 precoder_checker_[frame_id] ++;
                 if(precoder_checker_[frame_id] == OFDM_CA_NUM)
                 {
+                    if (DEBUG_PRINT_TASK_DONE || DEBUG_PRINT_SUMMARY) 
+                        printf("Main thread: ZF done frame: %d\n", frame_id);
                     precoder_checker_[frame_id] = 0;
                     //TODO: this flag can be used to optimize deDemul logic
                     precoder_status_[frame_id] = true;
@@ -319,31 +354,39 @@ void CoMP::start()
                 int data_subframe_id = offset_without_ca % (subframe_num_perframe - UE_NUM);
                 int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
 
-                if (DEBUG_PRINT_TASK_DONE) 
-                    printf("Main thread: Demodulation done frame: %d, subframe: %d, subcarrier: %d\n", frame_id, data_subframe_id, ca_id);
-
+                
                 demul_checker_[frame_id][data_subframe_id] += demul_block_size;
                 // if this subframe is ready
                 if(demul_checker_[frame_id][data_subframe_id] == OFDM_CA_NUM)
                 {
+                    if (DEBUG_PRINT_TASK_DONE) 
+                        printf("Main thread: Demodulation done frame: %d, subframe: %d\n", frame_id, data_subframe_id);
+
                     demul_checker_[frame_id][data_subframe_id] = 0;
-                    /*
-                    // debug
-                    if(frame_id == 4 && data_subframe_id == 4)
+                    demul_status_[frame_id]++;
+                    if (demul_status_[frame_id]==data_subframe_num_perframe) 
                     {
-                        printf("save demul data\n");
-                        FILE* fp = fopen("ver_data.txt","w");
+                        if (DEBUG_PRINT_SUMMARY) 
+                        {
+                            printf("Main thread: Demodulation done frame: %d \n", frame_id);
+                        }
+                        demul_status_[frame_id] = 0;
+                    }
+
+                    if (WRITE_DEMUL) 
+                    {
+                        FILE* fp = fopen("demul_data.txt","a");
                         for(int cc = 0; cc < OFDM_CA_NUM; cc++)
                         {
-                            complex_float* cx = &demul_buffer_.data[offset_without_ca][cc * UE_NUM];
+                            long long* cx = &demul_buffer2_.data[offset_without_ca][cc * UE_NUM];
+                            fprintf(fp, "SC: %d, Frame %d, subframe: %d, ", cc, frame_id, data_subframe_id);
                             for(int kk = 0; kk < UE_NUM; kk++)  
-                                fprintf(fp, "%f %f\n", cx[kk].real, cx[kk].imag);
+                                fprintf(fp, "%d ", cx[kk]);
+                            fprintf(fp, "\n");
                         }
                         fclose(fp);
-                        exit(0);
                     }
-                    */
-
+                    
                     demul_count += 1;
                     // print log per 100 frames
                     if(demul_count == data_subframe_num_perframe * 100)
@@ -370,6 +413,8 @@ void* CoMP::taskThread(void* context)
     
     CoMP* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_ = &(obj_ptr->task_queue_);
+    moodycamel::ConcurrentQueue<Event_data>* zf_queue_ = &(obj_ptr->zf_queue_);
+    moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
     int tid = ((EventHandlerContext *)context)->id;
     printf("task thread %d starts\n", tid);
     
@@ -397,37 +442,55 @@ void* CoMP::taskThread(void* context)
     int miss_count = 0;
     Event_data event;
     bool ret = false;
+    bool ret_zf = false;
+    bool ret_demul = false;
     while(true)
     {
-        ret = task_queue_->try_dequeue(event);
-        if(tid == 0)
-            total_count++;
-        if(tid == 0 && total_count == 1e6)
-        {
-            // print the task queue miss rate if required
-            //printf("thread 0 task dequeue miss rate %f, queue length %d\n", (float)miss_count / total_count, task_queue_->size_approx());
-            total_count = 0;
-            miss_count = 0;
-        }
-        if(!ret)
-        {
-            if(tid == 0)
-                miss_count++;
-            continue;
-        }
 
-        // do different tasks according to task type
-        if(event.event_type == TASK_CROP)
-        {   
-            obj_ptr->doCrop(tid, event.data);
+        ret_zf = false;
+        ret_demul = false;
+        ret = false;
+
+        ret_zf = zf_queue_->try_dequeue(event);
+        if(!ret_zf) 
+        {
+            ret_demul = demul_queue_->try_dequeue(event);
+            if (!ret_demul)
+            {   
+                ret = task_queue_->try_dequeue(event);
+                if (!ret)
+                {
+                    continue;
+                }
+                else if (event.event_type == TASK_CROP)
+                {
+                    // printf("ZF: %d, Demul: %d, FFT: %d\n", ret_zf,ret_demul,ret);
+                    obj_ptr->doCrop(tid, event.data);
+                }
+                else 
+                {
+                    printf("Event type error\n");
+                    exit(0);
+                }
+            }
+            else if (event.event_type == TASK_DEMUL) // TODO: add precoder status check
+            {
+                obj_ptr->doDemul(tid, event.data);
+            }
+            else
+            {
+                printf("Event type error\n");
+                exit(0);
+            }
         }
         else if(event.event_type == TASK_ZF)
         {
             obj_ptr->doZF(tid, event.data);
         }
-        else if(event.event_type == TASK_DEMUL)
+        else
         {
-            obj_ptr->doDemul(tid, event.data);
+            printf("Event type error\n");
+            exit(0);
         }
         
     }
@@ -513,8 +576,13 @@ void CoMP::doDemul(int tid, int offset)
     // frame_id = frame_id
     int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
 
-    if (DEBUG_PRINT)
-        printf("In doDemul: frame: %d, subframe: %d, subcarrier: %d \n", frame_id,data_subframe_id,ca_id);
+    // if (!precoder_status_[frame_id]) {
+    //     printf("Precoder is not avaiable for frame %d\n", frame_id);
+    //     return;
+    // }
+
+    if (DEBUG_PRINT_IN_TASK)
+        printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id,data_subframe_id,ca_id);
 
     //printf("do demul, %d %d %d\n", frame_id, data_subframe_id, ca_id);
     // see the slides for more details
@@ -572,34 +640,6 @@ void CoMP::doDemul(int tid, int offset)
         // calculate mat_demuled for i-th subcarrier in the n-th block
         mat_demuled = mat_precoder * mat_data;
 
-/*
-        //debug
-        if(ca_id == 640 && i == 9 && frame_id == 4 && data_subframe_id == 0)
-        {
-            printf("thread %d, save mat precoder\n", tid);
-            FILE* fp_debug = fopen("tmpPrecoder.txt", "w");
-            for(int i = 0; i < UE_NUM; i++)
-            {
-                for(int j = 0; j < BS_ANT_NUM; j++)
-                    fprintf(fp_debug, "%f %f ", mat_precoder.at(i,j).real(), mat_precoder.at(i,j).imag());
-                fprintf(fp_debug, "\n" );
-            }
-            fclose(fp_debug);
-
-            fp_debug = fopen("tmpData.txt","w");
-            for(int i = 0; i < BS_ANT_NUM; i++)
-                fprintf(fp_debug, "%f %f\n", mat_data.at(i,0).real(), mat_data.at(i,0).imag());
-            fclose(fp_debug);
-
-            fp_debug = fopen("tmpDemul.txt","w");
-            for(int i = 0; i < UE_NUM; i++)
-                fprintf(fp_debug, "%f %f\n", mat_demuled.at(i,0).real(), mat_demuled.at(i,0).imag());
-            fclose(fp_debug);
-            
-            exit(0);
-
-        }
-*/
 
         // Demodulation
         // int* demul_ptr2 = (int *)(&demul_buffer2_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
@@ -609,29 +649,30 @@ void CoMP::doDemul(int tid, int offset)
         // {
         //     *demul_ptr2+ue_idx=demod_16qam((complex_float)mat_demuled[ue_idx]);
         // }
-        int* demul_ptr2 = (int *)(&demul_buffer2_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
-        imat  mat_demuled2 = zeros<imat>(UE_NUM,1);
+        sword* demul_ptr2 = (sword *)(&demul_buffer2_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
+        imat mat_demuled2(demul_ptr2, UE_NUM, 1, false);
+        // imat  mat_demuled2 = zeros<imat>(UE_NUM,1);
         
         mat_demuled2 = demod_16qam(mat_demuled);
         // cout << "Frame: "<< frame_id<<", subframe: "<< data_subframe_id<<", SC: " << ca_id+i << ", data: " << mat_demuled2.st() << endl;
 
-        if (frame_id==0) 
-        {
-            FILE* fp_debug = fopen("tmpresult.txt", "a");
-            if (fp_debug==NULL) {
-                printf("open file faild");
-                std::cerr << "Error: " << strerror(errno) << std::endl;
-                exit(0);
-            }
-            for(int ii = 0; ii < UE_NUM; ii++)
-            {
-                // printf("User %d: %d, ", ii,mat_demuled2(ii));
-                fprintf(fp_debug, "%d\n", mat_demuled2(ii));
-            }
-            // printf("\n");
-            // fwrite(mat_demuled2.memptr(), sizeof(int),sizeof(mat_demuled), fp_debug);
-            fclose(fp_debug);
-        }
+        // if (frame_id==0) 
+        // {
+        //     FILE* fp_debug = fopen("tmpresult.txt", "a");
+        //     if (fp_debug==NULL) {
+        //         printf("open file faild");
+        //         std::cerr << "Error: " << strerror(errno) << std::endl;
+        //         exit(0);
+        //     }
+        //     for(int ii = 0; ii < UE_NUM; ii++)
+        //     {
+        //         // printf("User %d: %d, ", ii,demul_ptr2(ii));
+        //         fprintf(fp_debug, "%d\n", mat_demuled2(ii));
+        //     }
+        //     // printf("\n");
+        //     // fwrite(mat_demuled2.memptr(), sizeof(int),sizeof(mat_demuled), fp_debug);
+        //     fclose(fp_debug);
+        // }
 
 
     }
@@ -655,8 +696,8 @@ void CoMP::doZF(int tid, int offset)
 
     int ca_id = offset % OFDM_CA_NUM;
     int frame_id = (offset - ca_id) / OFDM_CA_NUM;
-    if (DEBUG_PRINT)
-        printf("In doZF: frame: %d, subcarrier: %d\n", frame_id, ca_id);
+    if (DEBUG_PRINT_IN_TASK)
+        printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, ca_id);
 
     cx_float* ptr_in = (cx_float *)csi_buffer_.CSI[offset].data();
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
@@ -722,8 +763,8 @@ void CoMP::doCrop(int tid, int offset)
         float* cur_fft_buffer_float_output = (float*)fft_buffer_.FFT_outputs[FFT_buffer_target_id];
         
 
-        if (DEBUG_PRINT)
-            printf("In doCrop: pilot: frame: %d, subframe: %d, ant: %d\n", frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+        if (DEBUG_PRINT_IN_TASK)
+            printf("In doCrop thread %d: pilot: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 
         for(int j = 0; j < (OFDM_CA_NUM); j++)
         {
@@ -760,8 +801,8 @@ void CoMP::doCrop(int tid, int offset)
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + data_subframe_id;
         
 
-        if (DEBUG_PRINT)
-            printf("In doCrop: data: frame: %d, subframe: %d, ant: %d\n", frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+        if (DEBUG_PRINT_IN_TASK)
+            printf("In doCrop thread %d: data: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 
 
         /* //naive transpose

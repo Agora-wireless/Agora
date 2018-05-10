@@ -19,7 +19,14 @@
 #define TASK_DEMUL 2
 
 #define DEBUG_PRINT 0
+#define DEBUG_PRINT_SUMMARY 1
+#define DEBUG_PRINT_ENTER_QUEUE 0
+#define DEBUG_PRINT_ENTER_QUEUE_FFT 0
+#define DEBUG_PRINT_IN_TASK 0
 #define DEBUG_PRINT_TASK_DONE 1
+#define DEBUG_SENDER 0
+#define DEBUG_RECV 0
+#define WRITE_DEMUL 0
 
 
 static const int subframe_num_perframe = 40;

@@ -127,6 +127,10 @@ private:
     moodycamel::ConcurrentQueue<Event_data> task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     
+
+    moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+
     pthread_t task_threads[TASK_THREAD_NUM];
 
     EventHandlerContext context[TASK_THREAD_NUM];
@@ -139,7 +143,10 @@ private:
     int precoder_checker_[TASK_BUFFER_FRAME_NUM];
     bool precoder_status_[TASK_BUFFER_FRAME_NUM];
 
+    int cropper_created_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
+
     int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int demul_status_[TASK_BUFFER_FRAME_NUM];
 
     std::queue<std::tuple<int, int>> taskWaitList;
 
