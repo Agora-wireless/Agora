@@ -235,7 +235,7 @@ void* PackageSender::loopSend(void *in_context)
 
         if (package_count % (BS_ANT_NUM) == 0)
         {
-            usleep(71);
+            usleep(142);
         }
 
         if(package_count == (int)1e5)
