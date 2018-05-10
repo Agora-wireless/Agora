@@ -233,10 +233,10 @@ void* PackageSender::loopSend(void *in_context)
         
         package_count++;
 
-        if (package_count % (BS_ANT_NUM) == 0)
-        {
-            usleep(142);
-        }
+        // if (package_count % (BS_ANT_NUM) == 0)
+        // {
+        //     usleep(10);
+        // }
 
         if(package_count == (int)1e5)
         {
