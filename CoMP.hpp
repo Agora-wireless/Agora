@@ -160,6 +160,7 @@ private:
     // Second dimension: BS_ANT_NUM
     myVec spm_buffer[TASK_THREAD_NUM];
 
+
 };
 
 #endif

@@ -533,7 +533,7 @@ inline complex_float CoMP::divide(complex_float e1, complex_float e2)
 }
 
 
-inline imat CoMP::demod_16qam(arma::cx_fmat x)
+inline imat CoMP::demod_16qam(cx_fmat x)
 {
     imat re;
     mat zero_mat = zeros<mat>(size(x));
