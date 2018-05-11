@@ -468,8 +468,8 @@ void* CoMP::taskThread(void* context)
 #ifdef ENABLE_CPU_ATTACH
     int offset_id = SOCKET_THREAD_NUM + 1;
     int tar_core_id = tid + offset_id;
-    // if(tar_core_id >= 18)
-    //     tar_core_id = (tar_core_id - 18) + 36;
+    if(tar_core_id >= 18)
+        tar_core_id = (tar_core_id - 18) + 36;
     if(stick_this_thread_to_core(tar_core_id) != 0)
     {
         printf("Task thread: stitch thread %d to core %d failed\n", tid, tar_core_id);

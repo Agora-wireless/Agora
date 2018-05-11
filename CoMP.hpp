@@ -31,8 +31,8 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = 2;
-    static const int SOCKET_THREAD_NUM = 1;
+    static const int TASK_THREAD_NUM = 28;
+    static const int SOCKET_THREAD_NUM = 7;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
     // * subframe_num_perframe * BS_ANT_NUM
