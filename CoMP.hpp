@@ -58,6 +58,7 @@ public:
     void doCrop(int tid, int offset);
     void doZF(int tid, int offset);
     void doDemul(int tid, int offset);
+    void doPred(int tid, int offset);
 
     struct EventHandlerContext
     {
@@ -119,6 +120,12 @@ private:
     // First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
     // Second dimension: OFDM_CA_NUM * UE_NUM
     DemulBuffer2 demul_buffer2_;
+
+
+    // Predicted CSI data 
+    // First dimension: OFDM_CA_NUM 
+    // Second dimension: BS_ANT_NUM * UE_NUM
+    CSIBuffer pred_csi_buffer_;
 
     std::vector<float> pilots_;
 

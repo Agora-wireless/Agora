@@ -39,6 +39,14 @@ CoMP::CoMP()
         csi_buffer_.CSI[i].resize(BS_ANT_NUM * UE_NUM);
     // printf("CSI buffer initialized\n");
 
+
+    if (DO_PREDICTION) 
+    {
+        pred_csi_buffer_.CSI.resize(OFDM_CA_NUM);
+        for(int i = 0; i < csi_buffer_.CSI.size(); i++)
+            pred_csi_buffer_.CSI[i].resize(BS_ANT_NUM * UE_NUM);
+    }
+
     // initialize data buffer
     data_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
     for(int i = 0; i < data_buffer_.data.size(); i++)
@@ -163,6 +171,8 @@ void CoMP::start()
     auto demul_begin = std::chrono::system_clock::now();
     int miss_count = 0;
     int total_count = 0;
+    int frame_count = 0;
+
 
     Event_data events_list[dequeue_bulk_size];
     int ret = 0;
@@ -251,37 +261,72 @@ void CoMP::start()
                     // if this subframe is pilot part
                     if(isPilot(subframe_id))
                     {   
-                        // check if csi of all UEs are ready
+                        
                         int csi_checker_id = frame_id;
                         if (DEBUG_PRINT)
                             printf("Main thread: pilot frame id: %d, subframe_id: %d\n", csi_checker_id,subframe_id);
                         csi_checker_[csi_checker_id] ++;
+
+                        // check if csi of all UEs are ready
                         if(csi_checker_[csi_checker_id] == UE_NUM)
                         {
-                            if (DEBUG_PRINT)
-                                printf("Main thread: pilot frame: %d, finished collecting pilot frames: %d\n", csi_checker_id,subframe_id);
-                            // if CSI from all UEs are ready, do ZF
-                            csi_checker_[csi_checker_id] = 0;
-                            //if(frame_id == 4)
-                            //    printf("Frame %d, csi ready, assign ZF\n", frame_id);
-                            
-                            Event_data do_ZF_task;
-                            do_ZF_task.event_type = TASK_ZF;
-                            if (DEBUG_PRINT_ENTER_QUEUE) 
-                                printf("Main thread: created ZF tasks for frame: %d\n", frame_id);
+                            csi_checker_[csi_checker_id] = 0; 
+                            if (DEBUG_PRINT_SUMMARY)
+                                printf("Main thread: pilot frame: %d, finished collecting pilot frames\n", csi_checker_id);
 
-                            // add ZF tasks for each sub-carrier
-                            for(int i = 0; i < OFDM_CA_NUM; i++)
-                            {
-                                int csi_offset_id = frame_id * OFDM_CA_NUM + i;
-                                do_ZF_task.data = csi_offset_id;
-                                if ( !zf_queue_.try_enqueue(ptok_zf, do_ZF_task ) ) {
-                                    printf("need more memory\n");
-                                    if ( !zf_queue_.enqueue(ptok_zf, do_ZF_task ) ) {
-                                        printf("ZF task enqueue failed\n");
-                                        exit(0);
+                            frame_count ++;
+                            if (frame_count<=INIT_FRAME_NUM || !DO_PREDICTION) {
+                                // do normal scheduling when traning data is not enough or prediction is not enabled
+                                // if CSI from all UEs are ready, do ZF
+                                                           
+                                Event_data do_ZF_task;
+                                do_ZF_task.event_type = TASK_ZF;
+                                if (DEBUG_PRINT_ENTER_QUEUE) 
+                                    printf("Main thread: created ZF tasks for frame: %d\n", frame_id);
+
+                                // add ZF tasks for each sub-carrier
+                                for(int i = 0; i < OFDM_CA_NUM; i++)
+                                {
+                                    int csi_offset_id = frame_id * OFDM_CA_NUM + i;
+                                    do_ZF_task.data = csi_offset_id;
+                                    if ( !zf_queue_.try_enqueue(ptok_zf, do_ZF_task ) ) {
+                                        printf("need more memory\n");
+                                        if ( !zf_queue_.enqueue(ptok_zf, do_ZF_task ) ) {
+                                            printf("ZF task enqueue failed\n");
+                                            exit(0);
+                                        }
                                     }
                                 }
+                            }
+                            if (frame_count>=INIT_FRAME_NUM && DO_PREDICTION)
+                            {
+                                // do prediction
+                                // when frame count equals to INIT_FRAME_NUM, do both prediction and ZF
+                                Event_data do_pred_task;
+                                do_pred_task.event_type = TASK_PRED;
+                                if (DEBUG_PRINT_ENTER_QUEUE) 
+                                    printf("Main thread: created Prediction tasks for frame: %d\n", frame_id);
+
+                                // add prediction tasks for each sub-carrier
+                                for(int i = 0; i < OFDM_CA_NUM; i++)
+                                {
+                                    int csi_offset_id = frame_id * OFDM_CA_NUM + i;
+                                    do_pred_task.data = csi_offset_id;
+                                    if ( !zf_queue_.try_enqueue(ptok_zf, do_pred_task ) ) {
+                                        printf("need more memory\n");
+                                        if ( !zf_queue_.enqueue(ptok_zf, do_pred_task ) ) {
+                                            printf("Prediction task enqueue failed\n");
+                                            exit(0);
+                                        }
+                                    }
+                                }
+
+                            }
+
+
+                            if (frame_count==MAX_FRAME_ID) 
+                            {
+                                frame_count=0;
                             }
                         }
                     }
@@ -293,8 +338,8 @@ void CoMP::start()
                         Event_data do_demul_task;
                         do_demul_task.event_type = TASK_DEMUL;
 
-                        if (DEBUG_PRINT_ENTER_QUEUE)
-                            printf("Main thread: created demodulation task for frame: %d, subframe: %d\n", data_checker_id,subframe_id);
+                        if (DEBUG_PRINT_ENTER_QUEUE_DEMUL)
+                            printf("Main thread: created Demodulation task for frame: %d, subframe: %d\n", data_checker_id,subframe_id);
                         data_checker_[data_checker_id] ++;
 
                         for(int i = 0; i < OFDM_CA_NUM / demul_block_size; i++)
@@ -319,7 +364,7 @@ void CoMP::start()
                             // the entire frame is ready
                             
                             if (DEBUG_PRINT_SUMMARY)
-                                printf("Main thread: frame: %d, finished collecting data frames: %d\n", frame_id,subframe_id);
+                                printf("Main thread: frame: %d, finished collecting data frames\n", frame_id);
                             data_checker_[data_checker_id] = 0;
                         }     
                     }
@@ -483,9 +528,13 @@ void* CoMP::taskThread(void* context)
                 exit(0);
             }
         }
-        else if(event.event_type == TASK_ZF)
+        else if (event.event_type == TASK_ZF)
         {
             obj_ptr->doZF(tid, event.data);
+        }
+        else if (event.event_type == TASK_PRED)
+        {
+            obj_ptr->doPred(tid, event.data);
         }
         else
         {
@@ -714,6 +763,33 @@ void CoMP::doZF(int tid, int offset)
 
     if ( !message_queue_.enqueue(*task_ptok[tid], ZF_finish_event ) ) {
         printf("ZF message enqueue failed\n");
+        exit(0);
+    }
+}
+
+
+//do Prediction
+void CoMP::doPred(int tid, int offset) 
+{
+    int ca_id = offset % OFDM_CA_NUM;
+    int frame_id = (offset - ca_id) / OFDM_CA_NUM;
+    int offset_next_frame = ((frame_id+1)%TASK_BUFFER_FRAME_NUM)*OFDM_CA_NUM+ca_id;
+    // Use stale CSI as predicted CSI
+    // TODO: add prediction algorithm
+    cx_float* ptr_in = (cx_float *)pred_csi_buffer_.CSI[ca_id].data();
+    memcpy(ptr_in, (cx_float *)csi_buffer_.CSI[offset].data(), sizeof(cx_float)*BS_ANT_NUM*UE_NUM);
+    cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
+    cx_float* ptr_out = (cx_float *)precoder_buffer_.precoder[offset_next_frame].data();
+    cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
+    pinv(mat_output, mat_input, 1e-1, "dc");
+
+    // inform main thread
+    Event_data pred_finish_event;
+    pred_finish_event.event_type = EVENT_ZF;
+    pred_finish_event.data = offset_next_frame;
+
+    if ( !message_queue_.enqueue(*task_ptok[tid], pred_finish_event ) ) {
+        printf("Prediction message enqueue failed\n");
         exit(0);
     }
 }
