@@ -26,6 +26,24 @@ PackageReceiver::PackageReceiver(int N_THREAD)
         int optval = 1;
         setsockopt(socket_[i], SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
 
+        int sock_buf_size = 1024*1024*64*8;
+        if (setsockopt(socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
+        {
+            printf("Error setting buffer size to %d\n", sock_buf_size);
+        }
+
+        // int readValue = 0;
+        // unsigned int readLen = sizeof(readValue);
+        // int res = getsockopt( socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&readValue, &readLen );
+        // if ( -1 == res )
+        // {
+        //     printf("ERROR reading socket buffer size\n");
+        // }
+        // else
+        // {
+        //     printf("Read socket buffer size:%d\n",readValue);
+        // }
+
         if(bind(socket_[i], (struct sockaddr *) &servaddr_, sizeof(servaddr_)) != 0)
         {
             printf("socket bind failed %d\n", i);
