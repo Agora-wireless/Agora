@@ -26,7 +26,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
             exit(0);
         }
         else{
-            printf("Created socket: %d\n",socket_num);
+            printf("Created socket: %d\n",i);
         }
 
         /*Bind socket with address struct*/
@@ -107,7 +107,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
     while(true)
     {
         pthread_mutex_lock( &lock_ );
-        if(buffer_len_ == max_length_-1) // full
+        if(buffer_len_ == max_length_-10) // full
         {
             pthread_mutex_unlock( &lock_ );
             // wait some time
@@ -235,7 +235,7 @@ void* PackageSender::loopSend(void *in_context)
 
         // if (package_count % (BS_ANT_NUM) == 0)
         // {
-        //     usleep(10);
+        //     usleep(71);
         // }
 
         if(package_count == (int)1e5)
