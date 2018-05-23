@@ -1,13 +1,29 @@
 # CoMP
-Mac version of CoMP
 
 ## Instruction:
 
-1. Compile
-* mkdir build
-* cd build
-* cmake ..
-* make -j36 (36 is the number of cores, on the server it can be 36)
+1. Installation
+
+Required packages LAPACK, BLAS, Boost, Armadillo, Doxygen
+
+	sudo apt-get install liblapack-dev, libblas-dev, libboost-all-dev
+	sudo apt-get install libarmadillo-dev
+	sudo apt-get install doxygen
+
+Install muFFT:
+
+	git clone https://github.com/Themaister/muFFT.git
+	cd muFFT
+	make
+	sudo make install
+
+Compile CoMP:
+
+	cd CoMP
+	mkdir build
+	cd build
+	cmake ..
+	make -j36 (36 is the number of cores, on the server it can be 36)
 
 2. Run
 * In one terminal, run "./CoMP" to start the receiver
