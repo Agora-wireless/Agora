@@ -14,7 +14,7 @@ add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)
 target_link_libraries(receiver -lpthread )
 
 
-add_executable(CoMP main.cpp packageReceiver.cpp CoMP.cpp cpu_attach.cpp)
+add_executable(CoMP main.cpp packageReceiver.cpp packageSenderBS.cpp CoMP.cpp cpu_attach.cpp)
 target_link_libraries(CoMP -lpthread /usr/local/lib/libmufft.a -larmadillo )
 
 

@@ -65,13 +65,13 @@ struct PrecoderBuffer
     std::vector<myVec> precoder;
 };
 
-struct DemulBuffer
+struct EqualBuffer
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
     std::vector<myVec> data;
 };
 
-struct DemulBuffer2
+struct DemulBuffer
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
     std::vector<std::vector<long long>> data;

@@ -8,6 +8,7 @@
 #define COMP_HEAD
 
 #include "packageReceiver.hpp"
+#include "packageSenderBS.hpp"
 #include <unistd.h>
 #include <memory>
 #include <iostream>
@@ -31,8 +32,9 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = 28;
-    static const int SOCKET_THREAD_NUM = 7;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 27 : 28;
+    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 7;
+    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
     // * subframe_num_perframe * BS_ANT_NUM
@@ -55,10 +57,16 @@ public:
     // while loop of task thread
     static void* taskThread(void* context);
     // do different tasks
+    // Uplink
     void doCrop(int tid, int offset);
     void doZF(int tid, int offset);
     void doDemul(int tid, int offset);
     void doPred(int tid, int offset);
+
+    // Downlink
+    void do_ifft(int tid, int offset);
+    void do_precode(int tid, int offset); 
+    void do_modulation(int tid, int offset);
 
     struct EventHandlerContext
     {
@@ -79,16 +87,21 @@ public:
 
     // inline int demod_16qam(complex_float x);
     inline arma::imat demod_16qam(arma::cx_fmat x);
+    inline arma::cx_fmat mod_16qam(arma::imat x);
 
 private:
+    /**********************/
+    /* Uplink */
+    /**********************/
+    
     std::unique_ptr<PackageReceiver> receiver_;
-
+    
     // received data 
     // Frist dimension: SOCKET_THREAD_NUM
     // Second dimension of buffer (type: char): package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     // Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    SocketBuffer socket_buffer_[SOCKET_THREAD_NUM];
+    SocketBuffer socket_buffer_[SOCKET_RX_THREAD_NUM];
 
     // Data for FFT, after time sync (prefix removed)
     // First dimension: FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM
@@ -100,7 +113,7 @@ private:
     // Second dimension: BS_ANT_NUM * UE_NUM
     CSIBuffer csi_buffer_;
 
-    // Data symbols after FFT
+    // Data symbols after IFFT
     // First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
     // second dimension: BS_ANT_NUM * OFDM_CA_NUM
     // second dimension data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
@@ -114,29 +127,34 @@ private:
     // Data after equalization
     // First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
     // Second dimension: OFDM_CA_NUM * UE_NUM
-    DemulBuffer demul_buffer_;
+    EqualBuffer equal_buffer_;
 
     // Data after demudulation
     // First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
     // Second dimension: OFDM_CA_NUM * UE_NUM
-    DemulBuffer2 demul_buffer2_;
-
+    DemulBuffer demul_buffer_;
 
     // Predicted CSI data 
     // First dimension: OFDM_CA_NUM 
     // Second dimension: BS_ANT_NUM * UE_NUM
     CSIBuffer pred_csi_buffer_;
 
+
     std::vector<float> pilots_;
 
     mufft_plan_1d* muplans_[TASK_THREAD_NUM];
-   
-    moodycamel::ConcurrentQueue<Event_data> task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    
 
+
+    // Concurrent queues
+    // task queue for uplink FFT
+    moodycamel::ConcurrentQueue<Event_data> task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    // task queue for ZF
     moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    // task queue for uplink demodulation
     moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    // main thread message queue
+    moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+
 
     pthread_t task_threads[TASK_THREAD_NUM];
 
@@ -152,6 +170,7 @@ private:
 
     int cropper_created_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
 
+    // can possibly remove this checker
     int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int demul_status_[TASK_BUFFER_FRAME_NUM];
 
@@ -167,6 +186,62 @@ private:
     // Second dimension: BS_ANT_NUM
     myVec spm_buffer[TASK_THREAD_NUM];
 
+
+
+    /**********************/
+    /* Downlink */
+    /**********************/  
+
+    std::unique_ptr<packageSenderBS> transmitter_;
+
+    // Raw data
+    // First dimension: subframe_num_perframe * UE_NUM
+    // Second dimension: OFDM_FRAME_LEN 
+    int** dl_IQ_data;
+    long long** dl_IQ_data_long;
+
+    // Modulated data
+    // First dimension: subframe_num_perframe (40) * TASK_BUFFER_FRAME_NUM
+    // Second dimension: OFDM_CA_NUM * UE_NUM
+    EqualBuffer dl_modulated_buffer_;
+
+
+    // Precoded data
+    // First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+    // second dimension: BS_ANT_NUM * OFDM_CA_NUM
+    // second dimension data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
+    DataBuffer dl_precoded_data_buffer_;
+
+
+    // Data after IFFT
+    // First dimension: FFT_buffer_block_num = UE_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+    // Second dimension: OFDM_CA_NUM
+    FFTBuffer dl_ifft_buffer_;
+
+    // Data for transmission
+    // First dimension of buffer (type: char): package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+    // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+    // First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+    SocketBuffer dl_socket_buffer_;
+
+    // First dimension: TASK_THREAD_NUM
+    // Second dimension: UE_NUM
+    myVec dl_spm_buffer[TASK_THREAD_NUM];
+
+    // task queue for downlink IFFT
+    moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    // task queue for downlink modulation
+    moodycamel::ConcurrentQueue<Event_data> modulation_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    // task queue for downlink precoding
+    moodycamel::ConcurrentQueue<Event_data> precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    // task queue for downlink data transmission 
+    moodycamel::ConcurrentQueue<Event_data> tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+
+    mufft_plan_1d* muplans_ifft_[TASK_THREAD_NUM];
+
+    int modul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int ifft_checker_[TASK_BUFFER_FRAME_NUM];
+    // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
 
 };
 

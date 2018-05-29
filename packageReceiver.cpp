@@ -76,7 +76,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
-    assert(in_buffer_length == package_length * buffer_frame_num_); // should be integre
+    assert(in_buffer_length == package_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
@@ -117,11 +117,11 @@ void* PackageReceiver::loopRecv(void *in_context)
 #ifdef ENABLE_CPU_ATTACH
     if(stick_this_thread_to_core(core_id + tid) != 0)
     {
-        printf("Recv thread: stitch thread %d to core %d failed\n", tid, core_id + tid);
+        printf("RX thread: stitch thread %d to core %d failed\n", tid, core_id + tid);
         exit(0);
     }
     else{
-        printf("Recv thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
+        printf("RX thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
     }
 #endif
     // use token to speed up
