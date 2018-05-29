@@ -8,7 +8,7 @@ CoMP::CoMP()
 
     printf("enter constructor\n");
     // initialize socket buffer
-    for(int i = 0; i < SOCKET_THREAD_NUM; i++)
+    for(int i = 0; i < SOCKET_RX_THREAD_NUM; i++)
     {
         socket_buffer_[i].buffer.resize(PackageReceiver::package_length 
             * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM); // buffer SOCKET_BUFFER_FRAME_NUM entire frame
@@ -58,15 +58,15 @@ CoMP::CoMP()
     for(int i = 0; i < precoder_buffer_.precoder.size(); i++)
         precoder_buffer_.precoder[i].resize(UE_NUM * BS_ANT_NUM);
 
+    // initialize equalized data buffer
+    equal_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    for(int i = 0; i < equal_buffer_.data.size(); i++)
+        equal_buffer_.data[i].resize(OFDM_CA_NUM * UE_NUM);
+
     // initialize demultiplexed data buffer
     demul_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
     for(int i = 0; i < demul_buffer_.data.size(); i++)
         demul_buffer_.data[i].resize(OFDM_CA_NUM * UE_NUM);
-
-    // initialize demultiplexed data buffer
-    demul_buffer2_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    for(int i = 0; i < demul_buffer2_.data.size(); i++)
-        demul_buffer2_.data[i].resize(OFDM_CA_NUM * UE_NUM);
 
     for (int i = 0; i < TASK_THREAD_NUM; ++i)
         spm_buffer[i].resize(BS_ANT_NUM);
@@ -86,7 +86,7 @@ CoMP::CoMP()
     // printf("Pilot data read\n");
 
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(SOCKET_THREAD_NUM, &message_queue_));
+    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, &message_queue_));
 
     // initilize all kinds of checkers
     memset(cropper_checker_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
@@ -103,7 +103,7 @@ CoMP::CoMP()
         memset(demul_checker_[i], 0, sizeof(int) * (subframe_num_perframe - UE_NUM));
     }
 
-    // create task thread
+    // create task thread 
     for(int i = 0; i < TASK_THREAD_NUM; i++)
     {
         context[i].obj_ptr = this;
@@ -116,6 +116,89 @@ CoMP::CoMP()
         }
     }
 
+
+
+    if (ENABLE_DOWNLINK) 
+    {
+        dl_IQ_data = new int*[subframe_num_perframe * UE_NUM];
+        dl_IQ_data_long = new long long*[subframe_num_perframe * UE_NUM];
+        for(int i = 0; i < subframe_num_perframe * UE_NUM; i++)
+        {
+            dl_IQ_data[i] = new int[PackageReceiver::OFDM_FRAME_LEN * 2];
+            dl_IQ_data_long[i] = new long long[PackageReceiver::OFDM_FRAME_LEN * 2];
+        }
+        // read data from file
+        FILE* fp = fopen("../orig_data.bin","rb");
+        if (fp==NULL) {
+            printf("open file faild");
+            std::cerr << "Error: " << strerror(errno) << std::endl;
+        }
+        for(int i = 0; i < subframe_num_perframe * UE_NUM; i++)
+        {
+            fread(dl_IQ_data[i], sizeof(int), PackageReceiver::OFDM_FRAME_LEN * 2, fp);
+            // range [-2,2]
+            for(int j = 0; j < PackageReceiver::OFDM_FRAME_LEN * 2; j++)
+            {
+                dl_IQ_data_long[i][j] = (long long)dl_IQ_data[i][j];
+                // printf("i:%d, j:%d, Coded: %d, orignal: %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
+            }
+
+        }
+        fclose(fp);
+
+        int IFFT_buffer_block_num = UE_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+        dl_ifft_buffer_.IFFT_inputs = new complex_float*[IFFT_buffer_block_num];
+        dl_ifft_buffer_.IFFT_outputs = new complex_float*[IFFT_buffer_block_num];
+        for(int i = 0; i < IFFT_buffer_block_num; i++)
+        {
+            dl_ifft_buffer_.IFFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
+            dl_ifft_buffer_.IFFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
+        }
+
+
+        // initialize muplans for ifft
+        for(int i = 0; i < TASK_THREAD_NUM; i++)
+        {
+            muplans_ifft_[i] = mufft_create_plan_1d_c2c(OFDM_CA_NUM, MUFFT_INVERSE, MUFFT_FLAG_CPU_ANY);
+        }
+
+        // initialize downlink precoded data buffer
+        dl_precoded_data_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+        for(int i = 0; i < data_buffer_.data.size(); i++)
+            dl_precoded_data_buffer_.data[i].resize(BS_ANT_NUM * OFDM_CA_NUM);
+        // printf("Data buffer initialized\n");
+
+        
+        // initialize downlink modulated data buffer
+        dl_modulated_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+        for(int i = 0; i < equal_buffer_.data.size(); i++)
+            dl_modulated_buffer_.data[i].resize(OFDM_CA_NUM * UE_NUM);
+
+        for (int i = 0; i < TASK_THREAD_NUM; ++i)
+            dl_spm_buffer[i].resize(UE_NUM);
+
+        // initialize downlink socket buffer
+        // for(int i = 0; i < SOCKET_TX_THREAD_NUM; i++)
+        // {
+        dl_socket_buffer_.buffer.resize(PackageReceiver::package_length 
+            * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM); // buffer SOCKET_BUFFER_FRAME_NUM entire frame
+        dl_socket_buffer_.buffer_status.resize(subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM);
+        // }
+
+        memset(modul_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
+        memset(ifft_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
+
+        for(int i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+        {
+            memset(modul_checker_[i], 0, sizeof(int) * (subframe_num_perframe - UE_NUM));
+        }
+
+
+        printf("new PackageSender\n");
+        transmitter_.reset(new packageSenderBS(SOCKET_TX_THREAD_NUM, &message_queue_, &tx_queue_));
+
+    }
+
 }
 
 CoMP::~CoMP()
@@ -123,6 +206,7 @@ CoMP::~CoMP()
     for(int i = 0; i < TASK_THREAD_NUM; i++)
     {
         mufft_free_plan_1d(muplans_[i]);
+        mufft_free_plan_1d(muplans_ifft_[i]);
     }
     // release FFT_buffer
     int FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
@@ -130,7 +214,17 @@ CoMP::~CoMP()
     {
         mufft_free(fft_buffer_.FFT_inputs[i]);
         mufft_free(fft_buffer_.FFT_outputs[i]);
+        mufft_free(dl_fft_buffer_.FFT_inputs[i]);
+        mufft_free(dl_fft_buffer_.FFT_outputs[i]);
     }
+
+    for(int i = 0; i < subframe_num_perframe * UE_NUM; i++)
+    {
+        delete[] dl_IQ_data_long[i];
+        delete[] dl_IQ_data[i];
+    }
+    delete[] dl_IQ_data;
+    delete[] dl_IQ_data_long;
 }
 
 void CoMP::start()
@@ -147,21 +241,39 @@ void CoMP::start()
         printf("Main thread: stitch main thread to core 0 succeeded\n");
     }
 #endif
+    // start uplink receiver
     // creare socket buffer and socket threads
-    char* socket_buffer_ptrs[SOCKET_THREAD_NUM];
-    int* socket_buffer_status_ptrs[SOCKET_THREAD_NUM];
-    for(int i = 0; i < SOCKET_THREAD_NUM; i++)
+    char* socket_buffer_ptrs[SOCKET_RX_THREAD_NUM];
+    int* socket_buffer_status_ptrs[SOCKET_RX_THREAD_NUM];
+    for(int i = 0; i < SOCKET_RX_THREAD_NUM; i++)
     {
         socket_buffer_ptrs[i] = socket_buffer_[i].buffer.data();
         socket_buffer_status_ptrs[i] = socket_buffer_[i].buffer_status.data();
     }
-    std::vector<pthread_t> recv_thread = receiver_->startRecv(socket_buffer_ptrs, 
+    std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
         socket_buffer_status_ptrs, socket_buffer_[0].buffer_status.size(), socket_buffer_[0].buffer.size(), 1);
+
+    // start downlink transmitter
+    if (ENABLE_DOWNLINK)
+    {
+        char* dl_socket_buffer_ptr = dl_socket_buffer_.buffer.data();
+        int* dl_socket_buffer_status_ptr = dl_socket_buffer_.buffer_status.data();
+        std::vector<pthread_t> tx_threads = transmitter_->startTX(dl_socket_buffer_ptr, 
+            dl_socket_buffer_status_ptr, socket_buffer_[0].buffer_status.size(), socket_buffer_[0].buffer.size(), 1+SOCKET_RX_THREAD_NUM);
+    }
     // for task_queue, main thread is producer, it is single-procuder & multiple consumer
     // for task queue
+    // uplink
+
+    // TODO: make the producertokens global and try "try_dequeue_from_producer(token,item)"
     moodycamel::ProducerToken ptok(task_queue_);
     moodycamel::ProducerToken ptok_zf(zf_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
+    // downlink
+    moodycamel::ProducerToken ptok_ifft(ifft_queue_);
+    moodycamel::ProducerToken ptok_modul(modulation_queue_);
+    moodycamel::ProducerToken ptok_precode(precode_queue_);
+    moodycamel::ProducerToken ptok_tx(tx_queue_);
     // for message_queue, main thread is a comsumer, it is multiple producers
     // & single consumer for message_queue
     moodycamel::ConsumerToken ctok(message_queue_);
@@ -172,6 +284,7 @@ void CoMP::start()
     int miss_count = 0;
     int total_count = 0;
     int frame_count = 0;
+    int tx_count = 0;
 
 
     Event_data events_list[dequeue_bulk_size];
@@ -247,17 +360,22 @@ void CoMP::start()
                 // get frame_id & subframe_id
                 int frame_id, subframe_id, ant_id;
                 splitSubframeBufferIndex(FFT_buffer_target_id, &frame_id, &subframe_id);
+
+                // checker to count # of antennas in a subframe
                 // check if all antennas in this subframe is ready
                 int cropper_checker_id = frame_id * subframe_num_perframe + subframe_id;
                 cropper_checker_[cropper_checker_id] ++;
 
+                // if FFT for all anetnnas in a subframe is done, schedule ZF or equalization+demodulation
                 if(cropper_checker_[cropper_checker_id] == BS_ANT_NUM) // this sub-frame is finished
                 {
-                    //printf("subframe %d, frame %d\n", subframe_id, frame_id);
+                    
                     if (DEBUG_PRINT_TASK_DONE)
                         printf("Main thread: finished FFT for frame: %d, subframe: %d\n", frame_id, subframe_id);
 
-                    cropper_checker_[cropper_checker_id] = 0; // this subframe is finished
+                    // Reset checker value
+                    cropper_checker_[cropper_checker_id] = 0;
+
                     // if this subframe is pilot part
                     if(isPilot(subframe_id))
                     {   
@@ -265,20 +383,23 @@ void CoMP::start()
                         int csi_checker_id = frame_id;
                         if (DEBUG_PRINT)
                             printf("Main thread: pilot frame id: %d, subframe_id: %d\n", csi_checker_id,subframe_id);
+
+                        // checker to count # of pilots/users
                         csi_checker_[csi_checker_id] ++;
 
-                        // check if csi of all UEs are ready
+                        // if csi of all UEs is ready, schedule ZF or prediction 
                         if(csi_checker_[csi_checker_id] == UE_NUM)
                         {
                             csi_checker_[csi_checker_id] = 0; 
                             if (DEBUG_PRINT_SUMMARY)
                                 printf("Main thread: pilot frame: %d, finished collecting pilot frames\n", csi_checker_id);
 
+                            // count # of frame with CSI estimation
                             frame_count ++;
-                            if (frame_count<=INIT_FRAME_NUM || !DO_PREDICTION) {
-                                // do normal scheduling when traning data is not enough or prediction is not enabled
-                                // if CSI from all UEs are ready, do ZF
-                                                           
+
+                            // schedule ZF when traning data is not enough or prediction is not enabled
+                            if (frame_count<=INIT_FRAME_NUM || !DO_PREDICTION) {  
+                                // schedule normal ZF                                                                                        
                                 Event_data do_ZF_task;
                                 do_ZF_task.event_type = TASK_ZF;
                                 if (DEBUG_PRINT_ENTER_QUEUE) 
@@ -298,10 +419,10 @@ void CoMP::start()
                                     }
                                 }
                             }
+                            // schedule prediction when traning data is enough and prediction is enabled
+                            // when frame count equals to INIT_FRAME_NUM, do both prediction and ZF
                             if (frame_count>=INIT_FRAME_NUM && DO_PREDICTION)
-                            {
-                                // do prediction
-                                // when frame count equals to INIT_FRAME_NUM, do both prediction and ZF
+                            {                              
                                 Event_data do_pred_task;
                                 do_pred_task.event_type = TASK_PRED;
                                 if (DEBUG_PRINT_ENTER_QUEUE) 
@@ -320,14 +441,41 @@ void CoMP::start()
                                         }
                                     }
                                 }
-
                             }
 
-
+                            // reset frame_count to avoid overflow
                             if (frame_count==MAX_FRAME_ID) 
                             {
                                 frame_count=0;
                             }
+                        }
+
+
+                        // if downlink data transmission is enabled, schedule downlink modulation for all data subframes
+                        if (ENABLE_DOWNLINK) 
+                        {
+                            Event_data do_modulation_task;
+                            do_modulation_task.event_type = TASK_MODUL;
+
+                            for (int i = 0; i < data_subframe_num_perframe; i++) 
+                            {
+                                for (int j = 0; j < OFDM_CA_NUM / demul_block_size; j++) 
+                                {
+                                    // TODO: fix offset
+                                    int modul_offset_id = frame_id * OFDM_CA_NUM * subframe_num_perframe
+                                        + (subframe_id-UE_NUM) * OFDM_CA_NUM + i * demul_block_size;
+                                    do_modulation_task.data = modul_offset_id;
+                                    if ( !modulation_queue_.try_enqueue(ptok_demul, do_modulation_task ) ) {
+                                        printf("need more memory\n");
+                                        if ( !modulation_queue_.enqueue(ptok_modul, do_modulation_task ) ) {
+                                            printf("Modulation task enqueue failed\n");
+                                            exit(0);
+                                        }
+                                    }
+                                }
+
+                            }
+
                         }
                     }
                     else if(isData(subframe_id))
@@ -342,6 +490,7 @@ void CoMP::start()
                             printf("Main thread: created Demodulation task for frame: %d, subframe: %d\n", data_checker_id,subframe_id);
                         data_checker_[data_checker_id] ++;
 
+                        // schedule 
                         for(int i = 0; i < OFDM_CA_NUM / demul_block_size; i++)
                         {
                             int demul_offset_id = frame_id * OFDM_CA_NUM * data_subframe_num_perframe
@@ -358,11 +507,8 @@ void CoMP::start()
 
 
                         if(data_checker_[data_checker_id] == data_subframe_num_perframe)
-                        {
-                            // if all data part is ready. TODO: optimize the
-                            // logic, do deMul when CSI is ready, do not wait
-                            // the entire frame is ready
-                            
+                        {   
+                            // do nothing...                         
                             if (DEBUG_PRINT_SUMMARY)
                                 printf("Main thread: frame: %d, finished collecting data frames\n", frame_id);
                             data_checker_[data_checker_id] = 0;
@@ -423,7 +569,7 @@ void CoMP::start()
                         FILE* fp = fopen("demul_data.txt","a");
                         for(int cc = 0; cc < OFDM_CA_NUM; cc++)
                         {
-                            long long* cx = &demul_buffer2_.data[offset_without_ca][cc * UE_NUM];
+                            long long* cx = &demul_buffer_.data[offset_without_ca][cc * UE_NUM];
                             fprintf(fp, "SC: %d, Frame %d, subframe: %d, ", cc, frame_id, data_subframe_id);
                             for(int kk = 0; kk < UE_NUM; kk++)  
                                 fprintf(fp, "%d ", cx[kk]);
@@ -446,6 +592,50 @@ void CoMP::start()
                     }
                 }
             }
+            else if (event.event_type == EVENT_MODUL) 
+            {
+                // Data is modulated, perform IFFT when data for all subcarriers is ready
+                int offset_modul = event.data;
+                int ca_id = offset_demul % OFDM_CA_NUM;
+                int offset_without_ca = (offset_demul - ca_id) / OFDM_CA_NUM;
+                int data_subframe_id = offset_without_ca % (subframe_num_perframe - UE_NUM);
+                int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
+
+                modul_checker_[frame_id][data_subframe_id] += demul_block_size;
+                // if all subcarriers of this frame is ready
+                if (modul_checker_[frame_id][data_subframe_id] == OFDM_CA_NUM)
+                {
+                    Event_data do_ifft_task;
+                    do_demul_task.event_type = TASK_IFFT;
+                    // add ZF tasks for each sub-carrier
+                    for(int i = 0; i < OFDM_CA_NUM; i++)
+                    {
+                        int csi_offset_id = frame_id * OFDM_CA_NUM + i;
+                        do_ifft_task.data = csi_offset_id;
+                        if ( !ifft_queue_.try_enqueue(ptok_ifft, do_ifft_task ) ) {
+                            printf("need more memory\n");
+                            if ( !ifft_queue_.enqueue(ptok_ifft, do_ifft_task ) ) {
+                                printf("ZF task enqueue failed\n");
+                                exit(0);
+                            }
+                        }
+                    }
+                }
+
+            }
+            else if (event.event_type == EVENT_IFFT)
+            {
+                // IFFT is done, schedule precoding when data for all users is ready
+            }    
+            else if (event.event_type == EVENT_PRECODE) 
+            {
+                // Precoding is done, schedule data transmission when data for all users is ready
+            } 
+            else if (event.event_type == EVENT_PACKAGE_SENT)
+            {
+                // Data is sent
+                tx_count ++;
+            }
 
         }
     }
@@ -460,13 +650,15 @@ void* CoMP::taskThread(void* context)
     moodycamel::ConcurrentQueue<Event_data>* task_queue_ = &(obj_ptr->task_queue_);
     moodycamel::ConcurrentQueue<Event_data>* zf_queue_ = &(obj_ptr->zf_queue_);
     moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
+    moodycamel::ConcurrentQueue<Event_data>* fft_queue_ = &(obj_ptr->fft_queue_);
+    moodycamel::ConcurrentQueue<Event_data>* modulation_queue_ = &(obj_ptr->modulation_queue_);
     int tid = ((EventHandlerContext *)context)->id;
     printf("task thread %d starts\n", tid);
     
     // attach task threads to specific cores
     // Note: cores 0-17, 36-53 are on the same socket
 #ifdef ENABLE_CPU_ATTACH
-    int offset_id = SOCKET_THREAD_NUM + 1;
+    int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + 1;
     int tar_core_id = tid + offset_id;
     if(tar_core_id >= 18)
         tar_core_id = (tar_core_id - 18) + 36;
@@ -492,9 +684,9 @@ void* CoMP::taskThread(void* context)
     while(true)
     {
 
-        ret_zf = false;
-        ret_demul = false;
-        ret = false;
+        // ret_zf = false;
+        // ret_demul = false;
+        // ret = false;
 
         ret_zf = zf_queue_->try_dequeue(event);
         if(!ret_zf) 
@@ -586,7 +778,9 @@ inline imat CoMP::demod_16qam(cx_fmat x)
 {
     imat re;
     mat zero_mat = zeros<mat>(size(x));
-    mat float_mat = 0.6325*ones<mat>(size(x));
+    // mat float_mat = 0.6325*ones<mat>(size(x));
+    mat float_mat(size(x));
+    float_mat.fill(0.6325);
 
     umat c1 = real(x)>zero_mat;
     imat c1_int = conv_to<imat>::from(c1);
@@ -601,6 +795,24 @@ inline imat CoMP::demod_16qam(cx_fmat x)
     // cout << x.st() << endl;
     // cout <<imag(x).st() << endl;
     // cout << "Re:" << re.st() << endl;
+    return re;
+}
+
+
+// TODO: test correctness
+inline cx_fmat CoMP::mod_16qam(imat x)
+{
+    cx_fmat re;
+    fmat real_re = conv_to<fmat>::from(x);
+    fmat imag_re = conv_to<fmat>::from(x);
+    float scale = 1/sqrt(10);
+    float modvec_16qam[4]  = {-3*scale, -1*scale, 3*scale, scale};
+
+    real_re.for_each([&modvec_16qam](fmat::elem_type& val) { val = modvec_16qam[(int)val/4]; } );
+    imag_re.for_each([&modvec_16qam](fmat::elem_type& val) { val = modvec_16qam[(int)val%4]; } );
+    re.set_real(real_re);
+    re.set_imag(imag_re);
+
     return re;
 }
 
@@ -682,12 +894,12 @@ void CoMP::doDemul(int tid, int offset)
 
         // mat_demuled size: UE_NUM \times 1
         // point to the (n*demul_block_size+i)-th subcarrier and first user
-        cx_float* demul_ptr = (cx_float *)(&demul_buffer_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
-        cx_fmat mat_demuled(demul_ptr, UE_NUM, 1, false);
+        cx_float* equal_ptr = (cx_float *)(&equal_buffer_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
+        cx_fmat mat_equaled(equal_ptr, UE_NUM, 1, false);
 
         // Equalization
         // calculate mat_demuled for i-th subcarrier in the n-th block
-        mat_demuled = mat_precoder * mat_data;
+        mat_equaled = mat_precoder * mat_data;
 
 
         // Demodulation
@@ -698,11 +910,11 @@ void CoMP::doDemul(int tid, int offset)
         // {
         //     *demul_ptr2+ue_idx=demod_16qam((complex_float)mat_demuled[ue_idx]);
         // }
-        sword* demul_ptr2 = (sword *)(&demul_buffer2_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
-        imat mat_demuled2(demul_ptr2, UE_NUM, 1, false);
+        sword* demul_ptr = (sword *)(&demul_buffer_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
+        imat mat_demuled(demul_ptr, UE_NUM, 1, false);
         // imat  mat_demuled2 = zeros<imat>(UE_NUM,1);
         
-        mat_demuled2 = demod_16qam(mat_demuled);
+        mat_demuled = demod_16qam(mat_equaled);
         // cout << "Frame: "<< frame_id<<", subframe: "<< data_subframe_id<<", SC: " << ca_id+i << ", data: " << mat_demuled2.st() << endl;
 
         // if (frame_id==0) 
@@ -794,7 +1006,7 @@ void CoMP::doPred(int tid, int offset)
     }
 }
 
-// do Crop
+// do Crop for uplink or downlink
 void CoMP::doCrop(int tid, int offset)
 {
     int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
@@ -802,6 +1014,7 @@ void CoMP::doCrop(int tid, int offset)
     offset = offset - buffer_id * buffer_frame_num;
     // read info of one frame
     char* cur_ptr_buffer = socket_buffer_[buffer_id].buffer.data() + offset * PackageReceiver::package_length;
+
     int ant_id, frame_id, subframe_id, cell_id;
     frame_id = *((int *)cur_ptr_buffer);
     subframe_id = *((int *)cur_ptr_buffer + 1);
@@ -826,9 +1039,11 @@ void CoMP::doCrop(int tid, int offset)
         memset((char *)fft_buffer_.FFT_inputs[FFT_buffer_target_id] 
             + (OFDM_CA_NUM - delay_offset) * 2 * sizeof(float), 0, sizeof(float) * 2 * delay_offset);
     }
+
     // perform fft
     mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id], 
         fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
+
 
     // if it is pilot part, do CE
     if(isPilot(subframe_id))
@@ -836,8 +1051,9 @@ void CoMP::doCrop(int tid, int offset)
         int UE_id = subframe_id;
         int ca_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM;
         int csi_offset = ant_id + UE_id * BS_ANT_NUM;
+
         float* cur_fft_buffer_float_output = (float*)fft_buffer_.FFT_outputs[FFT_buffer_target_id];
-        
+
 
         if (DEBUG_PRINT_IN_TASK)
             printf("In doCrop thread %d: pilot: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
@@ -891,6 +1107,7 @@ void CoMP::doCrop(int tid, int offset)
         // src_ptr: point to the start of subframe (subframe size: OFDM_CA_NUM) 
         // 2048 float values
         float* src_ptr = (float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][0];
+
         // tar_ptr: point to the start of subframe with size BS_ANT_NUM * OFDM_CA_NUM
         // 96*1024*2 float values
         float* tar_ptr = (float *)&data_buffer_.data[frame_offset][0];
@@ -929,5 +1146,138 @@ void CoMP::doCrop(int tid, int offset)
         printf("crop message enqueue failed\n");
         exit(0);
     }
+}
+
+
+
+/****************************************************************************************/
+// Downlink tasks
+
+void CoMP::do_ifft(int tid, int offset) 
+{
+    // TODO: fix offset
+    cx_float* cur_ptr_buffer = (cx_float*)dl_modulated_buffer_.buffer.data() + offset * PackageReceiver::package_length;
+    // perform ifft
+    cx_float* cur_ifft_buffer = (cx_float*)dl_ifft_buffer_.IFFT_inputs[offset];
+    // Copy data for fft from modulated buffer to fft buffer
+    memcpy(cur_ifft_buffer, cur_ptr_buffer, sizeof(cx_float)*OFDM_CA_NUM); // COPY
+    mufft_execute_plan_1d(muplans_ifft_[tid], dl_fft_buffer_.IFFT_outputs[FFT_buffer_target_id], 
+        dl_fft_buffer_.IFFT_inputs[FFT_buffer_target_id]);
+
+    // inform main thread
+    Event_data ifft_finish_event;
+    ifft_finish_event.event_type = EVENT_IFFT;
+    ifft_finish_event.data = offset;
+    
+    if ( !message_queue_.enqueue(*task_ptok[tid], ifft_finish_event ) ) {
+        printf("Demuliplexing message enqueue failed\n");
+        exit(0);
+    }
+}
+
+void CoMP::do_precode(int tid, int offset) 
+{
+    // TODO: fix offset
+    // Precoding for 1 block (32 subcarriers)
+
+    // get information 
+    // offset = frame_id * OFDM_CA_NUM * data_subframe_num_perframe+ j * OFDM_CA_NUM + n * demul_block_size;
+    // n = 0, 1, ..., OFDM_CA_NUM / demul_block_size-1 = 31
+    // j = 0, 1, ..., data_subframe_num_perframe-1 = 39
+
+    // subcarrier index
+    // ca_id = n*demul_block_size
+    int ca_id = offset % OFDM_CA_NUM;
+    // subframe index
+    // offset_without_ca = frame_id*data_subframe_num_perframe+j
+    int offset_without_ca = (offset - ca_id) / OFDM_CA_NUM;
+    // data_subframe_id = j
+    int data_subframe_id = offset_without_ca % (subframe_num_perframe - UE_NUM);
+    // frame index
+    // frame_id = frame_id
+    int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
+
+    // TODO: copy data from ifft buffer to downlink spm buffer
+    // i = 0, 1, ..., 31
+    for(int i = 0; i < demul_block_size; i++)
+    {
+        int precoder_offset = frame_id * OFDM_CA_NUM + ca_id + i;
+        cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset].data();
+        // mat_precoder size: UE_NUM \times BS_ANT_NUM
+        cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
+
+        // mat_data size: UE_NUM \times 1
+        cx_float* data_ptr = (cx_float *)(&dl_spm_buffer[tid][0]);
+        cx_fmat mat_data(data_ptr, UE_NUM, 1, false);
+
+        // mat_precoded size: UE_NUM \times 1
+        // point to the (n*demul_block_size+i)-th subcarrier and first user
+        cx_float* precoded_ptr = (cx_float *)(&dl_precoded_data_buffer_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
+        cx_fmat mat_precoded(precoded_ptr, BS_ANT_NUM, 1, false);
+
+        mat_precoded = mat_precoder.t() * mat_data;
+
+    }
+
+    // inform main thread
+    Event_data precode_finish_event;
+    precode_finish_event.event_type = EVENT_PRECODE;
+    precode_finish_event.data = offset;
+    
+    if ( !message_queue_.enqueue(*task_ptok[tid], precode_finish_event ) ) {
+        printf("Demuliplexing message enqueue failed\n");
+        exit(0);
+    }
+
+}
+
+
+void CoMP::do_modulation(int tid, int offset)
+{
+    // TODO: fix offset
+    // Modulation for 1 block (32 subcarriers)
+
+    // get information 
+    // offset = frame_id * OFDM_CA_NUM * data_subframe_num_perframe+ j * OFDM_CA_NUM + n * demul_block_size;
+    // n = 0, 1, ..., OFDM_CA_NUM / demul_block_size-1 = 31
+    // j = 0, 1, ..., data_subframe_num_perframe-1 = 39
+
+    // subcarrier index
+    // ca_id = n*demul_block_size
+    int ca_id = offset % OFDM_CA_NUM;
+    // subframe index
+    // offset_without_ca = frame_id*data_subframe_num_perframe+j
+    int offset_without_ca = (offset - ca_id) / OFDM_CA_NUM;
+    // data_subframe_id = j
+    int data_subframe_id = offset_without_ca % (subframe_num_perframe - UE_NUM);
+    // frame index
+    // frame_id = frame_id
+    int frame_id = (offset_without_ca - data_subframe_id) / (subframe_num_perframe - UE_NUM);
+
+    // i = 0, 1, ..., 31
+    for(int i = 0; i < demul_block_size; i++)
+    {
+        long long* modul_ptr = (long long*)(&dl_IQ_data_long[offset_without_ca][(ca_id + i) * UE_NUM]);
+        imat mat_rawdata(modul_ptr, UE_NUM, 1, false);
+
+        cx_float* moduled_ptr = (cx_float *)(&dl_modulated_buffer_.data[offset_without_ca][(ca_id + i) * UE_NUM]);
+        cx_fmat mat_moduled(moduled_ptr, BS_ANT_NUM, 1, false);
+        // imat  mat_demuled2 = zeros<imat>(UE_NUM,1);
+        
+        mat_moduled = demod_16qam(mat_rawdata);
+
+    }
+
+    // inform main thread
+    Event_data modul_finish_event;
+    modul_finish_event.event_type = EVENT_MODUL;
+    modul_finish_event.data = offset;
+    
+    if ( !message_queue_.enqueue(*task_ptok[tid], modul_finish_event ) ) {
+        printf("Demuliplexing message enqueue failed\n");
+        exit(0);
+    }
+    
+    //printf("put demul event\n");
 }
 
