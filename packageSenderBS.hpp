@@ -33,7 +33,9 @@ public:
     static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
 
-
+    static const int SOCKET_BUFFER_FRAME_NUM = 120;
+    // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
+    static const int TASK_BUFFER_FRAME_NUM = 60;
 
     struct PackageSenderContext
     {
@@ -47,9 +49,9 @@ public:
     packageSenderBS(int N_THREAD, moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task);
     ~packageSenderBS();
 
-    static void* loopSend(void *context);
+    static void *loopSend(void *context);
 
-    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
+    std::vector<pthread_t> startTX(char *in_buffer, int *in_buffer_status, double *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     
 private:
     struct sockaddr_in servaddr_;    /* server address */
@@ -71,12 +73,15 @@ private:
     // int subframe_id;
 
 
-    char* buffer_;
-    int* buffer_status_;
+    char *buffer_;
+    int *buffer_status_;
+    double *data_buffer_;
     int buffer_length_;
     int buffer_frame_num_;
 
     int thread_num_;
+    // int SOCKET_BUFFER_FRAME_NUM = 120;
+    // int TASK_BUFFER_FRAME_NUM = 60;
     // pointer to message_queue_
     moodycamel::ConcurrentQueue<Event_data> *message_queue_;
     moodycamel::ConcurrentQueue<Event_data> *task_queue_;
