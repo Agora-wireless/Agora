@@ -43,6 +43,14 @@ struct FFTBuffer
     complex_float ** FFT_outputs;
 };
 
+struct IFFTBuffer
+{
+    // Data before IFFT
+    // record TASK_BUFFER_FRAME_NUM entire frames
+    complex_float ** IFFT_inputs;
+    complex_float ** IFFT_outputs;
+};
+
 struct CSIBuffer
 {
     // CSI symbols after IFFT
@@ -76,6 +84,19 @@ struct DemulBuffer
     // record TASK_BUFFER_FRAME_NUM entire frames
     std::vector<std::vector<long long>> data;
 };
+
+struct DLSocketBuffer
+{
+    std::vector<char> buffer;
+};
+
+// struct RawDataBuffer
+// {
+//     // Raw data symbols before modulation    
+//     // record TASK_BUFFER_FRAME_NUM entire frames
+//     std::vector<int> buffer;
+//     std::vector<int> buffer_status;
+// };
 
 
 #endif
