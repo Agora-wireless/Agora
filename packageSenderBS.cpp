@@ -147,7 +147,7 @@ void* packageSenderBS::loopSend(void *in_context)
         ret = task_queue_->try_dequeue(task_event); 
         if(!ret)
             continue;
-        printf("tx queue length: %d\n", task_queue_->size_approx());
+        // printf("tx queue length: %d\n", task_queue_->size_approx());
         if (task_event.event_type!=TASK_SEND) {
             printf("Wrong event type!");
             exit(0);
