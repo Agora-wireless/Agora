@@ -57,7 +57,7 @@ packageSenderBS::~packageSenderBS()
 
 
 
-std::vector<pthread_t> packageSenderBS::startTX(char* in_buffer, int* in_buffer_status, double *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id)
+std::vector<pthread_t> packageSenderBS::startTX(char* in_buffer, int* in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
@@ -120,7 +120,7 @@ void* packageSenderBS::loopSend(void *in_context)
     // downlink socket buffer status
     int *buffer_status = obj_ptr->buffer_status_;
     // downlink data buffer
-    double *data_buffer = obj_ptr->data_buffer_;
+    float *data_buffer = obj_ptr->data_buffer_;
     // buffer_length: package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     int buffer_length = obj_ptr->buffer_length_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
@@ -134,7 +134,7 @@ void* packageSenderBS::loopSend(void *in_context)
     int offset;
     char *cur_ptr_buffer;
     int *cur_ptr_buffer_status;
-    double *cur_ptr_data;
+    float *cur_ptr_data;
     int ant_id, frame_id, subframe_id, total_data_subframe_id, current_data_subframe_id;
     int cell_id = 0;
 
@@ -147,10 +147,13 @@ void* packageSenderBS::loopSend(void *in_context)
         ret = task_queue_->try_dequeue(task_event); 
         if(!ret)
             continue;
+        printf("tx queue length: %d\n", task_queue_->size_approx());
         if (task_event.event_type!=TASK_SEND) {
             printf("Wrong event type!");
             exit(0);
         }
+
+        // printf("In transmitter\n");
 
         offset = task_event.data;
         ant_id = offset % BS_ANT_NUM;
@@ -162,20 +165,37 @@ void* packageSenderBS::loopSend(void *in_context)
         int socket_subframe_offset = (frame_id % SOCKET_BUFFER_FRAME_NUM) * data_subframe_num_perframe + current_data_subframe_id;
         int data_subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + current_data_subframe_id;
         cur_ptr_buffer = buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
-        cur_ptr_data = (double *) (data_buffer + data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
+        cur_ptr_data = (data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
         *((int *)cur_ptr_buffer) = frame_id;
         *((int *)cur_ptr_buffer + 1) = subframe_id;
         *((int *)cur_ptr_buffer + 2) = cell_id;
         *((int *)cur_ptr_buffer + 3) = ant_id;
 
+        // printf("In tx thread %d: frame %d, subframe %d, ant %d, offset %d, subframe offset %d,  start copy data\n", tid, frame_id, subframe_id, ant_id, offset, data_subframe_offset);
+        // for (int i = 0; i < OFDM_CA_NUM; i++) {
+        //     std::cout<<"TX: Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << i/BS_ANT_NUM << "Ant: "<<i%BS_ANT_NUM<<", data: " <<*(cur_ptr_data + i)<<std::endl;
+        // }
         // copy data from data buffer to socket buffer
-        __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
-
-        for (int c2 = 0; c2 < OFDM_CA_NUM / 4; c2++) {
-            double *input_shifted_ptr = cur_ptr_data + ant_id + c2 * BS_ANT_NUM * 4;
-            __m256d t_data = _mm256_i64gather_pd((double *)input_shifted_ptr, index, 8);
-            _mm256_store_pd((double *)(cur_ptr_buffer + sizeof(int) * 4) + c2 * 4, t_data);
+        // printf("In tx thread: frame %d, ant %d, subframe %d ", frame_id, ant_id, subframe_id);
+        for (int i = 0; i < OFDM_CA_NUM; i++) {
+            float *input_shifted_ptr = (cur_ptr_data + 2 * ant_id + 2 * i * BS_ANT_NUM);
+            // printf(" %.2f + j%.2f,    ",*input_shifted_ptr, *(input_shifted_ptr+1));
+            *((ushort *)(cur_ptr_buffer + sizeof(int) * 4) + 2 * i) = (ushort)(*input_shifted_ptr * 65536 / 4 + 65536 / 2);
+            *((ushort *)(cur_ptr_buffer + sizeof(int) * 4) + 2 * i + 1) = (ushort)(*(input_shifted_ptr+1) * 65536 / 4 + 65536 / 2);
         }
+        // printf("\nIn tx thread %d: frame %d, subframe %d, ant %d, finished copy data\n", tid, frame_id, subframe_id, ant_id);
+
+
+        // __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
+
+        // for (int c2 = 0; c2 < OFDM_CA_NUM / 4; c2++) {
+        //     printf("In tx thread %d: frame %d, subframe %d, ant %d, copy data from subcarrier: %d\n", tid, frame_id, subframe_id, ant_id, c2*4);
+        //     double *input_shifted_ptr = cur_ptr_data + ant_id + c2 * BS_ANT_NUM * 4;
+        //     __m256d t_data = _mm256_i64gather_pd((double *)input_shifted_ptr, index, 8);
+        //     printf("Got t_data\n");
+        //     _mm256_store_pd((double *)(cur_ptr_buffer + sizeof(int) * 4) + c2 * 4, t_data);
+        //     printf("In tx thread %d: frame %d, subframe %d, ant %d, finished copy %d bytes data from subcarrier: %d\n", tid, frame_id, subframe_id, ant_id, sizeof(t_data), c2*4);
+        // }
 
         // send data (one OFDM symbol)
         if (sendto(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *)&obj_ptr->servaddr_, sizeof(obj_ptr->servaddr_)) < 0) {
