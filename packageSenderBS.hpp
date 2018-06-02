@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <pthread.h>
+#include <iostream>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 
@@ -51,7 +52,7 @@ public:
 
     static void *loopSend(void *context);
 
-    std::vector<pthread_t> startTX(char *in_buffer, int *in_buffer_status, double *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
+    std::vector<pthread_t> startTX(char *in_buffer, int *in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     
 private:
     struct sockaddr_in servaddr_;    /* server address */
@@ -75,7 +76,7 @@ private:
 
     char *buffer_;
     int *buffer_status_;
-    double *data_buffer_;
+    float *data_buffer_;
     int buffer_length_;
     int buffer_frame_num_;
 
