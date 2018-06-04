@@ -36,7 +36,7 @@ public:
 
     static const int SOCKET_BUFFER_FRAME_NUM = 120;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
-    static const int TASK_BUFFER_FRAME_NUM = 60;
+    static const int TASK_BUFFER_FRAME_NUM = 120;
 
     struct PackageSenderContext
     {
