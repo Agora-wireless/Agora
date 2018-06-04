@@ -137,6 +137,8 @@ void* packageSenderBS::loopSend(void *in_context)
     float *cur_ptr_data;
     int ant_id, frame_id, subframe_id, total_data_subframe_id, current_data_subframe_id;
     int cell_id = 0;
+    int maxMesgQLen = 0;
+    int maxTaskQLen = 0;
 
     // use token to speed up
     moodycamel::ProducerToken local_ptok(*message_queue_);
@@ -147,11 +149,7 @@ void* packageSenderBS::loopSend(void *in_context)
         ret = task_queue_->try_dequeue(task_event); 
         if(!ret)
             continue;
-<<<<<<< HEAD
         // printf("tx queue length: %d\n", task_queue_->size_approx());
-=======
-        printf("tx queue length: %d\n", task_queue_->size_approx());
->>>>>>> 71ce52cb6bbfbeb8a0384b4d83d6018e8f906517
         if (task_event.event_type!=TASK_SEND) {
             printf("Wrong event type!");
             exit(0);
@@ -175,39 +173,13 @@ void* packageSenderBS::loopSend(void *in_context)
         *((int *)cur_ptr_buffer + 2) = cell_id;
         *((int *)cur_ptr_buffer + 3) = ant_id;
 
-        // printf("In tx thread %d: frame %d, subframe %d, ant %d, offset %d, subframe offset %d,  start copy data\n", tid, frame_id, subframe_id, ant_id, offset, data_subframe_offset);
-        // for (int i = 0; i < OFDM_CA_NUM; i++) {
-        //     std::cout<<"TX: Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << i/BS_ANT_NUM << "Ant: "<<i%BS_ANT_NUM<<", data: " <<*(cur_ptr_data + i)<<std::endl;
-        // }
-        // copy data from data buffer to socket buffer
-        // printf("In tx thread: frame %d, ant %d, subframe %d ", frame_id, ant_id, subframe_id);
-        for (int i = 0; i < OFDM_CA_NUM; i++) {
-            float *input_shifted_ptr = (cur_ptr_data + 2 * ant_id + 2 * i * BS_ANT_NUM);
-            // printf(" %.2f + j%.2f,    ",*input_shifted_ptr, *(input_shifted_ptr+1));
-            *((ushort *)(cur_ptr_buffer + sizeof(int) * 4) + 2 * i) = (ushort)(*input_shifted_ptr * 65536 / 4 + 65536 / 2);
-            *((ushort *)(cur_ptr_buffer + sizeof(int) * 4) + 2 * i + 1) = (ushort)(*(input_shifted_ptr+1) * 65536 / 4 + 65536 / 2);
-        }
-        // printf("\nIn tx thread %d: frame %d, subframe %d, ant %d, finished copy data\n", tid, frame_id, subframe_id, ant_id);
-
-
-        // __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
-
-        // for (int c2 = 0; c2 < OFDM_CA_NUM / 4; c2++) {
-        //     printf("In tx thread %d: frame %d, subframe %d, ant %d, copy data from subcarrier: %d\n", tid, frame_id, subframe_id, ant_id, c2*4);
-        //     double *input_shifted_ptr = cur_ptr_data + ant_id + c2 * BS_ANT_NUM * 4;
-        //     __m256d t_data = _mm256_i64gather_pd((double *)input_shifted_ptr, index, 8);
-        //     printf("Got t_data\n");
-        //     _mm256_store_pd((double *)(cur_ptr_buffer + sizeof(int) * 4) + c2 * 4, t_data);
-        //     printf("In tx thread %d: frame %d, subframe %d, ant %d, finished copy %d bytes data from subcarrier: %d\n", tid, frame_id, subframe_id, ant_id, sizeof(t_data), c2*4);
-        // }
-
         // send data (one OFDM symbol)
         if (sendto(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *)&obj_ptr->servaddr_, sizeof(obj_ptr->servaddr_)) < 0) {
             perror("socket sendto failed");
             exit(0);
         }
 
-#ifdef DEBUG_BS_SENDER
+#if DEBUG_BS_SENDER
         // read information from received packet
         frame_id = *((int *)cur_ptr_buffer);
         subframe_id = *((int *)cur_ptr_buffer + 1);
@@ -225,8 +197,10 @@ void* packageSenderBS::loopSend(void *in_context)
             exit(0);
         }
         //printf("enqueue offset %d\n", offset);
-        int cur_queue_len = message_queue_->size_approx();
-
+        int cur_mesg_queue_len = message_queue_->size_approx();
+        int cur_task_queue_len = task_queue_->size_approx();
+        maxMesgQLen = maxMesgQLen > cur_mesg_queue_len ? maxMesgQLen : cur_mesg_queue_len;
+        maxTaskQLen = maxTaskQLen > cur_task_queue_len ? maxTaskQLen : cur_task_queue_len;
         package_count++;
 
         // if (package_count % (BS_ANT_NUM) == 0)
@@ -239,7 +213,7 @@ void* packageSenderBS::loopSend(void *in_context)
             auto end = std::chrono::system_clock::now();
             double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * 1e5;
             std::chrono::duration<double> diff = end - begin;
-            printf("thread %d send %f bytes in %f secs, throughput %f MB/s\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024);
+            printf("thread %d send %f bytes in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
             begin = std::chrono::system_clock::now();
             package_count = 0;
         }

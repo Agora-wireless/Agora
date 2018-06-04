@@ -30,7 +30,7 @@
 
 #define ENABLE_DOWNLINK 1
 
-#define DO_PREDICTION 0
+#define DO_PREDICTION 1
 #define INIT_FRAME_NUM 10
 
 
