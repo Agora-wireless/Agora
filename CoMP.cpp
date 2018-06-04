@@ -178,6 +178,12 @@ CoMP::CoMP()
         memset(ifft_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
     }
 
+    memset(tx_status_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
+    memset(tx_checker_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
+
+    for (int i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) 
+        memset(tx_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
+
     printf("initialize QAM16 table\n");
     float scale = 1/sqrt(10);
     float modvec_16qam[4] = {-3*scale, -1*scale, 3*scale, scale};
@@ -316,36 +322,29 @@ void CoMP::start()
                     do_crop_task.event_type = TASK_CROP;
                     do_crop_task.data = offset;
 
-#if DEBUG_PRINT_ENTER_QUEUE_FFT 
-                    int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-                    int buffer_id = offset / buffer_frame_num;
-                    offset = offset - buffer_id * buffer_frame_num;
-                    // read info of one frame
-                    char* cur_ptr_buffer = socket_buffer_[buffer_id].buffer.data() + offset * PackageReceiver::package_length;
-                    int ant_id, frame_id, subframe_id, cell_id;
-                    frame_id = *((int *)cur_ptr_buffer);
-                    subframe_id = *((int *)cur_ptr_buffer + 1);
-                    cell_id = *((int *)cur_ptr_buffer + 2);
-                    ant_id = *((int *)cur_ptr_buffer + 3);
-                    int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM) * subframe_num_perframe + subframe_id;
-                    cropper_created_checker_[cropper_created_checker_id] ++;
-                    // printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-                    if (cropper_created_checker_[cropper_created_checker_id] == BS_ANT_NUM) {
-                        printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id);
-                        cropper_created_checker_[cropper_created_checker_id] = 0;
-                    }
-#endif
 
-                    if (!ENABLE_DOWNLINK) {
+                    int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+                    int socket_thread_id = offset / buffer_frame_num;
+                    int offset_in_current_buffer = offset % buffer_frame_num;
+                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer.data() + offset_in_current_buffer * PackageReceiver::package_length;
+                    int subframe_id = *((int *)socket_buffer_ptr + 1);
+                    if (!ENABLE_DOWNLINK || subframe_id < UE_NUM) {
                         schedule_task(do_crop_task, &task_queue_, ptok);
+#if DEBUG_PRINT_ENTER_QUEUE_FFT                      
+                        int frame_id = *((int *)socket_buffer_ptr);
+                        subframe_id = *((int *)socket_buffer_ptr + 1);
+                        int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM) * subframe_num_perframe + subframe_id;
+                        cropper_created_checker_[cropper_created_checker_id] ++;
+                        // printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+                        if (cropper_created_checker_[cropper_created_checker_id] == BS_ANT_NUM) {
+                            printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id);
+                            cropper_created_checker_[cropper_created_checker_id] = 0;
+                        }
+#endif                        
                     }
-                    else {
-                        int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-                        int buffer_id = offset / buffer_frame_num;
-                        char* ptr_buffer = socket_buffer_[buffer_id].buffer.data() + offset * PackageReceiver::package_length;
-                        int subframe_id = *((int *)ptr_buffer + 1);
-                        if (subframe_id < UE_NUM) 
-                            schedule_task(do_crop_task, &task_queue_, ptok);
+                    else if (ENABLE_DOWNLINK) {
+                        // set the buffer of data subframe to be empty
+                        socket_buffer_[socket_thread_id].buffer_status[offset] = 0; //
                     }
                 }                
                 break;
@@ -595,6 +594,28 @@ void CoMP::start()
             case EVENT_PACKAGE_SENT: {
                     // Data is sent
                     tx_count ++;
+#if DEBUG_PRINT_SUMMARY || DEBUG_PRINT_TASK_DONE
+                    int offset_tx = event.data;
+                    int ant_idx = offset_tx % BS_ANT_NUM;
+                    int total_data_subframe_idx = offset_tx / BS_ANT_NUM;
+                    int current_data_subframe_idx = total_data_subframe_idx % data_subframe_num_perframe;
+                    int frame_idx = total_data_subframe_idx / data_subframe_num_perframe;
+                    tx_checker_[frame_idx][current_data_subframe_idx] += 1;
+
+                    if (tx_checker_[frame_idx][current_data_subframe_idx] == BS_ANT_NUM) {
+                        tx_status_[frame_idx] += 1;
+                        tx_checker_[frame_idx][current_data_subframe_idx] = 0;
+                        if (DEBUG_PRINT_TASK_DONE)
+                            printf("Main thread: tx done frame: %d, subframe: %d\n", frame_idx, current_data_subframe_idx);
+                        if (tx_status_[frame_idx] == data_subframe_num_perframe) {
+                            tx_status_[frame_idx] = 0;
+                            if (DEBUG_PRINT_SUMMARY) {
+                                printf("Main thread: tx done frame: %d\n", frame_idx);
+                            }
+                        }
+                    }
+#endif
+
                 }
                 break;
             default:
@@ -1172,11 +1193,22 @@ void CoMP::do_precode(int tid, int offset)
 
         mat_precoded = mat_precoder.t() * mat_data;
         // cout << "Frame: "<< frame_idx<<", subframe: "<< current_data_subframe_idx<<", SC: " << sc_idx+i << ", data: " << real(mat_precoded).st() << endl;
+
+        // calculate data for socket buffer
+        int socket_subframe_offset = (frame_idx % SOCKET_BUFFER_FRAME_NUM) * data_subframe_num_perframe + current_data_subframe_idx;
+        char *socket_ptr = &dl_socket_buffer_.buffer[socket_subframe_offset * BS_ANT_NUM * PackageReceiver::package_length];
+
+        for (int c2 = 0; c2 < BS_ANT_NUM; c2++) {
+            float *shifted_precoded_ptr = (float *)(precoded_ptr + c2);
+            int socket_offset = sizeof(int) * 4 + c2 * PackageReceiver::package_length;
+            *((ushort *)(socket_ptr + socket_offset) + 2 * (sc_idx + i)) = (ushort)(*shifted_precoded_ptr * 65536 / 4 + 65536 / 2);
+            *((ushort *)(socket_ptr + socket_offset) + 2 * (sc_idx + i) + 1 ) = (ushort)(*(shifted_precoded_ptr+1) * 65536 / 4 + 65536 / 2);
+        }
+
         // for (int c2 = 0; c2 < BS_ANT_NUM; c2++) {
-        //     float *temp_ptr = (float *)(&dl_precoded_data_buffer_.data[0][0]);
-        //     int temp_offset = total_data_subframe_idx * BS_ANT_NUM * OFDM_CA_NUM * 2 + (sc_idx+i)*BS_ANT_NUM*2 + c2 * 2;
-        //     cout<<"Frame: "<< frame_idx<<", subframe: "<< current_data_subframe_idx<<", SC: " << sc_idx+i << ", data: " <<dl_precoded_data_buffer_.data[total_data_subframe_idx][(sc_idx + i) * BS_ANT_NUM+c2].real
-        //     <<", data from ptr: "<<*(temp_ptr+temp_offset)<<endl;
+        //     int socket_offset = sizeof(int) * 4 + c2 * PackageReceiver::package_length;
+        //     cout<<"Frame: "<< frame_idx<<", subframe: "<< current_data_subframe_idx<<", SC: " << sc_idx+i << ", Ant: " << c2 << ", data: " <<dl_precoded_data_buffer_.data[total_data_subframe_idx][(sc_idx + i) * BS_ANT_NUM+c2].real
+        //     <<", data from ptr: "<<*((ushort *)(socket_ptr + socket_offset) + 2 * (sc_idx + i)) <<endl;
         // }
     }
     // inform main thread
