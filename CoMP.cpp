@@ -332,7 +332,6 @@ void CoMP::start()
                         schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT                      
                         int frame_id = *((int *)socket_buffer_ptr);
-                        subframe_id = *((int *)socket_buffer_ptr + 1);
                         int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM) * subframe_num_perframe + subframe_id;
                         cropper_created_checker_[cropper_created_checker_id] ++;
                         // printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
@@ -344,7 +343,10 @@ void CoMP::start()
                     }
                     else if (ENABLE_DOWNLINK) {
                         // set the buffer of data subframe to be empty
-                        socket_buffer_[socket_thread_id].buffer_status[offset] = 0; //
+                        socket_buffer_[socket_thread_id].buffer_status[offset_in_current_buffer] = 0; //
+                        // int ant_id = *((int *)socket_buffer_ptr + 3);
+                        // int frame_id = *((int *)socket_buffer_ptr);
+                        // printf("Main thread: buffer emptied for socket thread %d, frame %d, subframe %d, antenna %d, offset %d\n", socket_thread_id, frame_id, subframe_id, ant_id, offset);
                     }
                 }                
                 break;
@@ -610,7 +612,8 @@ void CoMP::start()
                         if (tx_status_[frame_idx] == data_subframe_num_perframe) {
                             tx_status_[frame_idx] = 0;
                             if (DEBUG_PRINT_SUMMARY) {
-                                printf("Main thread: tx done frame: %d\n", frame_idx);
+                                printf("Main thread: tx done frame: %d, queue length: zf %d, ifft %d, precode %d, tx %d\n", frame_idx,
+                                    zf_queue_.size_approx(), ifft_queue_.size_approx(), precode_queue_.size_approx(), tx_queue_.size_approx());
                             }
                         }
                     }
@@ -821,6 +824,7 @@ void CoMP::doCrop(int tid, int offset)
     int buffer_subframe_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     int socket_thread_id = offset / buffer_subframe_num;
     offset = offset - socket_thread_id * buffer_subframe_num;
+    // printf("In doCrop: socket_thread: %d offset %d\n", socket_thread_id, offset);
     // read info of one frame
     char *cur_ptr_buffer = socket_buffer_[socket_thread_id].buffer.data() + offset * PackageReceiver::package_length;
 
@@ -1084,9 +1088,12 @@ void CoMP::do_ifft(int tid, int offset)
     int *modul_ptr = &dl_IQ_data[current_data_subframe_idx * UE_NUM + user_idx][0];
     complex_float *ifft_ptr = &dl_ifft_buffer_.IFFT_inputs[offset][0];
 
+    // printf("Frame %d, subframe %d, user %d, data ", frame_idx, current_data_subframe_idx, user_idx);
     for (int i = 0; i < OFDM_CA_NUM; i++) {
         *(ifft_ptr + i) = mod_16qam_single(*(modul_ptr+i));
+        // printf(" (%d, %.4f+j%.4f) ", *(modul_ptr+i), (*(ifft_ptr + i)).real, (*(ifft_ptr + i)).imag);
     }
+    // printf("\n");
     // imat mat_rawdata(modul_ptr, OFDM_CA_NUM, 1, false);
 
     // cx_float *ifft_ptr = (cx_float *)(&dl_ifft_buffer_.IFFT_inputs[offset][0]);

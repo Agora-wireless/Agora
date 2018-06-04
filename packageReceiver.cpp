@@ -147,7 +147,14 @@ void* PackageReceiver::loopRecv(void *in_context)
         // if buffer is full, exit
         if(cur_ptr_buffer_status[0] == 1)
         {
-            printf("Receive thread %d buffer full\n", tid);
+            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
+            int sum = 0;
+            // printf("Status:\n");
+            // for(int i = 0; i < buffer_frame_num; i++) {
+            //     sum += *(buffer_status + i);
+            //     printf("%d", *(buffer_status + i));
+            // }
+            // printf("\n Sum: %d, total: %d", sum, buffer_frame_num);
             exit(0);
         }
         // receive data
