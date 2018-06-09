@@ -32,7 +32,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 28;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 21;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     // buffer length of each socket thread
@@ -170,6 +170,7 @@ public:
      * Downlink 
      *****************************************************/
 
+    void do_modulate(int tid, int offset);
     /**
      * Do modulation and ifft tasks for one OFDM symbol
      * @param tid: task thread index, used for selecting task ptok
@@ -240,9 +241,11 @@ public:
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
 
-    /* combine frame_id & subframe_id into one int */
-    inline int getSubframeBufferIndex(int frame_id, int subframe_id);
-    inline void splitSubframeBufferIndex(int FFT_buffer_target_id, int *frame_id, int *subframe_id);
+    inline int generateOffset2d(int unit_total_num, int frame_id, int unit_id);
+    inline int generateOffset3d(int unit_total_num, int frame_id, int current_data_subframe_id, int unit_id);
+    inline void interpreteOffset2d(int unit_total_num, int offset, int *frame_id, int *unit_id);
+    inline void interpreteOffset3d(int unit_total_num, int offset, int *frame_id, int *total_data_subframe_id, int *current_data_subframe_id, int *unit_id);
+
     /* combine frame_id & subframe_id & ant_id into one int */
     inline int getFFTBufferIndex(int frame_id, int subframe_id, int ant_id);
     inline void splitFFTBufferIndex(int FFT_buffer_target_id, int *frame_id, int *subframe_id, int *ant_id);
@@ -384,7 +387,7 @@ private:
     /** 
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM
-     * Second dimension: OFDM_FRAME_LEN 
+     * Second dimension: OFDM_CA_NUM
      */
     int **dl_IQ_data;
     long long **dl_IQ_data_long;
@@ -399,14 +402,14 @@ private:
 
     /** 
      * Modulated data
-     * First dimension: subframe_num_perframe (40) * UE_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: OFDM_CA_NUM 
+     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * second dimension: UE_NUM * OFDM_CA_NUM
      */
     EqualBuffer dl_modulated_buffer_;
 
     /**
      * Data for IFFT
-     * First dimension: FFT_buffer_block_num = UE_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * First dimension: FFT_buffer_block_num = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM
      */
     IFFTBuffer dl_ifft_buffer_;
@@ -417,7 +420,7 @@ private:
      * second dimension: UE_NUM * OFDM_CA_NUM
      * second dimension data order: SC1-32 of UEs, SC33-64 of UEs, ..., SC993-1024 of UEs (32 blocks each with 32 subcarriers)
      */
-    DataBuffer dl_iffted_data_buffer_;
+    // DataBuffer dl_iffted_data_buffer_;
 
 
     /**
@@ -445,7 +448,7 @@ private:
     /* task queue for downlink IFFT */
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for downlink modulation */
-    moodycamel::ConcurrentQueue<Event_data> modulation_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for downlink precoding */
     moodycamel::ConcurrentQueue<Event_data> precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for downlink data transmission */
@@ -454,7 +457,7 @@ private:
     mufft_plan_1d *muplans_ifft_[TASK_THREAD_NUM];
 
     int precode_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int ifft_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int modulate_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int tx_checker_[SOCKET_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int tx_status_[SOCKET_BUFFER_FRAME_NUM];
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
