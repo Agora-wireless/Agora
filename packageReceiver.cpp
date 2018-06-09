@@ -142,17 +142,25 @@ void* PackageReceiver::loopRecv(void *in_context)
 
     int maxQueueLength = 0;
     int ret = 0;
+    int maxSymbolNum = 0;
+    int Symbol_offset = 0;
     while(true)
     {
         // if buffer is full, exit
-        if(cur_ptr_buffer_status[0] == 1)
+        if (cur_ptr_buffer_status[0] == 1)
         {
             printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
-            int sum = 0;
+            // int sum = 0;
             // printf("Status:\n");
-            // for(int i = 0; i < buffer_frame_num; i++) {
+            // for (int i = 0; i < BS_ANT_NUM * subframe_num_perframe; i++) {
+            //     if ((i % (BS_ANT_NUM * subframe_num_perframe)) == 0) {
+            //         printf("\n New frame\n");
+            //     }
+            //     if (i % (BS_ANT_NUM * subframe_num_perframe) == UE_NUM * BS_ANT_NUM) {
+            //         printf("\nPilots ended\n");
+            //     }
             //     sum += *(buffer_status + i);
-            //     printf("%d", *(buffer_status + i));
+            //     printf(" (%d,%d) ", i, *(buffer_status + i));
             // }
             // printf("\n Sum: %d, total: %d", sum, buffer_frame_num);
             exit(0);
@@ -170,10 +178,12 @@ void* PackageReceiver::loopRecv(void *in_context)
         subframe_id = *((int *)cur_ptr_buffer + 1);
         cell_id = *((int *)cur_ptr_buffer + 2);
         ant_id = *((int *)cur_ptr_buffer + 3);
-        // printf("receive frame_id %d, subframe_id %d, cell_id %d, ant_id %d\n", frame_id, subframe_id, cell_id, ant_id);
+       
         
         // get the position in buffer
         offset = cur_ptr_buffer_status - buffer_status;
+
+        // printf("receive frame_id %d, subframe_id %d, cell_id %d, ant_id %d, offset %d\n", frame_id, subframe_id, cell_id, ant_id, offset);
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
         cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
@@ -190,6 +200,10 @@ void* PackageReceiver::loopRecv(void *in_context)
         //printf("enqueue offset %d\n", offset);
         int cur_queue_len = message_queue_->size_approx();
         maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
+        int total_symbols = (frame_id * subframe_num_perframe + subframe_id) * BS_ANT_NUM + ant_id;
+
+        maxSymbolNum = (maxSymbolNum > total_symbols) ? maxSymbolNum : total_symbols;
+        // printf("Frame %d, subframe %d, ant %d, total_symbols: %d, maxSymbolNum: %d, received %d\n", frame_id, subframe_id, ant_id, total_symbols, maxSymbolNum, package_num);
 
         package_num++;
         // print some information
@@ -198,9 +212,13 @@ void* PackageReceiver::loopRecv(void *in_context)
             auto end = std::chrono::system_clock::now();
             double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * 1e5;
             std::chrono::duration<double> diff = end - begin;
+            float package_loss_rate = 1.0e5 / (maxSymbolNum - Symbol_offset);
+
             // print network throughput & maximum message queue length during this period
-            printf("thread %d receive %f bytes in %f secs, throughput %f MB/s, max Message Queue Length %d\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024, maxQueueLength);
+            printf("RX thread %d receive %f bytes in %f secs, throughput %f MB/s, max Message Queue Length %d, package loss rate: 100000/%d = %.4f\n", tid, byte_len, diff.count(), 
+                byte_len / diff.count() / 1024 / 1024, maxQueueLength, (maxSymbolNum - Symbol_offset), package_loss_rate);
             maxQueueLength = 0;
+            Symbol_offset = maxSymbolNum;
             begin = std::chrono::system_clock::now();
             package_num = 0;
         }

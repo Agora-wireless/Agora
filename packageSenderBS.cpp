@@ -8,7 +8,7 @@ packageSenderBS::packageSenderBS(int N_THREAD)
     /*Configure settings in address struct*/
     servaddr_.sin_family = AF_INET;
     servaddr_.sin_port = htons(7891);
-    servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
+    servaddr_.sin_addr.s_addr = inet_addr("127.0.0.2");
     memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
 
     for (int i = 0; i < N_THREAD; i++) {
@@ -213,7 +213,7 @@ void* packageSenderBS::loopSend(void *in_context)
             auto end = std::chrono::system_clock::now();
             double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * 1e5;
             std::chrono::duration<double> diff = end - begin;
-            printf("thread %d send %f bytes in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
+            printf("TX thread %d send %f bytes in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
             begin = std::chrono::system_clock::now();
             package_count = 0;
         }
