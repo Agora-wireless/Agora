@@ -19,6 +19,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         cliaddr_.sin_family = AF_INET;
         cliaddr_.sin_port = htons(0);  // out going port is random
         //cliaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
+        cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
         memset(cliaddr_.sin_zero, 0, sizeof(cliaddr_.sin_zero));  
 
         if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
@@ -102,27 +103,14 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
 
     // create send threads
     int cell_id = 0;
-    pthread_mutex_init(&lock_, NULL);
+    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    int ret;
+    // pthread_mutex_init(&lock_, NULL);
     // gen data
-    while(true)
-    {
-        pthread_mutex_lock( &lock_ );
-        if(buffer_len_ == max_length_-10) // full
-        {
-            pthread_mutex_unlock( &lock_ );
-            // wait some time
-            //for(int p = 0; p < 1e4; p++)
-            //    rand();
-            // printf("buffer full, buffer length: %d\n", buffer_len_);
-            continue;
-        }
-        else // not full
-        {
-            // printf("buffer_len_: %d\n", buffer_len_);
-            buffer_len_ ++;  // take the place first
-        }
-        pthread_mutex_unlock( &lock_ );
 
+    // load data to buffer
+    for (int i = 0; i < max_length_; i++) {
+        cur_ptr_ = i;
         int data_index = subframe_id * BS_ANT_NUM + ant_id;
         int* ptr = (int *)trans_buffer_[cur_ptr_].data();
         (*ptr) = frame_id;
@@ -130,10 +118,60 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
         memcpy(trans_buffer_[cur_ptr_].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        if ( !task_queue_.enqueue( cur_ptr_ ) ) {
+            printf("send task enqueue failed\n");
+            exit(0);
+        }
+        ant_id++;
+        if(ant_id == BS_ANT_NUM)
+        {
+            ant_id = 0;
+            subframe_id++;
+            if(subframe_id == max_subframe_id)
+            {
+                subframe_id = 0;
+                frame_id++;
+                if(frame_id == MAX_FRAME_ID)
+                    frame_id = 0;
+            }
+        }
+    }
+
+    while(true)
+    {
+        // pthread_mutex_lock( &lock_ );
+        // if(buffer_len_ == max_length_-10) // full
+        // {
+        //     pthread_mutex_unlock( &lock_ );
+        //     // wait some time
+        //     //for(int p = 0; p < 1e4; p++)
+        //     //    rand();
+        //     // printf("buffer full, buffer length: %d\n", buffer_len_);
+        //     continue;
+        // }
+        // else // not full
+        // {
+        //     // printf("buffer_len_: %d\n", buffer_len_);
+        //     buffer_len_ ++;  // take the place first
+        // }
+        // pthread_mutex_unlock( &lock_ );
+
+        int data_ptr;
+        ret = message_queue_.try_dequeue(data_ptr); 
+        if(!ret)
+            continue;
+
+        int data_index = subframe_id * BS_ANT_NUM + ant_id;
+        int* ptr = (int *)trans_buffer_[data_ptr].data();
+        (*ptr) = frame_id;
+        (*(ptr+1)) = subframe_id;
+        (*(ptr+2)) = cell_id;
+        (*(ptr+3)) = ant_id;
+        memcpy(trans_buffer_[data_ptr].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
         // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
 
-        if ( !task_queue_.enqueue( cur_ptr_ ) ) {
-            printf("send message enqueue failed\n");
+        if ( !task_queue_.enqueue(data_ptr) ) {
+            printf("send task enqueue failed\n");
             exit(0);
         }
 
@@ -142,13 +180,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         //     printf("Enqueue for frame %d, subframe %d, ant %d, buffer %d\n", frame_id, subframe_id, ant_id,buffer_len_);
         // }
 
-        cur_ptr_ = (cur_ptr_ + 1) % max_length_;
+        // cur_ptr_ = (cur_ptr_ + 1) % max_length_;
         ant_id++;
         if(ant_id == BS_ANT_NUM)
         {
             ant_id = 0;
             subframe_id++;
-            if(subframe_id == subframe_num_perframe)
+            if(subframe_id == max_subframe_id)
             {
                 subframe_id = 0;
                 frame_id++;
@@ -185,6 +223,7 @@ void* PackageSender::loopSend(void *in_context)
     printf("package sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<int> *task_queue_ = &obj_ptr->task_queue_;
+    moodycamel::ConcurrentQueue<int> *message_queue_ = &obj_ptr->message_queue_;
 
 
 #ifdef ENABLE_CPU_ATTACH
@@ -206,6 +245,8 @@ void* PackageSender::loopSend(void *in_context)
     int used_socker_id = 0;
     int ret;
     int socket_per_thread = obj_ptr->socket_num / obj_ptr->thread_num;
+    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    printf("max_subframe_id: %d\n", max_subframe_id);
     while(true)
     {
         int data_ptr;
@@ -214,15 +255,19 @@ void* PackageSender::loopSend(void *in_context)
             continue;
 
         // get data
-        pthread_mutex_lock( &obj_ptr->lock_ );
-        obj_ptr->buffer_len_ --;
-        pthread_mutex_unlock( &obj_ptr->lock_ );
+        // pthread_mutex_lock( &obj_ptr->lock_ );
+        // obj_ptr->buffer_len_ --;
+        // pthread_mutex_unlock( &obj_ptr->lock_ );
 
-        used_socker_id = data_ptr % socket_per_thread + socket_per_thread * tid;
-        /* send a message to the server */
-        if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_, sizeof(obj_ptr->servaddr_)) < 0) {
-            perror("socket sendto failed");
-            exit(0);
+        used_socker_id = data_ptr % socket_per_thread + socket_per_thread * tid;     
+        int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr].data();
+        int subframe_id = (*(ptr+1));
+        if (!ENABLE_DOWNLINK || subframe_id < UE_NUM) {
+            /* send a message to the server */
+            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_, sizeof(obj_ptr->servaddr_)) < 0) {
+                perror("socket sendto failed");
+                exit(0);
+            }
         }
 
         if (DEBUG_SENDER) 
@@ -233,15 +278,20 @@ void* PackageSender::loopSend(void *in_context)
         
         package_count++;
 
-        // if (package_count % (BS_ANT_NUM) == 0)
+        if ( !message_queue_->enqueue(data_ptr) ) {
+            printf("send message enqueue failed\n");
+            exit(0);
+        }
+
+        // if (package_count % (BS_ANT_NUM * UE_NUM) == 0)
         // {
-        //     usleep(71);
+        //     usleep(0);
         // }
 
-        if(package_count == (int)1e5)
+        if(package_count == BS_ANT_NUM * max_subframe_id * 100)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * 1e5;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
             std::chrono::duration<double> diff = end - begin;
             printf("thread %d send %f bytes in %f secs, throughput %f MB/s\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024);
             begin = std::chrono::system_clock::now();
