@@ -59,6 +59,7 @@ private:
     pthread_mutex_t lock_;
 
     moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
+    moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
     int max_length_ = BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM;
 
     int ant_id;
