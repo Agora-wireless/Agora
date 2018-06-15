@@ -8,13 +8,17 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
     socket_ = new int[socket_num];
 
     /*Configure settings in address struct*/
-    servaddr_.sin_family = AF_INET;
-    servaddr_.sin_port = htons(7891);
-    servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
-    memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
+    // servaddr_.sin_family = AF_INET;
+    // servaddr_.sin_port = htons(7891);
+    // servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
 
-    for(int i = 0; i < socket_num; i++)
-    {
+    for (int i = 0; i < socket_num; i++) {
+        servaddr_[i].sin_family = AF_INET;
+        servaddr_[i].sin_port = htons(7891+i);
+        servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");
+        memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
+
         int rand_port = rand() % 65536;
         cliaddr_.sin_family = AF_INET;
         cliaddr_.sin_port = htons(0);  // out going port is random
@@ -259,12 +263,12 @@ void* PackageSender::loopSend(void *in_context)
         // obj_ptr->buffer_len_ --;
         // pthread_mutex_unlock( &obj_ptr->lock_ );
 
-        used_socker_id = data_ptr % socket_per_thread + socket_per_thread * tid;     
+        used_socker_id = data_ptr % obj_ptr->socket_num;     
         int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr].data();
         int subframe_id = (*(ptr+1));
         if (!ENABLE_DOWNLINK || subframe_id < UE_NUM) {
             /* send a message to the server */
-            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_, sizeof(obj_ptr->servaddr_)) < 0) {
+            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);
             }
@@ -293,7 +297,7 @@ void* PackageSender::loopSend(void *in_context)
             auto end = std::chrono::system_clock::now();
             double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
             std::chrono::duration<double> diff = end - begin;
-            printf("thread %d send %f bytes in %f secs, throughput %f MB/s\n", tid, byte_len, diff.count(), byte_len / diff.count() / 1024 / 1024);
+            printf("thread %d send 100 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024);
             begin = std::chrono::system_clock::now();
             package_count = 0;
         }
