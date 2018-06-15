@@ -32,7 +32,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 21;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 27;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     // buffer length of each socket thread
@@ -360,7 +360,7 @@ private:
     int precoder_checker_[TASK_BUFFER_FRAME_NUM];
     bool precoder_status_[TASK_BUFFER_FRAME_NUM];
 
-    int cropper_created_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
+    int cropper_created_checker_[TASK_BUFFER_FRAME_NUM];
 
     // can possibly remove this checker
     int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
@@ -458,6 +458,7 @@ private:
 
     int precode_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int modulate_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int ifft_checker_[TASK_BUFFER_FRAME_NUM];
     int tx_checker_[SOCKET_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int tx_status_[SOCKET_BUFFER_FRAME_NUM];
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
