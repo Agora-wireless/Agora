@@ -69,7 +69,7 @@ public:
     static void* loopRecv(void *context);
  
 private:
-    struct sockaddr_in servaddr_;    /* server address */
+    struct sockaddr_in servaddr_[10];    /* server address */
     int* socket_;
 
     char** buffer_;

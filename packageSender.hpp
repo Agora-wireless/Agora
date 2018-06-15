@@ -47,7 +47,7 @@ public:
     static void* loopSend(void *context);
     
 private:
-    struct sockaddr_in servaddr_;    /* server address */
+    struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in cliaddr_;    /* server address */
     int* socket_;
 

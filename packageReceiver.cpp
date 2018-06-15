@@ -11,13 +11,18 @@ PackageReceiver::PackageReceiver(int N_THREAD)
     socket_ = new int[N_THREAD];
     /*Configure settings in address struct*/
     // address of sender 
-    servaddr_.sin_family = AF_INET;
-    servaddr_.sin_port = htons(7891);
-    servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
-    memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
+    // servaddr_.sin_family = AF_INET;
+    // servaddr_.sin_port = htons(7891);
+    // servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
     
     for(int i = 0; i < N_THREAD; i++)
     {
+        servaddr_[i].sin_family = AF_INET;
+        servaddr_[i].sin_port = htons(7891+i);
+        servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");
+        memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
+
         if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
             printf("cannot create socket %d\n", i);
             exit(0);
@@ -44,7 +49,7 @@ PackageReceiver::PackageReceiver(int N_THREAD)
         //     printf("Read socket buffer size:%d\n",readValue);
         // }
 
-        if(bind(socket_[i], (struct sockaddr *) &servaddr_, sizeof(servaddr_)) != 0)
+        if(bind(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
         {
             printf("socket bind failed %d\n", i);
             exit(0);
@@ -135,7 +140,7 @@ void* PackageReceiver::loopRecv(void *in_context)
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
     // loop recv
-    socklen_t addrlen = sizeof(obj_ptr->servaddr_);
+    socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
     int offset = 0;
     int package_num = 0;
     auto begin = std::chrono::system_clock::now();
@@ -144,6 +149,7 @@ void* PackageReceiver::loopRecv(void *in_context)
     int ret = 0;
     int maxSymbolNum = 0;
     int Symbol_offset = 0;
+    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     while(true)
     {
         // if buffer is full, exit
@@ -167,17 +173,17 @@ void* PackageReceiver::loopRecv(void *in_context)
         }
         // receive data
         int recvlen = -1;
-        int ant_id, frame_id, subframe_id, cell_id;
-        if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_, &addrlen)) < 0)
+        // int ant_id, frame_id, subframe_id, cell_id;
+        if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
         {
             perror("recv failed");
             exit(0);
         }
-        // read information from received packet
-        frame_id = *((int *)cur_ptr_buffer);
-        subframe_id = *((int *)cur_ptr_buffer + 1);
-        cell_id = *((int *)cur_ptr_buffer + 2);
-        ant_id = *((int *)cur_ptr_buffer + 3);
+        // // read information from received packet
+        // frame_id = *((int *)cur_ptr_buffer);
+        // subframe_id = *((int *)cur_ptr_buffer + 1);
+        // cell_id = *((int *)cur_ptr_buffer + 2);
+        // ant_id = *((int *)cur_ptr_buffer + 3);
        
         
         // get the position in buffer
@@ -198,27 +204,29 @@ void* PackageReceiver::loopRecv(void *in_context)
             exit(0);
         }
         //printf("enqueue offset %d\n", offset);
-        int cur_queue_len = message_queue_->size_approx();
-        maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
-        int total_symbols = (frame_id * subframe_num_perframe + subframe_id) * BS_ANT_NUM + ant_id;
+        // int cur_queue_len = message_queue_->size_approx();
+        // maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
+        // int total_symbols = (frame_id * subframe_num_perframe + subframe_id) * BS_ANT_NUM + ant_id;
 
-        maxSymbolNum = (maxSymbolNum > total_symbols) ? maxSymbolNum : total_symbols;
-        // printf("Frame %d, subframe %d, ant %d, total_symbols: %d, maxSymbolNum: %d, received %d\n", frame_id, subframe_id, ant_id, total_symbols, maxSymbolNum, package_num);
+        // maxSymbolNum = (maxSymbolNum > total_symbols) ? maxSymbolNum : total_symbols;
+        // printf("Frame %d, subframe %d, ant %d, recvlen: %d, total_symbols: %d, maxSymbolNum: %d, received %d\n", frame_id, subframe_id, ant_id, recvlen, total_symbols, maxSymbolNum, package_num);
 
         package_num++;
         // print some information
-        if(package_num == 1e5)
+        if(package_num == BS_ANT_NUM * max_subframe_id * 100)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * 1e5;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
             std::chrono::duration<double> diff = end - begin;
-            float package_loss_rate = 1.0e5 / (maxSymbolNum - Symbol_offset);
+            // float package_loss_rate = 1.0e5 / (maxSymbolNum - Symbol_offset);
 
             // print network throughput & maximum message queue length during this period
-            printf("RX thread %d receive %f bytes in %f secs, throughput %f MB/s, max Message Queue Length %d, package loss rate: 100000/%d = %.4f\n", tid, byte_len, diff.count(), 
-                byte_len / diff.count() / 1024 / 1024, maxQueueLength, (maxSymbolNum - Symbol_offset), package_loss_rate);
-            maxQueueLength = 0;
-            Symbol_offset = maxSymbolNum;
+            printf("RX thread %d receive 100 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), 
+                byte_len / diff.count() / 1024 / 1024);
+            // printf("RX thread %d receive %f bytes in %f secs, throughput %f MB/s, max Message Queue Length %d, package loss rate: 100000/%d = %.4f\n", tid, byte_len, diff.count(), 
+                // byte_len / diff.count() / 1024 / 1024, maxQueueLength, (maxSymbolNum - Symbol_offset), package_loss_rate);
+            // maxQueueLength = 0;
+            // Symbol_offset = maxSymbolNum;
             begin = std::chrono::system_clock::now();
             package_num = 0;
         }
