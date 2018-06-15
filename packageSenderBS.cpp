@@ -143,7 +143,6 @@ void* packageSenderBS::loopSend(void *in_context)
     // use token to speed up
     moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ConsumerToken local_ctok(*task_queue_);
-    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     while(true) {
     
         Event_data task_event;
@@ -209,10 +208,10 @@ void* packageSenderBS::loopSend(void *in_context)
         //     usleep(71);
         // }
 
-        if(package_count == BS_ANT_NUM * max_subframe_id * 100)
+        if(package_count == BS_ANT_NUM * data_subframe_num_perframe * 100)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * data_subframe_num_perframe * 100;
             std::chrono::duration<double> diff = end - begin;
             printf("TX thread %d send 100 frames in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
             begin = std::chrono::system_clock::now();

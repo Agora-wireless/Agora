@@ -90,7 +90,7 @@ CoMP::CoMP()
     memset(precoder_status_, 0, sizeof(bool) * TASK_BUFFER_FRAME_NUM); 
 
     memset(demul_status_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-    memset(cropper_created_checker_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    memset(cropper_created_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
 
     for(int i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
         memset(demul_checker_[i], 0, sizeof(int) * (subframe_num_perframe - UE_NUM));
@@ -178,6 +178,7 @@ CoMP::CoMP()
         memset(modulate_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
     }
 
+    memset(ifft_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
     memset(tx_status_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
     memset(tx_checker_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
 
@@ -234,6 +235,14 @@ void CoMP::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_d
     }
 }
 
+static double get_time(void)
+{
+    struct timespec tv;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
+}
+
+
 void CoMP::start()
 {
     // if ENABLE_CPU_ATTACH, attach main thread to core 0
@@ -287,15 +296,24 @@ void CoMP::start()
     // counter for print log
     int demul_count = 0;
     auto demul_begin = std::chrono::system_clock::now();
-    auto tx_begin = std::chrono::system_clock::now();
+    auto tx_begin = std::chrono::high_resolution_clock::now();
+    auto ifft_begin = std::chrono::high_resolution_clock::now();
+    auto zf_begin = std::chrono::high_resolution_clock::now();
     int miss_count = 0;
     int total_count = 0;
     int frame_count = 0;
     int tx_count = 0;
+    int zf_count = 0;
+    // auto pilot_received = std::chrono::system_clock::now();
+    // std::chrono::time_point<std::chrono::high_resolution_clock> pilot_received[TASK_BUFFER_FRAME_NUM];
+    double pilot_received[TASK_BUFFER_FRAME_NUM];
+    double total_time = 0;
+    int ifft_frame_count = 0;
 
 
     Event_data events_list[dequeue_bulk_size];
     int ret = 0;
+    bool rx_start = false;
     while(true) {
         // get a bulk of events
         ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size);
@@ -328,17 +346,31 @@ void CoMP::start()
                     int offset_in_current_buffer = offset % buffer_frame_num;
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer.data() + offset_in_current_buffer * PackageReceiver::package_length;
                     int subframe_id = *((int *)socket_buffer_ptr + 1);
+                    if (!rx_start) {
+                        rx_start = true;
+                        tx_begin = std::chrono::high_resolution_clock::now();
+                        demul_begin = std::chrono::system_clock::now();
+                    }
                     if (!ENABLE_DOWNLINK || subframe_id < UE_NUM) {
                         schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT                      
                         int frame_id = *((int *)socket_buffer_ptr);
-                        int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM) * subframe_num_perframe + subframe_id;
+                        int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM);
                         cropper_created_checker_[cropper_created_checker_id] ++;
-                        // printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-                        if (cropper_created_checker_[cropper_created_checker_id] == BS_ANT_NUM) {
-                            printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id);
-                            cropper_created_checker_[cropper_created_checker_id] = 0;
+                        if (cropper_created_checker_[cropper_created_checker_id] == 1) {   
+                            pilot_received[cropper_created_checker_id] = get_time();                      
+                            // pilot_received[cropper_created_checker_id] = std::chrono::high_resolution_clock::now();
+                            // std::chrono::duration<double> diff = pilot_received[cropper_created_checker_id] - pilot_received[(cropper_created_checker_id-1)%TASK_BUFFER_FRAME_NUM];
+                            // printf("Main thread: data received from frame %d, time: %f\n", frame_id, diff.count());
                         }
+                        // printf("Main thread: created FFT tasks for all ants in frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+                        // if (cropper_created_checker_[cropper_created_checker_id] == BS_ANT_NUM * UE_NUM) {
+                        //     printf("Main thread: created FFT tasks for all ants and all users in frame: %d, frame buffer: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM);
+                        //     cropper_created_checker_[cropper_created_checker_id] = 0;
+                            
+                        //     // std::time_t time_now_t = std::chrono::system_clock::to_time_t(pilot_received[frame_id % TASK_BUFFER_FRAME_NUM]);
+                        //     // std::cout <<"Current time:" <<std::ctime(&time_now_t) << std::endl;
+                        // }
 #endif                        
                     }
                     else if (ENABLE_DOWNLINK) {
@@ -419,19 +451,6 @@ void CoMP::start()
                                 // reset frame_count to avoid overflow
                                 if (frame_count==MAX_FRAME_ID) 
                                     frame_count=0;
-                            
-                            // if downlink data transmission is enabled, schedule downlink modulation for all data subframes
-#if ENABLE_DOWNLINK
-                                Event_data do_modul_task;
-                                do_modul_task.event_type = TASK_MODUL;
-
-                                for (int i = 0; i < data_subframe_num_perframe; i++) {
-                                    for (int j = 0; j < UE_NUM; j++) {
-                                        do_modul_task.data = generateOffset3d(UE_NUM, frame_id, i, j);
-                                        schedule_task(do_modul_task, &modulate_queue_, ptok_modul);
-                                    }
-                                }
-#endif
                             }
                         }
                         else if (isData(subframe_id)) {
@@ -471,11 +490,34 @@ void CoMP::start()
 
                     precoder_checker_[frame_id] ++;
                     if (precoder_checker_[frame_id] == OFDM_CA_NUM) {
+                        // if downlink data transmission is enabled, schedule downlink modulation for all data subframes
+#if ENABLE_DOWNLINK
+                        Event_data do_modul_task;
+                        do_modul_task.event_type = TASK_MODUL;
+
+                        for (int i = 0; i < data_subframe_num_perframe; i++) {
+                            for (int j = 0; j < UE_NUM; j++) {
+                                do_modul_task.data = generateOffset3d(UE_NUM, frame_id, i, j);
+                                schedule_task(do_modul_task, &modulate_queue_, ptok_modul);
+                            }
+                        }
+#endif
                         if (DEBUG_PRINT_TASK_DONE || DEBUG_PRINT_SUMMARY) 
                             printf("Main thread: ZF done frame: %d\n", frame_id);
                         precoder_checker_[frame_id] = 0;
                         //TODO: this flag can be used to optimize deDemul logic
                         precoder_status_[frame_id] = true;
+
+#if DEBUG_PRINT_SUMMARY_100_FRAMES
+                        zf_count++;
+                        if (zf_count == 100) {
+                            auto zf_end = std::chrono::high_resolution_clock::now();
+                            std::chrono::duration<double> diff = zf_end - zf_begin;         
+                            printf("Main thread: finished ZF for 100 frames in %f secs\n", diff.count());
+                            zf_count = 0;
+                            zf_begin = std::chrono::high_resolution_clock::now();
+                        }
+#endif
                     }
                 }
                 break;
@@ -579,6 +621,20 @@ void CoMP::start()
                     do_tx_task.event_type = TASK_SEND;
                     do_tx_task.data = offset_ifft;                    
                     schedule_task(do_tx_task, &tx_queue_, ptok_tx);
+                    ifft_checker_[frame_id] += 1;
+                    if (ifft_checker_[frame_id] == BS_ANT_NUM * data_subframe_num_perframe) {
+                        ifft_checker_[frame_id] = 0;
+                        // printf("Finished IFFT for frame %d\n", frame_id);
+                        ifft_frame_count++;
+                        if (ifft_frame_count == 100) {   
+                            auto ifft_end = std::chrono::high_resolution_clock::now();
+                            std::chrono::duration<double> diff = ifft_end - ifft_begin;         
+                            printf("Main thread: finished IFFT for 100 frames in %f secs\n", diff.count());
+                            ifft_frame_count = 0;
+                            total_time = 0;
+                            ifft_begin = std::chrono::high_resolution_clock::now();
+                        }
+                    }
                 }
                 break;
             case EVENT_PACKAGE_SENT: {
@@ -597,12 +653,12 @@ void CoMP::start()
                         if (tx_count == data_subframe_num_perframe * 100)
                         {
                             tx_count = 0;
-                            auto tx_end = std::chrono::system_clock::now();
+                            auto tx_end = std::chrono::high_resolution_clock::now();
                             std::chrono::duration<double> diff = tx_end - tx_begin;
                             int samples_num_per_UE = OFDM_CA_NUM * data_subframe_num_perframe * 100;
                             printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %d\n", 
                                 samples_num_per_UE, UE_NUM, diff.count(), samples_num_per_UE * log2(16.0f) / diff.count(), tx_queue_.size_approx());
-                            tx_begin = std::chrono::system_clock::now();
+                            tx_begin = std::chrono::high_resolution_clock::now();
                         }
 #if DEBUG_PRINT_SUMMARY || DEBUG_PRINT_TASK_DONE                        
                         if (DEBUG_PRINT_TASK_DONE)
@@ -670,35 +726,44 @@ void* CoMP::taskThread(void* context)
     bool ret_precode = false;
 
     while(true) {
-        ret_zf = zf_queue_->try_dequeue(event);
-        if (!ret_zf) {
-            if (ENABLE_DOWNLINK) {
-                // do not process uplink data if downlink is enabled
-                ret_ifft = ifft_queue_->try_dequeue(event);
-                if (!ret_ifft) {
-                    ret_precode = precode_queue_->try_dequeue(event);
-                    if (!ret_precode) {
-                        ret_modul = modulate_queue_->try_dequeue(event);
-                        if (!ret_modul) {
+        if (ENABLE_DOWNLINK) {
+            // do not process uplink data if downlink is enabled
+            ret_ifft = ifft_queue_->try_dequeue(event);
+            if (!ret_ifft) {
+                ret_precode = precode_queue_->try_dequeue(event);
+                if (!ret_precode) {
+                    ret_modul = modulate_queue_->try_dequeue(event);
+                    if (!ret_modul) {
+                        ret_zf = zf_queue_->try_dequeue(event);
+                        if (!ret_zf) {
                             ret = task_queue_->try_dequeue(event);
                             if (!ret) 
                                 continue;
                             else
                                 obj_ptr->doCrop(tid, event.data);
                         }
-                        else {
-                            obj_ptr->do_modulate(tid, event.data);
+                        else if (event.event_type == TASK_ZF) {
+                            obj_ptr->doZF(tid, event.data);
+                        }
+                        else if (event.event_type == TASK_PRED) {
+                            obj_ptr->doPred(tid, event.data);
                         }
                     }
                     else {
-                        obj_ptr->do_precode(tid, event.data);
+                        obj_ptr->do_modulate(tid, event.data);
                     }
                 }
                 else {
-                    obj_ptr->do_ifft(tid, event.data);
+                    obj_ptr->do_precode(tid, event.data);
                 }
             }
             else {
+                obj_ptr->do_ifft(tid, event.data);
+            }
+        }
+        else {
+            ret_zf = zf_queue_->try_dequeue(event);
+            if (!ret_zf) {
                 ret_demul = demul_queue_->try_dequeue(event);
                 if (!ret_demul) {   
                     ret = task_queue_->try_dequeue(event);
@@ -712,19 +777,16 @@ void* CoMP::taskThread(void* context)
                     obj_ptr->doDemul(tid, event.data);
                 }
             }
-        }
-        else if (event.event_type == TASK_ZF) {
-            obj_ptr->doZF(tid, event.data);
-        }
-        else if (event.event_type == TASK_PRED) {
-            obj_ptr->doPred(tid, event.data);
-        }
-        else {
-            printf("Event type error\n");
-            exit(0);
-        }       
+            else if (event.event_type == TASK_ZF) {
+                obj_ptr->doZF(tid, event.data);
+            }
+            else if (event.event_type == TASK_PRED) {
+                obj_ptr->doPred(tid, event.data);
+            }
+        } 
     }
 }
+
 
 
 inline int CoMP::generateOffset2d(int unit_total_num, int frame_id, int unit_id) 
@@ -808,7 +870,7 @@ inline imat CoMP::demod_16qam(cx_fmat x)
 
 inline cx_fmat CoMP::mod_16qam(imat x)
 {
-    cx_fmat re(size(x));
+    // cx_fmat re(size(x));
     fmat real_re = conv_to<fmat>::from(x);
     fmat imag_re = conv_to<fmat>::from(x);
     // float scale = 1/sqrt(10);
@@ -818,9 +880,10 @@ inline cx_fmat CoMP::mod_16qam(imat x)
     // imag_re.for_each([&modvec_16qam](fmat::elem_type& val) { val = modvec_16qam[(int)val%4]; } );
     real_re.for_each([this](fmat::elem_type& val) { val = qam16_table[0][(int)val]; } );
     imag_re.for_each([this](fmat::elem_type& val) { val = qam16_table[1][(int)val]; } );
-    re.set_real(real_re);
-    re.set_imag(imag_re);
-    cout << "In mod_16qam: memory of x: " << x.memptr() << ",  memory of re: " << re.memptr() << endl;
+    cx_fmat re(real_re, imag_re);
+    // re.set_real(real_re);
+    // re.set_imag(imag_re);
+    // cout << "In mod_16qam: memory of x: " << x.memptr() << ",  memory of re: " << re.memptr() << endl;
     // cout << "x:" << endl;
     // cout << x.st() << endl;
     // cout << "Re:" << real(re).st() << endl;
