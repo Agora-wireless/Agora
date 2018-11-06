@@ -27,8 +27,8 @@ public:
     static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     // int for: frame_id, subframe_id, cell_id, ant_id
     // unsigned int for: I/Q samples
-    static const int buffer_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-    static const int data_offset = sizeof(int) * 4;
+    static const int buffer_length = sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+    static const int data_offset = sizeof(int) * 16;
     static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
 
@@ -41,7 +41,7 @@ public:
     };
 
 public:
-    PackageSender(int in_socket_num, int in_thread_num, int in_core_offset = 30);
+    PackageSender(int in_socket_num, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
     ~PackageSender();
 
     static void* loopSend(void *context);
@@ -75,6 +75,7 @@ private:
     int socket_num;
 
     int core_offset;
+    int delay;
     PackageSenderContext* context;
 
 };

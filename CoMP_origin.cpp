@@ -18,48 +18,39 @@ CoMP::CoMP()
     // openblas_set_num_threads(1);
     printf("enter constructor\n");
     // initialize socket buffer
-
-    printf("initialize buffers\n");
-    socket_buffer_size_ = PackageReceiver::package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
-    socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
-        socket_buffer_[i].buffer = (char *)aligned_alloc(64, socket_buffer_size_ * sizeof(char));
-        socket_buffer_[i].buffer_status = (int *)aligned_alloc(64, socket_buffer_status_size_ * sizeof(int));
+        socket_buffer_[i].buffer.resize(PackageReceiver::package_length 
+            * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM); // buffer SOCKET_BUFFER_FRAME_NUM entire frame
+        socket_buffer_[i].buffer_status.resize(subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM);
     }
-
-    
+    printf("initialize buffers\n");
 
     // initialize FFT buffer
-    // int FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    // fft_buffer_.FFT_inputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));//new complex_float * [FFT_buffer_block_num];
-    // fft_buffer_.FFT_outputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));//new complex_float * [FFT_buffer_block_num];
-    // for (int i = 0; i < FFT_buffer_block_num; i++) {
-    //     fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
-    //     fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
-    // }
-
-    int FFT_buffer_block_num = subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    fft_buffer_.FFT_inputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));
-    fft_buffer_.FFT_outputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));
+    int FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    fft_buffer_.FFT_inputs = new complex_float * [FFT_buffer_block_num];
+    fft_buffer_.FFT_outputs = new complex_float * [FFT_buffer_block_num];
     for (int i = 0; i < FFT_buffer_block_num; i++) {
-        fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
-        fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
+        fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
+        fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
     }
+
+    // int FFT_buffer_block_num = subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    // fft_buffer_.FFT_inputs = new complex_float * [FFT_buffer_block_num];
+    // fft_buffer_.FFT_outputs = new complex_float * [FFT_buffer_block_num];
+    // for (int i = 0; i < FFT_buffer_block_num; i++) {
+    //     fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
+    //     fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
+    // }
 
     // initialize muplans for fft
     for (int i = 0; i < TASK_THREAD_NUM; i++) 
         muplans_[i] = mufft_create_plan_1d_c2c(OFDM_CA_NUM, MUFFT_FORWARD, MUFFT_FLAG_CPU_ANY);
 
     // initialize CSI buffer
-    // csi_buffer_.CSI.resize(OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM);
-    // for (int i = 0; i < csi_buffer_.CSI.size(); i++)
-    //     csi_buffer_.CSI[i].resize(BS_ANT_NUM * UE_NUM);
-    // printf("CSI buffer initialized\n");
-
-    // TODO: remove this buffer
-    csi_buffer_.CSI.resize(UE_NUM * TASK_BUFFER_FRAME_NUM);
+    csi_buffer_.CSI.resize(OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM);
     for (int i = 0; i < csi_buffer_.CSI.size(); i++)
-        csi_buffer_.CSI[i].resize(BS_ANT_NUM * OFDM_CA_NUM);
+        csi_buffer_.CSI[i].resize(BS_ANT_NUM * UE_NUM);
+    // printf("CSI buffer initialized\n");
 
 
     if (DO_PREDICTION) {
@@ -68,33 +59,29 @@ CoMP::CoMP()
             pred_csi_buffer_.CSI[i].resize(BS_ANT_NUM * UE_NUM);
     }
 
+    // initialize data buffer
+    data_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    for (int i = 0; i < data_buffer_.data.size(); i++)
+        data_buffer_.data[i].resize(BS_ANT_NUM * OFDM_CA_NUM);
+    // printf("Data buffer initialized\n");
 
     // initialize precoder buffer
-    int precoder_buffer_size = OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM;
-    precoder_buffer_.precoder = (complex_float **)malloc(precoder_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < precoder_buffer_size; i++)
-        precoder_buffer_.precoder[i] = (complex_float *)aligned_alloc(64, UE_NUM * BS_ANT_NUM * sizeof(complex_float));
+    precoder_buffer_.precoder.resize(OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM);
+    for (int i = 0; i < precoder_buffer_.precoder.size(); i++)
+        precoder_buffer_.precoder[i].resize(UE_NUM * BS_ANT_NUM);
 
     // initialize equalized data buffer
-    int equal_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    equal_buffer_.data = (complex_float **)malloc(equal_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < equal_buffer_size; i++)
-        equal_buffer_.data[i] = (complex_float *)aligned_alloc(64, OFDM_CA_NUM * UE_NUM * sizeof(complex_float));
-
-
+    equal_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    for (int i = 0; i < equal_buffer_.data.size(); i++)
+        equal_buffer_.data[i].resize(OFDM_CA_NUM * UE_NUM);
 
     // initialize demultiplexed data buffer
-    int demul_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    demul_buffer_.data = (long long **)malloc(equal_buffer_size * sizeof(long long *));
-    for (int i = 0; i < demul_buffer_size; i++)
-        demul_buffer_.data[i] = (long long *)aligned_alloc(64, OFDM_CA_NUM * UE_NUM * sizeof(long long));
-
+    demul_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    for (int i = 0; i < demul_buffer_.data.size(); i++)
+        demul_buffer_.data[i].resize(OFDM_CA_NUM * UE_NUM);
 
     for (int i = 0; i < TASK_THREAD_NUM; ++i)
-        spm_buffer[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * sizeof(complex_float));
-
-    for (int i = 0; i < TASK_THREAD_NUM; ++i)
-        csi_gather_buffer[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * UE_NUM * sizeof(complex_float));
+        spm_buffer[i].resize(BS_ANT_NUM);
     // printf("Demultiplexed data buffer initialized\n");
 
     // read pilots from file
@@ -303,11 +290,11 @@ void CoMP::start()
     char *socket_buffer_ptrs[SOCKET_RX_THREAD_NUM];
     int *socket_buffer_status_ptrs[SOCKET_RX_THREAD_NUM];
     for(int i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
-        socket_buffer_ptrs[i] = socket_buffer_[i].buffer;
-        socket_buffer_status_ptrs[i] = socket_buffer_[i].buffer_status;
+        socket_buffer_ptrs[i] = socket_buffer_[i].buffer.data();
+        socket_buffer_status_ptrs[i] = socket_buffer_[i].buffer_status.data();
     }
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
-        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, main_core_id + 1);
+        socket_buffer_status_ptrs, socket_buffer_[0].buffer_status.size(), socket_buffer_[0].buffer.size(), main_core_id + 1);
 
     // start downlink transmitter
 #if ENABLE_DOWNLINK
@@ -390,7 +377,7 @@ void CoMP::start()
                         int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
                         int socket_thread_id = offset / buffer_frame_num;
                         int offset_in_current_buffer = offset % buffer_frame_num;
-                        char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer + offset_in_current_buffer * PackageReceiver::package_length;
+                        char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer.data() + offset_in_current_buffer * PackageReceiver::package_length;
                         int subframe_id = *((int *)socket_buffer_ptr + 1);
                         if (!rx_start) {
                             rx_start = true;
@@ -980,11 +967,10 @@ void CoMP::doCrop(int tid, int offset)
 {
     int buffer_subframe_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     int socket_thread_id = offset / buffer_subframe_num;
-    // offset = offset - socket_thread_id * buffer_subframe_num;
-    offset = offset % buffer_subframe_num;
+    offset = offset - socket_thread_id * buffer_subframe_num;
     // printf("In doCrop: socket_thread: %d offset %d\n", socket_thread_id, offset);
     // read info of one frame
-    char *cur_ptr_buffer = socket_buffer_[socket_thread_id].buffer + offset * PackageReceiver::package_length;
+    char *cur_ptr_buffer = socket_buffer_[socket_thread_id].buffer.data() + offset * PackageReceiver::package_length;
 
     int ant_id, frame_id, subframe_id, cell_id;
     frame_id = *((int *)cur_ptr_buffer);
@@ -994,14 +980,14 @@ void CoMP::doCrop(int tid, int offset)
     // printf("thread %d process frame_id %d, subframe_id %d, cell_id %d, ant_id %d\n", tid, frame_id, subframe_id, cell_id, ant_id);
     // remove CP, do FFT
     int delay_offset = 0;
-    // int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
-    int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
+    int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
+    // int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
 
 
     // transfer ushort to float
-    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + 64);
-    // float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
-    float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
+    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + sizeof(int) * 4);
+    float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
+    // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
 
     // Copy data for fft from socket buffer to fft buffer
     // fmat mat_fft_float_input(cur_fft_buffer_float, OFDM_CA_NUM * 2, 1, false);
@@ -1014,54 +1000,34 @@ void CoMP::doCrop(int tid, int offset)
     // // cout<<"Complex mat: "<<conv_to<cx_fmat>::from(mat_fft_input).st()<<endl;
     // // cout<<endl;
 
-    // Use SIMD
-    __m256 format_offset = _mm256_set1_ps(csi_format_offset);
-    for (int i = 0; i < OFDM_CA_NUM * 2; i += 8)
-    {
-        //  Load 8 16-bit shorts.
-        //  vi = {a,b,c,d,e,f,g,h}
-        __m128i vi = _mm_load_si128((const __m128i*)(cur_ptr_buffer_ushort + i));
-
-        //  Convert to 32-bit integers
-        //  vi0 = {a,0,b,0,c,0,d,0}
-        //  vi1 = {e,0,f,0,g,0,h,0}
-        __m256i vi0 = _mm256_cvtepi16_epi32(vi);
-        // __mm256i vi1 = _mm256_cvtepi16_epi32(_mm_unpackhi_epi64(vi,vi));
-
-        //  Convert to float
-        __m256 vf0 = _mm256_cvtepi32_ps(vi0);
-        // __m128 vf1 = _mm256_cvtepi32_ps(vi1);
-
-        //  Multiply
-        vf0 = _mm256_mul_ps(vf0, format_offset);
-        // vf1 = _mm256_mul_ps(vf1,format_offset);
-
-        //  Store
-        _mm256_store_ps(cur_fft_buffer_float + i, vf0);
-        // _mm_store_ps(destination + i + 4,vf1);
-    }
-
-    // for(int i = 0; i < (OFDM_CA_NUM - delay_offset) * 2; i++)
-    //     cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[OFDM_PREFIX_LEN + delay_offset + i] * csi_format_offset;
+    for(int i = 0; i < (OFDM_CA_NUM - delay_offset) * 2; i++)
+        cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[OFDM_PREFIX_LEN + delay_offset + i] * csi_format_offset;
    
     // append zero
     // if(delay_offset > 0) 
     //     memset((char *)fft_buffer_.FFT_inputs[FFT_buffer_target_id] 
     //         + (OFDM_CA_NUM - delay_offset) * 2 * sizeof(float), 0, sizeof(float) * 2 * delay_offset);
 
+    // perform fft
+    // cx_fvec mat_fft_cx_input((cx_float *)cur_fft_buffer_float, OFDM_CA_NUM,  false);
+    // cx_fvec mat_fft_cx_output((cx_float *)fft_buffer_.FFT_outputs[FFT_buffer_target_id], OFDM_CA_NUM,  false);
+    // mat_fft_cx_output = fft(mat_fft_cx_input);
+    // // cout<<"FFT outputs: "<<mat_fft_cx_output.st()<<endl;
+    // // cout<<endl;
+    // // 
 
-    mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM, 
-        fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
+
+
+    mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id], 
+        fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
     // printf("FFT input\n");
     // for ( int i = 0; i< OFDM_CA_NUM; i++) {
-    //     // cout <<"("<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)).real<<","<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)).imag<<") ";
-    //     cout <<"("<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).real<<","<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).imag<<") ";
+    //     cout <<"("<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)).real<<","<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)).imag<<") ";
     //     // printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)), *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)+1));
     // }
     // printf("\n FFT output: \n");
     // for ( int i = 0; i< OFDM_CA_NUM; i++) {
-    //     printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_outputs[FFT_buffer_target_id]+i)), *((float *)(fft_buffer_.FFT_outputs[FFT_buffer_target_id]+i)+1));
-    //      // printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)), *((float *)(fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)+1));
+    //      printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)), *((float *)(fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)+1));
     // }
     // printf("\n");
 
@@ -1070,104 +1036,81 @@ void CoMP::doCrop(int tid, int offset)
         printf("In doCrop thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 #endif
     // if it is pilot part, do CE
-    // if(isPilot(subframe_id)) {
-    //     int UE_id = subframe_id;
-    //     // int ca_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM;
-    //     // int csi_offset = ant_id + UE_id * BS_ANT_NUM;
-    //     int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * UE_NUM + UE_id;
-    //     // int csi_offset = UE_id + ant_id * UE_NUM;
+    if(isPilot(subframe_id)) {
+        int UE_id = subframe_id;
+        int ca_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM;
+        int csi_offset = ant_id + UE_id * BS_ANT_NUM;
+        // int csi_offset = UE_id + ant_id * UE_NUM;
 
-    //     float* cur_fft_buffer_float_output = (float*)(fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
+        float* cur_fft_buffer_float_output = (float*)fft_buffer_.FFT_outputs[FFT_buffer_target_id];
 
-    //     // Use SIMD
-    //     float* csi_buffer_ptr = (float*)(csi_buffer_.CSI[subframe_offset].data());
-    //     int sc_idx = 0;
-    //     int dst_idx = 0;
+        // float* csi_buffer_ptr = (float*)(csi_buffer_.CSI[ca_offset].data());
+        // cx_fmat mat_csi_buffer((cx_float*)(csi_buffer_.CSI[ca_offset].data())+csi_offset*2, OFDM_CA_NUM, 1, false);
+        // cx_fmat mat_pilot_after_fft((cx_float*)(fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM), OFDM_CA_NUM, 1, false);
+        // cx_fmat mat_pilot((cx_float *)pilots_complex_.data(), OFDM_CA_NUM, 1, false);
 
-    //     for (int block_idx = 0; block_idx < transpose_block_num; block_idx ++) {
+        // mat_csi_buffer = mat_pilot_after_fft % mat_pilot;
+        // // cout<<"Pilot: "<<mat_pilot.st()<<endl;
+        // // cout<<"Pilot recv: "<<mat_pilot_after_fft.st()<<endl;
+        // cout<<"CSI: "<<mat_csi_buffer.st()<<endl;
+        // cout<<endl;
 
-    //         for (int sc_inblock_idx = 0; sc_inblock_idx < demul_block_size; sc_inblock_idx += 4) {
-    //             // load 8 floats (4 bytes) / 4 complex floats
-    //             __m256 pilot_rx = _mm256_load_ps(cur_fft_buffer_float_output + sc_idx * 2);
-    //             __m256 pilot_tx = _mm256_set_ps(pilots_[sc_idx], pilots_[sc_idx], pilots_[sc_idx+1], pilots_[sc_idx+1], 
-    //                                             pilots_[sc_idx+2], pilots_[sc_idx+2], pilots_[sc_idx+3], pilots_[sc_idx+3]);
-    //             __m256 csi_est = _mm256_mul_ps(pilot_rx, pilot_tx);
-    //             _mm256_store_ps(csi_buffer_ptr + (block_idx * BS_ANT_NUM + ant_id) * transpose_block_num * 2 + sc_inblock_idx * 2, csi_est);
-    //             sc_idx += 4;
-    //             // printf("subcarrier index: %d\n", sc_idx);
-    //         }
-    //     }
-    //     // cout<<"Before: "<<endl;
-    //     // for (int i =0;i<OFDM_CA_NUM; i++) {
-    //     //     cout<<"("<<i<<", "<<fft_buffer_.FFT_outputs[FFT_buffer_target_id][i].real<<","<<fft_buffer_.FFT_outputs[FFT_buffer_target_id][i].imag<<") ";
-    //     // }
-    //     // cout<<endl;
-
-    //     // cout<<"After: "<<endl;
-    //     // for (int i =0;i<OFDM_CA_NUM*BS_ANT_NUM; i++) {
-    //     //     cout<<"("<<i<<", "<<csi_buffer_.CSI[subframe_offset][i].real<<","<<csi_buffer_.CSI[subframe_offset][i].imag<<") ";
-    //     // }
-    //     // cout<<endl;
-
-
-    //     // for(int j = 0; j < (OFDM_CA_NUM); j++) {
-    //     //     // divide fft output by pilot data to get CSI estimation
-    //     //     float* csi_buffer_ptr = (float*)(csi_buffer_.CSI[ca_offset+j].data())+csi_offset*2;
-    //     //     *(csi_buffer_ptr)= cur_fft_buffer_float_output[2*j]* pilots_[j];
-    //     //     *(csi_buffer_ptr+1)= cur_fft_buffer_float_output[2*j+1]* pilots_[j];           
-    //     // }     
-    // }
-    // if(isData(subframe_id)) {
+        for(int j = 0; j < (OFDM_CA_NUM); j++) {
+            // divide fft output by pilot data to get CSI estimation
+            float* csi_buffer_ptr = (float*)(csi_buffer_.CSI[ca_offset+j].data())+csi_offset*2;
+            *(csi_buffer_ptr)= cur_fft_buffer_float_output[2*j]* pilots_[j];
+            *(csi_buffer_ptr+1)= cur_fft_buffer_float_output[2*j+1]* pilots_[j];           
+        }     
+    }
+    else if(isData(subframe_id)) {
         
-    //     int data_subframe_id = subframe_id - UE_NUM;
-    //     int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + data_subframe_id;
+        int data_subframe_id = subframe_id - UE_NUM;
+        int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + data_subframe_id;
         
-    //     // cx_fmat mat_fft_cx_output((cx_float *)fft_buffer_.FFT_outputs[FFT_buffer_target_id], OFDM_CA_NUM, 1, false);
+        // cx_fmat mat_fft_cx_output((cx_float *)fft_buffer_.FFT_outputs[FFT_buffer_target_id], OFDM_CA_NUM, 1, false);
 
 
-    //     /* //naive transpose
-    //     for(int j = 0; j < OFDM_CA_NUM; j++)
-    //     {
-    //         data_buffer_.data[frame_offset][ant_id + j * BS_ANT_NUM] = fft_buffer_.FFT_outputs[FFT_buffer_target_id][j];
-    //     }
-    //     */
-    //     // block transpose
-    //     // src_ptr: point to the start of subframe (subframe size: OFDM_CA_NUM) 
-    //     // 2048 float values
-    //     // cx_float *src_ptr = (cx_float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][0];
-    //     // cx_mat mat_data_buffer(src_ptr, BS_ANT_NUM, )
+        /* //naive transpose
+        for(int j = 0; j < OFDM_CA_NUM; j++)
+        {
+            data_buffer_.data[frame_offset][ant_id + j * BS_ANT_NUM] = fft_buffer_.FFT_outputs[FFT_buffer_target_id][j];
+        }
+        */
+        // block transpose
+        // src_ptr: point to the start of subframe (subframe size: OFDM_CA_NUM) 
+        // 2048 float values
+        // cx_float *src_ptr = (cx_float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][0];
+        // cx_mat mat_data_buffer(src_ptr, BS_ANT_NUM, )
 
 
-    //     // float *src_ptr = (float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][0];
-    //     float *src_ptr = (float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][ant_id*OFDM_CA_NUM];
+        float *src_ptr = (float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][0];
+        // float *src_ptr = (float *)&fft_buffer_.FFT_outputs[FFT_buffer_target_id][ant_id*OFDM_CA_NUM];
 
-    //     // printf("FFT output: \n");
-    //     // for ( int i = 0; i< OFDM_CA_NUM; i++) {
-    //     //      printf("(%.4f, %.4f) ", *(src_ptr+i*2), *(src_ptr+i*2+1));
-    //     // }
-    //     // printf("\n");
+        // printf("FFT output: \n");
+        // for ( int i = 0; i< OFDM_CA_NUM; i++) {
+        //      printf("(%.4f, %.4f) ", *(src_ptr+i*2), *(src_ptr+i*2+1));
+        // }
+        // printf("\n");
 
-    //     // tar_ptr: point to the start of subframe with size BS_ANT_NUM * OFDM_CA_NUM
-    //     // 96*1024*2 float values
-    //     float *tar_ptr = (float *)&data_buffer_.data[frame_offset][0];
-    //     // copy data from fft_outputs to data_buffer
-    //     // 1024*2/8 = 256 iterations, copy 8 bytes every time
-    //     // c2 = 0, 1, ..., 1024/64*2-1 = 31
-    //     // c2*transpose_block_size = 0, 64, 128, ..., 2048-64
-    //     for(int c2 = 0; c2 < OFDM_CA_NUM / transpose_block_size * 2; c2++) {
-    //         // c3 = 0, 1, ..., transpose_block_size/8 -1 = 7
-    //         // c3*8 = 0, 8, ..., 64-8
-    //         for(int c3 = 0; c3 < transpose_block_size / 8; c3++) {
-    //             // data: 256 bits = 32 bytes = 8 float values = 4 subcarriers
-
-    //             __m256 data = _mm256_load_ps(src_ptr);
-    //             // original data order: SCs of ant1, SCs of ant2, ..., SCs of ant 96
-    //             // transposed data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
-    //             _mm256_store_ps(tar_ptr + c2 * BS_ANT_NUM * transpose_block_size + transpose_block_size * ant_id + c3 * 8, data);
-    //             src_ptr += 8;
-    //         }            
-    //     }        
-    // }
+        // tar_ptr: point to the start of subframe with size BS_ANT_NUM * OFDM_CA_NUM
+        // 96*1024*2 float values
+        float *tar_ptr = (float *)&data_buffer_.data[frame_offset][0];
+        // copy data from fft_outputs to data_buffer
+        // 1024*2/8 = 256 iterations, copy 8 bytes every time
+        // c2 = 0, 1, ..., 1024/64*2-1 = 31
+        // c2*transpose_block_size = 0, 64, 128, ..., 2048-64
+        for(int c2 = 0; c2 < OFDM_CA_NUM / transpose_block_size * 2; c2++) {
+            // c3 = 0, 1, ..., transpose_block_size/8 -1 = 7
+            // c3*8 = 0, 8, ..., 64-8
+            for(int c3 = 0; c3 < transpose_block_size / 8; c3++) {
+                // data: 256 bits = 32 bytes = 8 float values = 4 subcarriers
+                __m256 data = _mm256_load_ps(src_ptr + c2 * transpose_block_size + c3 * 8);
+                // original data order: SCs of ant1, SCs of ant2, ..., SCs of ant 96
+                // transposed data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
+                _mm256_store_ps(tar_ptr + c2 * BS_ANT_NUM * transpose_block_size + transpose_block_size * ant_id + c3 * 8, data);
+            }            
+        }        
+    }
 
 
     // after finish
@@ -1195,77 +1138,10 @@ void CoMP::doZF(int tid, int offset)
     if (DEBUG_PRINT_IN_TASK)
         printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 
-    // directly gather data from FFT buffer
-    __m256i index = _mm256_setr_epi32(0, 1, OFDM_CA_NUM * 2, OFDM_CA_NUM * 2 + 1, OFDM_CA_NUM * 4, OFDM_CA_NUM * 4 + 1, OFDM_CA_NUM * 6, OFDM_CA_NUM * 6 + 1);
-
-    // __m256i index = _mm256_setr_epi64x(0, transpose_block_size/2, transpose_block_size/2 * 2, transpose_block_size/2 * 3);
-
-    int transpose_block_id = sc_id / demul_block_size;
-    int sc_inblock_idx = sc_id % demul_block_size;
-    int offset_in_csi_buffer = transpose_block_id * BS_ANT_NUM * demul_block_size  + sc_inblock_idx;
-    // double *tar_csi_ptr = (double *)csi_gather_buffer[tid];
-    // int subframe_offset = frame_id * UE_NUM;
-    int subframe_offset = frame_id * subframe_num_perframe;
-    float *tar_csi_ptr = (float *)csi_gather_buffer[tid];
-
-    // if (sc_id == 1) {
-    //     cout<<"csi_buffer_ for subframe "<<subframe_offset<<endl;
-    //     for (int i=0;i<BS_ANT_NUM*OFDM_CA_NUM; i++) {
-    //         cout<<"("<<csi_buffer_.CSI[subframe_offset][i].real<<","<<csi_buffer_.CSI[subframe_offset][i].imag<<") ";
-    //     }
-
-    //     cout<<endl;
-    // }
-
-    // // gather data for all users and antennas
-    // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-    //     double *src_csi_ptr = (double *)csi_buffer_.CSI[subframe_offset + ue_idx].data() + offset_in_csi_buffer;
-    //     for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-    //         // fetch 4 complex floats for 4 ants
-    //         __m256d t_csi = _mm256_i64gather_pd(src_csi_ptr, index, 8);
-    //         _mm256_store_pd(tar_csi_ptr, t_csi);
-    //         printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1), 
-    //                 *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-    //         src_csi_ptr += 4 * demul_block_size;
-    //         tar_csi_ptr += 4;
-    //     }
-    // }
-
-
-    // gather data for all users and antennas
-    for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-        float *src_csi_ptr = (float *)fft_buffer_.FFT_outputs[subframe_offset+ue_idx] + sc_id * 2;
-        for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-            // fetch 4 complex floats for 4 ants
-            __m256 pilot_rx = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-           
-            if (pilots_[sc_id] > 0) {
-                _mm256_store_ps(tar_csi_ptr, pilot_rx);
-            }     
-            else if (pilots_[sc_id] < 0){
-                __m256 pilot_tx = _mm256_set1_ps(pilots_[sc_id]);
-                __m256 csi_est = _mm256_mul_ps(pilot_rx, pilot_tx);
-                _mm256_store_ps(tar_csi_ptr, csi_est);
-            }
-            else {
-                _mm256_store_ps(tar_csi_ptr, _mm256_setzero_ps());
-            }
-
-            // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1), 
-            //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-            src_csi_ptr += 8 * OFDM_CA_NUM;
-            tar_csi_ptr += 8;
-
-        }
-    }
-
-    cx_float *ptr_in = (cx_float *)csi_gather_buffer[tid];
-    //cx_float *ptr_in = (cx_float *)csi_buffer_.CSI[offset].data();
+    cx_float *ptr_in = (cx_float *)csi_buffer_.CSI[offset].data();
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
-    // cout<<"CSI matrix"<<endl;
-    // cout<<mat_input.st()<<endl;
     // cx_fmat mat_input(ptr_in, UE_NUM, BS_ANT_NUM, false);
-    cx_float *ptr_out = (cx_float *)precoder_buffer_.precoder[offset];
+    cx_float *ptr_out = (cx_float *)precoder_buffer_.precoder[offset].data();
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     // cx_fmat mat_output(ptr_out, BS_ANT_NUM, UE_NUM, false);
     
@@ -1295,7 +1171,7 @@ void CoMP::doPred(int tid, int offset)
     cx_float *ptr_in = (cx_float *)pred_csi_buffer_.CSI[sc_id].data();
     memcpy(ptr_in, (cx_float *)csi_buffer_.CSI[offset].data(), sizeof(cx_float)*BS_ANT_NUM*UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
-    cx_float *ptr_out = (cx_float *)precoder_buffer_.precoder[offset_next_frame];
+    cx_float *ptr_out = (cx_float *)precoder_buffer_.precoder[offset_next_frame].data();
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     pinv(mat_output, mat_input, 1e-1, "dc");
 
@@ -1321,64 +1197,37 @@ void CoMP::doDemul(int tid, int offset)
 #endif
 
     // index=[0,32,64,96]
-    // __m256i index = _mm256_setr_epi64x(0, transpose_block_size/2, transpose_block_size/2 * 2, transpose_block_size/2 * 3);
-    __m256i index = _mm256_setr_epi64x(0, OFDM_CA_NUM, OFDM_CA_NUM * 2, OFDM_CA_NUM * 3);
+    __m256i index = _mm256_setr_epi64x(0, transpose_block_size/2, transpose_block_size/2 * 2, transpose_block_size/2 * 3);
 
-    // float* tar_ptr = (float *)&data_buffer_.data[total_data_subframe_id][0];
-    // float* temp_buffer_ptr = (float *)&spm_buffer[tid][0];
-
-
-    int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
-    double *tar_data_ptr = (double *)spm_buffer[tid];
-
-    int gather_step_size = 4 * OFDM_CA_NUM;
-
+    float* tar_ptr = (float *)&data_buffer_.data[total_data_subframe_id][0];
+    float* temp_buffer_ptr = (float *)&spm_buffer[tid][0];
     // i = 0, 1, ..., 31
     for (int i = 0; i < transpose_block_size/2; i++) {
-        // block index
         int c1_base = (sc_id + i) * 2 / transpose_block_size;
-        // subcarrier index in block
         int c1_offset = (sc_id + i) * 2 % transpose_block_size;
         /**
          * block-wisely copy data of all antennas of the i-th subcarrier from data_buffer to spm_buffer
          * copy data of 4 ants of the i-th subcarrier in each iteration 
          */
-
-        // for (int c2 = 0; c2 < BS_ANT_NUM / 4; c2++) {
-        //     float *base_ptr = tar_ptr + c1_base * transpose_block_size * BS_ANT_NUM + c1_offset + c2 * transpose_block_size * 4;
-        //     // t_data holds 4 double values (32 bytes) (subcarriers of 4 ants c2*4-c2*4+3)
-        //     // t_data[0] = *(base_ptr+0*8)  data of i-th subcarrier of (c2*4+0)-th antenna
-        //     // ...
-        //     // t_data[3] = *(base_ptr+96*8)  data of i-th subcarrier of (c2*4+3)-th antenna
-        //     __m256d t_data = _mm256_i64gather_pd((double *)base_ptr, index, 8);
-        //     _mm256_store_pd((double *)(temp_buffer_ptr + c2 * 8), t_data);
-        // }
-
-        // current subcarrier index = sc_id + i
-        double *src_data_ptr = (double *)fft_buffer_.FFT_outputs[subframe_offset] + sc_id + i;
-
-        for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-            // fetch 4 complex floats for 4 ants
-            __m256d data_rx = _mm256_i64gather_pd(src_data_ptr, index, 8);
-            _mm256_store_pd(tar_data_ptr, data_rx);
-
-            // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1), 
-            //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-            src_data_ptr += gather_step_size;
-            tar_data_ptr += 4;
-
+        for (int c2 = 0; c2 < BS_ANT_NUM / 4; c2++) {
+            float *base_ptr = tar_ptr + c1_base * transpose_block_size * BS_ANT_NUM + c1_offset + c2 * transpose_block_size * 4;
+            // t_data holds 4 double values (32 bytes) (subcarriers of 4 ants c2*4-c2*4+3)
+            // t_data[0] = *(base_ptr+0*8)  data of i-th subcarrier of (c2*4+0)-th antenna
+            // ...
+            // t_data[3] = *(base_ptr+96*8)  data of i-th subcarrier of (c2*4+3)-th antenna
+            __m256d t_data = _mm256_i64gather_pd((double *)base_ptr, index, 8);
+            _mm256_store_pd((double *)(temp_buffer_ptr + c2 * 8), t_data);
         }
-        tar_data_ptr = tar_data_ptr - BS_ANT_NUM;
 
         // mat_precoder size: UE_NUM \times BS_ANT_NUM
         int precoder_offset = frame_id * OFDM_CA_NUM + sc_id + i;
-        cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
+        cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset].data();
         cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
         // cx_fmat mat_precoder(precoder_ptr, BS_ANT_NUM, UE_NUM, false);
         // cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
 
         // mat_data size: BS_ANT_NUM \times 1
-        cx_float* data_ptr = (cx_float *)(spm_buffer[tid]);
+        cx_float* data_ptr = (cx_float *)(&spm_buffer[tid][0]);
         cx_fmat mat_data(data_ptr, BS_ANT_NUM, 1, false);
 
         // mat_demuled size: UE_NUM \times 1
@@ -1477,7 +1326,7 @@ void CoMP::do_precode(int tid, int offset)
     for (int i = 0; i < transpose_block_size/2; i++) { 
         int precoder_offset = frame_id * OFDM_CA_NUM + sc_id + i;
         // mat_precoder size: UE_NUM \times BS_ANT_NUM        
-        cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
+        cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset].data();
         cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
 
         // mat_data size: UE_NUM \times 1

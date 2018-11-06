@@ -120,9 +120,9 @@ rx_vec = reshape(rx_mat_all, 1, numel(rx_mat_all));
 rx_vec_float = zeros(1,size(rx_vec,2)*2);
 rx_vec_float(1:2:end) = real(rx_vec);
 rx_vec_float(2:2:end) = imag(rx_vec);
-    fileID = fopen('rx_data.bin','w');
-    fwrite(fileID,rx_vec_float,'float');
-    fclose(fileID);
+%     fileID = fopen('rx_data.bin','w');
+%     fwrite(fileID,rx_vec_float,'float');
+%     fclose(fileID);
 % end
 
     

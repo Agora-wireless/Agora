@@ -1,10 +1,12 @@
 #ifndef SYMBOLS
 #define SYMBOLS
+#define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
 
 #define BS_ANT_NUM 96
 #define OFDM_CA_NUM 1024
+#define FFT_LEN 1024
 #define OFDM_PREFIX_LEN 0
 #define UE_NUM 4
 
@@ -28,7 +30,7 @@
 #define TASK_MODUL 6
 #define TASK_SEND 7
 
-#define ENABLE_DOWNLINK 1
+#define ENABLE_DOWNLINK 0
 
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10

@@ -26,14 +26,17 @@
 #include <immintrin.h>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
+#include <signal.h>
+// #include <cblas.h>
+// #include <stdio.h>
 
 
 class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 27;
-    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 26;
+    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 4;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
@@ -46,9 +49,10 @@ public:
     // optimization parameters for block transpose (see the slides for more
     // details)
     static const int transpose_block_size = 64;
+    static const int transpose_block_num = 32;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
-    static const int dequeue_bulk_size = 5;
+    static const int dequeue_bulk_size = 10;
 
     CoMP();
     ~CoMP();
@@ -260,6 +264,9 @@ public:
     inline arma::cx_fmat mod_16qam(arma::imat x);
     inline complex_float mod_16qam_single(int x);
 
+    void getDemulData(long long **ptr, int *size);
+    void getEqualData(float **ptr, int *size);
+
 private:
     /*****************************************************
      * Uplink 
@@ -287,7 +294,11 @@ private:
      * Estimated CSI data 
      * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM
+     * First dimension: UE_NUM * TASK_BUFFER_FRAME_NUM
+     * Second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
+
+    // TODO: need to remove
     CSIBuffer csi_buffer_;
 
     /** 
@@ -296,7 +307,7 @@ private:
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      * second dimension data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
      */
-    DataBuffer data_buffer_;
+    // DataBuffer data_buffer_;
 
     /**
      * Calculated precoder
@@ -328,11 +339,16 @@ private:
 
     /** 
      * First dimension: TASK_THREAD_NUM
-     * Second dimension: UE_NUM */
-    myVec spm_buffer[TASK_THREAD_NUM];
-
+     * Second dimension: BS_ANT_NUM */
+    // myVec spm_buffer[TASK_THREAD_NUM];
+    complex_float *spm_buffer[TASK_THREAD_NUM];
+    /** 
+     * First dimension: TASK_THREAD_NUM
+     * Second dimension: BS_ANT_NUM * UE_NUM */
+    complex_float *csi_gather_buffer[TASK_THREAD_NUM];
 
     std::vector<float> pilots_;
+    std::vector<complex_float> pilots_complex_;
 
     mufft_plan_1d *muplans_[TASK_THREAD_NUM];
 
@@ -373,6 +389,14 @@ private:
     int debug_count = 0;
 
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
+
+    int FFT_task_count[TASK_THREAD_NUM];
+    int ZF_task_count[TASK_THREAD_NUM];
+    int Demul_task_count[TASK_THREAD_NUM];
+
+
+    int socket_buffer_size_;
+    int socket_buffer_status_size_;
 
 
 
@@ -465,6 +489,8 @@ private:
 
     /* lookup table for 16 QAM, real and imag */
     float qam16_table[2][16];
+    int max_equaled_frame=0;
+    float csi_format_offset;
 
 };
 

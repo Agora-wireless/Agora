@@ -19,8 +19,8 @@ PackageReceiver::PackageReceiver(int N_THREAD)
     for(int i = 0; i < N_THREAD; i++)
     {
         servaddr_[i].sin_family = AF_INET;
-        servaddr_[i].sin_port = htons(7891+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");
+        servaddr_[i].sin_port = htons(8000+i);
+        servaddr_[i].sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
         if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
