@@ -18,7 +18,7 @@ struct complex_float {
 };
 
 //typedef std::vector<complex_float> myVec;
-typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 32>> myVec;
+typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
 
 // structure for event
 struct Event_data
@@ -31,8 +31,10 @@ struct Event_data
 struct SocketBuffer
 {
     // Received data
-    std::vector<char> buffer;
-    std::vector<int> buffer_status;
+    char *buffer;
+    int *buffer_status;
+    // std::vector<char> buffer;
+    // std::vector<int> buffer_status;
 };
 
 struct FFTBuffer
@@ -63,26 +65,30 @@ struct DataBuffer
 {
     // Data symbols after IFFT    
     // record TASK_BUFFER_FRAME_NUM entire frames
-    std::vector<myVec> data;
+    complex_float ** data;
+    // std::vector<myVec> data;
 };
 
 struct PrecoderBuffer
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
     // inner vector is a UE_NUM * BS_ANT_NUM matrix
-    std::vector<myVec> precoder;
+    // std::vector<myVec> precoder;
+    complex_float ** precoder;
 };
 
 struct EqualBuffer
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
-    std::vector<myVec> data;
+    // std::vector<myVec> data;
+    complex_float ** data;
 };
 
 struct DemulBuffer
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
-    std::vector<std::vector<long long>> data;
+    // std::vector<std::vector<long long>> data;
+    long long ** data;
 };
 
 struct DLSocketBuffer

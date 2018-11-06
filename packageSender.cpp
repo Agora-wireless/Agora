@@ -1,9 +1,9 @@
 #include "packageSender.hpp"
 #include "cpu_attach.hpp"
 
-PackageSender::PackageSender(int in_socket_num, int in_thread_num, int in_core_offset):
+PackageSender::PackageSender(int in_socket_num, int in_thread_num, int in_core_offset, int in_delay):
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
-socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
+socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
 {
     socket_ = new int[socket_num];
 
@@ -15,7 +15,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
 
     for (int i = 0; i < socket_num; i++) {
         servaddr_[i].sin_family = AF_INET;
-        servaddr_[i].sin_port = htons(7891+i);
+        servaddr_[i].sin_port = htons(8000+i);
         servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
@@ -62,7 +62,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset)
         // range [-2,2]
         for(int j = 0; j < OFDM_FRAME_LEN * 2; j++)
         {
-            IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 65536 / 4 + 65536 / 2);
+            IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 32768);
             // printf("i:%d, j:%d, Coded: %d, orignal: %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
         }
 
@@ -287,10 +287,10 @@ void* PackageSender::loopSend(void *in_context)
             exit(0);
         }
 
-        // if (package_count % (BS_ANT_NUM * UE_NUM) == 0)
-        // {
-        //     usleep(0);
-        // }
+        if (package_count % (BS_ANT_NUM * UE_NUM) == 0)
+        {
+            usleep(obj_ptr->delay);
+        }
 
         if(package_count == BS_ANT_NUM * max_subframe_id * 100)
         {
