@@ -3,7 +3,7 @@ project (CoMP)
 
 
 
-set(CMAKE_C_FLAGS "-std=c99 -w -g -march=broadwell -O3")
+set(CMAKE_C_FLAGS "-std=c99 -w -g -mavx2 -march=broadwell -O3")
 set(CMAKE_CXX_FLAGS "-std=c++11 -w -O3 -mavx2 -mavx -g -march=broadwell")
 
 find_package(Armadillo)

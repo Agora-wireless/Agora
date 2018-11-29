@@ -37,6 +37,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         /*Bind socket with address struct*/
         if(bind(socket_[i], (struct sockaddr *) &cliaddr_, sizeof(cliaddr_)) != 0)
             perror("socket bind failed");
+
+
+        // int sock_buf_size = 1024*1024*64*8;
+        // if (setsockopt(socket_[i], SOL_SOCKET, SO_SNDBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
+        // {
+        //     printf("Error setting buffer size to %d\n", sock_buf_size);
+        // }
     }
 
     /* initialize random seed: */
@@ -51,7 +58,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     
     // read from file
-    FILE* fp = fopen("../rx_data.bin","rb");
+    FILE* fp = fopen("../rx_data_2048.bin","rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -287,7 +294,7 @@ void* PackageSender::loopSend(void *in_context)
             exit(0);
         }
 
-        if (package_count % (BS_ANT_NUM * UE_NUM) == 0)
+        if (package_count % (BS_ANT_NUM) == 0)
         {
             usleep(obj_ptr->delay);
         }

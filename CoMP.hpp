@@ -35,21 +35,22 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 26;
-    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 4;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 20;
+    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
+    static const int CORE_OFFSET = 0;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
     // * subframe_num_perframe * BS_ANT_NUM
-    static const int SOCKET_BUFFER_FRAME_NUM = 120;
+    static const int SOCKET_BUFFER_FRAME_NUM = 60;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
-    static const int TASK_BUFFER_FRAME_NUM = 60;
+    static const int TASK_BUFFER_FRAME_NUM = 100;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 32;
+    static const int demul_block_size = 40;
     // optimization parameters for block transpose (see the slides for more
     // details)
-    static const int transpose_block_size = 64;
-    static const int transpose_block_num = 32;
+    static const int transpose_block_size = 8;
+    static const int transpose_block_num = 256;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
     static const int dequeue_bulk_size = 10;
@@ -256,6 +257,8 @@ public:
     
     inline bool isPilot(int subframe_id) {return (subframe_id >=0) && (subframe_id < UE_NUM); }
     inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
+    inline int getUEId(int subframe_id) {return subframe_id; }
+    inline int getULSFIndex(int subframe_id) {return subframe_id - UE_NUM; }
     // complex divide
     inline complex_float divide(complex_float e1, complex_float e2);
 
@@ -307,7 +310,7 @@ private:
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      * second dimension data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
      */
-    // DataBuffer data_buffer_;
+    DataBuffer data_buffer_;
 
     /**
      * Calculated precoder
@@ -360,8 +363,10 @@ private:
     moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for uplink demodulation */
     moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    /* main thread message queue */
+    /* main thread message queue for data receiving */
     moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    /* main thread message queue for task completion*/
+    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
 
 
     pthread_t task_threads[TASK_THREAD_NUM];
@@ -369,18 +374,28 @@ private:
     EventHandlerContext context[TASK_THREAD_NUM];
 
     // all checkers
-    int cropper_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
-    int csi_checker_[TASK_BUFFER_FRAME_NUM];
-    int data_checker_[TASK_BUFFER_FRAME_NUM];
+    /* used to check if RX for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
+    int rx_counter_packets_[TASK_BUFFER_FRAME_NUM];   
+    /* used to check if FFT for all antennas in a subframe is done (max: BS_ANT_NUM) */
+    int fft_counter_ants_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
+    /* used to check if FFT for all users/pilots in a frame is done (max: UE_NUM) */
+    int csi_counter_users_[TASK_BUFFER_FRAME_NUM];
+    /* used to check if FFT for all data subframes in a frame is done (max: data_subframe_num_perframe) */
+    int data_counter_subframes_[TASK_BUFFER_FRAME_NUM];
+    /* used to check if ZF for all subcarriers in a frame is done (max: OFDM_DATA_NUM) */
+    int precoder_counter_scs_[TASK_BUFFER_FRAME_NUM];
+    /* used to check if demodulation for all subcarriers in a data subframe is done (max: OFDM_DATA_NUM) */
+    int demul_counter_scs_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    /* used to check if demodulation for all data subframes in a frame is done (max: data_subframe_num_perframe) */
+    int demul_counter_subframes_[TASK_BUFFER_FRAME_NUM];
+    /* used to check if creating FFT for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
+    int fft_created_counter_packets_[TASK_BUFFER_FRAME_NUM];
 
-    int precoder_checker_[TASK_BUFFER_FRAME_NUM];
-    bool precoder_status_[TASK_BUFFER_FRAME_NUM];
+    /* used to check the existance of data after FFT of a subframe in a frame */
+    bool data_exist_in_subframe_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    /* used to check the existance of precoder in a frame */
+    bool precoder_exist_in_frame_[TASK_BUFFER_FRAME_NUM];
 
-    int cropper_created_checker_[TASK_BUFFER_FRAME_NUM];
-
-    // can possibly remove this checker
-    int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int demul_status_[TASK_BUFFER_FRAME_NUM];
 
     std::queue<std::tuple<int, int>> taskWaitList;
 
@@ -393,6 +408,13 @@ private:
     int FFT_task_count[TASK_THREAD_NUM];
     int ZF_task_count[TASK_THREAD_NUM];
     int Demul_task_count[TASK_THREAD_NUM];
+
+    double FFT_task_duration[TASK_THREAD_NUM];
+    double FFT_task_duration_part1[TASK_THREAD_NUM];
+    double FFT_task_duration_part2[TASK_THREAD_NUM];
+    double FFT_task_duration_part3[TASK_THREAD_NUM];
+    double ZF_task_duration[TASK_THREAD_NUM];
+    double Demul_task_duration[TASK_THREAD_NUM];
 
 
     int socket_buffer_size_;

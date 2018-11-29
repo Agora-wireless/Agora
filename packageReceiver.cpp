@@ -173,23 +173,26 @@ void* PackageReceiver::loopRecv(void *in_context)
         }
         // receive data
         int recvlen = -1;
-        // int ant_id, frame_id, subframe_id, cell_id;
+        
         if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
         {
             perror("recv failed");
             exit(0);
         }
-        // // read information from received packet
-        // frame_id = *((int *)cur_ptr_buffer);
-        // subframe_id = *((int *)cur_ptr_buffer + 1);
-        // cell_id = *((int *)cur_ptr_buffer + 2);
-        // ant_id = *((int *)cur_ptr_buffer + 3);
+        
        
         
         // get the position in buffer
         offset = cur_ptr_buffer_status - buffer_status;
 
-        // printf("receive frame_id %d, subframe_id %d, cell_id %d, ant_id %d, offset %d\n", frame_id, subframe_id, cell_id, ant_id, offset);
+        // // read information from received packet
+        // int ant_id, frame_id, subframe_id, cell_id;
+        // frame_id = *((int *)cur_ptr_buffer);
+        // subframe_id = *((int *)cur_ptr_buffer + 1);
+        // cell_id = *((int *)cur_ptr_buffer + 2);
+        // ant_id = *((int *)cur_ptr_buffer + 3);
+
+        
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
         cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
@@ -203,6 +206,8 @@ void* PackageReceiver::loopRecv(void *in_context)
             printf("socket message enqueue failed\n");
             exit(0);
         }
+
+        
         //printf("enqueue offset %d\n", offset);
         // int cur_queue_len = message_queue_->size_approx();
         // maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
