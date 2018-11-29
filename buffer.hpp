@@ -58,7 +58,8 @@ struct CSIBuffer
     // CSI symbols after IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
     // inner vector is a BS_ANT_NUM * UE_NUM matrix
-    std::vector<myVec> CSI;
+    // std::vector<myVec> CSI;
+    complex_float ** CSI;
 };
 
 struct DataBuffer

@@ -4,11 +4,13 @@
 
 #define ENABLE_CPU_ATTACH
 
-#define BS_ANT_NUM 96
-#define OFDM_CA_NUM 1024
-#define FFT_LEN 1024
+#define BS_ANT_NUM 8
+#define OFDM_CA_NUM 2048
+#define FFT_LEN 2048
+#define OFDM_DATA_NUM 1200
+#define OFDM_DATA_START 424
 #define OFDM_PREFIX_LEN 0
-#define UE_NUM 4
+#define UE_NUM 8
 
 #define EVENT_PACKAGE_RECEIVED 0
 #define EVENT_CROPPED 1
@@ -37,12 +39,20 @@
 
 
 #define DEBUG_PRINT 0
+#define DEBUG_PRINT_PER_FRAME_DONE 1
+#define DEBUG_PRINT_PER_SUBFRAME_DONE 0
+#define DEBUG_PRINT_PER_TASK_DONE 0
+#define DEBUG_PRINT_SUMMARY_100_FRAMES 1
+
+#define DEBUG_PRINT_PER_FRAME_ENTER_QUEUE 0
+#define DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE 0
+#define DEBUG_PRINT_PER_TASK_ENTER_QUEUE 0
+
+#define DEBUG_PRINT_PER_FRAME_START 0
+
 #define DEBUG_PRINT_PILOT 0
 #define DEBUG_PRINT_SUMMARY 0
-#define DEBUG_PRINT_SUMMARY_100_FRAMES 0
-#define DEBUG_PRINT_ENTER_QUEUE 0
-#define DEBUG_PRINT_ENTER_QUEUE_DEMUL 0
-#define DEBUG_PRINT_ENTER_QUEUE_FFT 0
+
 #define DEBUG_PRINT_IN_TASK 0
 #define DEBUG_PRINT_TASK_DONE 0
 #define DEBUG_SENDER 0
@@ -51,7 +61,7 @@
 #define WRITE_DEMUL 0
 
 
-static const int subframe_num_perframe = 40;
+static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
 
