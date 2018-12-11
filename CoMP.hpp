@@ -53,7 +53,7 @@ public:
     static const int transpose_block_num = 256;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
-    static const int dequeue_bulk_size = 10;
+    static const int dequeue_bulk_size = 8;
 
     CoMP();
     ~CoMP();
@@ -350,7 +350,8 @@ private:
      * Second dimension: BS_ANT_NUM * UE_NUM */
     complex_float *csi_gather_buffer[TASK_THREAD_NUM];
 
-    std::vector<float> pilots_;
+    float *pilots_;
+    // std::vector<float> pilots_;
     std::vector<complex_float> pilots_complex_;
 
     mufft_plan_1d *muplans_[TASK_THREAD_NUM];
@@ -410,11 +411,20 @@ private:
     int Demul_task_count[TASK_THREAD_NUM];
 
     double FFT_task_duration[TASK_THREAD_NUM];
+    double ZF_task_duration[TASK_THREAD_NUM];
+    double Demul_task_duration[TASK_THREAD_NUM];
+
     double FFT_task_duration_part1[TASK_THREAD_NUM];
     double FFT_task_duration_part2[TASK_THREAD_NUM];
     double FFT_task_duration_part3[TASK_THREAD_NUM];
-    double ZF_task_duration[TASK_THREAD_NUM];
-    double Demul_task_duration[TASK_THREAD_NUM];
+
+    double ZF_task_duration_part1[TASK_THREAD_NUM];
+    double ZF_task_duration_part2[TASK_THREAD_NUM];
+    double ZF_task_duration_part3[TASK_THREAD_NUM];
+
+    double Demul_task_duration_part1[TASK_THREAD_NUM];
+    double Demul_task_duration_part2[TASK_THREAD_NUM];
+    double Demul_task_duration_part3[TASK_THREAD_NUM];
 
 
     int socket_buffer_size_;
