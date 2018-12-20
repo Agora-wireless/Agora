@@ -29,7 +29,7 @@ public:
     // unsigned int for: I/Q samples
     static const int buffer_length = sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     static const int data_offset = sizeof(int) * 16;
-    static const int subframe_num_perframe = 70;
+//    static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
 
 
