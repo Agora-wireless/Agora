@@ -89,7 +89,7 @@ struct DemulBuffer
 {
     // record TASK_BUFFER_FRAME_NUM entire frames
     // std::vector<std::vector<long long>> data;
-    long long ** data;
+    int ** data;
 };
 
 struct DLSocketBuffer

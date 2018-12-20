@@ -105,9 +105,9 @@ CoMP::CoMP()
 
     // initialize demultiplexed data buffer
     int demul_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    demul_buffer_.data = (long long **)malloc(equal_buffer_size * sizeof(long long *));
+    demul_buffer_.data = (int **)malloc(equal_buffer_size * sizeof(int *));
     for (int i = 0; i < demul_buffer_size; i++)
-        demul_buffer_.data[i] = (long long *)aligned_alloc(64, OFDM_DATA_NUM * UE_NUM * sizeof(long long));
+        demul_buffer_.data[i] = (int *)aligned_alloc(64, OFDM_DATA_NUM * UE_NUM * sizeof(int));
 
 
     for (int i = 0; i < TASK_THREAD_NUM; ++i)
@@ -115,6 +115,10 @@ CoMP::CoMP()
 
     for (int i = 0; i < TASK_THREAD_NUM; ++i)
         csi_gather_buffer[i] = (complex_float *)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), BS_ANT_NUM * UE_NUM * sizeof(complex_float));
+
+
+    for (int i = 0; i < TASK_THREAD_NUM; ++i)
+        precoder_buffer_temp[i] = (complex_float *)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), BS_ANT_NUM * UE_NUM * sizeof(complex_float));
     // printf("Demultiplexed data buffer initialized\n");
 
     // read pilots from file
@@ -403,10 +407,11 @@ void CoMP::start()
     int zf_count = 0;
     // auto pilot_received = std::chrono::system_clock::now();
     // std::chrono::time_point<std::chrono::high_resolution_clock> pilot_received[TASK_BUFFER_FRAME_NUM];
-    double pilot_received[TASK_BUFFER_FRAME_NUM];
-    double fft_processed[TASK_BUFFER_FRAME_NUM];
-    double demul_processed[TASK_BUFFER_FRAME_NUM];
-    double zf_processed[TASK_BUFFER_FRAME_NUM];
+    double pilot_received[TASK_BUFFER_FRAME_NUM*100];
+    double rx_processed[TASK_BUFFER_FRAME_NUM*100];
+    double fft_processed[TASK_BUFFER_FRAME_NUM*100];
+    double demul_processed[TASK_BUFFER_FRAME_NUM*100];
+    double zf_processed[TASK_BUFFER_FRAME_NUM*100];
     double total_time = 0;
     int ifft_frame_count = 0;
 
@@ -497,12 +502,14 @@ void CoMP::start()
 #if DEBUG_PRINT_PER_FRAME_START 
                         printf("Main thread: data received from frame %d, subframe %d, ant %d, offset %d\n", frame_id, subframe_id, ant_id, offset);
 #endif
-                        pilot_received[rx_frame_id] = get_time();                           
+                        // pilot_received[rx_frame_id] = get_time();      
+                        pilot_received[frame_id] = get_time();                         
                     }
                     else if (rx_counter_packets_[rx_frame_id] == BS_ANT_NUM * subframe_num_perframe) {  
+                        rx_processed[frame_id] = get_time();
 #if DEBUG_PRINT_PER_FRAME_DONE 
-                        printf("Main thread: received data for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, get_time()-pilot_received[rx_frame_id]);
-#endif                        
+                        printf("Main thread: received data for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, rx_processed[frame_id]-pilot_received[frame_id]);
+#endif                         
                         rx_counter_packets_[rx_frame_id] = 0;                                  
                     }  
 
@@ -557,11 +564,13 @@ void CoMP::start()
                             csi_counter_users_[frame_id] ++;
                             // if csi of all UEs is ready, schedule ZF or prediction 
                             if (csi_counter_users_[frame_id] == UE_NUM) {
-                                fft_processed[frame_id] = get_time();   
+                                // fft_processed[frame_id] = get_time();  
+                                fft_processed[frame_count] = get_time();   
                                 csi_counter_users_[frame_id] = 0; 
 #if DEBUG_PRINT_PER_FRAME_DONE
                                 // printf("Main thread: pilot frame: %d, finished collecting pilot frames\n", frame_id);
-                                printf("Main thread: pilot frame: %d, finished FFT for all pilot subframes in %.5f us\n", frame_id, fft_processed[frame_id]-pilot_received[frame_id]);
+                                // printf("Main thread: pilot frame: %d, finished FFT for all pilot subframes in %.5f us\n", frame_id, fft_processed[frame_id]-pilot_received[frame_id]);
+                                printf("Main thread: pilot frame: %d, %d, finished FFT for all pilot subframes in %.5f us\n", frame_id, frame_count, fft_processed[frame_count]-pilot_received[frame_count]);
 #endif
                                 // count # of frame with CSI estimation
                                 frame_count ++;
@@ -602,7 +611,7 @@ void CoMP::start()
                             printf("Main thread: finished FFT for frame %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d\n", 
                                     frame_id, subframe_id, 
                                     precoder_exist_in_frame_[frame_id], task_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx());
-                            fft_previous_time = get_time();
+                            // fft_previous_time = get_time();
 #endif                            
                             data_exist_in_subframe_[frame_id][getULSFIndex(subframe_id)] = true;
                             // if precoder exist, schedule demodulation
@@ -651,7 +660,8 @@ void CoMP::start()
                     precoder_counter_scs_[frame_id] ++;
                     // printf("Main thread: ZF done frame: %d, subcarrier %d\n", frame_id, sc_id);
                     if (precoder_counter_scs_[frame_id] == OFDM_DATA_NUM) {
-                        zf_processed[frame_id] = get_time(); 
+                        // zf_processed[frame_id] = get_time(); 
+                        zf_processed[frame_count-1] = get_time(); 
                         // if all the data in a frame has arrived when ZF is done
                         if (data_counter_subframes_[frame_id] == data_subframe_num_perframe) {  
                             for (int sche_subframe_id = UE_NUM; sche_subframe_id < subframe_num_perframe; sche_subframe_id++) {
@@ -685,8 +695,10 @@ void CoMP::start()
                         }
 #endif
 #if DEBUG_PRINT_PER_FRAME_DONE                        
-                        printf("Main thread: ZF done frame: %d in %.5f us, total: %.5f us\n", frame_id, zf_processed[frame_id]-fft_processed[frame_id],
-                            zf_processed[frame_id]-pilot_received[frame_id]);
+                        // printf("Main thread: ZF done frame: %d in %.5f us, total: %.5f us\n", frame_id, zf_processed[frame_id]-fft_processed[frame_id],
+                        //     zf_processed[frame_id]-pilot_received[frame_id]);
+                        printf("Main thread: ZF done frame: %d, %d in %.5f us, total: %.5f us\n", frame_id, frame_count, zf_processed[frame_count-1]-fft_processed[frame_count-1],
+                            zf_processed[frame_count-1]-pilot_received[frame_count-1]);
 #endif                    
                         precoder_counter_scs_[frame_id] = 0;
                         precoder_exist_in_frame_[frame_id] = true;
@@ -724,7 +736,8 @@ void CoMP::start()
                         demul_counter_scs_[frame_id][data_subframe_id] = 0;
                         demul_counter_subframes_[frame_id]++;
                         if (demul_counter_subframes_[frame_id] == data_subframe_num_perframe) {
-                            demul_processed[frame_id] = get_time(); 
+                            // demul_processed[frame_id] = get_time(); 
+                            demul_processed[frame_count-1] = get_time(); 
                             precoder_exist_in_frame_[frame_id] = false;
                             data_counter_subframes_[frame_id] = 0;
 
@@ -754,8 +767,10 @@ void CoMP::start()
                             }
 
 #if DEBUG_PRINT_PER_FRAME_DONE
-                            printf("Main thread: Demodulation done frame: %d, demul_count %d, subframe %d in %.5f us, total %.5f us\n", frame_id, demul_count + 1, data_subframe_id, 
-                                demul_processed[frame_id]-zf_processed[frame_id], demul_processed[frame_id]-pilot_received[frame_id]);
+                            // printf("Main thread: Demodulation done frame: %d, demul_count %d, subframe %d in %.5f us, total %.5f us\n", frame_id, demul_count + 1, data_subframe_id, 
+                            //     demul_processed[frame_id]-zf_processed[frame_id], demul_processed[frame_id]-pilot_received[frame_id]);
+                            printf("Main thread: Demodulation done frame: %d, %d, demul_count %d, subframe %d in %.5f us, total %.5f us\n", frame_id, frame_count, demul_count + 1, data_subframe_id, 
+                                demul_processed[frame_count-1]-zf_processed[frame_count-1], demul_processed[frame_count-1]-pilot_received[frame_count-1]);
                             double sum_ZF_cur = 0;
                             double sum_demul_cur = 0;
                             double sum_FFT_cur = 0;
@@ -885,7 +900,7 @@ void CoMP::start()
                         FILE* fp = fopen("demul_data.txt","a");
                         for (int cc = 0; cc < OFDM_DATA_NUM; cc++)
                         {
-                            long long* cx = &demul_buffer_.data[total_data_subframe_id][cc * UE_NUM];
+                            int *cx = &demul_buffer_.data[total_data_subframe_id][cc * UE_NUM];
                             fprintf(fp, "SC: %d, Frame %d, subframe: %d, ", cc, frame_id, data_subframe_id);
                             for(int kk = 0; kk < UE_NUM; kk++)  
                                 fprintf(fp, "%d ", cx[kk]);
@@ -903,18 +918,24 @@ void CoMP::start()
                             auto demul_end = std::chrono::system_clock::now();
                             std::chrono::duration<double> diff = demul_end - demul_begin;
                             int samples_num_per_UE = OFDM_DATA_NUM * data_subframe_num_perframe * 100;
-                            printf("Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %d\n", 
-                                samples_num_per_UE, UE_NUM, diff.count(), samples_num_per_UE * log2(16.0f) / diff.count(), task_queue_.size_approx());
+                            printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %d\n", 
+                                frame_count, samples_num_per_UE, UE_NUM, diff.count(), samples_num_per_UE * log2(16.0f) / diff.count(), task_queue_.size_approx());
 #if DEBUG_PRINT_SUMMARY_100_FRAMES
+                            // printf("frame %d: rx: %.5f, fft: %.5f, zf: %.5f, demul: %.5f, total: %.5f us\n", 0,  
+                            //         pilot_received[0], fft_processed[0]-pilot_received[0], 
+                            //         zf_processed[0]-fft_processed[0], demul_processed[0]-zf_processed[0], demul_processed[0]-pilot_received[0]);
+                            // for (int i = 1; i < TASK_BUFFER_FRAME_NUM; i++) {
+                            //     printf("frame %d: duration_rx: %.5f, fft: %.5f, zf: %.5f, demul: %.5f, total: %.5f us\n", i,  
+                            //         pilot_received[i]-pilot_received[i-1], fft_processed[i]-pilot_received[i], 
+                            //         zf_processed[i]-fft_processed[i], demul_processed[i]-zf_processed[i], demul_processed[i]-pilot_received[i]);
+                            // }
                             printf("frame %d: rx: %.5f, fft: %.5f, zf: %.5f, demul: %.5f, total: %.5f us\n", 0,  
                                     pilot_received[0], fft_processed[0]-pilot_received[0], 
                                     zf_processed[0]-fft_processed[0], demul_processed[0]-zf_processed[0], demul_processed[0]-pilot_received[0]);
-                            for (int i = 1; i < TASK_BUFFER_FRAME_NUM; i++) {
-
+                            for (int i = frame_count-100; i < frame_count; i++) {
                                 printf("frame %d: duration_rx: %.5f, fft: %.5f, zf: %.5f, demul: %.5f, total: %.5f us\n", i,  
                                     pilot_received[i]-pilot_received[i-1], fft_processed[i]-pilot_received[i], 
                                     zf_processed[i]-fft_processed[i], demul_processed[i]-zf_processed[i], demul_processed[i]-pilot_received[i]);
-
                             }
 #endif
                             demul_begin = std::chrono::system_clock::now();
@@ -1032,6 +1053,24 @@ void CoMP::start()
         }
     }
     // }
+
+
+    printf("Print results\n");
+    FILE* fp_debug = fopen("../timeresult.txt", "w");
+    if (fp_debug==NULL) {
+        printf("open file faild");
+        std::cerr << "Error: " << strerror(errno) << std::endl;
+        exit(0);
+    }
+    for(int ii = 0; ii < frame_count; ii++)
+    {
+        // printf("User %d: %d, ", ii,demul_ptr2(ii));
+        fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii]);
+    }
+    // printf("\n");
+    // fwrite(mat_demuled2.memptr(), sizeof(int),sizeof(mat_demuled), fp_debug);
+    fclose(fp_debug);
+
     int sum_FFT = 0;
     int sum_ZF = 0;
     int sum_demul = 0;
@@ -1248,6 +1287,33 @@ inline imat CoMP::demod_16qam(cx_fmat x)
 }
 
 
+inline void CoMP::demod_16qam_loop(float *vec_in, int *vec_out, int ue_num)
+{
+    float float_val = 0.6325;
+    for (int i = 0; i < ue_num; i++) {
+        float real_val = *(vec_in + i * 2);
+        float imag_val = *(vec_in + i * 2 + 1);
+        
+        *(vec_out + i) = 0;
+        if (real_val > 0)
+            *(vec_out + i) += 8;
+        if (std::abs(real_val) < float_val)
+            *(vec_out + i) += 4;
+        if (imag_val > 0)
+            *(vec_out + i) += 2;
+        if (std::abs(imag_val) < float_val)
+            *(vec_out + i) += 1;
+
+    }
+    // __m128 vec_zero = _mm_set1_ps(0);
+    // __m128 vec_float = _mm_set1_ps(0.6325);
+    // for (int i = 0; i < ue_num; i += 4) {
+    //     __m128 vec_in_cur = 
+    //     __m128 vec_real_cmp = _mm_cmpgt_ps()
+    // }
+}
+
+
 inline cx_fmat CoMP::mod_16qam(imat x)
 {
     // cx_fmat re(size(x));
@@ -1303,7 +1369,7 @@ void CoMP::doCrop(int tid, int offset)
     // remove CP, do FFT
     int delay_offset = 0;
     // int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
-    int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
+    // int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
 
 
     // transfer ushort to float
@@ -1312,17 +1378,6 @@ void CoMP::doCrop(int tid, int offset)
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
     float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[tid]);
-
-    // Copy data for fft from socket buffer to fft buffer
-    // fmat mat_fft_float_input(cur_fft_buffer_float, OFDM_CA_NUM * 2, 1, false);
-    // Mat <short> mat_fft_ushort(cur_ptr_buffer_ushort+delay_offset, OFDM_CA_NUM * 2, 1, false);
-    // fmat mat_fft_float_raw = conv_to<fmat>::from(mat_fft_ushort);
-    // // cout<<"Ushort: "<<mat_fft_ushort.st()<<endl;
-    // // cout<<"float: "<<vec_fft_float_in.st()<<endl;
-    // mat_fft_float_input = mat_fft_float_raw * csi_format_offset;
-    // // cout<<"Output: "<<mat_fft_float_input.st()<<endl;
-    // // cout<<"Complex mat: "<<conv_to<cx_fmat>::from(mat_fft_input).st()<<endl;
-    // // cout<<endl;
 
     // Use SIMD
     // reference: https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
@@ -1376,8 +1431,7 @@ void CoMP::doCrop(int tid, int offset)
     //         + (OFDM_CA_NUM - delay_offset) * 2 * sizeof(float), 0, sizeof(float) * 2 * delay_offset);
     // mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[tid] + ant_id * OFDM_CA_NUM, 
     //     fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
-    mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[tid], 
-        fft_buffer_.FFT_inputs[tid]);
+    mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[tid], fft_buffer_.FFT_inputs[tid]);
 
     double duration2 = get_time() - start_time;
     FFT_task_duration_part2[tid] += duration2;
@@ -1527,7 +1581,7 @@ void CoMP::doCrop(int tid, int offset)
                 // transposed data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
                 // prefetch a cache line
                 _mm_prefetch((char*)(src_ptr + 16), _MM_HINT_T0);
-                float *tar_ptr_cur = tar_ptr + (c2 * BS_ANT_NUM + ant_id)* transpose_block_size * 2 + c3 * 8;
+                float *tar_ptr_cur = tar_ptr + (c2 * BS_ANT_NUM + ant_id)* transpose_block_size * 2 + c3 * 16;
                 _mm256_stream_ps(tar_ptr_cur, _mm256_load_ps(src_ptr));
                 _mm256_stream_ps(tar_ptr_cur + 8, _mm256_load_ps(src_ptr + 8));
                 // printf("In deCrop thread %d: frame %d, subframe %d, subcarrier %d %d, address offset: %d\n", tid, frame_id, subframe_id, c2, c3, tar_ptr_cur - src_ptr);
@@ -1604,7 +1658,7 @@ void CoMP::doZF(int tid, int offset)
     int cache_line_num = mat_elem / 8;
     for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
         _mm_prefetch((char *)precoder_buffer_.precoder[offset + 8 * line_idx], _MM_HINT_ET1);
-        _mm_prefetch((char *)(tar_csi_ptr + 16 * line_idx), _MM_HINT_ET1);
+        // _mm_prefetch((char *)(tar_csi_ptr + 16 * line_idx), _MM_HINT_ET1);
     }
 
     for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
@@ -1657,20 +1711,34 @@ void CoMP::doZF(int tid, int offset)
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
     // cx_fmat mat_input(ptr_in, UE_NUM, BS_ANT_NUM, false);
+    // cx_float *ptr_out = (cx_float *)precoder_buffer_temp[tid];
     cx_float *ptr_out = (cx_float *)precoder_buffer_.precoder[offset];
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     // cx_fmat mat_output(ptr_out, BS_ANT_NUM, UE_NUM, false);
 
     double duration2 = get_time() - start_time;
     ZF_task_duration_part2[tid] += get_time() - start_time;
+
     
+
     pinv(mat_output, mat_input, 1e-1, "dc");
+
+    // float *tar_ptr = (float *)precoder_buffer_.precoder[offset];
+    // // float temp = *tar_ptr;
+    // float *src_ptr = (float *)ptr_out;
 
     double duration3 = get_time() - start_time;
     ZF_task_duration_part3[tid] += duration3;
 
-    
 
+    // int mat_elem = UE_NUM * BS_ANT_NUM;
+    // int cache_line_num = mat_elem / 8;
+    // for (int line_idx = 0; line_idx < cache_line_num; line_idx++) {
+    //     _mm256_stream_ps(tar_ptr, _mm256_load_ps(src_ptr));
+    //     _mm256_stream_ps(tar_ptr + 8, _mm256_load_ps(src_ptr + 8));
+    //     tar_ptr += 16;
+    //     src_ptr += 16;
+    // }
 
 
     // inform main thread
@@ -1745,7 +1813,8 @@ void CoMP::doDemul(int tid, int offset)
     // float* tar_ptr = (float *)&data_buffer_.data[total_data_subframe_id][0];
     // float* temp_buffer_ptr = (float *)&spm_buffer[tid][0];
 
-
+    int mat_elem = UE_NUM * BS_ANT_NUM;
+    int cache_line_num = mat_elem / 8;
     
 
     // i = 0, 1, ..., 31
@@ -1781,8 +1850,10 @@ void CoMP::doDemul(int tid, int offset)
         float *tar_data_ptr = (float *)spm_buffer[tid];        
         float *src_data_ptr = (float *)data_buffer_.data[total_data_subframe_id] + cur_sc_offset * 2;
 
+
         for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
             // fetch 4 complex floats for 4 ants
+
             for (int j = 0; j < 8; j++) {
                 __m256 data_rx = _mm256_i32gather_ps(src_data_ptr + j * 2, index, 4);
                 _mm256_store_ps(tar_data_ptr + j * BS_ANT_NUM * 2, data_rx);
@@ -1809,6 +1880,12 @@ void CoMP::doDemul(int tid, int offset)
             // mat_precoder size: UE_NUM \times BS_ANT_NUM
             int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
             cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
+
+            
+            // for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
+            //     _mm_prefetch((char *)(precoder_ptr + 8 * line_idx), _MM_HINT_NTA);
+            // }
+
             cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
             // cout<<"Precoder: "<< mat_precoder<<endl;
 
@@ -1817,27 +1894,28 @@ void CoMP::doDemul(int tid, int offset)
             cx_fmat mat_equaled(equal_ptr, UE_NUM, 1, false);
 
             // Demodulation
-            sword* demul_ptr = (sword *)(&demul_buffer_.data[total_data_subframe_id][cur_sc_id * UE_NUM]);
-            imat mat_demuled(demul_ptr, UE_NUM, 1, false);
-
-            // Demul_task_duration_part1[tid] += get_time() - start_time2;
-
-
-            // double start_time3 = get_time();
+            // sword* demul_ptr = (sword *)(&demul_buffer_.data[total_data_subframe_id][cur_sc_id * UE_NUM]);
+            // imat mat_demuled(demul_ptr, UE_NUM, 1, false);
+            int *demul_ptr = (&demul_buffer_.data[total_data_subframe_id][cur_sc_id * UE_NUM]);
+            
             // Equalization
-            mat_equaled = mat_precoder* mat_data;
+            mat_equaled = mat_precoder * mat_data;
+            // cout << "Equaled data: "<<mat_equaled.st()<<endl;
 
-            // Demul_task_duration_part2[tid] += get_time() - start_time3;
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id);
 
-
-            // double start_time4 = get_time();
-
-            mat_demuled = demod_16qam(mat_equaled);
-
-            // Demul_task_duration_part3[tid] += get_time() - start_time3;
+            demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+            // cout<< "Demuled data: ";
+            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+            //     cout<<*(demul_ptr+ue_idx)<<"  ";
+            // }
+            // cout<<endl;
+            // demod_16qam(mat_equaled, mat_demuled);
+            // mat_demuled = demod_16qam(mat_equaled);
             // cout << "Demuled data: "<<mat_demuled.st()<<endl;
+            // 
 
+           
         }
 
         // for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
@@ -2052,9 +2130,9 @@ void CoMP::do_ifft(int tid, int offset)
 
 
 
-void CoMP::getDemulData(long long **ptr, int *size)
+void CoMP::getDemulData(int **ptr, int *size)
 {
-    *ptr = (long long *)&equal_buffer_.data[max_equaled_frame*data_subframe_num_perframe][0];
+    *ptr = (int *)&equal_buffer_.data[max_equaled_frame*data_subframe_num_perframe][0];
     *size = UE_NUM*FFT_LEN;
 }
 
@@ -2088,7 +2166,7 @@ extern "C"
     }
     EXPORT void CoMP_start(CoMP *comp) {comp->start();}
     EXPORT void CoMP_getEqualData(CoMP *comp, float **ptr, int *size) {return comp->getEqualData(ptr, size);}
-    EXPORT void CoMP_getDemulData(CoMP *comp, long long **ptr, int *size) {return comp->getDemulData(ptr, size);}
+    EXPORT void CoMP_getDemulData(CoMP *comp, int **ptr, int *size) {return comp->getDemulData(ptr, size);}
 }
 
 

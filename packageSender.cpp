@@ -16,7 +16,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     for (int i = 0; i < socket_num; i++) {
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");
+        servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.88");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
         int rand_port = rand() % 65536;
@@ -34,16 +34,15 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             printf("Created socket: %d\n",i);
         }
 
+        //int sock_buf_size = 1024*1024*64*8;
+        //if (setsockopt(socket_[i], SOL_SOCKET, SO_SNDBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
+        //{
+        //    printf("Error setting buffer size to %d\n", sock_buf_size);
+       // }
+
         /*Bind socket with address struct*/
         if(bind(socket_[i], (struct sockaddr *) &cliaddr_, sizeof(cliaddr_)) != 0)
             perror("socket bind failed");
-
-
-        // int sock_buf_size = 1024*1024*64*8;
-        // if (setsockopt(socket_[i], SOL_SOCKET, SO_SNDBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
-        // {
-        //     printf("Error setting buffer size to %d\n", sock_buf_size);
-        // }
     }
 
     /* initialize random seed: */
@@ -256,6 +255,7 @@ void* PackageSender::loopSend(void *in_context)
     int used_socker_id = 0;
     int ret;
     int socket_per_thread = obj_ptr->socket_num / obj_ptr->thread_num;
+    int total_tx_packets = 0;
     int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
     while(true)
@@ -284,10 +284,11 @@ void* PackageSender::loopSend(void *in_context)
         if (DEBUG_SENDER) 
         {
             int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr].data();
-            printf("Transmit frame %d, subframe %d, ant %d\n", *ptr, *(ptr+1), *(ptr+3));
+            printf("Thread %d transmit frame %d, subframe %d, ant %d\n", tid,  *ptr, *(ptr+1), *(ptr+3));
         }
         
         package_count++;
+	total_tx_packets++;
 
         if ( !message_queue_->enqueue(data_ptr) ) {
             printf("send message enqueue failed\n");
@@ -296,9 +297,14 @@ void* PackageSender::loopSend(void *in_context)
 
         if (package_count % (BS_ANT_NUM) == 0)
         {
-            usleep(obj_ptr->delay);
+	    if (total_tx_packets < 1000/7 * BS_ANT_NUM * max_subframe_id)
+		usleep(2000);
+	    else
+            	usleep(obj_ptr->delay);
         }
-
+	
+	if (total_tx_packets > 1e9)
+	    total_tx_packets = 9;
         if(package_count == BS_ANT_NUM * max_subframe_id * 100)
         {
             auto end = std::chrono::system_clock::now();

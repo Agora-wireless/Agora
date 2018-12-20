@@ -35,7 +35,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 20;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 26;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     static const int CORE_OFFSET = 0;
@@ -264,10 +264,11 @@ public:
 
     // inline int demod_16qam(complex_float x);
     inline arma::imat demod_16qam(arma::cx_fmat x);
+    inline void demod_16qam_loop(float *vec_in, int *vec_out, int ue_num);
     inline arma::cx_fmat mod_16qam(arma::imat x);
     inline complex_float mod_16qam_single(int x);
 
-    void getDemulData(long long **ptr, int *size);
+    void getDemulData(int **ptr, int *size);
     void getEqualData(float **ptr, int *size);
 
 private:
@@ -341,14 +342,28 @@ private:
     CSIBuffer pred_csi_buffer_;
 
     /** 
+     * Intermediate buffer to gather raw data
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM */
     // myVec spm_buffer[TASK_THREAD_NUM];
     complex_float *spm_buffer[TASK_THREAD_NUM];
+
     /** 
+     * Intermediate buffer to gather CSI
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM */
     complex_float *csi_gather_buffer[TASK_THREAD_NUM];
+
+
+    /** 
+     * Intermediate buffer for calculated precoder 
+     * First dimension: TASK_THREAD_NUM
+     * Second dimension: BS_ANT_NUM * UE_NUM */
+    complex_float *precoder_buffer_temp[TASK_THREAD_NUM];
+
+
+
+
 
     float *pilots_;
     // std::vector<float> pilots_;
