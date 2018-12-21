@@ -35,10 +35,14 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 16;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 25;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     static const int CORE_OFFSET = 0;
+
+    static const int FFT_THREAD_NUM = 2;
+    static const int ZF_THREAD_NUM = 16;
+    static const int DEMUL_THREAD_NUM = TASK_THREAD_NUM - FFT_THREAD_NUM - ZF_THREAD_NUM;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
     // * subframe_num_perframe * BS_ANT_NUM
@@ -61,6 +65,9 @@ public:
     void start();
     // while loop of task thread
     static void *taskThread(void *context);
+    static void *fftThread(void *context);
+    static void *zfThread(void *context);
+    static void *demulThread(void *context);
 
     /*****************************************************
      * Uplink 
@@ -169,6 +176,8 @@ public:
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
     void doDemul(int tid, int offset);
+
+    void doDemulSingleSC(int tid, int offset);
     
 
     /*****************************************************
@@ -374,7 +383,7 @@ private:
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
-    moodycamel::ConcurrentQueue<Event_data> task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for ZF */
     moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for uplink demodulation */
@@ -411,6 +420,7 @@ private:
     bool data_exist_in_subframe_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     /* used to check the existance of precoder in a frame */
     bool precoder_exist_in_frame_[TASK_BUFFER_FRAME_NUM];
+    bool precoder_exist_in_sc_[TASK_BUFFER_FRAME_NUM][OFDM_DATA_NUM];
 
 
     std::queue<std::tuple<int, int>> taskWaitList;

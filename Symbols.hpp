@@ -32,6 +32,7 @@
 #define TASK_MODUL 6
 #define TASK_SEND 7
 
+#define BIGSTATION 1
 #define ENABLE_DOWNLINK 0
 
 #define DO_PREDICTION 0
