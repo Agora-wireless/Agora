@@ -13,7 +13,7 @@
 #define UE_NUM 8
 
 #define EVENT_PACKAGE_RECEIVED 0
-#define EVENT_CROPPED 1
+#define EVENT_FFT 1
 #define EVENT_ZF 2
 #define EVENT_DEMUL 3
 #define EVENT_PRED 4
@@ -23,7 +23,7 @@
 #define EVENT_PACKAGE_SENT 8
 
 
-#define TASK_CROP 0
+#define TASK_FFT 0
 #define TASK_ZF 1
 #define TASK_DEMUL 2
 #define TASK_PRED 3
@@ -50,11 +50,11 @@
 
 #define DEBUG_PRINT_PER_FRAME_START 0
 
+#define DEBUG_PRINT_STATS_PER_THREAD 0
+#define DEBUG_UPDATE_STATS 1
 #define DEBUG_PRINT_PILOT 0
-#define DEBUG_PRINT_SUMMARY 0
 
 #define DEBUG_PRINT_IN_TASK 0
-#define DEBUG_PRINT_TASK_DONE 0
 #define DEBUG_SENDER 0
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
