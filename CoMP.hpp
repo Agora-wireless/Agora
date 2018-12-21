@@ -35,7 +35,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 26;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 16;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     static const int CORE_OFFSET = 0;
@@ -96,7 +96,7 @@ public:
      *        if subframe is data, copy data from fft_buffer_.FFT_outputs to data_buffer_ and do block transpose     
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void doCrop(int tid, int offset);
+    void doFFT(int tid, int offset);
 
 
     /**
@@ -425,21 +425,9 @@ private:
     int ZF_task_count[TASK_THREAD_NUM];
     int Demul_task_count[TASK_THREAD_NUM];
 
-    double FFT_task_duration[TASK_THREAD_NUM];
-    double ZF_task_duration[TASK_THREAD_NUM];
-    double Demul_task_duration[TASK_THREAD_NUM];
-
-    double FFT_task_duration_part1[TASK_THREAD_NUM];
-    double FFT_task_duration_part2[TASK_THREAD_NUM];
-    double FFT_task_duration_part3[TASK_THREAD_NUM];
-
-    double ZF_task_duration_part1[TASK_THREAD_NUM];
-    double ZF_task_duration_part2[TASK_THREAD_NUM];
-    double ZF_task_duration_part3[TASK_THREAD_NUM];
-
-    double Demul_task_duration_part1[TASK_THREAD_NUM];
-    double Demul_task_duration_part2[TASK_THREAD_NUM];
-    double Demul_task_duration_part3[TASK_THREAD_NUM];
+    double FFT_task_duration[TASK_THREAD_NUM][4];
+    double ZF_task_duration[TASK_THREAD_NUM][4];
+    double Demul_task_duration[TASK_THREAD_NUM][2];
 
 
     int socket_buffer_size_;
