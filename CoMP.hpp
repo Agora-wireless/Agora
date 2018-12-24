@@ -35,9 +35,9 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 21 : 25;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 20 : 25;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
-    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
+    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     static const int CORE_OFFSET = 0;
 
     static const int FFT_THREAD_NUM = 2;
@@ -376,7 +376,7 @@ private:
 
     float *pilots_;
     // std::vector<float> pilots_;
-    std::vector<complex_float> pilots_complex_;
+    // std::vector<complex_float> pilots_complex_;
 
     mufft_plan_1d *muplans_[TASK_THREAD_NUM];
 
@@ -512,7 +512,7 @@ private:
     /** 
      * First dimension: TASK_THREAD_NUM
      * Second dimension: UE_NUM */
-    myVec dl_spm_buffer[TASK_THREAD_NUM];
+    complex_float *dl_spm_buffer[TASK_THREAD_NUM];
 
     /* task queue for downlink IFFT */
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);

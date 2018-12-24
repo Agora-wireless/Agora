@@ -57,7 +57,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     
     // read from file
-    FILE* fp = fopen("../rx_data_2048.bin","rb");
+    FILE* fp = fopen("../rx_data_2048_ant16.bin","rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
