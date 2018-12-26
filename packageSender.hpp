@@ -11,11 +11,13 @@
 #include <stdlib.h>
 #include "Symbols.hpp"
 #include <vector>
-#include <ctime>
+// #include <ctime>
+#include <time.h>
 #include <algorithm>
 #include <numeric>
 #include <unistd.h>
 #include <chrono>
+#include <thread>
 #include <pthread.h>
 #include "concurrentqueue.h"
 
@@ -31,6 +33,8 @@ public:
     static const int data_offset = sizeof(int) * 16;
 //    static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
+
+    static const int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
 
 
 
@@ -60,7 +64,8 @@ private:
 
     moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
     moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
-    int max_length_ = BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM;
+    int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
+    // int max_length_ = max_subframe_id * BS_ANT_NUM;
 
     int ant_id;
     int frame_id;
@@ -78,6 +83,8 @@ private:
     int delay;
     PackageSenderContext* context;
 
+    int packet_count_per_subframe[BUFFER_FRAME_NUM][max_subframe_id];
+    int packet_count_per_frame[BUFFER_FRAME_NUM];
 };
 
 

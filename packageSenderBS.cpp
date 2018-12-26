@@ -6,12 +6,17 @@ packageSenderBS::packageSenderBS(int N_THREAD)
     socket_ = new int[N_THREAD];
 
     /*Configure settings in address struct*/
-    servaddr_.sin_family = AF_INET;
-    servaddr_.sin_port = htons(7891);
-    servaddr_.sin_addr.s_addr = inet_addr("127.0.0.2");
-    memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
+    // servaddr_.sin_family = AF_INET;
+    // servaddr_.sin_port = htons(8000);
+    // servaddr_.sin_addr.s_addr = inet_addr("168.6.245.90");
+    // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
 
     for (int i = 0; i < N_THREAD; i++) {
+        servaddr_[i].sin_family = AF_INET;
+        servaddr_[i].sin_port = htons(8000+i);
+        servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.90");
+        memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
+
         int rand_port = rand() % 65536;
         cliaddr_.sin_family = AF_INET;
         cliaddr_.sin_port = htons(0);  // out going port is random
@@ -164,17 +169,18 @@ void* packageSenderBS::loopSend(void *in_context)
         subframe_id = current_data_subframe_id + UE_NUM;
         frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
-        int socket_subframe_offset = (frame_id % SOCKET_BUFFER_FRAME_NUM) * data_subframe_num_perframe + current_data_subframe_id;
-        int data_subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + current_data_subframe_id;
+        int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
+        int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         cur_ptr_buffer = buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
         cur_ptr_data = (data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
         *((int *)cur_ptr_buffer) = frame_id;
         *((int *)cur_ptr_buffer + 1) = subframe_id;
         *((int *)cur_ptr_buffer + 2) = cell_id;
         *((int *)cur_ptr_buffer + 3) = ant_id;
+        printf("In RX thread %d, frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, subframe_id, ant_id);
 
         // send data (one OFDM symbol)
-        if (sendto(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *)&obj_ptr->servaddr_, sizeof(obj_ptr->servaddr_)) < 0) {
+        if (sendto(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[tid], sizeof(obj_ptr->servaddr_[tid])) < 0) {
             perror("socket sendto failed");
             exit(0);
         }

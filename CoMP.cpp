@@ -221,7 +221,7 @@ CoMP::CoMP()
         dl_IQ_data_long[i] = new long long[packageSenderBS::OFDM_FRAME_LEN];
     }
     // read data from file
-    fp = fopen("../orig_data_2048_ant16.bin","rb");
+    fp = fopen("../orig_data_2048.bin","rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -272,26 +272,27 @@ CoMP::CoMP()
 
 
     // initialize downlink socket buffer
-    int dl_socket_buffer_size = data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM * PackageReceiver::package_length * BS_ANT_NUM;
-    int dl_socket_buffer_status_size = data_subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    dl_socket_buffer_.buffer = (char *)aligned_alloc(64, dl_socket_buffer_size * sizeof(char));
-    dl_socket_buffer_.buffer_status = (int *)aligned_alloc(64, dl_socket_buffer_size * sizeof(int));
+    dl_socket_buffer_size_ = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM * PackageReceiver::package_length * BS_ANT_NUM;
+    dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * TASK_BUFFER_FRAME_NUM;
+    dl_socket_buffer_.buffer = (char *)aligned_alloc(64, dl_socket_buffer_size_ * sizeof(char));
+    dl_socket_buffer_.buffer_status = (int *)aligned_alloc(64, dl_socket_buffer_size_ * sizeof(int));
 
 
-    memset(precode_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-    memset(modulate_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
+    // memset(precode_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
+    // memset(modulate_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
 
     for (int i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
         memset(precode_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
         memset(modulate_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
+        memset(tx_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
     }
 
     memset(ifft_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
     memset(tx_status_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
-    memset(tx_checker_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
+    // memset(tx_checker_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
 
-    for (int i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) 
-        memset(tx_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
+    // for (int i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) 
+    //     memset(tx_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
 
     printf("initialize QAM16 table\n");
     float scale = 1/sqrt(10);
@@ -302,7 +303,7 @@ CoMP::CoMP()
     }
 
     printf("new PackageSender\n");
-    transmitter_.reset(new packageSenderBS(SOCKET_TX_THREAD_NUM, &message_queue_, &tx_queue_));
+    transmitter_.reset(new packageSenderBS(SOCKET_TX_THREAD_NUM, &complete_task_queue_, &tx_queue_));
 
 #endif
 
@@ -384,7 +385,7 @@ void CoMP::start()
     int *dl_socket_buffer_status_ptr = dl_socket_buffer_.buffer_status;
     float *dl_data_ptr = (float *)(&dl_precoded_data_buffer_.data[0][0]);
     std::vector<pthread_t> tx_threads = transmitter_->startTX(dl_socket_buffer_ptr, 
-        dl_socket_buffer_status_ptr, dl_data_ptr, socket_buffer_status_size_, socket_buffer_size_, main_core_id + 1 +SOCKET_RX_THREAD_NUM);
+        dl_socket_buffer_status_ptr, dl_data_ptr, dl_socket_buffer_status_size_, dl_socket_buffer_size_, main_core_id + 1 +SOCKET_RX_THREAD_NUM);
 #endif
 
     // for fft_queue, main thread is producer, it is single-procuder & multiple consumer
@@ -505,14 +506,25 @@ void CoMP::start()
                     int rx_frame_id = (frame_id % TASK_BUFFER_FRAME_NUM);
 
                     rx_counter_packets_[rx_frame_id]++;
-                    if (rx_counter_packets_[rx_frame_id] == 1) {   
-#if DEBUG_PRINT_PER_FRAME_START 
-                        printf("Main thread: data received from frame %d, subframe %d, ant %d, offset %d\n", frame_id, subframe_id, ant_id, offset);
+#if ENABLE_DOWNLINK
+                    int rx_counter_packets_max = BS_ANT_NUM * UE_NUM;
+#else
+                    int rx_counter_packets_max = BS_ANT_NUM * subframe_num_perframe;
 #endif
+                    if (rx_counter_packets_[rx_frame_id] == 1) {   
+
                         // pilot_received[rx_frame_id] = get_time();      
-                        pilot_received[frame_id] = get_time();                         
+                        pilot_received[frame_id] = get_time();  
+#if DEBUG_PRINT_PER_FRAME_START 
+                        if (frame_id > 0)
+                            printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us\n", frame_id, subframe_id, ant_id, 
+                                pilot_received[frame_id]-pilot_received[frame_id-1]);
+                        else
+                            printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us\n", frame_id, subframe_id, ant_id, 
+                                pilot_received[frame_id]);
+#endif                       
                     }
-                    else if (rx_counter_packets_[rx_frame_id] == BS_ANT_NUM * subframe_num_perframe) {  
+                    else if (rx_counter_packets_[rx_frame_id] == rx_counter_packets_max) {  
                         rx_processed[frame_id] = get_time();
 #if DEBUG_PRINT_PER_FRAME_DONE 
                         printf("Main thread: received data for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, rx_processed[frame_id]-pilot_received[frame_id]);
@@ -730,15 +742,20 @@ void CoMP::start()
                         }   
                         // if downlink data transmission is enabled, schedule downlink modulation for all data subframes
 #if ENABLE_DOWNLINK
-                        Event_data do_modul_task;
-                        do_modul_task.event_type = TASK_MODUL;
-
-                        for (int i = 0; i < data_subframe_num_perframe; i++) {
-                            for (int j = 0; j < UE_NUM; j++) {
-                                do_modul_task.data = generateOffset3d(UE_NUM, frame_id, i, j);
-                                schedule_task(do_modul_task, &modulate_queue_, ptok_modul);
-                            }
+                        Event_data do_precode_task;
+                        do_precode_task.event_type = TASK_PRECODE;
+                        for(int j = 0; j < OFDM_DATA_NUM / demul_block_size; j++) {
+                            do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, 0, j * demul_block_size);
+                            schedule_task(do_precode_task, &precode_queue_, ptok_precode);
                         }
+
+                        // for (int i = 0; i < data_subframe_num_perframe; i++) {
+                        //     for(int j = 0; j < OFDM_DATA_NUM / demul_block_size; j++) {
+                        //         do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, i, j * demul_block_size);
+                        //         schedule_task(do_precode_task, &precode_queue_, ptok_precode);
+                        //     }
+                        // }
+
 #endif
 #if DEBUG_PRINT_PER_FRAME_DONE                        
                         printf("Main thread: ZF done frame: %d, %d in %.5f us, total: %.5f us\n", frame_id, frame_count_zf, zf_processed[frame_count_zf]-fft_processed[frame_count_zf],
@@ -1040,7 +1057,8 @@ void CoMP::start()
                     interpreteOffset3d(OFDM_DATA_NUM, offset_precode, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
                     precode_checker_[frame_id][current_data_subframe_id] += demul_block_size;
 #if DEBUG_PRINT_PER_TASK_DONE
-                    printf("Main thread: Precoding done frame: %d, subframe: %d, subcarrier: %d\n", frame_id, current_data_subframe_id,  sc_id);
+                    printf("Main thread: Precoding done frame: %d, subframe: %d, subcarrier: %d, offset: %d, total SCs: %d\n", 
+                        frame_id, current_data_subframe_id,  sc_id, offset_precode, precode_checker_[frame_id][current_data_subframe_id]);
 #endif
                     
                     if (precode_checker_[frame_id][current_data_subframe_id] == OFDM_DATA_NUM) {
@@ -1050,7 +1068,15 @@ void CoMP::start()
                         do_ifft_task.event_type = TASK_IFFT;
                         for (int i = 0; i < BS_ANT_NUM; i++) {
                             do_ifft_task.data = generateOffset3d(BS_ANT_NUM, frame_id, current_data_subframe_id, i);
-                            schedule_task(do_ifft_task, &tx_queue_, ptok_ifft);
+                            schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);
+                        }
+                        if (current_data_subframe_id < data_subframe_num_perframe - 1) {
+                            Event_data do_precode_task;
+                            do_precode_task.event_type = TASK_PRECODE;
+                            for(int j = 0; j < OFDM_DATA_NUM / demul_block_size; j++) {
+                                do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, current_data_subframe_id + 1, j * demul_block_size);
+                                schedule_task(do_precode_task, &precode_queue_, ptok_precode);
+                            }
                         }
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
                         printf("Main thread: Precoding done for all subcarriers in frame: %d, subframe: %d\n", frame_id, current_data_subframe_id);
@@ -1078,7 +1104,7 @@ void CoMP::start()
                         int frame_id_next = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         if (delay_fft_queue_cnt[frame_id_next] > 0) {
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
-                            printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id_next], frame_id_next);
+                            printf("Main thread in IFFT: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id_next], frame_id_next);
 #endif                                
                             Event_data do_fft_task;
                             do_fft_task.event_type = TASK_FFT;
@@ -1090,7 +1116,7 @@ void CoMP::start()
                                 fft_created_counter_packets_[frame_id_next]++;
                                 if (fft_created_counter_packets_[frame_id_next] == BS_ANT_NUM * UE_NUM) {
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE                                    
-                                    printf("Main thread in demul: created FFT tasks for all packets in frame: %d in %.5f us\n", frame_id + 1, get_time()-pilot_received[frame_id_next]);
+                                    printf("Main thread in IFFT: created FFT tasks for all packets in frame: %d in %.5f us\n", frame_id + 1, get_time()-pilot_received[frame_id_next]);
 #endif                                        
                                     fft_created_counter_packets_[frame_id_next] = 0;
                                     ifft_checker_[frame_id] = 0;
@@ -1121,7 +1147,8 @@ void CoMP::start()
 
                     tx_checker_[frame_id][current_data_subframe_id] += 1;
 #if DEBUG_PRINT_PER_TASK_DONE
-                    printf("Main thread: TX done frame: %d, subframe: %d, antenna: %d\n", frame_id, current_data_subframe_id, ant_id);
+                    printf("Main thread: TX done frame: %d, subframe: %d, antenna: %d, total: %d\n", frame_id, current_data_subframe_id, ant_id,
+                        tx_checker_[frame_id][current_data_subframe_id]);
 #endif
                     if (tx_checker_[frame_id][current_data_subframe_id] == BS_ANT_NUM) {
                         tx_status_[frame_id] += 1;
@@ -1139,13 +1166,12 @@ void CoMP::start()
                             tx_begin = std::chrono::high_resolution_clock::now();
                         }
 #if DEBUG_PRINT_PER_SUBFRAME_DONE  
-                    printf("Main thread: TX done frame: %d, subframe: %d\n", frame_id, current_data_subframe_id);
+                        printf("Main thread: TX done for all antennas in frame: %d, subframe: %d\n", frame_id, current_data_subframe_id);
 #endif
 #if DEBUG_PRINT_PER_FRAME_DONE                           
                         if (tx_status_[frame_id] == data_subframe_num_perframe) {
                             tx_status_[frame_id] = 0;                   
-                            printf("Main thread: TX done frame: %d, queue length: zf %d, ifft %d, precode %d, tx %d\n", frame_id,
-                                zf_queue_.size_approx(), ifft_queue_.size_approx(), precode_queue_.size_approx(), tx_queue_.size_approx());                        
+                            printf("Main thread: TX done for all subframes in frame: %d\n", frame_id);                        
                         }
 #endif        
                     }                    
@@ -1229,7 +1255,7 @@ void* CoMP::taskThread(void* context)
     }
 #endif
 
-    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->message_queue_));
+    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
 
     int total_count = 0;
     int miss_count = 0;
@@ -1326,7 +1352,7 @@ void* CoMP::fftThread(void* context)
     }
 #endif
 
-    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->message_queue_));
+    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
 
     int total_count = 0;
     int miss_count = 0;
@@ -1366,7 +1392,7 @@ void* CoMP::zfThread(void* context)
     }
 #endif
 
-    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->message_queue_));
+    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
 
     int total_count = 0;
     int miss_count = 0;
@@ -1404,7 +1430,7 @@ void* CoMP::demulThread(void* context)
     }
 #endif
 
-    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->message_queue_));
+    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
     int total_count = 0;
     int miss_count = 0;
     Event_data event;
@@ -2317,9 +2343,11 @@ void CoMP::do_modulate(int tid, int offset)
 {
     int frame_id, total_data_subframe_id, current_data_subframe_id, user_id;
     interpreteOffset3d(UE_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &user_id);
+
+    printf("In doModulate thread %d: frame: %d, subframe: %d, user: %d\n", tid, frame_id, current_data_subframe_id, user_id);
     int *input_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][0];
     complex_float *output_ptr = &dl_modulated_buffer_.data[total_data_subframe_id][0];
-    for (int i = 0; i < OFDM_CA_NUM; i++) {
+    for (int i = 0; i < OFDM_DATA_NUM; i++) {
         *(output_ptr + i * UE_NUM + user_id) = mod_16qam_single(*(input_ptr+i));
         // printf(" (%d, %.4f+j%.4f) ", *(input_ptr+i), (*(output_ptr + i * OFDM_CA_NUM + user_id)).real, (*(output_ptr + i * OFDM_CA_NUM + user_id)).imag);
     }
@@ -2346,19 +2374,29 @@ void CoMP::do_precode(int tid, int offset)
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
     interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
 
-    for (int i = 0; i < transpose_block_size/2; i++) { 
-        int precoder_offset = frame_id * OFDM_DATA_NUM + sc_id + i;
+    // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+    double start_time = get_time();
+    for (int i = 0; i < demul_block_size; i++) { 
+        int cur_sc_id = sc_id + i;
+
+        complex_float *data_ptr = &dl_modulated_buffer_.data[total_data_subframe_id][UE_NUM * cur_sc_id];
+        for (int user_id = 0; user_id < UE_NUM; user_id ++) {
+            int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
+            *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr));
+        }
+
+        int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
         // mat_precoder size: UE_NUM \times BS_ANT_NUM        
         cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
         cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
 
         // mat_data size: UE_NUM \times 1
-        cx_float* data_ptr = (cx_float *)(&dl_modulated_buffer_.data[total_data_subframe_id][UE_NUM * (sc_id+i)]);
-        cx_fmat mat_data(data_ptr, UE_NUM, 1, false);
+        // cx_float* data_ptr = (cx_float *)(&dl_modulated_buffer_.data[total_data_subframe_id][UE_NUM * (sc_id+i)]);
+        cx_fmat mat_data((cx_float *)data_ptr, UE_NUM, 1, false);
         // cout << "Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << sc_id+i << ", data: " << real(mat_data).st() << endl;
 
         // mat_precoded size: BS_ANT_NUM \times 1
-        cx_float* precoded_ptr = (cx_float *)(&dl_precoded_data_buffer_.data[total_data_subframe_id][(sc_id + i) * BS_ANT_NUM]);
+        cx_float* precoded_ptr = (cx_float *)(&dl_precoded_data_buffer_.data[total_data_subframe_id][cur_sc_id * BS_ANT_NUM]);
         cx_fmat mat_precoded(precoded_ptr, BS_ANT_NUM, 1, false);
 
         mat_precoded = mat_precoder.t() * mat_data;
@@ -2392,6 +2430,10 @@ void CoMP::do_precode(int tid, int offset)
         printf("Precoding message enqueue failed\n");
         exit(0);
     }
+#if DEBUG_PRINT_IN_TASK
+    printf("In doPrecode thread %d: finished frame: %d, subframe: %d, subcarrier: %d , offset: %d\n", tid, 
+        frame_id, current_data_subframe_id, sc_id, offset);
+#endif
 }
 
 void CoMP::do_ifft(int tid, int offset)

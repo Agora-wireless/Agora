@@ -37,7 +37,7 @@ public:
     // TASK & SOCKET thread number 
     static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 20 : 25;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
-    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
+    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 6 : 0;
     static const int CORE_OFFSET = 0;
 
     static const int FFT_THREAD_NUM = 2;
@@ -50,7 +50,7 @@ public:
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 100;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 40;
+    static const int demul_block_size = 20;
     // optimization parameters for block transpose (see the slides for more
     // details)
     static const int transpose_block_size = 8;
@@ -528,7 +528,7 @@ private:
     int precode_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int modulate_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int ifft_checker_[TASK_BUFFER_FRAME_NUM];
-    int tx_checker_[SOCKET_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int tx_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int tx_status_[SOCKET_BUFFER_FRAME_NUM];
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
 
@@ -536,6 +536,9 @@ private:
     float qam16_table[2][16];
     int max_equaled_frame=0;
     float csi_format_offset;
+
+    int dl_socket_buffer_size_;
+    int dl_socket_buffer_status_size_;
 
 };
 

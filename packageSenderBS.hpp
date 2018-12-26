@@ -31,12 +31,12 @@ public:
     // unsigned int for: I/Q samples
     static const int package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     static const int data_offset = sizeof(int) * 4;
-    static const int subframe_num_perframe = 40;
-    static const int BUFFER_FRAME_NUM = 40;
+    // static const int subframe_num_perframe = 40;
+    // static const int BUFFER_FRAME_NUM = 40;
 
-    static const int SOCKET_BUFFER_FRAME_NUM = 120;
+    // static const int SOCKET_BUFFER_FRAME_NUM = 120;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
-    static const int TASK_BUFFER_FRAME_NUM = 120;
+    // static const int TASK_BUFFER_FRAME_NUM = 120;
 
     struct PackageSenderContext
     {
@@ -55,7 +55,7 @@ public:
     std::vector<pthread_t> startTX(char *in_buffer, int *in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     
 private:
-    struct sockaddr_in servaddr_;    /* server address */
+    struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in cliaddr_;    /* server address */
     int* socket_;
 

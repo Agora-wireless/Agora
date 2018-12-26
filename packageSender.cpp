@@ -1,6 +1,14 @@
 #include "packageSender.hpp"
 #include "cpu_attach.hpp"
 
+
+static double get_time(void)
+{
+    struct timespec tv;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
+}
+
 PackageSender::PackageSender(int in_socket_num, int in_thread_num, int in_core_offset, int in_delay):
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
 socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
@@ -48,6 +56,12 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     /* initialize random seed: */
     srand (time(NULL));
 
+
+    memset(packet_count_per_frame, 0, sizeof(int) * BUFFER_FRAME_NUM);
+    for (int i = 0; i < BUFFER_FRAME_NUM; i++) {
+        memset(packet_count_per_subframe[i], 0, sizeof(int) * max_subframe_id);
+    }
+
     IQ_data = new float*[subframe_num_perframe * BS_ANT_NUM];
     IQ_data_coded = new ushort*[subframe_num_perframe * BS_ANT_NUM];
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
@@ -57,7 +71,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     
     // read from file
-    FILE* fp = fopen("../rx_data_2048_ant16.bin","rb");
+    FILE* fp = fopen("../rx_data_2048.bin","rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -113,12 +127,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
     // create send threads
     int cell_id = 0;
-    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    // int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     int ret;
     // pthread_mutex_init(&lock_, NULL);
     // gen data
 
     // load data to buffer
+
     for (int i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
         int data_index = subframe_id * BS_ANT_NUM + ant_id;
@@ -128,10 +143,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
         memcpy(trans_buffer_[cur_ptr_].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
-        if ( !task_queue_.enqueue( cur_ptr_ ) ) {
-            printf("send task enqueue failed\n");
-            exit(0);
-        }
+        
         ant_id++;
         if(ant_id == BS_ANT_NUM)
         {
@@ -147,6 +159,14 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         }
     }
 
+    double start_time = get_time();
+    // push tasks of the first subframe into task queue
+    for (int i = 0; i < BS_ANT_NUM; i++) {
+        if ( !task_queue_.enqueue(i) ) {
+            printf("send task enqueue failed\n");
+            exit(0);
+        }
+    }
     while(true)
     {
         // pthread_mutex_lock( &lock_ );
@@ -170,20 +190,69 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         ret = message_queue_.try_dequeue(data_ptr); 
         if(!ret)
             continue;
-
         int data_index = subframe_id * BS_ANT_NUM + ant_id;
         int* ptr = (int *)trans_buffer_[data_ptr].data();
         (*ptr) = frame_id;
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
-        memcpy(trans_buffer_[data_ptr].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
-        // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
+        memcpy(trans_buffer_[data_ptr].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
 
-        if ( !task_queue_.enqueue(data_ptr) ) {
-            printf("send task enqueue failed\n");
-            exit(0);
+        int tx_ant_id = data_ptr % BS_ANT_NUM;
+        int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
+        int tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
+        int tx_frame_id = tx_total_subframe_id / max_subframe_id;
+        packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]++;
+
+        // printf("data_ptr: %d, tx_frame_id: %d, tx_total_subframe_id: %d, tx_current_subframe_id %d, tx_ant_id %d, max_subframe_id %d\n", data_ptr, 
+        //     tx_frame_id, tx_total_subframe_id, tx_current_subframe_id, tx_ant_id, max_subframe_id);
+        if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] == BS_ANT_NUM) {
+            packet_count_per_frame[tx_frame_id]++;
+            int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
+            
+            printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
+            // usleep(delay);
+            // struct timespec tim, tim2;
+            // tim.tv_sec = 0;
+            // tim.tv_nsec = 0;
+            // nanosleep(&tim , &tim2);
+            // std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
+
+            for (int i = 0; i < BS_ANT_NUM; i++) {
+                if ( !task_queue_.enqueue(i + next_subframe_ptr) ) {
+                    printf("send task enqueue failed\n");
+                    exit(0);
+                }
+            }
+
+            if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
+                packet_count_per_frame[tx_frame_id] = 0;
+#if ENABLE_DOWNLINK
+                std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
+#endif
+                printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
+                start_time = get_time();
+            }
+            packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
+   
+            // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
         }
+
+
+
+        // int data_index = subframe_id * BS_ANT_NUM + ant_id;
+        // int* ptr = (int *)trans_buffer_[data_ptr].data();
+        // (*ptr) = frame_id;
+        // (*(ptr+1)) = subframe_id;
+        // (*(ptr+2)) = cell_id;
+        // (*(ptr+3)) = ant_id;
+        // memcpy(trans_buffer_[data_ptr].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        // // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
+
+        // if ( !task_queue_.enqueue(data_ptr) ) {
+        //     printf("send task enqueue failed\n");
+        //     exit(0);
+        // }
 
         // if (DEBUG_SENDER) 
         // {
@@ -224,6 +293,7 @@ PackageSender::~PackageSender()
 }
 
 
+
 void* PackageSender::loopSend(void *in_context)
 {
 
@@ -256,7 +326,7 @@ void* PackageSender::loopSend(void *in_context)
     int ret;
     int socket_per_thread = obj_ptr->socket_num / obj_ptr->thread_num;
     int total_tx_packets = 0;
-    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    // int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
     while(true)
     {
@@ -295,12 +365,16 @@ void* PackageSender::loopSend(void *in_context)
             exit(0);
         }
 
-        if (package_count % (BS_ANT_NUM) == 0)
-        {
-	    if (total_tx_packets < 1000/7 * BS_ANT_NUM * max_subframe_id)
-		usleep(2000);
-	    else
-            	usleep(obj_ptr->delay);
+        if (package_count % (BS_ANT_NUM) == 0) {
+    	    if (total_tx_packets < 1000/7 * BS_ANT_NUM * max_subframe_id) {
+    		    // usleep(2000);
+                std::this_thread::sleep_for(std::chrono::microseconds(2000));
+    		    // printf("In thread %d delayed\n", tid);
+    	    }
+	        else {
+                std::this_thread::sleep_for(std::chrono::microseconds(obj_ptr->delay));
+                // usleep(obj_ptr->delay);
+            }
         }
 	
 	if (total_tx_packets > 1e9)
