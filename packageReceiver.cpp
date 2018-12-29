@@ -6,6 +6,14 @@
 
 #include "packageReceiver.hpp"
 #include "cpu_attach.hpp"
+
+static double get_time(void)
+{
+    struct timespec tv;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
+}
+
 PackageReceiver::PackageReceiver(int N_THREAD)
 {
     socket_ = new int[N_THREAD];
@@ -150,6 +158,7 @@ void* PackageReceiver::loopRecv(void *in_context)
     int maxSymbolNum = 0;
     int Symbol_offset = 0;
     int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    double start_time= get_time();
     while(true)
     {
         // if buffer is full, exit
@@ -185,12 +194,12 @@ void* PackageReceiver::loopRecv(void *in_context)
         // get the position in buffer
         offset = cur_ptr_buffer_status - buffer_status;
 
-        // // read information from received packet
-        // int ant_id, frame_id, subframe_id, cell_id;
-        // frame_id = *((int *)cur_ptr_buffer);
-        // subframe_id = *((int *)cur_ptr_buffer + 1);
-        // cell_id = *((int *)cur_ptr_buffer + 2);
-        // ant_id = *((int *)cur_ptr_buffer + 3);
+        // read information from received packet
+        int ant_id, frame_id, subframe_id, cell_id;
+        frame_id = *((int *)cur_ptr_buffer);
+        subframe_id = *((int *)cur_ptr_buffer + 1);
+        cell_id = *((int *)cur_ptr_buffer + 2);
+        ant_id = *((int *)cur_ptr_buffer + 3);
 
         
         // move ptr & set status to full
@@ -206,7 +215,8 @@ void* PackageReceiver::loopRecv(void *in_context)
             printf("socket message enqueue failed\n");
             exit(0);
         }
-
+        double cur_time = get_time();
+        // printf("In RX thread %d: received frame %d, subframe %d, ant %d at %.5f, duration %.5f\n", tid, frame_id, subframe_id, ant_id, cur_time, cur_time-start_time );
         
         //printf("enqueue offset %d\n", offset);
         // int cur_queue_len = message_queue_->size_approx();

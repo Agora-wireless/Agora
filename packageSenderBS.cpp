@@ -177,7 +177,6 @@ void* packageSenderBS::loopSend(void *in_context)
         *((int *)cur_ptr_buffer + 1) = subframe_id;
         *((int *)cur_ptr_buffer + 2) = cell_id;
         *((int *)cur_ptr_buffer + 3) = ant_id;
-        printf("In RX thread %d, frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, subframe_id, ant_id);
 
         // send data (one OFDM symbol)
         if (sendto(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[tid], sizeof(obj_ptr->servaddr_[tid])) < 0) {
@@ -191,7 +190,7 @@ void* packageSenderBS::loopSend(void *in_context)
         subframe_id = *((int *)cur_ptr_buffer + 1);
         cell_id = *((int *)cur_ptr_buffer + 2);
         ant_id = *((int *)cur_ptr_buffer + 3);
-        printf("Transmitted frame %d, subframe %d, ant %d\n", frame_id, subframe_id, ant_id);
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
 #endif
         
         Event_data package_message;

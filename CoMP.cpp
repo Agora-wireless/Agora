@@ -506,6 +506,7 @@ void CoMP::start()
                     int rx_frame_id = (frame_id % TASK_BUFFER_FRAME_NUM);
 
                     rx_counter_packets_[rx_frame_id]++;
+                    
 #if ENABLE_DOWNLINK
                     int rx_counter_packets_max = BS_ANT_NUM * UE_NUM;
 #else
@@ -531,6 +532,9 @@ void CoMP::start()
 #endif                         
                         rx_counter_packets_[rx_frame_id] = 0;                                  
                     }  
+                    // if (frame_id > 0)
+                    //     printf("Main thread: data received from frame %d, subframe %d, ant %d, total: %d, in %.5f us\n", frame_id, subframe_id, ant_id, 
+                    //         rx_counter_packets_[rx_frame_id], get_time()-pilot_received[frame_id]);
 
 #if BIGSTATION 
                     Event_data do_fft_task;
@@ -1212,7 +1216,11 @@ void CoMP::start()
         sum_demul = sum_demul + Demul_task_count[i];
     }
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
+#if ENABLE_DOWNLINK
+    double fft_frames = (double)sum_FFT/BS_ANT_NUM/UE_NUM;
+#else
     double fft_frames = (double)sum_FFT/BS_ANT_NUM/subframe_num_perframe;
+#endif
     double zf_frames = (double)sum_ZF/OFDM_DATA_NUM;
     double demul_frames = (double)sum_demul * demul_block_size/ OFDM_DATA_NUM / data_subframe_num_perframe;
     printf("Total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), Demulation: %d (%.2f frames)\n", 
