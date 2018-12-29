@@ -64,6 +64,7 @@ private:
 
     moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
     moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
+    std::unique_ptr<moodycamel::ProducerToken> task_ptok[10]; 
     int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
     // int max_length_ = max_subframe_id * BS_ANT_NUM;
 

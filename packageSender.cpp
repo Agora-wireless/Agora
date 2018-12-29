@@ -96,6 +96,9 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     printf("start sender\n");
 
+    for (int i = 0; i < thread_num; i++) 
+        task_ptok[i].reset(new moodycamel::ProducerToken(task_queue_));
+
     context = new PackageSenderContext[thread_num];
     std::vector<pthread_t> created_threads;
     for(int i = 0; i < thread_num; i++)
@@ -159,10 +162,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         }
     }
 
+    
+
     double start_time = get_time();
     // push tasks of the first subframe into task queue
     for (int i = 0; i < BS_ANT_NUM; i++) {
-        if ( !task_queue_.enqueue(i) ) {
+        int ptok_id = i % thread_num;
+        if ( !task_queue_.enqueue(*task_ptok[ptok_id], i) ) {
             printf("send task enqueue failed\n");
             exit(0);
         }
@@ -210,7 +216,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             packet_count_per_frame[tx_frame_id]++;
             int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             
-            printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
+            // printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
             // usleep(delay);
             // struct timespec tim, tim2;
             // tim.tv_sec = 0;
@@ -219,7 +225,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             // std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
 
             for (int i = 0; i < BS_ANT_NUM; i++) {
-                if ( !task_queue_.enqueue(i + next_subframe_ptr) ) {
+                int ptok_id = i % thread_num;
+                if ( !task_queue_.enqueue(*task_ptok[ptok_id], i + next_subframe_ptr) ) {
                     printf("send task enqueue failed\n");
                     exit(0);
                 }
@@ -230,7 +237,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 #if ENABLE_DOWNLINK
                 std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
 #endif
-                printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
+                // printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
                 start_time = get_time();
             }
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
@@ -328,10 +335,12 @@ void* PackageSender::loopSend(void *in_context)
     int total_tx_packets = 0;
     // int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
+    int ant_num_this_thread = BS_ANT_NUM / obj_ptr->thread_num + (tid < BS_ANT_NUM % obj_ptr->thread_num ? 1: 0);
+    printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, obj_ptr->thread_num);
     while(true)
     {
         int data_ptr;
-        ret = task_queue_->try_dequeue(data_ptr); 
+        ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->task_ptok[tid]),data_ptr); 
         if(!ret)
             continue;
 
@@ -354,7 +363,7 @@ void* PackageSender::loopSend(void *in_context)
         if (DEBUG_SENDER) 
         {
             int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr].data();
-            printf("Thread %d transmit frame %d, subframe %d, ant %d\n", tid,  *ptr, *(ptr+1), *(ptr+3));
+            printf("Thread %d transmit frame %d, subframe %d, ant %d, total: %d, at %.5f\n", tid,  *ptr, *(ptr+1), *(ptr+3), total_tx_packets, get_time());
         }
         
         package_count++;
@@ -365,10 +374,10 @@ void* PackageSender::loopSend(void *in_context)
             exit(0);
         }
 
-        if (package_count % (BS_ANT_NUM) == 0) {
-    	    if (total_tx_packets < 1000/7 * BS_ANT_NUM * max_subframe_id) {
+        if (package_count % ant_num_this_thread == 0) {
+    	    if (total_tx_packets < 500 * ant_num_this_thread * max_subframe_id) {
     		    // usleep(2000);
-                std::this_thread::sleep_for(std::chrono::microseconds(2000));
+                std::this_thread::sleep_for(std::chrono::microseconds(100));
     		    // printf("In thread %d delayed\n", tid);
     	    }
 	        else {
@@ -377,14 +386,14 @@ void* PackageSender::loopSend(void *in_context)
             }
         }
 	
-	if (total_tx_packets > 1e9)
-	    total_tx_packets = 9;
-        if(package_count == BS_ANT_NUM * max_subframe_id * 100)
+    	if (total_tx_packets > 1e9)
+    	    total_tx_packets = 0;
+        if(package_count == ant_num_this_thread * max_subframe_id * 1000)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * ant_num_this_thread * max_subframe_id * 1000;
             std::chrono::duration<double> diff = end - begin;
-            printf("thread %d send 100 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024);
+            printf("thread %d send %d frames in %f secs, throughput %f MB/s\n", tid, total_tx_packets/(ant_num_this_thread* max_subframe_id), diff.count(), byte_len / diff.count() / 1024 / 1024);
             begin = std::chrono::system_clock::now();
             package_count = 0;
         }
