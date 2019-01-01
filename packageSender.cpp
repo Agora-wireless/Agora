@@ -214,9 +214,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         //     tx_frame_id, tx_total_subframe_id, tx_current_subframe_id, tx_ant_id, max_subframe_id);
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] == BS_ANT_NUM) {
             packet_count_per_frame[tx_frame_id]++;
-            int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             
-            // printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
+            printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
             // usleep(delay);
             // struct timespec tim, tim2;
             // tim.tv_sec = 0;
@@ -224,6 +223,23 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             // nanosleep(&tim , &tim2);
             // std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
 
+            
+
+            if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
+                packet_count_per_frame[tx_frame_id] = 0;
+#if ENABLE_DOWNLINK
+                if (frame_id < 500)
+                    std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*120));
+                else
+                    std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
+#endif
+                printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
+                start_time = get_time();
+            }
+
+            packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
+
+            int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             for (int i = 0; i < BS_ANT_NUM; i++) {
                 int ptok_id = i % thread_num;
                 if ( !task_queue_.enqueue(*task_ptok[ptok_id], i + next_subframe_ptr) ) {
@@ -231,16 +247,6 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                     exit(0);
                 }
             }
-
-            if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
-                packet_count_per_frame[tx_frame_id] = 0;
-#if ENABLE_DOWNLINK
-                std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
-#endif
-                // printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
-                start_time = get_time();
-            }
-            packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
    
             // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
         }
