@@ -525,11 +525,12 @@ private:
 
     mufft_plan_1d *muplans_ifft_[TASK_THREAD_NUM];
 
-    int precode_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int dl_data_counter_scs_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int dl_data_counter_subframes_[TASK_BUFFER_FRAME_NUM];
     int modulate_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int ifft_checker_[TASK_BUFFER_FRAME_NUM];
-    int tx_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int tx_status_[SOCKET_BUFFER_FRAME_NUM];
+    int tx_counter_ants_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int tx_counter_subframes_[TASK_BUFFER_FRAME_NUM];
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
 
     /* lookup table for 16 QAM, real and imag */
