@@ -64,7 +64,8 @@
 static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
-static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - 31;
+static const int dl_data_subframe_start = 29;
+static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - dl_data_subframe_start;
 
 static const int MAX_FRAME_ID = 1e4;
 
