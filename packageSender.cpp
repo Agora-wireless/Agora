@@ -29,7 +29,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
         int rand_port = rand() % 65536;
         cliaddr_.sin_family = AF_INET;
-        cliaddr_.sin_port = htons(0);  // out going port is random
+        cliaddr_.sin_port = htons(6000+i);//htons(0);  // out going port is random
         //cliaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
         cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
         memset(cliaddr_.sin_zero, 0, sizeof(cliaddr_.sin_zero));  
@@ -71,7 +71,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     
     // read from file
-    FILE* fp = fopen("../rx_data_2048.bin","rb");
+    FILE* fp = fopen("../rx_data_2048_ant8.bin","rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -215,7 +215,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] == BS_ANT_NUM) {
             packet_count_per_frame[tx_frame_id]++;
             
-            printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
+            // printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
             // usleep(delay);
             // struct timespec tim, tim2;
             // tim.tv_sec = 0;
@@ -233,7 +233,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                 else
                     std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
 #endif
-                printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
+                //printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
                 start_time = get_time();
             }
 

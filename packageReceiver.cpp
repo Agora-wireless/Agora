@@ -194,12 +194,12 @@ void* PackageReceiver::loopRecv(void *in_context)
         // get the position in buffer
         offset = cur_ptr_buffer_status - buffer_status;
 
-        // read information from received packet
-        int ant_id, frame_id, subframe_id, cell_id;
-        frame_id = *((int *)cur_ptr_buffer);
-        subframe_id = *((int *)cur_ptr_buffer + 1);
-        cell_id = *((int *)cur_ptr_buffer + 2);
-        ant_id = *((int *)cur_ptr_buffer + 3);
+        // // read information from received packet
+        // int ant_id, frame_id, subframe_id, cell_id;
+        // frame_id = *((int *)cur_ptr_buffer);
+        // subframe_id = *((int *)cur_ptr_buffer + 1);
+        // cell_id = *((int *)cur_ptr_buffer + 2);
+        // ant_id = *((int *)cur_ptr_buffer + 3);
 
         
         // move ptr & set status to full

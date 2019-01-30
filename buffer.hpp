@@ -27,6 +27,12 @@ struct Event_data
     int data;
 };
 
+struct Event_data_tx
+{
+    int ptr;
+    int offset;
+};
+
 // buffer of each socket thread
 struct SocketBuffer
 {
