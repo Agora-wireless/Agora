@@ -313,6 +313,9 @@ CoMP::CoMP()
         memset(Precode_task_duration[i], 0, sizeof(double) * 4);
     }
 
+    memset(IFFT_task_count, 0, sizeof(int) * TASK_THREAD_NUM);
+    memset(Precode_task_count, 0, sizeof(int) * TASK_THREAD_NUM);
+
 #endif
 
 }
@@ -450,12 +453,16 @@ void CoMP::start()
     double fft_processed[10000];
     double demul_processed[10000];
     double zf_processed[10000];
+
     double fft_time_in_function[10000];
     double zf_time_in_function[10000];
     double demul_time_in_function[10000];
+    double ifft_time_in_function[10000];
+    double precode_time_in_function[10000];
 
     double precode_processed[10000];
     double ifft_processed[10000];
+    double tx_processed_first[10000];
     double tx_processed[10000];
 
     double total_time = 0;
@@ -467,21 +474,31 @@ void CoMP::start()
     bool rx_start = false;
     bool prev_demul_scheduled = false;
     double fft_previous_time = get_time();
+
     double fft_time_sum[4] = {0};
     double zf_time_sum[4] = {0};
     double demul_time_sum[4] = {0};
+    double ifft_time_sum[4] = {0};
+    double precode_time_sum[4] = {0};
 
     double fft_time_this_frame[4];
     double zf_time_this_frame[4];
     double demul_time_this_frame[4];
+    double ifft_time_this_frame[4];
+    double precode_time_this_frame[4];
+
 
     double fft_time_per_thread[4][TASK_THREAD_NUM] = {0};
     double zf_time_per_thread[4][TASK_THREAD_NUM] = {0};
     double demul_time_per_thread[4][TASK_THREAD_NUM] = {0};
+    double ifft_time_per_thread[4][TASK_THREAD_NUM] = {0};
+    double precode_time_per_thread[4][TASK_THREAD_NUM] = {0};
 
     int fft_count_per_thread[TASK_THREAD_NUM];
     int zf_count_per_thread[TASK_THREAD_NUM];
     int demul_count_per_thread[TASK_THREAD_NUM];
+    int ifft_count_per_thread[TASK_THREAD_NUM];
+    int precode_count_per_thread[TASK_THREAD_NUM];
 
     signal(SIGINT, intHandler);
     while(keep_running) {
@@ -576,7 +593,7 @@ void CoMP::start()
                     // if this is the first frame or the previous frame is all processed, schedule FFT for this packet
                     int frame_id_prev = frame_id == 0 ? (TASK_BUFFER_FRAME_NUM-1) : (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
     #if ENABLE_DOWNLINK
-                    bool previous_frame_done = ifft_checker_[frame_id_prev] == BS_ANT_NUM * data_subframe_num_perframe;
+                    bool previous_frame_done = ifft_checker_[frame_id_prev] == BS_ANT_NUM * dl_data_subframe_num_perframe;
     #else
                     bool previous_frame_done = demul_counter_subframes_[frame_id_prev] == data_subframe_num_perframe;
     #endif
@@ -766,7 +783,7 @@ void CoMP::start()
                         Event_data do_precode_task;
                         do_precode_task.event_type = TASK_PRECODE;
                         for(int j = 0; j < OFDM_DATA_NUM / demul_block_size; j++) {
-                            do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, 0, j * demul_block_size);
+                            do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, dl_data_subframe_start, j * demul_block_size);
                             schedule_task(do_precode_task, &precode_queue_, ptok_precode);
                         }
 
@@ -1105,12 +1122,12 @@ void CoMP::start()
                         printf("Main thread: Precoding done for all subcarriers in frame: %d, subframe: %d\n", frame_id, current_data_subframe_id);
 #endif  
                         dl_data_counter_subframes_[frame_id]++;
-                        if (dl_data_counter_subframes_[frame_id] == data_subframe_num_perframe) {
+                        if (dl_data_counter_subframes_[frame_id] == dl_data_subframe_num_perframe) {
                             precode_processed[frame_count_precode] = get_time();                    
                             dl_data_counter_subframes_[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_DONE
-                        printf("Main thread: Precoding done for all subframes in frame: %d, in %.5f us, total: %.5f us\n", frame_id, 
-                            precode_processed[frame_count_precode]-zf_processed[frame_count_precode], 
+                        printf("Main thread: Precoding done for all subframes in frame: %d, frame count: %d, in %.5f us, total: %.5f us\n", frame_id, 
+                            frame_count_precode, precode_processed[frame_count_precode]-zf_processed[frame_count_precode], 
                             precode_processed[frame_count_precode]-pilot_received[frame_count_precode]);
 #endif                    
                         frame_count_precode++;          
@@ -1133,7 +1150,7 @@ void CoMP::start()
                     do_tx_task.data = offset_ifft;                    
                     schedule_task(do_tx_task, &tx_queue_, ptok_tx);
                     ifft_checker_[frame_id] += 1;
-                    if (ifft_checker_[frame_id] == BS_ANT_NUM * data_subframe_num_perframe) {
+                    if (ifft_checker_[frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe) {
                         // ifft_checker_[frame_id] = 0;
 
                         // schedule fft for next frame
@@ -1152,7 +1169,7 @@ void CoMP::start()
                                 fft_created_counter_packets_[frame_id_next]++;
                                 if (fft_created_counter_packets_[frame_id_next] == BS_ANT_NUM * UE_NUM) {
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE                                    
-                                    printf("Main thread in IFFT: created FFT tasks for all packets in frame: %d in %.5f us\n", frame_id + 1, get_time()-pilot_received[frame_id_next]);
+                                    printf("Main thread in IFFT: created FFT tasks for all packets in frame: %d, in %.5f us\n", frame_id + 1, get_time()-pilot_received[frame_id_next]);
 #endif                                        
                                     fft_created_counter_packets_[frame_id_next] = 0;
                                     ifft_checker_[frame_id] = 0;
@@ -1162,7 +1179,7 @@ void CoMP::start()
                         }
                         ifft_processed[frame_count_ifft] = get_time();
 #if DEBUG_PRINT_PER_FRAME_DONE
-                        printf("Main thread: IFFT done for all antennas in frame: %d in %.5f us, total: %.5f us\n", frame_id,
+                        printf("Main thread: IFFT done for all antennas in frame: %d, frame count: %d, in %.5f us, total: %.5f us\n", frame_id, frame_count_ifft,
                             ifft_processed[frame_count_ifft]-precode_processed[frame_count_ifft], ifft_processed[frame_count_ifft]-pilot_received[frame_count_ifft]);
 #endif  
                         
@@ -1193,17 +1210,20 @@ void CoMP::start()
                         tx_counter_ants_[frame_id][current_data_subframe_id]);
 #endif
                     if (tx_counter_ants_[frame_id][current_data_subframe_id] == BS_ANT_NUM) {
+                        if (current_data_subframe_id == dl_data_subframe_start) {
+                            tx_processed_first[frame_count_tx] = get_time();
+                        }
                         tx_counter_subframes_[frame_id] += 1;
                         tx_counter_ants_[frame_id][current_data_subframe_id] = 0;
 
                         tx_count++;
                         // print log per 100 frames
-                        if (tx_count == data_subframe_num_perframe * 100)
+                        if (tx_count == dl_data_subframe_num_perframe * 100)
                         {
                             tx_count = 0;
                             auto tx_end = std::chrono::high_resolution_clock::now();
                             std::chrono::duration<double> diff = tx_end - tx_begin;
-                            int samples_num_per_UE = OFDM_CA_NUM * data_subframe_num_perframe * 100;
+                            int samples_num_per_UE = OFDM_CA_NUM * dl_data_subframe_num_perframe * 100;
                             printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %d\n", 
                                 samples_num_per_UE, UE_NUM, diff.count(), samples_num_per_UE * log2(16.0f) / diff.count(), tx_queue_.size_approx());
                             tx_begin = std::chrono::high_resolution_clock::now();
@@ -1211,14 +1231,113 @@ void CoMP::start()
 #if DEBUG_PRINT_PER_SUBFRAME_DONE  
                         printf("Main thread: TX done for all antennas in frame: %d, subframe: %d\n", frame_id, current_data_subframe_id);
 #endif
-                          
-                        if (tx_counter_subframes_[frame_id] == data_subframe_num_perframe) {
+#if DEBUG_PRINT_PER_FRAME_DONE
+                        if(current_data_subframe_id == dl_data_subframe_start) {
+                            printf("Main thread: TX done for first subframe in frame: %d, subframe: %d in %.5f us, total: %.5f us, deadline: %.5f\n", frame_id, current_data_subframe_id,
+                                tx_processed_first[frame_count_tx]-zf_processed[frame_count_tx], tx_processed_first[frame_count_tx]-pilot_received[frame_count_tx], 5000.0/subframe_num_perframe*(UE_NUM+dl_data_subframe_start));
+                        }
+#endif                          
+                        if (tx_counter_subframes_[frame_id] == dl_data_subframe_num_perframe) {
                             tx_processed[frame_count_tx] = get_time();
                                
 #if DEBUG_PRINT_PER_FRAME_DONE                                            
                             printf("Main thread: TX done for all subframes in frame: %d in %.5f us, total: %.5f us\n", frame_id,
                                 tx_processed[frame_count_tx]-ifft_processed[frame_count_tx], tx_processed[frame_count_tx]-pilot_received[frame_count_tx]);  
 #endif                      
+
+
+#if DEBUG_UPDATE_STATS
+                            double sum_ZF_this_frame[4] = {0};
+                            double sum_Precode_this_frame[4] = {0};
+                            double sum_FFT_this_frame[4] = {0};
+                            double sum_IFFT_this_frame[4] = {0};
+                            int fft_count_this_frame = 0;
+                            int zf_count_this_frame = 0;
+                            int ifft_count_this_frame = 0;
+                            int precode_count_this_frame = 0;
+                            for (int i = 0; i < TASK_THREAD_NUM; i++) {
+                                int fft_count_this_frame_this_thread = FFT_task_count[i]-fft_count_per_thread[i];
+                                int zf_count_this_frame_this_thread = ZF_task_count[i]-zf_count_per_thread[i];
+                                int precode_count_this_frame_this_thread = Precode_task_count[i]-precode_count_per_thread[i];
+                                int ifft_count_this_frame_this_thread = IFFT_task_count[i]-ifft_count_per_thread[i];
+
+                                double fft_time_this_frame_this_thread[4];
+                                double zf_time_this_frame_this_thread[4];
+                                double ifft_time_this_frame_this_thread[4];
+                                double precode_time_this_frame_this_thread[4];
+
+
+                                for (int j = 0; j < 4; j++) {
+                                    sum_FFT_this_frame[j] = sum_FFT_this_frame[j] + FFT_task_duration[i][j];
+                                    sum_ZF_this_frame[j] = sum_ZF_this_frame[j] + ZF_task_duration[i][j];      
+                                    sum_IFFT_this_frame[j] = sum_IFFT_this_frame[j] + IFFT_task_duration[i][j];
+                                    sum_Precode_this_frame[j] = sum_Precode_this_frame[j] + Precode_task_duration[i][j];                    
+
+                                    fft_time_this_frame_this_thread[j] = (FFT_task_duration[i][j]-fft_time_per_thread[j][i])/fft_count_this_frame_this_thread;
+                                    zf_time_this_frame_this_thread[j] = (ZF_task_duration[i][j]-zf_time_per_thread[j][i])/zf_count_this_frame_this_thread;
+                                    ifft_time_this_frame_this_thread[j] = (IFFT_task_duration[i][j]-ifft_time_per_thread[j][i])/ifft_count_this_frame_this_thread;
+                                    precode_time_this_frame_this_thread[j] = (Precode_task_duration[i][j]-precode_time_per_thread[j][i])/precode_count_this_frame_this_thread;
+
+                                    fft_time_per_thread[j][i] = FFT_task_duration[i][j];
+                                    zf_time_per_thread[j][i] = ZF_task_duration[i][j];
+                                    ifft_time_per_thread[j][i] = IFFT_task_duration[i][j];
+                                    precode_time_per_thread[j][i] = Precode_task_duration[i][j];
+                                }
+
+                                fft_count_this_frame += fft_count_this_frame_this_thread;
+                                zf_count_this_frame += zf_count_this_frame_this_thread;
+                                ifft_count_this_frame += ifft_count_this_frame_this_thread;
+                                precode_count_this_frame += precode_count_this_frame_this_thread;
+
+                                float sum_time_this_frame_this_thread = fft_time_this_frame_this_thread[0] * fft_count_this_frame_this_thread
+                                     + zf_time_this_frame_this_thread[0] * zf_count_this_frame_this_thread + 
+                                     ifft_time_this_frame_this_thread[0] * ifft_count_this_frame_this_thread + precode_time_this_frame_this_thread[0] * precode_count_this_frame_this_thread;
+    #if DEBUG_PRINT_STATS_PER_THREAD
+                                printf("In frame %d, thread %d, \t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), precode: %d tasks %.5f, ifft: %d tasks %.5f, sum: %.5f\n",
+                                        frame_id, i, fft_count_this_frame_this_thread, 
+                                        fft_time_this_frame_this_thread[0], fft_time_this_frame_this_thread[1], fft_time_this_frame_this_thread[2], fft_time_this_frame_this_thread[3],
+                                        zf_count_this_frame_this_thread, zf_time_this_frame_this_thread[0], zf_time_this_frame_this_thread[1], zf_time_this_frame_this_thread[2], zf_time_this_frame_this_thread[3], 
+                                        precode_count_this_frame_this_thread, precode_time_this_frame_this_thread[0], ifft_count_this_frame_this_thread, ifft_time_this_frame_this_thread[0], sum_time_this_frame_this_thread);
+    #endif
+                                fft_count_per_thread[i] = FFT_task_count[i];
+                                zf_count_per_thread[i] = ZF_task_count[i];
+                                ifft_count_per_thread[i] = IFFT_task_count[i];
+                                precode_count_per_thread[i] = Precode_task_count[i];
+                            }                  
+
+                            for (int i = 0; i < 4; i++) {
+                                fft_time_this_frame[i] = (sum_FFT_this_frame[i]-fft_time_sum[i])/TASK_THREAD_NUM;
+                                zf_time_this_frame[i] = (sum_ZF_this_frame[i]-zf_time_sum[i])/TASK_THREAD_NUM;
+                                ifft_time_this_frame[i] = (sum_IFFT_this_frame[i]-ifft_time_sum[i])/TASK_THREAD_NUM;
+                                precode_time_this_frame[i] = (sum_Precode_this_frame[i]-precode_time_sum[i])/TASK_THREAD_NUM;
+                            }     
+
+                            
+                            double sum_time_this_frame = fft_time_this_frame[0] + zf_time_this_frame[0] + precode_time_this_frame[0] + ifft_time_this_frame[0];
+                            fft_time_in_function[frame_count_tx] = fft_time_this_frame[0];
+                            zf_time_in_function[frame_count_tx] = zf_time_this_frame[0];
+                            ifft_time_in_function[frame_count_tx] = ifft_time_this_frame[0];
+                            precode_time_in_function[frame_count_tx] = precode_time_this_frame[0];
+    #if DEBUG_PRINT_PER_FRAME_DONE
+                            printf("In frame %d, \t\t\t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), precode: %d tasks %.5f, ifft: %d tasks %.5f, sum: %.5f\n", 
+                                    frame_id, fft_count_this_frame, fft_time_this_frame[0], fft_time_this_frame[1], fft_time_this_frame[2], fft_time_this_frame[3], 
+                                    zf_count_this_frame, zf_time_this_frame[0], zf_time_this_frame[1], zf_time_this_frame[2], zf_time_this_frame[3], 
+                                    precode_count_this_frame, precode_time_this_frame[0], ifft_count_this_frame, ifft_time_this_frame[0], sum_time_this_frame);
+    #endif
+                            for (int i = 0; i < 4; i++) {
+                                fft_time_sum[i] = sum_FFT_this_frame[i];
+                                zf_time_sum[i] = sum_ZF_this_frame[i];
+                                ifft_time_sum[i] = sum_IFFT_this_frame[i];
+                                precode_time_sum[i] = sum_Precode_this_frame[i];
+                            }   
+
+
+#endif
+
+
+
+
+
                             frame_count_tx++;
                             if (frame_count_tx == 1e9) 
                                 frame_count_tx = 0;
@@ -1244,12 +1363,21 @@ void CoMP::start()
         std::cerr << "Error: " << strerror(errno) << std::endl;
         exit(0);
     }
-    for(int ii = 0; ii < frame_count_demul; ii++)
-    {
+    
         // printf("User %d: %d, ", ii,demul_ptr2(ii));
+#if ENABLE_DOWNLINK
+    for(int ii = 0; ii < frame_count_tx; ii++) { 
+        fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
+            precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
+                fft_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii]);
+    }
+#else
+    for(int ii = 0; ii < frame_count_demul; ii++) {    
         fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
                 fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii]);
     }
+#endif
+    
     // printf("\n");
     // fwrite(mat_demuled2.memptr(), sizeof(int),sizeof(mat_demuled), fp_debug);
     fclose(fp_debug);
@@ -1257,20 +1385,36 @@ void CoMP::start()
     int sum_FFT = 0;
     int sum_ZF = 0;
     int sum_demul = 0;
+    int sum_IFFT = 0;
+    int sum_Precode = 0;
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
         sum_FFT = sum_FFT + FFT_task_count[i];
         sum_ZF = sum_ZF + ZF_task_count[i];
         sum_demul = sum_demul + Demul_task_count[i];
+        sum_IFFT = sum_IFFT + IFFT_task_count[i];
+        sum_Precode = sum_Precode + Precode_task_count[i];
     }
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
 #if ENABLE_DOWNLINK
     double fft_frames = (double)sum_FFT/BS_ANT_NUM/UE_NUM;
+    double precode_frames = (double)sum_Precode * demul_block_size/ OFDM_DATA_NUM / dl_data_subframe_num_perframe;
+    double ifft_frames = (double)sum_IFFT / BS_ANT_NUM / dl_data_subframe_num_perframe;
+    double zf_frames = (double)sum_ZF/OFDM_DATA_NUM;
+    printf("Downlink: total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), precode: %d (%.2f frames), IFFT: %d (%.2f frames)\n", 
+        sum_FFT, fft_frames, sum_ZF, zf_frames, sum_Precode, precode_frames, sum_IFFT, ifft_frames);
+    for (int i = 0; i < TASK_THREAD_NUM; i++) {
+        double percent_FFT = 100*double(FFT_task_count[i])/sum_FFT;
+        double percent_ZF = 100*double(ZF_task_count[i])/sum_ZF;
+        double percent_Precode = 100*double(Precode_task_count[i])/sum_Precode;
+        double percent_IFFT = 100*double(IFFT_task_count[i])/sum_IFFT;
+        printf("thread %d performed FFT: %d (%.2f%%), ZF: %d (%.2f%%), precode: %d (%.2f%%), IFFT: %d (%.2f%%)\n", 
+            i, FFT_task_count[i], percent_FFT, ZF_task_count[i], percent_ZF, Precode_task_count[i], percent_Precode, IFFT_task_count[i], percent_IFFT);
+    }
 #else
     double fft_frames = (double)sum_FFT/BS_ANT_NUM/subframe_num_perframe;
-#endif
-    double zf_frames = (double)sum_ZF/OFDM_DATA_NUM;
     double demul_frames = (double)sum_demul * demul_block_size/ OFDM_DATA_NUM / data_subframe_num_perframe;
-    printf("Total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), Demulation: %d (%.2f frames)\n", 
+    double zf_frames = (double)sum_ZF/OFDM_DATA_NUM;
+    printf("Uplink: total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), Demulation: %d (%.2f frames)\n", 
         sum_FFT, fft_frames, sum_ZF, zf_frames, sum_demul, demul_frames);
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
         double percent_FFT = 100*double(FFT_task_count[i])/sum_FFT;
@@ -1279,6 +1423,7 @@ void CoMP::start()
         printf("thread %d performed FFT: %d (%.2f%%), ZF: %d (%.2f%%), Demulation: %d (%.2f%%)\n", 
             i, FFT_task_count[i], percent_FFT, ZF_task_count[i], percent_ZF, Demul_task_count[i], percent_Demul);
     }
+#endif 
     exit(0);
     
 }
@@ -2534,7 +2679,8 @@ void CoMP::do_precode(int tid, int offset)
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, subcarrier: %d , offset: %d\n", tid, 
         frame_id, current_data_subframe_id, sc_id, offset);
 #endif
-    Precode_task_duration[tid][0] = get_time() - start_time;
+    Precode_task_count[tid] = Precode_task_count[tid]+1;
+    Precode_task_duration[tid][0] += get_time() - start_time;
 }
 
 void CoMP::do_ifft(int tid, int offset)
@@ -2589,7 +2735,8 @@ void CoMP::do_ifft(int tid, int offset)
         printf("IFFT message enqueue failed\n");
         exit(0);
     }
-    IFFT_task_duration[tid][0] = get_time() - start_time;
+    IFFT_task_count[tid] = IFFT_task_count[tid]+1;
+    IFFT_task_duration[tid][0] += get_time() - start_time;
 }
 
 

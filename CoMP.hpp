@@ -543,6 +543,9 @@ private:
 
     double IFFT_task_duration[TASK_THREAD_NUM][4];
     double Precode_task_duration[TASK_THREAD_NUM][4];
+
+    int IFFT_task_count[TASK_THREAD_NUM];
+    int Precode_task_count[TASK_THREAD_NUM];
 };
 
 #endif
