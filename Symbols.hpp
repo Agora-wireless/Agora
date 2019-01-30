@@ -32,14 +32,13 @@
 #define TASK_MODUL 6
 #define TASK_SEND 7
 
-#define BIGSTATION 1
-#define ENABLE_DOWNLINK 0
+#define BIGSTATION 0
+#define ENABLE_DOWNLINK 1
 
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10
 
 
-#define DEBUG_PRINT 0
 #define DEBUG_PRINT_PER_FRAME_DONE 0
 #define DEBUG_PRINT_PER_SUBFRAME_DONE 0
 #define DEBUG_PRINT_PER_TASK_DONE 0
@@ -65,6 +64,7 @@
 static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
+static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - 31;
 
 static const int MAX_FRAME_ID = 1e4;
 

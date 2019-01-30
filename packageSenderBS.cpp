@@ -185,12 +185,13 @@ void* packageSenderBS::loopSend(void *in_context)
         }
 
 #if DEBUG_BS_SENDER
-        // read information from received packet
-        frame_id = *((int *)cur_ptr_buffer);
-        subframe_id = *((int *)cur_ptr_buffer + 1);
-        cell_id = *((int *)cur_ptr_buffer + 2);
-        ant_id = *((int *)cur_ptr_buffer + 3);
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+        // printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d\n", tid, frame_id, subframe_id, ant_id, offset);
+        // // read information from received packet
+        // frame_id = *((int *)cur_ptr_buffer);
+        // subframe_id = *((int *)cur_ptr_buffer + 1);
+        // cell_id = *((int *)cur_ptr_buffer + 2);
+        // ant_id = *((int *)cur_ptr_buffer + 3);
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d\n", tid, frame_id, subframe_id, ant_id, offset);
 #endif
         
         Event_data package_message;

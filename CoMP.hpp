@@ -36,12 +36,12 @@ class CoMP
 public:
     // TASK & SOCKET thread number 
     static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 20 : 25;
-    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 7;
-    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 6 : 0;
+    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 4;
+    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     static const int CORE_OFFSET = 0;
 
-    static const int FFT_THREAD_NUM = 2;
-    static const int ZF_THREAD_NUM = 16;
+    static const int FFT_THREAD_NUM = 1;
+    static const int ZF_THREAD_NUM = 18;
     static const int DEMUL_THREAD_NUM = TASK_THREAD_NUM - FFT_THREAD_NUM - ZF_THREAD_NUM;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
@@ -50,7 +50,7 @@ public:
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 100;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 20;
+    static const int demul_block_size = 40;
     // optimization parameters for block transpose (see the slides for more
     // details)
     static const int transpose_block_size = 8;
@@ -541,6 +541,8 @@ private:
     int dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
+    double IFFT_task_duration[TASK_THREAD_NUM][4];
+    double Precode_task_duration[TASK_THREAD_NUM][4];
 };
 
 #endif
