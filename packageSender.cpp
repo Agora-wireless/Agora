@@ -29,7 +29,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
         int rand_port = rand() % 65536;
         cliaddr_.sin_family = AF_INET;
-        cliaddr_.sin_port = htons(6000+i);//htons(0);  // out going port is random
+        cliaddr_.sin_port = htons(0);  // out going port is random
         //cliaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
         cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
         memset(cliaddr_.sin_zero, 0, sizeof(cliaddr_.sin_zero));  
@@ -71,7 +71,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     
     // read from file
-    FILE* fp = fopen("../rx_data_2048_ant8.bin","rb");
+    FILE* fp = fopen("../rx_data_2048.bin","rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -214,6 +214,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         //     tx_frame_id, tx_total_subframe_id, tx_current_subframe_id, tx_ant_id, max_subframe_id);
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] == BS_ANT_NUM) {
             packet_count_per_frame[tx_frame_id]++;
+            int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             
             // printf("Finished transmit all antennas in frame: %d, subframe: %d, in %.5f us\n", tx_frame_id, tx_current_subframe_id, get_time()-start_time);
             // usleep(delay);
@@ -223,23 +224,6 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             // nanosleep(&tim , &tim2);
             // std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
 
-            
-
-            if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
-                packet_count_per_frame[tx_frame_id] = 0;
-#if ENABLE_DOWNLINK
-                if (frame_id < 500)
-                    std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*120));
-                else
-                    std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
-#endif
-                //printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
-                start_time = get_time();
-            }
-
-            packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
-
-            int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             for (int i = 0; i < BS_ANT_NUM; i++) {
                 int ptok_id = i % thread_num;
                 if ( !task_queue_.enqueue(*task_ptok[ptok_id], i + next_subframe_ptr) ) {
@@ -247,6 +231,16 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                     exit(0);
                 }
             }
+
+            if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
+                packet_count_per_frame[tx_frame_id] = 0;
+#if ENABLE_DOWNLINK
+                std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*70));
+#endif
+                // printf("Finished transmit all antennas in frame: %d in %.5f us\n", tx_frame_id,  get_time()-start_time);
+                start_time = get_time();
+            }
+            packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
    
             // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
         }
@@ -394,12 +388,12 @@ void* PackageSender::loopSend(void *in_context)
 	
     	if (total_tx_packets > 1e9)
     	    total_tx_packets = 0;
-        if(package_count == ant_num_this_thread * max_subframe_id * 1000)
+        if(package_count == BS_ANT_NUM * max_subframe_id * 100)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * ant_num_this_thread * max_subframe_id * 1000;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
             std::chrono::duration<double> diff = end - begin;
-            printf("thread %d send %d frames in %f secs, throughput %f MB/s\n", tid, total_tx_packets/(ant_num_this_thread* max_subframe_id), diff.count(), byte_len / diff.count() / 1024 / 1024);
+            printf("thread %d send %d frames in %f secs, throughput %f MB/s\n", tid, total_tx_packets/(BS_ANT_NUM * max_subframe_id), diff.count(), byte_len / diff.count() / 1024 / 1024);
             begin = std::chrono::system_clock::now();
             package_count = 0;
         }

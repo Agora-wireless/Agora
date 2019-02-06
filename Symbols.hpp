@@ -11,16 +11,27 @@
 #define OFDM_DATA_START 424
 #define OFDM_PREFIX_LEN 0
 #define UE_NUM 8
+#define CODED_LEN 144
+#define ORIG_CODE_LEN 72
+#define N_ITE 20
+#define NUM_CODE_BLOCK 8
+#define NUM_BITS 4
+#define MAX_CODED_SC 1152
+
 
 #define EVENT_PACKAGE_RECEIVED 0
 #define EVENT_FFT 1
 #define EVENT_ZF 2
 #define EVENT_DEMUL 3
+
 #define EVENT_PRED 4
 #define EVENT_MODUL 5
 #define EVENT_IFFT 6
 #define EVENT_PRECODE 7
 #define EVENT_PACKAGE_SENT 8
+
+#define EVENT_DECODE 9
+#define EVENT_ENCODE 10
 
 
 #define TASK_FFT 0
@@ -31,9 +42,14 @@
 #define TASK_IFFT 5
 #define TASK_MODUL 6
 #define TASK_SEND 7
+#define TASK_DECODE 8
+#define TASK_ENCODE 9
+
 
 #define BIGSTATION 0
-#define ENABLE_DOWNLINK 1
+#define ENABLE_DOWNLINK 0
+#define EXPORT_CONSTELLATION 0
+#define ENABLE_DECODE 0
 
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10

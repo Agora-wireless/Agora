@@ -9,7 +9,7 @@
 #define BUFFER_HEAD
 
 // boost is required for aligned memory allocation (for SIMD instructions)
-#include <boost/align/aligned_allocator.hpp>
+// #include <boost/align/aligned_allocator.hpp>
 
 // size: 8 bytes
 struct complex_float {
@@ -18,19 +18,13 @@ struct complex_float {
 };
 
 //typedef std::vector<complex_float> myVec;
-typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
+// typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
 
 // structure for event
 struct Event_data
 {
     int event_type;
     int data;
-};
-
-struct Event_data_tx
-{
-    int ptr;
-    int offset;
 };
 
 // buffer of each socket thread
