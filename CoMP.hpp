@@ -12,13 +12,15 @@
 #include <unistd.h>
 #include <memory>
 #include <iostream>
+#include <vector>
+
 
 #include <fcntl.h>
 #include <system_error>
 #include <pthread.h>
 #include <queue>
 #include "mufft/fft.h"
-#include <complex.h>
+// #include <complex.h>
 #include <math.h>
 #include <tuple>
 #include "cpu_attach.hpp"
@@ -27,6 +29,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include <signal.h>
+#include <aff3ct.hpp>
 // #include <cblas.h>
 // #include <stdio.h>
 
@@ -50,7 +53,8 @@ public:
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 100;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 40;
+    static const int demul_block_size = 32;
+    static const int demul_block_num = OFDM_DATA_NUM/demul_block_size + 1;
     // optimization parameters for block transpose (see the slides for more
     // details)
     static const int transpose_block_size = 8;
@@ -152,9 +156,9 @@ public:
      * Do demodulation task for a block of subcarriers (demul_block_size)
      * @param tid: task thread index, used for selecting spm_buffer and task ptok
      * @param offset: offset of the first subcarrier in the block in data_buffer_
-     * Buffers: data_buffer_, spm_buffer_, precoder_buffer_, equal_buffer_, demul_buffer_
+     * Buffers: data_buffer_, spm_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_
      *     Input buffer: data_buffer_, precoder_buffer_
-     *     Output buffer: demul_buffer_
+     *     Output buffer: demul_hard_buffer_
      *     Intermediate buffer: spm_buffer, equal_buffer_
      * Offsets: 
      *     data_buffer_: 
@@ -178,7 +182,8 @@ public:
     void doDemul(int tid, int offset);
 
     void doDemulSingleSC(int tid, int offset);
-    
+
+    void doDecode(int tid, int offset);    
 
     /*****************************************************
      * Downlink 
@@ -273,7 +278,7 @@ public:
 
     // inline int demod_16qam(complex_float x);
     inline arma::imat demod_16qam(arma::cx_fmat x);
-    inline void demod_16qam_loop(float *vec_in, int *vec_out, int ue_num);
+    inline void demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num);
     inline arma::cx_fmat mod_16qam(arma::imat x);
     inline complex_float mod_16qam_single(int x);
 
@@ -286,7 +291,23 @@ private:
      *****************************************************/ 
     
     std::unique_ptr<PackageReceiver> receiver_;
-    
+    std::vector<aff3ct::module::Encoder_LDPC_from_QC<>*> Encoders;
+    std::vector<aff3ct::module::Modem_generic<>*> Modems;
+    std::unique_ptr<aff3ct::module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>> Decoders[TASK_THREAD_NUM];
+    // std::vector<aff3ct::module::Decoder_LDPC_BP_flooding_inter<>*> Decoders;
+    std::vector<unsigned> info_bits_pos[TASK_THREAD_NUM];
+    std::vector<aff3ct::tools::Update_rule_NMS_simd<float,0>> up_rules;
+    aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
+    const int K = ORIG_CODE_LEN * NUM_BITS;
+    const int N = CODED_LEN * NUM_BITS;
+    // float ebn0 = 10.0f;
+    // const int K = ORIG_CODE_LEN * NUM_BITS;
+    // const int N = CODED_LEN * NUM_BITS;
+    // const float R = (float)K / (float)N;
+    // const float esn0  = aff3ct::tools::ebn0_to_esn0 (ebn0, R);
+    // const float sigma = aff3ct::tools::esn0_to_sigma(esn0   );
+
+    // const aff3ct::tools::Update_rule_NMS_simd<> up_rule = aff3ct::tools::Update_rule_NMS_simd <float>(0.75);
     /** 
      * received data 
      * Frist dimension: SOCKET_THREAD_NUM
@@ -341,7 +362,9 @@ private:
      * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    DemulBuffer demul_buffer_;
+    uint8_t **demul_hard_buffer_;
+
+    float **demul_soft_buffer_;
 
     /** 
      * Predicted CSI data 
@@ -349,6 +372,11 @@ private:
      * Second dimension: BS_ANT_NUM * UE_NUM
      */
     CSIBuffer pred_csi_buffer_;
+
+
+    int **decoded_buffer_;
+
+    
 
     /** 
      * Intermediate buffer to gather raw data
@@ -370,7 +398,17 @@ private:
      * Second dimension: BS_ANT_NUM * UE_NUM */
     complex_float *precoder_buffer_temp[TASK_THREAD_NUM];
 
+    /** 
+     * Intermediate buffer for equalized data
+     * First dimension: TASK_THREAD_NUM
+     * Second dimension: UE_NUM * 1 */
+    complex_float *equaled_buffer_temp[TASK_THREAD_NUM];
 
+
+    uint8_t *demul_hard_buffer_temp[TASK_THREAD_NUM];
+    float *demul_soft_buffer_temp[TASK_THREAD_NUM];
+
+    int *coded_buffer_temp[TASK_THREAD_NUM];
 
 
 
@@ -388,6 +426,8 @@ private:
     moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for uplink demodulation */
     moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    /* task queue for uplink demodulation */
+    moodycamel::ConcurrentQueue<Event_data> decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* main thread message queue for data receiving */
     moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* main thread message queue for task completion*/
@@ -421,6 +461,9 @@ private:
     /* used to check the existance of precoder in a frame */
     bool precoder_exist_in_frame_[TASK_BUFFER_FRAME_NUM];
     bool precoder_exist_in_sc_[TASK_BUFFER_FRAME_NUM][OFDM_DATA_NUM];
+
+    int decode_counter_blocks_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe-UE_NUM)];
+    int decode_counter_subframes_[TASK_BUFFER_FRAME_NUM];
 
 
     std::queue<std::tuple<int, int>> taskWaitList;

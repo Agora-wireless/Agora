@@ -97,6 +97,17 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     core_id_ = in_core_id;
     printf("start Recv thread\n");
     // new thread
+
+#ifdef ENABLE_CPU_ATTACH
+    if(stick_this_thread_to_core(core_id_ - 1) != 0)
+    {
+        printf("RX: stitch main thread to core %d failed\n", core_id_-1);
+        exit(0);
+    }
+    else{
+        printf("RX: stitch main thread to core %d succeeded\n", core_id_-1);
+    }
+#endif
     
     std::vector<pthread_t> created_threads;
     for(int i = 0; i < thread_num_; i++)
