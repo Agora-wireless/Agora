@@ -19,6 +19,7 @@
 #include <chrono>
 #include <thread>
 #include <pthread.h>
+#include <signal.h>
 #include "concurrentqueue.h"
 
 typedef unsigned short ushort;

@@ -38,7 +38,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 20 : 31;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 20 : 20;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 2;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     static const int CORE_OFFSET = 0;
@@ -592,7 +592,7 @@ private:
     int IFFT_task_count[TASK_THREAD_NUM];
     int Precode_task_count[TASK_THREAD_NUM];
 
-    double frame_start[TASK_THREAD_NUM][10000];
+    double frame_start[SOCKET_RX_THREAD_NUM][10000];
 
 
 

@@ -9,6 +9,13 @@ static double get_time(void)
     return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
 }
 
+bool keep_running = true;
+
+void intHandler(int) {
+    std::cout << "will exit..." << std::endl;
+    keep_running = false;
+}
+
 PackageSender::PackageSender(int in_socket_num, int in_thread_num, int in_core_offset, int in_delay):
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
 socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
@@ -116,10 +123,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         created_threads.push_back(send_thread_);
     }
 
-    // give time for all threads to lock
-    sleep(1);
-    printf("Master: Now releasing the condition\n");
-    pthread_cond_broadcast(&cond);
+
 
 #ifdef ENABLE_CPU_ATTACH
     if(stick_this_thread_to_core(core_offset) != 0)
@@ -133,6 +137,11 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
 #endif
 
+    // give time for all threads to lock
+    sleep(1);
+    printf("Master: Now releasing the condition\n");
+    pthread_cond_broadcast(&cond);
+
     // create send threads
     int cell_id = 0;
     // int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
@@ -141,6 +150,9 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     // gen data
 
     // load data to buffer
+
+    double frame_start[10000];
+    double frame_end[10000];
 
     for (int i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
@@ -170,6 +182,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     
 
     double start_time = get_time();
+    int tx_frame_count = 0;
     // push tasks of the first subframe into task queue
     for (int i = 0; i < BS_ANT_NUM; i++) {
         int ptok_id = i % thread_num;
@@ -178,7 +191,9 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             exit(0);
         }
     }
-    while(true)
+
+    signal(SIGINT, intHandler);
+    while(keep_running)
     {
         // pthread_mutex_lock( &lock_ );
         // if(buffer_len_ == max_length_-10) // full
@@ -231,6 +246,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             
 
             if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
+                frame_end[tx_frame_count] = get_time();
+                tx_frame_count++;
                 packet_count_per_frame[tx_frame_id] = 0;
 #if ENABLE_DOWNLINK
                 if (frame_id < 500)
@@ -294,7 +311,18 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             }
         }
     }
-    
+
+    printf("Print results\n");
+    FILE* fp_debug = fopen("../tx_result.txt", "w");
+    if (fp_debug==NULL) {
+        printf("open file faild");
+        std::cerr << "Error: " << strerror(errno) << std::endl;
+        exit(0);
+    }
+    for(int ii = 0; ii < tx_frame_count; ii++) {    
+        fprintf(fp_debug, "%.5f\n", frame_end[ii]);
+    }
+    exit(0);
 }
 
 PackageSender::~PackageSender()
