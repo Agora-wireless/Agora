@@ -20,6 +20,22 @@ CoMP::CoMP()
     printf("enter constructor\n");
     // initialize socket buffer
 
+
+    // read pilots from file
+    // pilots_.resize(OFDM_CA_NUM);
+    pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
+    FILE* fp = fopen("../pilot_f_2048.bin","rb");
+    fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    fclose(fp);
+
+
+#if DEBUG_PRINT_PILOT
+    cout<<"Pilot data"<<endl;
+    for (int i = 0; i<OFDM_CA_NUM;i++) 
+        cout<<pilots_[i]<<",";
+    cout<<endl;
+#endif
+
     printf("initialize buffers\n");
     socket_buffer_size_ = PackageReceiver::package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
@@ -30,7 +46,7 @@ CoMP::CoMP()
 
     
 
-    std::string filename = "/home/argos/Jian/aff3ct/build/bin/../../conf/dec/LDPC/WIMAX_288_576.alist";
+    std::string filename = "/home/argos/Jian/aff3ct/build/bin/../../conf/dec/LDPC/CCSDS_64_128.alist";
 
 
     
@@ -189,6 +205,9 @@ CoMP::CoMP()
         equaled_buffer_temp[i] = (complex_float *)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
 
     for (int i = 0; i < TASK_THREAD_NUM; ++i)
+        equaled_buffer_T_temp[i] = (complex_float *)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
+
+    for (int i = 0; i < TASK_THREAD_NUM; ++i)
         demul_hard_buffer_temp[i] = (uint8_t *)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(uint8_t));
 
     for (int i = 0; i < TASK_THREAD_NUM; ++i)
@@ -198,20 +217,6 @@ CoMP::CoMP()
         coded_buffer_temp[i] = (int*)aligned_alloc(64, NUM_BITS * CODED_LEN * sizeof(int));
     // printf("Demultiplexed data buffer initialized\n");
 
-    // read pilots from file
-    // pilots_.resize(OFDM_CA_NUM);
-    pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    FILE* fp = fopen("../pilot_f_2048.bin","rb");
-    fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
-    fclose(fp);
-
-
-#if DEBUG_PRINT_PILOT
-    cout<<"Pilot data"<<endl;
-    for (int i = 0; i<OFDM_CA_NUM;i++) 
-        cout<<pilots_[i]<<",";
-    cout<<endl;
-#endif
 
     printf("new PackageReceiver\n");
     receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, &message_queue_));
@@ -480,7 +485,7 @@ void CoMP::start()
         socket_buffer_status_ptrs[i] = socket_buffer_[i].buffer_status;
     }
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
-        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, main_core_id + 1);
+        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, main_core_id + 1, frame_start);
 
     // start downlink transmitter
 #if ENABLE_DOWNLINK
@@ -929,7 +934,7 @@ void CoMP::start()
                         printf("Main thread: Demodulation done frame: %d, subframe: %d\n", frame_id, data_subframe_id);
 #endif
 
-#if ENABLE_DECODE
+#if ENABLE_DECODE && !COMBINE_EQUAL_DECODE
                         // schedule decode
                         Event_data do_decode_task;
                         do_decode_task.event_type = TASK_DECODE;
@@ -1603,7 +1608,7 @@ void* CoMP::taskThread(void* context)
 
     obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
     obj_ptr->Decoders[tid].reset(new module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>(obj_ptr->K, obj_ptr->N, N_ITE, obj_ptr->H[tid], 
-                obj_ptr->info_bits_pos[tid],0.75f));
+                obj_ptr->info_bits_pos[tid],0.825f,0,0,1,UE_NUM));
 
     int total_count = 0;
     int miss_count = 0;
@@ -1922,6 +1927,22 @@ inline void CoMP::demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num)
 }
 
 
+inline void CoMP::demod_16qam_soft(float *vec_in, float *vec_out, int length )
+{
+    unsigned char re, im;
+    for (int i = 0; i < length; i++) {
+        float re_float = *(vec_in + i * 2);
+        float im_float = *(vec_in + i * 2+1);
+        re = (unsigned char)((re_float+1) * 255);
+        im = (unsigned char)((im_float+1) * 255);
+        *(vec_out + 4 * i) = m_bpsk_lut[re];
+        *(vec_out + 4 * i + 1) = m_qam16_lut2[re];
+        *(vec_out + 4 * i + 2) = m_bpsk_lut[im];
+        *(vec_out + 4 * i + 3) = m_qam16_lut2[im];
+    }
+}
+
+
 inline cx_fmat CoMP::mod_16qam(imat x)
 {
     // cx_fmat re(size(x));
@@ -2130,8 +2151,8 @@ void CoMP::doFFT(int tid, int offset)
         // // for (int i =0;i<OFDM_CA_NUM; i++) {
         // //     cout<<"("<<i<<", "<<fft_buffer_.FFT_outputs[tid][i].real*pilots_[i]<<","<<fft_buffer_.FFT_outputs[tid][i].imag*pilots_[i]<<") ";
         // // }
-        // for (int i =0;i<OFDM_CA_NUM*BS_ANT_NUM; i++) {
-        //     cout<<"("<<i<<", "<<csi_buffer_.CSI[subframe_offset][i].real<<","<<csi_buffer_.CSI[subframe_offset][i].imag<<") ";
+        // for (int i =0;i<OFDM_DATA_NUM*BS_ANT_NUM; i++) {
+        //     cout<<"("<<i<<", "<<csi_buffer_.CSI[subframe_offset][i].real<<"+j"<<csi_buffer_.CSI[subframe_offset][i].imag<<") ";
         // }
         // cout<<endl;
 
@@ -2335,19 +2356,19 @@ void CoMP::doZF(int tid, int offset)
     // cx_fmat mat_output(ptr_out, BS_ANT_NUM, UE_NUM, false);
     
     double duration2 = get_time() - start_time;
-    ZF_task_duration[tid][2] += get_time() - start_time;
+    ZF_task_duration[tid][2] += duration2;
 
     
-
+    double start_time3 = get_time();
     pinv(mat_output, mat_input, 1e-1, "dc");
 
-    // cout<<mat_output<<endl;
+    // cout<<"Precoder:" <<mat_output<<endl;
 
     // float *tar_ptr = (float *)precoder_buffer_.precoder[offset];
     // // float temp = *tar_ptr;
     // float *src_ptr = (float *)ptr_out;
 
-    double duration3 = get_time() - start_time;
+    double duration3 = get_time() - start_time3;
     ZF_task_duration[tid][3] += duration3;
 
 
@@ -2531,6 +2552,7 @@ void CoMP::doDemul(int tid, int offset)
            
             // Equalization
             mat_equaled = mat_precoder * mat_data;
+            // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout << "Equaled data: "<<mat_equaled.st()<<endl;
 #if !ENABLE_DECODE 
             // Hard decision
@@ -2566,21 +2588,72 @@ void CoMP::doDemul(int tid, int offset)
         // }
     }
 
+    double duration3 = get_time() - start_time;
+
 #if ENABLE_DECODE
-     __m256i index_out = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
+    __m256i index_out = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
 
-    if (sc_id < MAX_CODED_SC) {
-        int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
-        for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-            float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
-            float *tar_ptr =  (float *)&equal_buffer_.data[total_data_subframe_id][sc_id + ue_idx * OFDM_DATA_NUM];
-            for (int j = 0; j < max_sc_ite / 4; j++) {
-                __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index, 4);
-                _mm256_stream_ps(tar_ptr + j * 8, equaled_data);
+    #if COMBINE_EQUAL_DECODE
+        if (sc_id < MAX_CODED_SC) {
+            // int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
+            float *temp_ptr = (float *)&equaled_buffer_temp[tid][0];
+            // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+            // cout<< "Equalized data: ";
+            // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
+            //     cout<<*(temp_ptr+sc_idx)<<"  ";
+            // }
+            // cout<<endl;
+            
+            for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+                float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
+                for (int j = 0; j < max_sc_ite / 4; j++) {
+                    float *tar_ptr = (float *)(&equaled_buffer_T_temp[tid][j * 4 + ue_idx * max_sc_ite]);
+                    __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
+                    _mm256_store_ps(tar_ptr, equaled_data);
+                }
+                
+            }
+            // float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][ue_idx * max_sc_ite]);
+            float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][0]);
+            float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
+            demod_16qam_soft(equal_t_ptr, demul_ptr, max_sc_ite * UE_NUM );
+            int block_id = sc_id / demul_block_size;
+            // int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + ue_idx * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
+            int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS * UE_NUM];
+            Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
+            // if (tid == 10) {
+            //     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+            //     // cout<< "Equalized data: ";
+            //     // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
+            //     //     cout<<*(equal_t_ptr+sc_idx)<<"  ";
+            //     // }
+            //     // cout<<endl;
+            //     // cout<< "Demodulated data: ";
+            //     // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
+            //     //     cout<<*(demul_ptr+sc_idx)<<"  ";
+            //     // }
+            //     // cout<<endl;
+            //     cout<< "Decoded data after decode: ";
+            //     for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
+            //         cout<<*(decoded_buf_ptr+sc_idx)<<"  ";
+            //     }
+            //     cout<<endl;
+            // }
+        }
+    #else          
+        if (sc_id < MAX_CODED_SC) {
+            int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
+            for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+                float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
+                float *tar_ptr =  (float *)&equal_buffer_.data[total_data_subframe_id][sc_id + ue_idx * OFDM_DATA_NUM];
+                for (int j = 0; j < max_sc_ite / 4; j++) {
+                    __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
+                    _mm256_stream_ps(tar_ptr + j * 8, equaled_data);
 
+                }
             }
         }
-    }
+    #endif
 #endif
     // // sc location in the paded buffer 
     // int sc_offset_in_output = sc_id / CODED_LEN * 64 * 3 + sc_id % CODED_LEN;
@@ -2619,7 +2692,7 @@ void CoMP::doDemul(int tid, int offset)
 
 
     // inform main thread
-    double duration3 = get_time() - start_time;
+    
     Demul_task_duration[tid][1] += duration3;
     Event_data demul_finish_event;
     demul_finish_event.event_type = EVENT_DEMUL;
@@ -2730,12 +2803,13 @@ void CoMP::doDecode(int tid, int offset)
 #if DEBUG_PRINT_IN_TASK
     printf("In doDecode thread %d: frame: %d, subframe: %d, block: %d, user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
 #endif
-    float* equal_ptr = (float *)(&equal_buffer_.data[total_data_subframe_id][block_id * CODED_LEN + user_id * OFDM_DATA_NUM]);
+    float *equal_ptr = (float *)(&equal_buffer_.data[total_data_subframe_id][block_id * CODED_LEN + user_id * OFDM_DATA_NUM]);
     float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
     // Soft decision
-    Modems[tid]->demodulate(equal_ptr, demul_ptr);
+    // Modems[tid]->demodulate(equal_ptr, demul_ptr);
+    demod_16qam_soft(equal_ptr, demul_ptr, CODED_LEN * 2);
 
-    printf("In doDecode thread %d: frame: %d, subframe: %d, code block: %d user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
+    // printf("In doDecode thread %d: frame: %d, subframe: %d, code block: %d user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
 
 
     // cout<< "Demodulated data: ";
@@ -2746,7 +2820,7 @@ void CoMP::doDecode(int tid, int offset)
 
     int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + user_id * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
 
-    Decoders[tid]->decode_siho (demul_ptr, decoded_buf_ptr);
+    Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
 
     // cout<< "Decoded data after decode: ";
     // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS; sc_idx++) {

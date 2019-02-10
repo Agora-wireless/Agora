@@ -51,6 +51,8 @@ public:
     static void* loopSend(void *context);
     
 private:
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in cliaddr_;    /* server address */
     int* socket_;
