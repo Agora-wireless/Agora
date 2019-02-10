@@ -85,7 +85,7 @@ PackageReceiver::~PackageReceiver()
     delete[] context;
 }
 
-std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id)
+std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, double **in_frame_start, int in_core_id)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
@@ -93,6 +93,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     buffer_length_ = in_buffer_length;
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
+    frame_start_ = in_frame_start;
 
     core_id_ = in_core_id;
     printf("start Recv thread\n");
@@ -155,6 +156,7 @@ void* PackageReceiver::loopRecv(void *in_context)
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
+    double *frame_start = obj_ptr->frame_start_[tid];
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -169,7 +171,8 @@ void* PackageReceiver::loopRecv(void *in_context)
     int maxSymbolNum = 0;
     int Symbol_offset = 0;
     int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
-    double start_time= get_time();
+    int prev_frame_id = -1;
+    // double start_time= get_time();
     while(true)
     {
         // if buffer is full, exit
@@ -193,26 +196,31 @@ void* PackageReceiver::loopRecv(void *in_context)
         }
         // receive data
         int recvlen = -1;
-        
+        // start_time= get_time();
         if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
         {
             perror("recv failed");
             exit(0);
         }
         
-       
+        // double cur_time = get_time();
         
         // get the position in buffer
         offset = cur_ptr_buffer_status - buffer_status;
 
-        // // read information from received packet
+        // read information from received packet
         // int ant_id, frame_id, subframe_id, cell_id;
         // frame_id = *((int *)cur_ptr_buffer);
         // subframe_id = *((int *)cur_ptr_buffer + 1);
         // cell_id = *((int *)cur_ptr_buffer + 2);
         // ant_id = *((int *)cur_ptr_buffer + 3);
-
-        
+    #if MEASURE_TIME
+        int frame_id =*((int *)cur_ptr_buffer);
+        if (frame_id > prev_frame_id) {
+            *(frame_start + frame_id) = get_time();
+            prev_frame_id = frame_id;
+        }
+    #endif
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
         cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
@@ -226,7 +234,7 @@ void* PackageReceiver::loopRecv(void *in_context)
             printf("socket message enqueue failed\n");
             exit(0);
         }
-        double cur_time = get_time();
+        
         // printf("In RX thread %d: received frame %d, subframe %d, ant %d at %.5f, duration %.5f\n", tid, frame_id, subframe_id, ant_id, cur_time, cur_time-start_time );
         
         //printf("enqueue offset %d\n", offset);
@@ -239,15 +247,15 @@ void* PackageReceiver::loopRecv(void *in_context)
 
         package_num++;
         // print some information
-        if(package_num == BS_ANT_NUM * max_subframe_id * 100)
+        if(package_num == BS_ANT_NUM * max_subframe_id * 1000)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 100;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 1000;
             std::chrono::duration<double> diff = end - begin;
             // float package_loss_rate = 1.0e5 / (maxSymbolNum - Symbol_offset);
 
             // print network throughput & maximum message queue length during this period
-            printf("RX thread %d receive 100 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), 
+            printf("RX thread %d receive 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), 
                 byte_len / diff.count() / 1024 / 1024);
             // printf("RX thread %d receive %f bytes in %f secs, throughput %f MB/s, max Message Queue Length %d, package loss rate: 100000/%d = %.4f\n", tid, byte_len, diff.count(), 
                 // byte_len / diff.count() / 1024 / 1024, maxQueueLength, (maxSymbolNum - Symbol_offset), package_loss_rate);

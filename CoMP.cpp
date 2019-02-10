@@ -480,12 +480,14 @@ void CoMP::start()
     int buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     char *socket_buffer_ptrs[SOCKET_RX_THREAD_NUM];
     int *socket_buffer_status_ptrs[SOCKET_RX_THREAD_NUM];
+    double *frame_start_ptrs[SOCKET_RX_THREAD_NUM];
     for(int i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
         socket_buffer_ptrs[i] = socket_buffer_[i].buffer;
         socket_buffer_status_ptrs[i] = socket_buffer_[i].buffer_status;
+        frame_start_ptrs[i] = frame_start[i];
     }
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
-        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, main_core_id + 1, frame_start);
+        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, frame_start_ptrs, main_core_id + 1);
 
     // start downlink transmitter
 #if ENABLE_DOWNLINK
@@ -1520,8 +1522,8 @@ void CoMP::start()
     }
 #else
     for(int ii = 0; ii < frame_count_demul; ii++) {    
-        fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
-                fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii]);
+        fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
+                fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], frame_start[0][ii], frame_start[1][ii]);
     }
 #endif
     
@@ -1660,8 +1662,8 @@ void* CoMP::taskThread(void* context)
         else {
             ret_zf = zf_queue_->try_dequeue(event);
             if (!ret_zf) {
-                ret_decode = decode_queue_->try_dequeue(event);
-                if(!ret_decode) {
+                // ret_decode = decode_queue_->try_dequeue(event);
+                // if(!ret_decode) {
                     ret_demul = demul_queue_->try_dequeue(event);
                     if (!ret_demul) {   
                         ret = fft_queue_->try_dequeue(event);
@@ -1674,10 +1676,10 @@ void* CoMP::taskThread(void* context)
                         // TODO: add precoder status check
                         obj_ptr->doDemul(tid, event.data);
                     }
-                }
-                else {
-                    obj_ptr->doDecode(tid, event.data);
-                }
+                // }
+                // else {
+                //     obj_ptr->doDecode(tid, event.data);
+                // }
             }
             else if (event.event_type == TASK_ZF) {
                 obj_ptr->doZF(tid, event.data);

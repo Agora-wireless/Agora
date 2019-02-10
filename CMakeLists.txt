@@ -36,8 +36,8 @@ if (AFF3CT_FOUND)
 		add_executable(sender sender_cli.cpp packageSender.cpp cpu_attach.cpp)
 		target_link_libraries(sender -lpthread )
 
-		add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)
-		target_link_libraries(receiver -lpthread )
+		#add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)
+		#target_link_libraries(receiver -lpthread )
 
 
 		add_executable(CoMP main.cpp packageReceiver.cpp packageSenderBS.cpp CoMP.cpp cpu_attach.cpp)
