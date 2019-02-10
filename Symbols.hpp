@@ -11,10 +11,10 @@
 #define OFDM_DATA_START 424
 #define OFDM_PREFIX_LEN 0
 #define UE_NUM 8
-#define CODED_LEN 144
-#define ORIG_CODE_LEN 72
-#define N_ITE 20
-#define NUM_CODE_BLOCK 8
+#define CODED_LEN 32
+#define ORIG_CODE_LEN 16
+#define N_ITE 10
+#define NUM_CODE_BLOCK 36
 #define NUM_BITS 4
 #define MAX_CODED_SC 1152
 
@@ -50,6 +50,7 @@
 #define ENABLE_DOWNLINK 0
 #define EXPORT_CONSTELLATION 0
 #define ENABLE_DECODE 0
+#define COMBINE_EQUAL_DECODE 1
 
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10
