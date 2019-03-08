@@ -12,12 +12,13 @@ packageSenderBS::packageSenderBS(int N_THREAD)
     // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
 
     for (int i = 0; i < N_THREAD; i++) {
+
+#if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
         servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.90");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
-        int rand_port = rand() % 65536;
         cliaddr_.sin_family = AF_INET;
         cliaddr_.sin_port = htons(0);  // out going port is random
         cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
@@ -31,6 +32,22 @@ packageSenderBS::packageSenderBS(int N_THREAD)
             printf("Created socket: %d\n",i);
         }
 
+#else   
+        servaddr_[i].sin6_family = AF_INET6;
+        servaddr_[i].sin6_port = htons(8000+i);
+        inet_pton(AF_INET6, "fe80::5a9b:5a2f:c20a:d4d5", &servaddr_[i].sin6_addr);
+
+        cliaddr_.sin6_family = AF_INET;
+        cliaddr_.sin6_port = htons(6000+i);
+        cliaddr_.sin6_addr = in6addr_any;
+        if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+            printf("cannot create socket\n");
+            exit(0);
+        }
+        else{
+            printf("Created socket: %d\n",i);
+        }
+#endif       
         /*Bind socket with address struct*/
         if(bind(socket_[i], (struct sockaddr *) &cliaddr_, sizeof(cliaddr_)) != 0)
             perror("socket bind failed");

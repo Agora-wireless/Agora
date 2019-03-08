@@ -29,18 +29,18 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
 
     for (int i = 0; i < socket_num; i++) {
+#if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.88");
+        //servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.88");
+        servaddr_[i].sin_addr.s_addr = inet_addr("10.0.0.1");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
-        int rand_port = rand() % 65536;
         cliaddr_.sin_family = AF_INET;
         cliaddr_.sin_port = htons(6000+i);//htons(0);  // out going port is random
         //cliaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
         cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
         memset(cliaddr_.sin_zero, 0, sizeof(cliaddr_.sin_zero));  
-
         if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
             printf("cannot create socket\n");
             exit(0);
@@ -48,6 +48,24 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         else{
             printf("Created socket: %d\n",i);
         }
+#else   
+        servaddr_[i].sin6_family = AF_INET6;
+        servaddr_[i].sin6_port = htons(8000+i);
+        inet_pton(AF_INET6, "fe80::f436:d735:b04a:864a", &servaddr_[i].sin6_addr);
+
+        cliaddr_.sin6_family = AF_INET6;
+        cliaddr_.sin6_port = htons(6000+i);
+        cliaddr_.sin6_addr = in6addr_any;
+        if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+            printf("cannot create socket\n");
+            exit(0);
+        }
+        else{
+            printf("Created socket: %d\n",i);
+        }
+#endif
+
+        
 
         //int sock_buf_size = 1024*1024*64*8;
         //if (setsockopt(socket_[i], SOL_SOCKET, SO_SNDBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
@@ -78,7 +96,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     
     // read from file
-    FILE* fp = fopen("../rx_data_2048_ant8.bin","rb");
+    std::string filename = "../rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -151,8 +170,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
     // load data to buffer
 
-    double frame_start[10000];
-    double frame_end[10000];
+    double frame_start[10240] __attribute__( ( aligned (4096) ) );
+    double frame_end[10240] __attribute__( ( aligned (4096) ) ) ;
 
     for (int i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
@@ -193,7 +212,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
 
     signal(SIGINT, intHandler);
-    while(keep_running)
+    while(keep_running && tx_frame_count < 9600)
     {
         // pthread_mutex_lock( &lock_ );
         // if(buffer_len_ == max_length_-10) // full
@@ -216,26 +235,31 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         ret = message_queue_.try_dequeue(data_ptr); 
         if(!ret)
             continue;
-        int data_index = subframe_id * BS_ANT_NUM + ant_id;
+        int tx_ant_id = data_ptr % BS_ANT_NUM;
+        int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
         int* ptr = (int *)trans_buffer_[data_ptr].data();
         (*ptr) = frame_id;
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
-        (*(ptr+3)) = ant_id;
+        (*(ptr+3)) = tx_ant_id;
         memcpy(trans_buffer_[data_ptr].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
 
-        int tx_ant_id = data_ptr % BS_ANT_NUM;
+        
         int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
         int tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
         int tx_frame_id = tx_total_subframe_id / max_subframe_id;
         packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]++;
 
-        // printf("data_ptr: %d, tx_frame_id: %d, tx_total_subframe_id: %d, tx_current_subframe_id %d, tx_ant_id %d, max_subframe_id %d\n", data_ptr, 
-        //     tx_frame_id, tx_total_subframe_id, tx_current_subframe_id, tx_ant_id, max_subframe_id);
+        //printf("data_ptr: %d, tx_frame_id: %d, tx_total_subframe_id: %d, tx_current_subframe_id %d, tx_ant_id %d, max_subframe_id %d\n", data_ptr, 
+          //   tx_frame_id, tx_total_subframe_id, tx_current_subframe_id, tx_ant_id, max_subframe_id);
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] == BS_ANT_NUM) {
             packet_count_per_frame[tx_frame_id]++;
             // double cur_time = get_time();
             // printf("Finished transmit all antennas in frame: %d, subframe: %d, at %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id, cur_time,cur_time-start_time);
+            if (tx_frame_count < 200)
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+            else 
+                std::this_thread::sleep_for(std::chrono::microseconds(delay));
             // usleep(delay);
             // struct timespec tim, tim2;
             // tim.tv_sec = 0;
@@ -375,7 +399,8 @@ void* PackageSender::loopSend(void *in_context)
     pthread_mutex_unlock(&obj_ptr->mutex); // unlocking for all other threads
 
 
-    auto begin = std::chrono::system_clock::now();
+    // auto begin = std::chrono::system_clock::now();
+    double begin = get_time();
     int package_count = 0;
     //std::iota(ant_seq.begin(), ant_seq.end(), 0);
 
@@ -430,28 +455,28 @@ void* PackageSender::loopSend(void *in_context)
             exit(0);
         }
 
-        if (package_count % ant_num_this_thread == 0) {
-    	    if (total_tx_packets < 500 * ant_num_this_thread * max_subframe_id) {
-    		    // usleep(2000);
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
-    		    // printf("In thread %d delayed\n", tid);
-    	    }
-	        else {
-                std::this_thread::sleep_for(std::chrono::microseconds(obj_ptr->delay));
-                // usleep(obj_ptr->delay);
-            }
-        }
+        // if (package_count % ant_num_this_thread == 0) {
+    	   //  if (total_tx_packets < 120 * ant_num_this_thread * max_subframe_id) {
+    		  //   // usleep(2000);
+        //        std::this_thread::sleep_for(std::chrono::microseconds(1000));
+    		  //   // printf("In thread %d delayed\n", tid);
+    	   //  }
+	       //  else {
+        //         std::this_thread::sleep_for(std::chrono::microseconds(obj_ptr->delay));
+        //         // usleep(obj_ptr->delay);
+        //     }
+        // }
 	
     	if (total_tx_packets > 1e9)
     	    total_tx_packets = 0;
         if(package_count == ant_num_this_thread * max_subframe_id * 1000)
         {
-            auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * ant_num_this_thread * max_subframe_id * 1000;
-	    //double byte_len = buffer_length * ant_num_this_thread * max_subframe_id * 1000;
-            std::chrono::duration<double> diff = end - begin;
-            printf("thread %d send %d frames in %f secs, throughput %f MB/s\n", tid, total_tx_packets/(ant_num_this_thread* max_subframe_id), diff.count(), byte_len / diff.count() / 1024 / 1024);
-            begin = std::chrono::system_clock::now();
+            double end = get_time();
+            //double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * ant_num_this_thread * max_subframe_id * 1000;
+	        double byte_len = buffer_length * ant_num_this_thread * max_subframe_id * 1000.f;
+            double diff = end - begin;
+            printf("thread %d send %d frames in %f secs, throughput %f Mbps\n", tid, total_tx_packets/(ant_num_this_thread* max_subframe_id), diff/1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
+            begin = get_time();
             package_count = 0;
         }
     }

@@ -54,8 +54,13 @@ public:
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+#if USE_IPV4
     struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in cliaddr_;    /* server address */
+#else
+    struct sockaddr_in6 servaddr_[10];    /* server address */
+    struct sockaddr_in6 cliaddr_;    /* server address */
+#endif
     int* socket_;
 
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
@@ -65,8 +70,10 @@ private:
     int buffer_len_;
     pthread_mutex_t lock_;
 
-    moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
-    moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
+    // moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
+    // moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
+    moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( 1024);
+    moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( 1024);
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[10]; 
     int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
     // int max_length_ = max_subframe_id * BS_ANT_NUM;

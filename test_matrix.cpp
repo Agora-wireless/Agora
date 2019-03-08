@@ -18,7 +18,7 @@ static double test_get_time(void)
 
 static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
 {
-    srand(0);
+    srand(time(NULL));
     fmat real_H = randn<fmat>(Nx, Ny);
     fmat imag_H = randn<fmat>(Nx, Ny);
     cx_fmat mat_input(real_H, imag_H);
@@ -90,7 +90,7 @@ static double bench_multiply_transpose(unsigned Nx, unsigned Ny, unsigned iterat
     double start_time = test_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
-        result = mat_left.t() * mat_right;
+        result = mat_left.st() * mat_right;
     }
     double end_time = test_get_time();
 
@@ -105,6 +105,8 @@ static void run_benchmark_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
     double zf_time3 = bench_ZF(Nx, Ny, iterations);
     double zf_time4 = bench_ZF(Nx, Ny, iterations);
     double zf_time5 = bench_ZF(Nx, Ny, iterations);
+    double zf_time6 = bench_ZF(Nx, Ny, iterations);
+    double zf_time7 = bench_ZF(Nx, Ny, iterations);
 
     printf("ZF:              %04u x %04u  %12.3f us iteration\n",
             Nx, Ny, 1000000.0 * zf_time1 / iterations);
@@ -116,6 +118,10 @@ static void run_benchmark_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
             Nx, Ny, 1000000.0 * zf_time4 / iterations);
     printf("ZF:              %04u x %04u  %12.3f us iteration\n",
             Nx, Ny, 1000000.0 * zf_time5 / iterations);
+    printf("ZF:              %04u x %04u  %12.3f us iteration\n",
+            Nx, Ny, 1000000.0 * zf_time6 / iterations);
+    printf("ZF:              %04u x %04u  %12.3f us iteration\n",
+            Nx, Ny, 1000000.0 * zf_time7 / iterations);
 }
 
 static void run_benchmark_multiply(int dim, unsigned Nx, unsigned Ny, unsigned iterations)

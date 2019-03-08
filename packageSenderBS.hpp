@@ -55,8 +55,13 @@ public:
     std::vector<pthread_t> startTX(char *in_buffer, int *in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     
 private:
+#if USE_IPV4
     struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in cliaddr_;    /* server address */
+#else
+    struct sockaddr_in6 servaddr_[10];    /* server address */
+    struct sockaddr_in6 cliaddr_;    /* server address */
+#endif
     int* socket_;
 
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
