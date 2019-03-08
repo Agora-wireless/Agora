@@ -26,6 +26,7 @@
 #include <chrono>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
+#include <sys/ioctl.h>
 
 typedef unsigned short ushort;
 class PackageReceiver
@@ -69,7 +70,11 @@ public:
     static void* loopRecv(void *context);
  
 private:
+#if USE_IPV4
     struct sockaddr_in servaddr_[10];    /* server address */
+#else
+    struct sockaddr_in6 servaddr_[10];    /* server address */
+#endif
     int* socket_;
 
     char** buffer_;

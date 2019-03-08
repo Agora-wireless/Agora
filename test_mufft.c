@@ -46,11 +46,16 @@ static double bench_fft_1d(unsigned N, unsigned iterations, int direction)
 static void run_benchmark_1d(unsigned N, unsigned iterations)
 {
     double flops = 5.0 * N * log2(N); // Estimation
-    double mufft_time_fft1 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
-    double mufft_time_fft2 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
-    double mufft_time_fft3 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
-    double mufft_time_fft4 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
-    double mufft_time_ifft = bench_fft_1d(N, iterations, MUFFT_FORWARD);
+    // double mufft_time_fft1 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
+    // double mufft_time_fft2 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
+    // double mufft_time_fft3 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
+    // double mufft_time_fft4 = bench_fft_1d(N, iterations, MUFFT_FORWARD);
+    // double mufft_time_ifft = bench_fft_1d(N, iterations, MUFFT_FORWARD);
+    double mufft_time_fft1 = bench_fft_1d(N, iterations, MUFFT_INVERSE);
+    double mufft_time_fft2 = bench_fft_1d(N, iterations, MUFFT_INVERSE);
+    double mufft_time_fft3 = bench_fft_1d(N, iterations, MUFFT_INVERSE);
+    double mufft_time_fft4 = bench_fft_1d(N, iterations, MUFFT_INVERSE);
+    double mufft_time_ifft = bench_fft_1d(N, iterations, MUFFT_INVERSE);
     flops *= iterations;
 
     double mufft_mflops_fft1 = flops / (1000000.0 * mufft_time_fft1);

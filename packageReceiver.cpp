@@ -26,6 +26,7 @@ PackageReceiver::PackageReceiver(int N_THREAD)
     
     for(int i = 0; i < N_THREAD; i++)
     {
+#if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
         servaddr_[i].sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
@@ -35,6 +36,19 @@ PackageReceiver::PackageReceiver(int N_THREAD)
             printf("cannot create socket %d\n", i);
             exit(0);
         }
+#else
+        servaddr_[i].sin6_family = AF_INET6;
+        servaddr_[i].sin6_addr = in6addr_any;
+        servaddr_[i].sin6_port = htons(8000+i);
+        
+        if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+            printf("cannot create socket %d\n", i);
+            exit(0);
+        }
+        else{
+            printf("Created IPV6 socket %d\n", i);
+        }
+#endif
         // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
         int optval = 1;
         setsockopt(socket_[i], SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
@@ -158,6 +172,13 @@ void* PackageReceiver::loopRecv(void *in_context)
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
     double *frame_start = obj_ptr->frame_start_[tid];
 
+    // walk through all the pages
+    double temp;
+    for (int i = 0; i < 20; i++) {
+        temp = frame_start[i * 512];
+    }
+
+
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
     // loop recv
@@ -172,9 +193,10 @@ void* PackageReceiver::loopRecv(void *in_context)
     int Symbol_offset = 0;
     int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
     int prev_frame_id = -1;
-    // double start_time= get_time();
+    double start_time= get_time();
     while(true)
     {
+        start_time= get_time();
         // if buffer is full, exit
         if (cur_ptr_buffer_status[0] == 1)
         {
@@ -194,6 +216,9 @@ void* PackageReceiver::loopRecv(void *in_context)
             // printf("\n Sum: %d, total: %d", sum, buffer_frame_num);
             exit(0);
         }
+
+        int count;
+        ioctl(obj_ptr->socket_[tid], FIONREAD, &count);
         // receive data
         int recvlen = -1;
         // start_time= get_time();
@@ -202,6 +227,9 @@ void* PackageReceiver::loopRecv(void *in_context)
             perror("recv failed");
             exit(0);
         }
+
+        int count2;
+        ioctl(obj_ptr->socket_[tid], FIONREAD, &count2);
         
         // double cur_time = get_time();
         
@@ -209,21 +237,27 @@ void* PackageReceiver::loopRecv(void *in_context)
         offset = cur_ptr_buffer_status - buffer_status;
 
         // read information from received packet
-        // int ant_id, frame_id, subframe_id, cell_id;
-        // frame_id = *((int *)cur_ptr_buffer);
-        // subframe_id = *((int *)cur_ptr_buffer + 1);
+        int ant_id, frame_id, subframe_id, cell_id;
+        frame_id = *((int *)cur_ptr_buffer);
+        subframe_id = *((int *)cur_ptr_buffer + 1);
         // cell_id = *((int *)cur_ptr_buffer + 2);
-        // ant_id = *((int *)cur_ptr_buffer + 3);
+        ant_id = *((int *)cur_ptr_buffer + 3);
     #if MEASURE_TIME
-        int frame_id =*((int *)cur_ptr_buffer);
         if (frame_id > prev_frame_id) {
             *(frame_start + frame_id) = get_time();
             prev_frame_id = frame_id;
+            if (frame_id % 512 == 200) {
+                _mm_prefetch((char*)(frame_start+frame_id+512), _MM_HINT_T0);
+                // double temp = frame_start[frame_id+3];
+            }
         }
     #endif
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
-        cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
+        // cur_ptr_buffer_status[1] = 1;
+        // cur_ptr_buffer_status[2] = 1;
+        // cur_ptr_buffer_status[3] = 1;
+        cur_ptr_buffer_status = buffer_status + (offset + 1) % buffer_frame_num;
         cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length) % buffer_length;
         // push EVENT_PACKAGE_RECEIVED event into the queue
         Event_data package_message;
@@ -234,8 +268,17 @@ void* PackageReceiver::loopRecv(void *in_context)
             printf("socket message enqueue failed\n");
             exit(0);
         }
+        // Event_data package_message[4];
+        // for (int i=0; i<4; i++) {
+        //     package_message[i].event_type = EVENT_PACKAGE_RECEIVED;
+        //     package_message[i].data = offset + i + tid * buffer_frame_num;
+        // }
+        // if ( !message_queue_->enqueue_bulk(local_ptok, package_message, 4) ) {
+        //     printf("socket message enqueue failed\n");
+        //     exit(0);
+        // }
         
-        // printf("In RX thread %d: received frame %d, subframe %d, ant %d at %.5f, duration %.5f\n", tid, frame_id, subframe_id, ant_id, cur_time, cur_time-start_time );
+        
         
         //printf("enqueue offset %d\n", offset);
         // int cur_queue_len = message_queue_->size_approx();
@@ -264,6 +307,8 @@ void* PackageReceiver::loopRecv(void *in_context)
             begin = std::chrono::system_clock::now();
             package_num = 0;
         }
+        // double cur_time = get_time();
+        // printf("In RX thread %d: received frame %d, subframe %d, ant %d at %.2f, duration %.2f, recvlen: %d\n", tid, frame_id, subframe_id, ant_id, cur_time, cur_time-start_time, recvlen);
     }
 
 }
