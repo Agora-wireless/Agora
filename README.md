@@ -57,3 +57,14 @@ Compile CoMP:
 * CoMP.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
 * I added some debug information settings in Symbols.hpp
 * Thread number settings are in CoMP.hpp
+* test_matrix.cpp is for unit tests of matrix operations
+* test_mufft.c is for unit tests of FFT and IFFT
+
+To compile test_matrix.cpp:
+
+	g++ -I/opt/intel/vtune_amplifier/include -o test_matrix ../test_matrix.cpp ../cpu_attach.cpp -std=c++11 -w -O3 -mavx2 -mavx -g -larmadillo -lpthread /opt/intel/vtune_amplifier/lib64/libittnotify.a -ldl
+
+To compile test_mufft.c:
+
+	gcc -o test_mufft ../test_mufft.c /usr/local/lib/libmufft.a -lm -Wl,-no-undefined
+
