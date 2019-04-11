@@ -99,11 +99,11 @@ PackageReceiver::~PackageReceiver()
     delete[] context;
 }
 
-std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, double **in_frame_start, int in_core_id)
+std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start, int in_core_id)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
-    assert(in_buffer_length == package_length * buffer_frame_num_); // should be integer
+    // assert(in_buffer_length == package_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
@@ -168,7 +168,7 @@ void* PackageReceiver::loopRecv(void *in_context)
 
     char* buffer = obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
-    int buffer_length = obj_ptr->buffer_length_;
+    long long buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
     double *frame_start = obj_ptr->frame_start_[tid];
 
@@ -217,9 +217,10 @@ void* PackageReceiver::loopRecv(void *in_context)
             exit(0);
         }
 
-        int count;
-        ioctl(obj_ptr->socket_[tid], FIONREAD, &count);
+        // int count;
+        // ioctl(obj_ptr->socket_[tid], FIONREAD, &count);
         // receive data
+
         int recvlen = -1;
         // start_time= get_time();
         if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
@@ -228,8 +229,8 @@ void* PackageReceiver::loopRecv(void *in_context)
             exit(0);
         }
 
-        int count2;
-        ioctl(obj_ptr->socket_[tid], FIONREAD, &count2);
+        // int count2;
+        // ioctl(obj_ptr->socket_[tid], FIONREAD, &count2);
         
         // double cur_time = get_time();
         
@@ -242,6 +243,7 @@ void* PackageReceiver::loopRecv(void *in_context)
         subframe_id = *((int *)cur_ptr_buffer + 1);
         // cell_id = *((int *)cur_ptr_buffer + 2);
         ant_id = *((int *)cur_ptr_buffer + 3);
+        // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
     #if MEASURE_TIME
         if (frame_id > prev_frame_id) {
             *(frame_start + frame_id) = get_time();

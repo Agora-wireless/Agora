@@ -15,6 +15,8 @@ void intHandler(int) {
 
 CoMP::CoMP()
 {
+    putenv( "MKL_THREADING_LAYER=sequential" );
+    std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     csi_format_offset = 1.0/32768;
     // openblas_set_num_threads(1);
     printf("enter constructor\n");
@@ -37,16 +39,17 @@ CoMP::CoMP()
 #endif
 
     printf("initialize buffers\n");
-    socket_buffer_size_ = PackageReceiver::package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
+    socket_buffer_size_ = (long long)PackageReceiver::package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
         socket_buffer_[i].buffer = (char *)aligned_alloc(64, socket_buffer_size_ * sizeof(char));
         socket_buffer_[i].buffer_status = (int *)aligned_alloc(64, socket_buffer_status_size_ * sizeof(int));
+        // printf("socket buffer pointer: %llx, socket buffer size: %lld, %d, %d\n",socket_buffer_[i].buffer, socket_buffer_size_, PackageReceiver::package_length, SOCKET_BUFFER_FRAME_NUM);
     }
 
     
 
-    std::string filename = "/home/argos/Jian/aff3ct/build/bin/../../conf/dec/LDPC/CCSDS_64_128.alist";
+    std::string filename = "/home/argos/Jian/my_project_with_aff3ct/lib/aff3ct/conf/dec/LDPC/CCSDS_64_128.alist";
 
 
     
@@ -69,7 +72,7 @@ CoMP::CoMP()
 
     noise.set_noise(sigma, ebn0, esn0);
     
-    up_rules.reserve(TASK_THREAD_NUM);
+    // up_rules.reserve(TASK_THREAD_NUM);
     Encoders.reserve(TASK_THREAD_NUM);
     // Decoders.reserve(TASK_THREAD_NUM);
     Modems.reserve(TASK_THREAD_NUM);
@@ -82,7 +85,7 @@ CoMP::CoMP()
             info_bits_pos[i].resize(ORIG_CODE_LEN * NUM_BITS);
             std::iota(info_bits_pos[i].begin(), info_bits_pos[i].end(), 0);
         }
-        up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
+        // up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
     }
 
     const auto &msg_chk_to_var_id = H[0].get_col_to_rows();
@@ -117,6 +120,7 @@ CoMP::CoMP()
         // fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
         // fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
         fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
+        memset(fft_buffer_.FFT_inputs[i], 0, sizeof(OFDM_CA_NUM * sizeof(complex_float)));
         // fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
     }
 
@@ -290,14 +294,14 @@ CoMP::CoMP()
 #endif
 
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
-        memset(FFT_task_duration[i], 0, sizeof(double) * 4);
-        memset(ZF_task_duration[i], 0, sizeof(double) * 4);
-        memset(Demul_task_duration[i], 0, sizeof(double) * 2);
+        memset(FFT_task_duration[i], 0, sizeof(double) * 4 * 8);
+        memset(ZF_task_duration[i], 0, sizeof(double) * 4 * 8);
+        memset(Demul_task_duration[i], 0, sizeof(double) * 4 * 8);
     }
 
-    memset(FFT_task_count, 0, sizeof(int) * TASK_THREAD_NUM);
-    memset(ZF_task_count, 0, sizeof(int) * TASK_THREAD_NUM);
-    memset(Demul_task_count, 0, sizeof(int) * TASK_THREAD_NUM);
+    memset(FFT_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
+    memset(ZF_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
+    memset(Demul_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
 
 
 
@@ -486,6 +490,7 @@ void CoMP::start()
         socket_buffer_ptrs[i] = socket_buffer_[i].buffer;
         socket_buffer_status_ptrs[i] = socket_buffer_[i].buffer_status;
         frame_start_ptrs[i] = frame_start[i];
+        // printf("Socket buffer ptr: %llx, socket_buffer: %llx\n", socket_buffer_ptrs[i],socket_buffer_[i].buffer);
     }
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
         socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, frame_start_ptrs, main_core_id + 1);
@@ -635,15 +640,18 @@ void CoMP::start()
                         rx_start = true;
                         tx_begin = std::chrono::high_resolution_clock::now();
                         demul_begin = std::chrono::system_clock::now();
+                        // hpctoolkit_sampling_start();
                     }
 
                     // char *socket_buffer_ptr = socket_buffer_ptrs[socket_thread_id] + offset_in_current_buffer * PackageReceiver::package_length;
-                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer + offset_in_current_buffer * PackageReceiver::package_length;
+                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer + (long long) offset_in_current_buffer * PackageReceiver::package_length;
                     int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
                     int frame_id = *((int *)socket_buffer_ptr);
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int rx_frame_id = (frame_id % TASK_BUFFER_FRAME_NUM);
 
+                    // printf("Main thread: data received from frame %d, subframe %d, ant %d, buffer ptr: %llx, offset %lld\n", frame_id, subframe_id, ant_id, 
+                    //      socket_buffer_ptr, offset_in_current_buffer * PackageReceiver::package_length);
                     rx_counter_packets_[rx_frame_id]++;
                     
 #if ENABLE_DOWNLINK
@@ -672,8 +680,8 @@ void CoMP::start()
                         rx_counter_packets_[rx_frame_id] = 0;                                  
                     }  
                     // if (frame_id > 0)
-                    //     printf("Main thread: data received from frame %d, subframe %d, ant %d, total: %d, in %.5f us\n", frame_id, subframe_id, ant_id, 
-                    //         rx_counter_packets_[rx_frame_id], get_time()-pilot_received[frame_id]);
+                    //     printf("Main thread: data received from frame %d, subframe %d, ant %d, total: %d, in %.5f us, buffer ptr: %llx, offset %lld\n", frame_id, subframe_id, ant_id, 
+                    //         rx_counter_packets_[rx_frame_id], get_time()-pilot_received[frame_id], socket_buffer_ptr, offset_in_current_buffer * PackageReceiver::package_length);
 
 #if BIGSTATION 
                     Event_data do_fft_task;
@@ -821,7 +829,9 @@ void CoMP::start()
                                     start_sche_id = UE_NUM;
                                     prev_demul_scheduled = true;
                                 }
-                                for (int sche_subframe_id = start_sche_id; sche_subframe_id <= data_counter_subframes_[frame_id] + UE_NUM; sche_subframe_id++) {
+                                // printf("Main thread: schedule Demodulation task for frame: %d, start subframe: %d, end subframe: %d\n", frame_id, start_sche_id, data_counter_subframes_[frame_id] + UE_NUM);
+                                int end_sche_id = max(UE_NUM + data_counter_subframes_[frame_id], subframe_id);
+                                for (int sche_subframe_id = start_sche_id; sche_subframe_id <= end_sche_id; sche_subframe_id++) {
                                     int data_subframe_id = getULSFIndex(sche_subframe_id);
                                     if (data_exist_in_subframe_[frame_id][data_subframe_id]) {
                                         Event_data do_demul_task;
@@ -995,9 +1005,12 @@ void CoMP::start()
                                 demul_processed[frame_count_demul]-zf_processed[frame_count_demul], demul_processed[frame_count_demul]-pilot_received[frame_count_demul]);
 #endif
 
+/****************************/
+/* stats update starts here*/
+
 #if DEBUG_UPDATE_STATS                    
                             double sum_ZF_this_frame[4] = {0};
-                            double sum_demul_this_frame[2] = {0};
+                            double sum_demul_this_frame[4] = {0};
                             double sum_FFT_this_frame[4] = {0};
                             int fft_count_this_frame = 0;
                             int zf_count_this_frame = 0;
@@ -1005,12 +1018,12 @@ void CoMP::start()
 
 #if BIGSTATION
                             for (int i = 0; i < FFT_THREAD_NUM; i++) {
-                                int fft_count_this_frame_this_thread = FFT_task_count[i]-fft_count_per_thread[i];
+                                int fft_count_this_frame_this_thread = FFT_task_count[i * 16]-fft_count_per_thread[i];
                                 double fft_time_this_frame_this_thread[4];
                                 for (int j = 0; j < 4; j++) {
-                                    sum_FFT_this_frame[j] = sum_FFT_this_frame[j] + FFT_task_duration[i][j];                        
-                                    fft_time_this_frame_this_thread[j] = (FFT_task_duration[i][j]-fft_time_per_thread[j][i])/fft_count_this_frame_this_thread;
-                                    fft_time_per_thread[j][i] = FFT_task_duration[i][j];
+                                    sum_FFT_this_frame[j] = sum_FFT_this_frame[j] + FFT_task_duration[i * 8][j];                        
+                                    fft_time_this_frame_this_thread[j] = (FFT_task_duration[i * 8][j]-fft_time_per_thread[j][i])/fft_count_this_frame_this_thread;
+                                    fft_time_per_thread[j][i] = FFT_task_duration[i * 8][j];
                                 }
                                 fft_count_this_frame += fft_count_this_frame_this_thread;
                                 float sum_time_this_frame_this_thread = fft_time_this_frame_this_thread[0] * fft_count_this_frame_this_thread;
@@ -1020,16 +1033,16 @@ void CoMP::start()
                                         fft_time_this_frame_this_thread[0], fft_time_this_frame_this_thread[1], fft_time_this_frame_this_thread[2], fft_time_this_frame_this_thread[3],
                                         sum_time_this_frame_this_thread);
     #endif
-                                fft_count_per_thread[i] = FFT_task_count[i];
+                                fft_count_per_thread[i] = FFT_task_count[i * 16];
                             }   
 
                             for (int i = FFT_THREAD_NUM; i < FFT_THREAD_NUM + ZF_THREAD_NUM; i++) {
-                                int zf_count_this_frame_this_thread = ZF_task_count[i]-zf_count_per_thread[i];
+                                int zf_count_this_frame_this_thread = ZF_task_count[i * 16]-zf_count_per_thread[i];
                                 double zf_time_this_frame_this_thread[4];
                                 for (int j = 0; j < 4; j++) {
-                                    sum_ZF_this_frame[j] = sum_ZF_this_frame[j] + ZF_task_duration[i][j];                               
-                                    zf_time_this_frame_this_thread[j] = (ZF_task_duration[i][j]-zf_time_per_thread[j][i])/zf_count_this_frame_this_thread;
-                                    zf_time_per_thread[j][i] = ZF_task_duration[i][j];
+                                    sum_ZF_this_frame[j] = sum_ZF_this_frame[j] + ZF_task_duration[i * 8][j];                               
+                                    zf_time_this_frame_this_thread[j] = (ZF_task_duration[i * 8][j]-zf_time_per_thread[j][i])/zf_count_this_frame_this_thread;
+                                    zf_time_per_thread[j][i] = ZF_task_duration[i * 8][j];
                                 }
                                 zf_count_this_frame += zf_count_this_frame_this_thread;
                                 float sum_time_this_frame_this_thread = zf_time_this_frame_this_thread[0] * zf_count_this_frame_this_thread;
@@ -1039,16 +1052,16 @@ void CoMP::start()
                                         zf_time_this_frame_this_thread[0], zf_time_this_frame_this_thread[1], zf_time_this_frame_this_thread[2], zf_time_this_frame_this_thread[3],
                                         sum_time_this_frame_this_thread);
     #endif
-                                zf_count_per_thread[i] = ZF_task_count[i];
+                                zf_count_per_thread[i] = ZF_task_count[i * 16];
                             }   
 
                             for (int i = FFT_THREAD_NUM + ZF_THREAD_NUM; i < TASK_THREAD_NUM; i++) {
-                                int demul_count_this_frame_this_thread = Demul_task_count[i]-demul_count_per_thread[i];
+                                int demul_count_this_frame_this_thread = Demul_task_count[i * 16]-demul_count_per_thread[i];
                                 double demul_time_this_frame_this_thread[4];
-                                for (int j = 0; j < 2; j++) {
-                                    sum_demul_this_frame[j] = sum_demul_this_frame[j] + Demul_task_duration[i][j];
-                                    demul_time_this_frame_this_thread[j] = (Demul_task_duration[i][j]-demul_time_per_thread[j][i])/demul_count_this_frame_this_thread;
-                                    demul_time_per_thread[j][i] = Demul_task_duration[i][j];
+                                for (int j = 0; j < 4; j++) {
+                                    sum_demul_this_frame[j] = sum_demul_this_frame[j] + Demul_task_duration[i * 8][j];
+                                    demul_time_this_frame_this_thread[j] = (Demul_task_duration[i * 8][j]-demul_time_per_thread[j][i])/demul_count_this_frame_this_thread;
+                                    demul_time_per_thread[j][i] = Demul_task_duration[i * 8][j];
                                 }
                                 demul_count_this_frame += demul_count_this_frame_this_thread;
                                 float sum_time_this_frame_this_thread = demul_time_this_frame_this_thread[0] * demul_count_this_frame_this_thread;
@@ -1057,7 +1070,7 @@ void CoMP::start()
                                         frame_id, i, demul_count_this_frame_this_thread, demul_time_this_frame_this_thread[0], demul_time_this_frame_this_thread[1], 
                                         sum_time_this_frame_this_thread);
     #endif
-                                demul_count_per_thread[i] = Demul_task_count[i];
+                                demul_count_per_thread[i] = Demul_task_count[i * 16];
                             }  
 
                             for (int i = 0; i < 4; i++) {
@@ -1069,34 +1082,28 @@ void CoMP::start()
 
 #else                           
                             for (int i = 0; i < TASK_THREAD_NUM; i++) {
-                                int fft_count_this_frame_this_thread = FFT_task_count[i]-fft_count_per_thread[i];
-                                int zf_count_this_frame_this_thread = ZF_task_count[i]-zf_count_per_thread[i];
-                                int demul_count_this_frame_this_thread = Demul_task_count[i]-demul_count_per_thread[i];
+                                int fft_count_this_frame_this_thread = FFT_task_count[i * 16]-fft_count_per_thread[i];
+                                int zf_count_this_frame_this_thread = ZF_task_count[i * 16]-zf_count_per_thread[i];
+                                int demul_count_this_frame_this_thread = Demul_task_count[i * 16]-demul_count_per_thread[i];
 
                                 double fft_time_this_frame_this_thread[4];
                                 double zf_time_this_frame_this_thread[4];
                                 double demul_time_this_frame_this_thread[4];
 
                                 for (int j = 0; j < 4; j++) {
-                                    sum_FFT_this_frame[j] = sum_FFT_this_frame[j] + FFT_task_duration[i][j];
-                                    sum_ZF_this_frame[j] = sum_ZF_this_frame[j] + ZF_task_duration[i][j];                          
+                                    sum_FFT_this_frame[j] = sum_FFT_this_frame[j] + FFT_task_duration[i * 8][j];                                                              
+                                    fft_time_this_frame_this_thread[j] = (FFT_task_duration[i * 8][j]-fft_time_per_thread[j][i])/fft_count_this_frame_this_thread;
+                                    fft_time_per_thread[j][i] = FFT_task_duration[i * 8][j];
 
-                                    fft_time_this_frame_this_thread[j] = (FFT_task_duration[i][j]-fft_time_per_thread[j][i])/fft_count_this_frame_this_thread;
-                                    
+                                    sum_ZF_this_frame[j] = sum_ZF_this_frame[j] + ZF_task_duration[i * 8][j];
+                                    zf_time_this_frame_this_thread[j] = (ZF_task_duration[i * 8][j]-zf_time_per_thread[j][i])/zf_count_this_frame_this_thread;
+                                    zf_time_per_thread[j][i] = ZF_task_duration[i * 8][j];
 
-                                    zf_time_this_frame_this_thread[j] = (ZF_task_duration[i][j]-zf_time_per_thread[j][i])/zf_count_this_frame_this_thread;
-                                    // if (j>0)
-                                    //     zf_time_this_frame_this_thread[j] = zf_time_this_frame_this_thread[j]/zf_block_size;
-
-
-                                    fft_time_per_thread[j][i] = FFT_task_duration[i][j];
-                                    zf_time_per_thread[j][i] = ZF_task_duration[i][j];
-
-                                    if (j < 2) {
-                                        sum_demul_this_frame[j] = sum_demul_this_frame[j] + Demul_task_duration[i][j];
-                                        demul_time_this_frame_this_thread[j] = (Demul_task_duration[i][j]-demul_time_per_thread[j][i])/demul_count_this_frame_this_thread;
-                                        demul_time_per_thread[j][i] = Demul_task_duration[i][j];
-                                    }
+                                    // if (j < 2) {
+                                    sum_demul_this_frame[j] = sum_demul_this_frame[j] + Demul_task_duration[i * 8][j];
+                                    demul_time_this_frame_this_thread[j] = (Demul_task_duration[i * 8][j]-demul_time_per_thread[j][i])/demul_count_this_frame_this_thread;
+                                    demul_time_per_thread[j][i] = Demul_task_duration[i * 8][j];
+                                    // }
                                 }
 
                                 fft_count_this_frame += fft_count_this_frame_this_thread;
@@ -1106,22 +1113,23 @@ void CoMP::start()
                                 float sum_time_this_frame_this_thread = fft_time_this_frame_this_thread[0] * fft_count_this_frame_this_thread
                                      + zf_time_this_frame_this_thread[0] * zf_count_this_frame_this_thread + demul_time_this_frame_this_thread[0] * demul_count_this_frame_this_thread;
     #if DEBUG_PRINT_STATS_PER_THREAD
-                                printf("In frame %d, thread %d, \t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), demul: %d tasks %.5f (%.5f), sum: %.5f\n",
+                                printf("In frame %d, thread %d, \t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), demul: %d tasks %.5f (%.5f, %.5f, %.5f), sum: %.5f\n",
                                         frame_id, i, fft_count_this_frame_this_thread, 
                                         fft_time_this_frame_this_thread[0], fft_time_this_frame_this_thread[1], fft_time_this_frame_this_thread[2], fft_time_this_frame_this_thread[3],
                                         zf_count_this_frame_this_thread, zf_time_this_frame_this_thread[0], zf_time_this_frame_this_thread[1], zf_time_this_frame_this_thread[2], zf_time_this_frame_this_thread[3], 
-                                        demul_count_this_frame_this_thread, demul_time_this_frame_this_thread[0], demul_time_this_frame_this_thread[1], sum_time_this_frame_this_thread);
+                                        demul_count_this_frame_this_thread, demul_time_this_frame_this_thread[0], demul_time_this_frame_this_thread[1], demul_time_this_frame_this_thread[2], demul_time_this_frame_this_thread[3], 
+                                        sum_time_this_frame_this_thread);
     #endif
-                                fft_count_per_thread[i] = FFT_task_count[i];
-                                zf_count_per_thread[i] = ZF_task_count[i];
-                                demul_count_per_thread[i] = Demul_task_count[i];
+                                fft_count_per_thread[i] = FFT_task_count[i * 16];
+                                zf_count_per_thread[i] = ZF_task_count[i * 16];
+                                demul_count_per_thread[i] = Demul_task_count[i * 16];
                             }                  
 
                             for (int i = 0; i < 4; i++) {
                                 fft_time_this_frame[i] = (sum_FFT_this_frame[i]-fft_time_sum[i])/TASK_THREAD_NUM;
                                 zf_time_this_frame[i] = (sum_ZF_this_frame[i]-zf_time_sum[i])/TASK_THREAD_NUM;
-                                if (i < 2)
-                                    demul_time_this_frame[i] = (sum_demul_this_frame[i]-demul_time_sum[i])/TASK_THREAD_NUM;
+                                // if (i < 2)
+                                demul_time_this_frame[i] = (sum_demul_this_frame[i]-demul_time_sum[i])/TASK_THREAD_NUM;
                             }     
 #endif
                             
@@ -1133,19 +1141,24 @@ void CoMP::start()
                             zf_time_in_function_comp[frame_count_demul] = zf_time_this_frame[2];
                             demul_time_in_function[frame_count_demul] = demul_time_this_frame[0];
 #if DEBUG_PRINT_PER_FRAME_DONE
-                            printf("In frame %d, \t\t\t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), demul: %d tasks %.5f (%.5f), sum: %.5f\n", 
+                            printf("In frame %d, \t\t\t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), demul: %d tasks %.5f (%.5f, %.5f, %.5f), sum: %.5f\n", 
                                     frame_id, fft_count_this_frame, fft_time_this_frame[0], fft_time_this_frame[1], fft_time_this_frame[2], fft_time_this_frame[3], 
                                     zf_count_this_frame, zf_time_this_frame[0], zf_time_this_frame[1], zf_time_this_frame[2], zf_time_this_frame[3], 
-                                    demul_count_this_frame, demul_time_this_frame[0], demul_time_this_frame[1], sum_time_this_frame);
+                                    demul_count_this_frame, demul_time_this_frame[0], demul_time_this_frame[1], demul_time_this_frame[2], demul_time_this_frame[3],
+                                    sum_time_this_frame);
 #endif
                             for (int i = 0; i < 4; i++) {
                                 fft_time_sum[i] = sum_FFT_this_frame[i];
                                 zf_time_sum[i] = sum_ZF_this_frame[i];
-                                if (i < 2)
-                                    demul_time_sum[i] = sum_demul_this_frame[i];
+                                // if (i < 2)
+                                demul_time_sum[i] = sum_demul_this_frame[i];
                             }   
                       
 #endif
+
+/* stats update ends here*/
+/****************************/
+
 
                             frame_count_demul++;
                             if (frame_count_demul == 1e9) 
@@ -1553,11 +1566,11 @@ void CoMP::start()
     int sum_IFFT = 0;
     int sum_Precode = 0;
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
-        sum_FFT = sum_FFT + FFT_task_count[i];
-        sum_ZF = sum_ZF + ZF_task_count[i];
-        sum_demul = sum_demul + Demul_task_count[i];
-        sum_IFFT = sum_IFFT + IFFT_task_count[i];
-        sum_Precode = sum_Precode + Precode_task_count[i];
+        sum_FFT = sum_FFT + FFT_task_count[i * 16];
+        sum_ZF = sum_ZF + ZF_task_count[i * 16];
+        sum_demul = sum_demul + Demul_task_count[i * 16];
+        sum_IFFT = sum_IFFT + IFFT_task_count[i * 16];
+        sum_Precode = sum_Precode + Precode_task_count[i * 16];
     }
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
 #if ENABLE_DOWNLINK
@@ -1568,25 +1581,25 @@ void CoMP::start()
     printf("Downlink: total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), precode: %d (%.2f frames), IFFT: %d (%.2f frames)\n", 
         sum_FFT, fft_frames, sum_ZF, zf_frames, sum_Precode, precode_frames, sum_IFFT, ifft_frames);
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
-        double percent_FFT = 100*double(FFT_task_count[i])/sum_FFT;
-        double percent_ZF = 100*double(ZF_task_count[i])/sum_ZF;
-        double percent_Precode = 100*double(Precode_task_count[i])/sum_Precode;
-        double percent_IFFT = 100*double(IFFT_task_count[i])/sum_IFFT;
+        double percent_FFT = 100*double(FFT_task_count[i * 16])/sum_FFT;
+        double percent_ZF = 100*double(ZF_task_count[i * 16])/sum_ZF;
+        double percent_Precode = 100*double(Precode_task_count[i * 16])/sum_Precode;
+        double percent_IFFT = 100*double(IFFT_task_count[i * 16])/sum_IFFT;
         printf("thread %d performed FFT: %d (%.2f%%), ZF: %d (%.2f%%), precode: %d (%.2f%%), IFFT: %d (%.2f%%)\n", 
-            i, FFT_task_count[i], percent_FFT, ZF_task_count[i], percent_ZF, Precode_task_count[i], percent_Precode, IFFT_task_count[i], percent_IFFT);
+            i, FFT_task_count[i * 16], percent_FFT, ZF_task_count[i * 16], percent_ZF, Precode_task_count[i * 16], percent_Precode, IFFT_task_count[i * 16], percent_IFFT);
     }
 #else
     double fft_frames = (double)sum_FFT/BS_ANT_NUM/subframe_num_perframe;
-    double demul_frames = (double)sum_demul * demul_block_size/ OFDM_DATA_NUM / data_subframe_num_perframe;
+    double demul_frames = (double)sum_demul/ OFDM_DATA_NUM / data_subframe_num_perframe;
     double zf_frames = (double)sum_ZF/OFDM_DATA_NUM;
     printf("Uplink: total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), Demulation: %d (%.2f frames)\n", 
         sum_FFT, fft_frames, sum_ZF, zf_frames, sum_demul, demul_frames);
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
-        double percent_FFT = 100*double(FFT_task_count[i])/sum_FFT;
-        double percent_ZF = 100*double(ZF_task_count[i])/sum_ZF;
-        double percent_Demul = 100*double(Demul_task_count[i])/sum_demul;
+        double percent_FFT = 100*double(FFT_task_count[i * 16])/sum_FFT;
+        double percent_ZF = 100*double(ZF_task_count[i * 16])/sum_ZF;
+        double percent_Demul = 100*double(Demul_task_count[i * 16])/sum_demul;
         printf("thread %d performed FFT: %d (%.2f%%), ZF: %d (%.2f%%), Demulation: %d (%.2f%%)\n", 
-            i, FFT_task_count[i], percent_FFT, ZF_task_count[i], percent_ZF, Demul_task_count[i], percent_Demul);
+            i, FFT_task_count[i * 16], percent_FFT, ZF_task_count[i * 16], percent_ZF, Demul_task_count[i * 16], percent_Demul);
     }
 #endif 
     exit(0);
@@ -2007,7 +2020,7 @@ void CoMP::doFFT(int tid, int offset)
     offset = offset % buffer_subframe_num;
     // printf("In doFFT: socket_thread: %d offset %d\n", socket_thread_id, offset);
     // read info of one frame
-    char *cur_ptr_buffer = socket_buffer_[socket_thread_id].buffer + offset * PackageReceiver::package_length;
+    char *cur_ptr_buffer = socket_buffer_[socket_thread_id].buffer + (long long) offset * PackageReceiver::package_length;
 
     int ant_id, frame_id, subframe_id, cell_id;
     frame_id = *((int *)cur_ptr_buffer);
@@ -2035,16 +2048,18 @@ void CoMP::doFFT(int tid, int offset)
     const __m256i magic_i = _mm256_castps_si256(magic);
     for (int i = 0; i < OFDM_CA_NUM * 2; i += 8) {
         // get input:
-        __m128i val = _mm_load_si128((__m128i*)(cur_ptr_buffer_ushort + i));
+        __m128i val = _mm_load_si128((__m128i*)(cur_ptr_buffer_ushort + i)); // port 2,3
         // interleave with 0x0000
-        __m256i val_unpacked = _mm256_cvtepu16_epi32(val);
+        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
         /// convert by xor-ing and subtracting magic value:
         // VPXOR avoids port5 bottlenecks on Intel CPUs before SKL
-        __m256i val_f_int = _mm256_xor_si256(val_unpacked, magic_i);
-        __m256 val_f = _mm256_castsi256_ps(val_f_int);
-        __m256 converted = _mm256_sub_ps(val_f, magic);
+        __m256i val_f_int = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
+        __m256 val_f = _mm256_castsi256_ps(val_f_int);  // no instruction
+        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
         // store:
-        _mm256_store_ps(cur_fft_buffer_float + i, converted);
+        // __m256 converted = _mm256_set1_ps(0); 
+        _mm256_store_ps(cur_fft_buffer_float + i, converted); // port 2,3,4,7
+        // _mm256_load_ps((cur_fft_buffer_float + i));
 
     }
     
@@ -2068,9 +2083,10 @@ void CoMP::doFFT(int tid, int offset)
         // _mm256_store_ps(cur_fft_buffer_float + i, vf0);
 
     // }
-#if DEBUG_UPDATE_STATS
-    double duration1 = get_time() - start_time;
-    FFT_task_duration[tid][1] += duration1;
+#if DEBUG_UPDATE_STATS_DETAILED
+    double start_time1 = get_time();
+    double duration1 = start_time1 - start_time;
+    FFT_task_duration[tid * 8][1] += duration1;
 #endif
     // for(int i = 0; i < (OFDM_CA_NUM - delay_offset) * 2; i++)
     //     cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[OFDM_PREFIX_LEN + delay_offset + i] * csi_format_offset;
@@ -2083,15 +2099,16 @@ void CoMP::doFFT(int tid, int offset)
     //     fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
     mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[tid], fft_buffer_.FFT_inputs[tid]);
 
-#if DEBUG_UPDATE_STATS
-    double duration2 = get_time() - start_time;
-    FFT_task_duration[tid][2] += duration2;
+#if DEBUG_UPDATE_STATS_DETAILED
+    double start_time2 = get_time();
+    double duration2 = start_time2 - start_time1;
+    FFT_task_duration[tid * 8][2] += duration2;
 #endif
     // mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM, 
     //     fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
     // printf("FFT input\n");
     // for ( int i = 0; i< OFDM_CA_NUM; i++) {
-    //     cout <<"("<<(*(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM+i)).real<<","<<(*(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM+i)).imag<<") ";
+    //     cout <<"("<<(*(fft_buffer_.FFT_inputs[tid] +i)).real<<","<<(*(fft_buffer_.FFT_inputs[tid] +i)).imag<<") ";
     //     // cout <<"("<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).real<<","<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).imag<<") ";
     //     // printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)), *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)+1));
     // }
@@ -2107,7 +2124,7 @@ void CoMP::doFFT(int tid, int offset)
 #if DEBUG_PRINT_IN_TASK
         printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 #endif
-#if DEBUG_UPDATE_STATS
+#if DEBUG_UPDATE_STATS_DETAILED
     double start_time_part3 = get_time();
 #endif
     // if it is pilot part, do CE
@@ -2132,13 +2149,13 @@ void CoMP::doFFT(int tid, int offset)
         int block_num = OFDM_DATA_NUM / transpose_block_size;
         _mm_prefetch((char*)pilots_, _MM_HINT_T0);
         for (int block_idx = 0; block_idx < block_num; block_idx ++) {
-            if (block_idx % iteration_per_page == 0 && block_idx < block_num - iteration_per_page)
-                float temp = *(cur_fft_buffer_float_output + sc_idx * 2 + 1024);
+            // if (block_idx % iteration_per_page == 0 && block_idx < block_num - iteration_per_page)
+            //     float temp = *(cur_fft_buffer_float_output + sc_idx * 2 + 1024);
             for (int sc_inblock_idx = 0; sc_inblock_idx < transpose_block_size; sc_inblock_idx += 8) {
                 // load 8 floats (4 bytes) / 4 complex floats
                 float *src_ptr_cur = cur_fft_buffer_float_output + sc_idx * 2;
-                _mm_prefetch((char*)(src_ptr_cur + 16), _MM_HINT_T0);
-                _mm_prefetch((char*)(pilots_ + sc_idx * 2 + 16), _MM_HINT_T0);
+                // _mm_prefetch((char*)(src_ptr_cur + 16), _MM_HINT_T0);
+                // _mm_prefetch((char*)(pilots_ + sc_idx * 2 + 16), _MM_HINT_T0);
                 __m256 pilot_rx = _mm256_load_ps(src_ptr_cur);
                 __m256 pilot_tx = _mm256_set_ps(pilots_[sc_idx+3], pilots_[sc_idx+3], pilots_[sc_idx+2], pilots_[sc_idx+2], 
                                                 pilots_[sc_idx+1], pilots_[sc_idx+1], pilots_[sc_idx], pilots_[sc_idx]);
@@ -2232,8 +2249,8 @@ void CoMP::doFFT(int tid, int offset)
         for(int c2 = 0; c2 < block_num; c2++) {
             // c3 = 0, 1, ..., transpose_block_size/8 -1 = 7
             // c3*8 = 0, 8, ..., 64-8
-            if (c2 % iteration_per_page == 0 && c2 < block_num - iteration_per_page)
-                float temp = *(src_ptr + 1024);
+            // if (c2 % iteration_per_page == 0 && c2 < block_num - iteration_per_page)
+            //     float temp = *(src_ptr + 1024);
             for(int c3 = 0; c3 < cache_line_num; c3++) {
                 // data: 256 bits = 32 bytes = 8 float values = 4 subcarriers
 
@@ -2241,7 +2258,7 @@ void CoMP::doFFT(int tid, int offset)
                 // original data order: SCs of ant1, SCs of ant2, ..., SCs of ant 96
                 // transposed data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
                 // prefetch a cache line
-                _mm_prefetch((char*)(src_ptr + 16), _MM_HINT_T0);
+                // _mm_prefetch((char*)(src_ptr + 16), _MM_HINT_T0);
                 float *tar_ptr_cur = tar_ptr + (c2 * BS_ANT_NUM + ant_id)* transpose_block_size * 2 + c3 * 16;
                 _mm256_stream_ps(tar_ptr_cur, _mm256_load_ps(src_ptr));
                 _mm256_stream_ps(tar_ptr_cur + 8, _mm256_load_ps(src_ptr + 8));
@@ -2250,9 +2267,10 @@ void CoMP::doFFT(int tid, int offset)
             }            
         }        
     }
-#if DEBUG_UPDATE_STATS
-    double duration3 = get_time() - start_time_part3;
-    FFT_task_duration[tid][3] += duration3;
+#if DEBUG_UPDATE_STATS_DETAILED
+    double end_time = get_time();
+    double duration3 = end_time - start_time_part3;
+    FFT_task_duration[tid * 8][3] += duration3;
 #endif    
 
     // after finish
@@ -2260,9 +2278,9 @@ void CoMP::doFFT(int tid, int offset)
     // printf("In doFFT: emptied socket buffer frame: %d, subframe: %d, ant: %d, offset: %d\n",frame_id, subframe_id, ant_id, offset);
     // inform main thread
 #if DEBUG_UPDATE_STATS
-    FFT_task_count[tid] = FFT_task_count[tid]+1;
+    FFT_task_count[tid * 16] = FFT_task_count[tid * 16]+1;
     double duration = get_time() - start_time;
-    FFT_task_duration[tid][0] += duration;
+    FFT_task_duration[tid * 8][0] += duration;
 #endif
     Event_data fft_finish_event;
     fft_finish_event.event_type = EVENT_FFT;
@@ -2282,9 +2300,9 @@ void CoMP::doFFT(int tid, int offset)
 
 void CoMP::doZF(int tid, int offset)
 {
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif 
+// #if DEBUG_UPDATE_STATS
+//     double start_time = get_time();
+// #endif 
     int frame_id, sc_id;
     interpreteOffset2d(OFDM_DATA_NUM, offset, &frame_id, &sc_id);
 
@@ -2300,7 +2318,7 @@ void CoMP::doZF(int tid, int offset)
     for (int i = 0; i < max_sc_ite; i++) {
 
 #if DEBUG_UPDATE_STATS
-        // double start_time1 = get_time();
+        double start_time1 = get_time();
 #endif 
         int cur_sc_id = sc_id + i;
         int cur_offset = offset + i;
@@ -2330,10 +2348,10 @@ void CoMP::doZF(int tid, int offset)
         // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
         int mat_elem = UE_NUM * BS_ANT_NUM;
         int cache_line_num = mat_elem / 8;
-        for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
-            _mm_prefetch((char *)precoder_buffer_.precoder[cur_offset + 8 * line_idx], _MM_HINT_ET1);
-            // _mm_prefetch((char *)(tar_csi_ptr + 16 * line_idx), _MM_HINT_ET1);
-        }
+        // for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
+        //     _mm_prefetch((char *)precoder_buffer_.precoder[cur_offset + 8 * line_idx], _MM_HINT_ET1);
+        //     // _mm_prefetch((char *)(tar_csi_ptr + 16 * line_idx), _MM_HINT_ET1);
+        // }
 
         for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
             float *src_csi_ptr = (float *)csi_buffer_.CSI[subframe_offset + ue_idx] + offset_in_csi_buffer * 2;
@@ -2376,7 +2394,11 @@ void CoMP::doZF(int tid, int offset)
         //     }
         // }
 
-
+    #if DEBUG_UPDATE_STATS_DETAILED
+        double duration1 = get_time() - start_time1;
+        ZF_task_duration[tid * 8][1] += duration1;
+        // double start_time2 = get_time();
+    #endif
         cx_float *ptr_in = (cx_float *)csi_gather_buffer[tid];
         //cx_float *ptr_in = (cx_float *)csi_buffer_.CSI[offset].data();
         cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
@@ -2387,19 +2409,21 @@ void CoMP::doZF(int tid, int offset)
         cx_float *ptr_out = (cx_float *)precoder_buffer_.precoder[cur_offset];
         cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
         // cx_fmat mat_output(ptr_out, BS_ANT_NUM, UE_NUM, false);
-    #if DEBUG_UPDATE_STATS
-        // double duration1 = get_time() - start_time1;
-        // ZF_task_duration[tid][1] += duration1;
+
+    #if DEBUG_UPDATE_STATS_DETAILED
         double start_time2 = get_time();
+        double duration2 = start_time2 - start_time1;
+        ZF_task_duration[tid * 8][2] += duration2;
+        // double start_time2 = get_time();
     #endif
    
         
         pinv(mat_output, mat_input, 1e-1, "dc");
 
         // cout<<"Precoder:" <<mat_output<<endl;
-    #if DEBUG_UPDATE_STATS    
-        double duration2 = get_time() - start_time2;
-        ZF_task_duration[tid][2] += duration2;
+    #if DEBUG_UPDATE_STATS_DETAILED    
+        double duration3 = get_time() - start_time2;
+        ZF_task_duration[tid * 8][3] += duration3;
         // double start_time3 = get_time();
     #endif
         
@@ -2420,13 +2444,15 @@ void CoMP::doZF(int tid, int offset)
     //     double duration3 = get_time() - start_time3;
     //     ZF_task_duration[tid][3] += duration3;
     // #endif
+    #if DEBUG_UPDATE_STATS   
+        ZF_task_count[tid * 16] = ZF_task_count[tid * 16]+1; 
+        double duration = get_time() - start_time1;
+        ZF_task_duration[tid * 8][0] += duration;
+    #endif
+
     }
 
-#if DEBUG_UPDATE_STATS   
-    ZF_task_count[tid] = ZF_task_count[tid]+1; 
-    double duration = get_time() - start_time;
-    ZF_task_duration[tid][0] += get_time() - start_time;
-#endif
+
 
     // inform main thread
     Event_data ZF_finish_event;
@@ -2471,64 +2497,49 @@ void CoMP::doPred(int tid, int offset)
 
 void CoMP::doDemul(int tid, int offset)
 {
-#if DEBUG_UPDATE_STATS    
-    double start_time = get_time();
-#endif
+
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
     interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
-    
 
-    // int gather_step_size = 8 * OFDM_CA_NUM;
-    int gather_step_size = 8 * transpose_block_size;
+#if DEBUG_UPDATE_STATS    
+    double start_time = get_time();
+#endif
+    
 
 #if DEBUG_PRINT_IN_TASK
         printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
 #endif
-        // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
 
-    // index=[0,32,64,96]
-    // __m256i index = _mm256_setr_epi64x(0, transpose_block_size/2, transpose_block_size/2 * 2, transpose_block_size/2 * 3);
-    // __m256i index = _mm256_setr_epi64x(0, OFDM_CA_NUM, OFDM_CA_NUM * 2, OFDM_CA_NUM * 3);
-    // __m256i index = _mm256_setr_epi32(0, 1, OFDM_CA_NUM * 2, OFDM_CA_NUM * 2 + 1, OFDM_CA_NUM * 4, OFDM_CA_NUM * 4 + 1, OFDM_CA_NUM * 6, OFDM_CA_NUM * 6 + 1);
-       __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
-    // float* tar_ptr = (float *)&data_buffer_.data[total_data_subframe_id][0];
-    // float* temp_buffer_ptr = (float *)&spm_buffer[tid][0];
+    __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
+    int gather_step_size = 8 * transpose_block_size;
 
     int mat_elem = UE_NUM * BS_ANT_NUM;
     int cache_line_num = mat_elem / 8;
-    
+    int ue_data_cache_line_num = UE_NUM/8;
     int max_sc_ite;
     if (sc_id + demul_block_size <= OFDM_DATA_NUM) 
         max_sc_ite = demul_block_size;
     else
         max_sc_ite = OFDM_DATA_NUM - sc_id;
-    // i = 0, 1, ..., 31
-    for (int i = 0; i < max_sc_ite/8; i++) {
-        
-        // int cur_block_id = (sc_id + i) / transpose_block_size;
-        // int sc_inblock_idx = i % transpose_block_size;
-        // int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
-        // float *tar_data_ptr = (float *)spm_buffer[tid];        
-        // float *src_data_ptr = (float *)data_buffer_.data[total_data_subframe_id] + cur_sc_offset * 2;
-        // for (int c2 = 0; c2 < BS_ANT_NUM / 4; c2++) {
-        //     __m256 data_rx = _mm256_i32gather_ps(src_data_ptr, index, 4);
-        //     _mm256_store_ps(tar_data_ptr, data_rx);
+    /* i = 0, 1, ..., 32/8
+     * iterate through cache lines (each cache line has 8 subcarriers) */
+    for (int i = 0; i < max_sc_ite/8; i++) {        
+        /* for a cache line size of 64 bytes, each read load 8 subcarriers
+         * use spatial locality to reduce latency */
+    #if DEBUG_UPDATE_STATS_DETAILED    
+        double start_time1 = get_time();
+    #endif
 
-        //     // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1), 
-        //         //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));           
-        //     src_data_ptr += gather_step_size;
-        //     tar_data_ptr += 8;
+        // for (int j = 0; j < 1; j++) {
+        //     int cur_sc_id = i * 8 + j + sc_id;
+        //     int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
+        //     cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
+        //     for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
+        //         _mm_prefetch((char *)(precoder_ptr + 8 * line_idx), _MM_HINT_T2);
+        //     }
         // }
 
-
-        // for a cache line size of 64 bytes, each read load 8 subcarriers
-        // use spatial locality to reduce latency
-        // float *tar_data_ptr = (float *)spm_buffer[tid];        
-        // // float *src_data_ptr = (float *)fft_buffer_.FFT_outputs[subframe_offset] + (sc_id + i * 8) * 2;
-        // float *src_data_ptr = (float *)fft_buffer_.FFT_outputs[subframe_offset] + (sc_id + i) * 2;
-
-        // double start_time1 = get_time();
 
         int cur_block_id = (sc_id + i * 8) / transpose_block_size;
         int sc_inblock_idx = (i * 8) % transpose_block_size;
@@ -2536,69 +2547,73 @@ void CoMP::doDemul(int tid, int offset)
         float *tar_data_ptr = (float *)spm_buffer[tid];        
         float *src_data_ptr = (float *)data_buffer_.data[total_data_subframe_id] + cur_sc_offset * 2;
 
-
+        /* gather data for all antennas and 8 subcarriers in the same cache line */
         for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-            // fetch 4 complex floats for 4 ants
-
+            /* 1 subcarrier and 4 ants per iteration */
             for (int j = 0; j < 8; j++) {
                 __m256 data_rx = _mm256_i32gather_ps(src_data_ptr + j * 2, index, 4);
                 _mm256_store_ps(tar_data_ptr + j * BS_ANT_NUM * 2, data_rx);
-
                 // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1), 
                 //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));   
             }
             src_data_ptr += gather_step_size;
             tar_data_ptr += 8;
         }
+    #if DEBUG_UPDATE_STATS_DETAILED   
+        double duration1 = get_time() - start_time1;
+        Demul_task_duration[tid * 8][1] += duration1;
+    #endif
 
         // Demul_task_duration_part1[tid] += get_time() - start_time1;
         
-
+        /* perform computation for 8 subcarriers */
         for (int j = 0; j < 8; j++) {
-            // double start_time2 = get_time();
-
-            int cur_sc_id = i * 8 + j + sc_id;
-            // mat_data size: BS_ANT_NUM \times 1
+            /* create input data matrix */
             cx_float* data_ptr = (cx_float *)(spm_buffer[tid] + j * BS_ANT_NUM);
             cx_fmat mat_data(data_ptr, BS_ANT_NUM, 1, false);
-            // cout<< "Raw data: " << mat_data.st()<<endl;
 
-            // mat_precoder size: UE_NUM \times BS_ANT_NUM
+            /* create input precoder matrix */
+            int cur_sc_id = i * 8 + j + sc_id;
             int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
             cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
-
-            
             // for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
             //     _mm_prefetch((char *)(precoder_ptr + 8 * line_idx), _MM_HINT_NTA);
             // }
-
             cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
+
+
             // cout<<"Precoder: "<< mat_precoder<<endl;
 
+            /* create output matrix for equalization */ 
 #if EXPORT_CONSTELLATION
-            // mat_demuled size: UE_NUM \times 1
             cx_float* equal_ptr = (cx_float *)(&equal_buffer_.data[total_data_subframe_id][cur_sc_id * UE_NUM]);
 #else
             cx_float* equal_ptr = (cx_float *)(&equaled_buffer_temp[tid][(cur_sc_id-sc_id) * UE_NUM]);
 #endif
             cx_fmat mat_equaled(equal_ptr, UE_NUM, 1, false);
 
-            // Demodulation
-            // sword* demul_ptr = (sword *)(&demul_hard_buffer_.data[total_data_subframe_id][cur_sc_id * UE_NUM]);
-            // imat mat_demuled(demul_ptr, UE_NUM, 1, false);
-
-            // uint8_t *demul_ptr = (&demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
-            // uint8_t *demul_ptr = (&demul_hard_buffer_temp[tid][(cur_sc_id-sc_id) * UE_NUM]);
-            // float *demul_ptr = (&demul_soft_buffer_temp[tid][(cur_sc_id-sc_id) * UE_NUM * NUM_BITS]);
-           
-            // Equalization
+#if DEBUG_UPDATE_STATS_DETAILED    
+    double start_time2 = get_time();
+#endif      
+            /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
+
+#if DEBUG_UPDATE_STATS_DETAILED   
+    double start_time3 = get_time(); 
+    double duration2 = start_time3 - start_time2;   
+    Demul_task_duration[tid * 8][2] += duration2;
+#endif
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout << "Equaled data: "<<mat_equaled.st()<<endl;
+            
 #if !ENABLE_DECODE 
-            // Hard decision
+            /* decode with hard decision */
             uint8_t *demul_ptr = (&demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
             demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+#if DEBUG_UPDATE_STATS_DETAILED   
+    double duration3 = get_time() - start_time3;   
+    Demul_task_duration[tid * 8][3] += duration3;
+#endif
 
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout<< "Demuled data: ";
@@ -2608,6 +2623,9 @@ void CoMP::doDemul(int tid, int offset)
             // }
             // cout<<endl; 
 #endif      
+        #if DEBUG_UPDATE_STATS    
+            Demul_task_count[tid * 16] = Demul_task_count[tid * 16] + 1;
+        #endif
         }
 
         // if (frame_id==0) 
@@ -2628,9 +2646,95 @@ void CoMP::doDemul(int tid, int offset)
         //     fclose(fp_debug);
         // }
     }
-#if DEBUG_UPDATE_STATS    
-    double duration3 = get_time() - start_time;
-#endif
+
+
+
+//     for (int i = 0; i < max_sc_ite; i++) {        
+//     #if DEBUG_UPDATE_STATS_DETAILED    
+//         double start_time1 = get_time();
+//     #endif
+//         int cur_block_id = (sc_id + i) / transpose_block_size;
+//         int sc_inblock_idx = i % transpose_block_size;
+//         int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
+//         float *tar_data_ptr = (float *)spm_buffer[tid];        
+//         float *src_data_ptr = (float *)data_buffer_.data[total_data_subframe_id] + cur_sc_offset * 2;
+//         for (int c2 = 0; c2 < BS_ANT_NUM / 4; c2++) {
+//             __m256 data_rx = _mm256_i32gather_ps(src_data_ptr, index, 4);
+//             _mm256_store_ps(tar_data_ptr, data_rx);
+//             // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1), 
+//                 //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));           
+//             src_data_ptr += gather_step_size;
+//             tar_data_ptr += 8;
+//         }
+       
+//     #if DEBUG_UPDATE_STATS_DETAILED   
+//         double start_time2 = get_time();
+//         double duration1 = start_time2 - start_time1;
+//         Demul_task_duration[tid * 8][1] += duration1;
+//     #endif
+
+//         // Demul_task_duration_part1[tid] += get_time() - start_time1;
+        
+//         /* perform computation for 8 subcarriers */
+        
+// // #if DEBUG_UPDATE_STATS_DETAILED    
+// //     double start_time2 = get_time();
+// // #endif
+
+//         /* create input data matrix */
+//         cx_float* data_ptr = (cx_float *)(spm_buffer[tid]);
+//         cx_fmat mat_data(data_ptr, BS_ANT_NUM, 1, false);
+
+//         /* create input precoder matrix */
+//         int cur_sc_id = i + sc_id;
+//         int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
+//         cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
+//         // for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
+//         //     _mm_prefetch((char *)(precoder_ptr + 8 * line_idx), _MM_HINT_NTA);
+//         // }
+//         cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
+//         // cout<<"Precoder: "<< mat_precoder<<endl;
+
+//         /* create output matrix for equalization */ 
+// #if EXPORT_CONSTELLATION
+//         cx_float* equal_ptr = (cx_float *)(&equal_buffer_.data[total_data_subframe_id][cur_sc_id * UE_NUM]);
+// #else
+//         cx_float* equal_ptr = (cx_float *)(&equaled_buffer_temp[tid][(cur_sc_id-sc_id) * UE_NUM]);
+// #endif
+//         cx_fmat mat_equaled(equal_ptr, UE_NUM, 1, false);
+      
+//         /* perform computation for equalization */
+//         mat_equaled = mat_precoder * mat_data;
+
+// #if DEBUG_UPDATE_STATS_DETAILED   
+//     double start_time3 = get_time(); 
+//     double duration2 = start_time3 - start_time2;   
+//     Demul_task_duration[tid * 8][2] += duration2;
+// #endif
+// #if !ENABLE_DECODE 
+//         /* decode with hard decision */
+//         uint8_t *demul_ptr = (&demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
+//         demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+// #if DEBUG_UPDATE_STATS_DETAILED   
+//     double duration3 = get_time() - start_time3;   
+//     Demul_task_duration[tid * 8][3] += duration3;
+// #endif
+//         // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
+//         // cout<< "Demuled data: ";
+//         // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+//         //     // cout<<demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM+ue_idx]<<" "<<endl;
+//         //     cout<<+*(demul_ptr+ue_idx)<<"  ";
+//         // }
+//         // cout<<endl; 
+// #endif      
+//         #if DEBUG_UPDATE_STATS    
+//             Demul_task_count[tid * 16] = Demul_task_count[tid * 16] + 1;
+//         #endif
+        
+//     }
+
+
+
 
 #if ENABLE_DECODE
     __m256i index_out = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
@@ -2697,51 +2801,12 @@ void CoMP::doDemul(int tid, int offset)
         }
     #endif
 #endif
-    // // sc location in the paded buffer 
-    // int sc_offset_in_output = sc_id / CODED_LEN * 64 * 3 + sc_id % CODED_LEN;
-    // // printf("In doDemul thread %d: frame: %d, subframe: %d (%d), subcarrier: %d, sc_offset_in_output: %d\n", tid, frame_id, current_data_subframe_id,total_data_subframe_id, sc_id, sc_offset_in_output);
-    
-        
-    // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-    //     // printf("In doDemul thread %d: frame: %d, subframe: %d (%d), subcarrier: %d, ue_idx %d, sc_offset_in_output: %d\n", tid, frame_id, current_data_subframe_id,total_data_subframe_id, sc_id, ue_idx, sc_offset_in_output);
-    //     uint8_t *src_ptr = &demul_hard_buffer_temp[tid][ue_idx];
-    //     uint8_t *tar_ptr = &demul_hard_buffer_[total_data_subframe_id][sc_offset_in_output + ue_idx * OFDM_DATA_NUM_PADED];
-    //     // printf("Address of tar_ptr: %p\n", (void *)tar_ptr);
-    //     __m128i data_16sc1 = _mm_set_epi8(*(src_ptr+UE_NUM*15),
-    //                             *(src_ptr+UE_NUM*14),*(src_ptr+UE_NUM*13), *(src_ptr+UE_NUM*12), *(src_ptr+UE_NUM*11),*(src_ptr+UE_NUM*10), *(src_ptr+UE_NUM*9), 
-    //                             *(src_ptr+UE_NUM*8),*(src_ptr+UE_NUM*7), *(src_ptr+UE_NUM*6), *(src_ptr+UE_NUM*5),*(src_ptr+UE_NUM*4), *(src_ptr+UE_NUM*3), 
-    //                             *(src_ptr+UE_NUM*2),*(src_ptr+UE_NUM*1), *(src_ptr+UE_NUM*0));
-    //     _mm_stream_si128((__m128i *)tar_ptr, data_16sc1);
-    //     __m128i data_16sc2 = _mm_set_epi8(*(src_ptr+31*UE_NUM),*(src_ptr+30*UE_NUM), *(src_ptr+UE_NUM*29), *(src_ptr+UE_NUM*28), *(src_ptr+UE_NUM*27),
-    //                             *(src_ptr+UE_NUM*26), *(src_ptr+UE_NUM*25), *(src_ptr+UE_NUM*24),*(src_ptr+UE_NUM*23), *(src_ptr+UE_NUM*22), *(src_ptr+UE_NUM*21),
-    //                             *(src_ptr+UE_NUM*20), *(src_ptr+UE_NUM*19), *(src_ptr+UE_NUM*18),*(src_ptr+UE_NUM*17),*(src_ptr+UE_NUM*16));
-    //     if (sc_id % CODED_LEN == 128) {
-    //         _mm_stream_si128((__m128i *)(tar_ptr+64), data_16sc2);
-    //     }
-    //     else {
-    //         _mm_stream_si128((__m128i *)(tar_ptr+16), data_16sc2);
-    //     }
-    // }
-
-    // cout<<"Data in demul_buffer:"<<endl;
-    // for (int i = 0; i < OFDM_CA_NUM * UE_NUM; i++) {
-    //     cout<<+(demul_hard_buffer_[total_data_subframe_id][i])<<" ";
-    //     if ((i+1) % OFDM_DATA_NUM_PADED == 0)
-    //         cout<<endl;
-    // }
-
-    // cout<<endl;
 
 
     // inform main thread
-#if DEBUG_UPDATE_STATS       
-    Demul_task_duration[tid][1] += duration3;
-#endif
-
-#if DEBUG_UPDATE_STATS    
-    Demul_task_count[tid] = Demul_task_count[tid]+1;
+#if DEBUG_UPDATE_STATS   
     double duration = get_time() - start_time;
-    Demul_task_duration[tid][0] += duration;
+    Demul_task_duration[tid * 8][0] += duration;
 #endif
     Event_data demul_finish_event;
     demul_finish_event.event_type = EVENT_DEMUL;
