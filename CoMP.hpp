@@ -30,6 +30,7 @@
 #include "concurrentqueue.h"
 #include <signal.h>
 #include <aff3ct.hpp>
+// #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
 
@@ -38,7 +39,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 30: 30;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 30: 12;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 4;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 0;
     static const int CORE_OFFSET = 17;
@@ -53,9 +54,9 @@ public:
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 60;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 1200/40;
+    static const int demul_block_size = 16;
     static const int demul_block_num = OFDM_DATA_NUM/demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
-    static const int zf_block_size = 20;
+    static const int zf_block_size = 50;
     static const int zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
     // optimization parameters for block transpose (see the slides for more
     // details)
@@ -299,7 +300,7 @@ private:
     std::unique_ptr<aff3ct::module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>> Decoders[TASK_THREAD_NUM];
     // std::vector<aff3ct::module::Decoder_LDPC_BP_flooding_inter<>*> Decoders;
     std::vector<unsigned> info_bits_pos[TASK_THREAD_NUM];
-    std::vector<aff3ct::tools::Update_rule_NMS_simd<float,0>> up_rules;
+    // std::vector<aff3ct::tools::Update_rule_NMS_simd<float,0>> up_rules;
     aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
     const int K = ORIG_CODE_LEN * NUM_BITS;
     const int N = CODED_LEN * NUM_BITS;
@@ -491,16 +492,16 @@ private:
 
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
 
-    int FFT_task_count[TASK_THREAD_NUM];
-    int ZF_task_count[TASK_THREAD_NUM];
-    int Demul_task_count[TASK_THREAD_NUM];
+    int FFT_task_count[TASK_THREAD_NUM*16];
+    int ZF_task_count[TASK_THREAD_NUM*16];
+    int Demul_task_count[TASK_THREAD_NUM*16];
 
-    double FFT_task_duration[TASK_THREAD_NUM][4];
-    double ZF_task_duration[TASK_THREAD_NUM][4];
-    double Demul_task_duration[TASK_THREAD_NUM][2];
+    double FFT_task_duration[TASK_THREAD_NUM*8][4];
+    double ZF_task_duration[TASK_THREAD_NUM*8][4];
+    double Demul_task_duration[TASK_THREAD_NUM*8][4];
 
 
-    int socket_buffer_size_;
+    long long socket_buffer_size_;
     int socket_buffer_status_size_;
 
 
@@ -598,7 +599,7 @@ private:
     int max_equaled_frame=0;
     float csi_format_offset;
 
-    int dl_socket_buffer_size_;
+    long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
     double IFFT_task_duration[TASK_THREAD_NUM][4];

@@ -62,7 +62,7 @@ public:
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + N_THREAD - 1}
     */ 
-    std::vector<pthread_t> startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, double **in_frame_start, int in_core_id=0);
+    std::vector<pthread_t> startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start, int in_core_id=0);
     /**
      * receive thread
      * context: PackageReceiverContext type
@@ -79,7 +79,7 @@ private:
 
     char** buffer_;
     int** buffer_status_;
-    int buffer_length_;
+    long long buffer_length_;
     int buffer_frame_num_;
 
     int thread_num_;
