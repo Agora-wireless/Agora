@@ -5,6 +5,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include "cpu_attach.hpp"
+#include <sys/time.h>
+#include <sys/resource.h>
+#include "ittnotify.h"
+// #include <hpctoolkit.h>
 
 using namespace arma;
 
@@ -16,6 +21,38 @@ static double test_get_time(void)
 }
 
 
+int flushCache()
+{
+    const size_t bigger_than_cachesize = 100 * 1024 * 1024;
+    long *p = new long[bigger_than_cachesize];
+    // When you want to "flush" cache. 
+    for(int i = 0; i < bigger_than_cachesize; i++)
+    {
+       p[i] = rand();
+    }
+    delete p;
+}
+
+static double bench_ZF_warmup(unsigned Nx, unsigned Ny, unsigned iterations)
+{
+    srand(time(NULL));
+    fmat real_H = randn<fmat>(Nx, Ny);
+    fmat imag_H = randn<fmat>(Nx, Ny);
+    cx_fmat mat_input(real_H, imag_H);
+    cx_fmat mat_output(Ny, Nx);
+
+    __itt_resume();
+    double start_time = test_get_time();
+    for (unsigned i = 0; i < iterations; i++)
+    {
+        pinv(mat_output, mat_input, 1e-1, "dc");
+    }
+    double end_time = test_get_time();
+    __itt_pause();
+
+    return end_time - start_time;
+}
+
 static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
 {
     srand(time(NULL));
@@ -24,12 +61,16 @@ static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
     cx_fmat mat_input(real_H, imag_H);
     cx_fmat mat_output(Ny, Nx);
 
+    // std::cout<<mat_input<<std::endl;
+
+    __itt_resume();
     double start_time = test_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
         pinv(mat_output, mat_input, 1e-1, "dc");
     }
     double end_time = test_get_time();
+    __itt_pause();
 
     return end_time - start_time;
 }
@@ -45,12 +86,14 @@ static double bench_multiply_dim1(unsigned Nx, unsigned Ny, unsigned iterations)
     cx_fmat mat_left(real_left, imag_left);
     cx_fmat result(1, Ny);
 
+    __itt_resume();
     double start_time = test_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
         result = mat_left * mat_right;
     }
     double end_time = test_get_time();
+    __itt_pause();
 
     return end_time - start_time;
 }
@@ -100,13 +143,17 @@ static double bench_multiply_transpose(unsigned Nx, unsigned Ny, unsigned iterat
 
 static void run_benchmark_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
 {
-    double zf_time1 = bench_ZF(Nx, Ny, iterations);
+    double zf_time1 = bench_ZF_warmup(Nx, Ny, iterations);
+    // hpctoolkit_sampling_start();
+    __itt_pause();
     double zf_time2 = bench_ZF(Nx, Ny, iterations);
     double zf_time3 = bench_ZF(Nx, Ny, iterations);
     double zf_time4 = bench_ZF(Nx, Ny, iterations);
     double zf_time5 = bench_ZF(Nx, Ny, iterations);
     double zf_time6 = bench_ZF(Nx, Ny, iterations);
     double zf_time7 = bench_ZF(Nx, Ny, iterations);
+    __itt_pause();
+    // hpctoolkit_sampling_start();
 
     printf("ZF:              %04u x %04u  %12.3f us iteration\n",
             Nx, Ny, 1000000.0 * zf_time1 / iterations);
@@ -126,11 +173,13 @@ static void run_benchmark_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
 
 static void run_benchmark_multiply(int dim, unsigned Nx, unsigned Ny, unsigned iterations)
 {
+    __itt_pause();
     double mul_time1 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations) : bench_multiply_dim2(Nx, Ny, iterations);
     double mul_time2 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations) : bench_multiply_dim2(Nx, Ny, iterations);
     double mul_time3 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations) : bench_multiply_dim2(Nx, Ny, iterations);
     double mul_time4 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations) : bench_multiply_dim2(Nx, Ny, iterations);
     double mul_time5 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations) : bench_multiply_dim2(Nx, Ny, iterations);
+    __itt_pause();
 
     if (dim == 1)
         printf("(1 x %04u) * (%04u x %04u)\n", Nx, Nx, Ny);
@@ -190,12 +239,27 @@ static void run_benchmark_precode(unsigned Nx, unsigned Ny, unsigned iterations)
 
 int main(int argc, char *argv[])
 {
+    __itt_pause();
+    putenv( "MKL_THREADING_LAYER=sequential" );
+    std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     if (argc != 5)
     {
         fprintf(stderr, "Usage: %s [iterations] [Nx] [Ny] mode\n",
                 argv[0]);
         return 1;
     }
+
+
+    int main_core_id = 2;
+    if(stick_this_thread_to_core(main_core_id) != 0) {
+        printf("Main thread: stitch main thread to core %d failed\n", main_core_id);
+        exit(0);
+    }
+    else {
+        printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
+    }
+
+    setpriority(PRIO_PROCESS, 0, -20);
 
 	if (argc == 5)
     {
