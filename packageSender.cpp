@@ -76,6 +76,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         /*Bind socket with address struct*/
         if(bind(socket_[i], (struct sockaddr *) &cliaddr_, sizeof(cliaddr_)) != 0)
             perror("socket bind failed");
+        if(connect(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
+            perror("socket connect failed");
     }
 
     /* initialize random seed: */
@@ -257,7 +259,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             // double cur_time = get_time();
             // printf("Finished transmit all antennas in frame: %d, subframe: %d, at %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id, cur_time,cur_time-start_time);
             if (tx_frame_count < 200)
-                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+                std::this_thread::sleep_for(std::chrono::microseconds(1500));
             else 
                 std::this_thread::sleep_for(std::chrono::microseconds(delay));
             // usleep(delay);
@@ -279,8 +281,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                 else
                     std::this_thread::sleep_for(std::chrono::microseconds(int(data_subframe_num_perframe*71.43)));
 #endif
-                // printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
-                // start_time = get_time();
+               // printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
+               // start_time = get_time();
             }
 
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
@@ -435,7 +437,8 @@ void* PackageSender::loopSend(void *in_context)
 #endif
         if (!ENABLE_DOWNLINK || subframe_id < UE_NUM) {
             /* send a message to the server */
-            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
+            if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0) < 0){
+            // if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);
             }
