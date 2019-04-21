@@ -24,60 +24,60 @@ PackageReceiver::PackageReceiver(int N_THREAD)
     // servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
     // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
     
-    for(int i = 0; i < N_THREAD; i++)
-    {
-#if USE_IPV4
-        servaddr_[i].sin_family = AF_INET;
-        servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-        memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
+//     for(int i = 0; i < N_THREAD; i++)
+//     {
+// #if USE_IPV4
+//         servaddr_[i].sin_family = AF_INET;
+//         servaddr_[i].sin_port = htons(8000+i);
+//         servaddr_[i].sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+//         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
-        if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-            printf("cannot create socket %d\n", i);
-            exit(0);
-        }
-#else
-        servaddr_[i].sin6_family = AF_INET6;
-        servaddr_[i].sin6_addr = in6addr_any;
-        servaddr_[i].sin6_port = htons(8000+i);
+//         if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
+//             printf("cannot create socket %d\n", i);
+//             exit(0);
+//         }
+// #else
+//         servaddr_[i].sin6_family = AF_INET6;
+//         servaddr_[i].sin6_addr = in6addr_any;
+//         servaddr_[i].sin6_port = htons(8000+i);
         
-        if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-            printf("cannot create socket %d\n", i);
-            exit(0);
-        }
-        else{
-            printf("Created IPV6 socket %d\n", i);
-        }
-#endif
-        // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
-        int optval = 1;
-        setsockopt(socket_[i], SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+//         if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+//             printf("cannot create socket %d\n", i);
+//             exit(0);
+//         }
+//         else{
+//             printf("Created IPV6 socket %d\n", i);
+//         }
+// #endif
+//         // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
+//         int optval = 1;
+//         setsockopt(socket_[i], SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
 
-        int sock_buf_size = 1024*1024*64*8;
-        if (setsockopt(socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
-        {
-            printf("Error setting buffer size to %d\n", sock_buf_size);
-        }
+//         int sock_buf_size = 1024*1024*64*8;
+//         if (setsockopt(socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
+//         {
+//             printf("Error setting buffer size to %d\n", sock_buf_size);
+//         }
 
-        // int readValue = 0;
-        // unsigned int readLen = sizeof(readValue);
-        // int res = getsockopt( socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&readValue, &readLen );
-        // if ( -1 == res )
-        // {
-        //     printf("ERROR reading socket buffer size\n");
-        // }
-        // else
-        // {
-        //     printf("Read socket buffer size:%d\n",readValue);
-        // }
+//         // int readValue = 0;
+//         // unsigned int readLen = sizeof(readValue);
+//         // int res = getsockopt( socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&readValue, &readLen );
+//         // if ( -1 == res )
+//         // {
+//         //     printf("ERROR reading socket buffer size\n");
+//         // }
+//         // else
+//         // {
+//         //     printf("Read socket buffer size:%d\n",readValue);
+//         // }
 
-        if(bind(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
-        {
-            printf("socket bind failed %d\n", i);
-            exit(0);
-        }
+//         if(bind(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
+//         {
+//             printf("socket bind failed %d\n", i);
+//             exit(0);
+//         }
 
-    }
+//     }
     
 
     thread_num_ = N_THREAD;
@@ -163,6 +163,55 @@ void* PackageReceiver::loopRecv(void *in_context)
         printf("RX thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
     }
 #endif
+
+
+#if USE_IPV4
+    struct sockaddr_in servaddr_local;
+    int socket_local;
+    servaddr_local.sin_family = AF_INET;
+    servaddr_local.sin_port = htons(8000+tid);
+    servaddr_local.sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
+
+    if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
+        printf("cannot create socket %d\n", tid);
+        exit(0);
+    }
+    else{
+        printf("Created IPV4 socket %d\n", tid);
+    }
+#else
+    struct sockaddr_in6 servaddr_local;
+    int socket_local;
+    servaddr_local.sin6_family = AF_INET6;
+    servaddr_local.sin6_addr = in6addr_any;
+    servaddr_local.sin6_port = htons(8000+tid);
+    
+    if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+        printf("cannot create socket %d\n", tid);
+        exit(0);
+    }
+    else{
+        printf("Created IPV6 socket %d\n", tid);
+    }
+#endif
+    // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
+    int optval = 1;
+    setsockopt(socket_local, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+
+    int sock_buf_size = 1024*1024*64*8;
+    if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
+    {
+        printf("Error setting buffer size to %d\n", sock_buf_size);
+    }
+
+    if(bind(socket_local, (struct sockaddr *) &servaddr_local, sizeof(servaddr_local)) != 0)
+    {
+        printf("socket bind failed %d\n", tid);
+        exit(0);
+    }
+
+
     // use token to speed up
     moodycamel::ProducerToken local_ptok(*message_queue_);
 
@@ -223,8 +272,9 @@ void* PackageReceiver::loopRecv(void *in_context)
 
         int recvlen = -1;
         // start_time= get_time();
-        if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
-        {
+        // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
+        if ((recvlen = recv(socket_local, (char*)cur_ptr_buffer, package_length, 0))<0) {
+        // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
         }

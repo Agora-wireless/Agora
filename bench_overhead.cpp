@@ -46,7 +46,7 @@ CoMP::CoMP()
 
     
 
-    std::string filename = "/home/argos/Jian/aff3ct/build/bin/../../conf/dec/LDPC/CCSDS_64_128.alist";
+    std::string filename = "/home/argos/Jian/my_project_with_aff3ct/lib/aff3ct/conf/dec/LDPC/CCSDS_64_128.alist";
 
 
     
@@ -69,7 +69,7 @@ CoMP::CoMP()
 
     noise.set_noise(sigma, ebn0, esn0);
     
-    up_rules.reserve(TASK_THREAD_NUM);
+    // up_rules.reserve(TASK_THREAD_NUM);
     Encoders.reserve(TASK_THREAD_NUM);
     // Decoders.reserve(TASK_THREAD_NUM);
     Modems.reserve(TASK_THREAD_NUM);
@@ -82,7 +82,7 @@ CoMP::CoMP()
             info_bits_pos[i].resize(ORIG_CODE_LEN * NUM_BITS);
             std::iota(info_bits_pos[i].begin(), info_bits_pos[i].end(), 0);
         }
-        up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
+        // up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
     }
 
     const auto &msg_chk_to_var_id = H[0].get_col_to_rows();
@@ -1627,6 +1627,8 @@ void* CoMP::taskThread(void* context)
     int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
 
     int tar_core_id = tid + offset_id;
+    if (tar_core_id>=36) 
+        tar_core_id = tar_core_id - 36 + 1;
     // if (tid>=20) 
     //     tar_core_id = tar_core_id - 20 + 36;
     if(stick_this_thread_to_core(tar_core_id) != 0) {

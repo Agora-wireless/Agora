@@ -26,10 +26,13 @@
 #include "cpu_attach.hpp"
 #include <armadillo>
 #include <immintrin.h>
+#include <emmintrin.h>
+#include <stdint.h>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include <signal.h>
 #include <aff3ct.hpp>
+#include "mkl_dfti.h"
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
@@ -39,24 +42,24 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 30: 12;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 30: 30;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 4;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 0;
     static const int CORE_OFFSET = 17;
 
-    static const int FFT_THREAD_NUM = 1;
-    static const int ZF_THREAD_NUM = 16;
+    static const int FFT_THREAD_NUM = 6;
+    static const int ZF_THREAD_NUM = 6;//16;
     static const int DEMUL_THREAD_NUM = TASK_THREAD_NUM - FFT_THREAD_NUM - ZF_THREAD_NUM;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
     // * subframe_num_perframe * BS_ANT_NUM
-    static const int SOCKET_BUFFER_FRAME_NUM = 60;
+    static const int SOCKET_BUFFER_FRAME_NUM = 100;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 60;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 16;
+    static const int demul_block_size = 40;
     static const int demul_block_num = OFDM_DATA_NUM/demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
-    static const int zf_block_size = 50;
+    static const int zf_block_size = 40;
     static const int zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
     // optimization parameters for block transpose (see the slides for more
     // details)
@@ -422,6 +425,9 @@ private:
     // std::vector<complex_float> pilots_complex_;
 
     mufft_plan_1d *muplans_[TASK_THREAD_NUM];
+
+    DFTI_DESCRIPTOR_HANDLE mkl_handles[TASK_THREAD_NUM];
+    MKL_LONG mkl_statuses[TASK_THREAD_NUM];
 
 
     /* Concurrent queues */
