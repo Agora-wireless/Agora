@@ -86,14 +86,16 @@ static double bench_multiply_dim1(unsigned Nx, unsigned Ny, unsigned iterations)
     cx_fmat mat_left(real_left, imag_left);
     cx_fmat result(1, Ny);
 
-    __itt_resume();
+    
     double start_time = test_get_time();
+    __itt_resume();
     for (unsigned i = 0; i < iterations; i++)
     {
         result = mat_left * mat_right;
     }
-    double end_time = test_get_time();
     __itt_pause();
+    double end_time = test_get_time();
+    
 
     return end_time - start_time;
 }
@@ -109,12 +111,16 @@ static double bench_multiply_dim2(unsigned Nx, unsigned Ny, unsigned iterations)
     cx_fmat mat_left(real_left, imag_left);
     cx_fmat result(Nx, 1);
 
+    
     double start_time = test_get_time();
+    __itt_resume();
     for (unsigned i = 0; i < iterations; i++)
     {
         result = mat_left * mat_right;
     }
+    __itt_pause();
     double end_time = test_get_time();
+    
 
     return end_time - start_time;
 }
