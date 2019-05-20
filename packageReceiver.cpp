@@ -245,7 +245,7 @@ void* PackageReceiver::loopRecv(void *in_context)
     double start_time= get_time();
     while(true)
     {
-        start_time= get_time();
+        // start_time= get_time();
         // if buffer is full, exit
         if (cur_ptr_buffer_status[0] == 1)
         {
@@ -270,6 +270,9 @@ void* PackageReceiver::loopRecv(void *in_context)
         // ioctl(obj_ptr->socket_[tid], FIONREAD, &count);
         // receive data
 
+        // for (int i = 0; i < (package_length/64); i++)
+        //     _mm256_stream_load_si256 ((__m256i const*) (cur_ptr_buffer + i*64));
+
         int recvlen = -1;
         // start_time= get_time();
         // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
@@ -278,6 +281,8 @@ void* PackageReceiver::loopRecv(void *in_context)
             perror("recv failed");
             exit(0);
         }
+
+
 
         // int count2;
         // ioctl(obj_ptr->socket_[tid], FIONREAD, &count2);
@@ -320,6 +325,11 @@ void* PackageReceiver::loopRecv(void *in_context)
             printf("socket message enqueue failed\n");
             exit(0);
         }
+
+        
+        // for (int i = 0; i < (package_length/64); i++)
+        //     _mm_prefetch((char*)cur_ptr_buffer + 64 * i, _MM_HINT_NTA);
+
         // Event_data package_message[4];
         // for (int i=0; i<4; i++) {
         //     package_message[i].event_type = EVENT_PACKAGE_RECEIVED;
@@ -331,7 +341,8 @@ void* PackageReceiver::loopRecv(void *in_context)
         // }
         
         
-        
+        // for (int i = 0; i < (package_length/64); i++)
+            // _mm256_stream_load_si256 ((__m256i const*) (cur_ptr_buffer + i*64));
         //printf("enqueue offset %d\n", offset);
         // int cur_queue_len = message_queue_->size_approx();
         // maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;

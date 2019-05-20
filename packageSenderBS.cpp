@@ -16,7 +16,8 @@ packageSenderBS::packageSenderBS(int N_THREAD)
 #if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.90");
+        // servaddr_[i].sin_addr.s_addr = inet_addr("168.6.245.88");
+        servaddr_[i].sin_addr.s_addr = inet_addr("10.0.0.2");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
         cliaddr_.sin_family = AF_INET;
@@ -220,23 +221,24 @@ void* packageSenderBS::loopSend(void *in_context)
             exit(0);
         }
         //printf("enqueue offset %d\n", offset);
-        int cur_mesg_queue_len = message_queue_->size_approx();
-        int cur_task_queue_len = task_queue_->size_approx();
-        maxMesgQLen = maxMesgQLen > cur_mesg_queue_len ? maxMesgQLen : cur_mesg_queue_len;
-        maxTaskQLen = maxTaskQLen > cur_task_queue_len ? maxTaskQLen : cur_task_queue_len;
-        package_count++;
+        // int cur_mesg_queue_len = message_queue_->size_approx();
+        // int cur_task_queue_len = task_queue_->size_approx();
+        // maxMesgQLen = maxMesgQLen > cur_mesg_queue_len ? maxMesgQLen : cur_mesg_queue_len;
+        // maxTaskQLen = maxTaskQLen > cur_task_queue_len ? maxTaskQLen : cur_task_queue_len;
+        // package_count++;
 
         // if (package_count % (BS_ANT_NUM) == 0)
         // {
         //     usleep(71);
         // }
 
-        if(package_count == BS_ANT_NUM * data_subframe_num_perframe * 100)
+        if(package_count == BS_ANT_NUM * dl_data_subframe_num_perframe * 1000)
         {
             auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * data_subframe_num_perframe * 100;
+            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * data_subframe_num_perframe * 1000;
             std::chrono::duration<double> diff = end - begin;
-            printf("TX thread %d send 100 frames in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
+            // printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
+            printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024);
             begin = std::chrono::system_clock::now();
             package_count = 0;
         }
