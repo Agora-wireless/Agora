@@ -46,12 +46,12 @@ public:
     };
 
 public:
-    PackageReceiver(int N_THREAD = 1);
+    PackageReceiver(int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1);
     /**
-     * N_THREAD: socket thread number
+     * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
     */ 
-    PackageReceiver(int N_THREAD, moodycamel::ConcurrentQueue<Event_data> * in_queue);
+    PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task);
     ~PackageReceiver();
     
     /**
@@ -60,14 +60,16 @@ public:
      * in_buffer_status: record the status of each memory block (0: empty, 1: full)
      * in_buffer_frame_num: number of packets the ring buffer could hold
      * in_buffer_length: size of ring buffer
-     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + N_THREAD - 1}
+     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + RX_THREAD_NUM - 1}
     */ 
     std::vector<pthread_t> startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start, int in_core_id=0);
+    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length, int in_core_id=1);
     /**
      * receive thread
      * context: PackageReceiverContext type
     */
     static void* loopRecv(void *context);
+    static void* loopSend(void *context);
  
 private:
 #if USE_IPV4
@@ -82,14 +84,24 @@ private:
     long long buffer_length_;
     int buffer_frame_num_;
 
-    int thread_num_;
+    char* tx_buffer_;
+    int* tx_buffer_status_;
+    long long tx_buffer_length_;
+    int tx_buffer_frame_num_;
+    float *tx_data_buffer_;
+
+    int rx_thread_num_;
+    int tx_thread_num_;
 
     double **frame_start_;
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data> *message_queue_;
+    moodycamel::ConcurrentQueue<Event_data> *task_queue_;
     int core_id_;
+    int tx_core_id_;
 
-    PackageReceiverContext* context;
+    PackageReceiverContext* tx_context;
+    PackageReceiverContext* rx_context;
 };
 
 

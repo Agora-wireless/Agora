@@ -8,7 +8,7 @@
 #define COMP_HEAD
 
 #include "packageReceiver.hpp"
-#include "packageSenderBS.hpp"
+// #include "packageSenderBS.hpp"
 #include <unistd.h>
 #include <memory>
 #include <iostream>
@@ -42,12 +42,12 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 17: 22;
-    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 1 : 3;
-    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 1 : 0;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 25;
+    static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 4;
+    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 0;
     static const int CORE_OFFSET = 17;
 
-    static const int FFT_THREAD_NUM = 1;
+    static const int FFT_THREAD_NUM = 3;
     // static const int ZF_THREAD_NUM = 8;//16;
     // static const int DEMUL_THREAD_NUM = TASK_THREAD_NUM - FFT_THREAD_NUM - ZF_THREAD_NUM;
     static const int DEMUL_THREAD_NUM = 8;//16;
@@ -522,7 +522,7 @@ private:
      * Downlink 
      *****************************************************/  
 
-    std::unique_ptr<packageSenderBS> transmitter_;
+    // std::unique_ptr<packageSenderBS> transmitter_;
 
     /** 
      * Raw data

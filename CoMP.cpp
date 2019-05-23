@@ -233,7 +233,7 @@ CoMP::CoMP()
 
 
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, &message_queue_));
+    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, &message_queue_, &tx_queue_));
 
     // initilize all kinds of checkers
     memset(fft_counter_ants_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
@@ -322,7 +322,7 @@ CoMP::CoMP()
     dl_IQ_data_long = new long long * [data_subframe_num_perframe * UE_NUM];
     for (int i = 0; i < data_subframe_num_perframe * UE_NUM; i++) {
         dl_IQ_data[i] = new int[OFDM_CA_NUM];
-        dl_IQ_data_long[i] = new long long[packageSenderBS::OFDM_FRAME_LEN];
+        dl_IQ_data_long[i] = new long long[PackageReceiver::OFDM_FRAME_LEN];
     }
     // read data from file
     std::string filename1 = "../orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
@@ -417,8 +417,8 @@ CoMP::CoMP()
         qam16_table[1][i] = modvec_16qam[i % 4];
     }
 
-    printf("new PackageSender\n");
-    transmitter_.reset(new packageSenderBS(SOCKET_TX_THREAD_NUM, &complete_task_queue_, &tx_queue_));
+    // printf("new PackageSender\n");
+    // transmitter_.reset(new packageSenderBS(SOCKET_TX_THREAD_NUM, &complete_task_queue_, &tx_queue_));
 
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
         memset(IFFT_task_duration[i], 0, sizeof(double) * 4 * 8);
@@ -519,8 +519,10 @@ void CoMP::start()
     char *dl_socket_buffer_ptr = dl_socket_buffer_.buffer;
     int *dl_socket_buffer_status_ptr = dl_socket_buffer_.buffer_status;
     float *dl_data_ptr = (float *)(&dl_precoded_data_buffer_.data[0][0]);
-    std::vector<pthread_t> tx_threads = transmitter_->startTX(dl_socket_buffer_ptr, 
+    std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_ptr, 
         dl_socket_buffer_status_ptr, dl_data_ptr, dl_socket_buffer_status_size_, dl_socket_buffer_size_, main_core_id + 1 +SOCKET_RX_THREAD_NUM);
+    // std::vector<pthread_t> tx_threads = transmitter_->startTX(dl_socket_buffer_ptr, 
+    //     dl_socket_buffer_status_ptr, dl_data_ptr, dl_socket_buffer_status_size_, dl_socket_buffer_size_, main_core_id + 1 +SOCKET_RX_THREAD_NUM);
 #endif
 
     // for fft_queue, main thread is producer, it is single-procuder & multiple consumer
@@ -3308,7 +3310,12 @@ void CoMP::do_precode(int tid, int offset)
 
     // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
     // double start_time = get_time();
-    for (int i = 0; i < demul_block_size; i++) { 
+    int max_sc_ite;
+    if (sc_id + demul_block_size <= OFDM_DATA_NUM) 
+        max_sc_ite = demul_block_size;
+    else
+        max_sc_ite = OFDM_DATA_NUM - sc_id;
+    for (int i = 0; i < max_sc_ite; i++) { 
         int cur_sc_id = sc_id + i;
 
         complex_float *data_ptr = &dl_modulated_buffer_.data[total_data_subframe_id][UE_NUM * cur_sc_id];

@@ -46,13 +46,13 @@ target_link_libraries(sender -lpthread )
 #target_link_libraries(receiver -lpthread )
 
 #link_directories("/usr/local/lib/hpctoolkit")
-add_executable(bench_overhead main.cpp packageReceiver.cpp packageSenderBS.cpp bench_overhead.cpp cpu_attach.cpp)
-target_link_libraries(bench_overhead -lpthread /usr/local/lib/libmufft.a -larmadillo aff3ct::aff3ct-static-lib)
+#add_executable(bench_overhead main.cpp packageReceiver.cpp packageSenderBS.cpp bench_overhead.cpp cpu_attach.cpp)
+#target_link_libraries(bench_overhead -lpthread /usr/local/lib/libmufft.a -larmadillo aff3ct::aff3ct-static-lib)
 
 #add_executable(bench_data main.cpp packageReceiver.cpp packageSenderBS.cpp bench_data.cpp cpu_attach.cpp)
 #target_link_libraries(bench_data -lpthread /usr/local/lib/libmufft.a -larmadillo aff3ct::aff3ct-static-lib)
 
-add_executable(CoMP main.cpp packageReceiver.cpp packageSenderBS.cpp CoMP.cpp cpu_attach.cpp)
+add_executable(CoMP main.cpp packageReceiver.cpp CoMP.cpp cpu_attach.cpp)
 target_link_libraries(CoMP -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt aff3ct::aff3ct-static-lib -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl)
 
 
