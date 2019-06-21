@@ -21,6 +21,10 @@
 #include <pthread.h>
 #include <signal.h>
 #include "concurrentqueue.h"
+#include <emmintrin.h>
+
+
+#define CPU_FREQ 2.3e9
 
 typedef unsigned short ushort;
 
@@ -30,7 +34,9 @@ public:
     static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     // int for: frame_id, subframe_id, cell_id, ant_id
     // unsigned int for: I/Q samples
-    static const int buffer_length = sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+
+    static const int tx_buf_offset = USE_DPDK ? 22 : 0;
+    static const int buffer_length = tx_buf_offset + sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     static const int data_offset = sizeof(int) * 16;
 //    static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
@@ -62,6 +68,7 @@ private:
     struct sockaddr_in6 cliaddr_;    /* server address */
 #endif
     int* socket_;
+    // int* socket_tcp_;
 
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
