@@ -42,7 +42,7 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 25;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 24;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 4;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 0;
     static const int CORE_OFFSET = 17;
@@ -59,7 +59,7 @@ public:
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 60;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 24;
+    static const int demul_block_size = 48;
     static const int demul_block_num = OFDM_DATA_NUM/demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
     static const int zf_block_size = 1;
     static const int zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
@@ -69,7 +69,8 @@ public:
     static const int transpose_block_num = 256;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
-    static const int dequeue_bulk_size = 8;
+    static const int dequeue_bulk_size = 32;
+    static const int dequeue_bulk_size_single = 8;
 
     CoMP();
     ~CoMP();
@@ -499,6 +500,8 @@ private:
     int debug_count = 0;
 
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
+
+    std::unique_ptr<moodycamel::ProducerToken> rx_ptok[SOCKET_RX_THREAD_NUM]; 
 
     int CSI_task_count[TASK_THREAD_NUM*16];
     int FFT_task_count[TASK_THREAD_NUM*16];

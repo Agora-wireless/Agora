@@ -15,6 +15,7 @@ void intHandler(int) {
 
 CoMP::CoMP()
 {
+    printf("Main thread: on core %d\n", sched_getcpu());
     putenv( "MKL_THREADING_LAYER=sequential" );
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     csi_format_offset = 1.0/32768;
@@ -231,9 +232,15 @@ CoMP::CoMP()
         coded_buffer_temp[i] = (int*)aligned_alloc(64, NUM_BITS * CODED_LEN * sizeof(int));
     // printf("Demultiplexed data buffer initialized\n");
 
+    moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
+        rx_ptok[i].reset(new moodycamel::ProducerToken(message_queue_));
+        rx_ptoks_ptr[i] = rx_ptok[i].get();
+    }
+
 
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, &message_queue_, &tx_queue_));
+    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, &message_queue_, &tx_queue_, rx_ptoks_ptr));
 
     // initilize all kinds of checkers
     memset(fft_counter_ants_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
@@ -477,11 +484,24 @@ void CoMP::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_d
     }
 }
 
-static double get_time(void)
+/* assembly code to read the TSC */
+static inline uint64_t RDTSC()
 {
+  unsigned int hi, lo;
+  __asm__ volatile("rdtsc" : "=a" (lo), "=d" (hi));
+  return ((uint64_t)hi << 32) | lo;
+}
+
+
+static inline double get_time(void)
+{
+#if USE_RDTSC
+    return double(RDTSC())/2.3e3;
+#else
     struct timespec tv;
     clock_gettime(CLOCK_MONOTONIC, &tv);
     return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
+#endif
 }
 
 
@@ -512,7 +532,7 @@ void CoMP::start()
         // printf("Socket buffer ptr: %llx, socket_buffer: %llx\n", socket_buffer_ptrs[i],socket_buffer_[i].buffer);
     }
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
-        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, frame_start_ptrs, main_core_id + 1);
+        socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, frame_start_ptrs);
 
     // start downlink transmitter
 #if ENABLE_DOWNLINK
@@ -520,7 +540,7 @@ void CoMP::start()
     int *dl_socket_buffer_status_ptr = dl_socket_buffer_.buffer_status;
     float *dl_data_ptr = (float *)(&dl_precoded_data_buffer_.data[0][0]);
     std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_ptr, 
-        dl_socket_buffer_status_ptr, dl_data_ptr, dl_socket_buffer_status_size_, dl_socket_buffer_size_, main_core_id + 1 +SOCKET_RX_THREAD_NUM);
+        dl_socket_buffer_status_ptr, dl_data_ptr, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
     // std::vector<pthread_t> tx_threads = transmitter_->startTX(dl_socket_buffer_ptr, 
     //     dl_socket_buffer_status_ptr, dl_data_ptr, dl_socket_buffer_status_size_, dl_socket_buffer_size_, main_core_id + 1 +SOCKET_RX_THREAD_NUM);
 #endif
@@ -642,12 +662,38 @@ void CoMP::start()
     int ifft_count_per_thread[TASK_THREAD_NUM];
     int precode_count_per_thread[TASK_THREAD_NUM];
 
+
+    int last_dequeue = 0;
+    int cur_queue_itr = 0;
+
     signal(SIGINT, intHandler);
     while(keep_running) {
         // get a bulk of events
-        ret = complete_task_queue_.try_dequeue_bulk(ctok_complete, events_list, dequeue_bulk_size);
-        if (ret == 0)
-            ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size);
+        // ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size);
+        // if (ret == 0)
+        //     ret = complete_task_queue_.try_dequeue_bulk(ctok_complete, events_list, dequeue_bulk_size);
+        if (last_dequeue == 0) {
+            // ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size_single);
+            ret = 0;
+            for (int rx_itr = 0; rx_itr < SOCKET_RX_THREAD_NUM; rx_itr ++) {
+                
+                ret += message_queue_.try_dequeue_bulk_from_producer(*rx_ptok[rx_itr], events_list + ret, dequeue_bulk_size_single);
+            }
+            last_dequeue = 1;
+            // ret = message_queue_.try_dequeue_bulk_from_producer(*rx_ptok[cur_queue_itr], events_list, dequeue_bulk_size_single);
+            // cur_queue_itr++;
+            // if (cur_queue_itr == SOCKET_RX_THREAD_NUM) {
+            //     cur_queue_itr = 0;
+            //     last_dequeue = 1;
+            // }
+        }
+        else {   
+            ret = complete_task_queue_.try_dequeue_bulk(ctok_complete, events_list, dequeue_bulk_size_single);
+            last_dequeue = 0;
+        }
+        // if (ret == 0)
+        //     ret = complete_task_queue_.try_dequeue_bulk(ctok_complete, events_list, dequeue_bulk_size);
+            // ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size);
         total_count++;
         if(total_count == 1e9) {
             //printf("message dequeue miss rate %f\n", (float)miss_count / total_count);
@@ -685,7 +731,7 @@ void CoMP::start()
                     // printf("Main thread: data received from frame %d, subframe %d, ant %d, buffer ptr: %llx, offset %lld\n", frame_id, subframe_id, ant_id, 
                     //      socket_buffer_ptr, offset_in_current_buffer * PackageReceiver::package_length);
                     rx_counter_packets_[rx_frame_id]++;
-                    
+                    // printf("Main thread: data received from frame %d, subframe %d, ant %d\n", frame_id, subframe_id, ant_id);
 #if ENABLE_DOWNLINK
                     int rx_counter_packets_max = BS_ANT_NUM * UE_NUM;
 #else
@@ -696,18 +742,28 @@ void CoMP::start()
                         // pilot_received[rx_frame_id] = get_time();      
                         pilot_received[frame_id] = get_time();  
 #if DEBUG_PRINT_PER_FRAME_START 
-                        if (frame_id > 0)
-                            printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us\n", frame_id, subframe_id, ant_id, 
-                                pilot_received[frame_id]-pilot_received[frame_id-1]);
-                        else
+                        if (frame_id > 0) {
+                            int prev_frame_id = (frame_id > 1)? (frame_id - 1) %TASK_BUFFER_FRAME_NUM : 0;
+                            printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us, previous frame: %d\n", frame_id, subframe_id, ant_id, 
+                                pilot_received[frame_id]-pilot_received[frame_id-1], rx_counter_packets_[prev_frame_id]);
+                        }
+                        else {
                             printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us\n", frame_id, subframe_id, ant_id, 
                                 pilot_received[frame_id]);
+                        }
 #endif                       
                     }
+                    // else if (rx_counter_packets_[rx_frame_id] % BS_ANT_NUM == 0) {
+                    //     printf("Main thread: received in frame: %d, subframe: %d ant %d, in %.5f us\n", frame_id, subframe_id, ant_id,
+                    //             get_time() - pilot_received[frame_id]);
+                    // }
                     else if (rx_counter_packets_[rx_frame_id] == rx_counter_packets_max) {  
                         rx_processed[frame_id] = get_time();
 #if DEBUG_PRINT_PER_FRAME_DONE 
-                        printf("Main thread: received data for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, rx_processed[frame_id]-pilot_received[frame_id]);
+                        int prev_frame_id = (frame_id > 1)? (frame_id - 1) %TASK_BUFFER_FRAME_NUM : 0;
+                        printf("Main thread: received data for all packets in frame: %d, frame buffer: %d in %.5f us, demul: %d done, FFT: %d,%d,  received %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, 
+                                rx_processed[frame_id]-pilot_received[frame_id], demul_counter_subframes_[rx_frame_id],data_counter_subframes_[rx_frame_id], 
+                                fft_counter_ants_[data_counter_subframes_[rx_frame_id]+subframe_num_perframe*(rx_frame_id)+UE_NUM], rx_counter_packets_[prev_frame_id] );
 #endif                         
                         rx_counter_packets_[rx_frame_id] = 0;                                  
                     }  
@@ -811,13 +867,14 @@ void CoMP::start()
                     int frame_id, subframe_id;
                     interpreteOffset2d(subframe_num_perframe, offset_fft, &frame_id, &subframe_id);
                     fft_counter_ants_[offset_fft] ++;
+                    // printf("FFT done: frame %d, subframe %d, total subframes %d, ant counter %d \n", frame_id, subframe_id, offset_fft, fft_counter_ants_[offset_fft]);
 
                     // if FFT for all anetnnas in a subframe is done, schedule ZF or equalization+demodulation
                     if (fft_counter_ants_[offset_fft] == BS_ANT_NUM) {
                         fft_counter_ants_[offset_fft] = 0;
                         if (isPilot(subframe_id)) {   
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
-                            printf("Main thread: pilot FFT done for frame: %d, subframe: %d\n", frame_id,subframe_id);
+                            printf("Main thread: pilot FFT done for frame: %d, subframe: %d, csi_counter_users: %d\n", frame_id,subframe_id, csi_counter_users_[frame_id] + 1);
 #endif
                             csi_counter_users_[frame_id] ++;
                             // if csi of all UEs is ready, schedule ZF or prediction 
@@ -865,9 +922,10 @@ void CoMP::start()
                         }
                         else if (isData(subframe_id)) {
 #if DEBUG_PRINT_PER_SUBFRAME_DONE                           
-                            printf("Main thread: finished FFT for frame %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d\n", 
+                            printf("Main thread: finished FFT for frame %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d, in %.5f\n", 
                                     frame_id, subframe_id, 
-                                    precoder_exist_in_frame_[frame_id], fft_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx());
+                                    precoder_exist_in_frame_[frame_id], fft_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx(),
+                                    get_time()-pilot_received[frame_count_pilot_fft-1]);
 #endif                            
                             data_exist_in_subframe_[frame_id][getULSFIndex(subframe_id)] = true;
                             // if precoder exist, schedule demodulation
@@ -891,7 +949,7 @@ void CoMP::start()
                                             schedule_task(do_demul_task, &demul_queue_, ptok_demul);
                                         }
 #if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
-                                            printf("Main thread: created Demodulation task for frame: %d, start sc: %d, subframe: %d\n", frame_id, start_sche_id, sche_subframe_id);
+                                            printf("Main thread: created Demodulation task for frame: %d,, start sc: %d, subframe: %d\n", frame_id, start_sche_id, sche_subframe_id);
 #endif                                         
                                         // clear data status after scheduling
                                         data_exist_in_subframe_[frame_id][data_subframe_id] = false;
@@ -902,7 +960,7 @@ void CoMP::start()
                             data_counter_subframes_[frame_id] ++;
                             if (data_counter_subframes_[frame_id] == data_subframe_num_perframe) {                           
 #if DEBUG_PRINT_PER_FRAME_DONE
-                                    printf("Main thread: data frame: %d, finished FFT for all data subframes in %.5f us\n", frame_id, get_time()-pilot_received[frame_id]);
+                                    printf("Main thread: data frame: %d, %d, finished FFT for all data subframes in %.5f us\n", frame_id, frame_count_pilot_fft-1, get_time()-pilot_received[frame_count_pilot_fft-1]);
 #endif                                
                                 prev_demul_scheduled = false;
                             }     
@@ -1925,17 +1983,27 @@ void* CoMP::taskThread(void* context)
             if (!ret_zf) {
                 // ret_decode = decode_queue_->try_dequeue(event);
                 // if(!ret_decode) {
-                    ret_demul = demul_queue_->try_dequeue(event);
-                    if (!ret_demul) {   
-                        ret = fft_queue_->try_dequeue(event);
-                        if (!ret)
+                    // ret_demul = demul_queue_->try_dequeue(event);
+                    // if (!ret_demul) {   
+                    //     ret = fft_queue_->try_dequeue(event);
+                    //     if (!ret)
+                    //         continue;
+                    //     else 
+                    //         obj_ptr->doFFT(tid, event.data);
+                    // }
+                    // else {
+                    //     obj_ptr->doDemul(tid, event.data);
+                    // }
+                    ret = fft_queue_->try_dequeue(event);
+                    if (!ret) {   
+                        ret_demul = demul_queue_->try_dequeue(event);
+                        if (!ret_demul)
                             continue;
                         else 
-                            obj_ptr->doFFT(tid, event.data);
+                            obj_ptr->doDemul(tid, event.data);
                     }
                     else {
-                        // TODO: add precoder status check
-                        obj_ptr->doDemul(tid, event.data);
+                        obj_ptr->doFFT(tid, event.data);
                     }
                 // }
                 // else {
@@ -2599,7 +2667,8 @@ void CoMP::doFFT(int tid, int offset)
     
     
 
-    if ( !complete_task_queue_.enqueue(*task_ptok[tid], fft_finish_event ) ) {
+    // if ( !complete_task_queue_.enqueue(*task_ptok[tid], fft_finish_event ) ) {
+    if ( !complete_task_queue_.enqueue(fft_finish_event ) ) {
         printf("fft message enqueue failed\n");
         exit(0);
     }
