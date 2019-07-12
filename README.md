@@ -1,4 +1,4 @@
-# CoMP
+# Millipede
 
 ## Instruction:
 
@@ -36,21 +36,21 @@ Install aff3ct:
 	cmake .. -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-funroll-loops -march=native" -DAFF3CT_COMPILE_EXE="OFF" -DAFF3CT_COMPILE_STATIC_LIB="ON" -DAFF3CT_COMPILE_SHARED_LIB="ON"
 	make -j4
 	
-Go back to the CoMP repository
+Go back to the Millipede repository
 
 	mkdir cmake && mkdir cmake/Modules
 	cp ../../my_project_with_aff3ct/lib/aff3ct/build/lib/cmake/aff3ct-*/* cmake/Modules
 
-Compile CoMP:
+Compile Millipede:
 
-	cd CoMP
+	cd millipede
 	mkdir build
 	cd build
 	cmake ..
 	make -j36 (36 is the number of cores, on the server it can be 36)
 
 2. Run
-* In one terminal, run "./CoMP" to start the receiver
+* In one terminal, run "./millipede" to start the receiver
 * In another terminal, run "./sender 2 2 1 20" to start the sender, the four arguments are: # of sockets, # of threads (should be same as # of sockets), offset of CPU core index (change the value according to which socket the NIC is installed), and delay between symbols
 
 3. Other information
