@@ -1,7 +1,7 @@
 #include "CoMP.hpp"
 
 using namespace arma;
-using namespace aff3ct;
+// using namespace aff3ct;
 typedef cx_float COMPLEX;
 
 
@@ -27,7 +27,7 @@ CoMP::CoMP()
     // read pilots from file
     // pilots_.resize(OFDM_CA_NUM);
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    FILE* fp = fopen("../pilot_f_2048.bin","rb");
+    FILE* fp = fopen("../data/pilot_f_2048.bin","rb");
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
 
@@ -50,55 +50,51 @@ CoMP::CoMP()
 
     
 
-    std::string filename = "/home/argos/Jian/my_project_with_aff3ct/lib/aff3ct/conf/dec/LDPC/CCSDS_64_128.alist";
-
-
-    
+    // std::string filename = "/home/argos/Jian/my_project_with_aff3ct/lib/aff3ct/conf/dec/LDPC/CCSDS_64_128.alist";
     // aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
-
     // H = aff3ct::tools::LDPC_matrix_handler::read(filename, &info_bits_pos);
 
     
     
-    tools::Sigma<float> noise;
-    float ebn0 = 10.0f;
-    // const int K = ORIG_CODE_LEN * NUM_BITS;
-    // const int N = CODED_LEN * NUM_BITS;
-    const float R = (float)K / (float)N;
-    const auto esn0  = tools::ebn0_to_esn0 (ebn0, R);
-    const auto sigma = tools::esn0_to_sigma(esn0   );
+    // tools::Sigma<float> noise;
+    // float ebn0 = 10.0f;
+    // // const int K = ORIG_CODE_LEN * NUM_BITS;
+    // // const int N = CODED_LEN * NUM_BITS;
+    // const float R = (float)K / (float)N;
+    // const auto esn0  = tools::ebn0_to_esn0 (ebn0, R);
+    // const auto sigma = tools::esn0_to_sigma(esn0   );
     
 
     // const auto up_rule = tools::Update_rule_NMS_simd <float>(0.75);
 
-    noise.set_noise(sigma, ebn0, esn0);
+    // noise.set_noise(sigma, ebn0, esn0);
     
-    // up_rules.reserve(TASK_THREAD_NUM);
-    Encoders.reserve(TASK_THREAD_NUM);
-    // Decoders.reserve(TASK_THREAD_NUM);
-    Modems.reserve(TASK_THREAD_NUM);
+    // // up_rules.reserve(TASK_THREAD_NUM);
+    // Encoders.reserve(TASK_THREAD_NUM);
+    // // Decoders.reserve(TASK_THREAD_NUM);
+    // Modems.reserve(TASK_THREAD_NUM);
 
-    // std::unique_ptr<tools::Constellation<float>> cstl(new tools::Constellation_QAM <float>(NUM_BITS));
-    for (int i = 0; i < TASK_THREAD_NUM; i++) {
-        H[i] = aff3ct::tools::LDPC_matrix_handler::read(filename, &info_bits_pos[i]);
-        if (info_bits_pos[i].empty()) {
-            // generate a default vector [0, 1, 2, 3, ..., K-1]
-            info_bits_pos[i].resize(ORIG_CODE_LEN * NUM_BITS);
-            std::iota(info_bits_pos[i].begin(), info_bits_pos[i].end(), 0);
-        }
-        // up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
-    }
+    // // std::unique_ptr<tools::Constellation<float>> cstl(new tools::Constellation_QAM <float>(NUM_BITS));
+    // for (int i = 0; i < TASK_THREAD_NUM; i++) {
+    //     H[i] = aff3ct::tools::LDPC_matrix_handler::read(filename, &info_bits_pos[i]);
+    //     if (info_bits_pos[i].empty()) {
+    //         // generate a default vector [0, 1, 2, 3, ..., K-1]
+    //         info_bits_pos[i].resize(ORIG_CODE_LEN * NUM_BITS);
+    //         std::iota(info_bits_pos[i].begin(), info_bits_pos[i].end(), 0);
+    //     }
+    //     // up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
+    // }
 
-    const auto &msg_chk_to_var_id = H[0].get_col_to_rows();
-    const auto &msg_var_to_chk_id = H[0].get_row_to_cols();
-    for (int i = 0; i < TASK_THREAD_NUM; i++) {
-        Encoders.push_back(new module::Encoder_LDPC_from_QC<>(K, N, H[i]));
-        // Decoders.push_back(new module::Decoder_LDPC_BP_flooding_inter<>(K, N, N_ITE, H[i], info_bits_pos[i],up_rules[i]));
-        // Decoders[i].reset(new module::Decoder_LDPC_BP_flooding_inter<>(K, N, N_ITE, H[i], info_bits_pos[i],up_rules[i]));
-        std::unique_ptr<tools::Constellation<float>> cstl(new tools::Constellation_QAM <float>(NUM_BITS));
-        Modems.push_back(new module::Modem_generic<>(N, std::move(cstl)));
-        Modems[i]->set_noise(noise);
-    }    
+    // const auto &msg_chk_to_var_id = H[0].get_col_to_rows();
+    // const auto &msg_var_to_chk_id = H[0].get_row_to_cols();
+    // for (int i = 0; i < TASK_THREAD_NUM; i++) {
+    //     Encoders.push_back(new module::Encoder_LDPC_from_QC<>(K, N, H[i]));
+    //     // Decoders.push_back(new module::Decoder_LDPC_BP_flooding_inter<>(K, N, N_ITE, H[i], info_bits_pos[i],up_rules[i]));
+    //     // Decoders[i].reset(new module::Decoder_LDPC_BP_flooding_inter<>(K, N, N_ITE, H[i], info_bits_pos[i],up_rules[i]));
+    //     std::unique_ptr<tools::Constellation<float>> cstl(new tools::Constellation_QAM <float>(NUM_BITS));
+    //     Modems.push_back(new module::Modem_generic<>(N, std::move(cstl)));
+    //     Modems[i]->set_noise(noise);
+    // }    
 
 
 
@@ -339,7 +335,7 @@ CoMP::CoMP()
         dl_IQ_data_long[i] = new long long[PackageReceiver::OFDM_FRAME_LEN];
     }
     // read data from file
-    std::string filename1 = "../orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename1 = "../data/orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     fp = fopen(filename1.c_str(),"rb");
     if (fp==NULL) {
         printf("open file faild");
@@ -469,13 +465,13 @@ CoMP::~CoMP()
     delete[] dl_IQ_data_long;
 
    
-    for (auto it = Encoders.begin(); it != Encoders.end(); ++it) {
-        delete *it;
-    }
+    // for (auto it = Encoders.begin(); it != Encoders.end(); ++it) {
+    //     delete *it;
+    // }
 
-    for (auto it = Modems.begin(); it != Modems.end(); ++it) {
-        delete *it;
-    }
+    // for (auto it = Modems.begin(); it != Modems.end(); ++it) {
+    //     delete *it;
+    // }
 
 }
 
@@ -957,7 +953,9 @@ void CoMP::start()
                                     prev_demul_scheduled = true;
                                 }
                                 // printf("Main thread: schedule Demodulation task for frame: %d, start subframe: %d, end subframe: %d\n", frame_id, start_sche_id, data_counter_subframes_[frame_id] + UE_NUM);
-                                int end_sche_id = max(UE_NUM + data_counter_subframes_[frame_id], subframe_id);
+                                int end_sche_id = UE_NUM + data_counter_subframes_[frame_id];
+                                if (end_sche_id < subframe_id)
+                                    end_sche_id = subframe_id;
                                 for (int sche_subframe_id = start_sche_id; sche_subframe_id <= end_sche_id; sche_subframe_id++) {
                                     int data_subframe_id = getULSFIndex(sche_subframe_id);
                                     if (data_exist_in_subframe_[frame_id][data_subframe_id]) {
@@ -1965,8 +1963,8 @@ void* CoMP::taskThread(void* context)
 #endif
 
     obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
-    obj_ptr->Decoders[tid].reset(new module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>(obj_ptr->K, obj_ptr->N, N_ITE, obj_ptr->H[tid], 
-                obj_ptr->info_bits_pos[tid],0.825f,0,0,1,UE_NUM));
+    // obj_ptr->Decoders[tid].reset(new module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>(obj_ptr->K, obj_ptr->N, N_ITE, obj_ptr->H[tid], 
+    //             obj_ptr->info_bits_pos[tid],0.825f,0,0,1,UE_NUM));
 
     int total_count = 0;
     int miss_count = 0;
@@ -3168,71 +3166,71 @@ void CoMP::doDemul(int tid, int offset)
 
 
 
-#if ENABLE_DECODE
-    __m256i index_out = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
+// #if ENABLE_DECODE
+//     __m256i index_out = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
 
-    #if COMBINE_EQUAL_DECODE
-        if (sc_id < MAX_CODED_SC) {
-            // int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
-            float *temp_ptr = (float *)&equaled_buffer_temp[tid][0];
-            // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
-            // cout<< "Equalized data: ";
-            // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
-            //     cout<<*(temp_ptr+sc_idx)<<"  ";
-            // }
-            // cout<<endl;
+//     #if COMBINE_EQUAL_DECODE
+//         if (sc_id < MAX_CODED_SC) {
+//             // int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
+//             float *temp_ptr = (float *)&equaled_buffer_temp[tid][0];
+//             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+//             // cout<< "Equalized data: ";
+//             // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
+//             //     cout<<*(temp_ptr+sc_idx)<<"  ";
+//             // }
+//             // cout<<endl;
             
-            for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-                float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
-                for (int j = 0; j < max_sc_ite / 4; j++) {
-                    float *tar_ptr = (float *)(&equaled_buffer_T_temp[tid][j * 4 + ue_idx * max_sc_ite]);
-                    __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
-                    _mm256_store_ps(tar_ptr, equaled_data);
-                }
+//             for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+//                 float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
+//                 for (int j = 0; j < max_sc_ite / 4; j++) {
+//                     float *tar_ptr = (float *)(&equaled_buffer_T_temp[tid][j * 4 + ue_idx * max_sc_ite]);
+//                     __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
+//                     _mm256_store_ps(tar_ptr, equaled_data);
+//                 }
                 
-            }
-            // float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][ue_idx * max_sc_ite]);
-            float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][0]);
-            float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
-            demod_16qam_soft(equal_t_ptr, demul_ptr, max_sc_ite * UE_NUM );
-            int block_id = sc_id / demul_block_size;
-            // int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + ue_idx * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
-            int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS * UE_NUM];
-            Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
-            // if (tid == 10) {
-            //     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
-            //     // cout<< "Equalized data: ";
-            //     // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
-            //     //     cout<<*(equal_t_ptr+sc_idx)<<"  ";
-            //     // }
-            //     // cout<<endl;
-            //     // cout<< "Demodulated data: ";
-            //     // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
-            //     //     cout<<*(demul_ptr+sc_idx)<<"  ";
-            //     // }
-            //     // cout<<endl;
-            //     cout<< "Decoded data after decode: ";
-            //     for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
-            //         cout<<*(decoded_buf_ptr+sc_idx)<<"  ";
-            //     }
-            //     cout<<endl;
-            // }
-        }
-    #else          
-        if (sc_id < MAX_CODED_SC) {
-            int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
-            for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-                float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
-                float *tar_ptr =  (float *)&equal_buffer_.data[total_data_subframe_id][sc_id + ue_idx * OFDM_DATA_NUM];
-                for (int j = 0; j < max_sc_ite / 4; j++) {
-                    __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
-                    _mm256_stream_ps(tar_ptr + j * 8, equaled_data);
+//             }
+//             // float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][ue_idx * max_sc_ite]);
+//             float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][0]);
+//             float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
+//             demod_16qam_soft(equal_t_ptr, demul_ptr, max_sc_ite * UE_NUM );
+//             int block_id = sc_id / demul_block_size;
+//             // int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + ue_idx * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
+//             int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS * UE_NUM];
+//             Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
+//             // if (tid == 10) {
+//             //     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+//             //     // cout<< "Equalized data: ";
+//             //     // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
+//             //     //     cout<<*(equal_t_ptr+sc_idx)<<"  ";
+//             //     // }
+//             //     // cout<<endl;
+//             //     // cout<< "Demodulated data: ";
+//             //     // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
+//             //     //     cout<<*(demul_ptr+sc_idx)<<"  ";
+//             //     // }
+//             //     // cout<<endl;
+//             //     cout<< "Decoded data after decode: ";
+//             //     for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
+//             //         cout<<*(decoded_buf_ptr+sc_idx)<<"  ";
+//             //     }
+//             //     cout<<endl;
+//             // }
+//         }
+//     #else          
+//         if (sc_id < MAX_CODED_SC) {
+//             int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
+//             for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+//                 float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
+//                 float *tar_ptr =  (float *)&equal_buffer_.data[total_data_subframe_id][sc_id + ue_idx * OFDM_DATA_NUM];
+//                 for (int j = 0; j < max_sc_ite / 4; j++) {
+//                     __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
+//                     _mm256_stream_ps(tar_ptr + j * 8, equaled_data);
 
-                }
-            }
-        }
-    #endif
-#endif
+//                 }
+//             }
+//         }
+//     #endif
+// #endif
 
 
     // inform main thread
@@ -3340,52 +3338,52 @@ void CoMP::doDemulSingleSC(int tid, int offset)
 }
 
 
-void CoMP::doDecode(int tid, int offset) 
-{
-    int frame_id, total_data_subframe_id, current_data_subframe_id, user_offset;
-    interpreteOffset3d(OFDM_DATA_NUM * UE_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &user_offset);
-    int user_id = user_offset % CODED_LEN;
-    int block_id = user_offset / CODED_LEN;
-#if DEBUG_PRINT_IN_TASK
-    printf("In doDecode thread %d: frame: %d, subframe: %d, block: %d, user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
-#endif
-    float *equal_ptr = (float *)(&equal_buffer_.data[total_data_subframe_id][block_id * CODED_LEN + user_id * OFDM_DATA_NUM]);
-    float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
-    // Soft decision
-    // Modems[tid]->demodulate(equal_ptr, demul_ptr);
-    demod_16qam_soft(equal_ptr, demul_ptr, CODED_LEN * 2);
+// void CoMP::doDecode(int tid, int offset) 
+// {
+//     int frame_id, total_data_subframe_id, current_data_subframe_id, user_offset;
+//     interpreteOffset3d(OFDM_DATA_NUM * UE_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &user_offset);
+//     int user_id = user_offset % CODED_LEN;
+//     int block_id = user_offset / CODED_LEN;
+// #if DEBUG_PRINT_IN_TASK
+//     printf("In doDecode thread %d: frame: %d, subframe: %d, block: %d, user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
+// #endif
+//     float *equal_ptr = (float *)(&equal_buffer_.data[total_data_subframe_id][block_id * CODED_LEN + user_id * OFDM_DATA_NUM]);
+//     float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
+//     // Soft decision
+//     // Modems[tid]->demodulate(equal_ptr, demul_ptr);
+//     demod_16qam_soft(equal_ptr, demul_ptr, CODED_LEN * 2);
 
-    // printf("In doDecode thread %d: frame: %d, subframe: %d, code block: %d user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
-
-
-    // cout<< "Demodulated data: ";
-    // for (int sc_idx = 0; sc_idx < CODED_LEN*NUM_BITS; sc_idx++) {
-    //     cout<<*(demul_ptr+sc_idx)<<"  ";
-    // }
-    // cout<<endl;
-
-    int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + user_id * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
-
-    Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
-
-    // cout<< "Decoded data after decode: ";
-    // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS; sc_idx++) {
-    //     cout<<*(decoded_buf_ptr+sc_idx)<<"  ";
-    // }
-    // cout<<endl;
+//     // printf("In doDecode thread %d: frame: %d, subframe: %d, code block: %d user: %d\n", tid, frame_id, current_data_subframe_id,block_id, user_id);
 
 
-    Event_data decode_finish_event;
-    decode_finish_event.event_type = EVENT_DECODE;
-    decode_finish_event.data = offset;
+//     // cout<< "Demodulated data: ";
+//     // for (int sc_idx = 0; sc_idx < CODED_LEN*NUM_BITS; sc_idx++) {
+//     //     cout<<*(demul_ptr+sc_idx)<<"  ";
+//     // }
+//     // cout<<endl;
 
-    if ( !complete_task_queue_.enqueue(*task_ptok[tid], decode_finish_event ) ) {
-        printf("Demuliplexing message enqueue failed\n");
-        exit(0);
-    }  
+//     int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + user_id * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
+
+//     Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
+
+//     // cout<< "Decoded data after decode: ";
+//     // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS; sc_idx++) {
+//     //     cout<<*(decoded_buf_ptr+sc_idx)<<"  ";
+//     // }
+//     // cout<<endl;
 
 
-}
+//     Event_data decode_finish_event;
+//     decode_finish_event.event_type = EVENT_DECODE;
+//     decode_finish_event.data = offset;
+
+//     if ( !complete_task_queue_.enqueue(*task_ptok[tid], decode_finish_event ) ) {
+//         printf("Demuliplexing message enqueue failed\n");
+//         exit(0);
+//     }  
+
+
+// }
 
 /*****************************************************
  * Downlink tasks
