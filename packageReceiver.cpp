@@ -195,12 +195,13 @@ PackageReceiver::PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, int in_co
 
 PackageReceiver::PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset, 
         moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
-        moodycamel::ProducerToken **in_rx_ptoks):
+        moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks):
 PackageReceiver(RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
     rx_ptoks_ = in_rx_ptoks;
+    tx_ptoks_ = in_tx_ptoks;
 
 }
 
@@ -334,39 +335,41 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 #endif
 
     std::vector<pthread_t> created_threads;
-#if USE_DPDK
-    unsigned int nb_lcores = rte_lcore_count();
-    printf("Number of DPDK cores: %d\n", nb_lcores);
-    unsigned int lcore_id;
-    int worker_id = 0;
-    // Launch specific task to cores
-    RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-    // launch communication and task thread onto specific core
-        if (worker_id < rx_thread_num_) {
-            rx_context[worker_id].ptr = this;
-            rx_context[worker_id].tid = worker_id;
-            rte_eal_remote_launch((lcore_function_t *)loopRecv,
-                                &rx_context[worker_id], lcore_id);
-            printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
-        } 
-        worker_id++;
-    }
-#else   
-    
-    for(int i = 0; i < rx_thread_num_; i++)
-    {
-        pthread_t recv_thread_;
-        // record the thread id 
-        rx_context[i].ptr = this;
-        rx_context[i].tid = i;
-        // start socket thread
-        if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv, (void *)(&rx_context[i])) != 0)
-        {
-            perror("socket recv thread create failed");
-            exit(0);
+#if !ENABLE_DOWNLINK
+    #if USE_DPDK
+        unsigned int nb_lcores = rte_lcore_count();
+        printf("Number of DPDK cores: %d\n", nb_lcores);
+        unsigned int lcore_id;
+        int worker_id = 0;
+        // Launch specific task to cores
+        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+        // launch communication and task thread onto specific core
+            if (worker_id < rx_thread_num_) {
+                rx_context[worker_id].ptr = this;
+                rx_context[worker_id].tid = worker_id;
+                rte_eal_remote_launch((lcore_function_t *)loopRecv_DPDK,
+                                    &rx_context[worker_id], lcore_id);
+                printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
+            } 
+            worker_id++;
         }
-        created_threads.push_back(recv_thread_);
-    }
+    #else   
+        
+        for(int i = 0; i < rx_thread_num_; i++)
+        {
+            pthread_t recv_thread_;
+            // record the thread id 
+            rx_context[i].ptr = this;
+            rx_context[i].tid = i;
+            // start socket thread
+            if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv, (void *)(&rx_context[i])) != 0)
+            {
+                perror("socket recv thread create failed");
+                exit(0);
+            }
+            created_threads.push_back(recv_thread_);
+        }
+    #endif
 #endif
     
     return created_threads;
@@ -410,16 +413,30 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     }
 #else
     
+    // for (int i = 0; i < tx_thread_num_; i++) {
+    //     pthread_t send_thread_;
+        
+    //     tx_context[i].ptr = this;
+    //     tx_context[i].tid = i;
+
+    //     if (pthread_create( &send_thread_, NULL, PackageReceiver::loopSend, (void *)(&tx_context[i])) != 0) {
+    //         perror("socket Transmit thread create failed");
+    //         exit(0);
+    //     }
+
+    //     created_threads.push_back(send_thread_);
+    // }
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
         
         tx_context[i].ptr = this;
         tx_context[i].tid = i;
 
-        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopSend, (void *)(&tx_context[i])) != 0) {
+        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopTXRX, (void *)(&tx_context[i])) != 0) {
             perror("socket Transmit thread create failed");
             exit(0);
         }
+        
         created_threads.push_back(send_thread_);
     }
 #endif
@@ -518,69 +535,62 @@ void* PackageReceiver::loopRecv(void *in_context)
     int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 
-#if !USE_DPDK
-    #ifdef ENABLE_CPU_ATTACH 
-        if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
-            printf("RX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
-            exit(0);
-        }
-        else {
-            printf("RX thread: attached thread %d to core %d\n", tid, core_id + tid + 1);
-        }
-    #endif
+
+#ifdef ENABLE_CPU_ATTACH 
+    if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
+        printf("RX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
+        exit(0);
+    }
+    else {
+        printf("RX thread: attached thread %d to core %d\n", tid, core_id + tid + 1);
+    }
+#endif
 
 
 
-    #if USE_IPV4
-        struct sockaddr_in servaddr_local;
-        int socket_local, socket_tcp_local;
-        servaddr_local.sin_family = AF_INET;
-        servaddr_local.sin_port = htons(8000+tid);
-        servaddr_local.sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-        memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
+#if USE_IPV4
+    struct sockaddr_in servaddr_local;
+    int socket_local;
+    servaddr_local.sin_family = AF_INET;
+    servaddr_local.sin_port = htons(8000+tid);
+    servaddr_local.sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
 
-        if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-            printf("RX thread %d cannot create IPV4 socket\n", tid);
-            exit(0);
-        }
-        else{
-            printf("RX thread %d created IPV4 socket\n", tid);
-        }
+    if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
+        printf("RX thread %d cannot create IPV4 socket\n", tid);
+        exit(0);
+    }
+    else{
+        printf("RX thread %d created IPV4 socket\n", tid);
+    }
 
-
-        if ((socket_tcp_local = socket(AF_INET, SOCK_STREAM, 0)) < 0) { // UDP socket
-            printf("RX thread %d cannot create IPV4 TCP socket\n", tid);
-            exit(0);
-        }
-        else{
-            printf("RX thread %d created IPV4 socket\n", tid);
-        }
-    #else
-        struct sockaddr_in6 servaddr_local;
-        int socket_local;
-        servaddr_local.sin6_family = AF_INET6;
-        servaddr_local.sin6_addr = in6addr_any;
-        servaddr_local.sin6_port = htons(8000+tid);
-        
-        if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-            printf("RX thread %d cannot create IPV6 socket\n", tid);
-            exit(0);
-        }
-        else{
-            printf("RX thread %d Created IPV46 socket\n", tid);
-        }
-    #endif
+#else
+    struct sockaddr_in6 servaddr_local;
+    int socket_local;
+    servaddr_local.sin6_family = AF_INET6;
+    servaddr_local.sin6_addr = in6addr_any;
+    servaddr_local.sin6_port = htons(8000+tid);
+    
+    if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+        printf("RX thread %d cannot create IPV6 socket\n", tid);
+        exit(0);
+    }
+    else{
+        printf("RX thread %d Created IPV46 socket\n", tid);
+    }
+#endif
 
     // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
     int optval = 1;
 
     setsockopt(socket_local, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+    // fcntl(socket_local, F_SETFL, O_NONBLOCK);
     socklen_t optlen;
     int sock_buf_size;
     optlen = sizeof(sock_buf_size);
     // int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
     // printf("Current socket %d buffer size %d\n", tid, sock_buf_size);
-    sock_buf_size = 1024*1024*64*15-1;
+    sock_buf_size = 1024*1024*64*8-1;
     if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, sizeof(sock_buf_size))<0) {
         printf("Error setting buffer size to %d\n", sock_buf_size);
     }
@@ -594,30 +604,7 @@ void* PackageReceiver::loopRecv(void *in_context)
         exit(0);
     }
 
-    if(bind(socket_tcp_local, (struct sockaddr *) &servaddr_local, sizeof(servaddr_local)) != 0) {
-        printf("TCP socket bind failed %d\n", tid);
-        exit(0);
-    }
 
-    if (listen(socket_tcp_local, 3) < 0) 
-    { 
-        perror("listen"); 
-        exit(EXIT_FAILURE); 
-    } 
-
-#else
-        uint16_t nic;
-        struct rte_mbuf *bufs[BURST_SIZE * 2] __attribute__( ( aligned (64) ) );
-        struct udp_hdr    *udp_h;
-        struct ipv4_hdr   *ip_h;
-        uint16_t dst_port = rte_cpu_to_be_16((obj_ptr->dst_port_start + tid));
-        uint16_t src_port = rte_cpu_to_be_16((obj_ptr->src_port_start + tid));
-
-        uint16_t mtu_size;
-        rte_eth_dev_get_mtu(0, &mtu_size);
-        printf("MTU: %d\n", mtu_size);
-
-#endif
 
 
     // use token to speed up
@@ -657,7 +644,6 @@ void* PackageReceiver::loopRecv(void *in_context)
 
 
     while(true) {
-#if !USE_DPDK
         // if buffer is full, exit
         if (cur_ptr_buffer_status[0] == 1) {
             printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
@@ -674,11 +660,7 @@ void* PackageReceiver::loopRecv(void *in_context)
         // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
-        }
-
-
-        
-        
+        } 
 
     #if MEASURE_TIME
         // read information from received packet
@@ -713,33 +695,75 @@ void* PackageReceiver::loopRecv(void *in_context)
             exit(0);
         }
 
-        
-        // for (int i = 0; i < (package_length/64); i++)
-        //     _mm_prefetch((char*)cur_ptr_buffer + 64 * i, _MM_HINT_NTA);
+    }
 
-        
-        package_num++;
-    // #if DEBUG_PRINT_PER_FRAME_DONE
-    //     package_num_per_frame++;
-    //     if (package_num_per_frame == BS_ANT_NUM * max_subframe_id/obj_ptr->rx_thread_num_) {
-    //         printf("RX thread %d receive all packets in frame %d\n", tid, frame_id);
-    //         package_num_per_frame = 0;
-    //     }
-    // #endif
-        
-        // print some information
-        if (package_num == BS_ANT_NUM * max_subframe_id * 1000) {
-            auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 1000;
-            std::chrono::duration<double> diff = end - begin;
-            // print network throughput & maximum message queue length during this period
-            printf("RX thread %d receive 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), 
-                byte_len / diff.count() / 1024 / 1024);
-            begin = std::chrono::system_clock::now();
-            package_num = 0;
-        } 
+}
 
-#else
+
+
+
+void* PackageReceiver::loopRecv_DPDK(void *in_context)
+{
+    // get the pointer of class & tid
+    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
+    int tid = ((PackageReceiverContext *)in_context)->tid;
+    printf("package receiver thread %d start\n", tid);
+    // get pointer of message queue
+    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
+    int core_id = obj_ptr->core_id_;
+    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
+
+
+    uint16_t nic;
+    struct rte_mbuf *bufs[BURST_SIZE * 2] __attribute__( ( aligned (64) ) );
+    struct udp_hdr    *udp_h;
+    struct ipv4_hdr   *ip_h;
+    uint16_t dst_port = rte_cpu_to_be_16((obj_ptr->dst_port_start + tid));
+    uint16_t src_port = rte_cpu_to_be_16((obj_ptr->src_port_start + tid));
+
+    uint16_t mtu_size;
+    rte_eth_dev_get_mtu(0, &mtu_size);
+    printf("MTU: %d\n", mtu_size);
+
+
+
+    // use token to speed up
+    // moodycamel::ProducerToken local_ptok(*message_queue_);
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+
+
+    char* buffer = obj_ptr->buffer_[tid];
+    int* buffer_status = obj_ptr->buffer_status_[tid];
+    long long buffer_length = obj_ptr->buffer_length_;
+    int buffer_frame_num = obj_ptr->buffer_frame_num_;
+    double *frame_start = obj_ptr->frame_start_[tid];
+
+    // walk through all the pages
+    double temp;
+    for (int i = 0; i < 20; i++) {
+        temp = frame_start[i * 512];
+    }
+
+
+    char* cur_ptr_buffer = buffer;
+    int* cur_ptr_buffer_status = buffer_status;
+    // loop recv
+    // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
+    int offset = 0;
+    int package_num = 0;
+    auto begin = std::chrono::system_clock::now();
+
+    int ret = 0;
+    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    int prev_frame_id = -1;
+    int package_num_per_frame = 0;
+    double start_time= get_time();
+
+
+    // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
+
+
+    while(true) {
 
         uint16_t nb_rx = rte_eth_rx_burst(0, tid, bufs, BURST_SIZE);
         // printf("Thread %d receives %d packets\n", tid, nb_rx);
@@ -860,15 +884,9 @@ void* PackageReceiver::loopRecv(void *in_context)
                     byte_len / diff.count() / 1024 / 1024);
                 begin = std::chrono::system_clock::now();
                 package_num = 0;
-            } 
-            
+            }    
         }
-#endif
-
-
     }
-
-
 }
 
 
@@ -906,7 +924,7 @@ void* PackageReceiver::loopSend(void *in_context)
     int socket_local;
     servaddr_local.sin_family = AF_INET;
     servaddr_local.sin_port = htons(6000+tid);
-    servaddr_local.sin_addr.s_addr = inet_addr("10.0.0.2");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    servaddr_local.sin_addr.s_addr = inet_addr("10.0.0.4");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
 
     cliaddr_local.sin_family = AF_INET;
@@ -952,15 +970,15 @@ void* PackageReceiver::loopSend(void *in_context)
 
 
     // downlink socket buffer
-    char *buffer = obj_ptr->tx_buffer_;
+    char *dl_buffer = obj_ptr->tx_buffer_;
     // downlink socket buffer status
-    int *buffer_status = obj_ptr->tx_buffer_status_;
+    // int *dl_buffer_status = obj_ptr->tx_buffer_status_;
     // downlink data buffer
-    float *data_buffer = obj_ptr->tx_data_buffer_;
+    // float *dl_data_buffer = obj_ptr->tx_data_buffer_;
     // buffer_length: package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    int buffer_length = obj_ptr->tx_buffer_length_;
+    // int dl_buffer_length = obj_ptr->tx_buffer_length_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    int buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
+    int dl_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
 
 
 
@@ -969,7 +987,7 @@ void* PackageReceiver::loopSend(void *in_context)
     int ret;
     int offset;
     char *cur_ptr_buffer;
-    int *cur_ptr_buffer_status;
+    // int *cur_ptr_buffer_status;
     float *cur_ptr_data;
     int ant_id, frame_id, subframe_id, total_data_subframe_id, current_data_subframe_id;
     int cell_id = 0;
@@ -977,12 +995,14 @@ void* PackageReceiver::loopSend(void *in_context)
     int maxTaskQLen = 0;
 
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(*message_queue_);
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+    // moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ConsumerToken local_ctok(*task_queue_);
     while(true) {
     
         Event_data task_event;
-        ret = task_queue_->try_dequeue(task_event); 
+        // ret = task_queue_->try_dequeue(task_event); 
+        ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->tx_ptoks_[tid]),task_event); 
         if(!ret)
             continue;
         // printf("tx queue length: %d\n", task_queue_->size_approx());
@@ -1002,8 +1022,8 @@ void* PackageReceiver::loopSend(void *in_context)
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-        cur_ptr_buffer = buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
-        cur_ptr_data = (data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
+        cur_ptr_buffer = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
+        // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
         *((int *)cur_ptr_buffer) = frame_id;
         *((int *)cur_ptr_buffer + 1) = subframe_id;
         *((int *)cur_ptr_buffer + 2) = cell_id;
@@ -1016,14 +1036,15 @@ void* PackageReceiver::loopSend(void *in_context)
         }
 
 #if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d\n", tid, frame_id, subframe_id, ant_id, offset);
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, subframe_id, ant_id, offset,
+            message_queue_->size_approx());
 #endif
         
         Event_data package_message;
         package_message.event_type = EVENT_PACKAGE_SENT;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         package_message.data = offset;
-        if ( !message_queue_->enqueue(local_ptok, package_message ) ) {
+        if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -1033,21 +1054,331 @@ void* PackageReceiver::loopSend(void *in_context)
         //     usleep(71);
         // }
 
-        if(package_count == BS_ANT_NUM * dl_data_subframe_num_perframe * 1000)
-        {
-            auto end = std::chrono::system_clock::now();
-            double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * data_subframe_num_perframe * 1000;
-            std::chrono::duration<double> diff = end - begin;
-            // printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
-            printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024);
-            begin = std::chrono::system_clock::now();
-            package_count = 0;
-        }
+        // if(package_count == BS_ANT_NUM * dl_data_subframe_num_perframe * 1000)
+        // {
+        //     auto end = std::chrono::system_clock::now();
+        //     double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * data_subframe_num_perframe * 1000;
+        //     std::chrono::duration<double> diff = end - begin;
+        //     // printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
+        //     printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024);
+        //     begin = std::chrono::system_clock::now();
+        //     package_count = 0;
+        // }
     }
     
 }
 
 
+
+
+
+void* PackageReceiver::loopTXRX(void *in_context)
+{
+    // get the pointer of class & tid
+    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
+    int tid = ((PackageReceiverContext *)in_context)->tid;
+    printf("package TXRX thread %d start\n", tid);
+    int core_id = obj_ptr->core_id_;
+    int rx_thread_num = obj_ptr->rx_thread_num_;
+    int tx_thread_num = obj_ptr->tx_thread_num_;
+
+#ifdef ENABLE_CPU_ATTACH 
+    if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
+        printf("TXRX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
+        exit(0);
+    }
+    else {
+        printf("TXRX thread: attached thread %d to core %d\n", tid, core_id + tid + 1);
+    }
+#endif
+
+
+
+#if USE_IPV4
+    struct sockaddr_in local_addr;
+    struct sockaddr_in remote_addr;
+    
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_port = htons(8000+tid);
+    local_addr.sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    memset(local_addr.sin_zero, 0, sizeof(local_addr.sin_zero)); 
+
+    remote_addr.sin_family = AF_INET;
+    remote_addr.sin_port = htons(6000+tid);
+    remote_addr.sin_addr.s_addr = inet_addr("10.0.0.4");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero)); 
+
+    int socket_local;
+    if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
+        printf("TXRX thread %d cannot create IPV4 socket\n", tid);
+        exit(0);
+    }
+    else{
+        printf("TXRX thread %d created IPV4 socket\n", tid);
+    }
+#else
+    struct sockaddr_in6 local_addr;
+    struct sockaddr_in6 remote_addr;
+    local_addr.sin6_family = AF_INET6;
+    local_addr.sin6_addr = in6addr_any;
+    local_addr.sin6_port = htons(8000+tid);
+
+    remote_addr.sin6_family = AF_INET6;
+    remote_addr.sin6_port = htons(6000+tid);
+    inet_pton(AF_INET6, "fe80::5a9b:5a2f:c20a:d4d5", &remote_addr.sin6_addr);
+
+    int socket_local;
+    if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
+        printf("TXRX thread %d cannot create IPV6 socket\n", tid);
+        exit(0);
+    }
+    else{
+        printf("TXRX thread %d Created IPV46 socket\n", tid);
+    }
+#endif
+
+    // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
+    int optval = 1;
+    setsockopt(socket_local, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+    socklen_t optlen;
+    int sock_buf_size;
+    optlen = sizeof(sock_buf_size);
+
+    sock_buf_size = 1024*1024*64*8-1;
+    if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, sizeof(sock_buf_size))<0) {
+        printf("Error setting buffer size to %d\n", sock_buf_size);
+    }
+    else {     
+        int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
+        printf("Set socket %d buffer size to %d\n", tid, sock_buf_size);
+    }
+
+    if(bind(socket_local, (struct sockaddr *) &local_addr, sizeof(local_addr)) != 0) {
+        printf("socket bind failed %d\n", tid);
+        exit(0);
+    }
+
+    // get pointer of message queue
+    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
+    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
+    // use token to speed up
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+    moodycamel::ConsumerToken local_ctok(*task_queue_);
+
+
+    // RX  pointers
+    char* rx_buffer = obj_ptr->buffer_[tid];
+    int* rx_buffer_status = obj_ptr->buffer_status_[tid];
+    long long rx_buffer_length = obj_ptr->buffer_length_;
+    int rx_buffer_frame_num = obj_ptr->buffer_frame_num_;
+    double *rx_frame_start = obj_ptr->frame_start_[tid];
+    char* rx_cur_ptr_buffer = rx_buffer;
+    int* rx_cur_ptr_buffer_status = rx_buffer_status;
+    int rx_offset = 0;
+    int ant_id, frame_id, subframe_id, cell_id;
+
+
+    // walk through all the pages
+    double temp;
+    for (int i = 0; i < 20; i++) {
+        temp = rx_frame_start[i * 512];
+    }
+
+
+    // TX pointers
+    char *tx_buffer = obj_ptr->tx_buffer_;
+    float *tx_data_buffer = obj_ptr->tx_data_buffer_;
+    // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+    int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
+    int ret;
+    int tx_offset;
+    char *tx_cur_ptr_buffer;
+    // float *tx_cur_ptr_data;
+    int tx_ant_id, tx_frame_id, tx_subframe_id, tx_total_data_subframe_id, tx_current_data_subframe_id;
+    int tx_cell_id = 0;
+
+
+    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    int max_rx_packet_num_per_frame = max_subframe_id * BS_ANT_NUM / rx_thread_num;
+    int max_tx_packet_num_per_frame = dl_data_subframe_num_perframe * BS_ANT_NUM / tx_thread_num;
+    printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame, max_tx_packet_num_per_frame);
+    int prev_frame_id = -1;
+    int rx_packet_num_per_frame = 0;
+    int tx_packet_num_per_frame = 0;
+    int do_tx = 0;
+
+
+    double start_time= get_time();
+
+#if !ENABLE_DOWNLINK
+    while(true) {
+        // if buffer is full, exit
+        if (rx_cur_ptr_buffer_status[0] == 1) {
+            printf("Receive thread %d buffer full, offset: %d\n", tid, rx_offset);
+            exit(0);
+        }
+
+        int recvlen = -1;
+
+        // start_time= get_time();
+        // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
+        if ((recvlen = recv(socket_local, (char*)rx_cur_ptr_buffer, package_length, 0))<0) {
+        // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+            perror("recv failed");
+            exit(0);
+        } 
+
+        // rx_package_num_per_frame++;
+
+    #if MEASURE_TIME
+        // read information from received packet 
+        frame_id = *((int *)rx_cur_ptr_buffer);
+        subframe_id = *((int *)rx_cur_ptr_buffer + 1);
+        ant_id = *((int *)rx_cur_ptr_buffer + 3);
+        // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+        if (frame_id > prev_frame_id) {
+            *(rx_frame_start + frame_id) = get_time();
+            prev_frame_id = frame_id;
+            if (frame_id % 512 == 200) {
+                _mm_prefetch((char*)(rx_frame_start+frame_id+512), _MM_HINT_T0);
+                // double temp = frame_start[frame_id+3];
+            }
+        }
+    #endif
+        // get the position in buffer
+        rx_offset = rx_cur_ptr_buffer_status - rx_buffer_status;
+        // move ptr & set status to full
+        rx_cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
+        rx_cur_ptr_buffer_status = rx_buffer_status + (rx_offset + 1) % rx_buffer_frame_num;
+        rx_cur_ptr_buffer = rx_buffer + (rx_cur_ptr_buffer - rx_buffer + package_length) % rx_buffer_length;
+
+        // push EVENT_PACKAGE_RECEIVED event into the queue
+        Event_data rx_message;
+        rx_message.event_type = EVENT_PACKAGE_RECEIVED;
+        // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
+        rx_message.data = rx_offset + tid * rx_buffer_frame_num;
+        if ( !message_queue_->enqueue(*local_ptok, rx_message ) ) {
+            printf("socket message enqueue failed\n");
+            exit(0);
+        }
+
+    }
+#else
+    while(true) {
+        if (do_tx == 0) {
+            // if buffer is full, exit
+            if (rx_cur_ptr_buffer_status[0] == 1) {
+                printf("Receive thread %d buffer full, offset: %d\n", tid, rx_offset);
+                exit(0);
+            }
+
+            int recvlen = -1;
+
+            // start_time= get_time();
+            // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
+            if ((recvlen = recv(socket_local, (char*)rx_cur_ptr_buffer, package_length, 0))<0) {
+            // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+                perror("recv failed");
+                exit(0);
+            } 
+
+            rx_packet_num_per_frame++;
+
+        #if MEASURE_TIME
+            // read information from received packet 
+            frame_id = *((int *)rx_cur_ptr_buffer);
+            subframe_id = *((int *)rx_cur_ptr_buffer + 1);
+            ant_id = *((int *)rx_cur_ptr_buffer + 3);
+            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+            if (frame_id > prev_frame_id) {
+                *(rx_frame_start + frame_id) = get_time();
+                prev_frame_id = frame_id;
+                if (frame_id % 512 == 200) {
+                    _mm_prefetch((char*)(rx_frame_start+frame_id+512), _MM_HINT_T0);
+                    // double temp = frame_start[frame_id+3];
+                }
+            }
+        #endif
+            // get the position in buffer
+            rx_offset = rx_cur_ptr_buffer_status - rx_buffer_status;
+            // move ptr & set status to full
+            rx_cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
+            rx_cur_ptr_buffer_status = rx_buffer_status + (rx_offset + 1) % rx_buffer_frame_num;
+            rx_cur_ptr_buffer = rx_buffer + (rx_cur_ptr_buffer - rx_buffer + package_length) % rx_buffer_length;
+
+            // push EVENT_PACKAGE_RECEIVED event into the queue
+            Event_data rx_message;
+            rx_message.event_type = EVENT_PACKAGE_RECEIVED;
+            // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
+            rx_message.data = rx_offset + tid * rx_buffer_frame_num;
+            if ( !message_queue_->enqueue(*local_ptok, rx_message ) ) {
+                printf("socket message enqueue failed\n");
+                exit(0);
+            }
+
+            if(rx_packet_num_per_frame == max_rx_packet_num_per_frame) {
+                do_tx = 1;
+                rx_packet_num_per_frame = 0;
+            }
+        }
+        else {
+            Event_data task_event;
+            // ret = task_queue_->try_dequeue(task_event); 
+            ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->tx_ptoks_[tid]),task_event); 
+            if(!ret)
+                continue;
+            // printf("tx queue length: %d\n", task_queue_->size_approx());
+            if (task_event.event_type!=TASK_SEND) {
+                printf("Wrong event type!");
+                exit(0);
+            }
+
+            tx_offset = task_event.data;
+            tx_ant_id = tx_offset % BS_ANT_NUM;
+            tx_total_data_subframe_id = tx_offset / BS_ANT_NUM; 
+            tx_current_data_subframe_id = tx_total_data_subframe_id % data_subframe_num_perframe;
+            tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
+            tx_frame_id = tx_total_data_subframe_id / data_subframe_num_perframe;
+
+            int socket_subframe_offset = tx_frame_id * data_subframe_num_perframe + tx_current_data_subframe_id;
+            int data_subframe_offset = tx_frame_id * data_subframe_num_perframe + tx_current_data_subframe_id;
+            tx_cur_ptr_buffer = tx_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
+            // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
+            *((int *)tx_cur_ptr_buffer) = tx_frame_id;
+            *((int *)tx_cur_ptr_buffer + 1) = tx_subframe_id;
+            *((int *)tx_cur_ptr_buffer + 2) = tx_cell_id;
+            *((int *)tx_cur_ptr_buffer + 3) = tx_ant_id;
+
+            // send data (one OFDM symbol)
+            if (sendto(socket_local, (char*)tx_cur_ptr_buffer, package_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
+                perror("socket sendto failed");
+                exit(0);
+            }
+            tx_packet_num_per_frame++;
+
+    #if DEBUG_BS_SENDER
+            printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, tx_frame_id, tx_subframe_id, tx_ant_id, tx_offset,
+                message_queue_->size_approx());
+    #endif
+            Event_data tx_message;
+            tx_message.event_type = EVENT_PACKAGE_SENT;
+            tx_message.data = tx_offset;
+            if ( !message_queue_->enqueue(*local_ptok, tx_message ) ) {
+                printf("socket message enqueue failed\n");
+                exit(0);
+            }
+            if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
+                do_tx = 0;
+                tx_packet_num_per_frame = 0;
+            }
+        }  
+
+    }
+
+#endif
+
+
+}
 
 
 

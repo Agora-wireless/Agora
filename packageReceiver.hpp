@@ -27,6 +27,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include <sys/ioctl.h>
+#include <fcntl.h>
 
 
 #include <inttypes.h>
@@ -92,7 +93,9 @@ public:
      * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
     */ 
-    PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, moodycamel::ProducerToken **in_rx_ptoks);
+    PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
+            moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
+            moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks);
     ~PackageReceiver();
     
 
@@ -117,7 +120,9 @@ public:
      * context: PackageReceiverContext type
     */
     static void* loopRecv(void *context);
+    static void* loopRecv_DPDK(void *context);
     static void* loopSend(void *context);
+    static void* loopTXRX(void *context);
 
 
  
@@ -156,6 +161,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data> *message_queue_;
     moodycamel::ConcurrentQueue<Event_data> *task_queue_;
     moodycamel::ProducerToken **rx_ptoks_;
+    moodycamel::ProducerToken **tx_ptoks_;
     int core_id_;
     int tx_core_id_;
 

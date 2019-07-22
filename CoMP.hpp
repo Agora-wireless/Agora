@@ -42,15 +42,15 @@ class CoMP
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 24;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 30: 25;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 4;
-    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 2 : 0;
+    static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     static const int CORE_OFFSET = 17;
 
-    static const int FFT_THREAD_NUM = 3;
+    static const int FFT_THREAD_NUM = 1;
     // static const int ZF_THREAD_NUM = 8;//16;
     // static const int DEMUL_THREAD_NUM = TASK_THREAD_NUM - FFT_THREAD_NUM - ZF_THREAD_NUM;
-    static const int DEMUL_THREAD_NUM = 8;//16;
+    static const int DEMUL_THREAD_NUM = 7;//16;
     static const int ZF_THREAD_NUM = TASK_THREAD_NUM - FFT_THREAD_NUM - DEMUL_THREAD_NUM;
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
@@ -59,7 +59,7 @@ public:
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     static const int TASK_BUFFER_FRAME_NUM = 60;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 48;
+    static const int demul_block_size = 64;
     static const int demul_block_num = OFDM_DATA_NUM/demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
     static const int zf_block_size = 1;
     static const int zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
@@ -502,6 +502,10 @@ private:
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
 
     std::unique_ptr<moodycamel::ProducerToken> rx_ptok[SOCKET_RX_THREAD_NUM]; 
+
+    std::unique_ptr<moodycamel::ProducerToken> tx_ptok[SOCKET_RX_THREAD_NUM]; 
+
+
 
     int CSI_task_count[TASK_THREAD_NUM*16];
     int FFT_task_count[TASK_THREAD_NUM*16];
