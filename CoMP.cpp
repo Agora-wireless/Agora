@@ -239,8 +239,15 @@ CoMP::CoMP()
     }
 
 
+    moodycamel::ProducerToken *tx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
+        tx_ptok[i].reset(new moodycamel::ProducerToken(tx_queue_));
+        tx_ptoks_ptr[i] = tx_ptok[i].get();
+    }
+
+
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, &message_queue_, &tx_queue_, rx_ptoks_ptr));
+    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     // initilize all kinds of checkers
     memset(fft_counter_ants_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
@@ -665,6 +672,11 @@ void CoMP::start()
 
     int last_dequeue = 0;
     int cur_queue_itr = 0;
+    double last_dequeue_time = get_time();
+    double cur_dequeue_time = get_time();
+    double diff_dequeue_time;
+    double queue_process_time;
+    double queue_process_start;
 
     signal(SIGINT, intHandler);
     while(keep_running) {
@@ -679,6 +691,8 @@ void CoMP::start()
                 
                 ret += message_queue_.try_dequeue_bulk_from_producer(*rx_ptok[rx_itr], events_list + ret, dequeue_bulk_size_single);
             }
+            // if (ret == 0);
+            //     ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size_single);
             last_dequeue = 1;
             // ret = message_queue_.try_dequeue_bulk_from_producer(*rx_ptok[cur_queue_itr], events_list, dequeue_bulk_size_single);
             // cur_queue_itr++;
@@ -704,8 +718,15 @@ void CoMP::start()
             miss_count++;
             continue;
         }
+
+        cur_dequeue_time = get_time();
+        diff_dequeue_time = cur_dequeue_time - last_dequeue_time;
+        // if (diff_dequeue_time > 3000 && frame_count_zf > 1000)
+        //     printf("Main thread: frame %d takes %.2f us since last dequeue\n", frame_count_zf, diff_dequeue_time);
+        last_dequeue_time = get_time();
         // handle each event
         for(int bulk_count = 0; bulk_count < ret; bulk_count ++) {
+            queue_process_start = get_time();
             Event_data& event = events_list[bulk_count];
 
             switch(event.event_type) {
@@ -781,26 +802,26 @@ void CoMP::start()
                     printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
     #endif   
     #if ENABLE_DOWNLINK
-                        if (fft_created_counter_packets_[rx_frame_id] == BS_ANT_NUM * UE_NUM) {
+                    if (fft_created_counter_packets_[rx_frame_id] == BS_ANT_NUM * UE_NUM) {
         #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE                            
-                            printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, get_time()-pilot_received[frame_id]);
+                        printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, get_time()-pilot_received[frame_id]);
         #endif                            
-                            fft_created_counter_packets_[rx_frame_id] = 0;
-                            if(frame_id > 0) 
-                                ifft_checker_[(frame_id-1)%TASK_BUFFER_FRAME_NUM] = 0;
-                            else
-                                ifft_checker_[TASK_BUFFER_FRAME_NUM-1] = 0;
-                        }
+                        fft_created_counter_packets_[rx_frame_id] = 0;
+                        if(frame_id > 0) 
+                            ifft_checker_[(frame_id-1)%TASK_BUFFER_FRAME_NUM] = 0;
+                        else
+                            ifft_checker_[TASK_BUFFER_FRAME_NUM-1] = 0;
+                    }
     #else                          
                     if (fft_created_counter_packets_[rx_frame_id] == BS_ANT_NUM * subframe_num_perframe) {
         #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE                            
                         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n", frame_id, frame_id% TASK_BUFFER_FRAME_NUM, get_time()-pilot_received[frame_id]);
         #endif                       
                         fft_created_counter_packets_[rx_frame_id] = 0;
-                        if(frame_id > 0) 
-                            demul_counter_subframes_[(frame_id-1)%TASK_BUFFER_FRAME_NUM] = 0;
-                        else
-                            demul_counter_subframes_[TASK_BUFFER_FRAME_NUM-1] = 0;
+                        // if(frame_id > 0) 
+                        //     demul_counter_subframes_[(frame_id-1)%TASK_BUFFER_FRAME_NUM] = 0;
+                        // else
+                        //     demul_counter_subframes_[TASK_BUFFER_FRAME_NUM-1] = 0;
                     }
     #endif
 #else
@@ -1057,7 +1078,7 @@ void CoMP::start()
                     // if this subframe is ready
                     if (demul_counter_scs_[frame_id][data_subframe_id] == demul_block_num) {
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
-                        printf("Main thread: Demodulation done frame: %d, subframe: %d\n", frame_id, data_subframe_id);
+                        printf("Main thread: Demodulation done frame: %d, subframe: %d, counter: %d\n", frame_id, data_subframe_id, demul_counter_subframes_[frame_id]+1);
 #endif
 
 #if ENABLE_DECODE && !COMBINE_EQUAL_DECODE
@@ -1108,7 +1129,10 @@ void CoMP::start()
                                 }
                                 delay_fft_queue_cnt[frame_id_next] = 0;
                             }
-
+#if BIGSTATION
+                            demul_counter_subframes_[frame_id] = 0;
+#endif
+                            
 #if DEBUG_PRINT_PER_FRAME_DONE
                             printf("Main thread: Demodulation done frame: %d, %d, subframe %d in %.5f us, total %.5f us\n", frame_id, frame_count_demul, data_subframe_id, 
                                 demul_processed[frame_count_demul]-zf_processed[frame_count_demul], demul_processed[frame_count_demul]-pilot_received[frame_count_demul]);
@@ -1329,7 +1353,7 @@ void CoMP::start()
                         
                         
                         // print log per 100 frames
-                        if (demul_count == data_subframe_num_perframe * 1000)
+                        if (demul_count == data_subframe_num_perframe * 9000)
                         {
                             demul_count = 0;
                             auto demul_end = std::chrono::system_clock::now();
@@ -1472,8 +1496,10 @@ void CoMP::start()
 #endif
                     Event_data do_tx_task;
                     do_tx_task.event_type = TASK_SEND;
-                    do_tx_task.data = offset_ifft;                    
-                    schedule_task(do_tx_task, &tx_queue_, ptok_tx);
+                    do_tx_task.data = offset_ifft;      
+
+                    int ptok_id = ant_id % SOCKET_TX_THREAD_NUM;          
+                    schedule_task(do_tx_task, &tx_queue_, *tx_ptok[ptok_id]);
                     ifft_checker_[frame_id] += 1;
                     if (ifft_checker_[frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe) {
                         // ifft_checker_[frame_id] = 0;
@@ -1546,7 +1572,7 @@ void CoMP::start()
 
                         tx_count++;
                         // print log per 100 frames
-                        if (tx_count == dl_data_subframe_num_perframe * 1000)
+                        if (tx_count == dl_data_subframe_num_perframe * 9000)
                         {
                             tx_count = 0;
                             auto tx_end = std::chrono::high_resolution_clock::now();
@@ -1770,6 +1796,9 @@ void CoMP::start()
                 printf("Wrong event type in message queue!");
                 exit(0);
             }
+            // queue_process_time = get_time() - queue_process_start;
+            // if (queue_process_time > 50)
+            //     printf("In frame %d, queue process time %.5f us\n", frame_count_zf, queue_process_time);
         }
     }
     // }
@@ -1783,12 +1812,19 @@ void CoMP::start()
         exit(0);
     }
     
-        // printf("User %d: %d, ", ii,demul_ptr2(ii));
+    printf("Total processed frames %d ", frame_count_zf);
 #if ENABLE_DOWNLINK
     for(int ii = 0; ii < frame_count_tx; ii++) { 
-        fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
-            precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
-                csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii]);
+        if (SOCKET_RX_THREAD_NUM == 1) {
+            fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
+                precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
+                csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii], frame_start[0][ii]);
+        } 
+        else {
+            fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
+                precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
+                csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii]);
+        }
     }
 #else
     for(int ii = 0; ii < frame_count_demul; ii++) {  
@@ -1913,7 +1949,8 @@ void* CoMP::taskThread(void* context)
     
     // attach task threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
-    int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    int offset_id = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 2;
 
     int tar_core_id = tid + offset_id;
     if (tar_core_id>=36) 
@@ -2035,7 +2072,8 @@ void* CoMP::fftThread(void* context)
     
     // attach task threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
-    int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    int offset_id = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 2;
     int tar_core_id = tid + offset_id;
     if (tar_core_id>=36) 
         tar_core_id = tar_core_id - 36 + 1;
@@ -2086,7 +2124,8 @@ void* CoMP::zfThread(void* context)
     
     // attach task threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
-    int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    int offset_id = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 2;
     int tar_core_id = tid + offset_id;
     if (tar_core_id>=36) 
         tar_core_id = tar_core_id - 36 + 1;
@@ -2129,7 +2168,8 @@ void* CoMP::demulThread(void* context)
     
     // attach task threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
-    int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
+    int offset_id = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 2;
     int tar_core_id = tid + offset_id;
     if (tar_core_id>=36) 
         tar_core_id = tar_core_id - 36 + 1;
@@ -2654,10 +2694,16 @@ void CoMP::doFFT(int tid, int offset)
     if (pilot_symbol == 0) {
         FFT_task_count[tid * 16] = FFT_task_count[tid * 16]+1;
         FFT_task_duration[tid * 8][0] += duration;
+        if (duration > 500) {
+            printf("Thread %d FFT takes %.2f\n", tid, duration);
+        }
     }
     else {
         CSI_task_count[tid * 16] = CSI_task_count[tid * 16]+1;
         CSI_task_duration[tid * 8][0] += duration;
+        if (duration > 500) {
+            printf("Thread %d pilot FFT takes %.2f\n", tid, duration);
+        }
     }
 #endif
     Event_data fft_finish_event;
@@ -2827,6 +2873,9 @@ void CoMP::doZF(int tid, int offset)
         ZF_task_count[tid * 16] = ZF_task_count[tid * 16]+1; 
         double duration = get_time() - start_time1;
         ZF_task_duration[tid * 8][0] += duration;
+        if (duration > 500) {
+            printf("Thread %d ZF takes %.2f\n", tid, duration);
+        }
     #endif
 
     }
@@ -3190,6 +3239,9 @@ void CoMP::doDemul(int tid, int offset)
 #if DEBUG_UPDATE_STATS   
     double duration = get_time() - start_time;
     Demul_task_duration[tid * 8][0] += duration;
+    if (duration > 500) {
+            printf("Thread %d Demul takes %.2f\n", tid, duration);
+    }
 #endif
     Event_data demul_finish_event;
     demul_finish_event.event_type = EVENT_DEMUL;
@@ -3377,13 +3429,14 @@ void CoMP::do_precode(int tid, int offset)
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
     interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
 
-    // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+    
     // double start_time = get_time();
     int max_sc_ite;
     if (sc_id + demul_block_size <= OFDM_DATA_NUM) 
         max_sc_ite = demul_block_size;
     else
         max_sc_ite = OFDM_DATA_NUM - sc_id;
+    printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d, max_sc_ite: %d\n", tid, frame_id, current_data_subframe_id, sc_id, max_sc_ite);
     for (int i = 0; i < max_sc_ite; i++) { 
         int cur_sc_id = sc_id + i;
 
