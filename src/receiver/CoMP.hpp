@@ -31,7 +31,8 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include <signal.h>
-#include <aff3ct.hpp>
+#include <algorithm>
+// #include <aff3ct.hpp>
 #include "mkl_dfti.h"
 // #include <hpctoolkit.h>
 // #include <cblas.h>
@@ -192,7 +193,7 @@ public:
 
     void doDemulSingleSC(int tid, int offset);
 
-    void doDecode(int tid, int offset);    
+    // void doDecode(int tid, int offset);    
 
     /*****************************************************
      * Downlink 
@@ -301,15 +302,15 @@ private:
      *****************************************************/ 
     
     std::unique_ptr<PackageReceiver> receiver_;
-    std::vector<aff3ct::module::Encoder_LDPC_from_QC<>*> Encoders;
-    std::vector<aff3ct::module::Modem_generic<>*> Modems;
-    std::unique_ptr<aff3ct::module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>> Decoders[TASK_THREAD_NUM];
+    // std::vector<aff3ct::module::Encoder_LDPC_from_QC<>*> Encoders;
+    // std::vector<aff3ct::module::Modem_generic<>*> Modems;
+    // std::unique_ptr<aff3ct::module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>> Decoders[TASK_THREAD_NUM];
     // std::vector<aff3ct::module::Decoder_LDPC_BP_flooding_inter<>*> Decoders;
-    std::vector<unsigned> info_bits_pos[TASK_THREAD_NUM];
+    // std::vector<unsigned> info_bits_pos[TASK_THREAD_NUM];
     // std::vector<aff3ct::tools::Update_rule_NMS_simd<float,0>> up_rules;
-    aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
-    const int K = ORIG_CODE_LEN * NUM_BITS;
-    const int N = CODED_LEN * NUM_BITS;
+    // aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
+    // const int K = ORIG_CODE_LEN * NUM_BITS;
+    // const int N = CODED_LEN * NUM_BITS;
     // float ebn0 = 10.0f;
     // const int K = ORIG_CODE_LEN * NUM_BITS;
     // const int N = CODED_LEN * NUM_BITS;
