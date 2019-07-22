@@ -187,10 +187,10 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     // }
     
     // read from file
-    std::string filename = "../rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename = "../../data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
-        printf("open file faild");
+        printf("open file faild: ");
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
