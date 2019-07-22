@@ -61,6 +61,23 @@ void delay_pause(unsigned int us)
     // printf("duration: %.5f, us %d\n", duration, us);
 }
 
+
+
+static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
+    // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src, %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31), (intptr_t(pvSrc) & 31) );
+    // assert(nBytes % 32 == 0);
+    // assert((intptr_t(pvDest) & 31) == 0);
+    // assert((intptr_t(pvSrc) & 31) == 0);
+    const __m256i *pSrc = reinterpret_cast<const __m256i*>(pvSrc);
+    __m256i *pDest = reinterpret_cast<__m256i*>(pvDest);
+    int64_t nVects = nBytes / sizeof(*pSrc);
+    for (; nVects > 0; nVects--, pSrc++, pDest++) {
+    const __m256i loaded = _mm256_stream_load_si256(pSrc);
+    _mm256_stream_si256(pDest, loaded);
+    }
+    _mm_sfence();
+}
+
 PackageSender::PackageSender(int in_socket_num, int in_thread_num, int in_core_offset, int in_delay):
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
 socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
@@ -83,7 +100,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 #if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("10.0.0.1");
+        servaddr_[i].sin_addr.s_addr = inet_addr("10.0.0.3");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
         cliaddr_.sin_family = AF_INET;
@@ -153,13 +170,21 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         memset(packet_count_per_subframe[i], 0, sizeof(int) * max_subframe_id);
     }
 
-    IQ_data = new float*[subframe_num_perframe * BS_ANT_NUM];
-    IQ_data_coded = new ushort*[subframe_num_perframe * BS_ANT_NUM];
-    for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
-    {
-        IQ_data[i] = new float[OFDM_FRAME_LEN * 2];
-        IQ_data_coded[i] = new ushort[OFDM_FRAME_LEN * 2];
+    int IQ_data_size = subframe_num_perframe * BS_ANT_NUM;
+    IQ_data = (float **)malloc(IQ_data_size * sizeof(float *));
+    IQ_data_coded = (ushort **)malloc(IQ_data_size * sizeof(ushort *));
+    for (int i = 0; i < IQ_data_size; i++) {
+        IQ_data[i] = (float *)aligned_alloc(64, OFDM_FRAME_LEN * 2 * sizeof(float));
+        IQ_data_coded[i] = (ushort *)aligned_alloc(64, OFDM_FRAME_LEN * 2 * sizeof(ushort));
     }
+
+    // IQ_data = new float*[subframe_num_perframe * BS_ANT_NUM];
+    // IQ_data_coded = new ushort*[subframe_num_perframe * BS_ANT_NUM];
+    // for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
+    // {
+    //     IQ_data[i] = new float[OFDM_FRAME_LEN * 2];
+    //     IQ_data_coded[i] = new ushort[OFDM_FRAME_LEN * 2];
+    // }
     
     // read from file
     std::string filename = "../rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
@@ -181,11 +206,14 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
     fclose(fp);
 
-    trans_buffer_.resize(max_length_);
-    for (int i = 0; i < max_length_; ++i)
-    {
-        trans_buffer_[i].resize(buffer_length);
-    }
+    trans_buffer_ = (char **)malloc(max_length_ * sizeof(char *));
+    for (int i = 0; i < max_length_; i++)
+        trans_buffer_[i] = (char *)aligned_alloc(64, buffer_length * sizeof(char));
+    // trans_buffer_.resize(max_length_);
+    // for (int i = 0; i < max_length_; ++i)
+    // {
+    //     trans_buffer_[i].resize(buffer_length);
+    // }
     printf("start sender\n");
 
     for (int i = 0; i < thread_num; i++) 
@@ -242,12 +270,12 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     for (int i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
         int data_index = subframe_id * BS_ANT_NUM + ant_id;
-        int* ptr = (int *)(trans_buffer_[cur_ptr_].data()+tx_buf_offset);
+        int* ptr = (int *)(trans_buffer_[cur_ptr_]+tx_buf_offset);
         (*ptr) = frame_id;
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
-        memcpy(trans_buffer_[cur_ptr_].data() + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
         
         ant_id++;
         if(ant_id == BS_ANT_NUM)
@@ -273,7 +301,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     uint64_t ticks_500 = (uint64_t) 6000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
+    uint64_t ticks_per_symbol = (uint64_t) 71.3 * CPU_FREQ / 1e6;
 
+
+    // ticks_100 = (uint64_t) 100000 * CPU_FREQ / 1e6 / 70;
+    // ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
+    // ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
+    // ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
     // push tasks of the first subframe into task queue
     for (int i = 0; i < BS_ANT_NUM; i++) {
@@ -311,13 +345,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             continue;
         int tx_ant_id = data_ptr % BS_ANT_NUM;
         int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
-        int* ptr = (int *)(trans_buffer_[data_ptr].data() + tx_buf_offset);
+        int* ptr = (int *)(trans_buffer_[data_ptr] + tx_buf_offset);
         (*ptr) = frame_id;
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = tx_ant_id;
-        memcpy(trans_buffer_[data_ptr].data() + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
-
+        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
+        // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         
         int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
         int tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
@@ -397,17 +431,24 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                 //     std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*120));
                 // else
                 //     std::this_thread::sleep_for(std::chrono::microseconds(int(data_subframe_num_perframe*71.43)));
-                if (frame_id < 500)
-                    delay_busy_cpu(data_subframe_num_perframe*120*2.3e3/6);
-                else
-                    delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
+                if (frame_id < 500) {
+                    while ((RDTSC() - tick_start) < 2 * data_subframe_num_perframe * ticks_all) 
+                        _mm_pause; 
+                    // delay_busy_cpu(data_subframe_num_perframe*120*2.3e3/6);
+                }
+                else {
+                    while ((RDTSC() - tick_start) < data_subframe_num_perframe * ticks_all) 
+                        _mm_pause; 
+                    // delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
+                }
 #endif
                // printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
                // start_time = get_time();
+	       tick_start = RDTSC();
             }
 
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
-
+	    //tick_start = RDTSC();
 
 
             int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
@@ -558,7 +599,7 @@ void* PackageSender::loopSend(void *in_context)
         used_socker_id = data_ptr % obj_ptr->socket_num;   
          
 
-        int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr].data();
+        int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr];
         int subframe_id = (*(ptr+1)); 
 #if DEBUG_SENDER
         start_time_send = get_time();
@@ -567,12 +608,12 @@ void* PackageSender::loopSend(void *in_context)
             /* send a message to the server */
 #if USE_DPDK || !CONNECT_UDP
             // if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0) < 0){
-            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
+            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);
             }
 #else
-            if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0) < 0){
+            if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0) < 0){
             // if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);

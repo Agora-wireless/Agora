@@ -22,6 +22,8 @@
 #include <signal.h>
 #include "concurrentqueue.h"
 #include <emmintrin.h>
+#include <immintrin.h>
+#include <boost/align/aligned_allocator.hpp>
 
 
 #define CPU_FREQ 2.3e9
@@ -72,7 +74,8 @@ private:
 
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
-    std::vector<std::vector<char>> trans_buffer_;
+    // std::vector<std::vector<char,boost::alignment::aligned_allocator<char, 64>>> trans_buffer_;
+    char **trans_buffer_;
     int cur_ptr_;
     int buffer_len_;
     pthread_mutex_t lock_;
@@ -91,8 +94,8 @@ private:
 
     // First dimension: subframe_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
-    float** IQ_data;
-    ushort** IQ_data_coded;
+    float **IQ_data;
+    ushort **IQ_data_coded;
 
     int thread_num;
     int socket_num;
