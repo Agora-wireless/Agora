@@ -9,7 +9,6 @@
 #include <stdio.h>  /* for fprintf */
 #include <string.h> /* for memcpy */
 #include <stdlib.h>
-#include "Symbols.hpp"
 #include <vector>
 // #include <ctime>
 #include <time.h>
@@ -20,10 +19,13 @@
 #include <thread>
 #include <pthread.h>
 #include <signal.h>
-#include "concurrentqueue.h"
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <boost/align/aligned_allocator.hpp>
+
+#include "gettime.h"
+#include "Symbols.hpp"
+#include "concurrentqueue.h"
 
 
 #define CPU_FREQ 2.3e9

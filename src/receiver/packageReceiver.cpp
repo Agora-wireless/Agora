@@ -7,26 +7,6 @@
 #include "packageReceiver.hpp"
 #include "cpu_attach.hpp"
 
-/* assembly code to read the TSC */
-static inline uint64_t RDTSC()
-{
-  unsigned int hi, lo;
-  __asm__ volatile("rdtsc" : "=a" (lo), "=d" (hi));
-  return ((uint64_t)hi << 32) | lo;
-}
-
-
-static inline double get_time(void)
-{
-#if USE_RDTSC
-    return double(RDTSC())/2.3e3;
-#else
-    struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
-#endif
-}
-
 inline const struct rte_eth_conf port_conf_default() {
     struct rte_eth_conf rte = rte_eth_conf();
     // rte.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
@@ -46,68 +26,6 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
 PackageReceiver::PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
     socket_ = new int[RX_THREAD_NUM];
-    /*Configure settings in address struct*/
-    // address of sender 
-    // servaddr_.sin_family = AF_INET;
-    // servaddr_.sin_port = htons(7891);
-    // servaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
-    // memset(servaddr_.sin_zero, 0, sizeof(servaddr_.sin_zero));  
-    
-//     for(int i = 0; i < RX_THREAD_NUM; i++)
-//     {
-// #if USE_IPV4
-//         servaddr_[i].sin_family = AF_INET;
-//         servaddr_[i].sin_port = htons(8000+i);
-//         servaddr_[i].sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-//         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
-
-//         if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-//             printf("cannot create socket %d\n", i);
-//             exit(0);
-//         }
-// #else
-//         servaddr_[i].sin6_family = AF_INET6;
-//         servaddr_[i].sin6_addr = in6addr_any;
-//         servaddr_[i].sin6_port = htons(8000+i);
-        
-//         if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-//             printf("cannot create socket %d\n", i);
-//             exit(0);
-//         }
-//         else{
-//             printf("Created IPV6 socket %d\n", i);
-//         }
-// #endif
-//         // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
-//         int optval = 1;
-//         setsockopt(socket_[i], SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-
-//         int sock_buf_size = 1024*1024*64*8;
-//         if (setsockopt(socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&sock_buf_size, sizeof(sock_buf_size))<0)
-//         {
-//             printf("Error setting buffer size to %d\n", sock_buf_size);
-//         }
-
-//         // int readValue = 0;
-//         // unsigned int readLen = sizeof(readValue);
-//         // int res = getsockopt( socket_[i], SOL_SOCKET, SO_RCVBUF, (void*)&readValue, &readLen );
-//         // if ( -1 == res )
-//         // {
-//         //     printf("ERROR reading socket buffer size\n");
-//         // }
-//         // else
-//         // {
-//         //     printf("Read socket buffer size:%d\n",readValue);
-//         // }
-
-//         if(bind(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
-//         {
-//             printf("socket bind failed %d\n", i);
-//             exit(0);
-//         }
-
-//     }
-    
 
     rx_thread_num_ = RX_THREAD_NUM;
     tx_thread_num_ = TX_THREAD_NUM;

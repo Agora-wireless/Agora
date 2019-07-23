@@ -7,14 +7,10 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
 
-#include "packageReceiver.hpp"
-// #include "packageSenderBS.hpp"
 #include <unistd.h>
 #include <memory>
 #include <iostream>
 #include <vector>
-
-
 #include <fcntl.h>
 #include <system_error>
 #include <pthread.h>
@@ -23,13 +19,10 @@
 // #include <complex.h>
 #include <math.h>
 #include <tuple>
-#include "cpu_attach.hpp"
 #include <armadillo>
 #include <immintrin.h>
 #include <emmintrin.h>
 #include <stdint.h>
-#include "buffer.hpp"
-#include "concurrentqueue.h"
 #include <signal.h>
 #include <algorithm>
 // #include <aff3ct.hpp>
@@ -37,6 +30,13 @@
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
+#include "cpu_attach.hpp"
+#include "packageReceiver.hpp"
+#include "buffer.hpp"
+#include "concurrentqueue.h"
+#include "gettime.h"
+#include "compute_common.hpp"
+#include "offset.h"
 
 
 class CoMP
@@ -58,9 +58,9 @@ public:
     // * subframe_num_perframe * BS_ANT_NUM
     static const int SOCKET_BUFFER_FRAME_NUM = 100;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
-    static const int TASK_BUFFER_FRAME_NUM = 60;
+    // static const int TASK_BUFFER_FRAME_NUM = 60;
     // do demul_block_size sub-carriers in each task
-    static const int demul_block_size = 64;
+    static const int demul_block_size = 80;
     static const int demul_block_num = OFDM_DATA_NUM/demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
     static const int zf_block_size = 1;
     static const int zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
@@ -269,29 +269,11 @@ public:
 
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
-
-    inline int generateOffset2d(int unit_total_num, int frame_id, int unit_id);
-    inline int generateOffset3d(int unit_total_num, int frame_id, int current_data_subframe_id, int unit_id);
-    inline void interpreteOffset2d(int unit_total_num, int offset, int *frame_id, int *unit_id);
-    inline void interpreteOffset3d(int unit_total_num, int offset, int *frame_id, int *total_data_subframe_id, int *current_data_subframe_id, int *unit_id);
-
-    /* combine frame_id & subframe_id & ant_id into one int */
-    inline int getFFTBufferIndex(int frame_id, int subframe_id, int ant_id);
-    inline void splitFFTBufferIndex(int FFT_buffer_target_id, int *frame_id, int *subframe_id, int *ant_id);
     
     inline bool isPilot(int subframe_id) {return (subframe_id >=0) && (subframe_id < UE_NUM); }
     inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
     inline int getUEId(int subframe_id) {return subframe_id; }
     inline int getULSFIndex(int subframe_id) {return subframe_id - UE_NUM; }
-    // complex divide
-    inline complex_float divide(complex_float e1, complex_float e2);
-
-    // inline int demod_16qam(complex_float x);
-    inline arma::imat demod_16qam(arma::cx_fmat x);
-    inline void demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num);
-    inline void demod_16qam_soft(float *vec_in, float *vec_out, int length);
-    inline arma::cx_fmat mod_16qam(arma::imat x);
-    inline complex_float mod_16qam_single(int x);
 
     void getDemulData(int **ptr, int *size);
     void getEqualData(float **ptr, int *size);
@@ -630,85 +612,6 @@ private:
     int Precode_task_count[TASK_THREAD_NUM*16];
 
     double frame_start[SOCKET_RX_THREAD_NUM][10240] __attribute__( ( aligned (4096) ) ) ;
-
-
-
-    // const float m_bpsk_lut[256] = {
-    // 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 
-    // 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 
-    // 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 
-    // };
-
-    const float m_bpsk_lut[256] = {
-    -4, -4, -4, -4, -4, -4, -4, -4, -4, -5, -5, -5, -5, -5, -5, -5, 
-    -5, -5, -6, -6, -6, -6, -6, -6, -6, -6, -6, -6, -6, -6, -6, -7, 
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, 
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, 
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, 
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, 
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, 
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 
-    2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 
-    };
-
-    // const float m_qam16_lut2[256] = {
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 5, 5, 5, 4, 4, 
-    // 3, 3, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 
-    // 3, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    // };
-
-    const float m_qam16_lut2[256] = {
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,
-    1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
-    7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 5, 5, 5, 4, 4, 3,  
-    3, 2, 2, 1, 1, 1, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,  
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,  
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,
-    -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7,
-    };
-
-
 
 
 };
