@@ -37,6 +37,8 @@
 #include "gettime.h"
 #include "compute_common.hpp"
 #include "offset.h"
+#include "dofft.hpp"
+#include "dozf.hpp"
 
 
 class CoMP
@@ -56,7 +58,7 @@ public:
     // buffer length of each socket thread
     // the actual length will be SOCKET_BUFFER_FRAME_NUM
     // * subframe_num_perframe * BS_ANT_NUM
-    static const int SOCKET_BUFFER_FRAME_NUM = 100;
+    // static const int SOCKET_BUFFER_FRAME_NUM = 100;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
     // static const int TASK_BUFFER_FRAME_NUM = 60;
     // do demul_block_size sub-carriers in each task
@@ -86,82 +88,7 @@ public:
     /*****************************************************
      * Uplink 
      *****************************************************/ 
-   
-    /**
-     * Do FFT task for one OFDM symbol 
-     * @param tid: task thread index, used for selecting muplans and task ptok
-     * @param offset: offset of the OFDM symbol in socket_buffer_
-     * Buffers: socket_buffer_, fft_buffer_, csi_buffer_, data_buffer_ 
-     *     Input buffer: socket_buffer_
-     *     Output buffer: csi_buffer_ if subframe is pilot
-     *                    data_buffer_ if subframe is data
-     *     Intermediate buffer: fft_buffer_ (FFT_inputs, FFT_outputs)
-     * Offsets: 
-     *     socket_buffer_: 
-     *         dim1: socket thread index: (offset / # of OFDM symbols per thread)
-     *         dim2: OFDM symbol index in this socket thread (offset - # of subframes in previous threads)
-     *     FFT_inputs, FFT_outputs: 
-     *         dim1: frame index * # of OFDM symbols per frame + subframe index * # of atennas + antenna index
-     *         dim2: subcarrier index
-     *     csi_buffer_: 
-     *         dim1: frame index * FFT size + subcarrier index in the current frame
-     *         dim2: user index * # of antennas + antenna index
-     *     data_buffer_: 
-     *         dim1: frame index * # of data subframes per frame + data subframe index
-     *         dim2: transpose block index * block size * # of antennas + antenna index * block size
-     * Event offset: frame index * # of subframe per frame + subframe index
-     * Description: 
-     *     1. copy received data (one OFDM symbol) from socket_buffer to fft_buffer_.FFT_inputs (remove CP)
-     *     2. perform FFT on fft_buffer_.FFT_inputs and store results in fft_buffer_.FFT_outputs
-     *     3. if subframe is pilot, do channel estimation from fft_buffer_.FFT_outputs to csi_buffer_
-     *        if subframe is data, copy data from fft_buffer_.FFT_outputs to data_buffer_ and do block transpose     
-     *     4. add an event to the message queue to infrom main thread the completion of this task
-     */
-    void doFFT(int tid, int offset);
-
-
-    /**
-     * Do ZF task for one subcarrier with all pilots in a frame
-     * @param tid: task thread index, used for selecting task ptok
-     * @param offset: offset of the subcarrier in csi_buffer_
-     * Buffers: csi_buffer_, precoder_buffer_
-     *     Input buffer: csi_buffer_
-     *     Output buffer: precoder_buffer_
-     * Offsets:
-     *     csi_buffer_, precoder_buffer_: 
-     *         dim1: frame index * FFT size + subcarrier index in the current frame
-     * Event offset: offset
-     * Description:
-     *     1. perform pseudo-inverse (pinv) on csi_buffer_ and store results in precoder_buffer_  
-     *     2. add an event to the message queue to infrom main thread the completion of this task
-     */
-    void doZF(int tid, int offset);
-
-
-    /**
-     * Do prediction task for one subcarrier 
-     * @param tid: task thread index, used for selecting task ptok
-     * @param offset: offset of the subcarrier in csi_buffer_
-     * Buffers: csi_buffer_, pred_csi_buffer_, precoder_buffer_
-     *     Input buffer: csi_buffer_
-     *     Output buffer: precoder_buffer_
-     *     Intermediate buffer: pred_csi_buffer_
-     * Offsets:
-     *     csi_buffer_: 
-     *         dim1: frame index * FFT size + subcarrier index in the current frame
-     *     pred_csi_buffer:
-     *         dim1: subcarrier index in the current frame
-     *     precoder_buffer_:
-     *         dim1: (frame index + 1) * FFT size + subcarrier index in the current frame
-     * Event offset: offset
-     * Description:
-     *     1. predict CSI (copy CSI from the current frame if prediction is based on stale CSI)
-     *     2. perform pseudo-inverse (pinv) on pred_csi_buffer_ and store results in precoder_buffer_  
-     *     3. add an event to the message queue to infrom main thread the completion of this task
-     */
-    void doPred(int tid, int offset);
-
-
+    
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
      * @param tid: task thread index, used for selecting spm_buffer and task ptok
@@ -200,31 +127,6 @@ public:
      *****************************************************/
 
     void do_modulate(int tid, int offset);
-    /**
-     * Do modulation and ifft tasks for one OFDM symbol
-     * @param tid: task thread index, used for selecting task ptok
-     * @param offset: offset of the OFDM symbol in dl_modulated_buffer_
-     * Buffers: dl_IQ_data_long, dl_modulated_buffer_
-     *     Input buffer: dl_IQ_data_long
-     *     Output buffer: dl_iffted_data_buffer_
-     *     Intermediate buffer: dl_ifft_buffer_
-     * Offsets: 
-     *     dl_IQ_data_long_: 
-     *         dim1: data subframe index in the current frame * # of users + user index
-     *         dim2: subcarrier index
-     *     dl_ifft_buffer_: 
-     *         dim1: frame index * # of data subframes per frame * # of users + data subframe index * # of users + user index
-     *         dim2: subcarrier index 
-     *     dl_iffted_data_buffer_: 
-     *         dim1: frame index * # of data subframes per frame + data subframe index
-     *         dim2: transpose block index * block size * # of UEs + user index * block size
-     * Event offset: offset
-     * Description: 
-     *     1. for each OFDM symbol, perform modulation and then ifft
-     *     2. perform block-wise transpose on IFFT outputs and store results in dl_iffted_data_buffer_
-     *     2. add an event to the message queue to infrom main thread the completion of this task
-     */
-    void do_ifft(int tid, int offset);
 
 
     /**
@@ -284,23 +186,6 @@ private:
      *****************************************************/ 
     
     std::unique_ptr<PackageReceiver> receiver_;
-    // std::vector<aff3ct::module::Encoder_LDPC_from_QC<>*> Encoders;
-    // std::vector<aff3ct::module::Modem_generic<>*> Modems;
-    // std::unique_ptr<aff3ct::module::Decoder_LDPC_BP_horizontal_layered_ONMS_inter<>> Decoders[TASK_THREAD_NUM];
-    // std::vector<aff3ct::module::Decoder_LDPC_BP_flooding_inter<>*> Decoders;
-    // std::vector<unsigned> info_bits_pos[TASK_THREAD_NUM];
-    // std::vector<aff3ct::tools::Update_rule_NMS_simd<float,0>> up_rules;
-    // aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
-    // const int K = ORIG_CODE_LEN * NUM_BITS;
-    // const int N = CODED_LEN * NUM_BITS;
-    // float ebn0 = 10.0f;
-    // const int K = ORIG_CODE_LEN * NUM_BITS;
-    // const int N = CODED_LEN * NUM_BITS;
-    // const float R = (float)K / (float)N;
-    // const float esn0  = aff3ct::tools::ebn0_to_esn0 (ebn0, R);
-    // const float sigma = aff3ct::tools::esn0_to_sigma(esn0   );
-
-    // const aff3ct::tools::Update_rule_NMS_simd<> up_rule = aff3ct::tools::Update_rule_NMS_simd <float>(0.75);
     /** 
      * received data 
      * Frist dimension: SOCKET_THREAD_NUM
@@ -309,13 +194,6 @@ private:
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
     SocketBuffer socket_buffer_[SOCKET_RX_THREAD_NUM];
-
-    /** 
-     * Data for FFT, after time sync (prefix removed)
-     * First dimension: FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * Second dimension: OFDM_CA_NUM
-     */
-    FFTBuffer fft_buffer_;
 
     /** 
      * Estimated CSI data 
@@ -378,11 +256,8 @@ private:
     // myVec spm_buffer[TASK_THREAD_NUM];
     complex_float *spm_buffer[TASK_THREAD_NUM];
 
-    /** 
-     * Intermediate buffer to gather CSI
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
-    complex_float *csi_gather_buffer[TASK_THREAD_NUM];
+
+
 
 
     /** 
@@ -409,11 +284,6 @@ private:
     float *pilots_;
     // std::vector<float> pilots_;
     // std::vector<complex_float> pilots_complex_;
-
-    mufft_plan_1d *muplans_[TASK_THREAD_NUM];
-
-    DFTI_DESCRIPTOR_HANDLE mkl_handles[TASK_THREAD_NUM];
-    MKL_LONG mkl_statuses[TASK_THREAD_NUM];
 
 
     /* Concurrent queues */
@@ -584,10 +454,6 @@ private:
     /* task queue for downlink data transmission */
     moodycamel::ConcurrentQueue<Event_data> tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
 
-    mufft_plan_1d *muplans_ifft_[TASK_THREAD_NUM];
-
-    DFTI_DESCRIPTOR_HANDLE mkl_handles_dl[TASK_THREAD_NUM];
-    MKL_LONG mkl_statuses_dl[TASK_THREAD_NUM];
 
     int dl_data_counter_scs_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
     int dl_data_counter_subframes_[TASK_BUFFER_FRAME_NUM];

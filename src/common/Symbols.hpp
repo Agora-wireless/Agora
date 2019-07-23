@@ -18,6 +18,7 @@
 #define NUM_BITS 4
 #define MAX_CODED_SC 1152
 #define TASK_BUFFER_FRAME_NUM 60
+#define SOCKET_BUFFER_FRAME_NUM 100
 
 
 #define EVENT_PACKAGE_RECEIVED 0
@@ -47,7 +48,7 @@
 #define TASK_ENCODE 9
 
 
-#define BIGSTATION 1
+#define BIGSTATION 0
 #define ENABLE_DOWNLINK 1
 #define USE_IPV4 1
 #define USE_DPDK 0
@@ -61,7 +62,7 @@
 #define INIT_FRAME_NUM 10
 
 
-#define DEBUG_PRINT_PER_FRAME_DONE 0
+#define DEBUG_PRINT_PER_FRAME_DONE 1
 #define DEBUG_PRINT_PER_SUBFRAME_DONE 0
 #define DEBUG_PRINT_PER_TASK_DONE 0
 #define DEBUG_PRINT_SUMMARY_100_FRAMES 0
@@ -88,7 +89,7 @@
 static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
-static const int dl_data_subframe_start = data_subframe_num_perframe-30;
+static const int dl_data_subframe_start = data_subframe_num_perframe-1;
 static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - dl_data_subframe_start;
 
 static const int MAX_FRAME_ID = 1e4;
