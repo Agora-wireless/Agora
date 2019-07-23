@@ -116,7 +116,7 @@ void demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num)
 // }
 
 
-complex_float mod_16qam_single(int x, float (*qam16_table)[16]) 
+complex_float mod_16qam_single(int x, float **qam16_table) 
 {
     complex_float re;
     re.real = qam16_table[0][x];

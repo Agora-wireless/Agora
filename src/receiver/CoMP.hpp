@@ -39,6 +39,8 @@
 #include "offset.h"
 #include "dofft.hpp"
 #include "dozf.hpp"
+#include "dodemul.hpp"
+#include "doprecode.hpp"
 
 
 class CoMP
@@ -83,85 +85,8 @@ public:
     static void *taskThread(void *context);
     static void *fftThread(void *context);
     static void *zfThread(void *context);
-    static void *demulThread(void *context);
+    static void *demulThread(void *context); 
 
-    /*****************************************************
-     * Uplink 
-     *****************************************************/ 
-    
-    /**
-     * Do demodulation task for a block of subcarriers (demul_block_size)
-     * @param tid: task thread index, used for selecting spm_buffer and task ptok
-     * @param offset: offset of the first subcarrier in the block in data_buffer_
-     * Buffers: data_buffer_, spm_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_
-     *     Input buffer: data_buffer_, precoder_buffer_
-     *     Output buffer: demul_hard_buffer_
-     *     Intermediate buffer: spm_buffer, equal_buffer_
-     * Offsets: 
-     *     data_buffer_: 
-     *         dim1: frame index * # of data subframes per frame + data subframe index
-     *         dim2: transpose block index * block size * # of antennas + antenna index * block size
-     *     spm_buffer: 
-     *         dim1: task thread index
-     *         dim2: antenna index
-     *     precoder_buffer_: 
-     *         dim1: frame index * FFT size + subcarrier index in the current frame
-     *     equal_buffer_, demul_buffer: 
-     *         dim1: frame index * # of data subframes per frame + data subframe index
-     *         dim2: subcarrier index * # of users
-     * Event offset: offset
-     * Description: 
-     *     1. for each subcarrier in the block, block-wisely copy data from data_buffer_ to spm_buffer_
-     *     2. perform equalization with data and percoder matrixes
-     *     3. perform demodulation on equalized data matrix   
-     *     4. add an event to the message queue to infrom main thread the completion of this task
-     */
-    void doDemul(int tid, int offset);
-
-    void doDemulSingleSC(int tid, int offset);
-
-    // void doDecode(int tid, int offset);    
-
-    /*****************************************************
-     * Downlink 
-     *****************************************************/
-
-    void do_modulate(int tid, int offset);
-
-
-    /**
-     * Do precoding task for a block of subcarriers (demul_block_size)
-     * @param tid: task thread index, used for selecting task ptok and dl_spm_buffer
-     * @param offset: offset of the first subcarrier in the block in dl_iffted_data_buffer_
-     * Buffers: dl_iffted_data_buffer_, precoder_buffer_, dl_spm_buffer, dl_precoded_data_buffer_
-     *     Input buffer: dl_iffted_data_buffer_, precoder_buffer_
-     *     Output buffer: dl_precoded_data_buffer_
-     *     Intermediate buffer: dl_spm_buffer
-     * Offsets: 
-     *     dl_iffted_data_buffer_: 
-     *         dim1: frame index * # of data subframes per frame + data subframe index
-     *         dim2: transpose block index * block size * # of UEs + user index * block size
-     *     dl_spm_buffer: 
-     *         dim1: task thread index
-     *         dim2: user index 
-     *     precoder_buffer_:
-     *         dim1: frame index * FFT size + subcarrier index in the current frame
-     *     dl_precoded_data_buffer_: 
-     *         dim1: frame index * # of data subframes per frame + data subframe index
-     *         dim2: subcarrier index * # of ants
-     * Event offset: offset
-     * Description: 
-     *     1. for each OFDM symbol, perform modulation and then ifft
-     *     2. perform block-wise transpose on IFFT outputs and store results in dl_iffted_data_buffer_
-     *     2. add an event to the message queue to infrom main thread the completion of this task
-     */
-    void do_precode(int tid, int offset); 
-
-
-    // void do_tx(int tid, int offset);
-
-    
-    
 
     struct EventHandlerContext
     {
@@ -247,15 +172,6 @@ private:
 
     int **decoded_buffer_;
 
-    
-
-    /** 
-     * Intermediate buffer to gather raw data
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM */
-    // myVec spm_buffer[TASK_THREAD_NUM];
-    complex_float *spm_buffer[TASK_THREAD_NUM];
-
 
 
 
@@ -265,12 +181,6 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM */
     complex_float *precoder_buffer_temp[TASK_THREAD_NUM];
-
-    /** 
-     * Intermediate buffer for equalized data
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: UE_NUM * 1 */
-    complex_float *equaled_buffer_temp[TASK_THREAD_NUM];
     complex_float *equaled_buffer_T_temp[TASK_THREAD_NUM];
 
 
