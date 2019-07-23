@@ -62,10 +62,6 @@ public:
      *     3. add an event to the message queue to infrom main thread the completion of this task
      */
     void Predict(int offset);
-
-    static const int buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
-    static const int package_length = sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     
  
 private:
