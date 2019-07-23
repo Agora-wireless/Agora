@@ -4,29 +4,6 @@
 
 
 
-
-/* assembly code to read the TSC */
-static inline uint64_t RDTSC()
-{
-  unsigned int hi, lo;
-  __asm__ volatile("rdtsc" : "=a" (lo), "=d" (hi));
-  return ((uint64_t)hi << 32) | lo;
-}
-
-
-static double get_time(void)
-{
-#if USE_RDTSC
-    return double(RDTSC())/2.3e3;
-#else
-    struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
-#endif
-}
-
-
-
 bool keep_running = true;
 
 void intHandler(int) {
@@ -187,7 +164,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     // }
     
     // read from file
-    std::string filename = "../../data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename = "/home/argos/Jian/CoMP_0722/data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
         printf("open file faild: ");
@@ -501,7 +478,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
 
     printf("Print results\n");
-    FILE* fp_debug = fopen("../tx_result.txt", "w");
+    FILE* fp_debug = fopen("/home/argos/Jian/CoMP_0722/matlab/tx_result.txt", "w");
     if (fp_debug==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;

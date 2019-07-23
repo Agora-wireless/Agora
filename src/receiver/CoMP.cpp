@@ -1,7 +1,6 @@
 #include "CoMP.hpp"
 
-using namespace arma;
-// using namespace aff3ct;
+// using namespace arma;
 typedef cx_float COMPLEX;
 
 
@@ -25,7 +24,6 @@ CoMP::CoMP()
 
 
     // read pilots from file
-    // pilots_.resize(OFDM_CA_NUM);
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
     FILE* fp = fopen("../data/pilot_f_2048.bin","rb");
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
@@ -48,85 +46,16 @@ CoMP::CoMP()
         // printf("socket buffer pointer: %llx, socket buffer size: %lld, %d, %d\n",socket_buffer_[i].buffer, socket_buffer_size_, PackageReceiver::package_length, SOCKET_BUFFER_FRAME_NUM);
     }
 
-    
 
-    // std::string filename = "/home/argos/Jian/my_project_with_aff3ct/lib/aff3ct/conf/dec/LDPC/CCSDS_64_128.alist";
-    // aff3ct::tools::Sparse_matrix H[TASK_THREAD_NUM];
-    // H = aff3ct::tools::LDPC_matrix_handler::read(filename, &info_bits_pos);
-
-    
-    
-    // tools::Sigma<float> noise;
-    // float ebn0 = 10.0f;
-    // // const int K = ORIG_CODE_LEN * NUM_BITS;
-    // // const int N = CODED_LEN * NUM_BITS;
-    // const float R = (float)K / (float)N;
-    // const auto esn0  = tools::ebn0_to_esn0 (ebn0, R);
-    // const auto sigma = tools::esn0_to_sigma(esn0   );
-    
-
-    // const auto up_rule = tools::Update_rule_NMS_simd <float>(0.75);
-
-    // noise.set_noise(sigma, ebn0, esn0);
-    
-    // // up_rules.reserve(TASK_THREAD_NUM);
-    // Encoders.reserve(TASK_THREAD_NUM);
-    // // Decoders.reserve(TASK_THREAD_NUM);
-    // Modems.reserve(TASK_THREAD_NUM);
-
-    // // std::unique_ptr<tools::Constellation<float>> cstl(new tools::Constellation_QAM <float>(NUM_BITS));
-    // for (int i = 0; i < TASK_THREAD_NUM; i++) {
-    //     H[i] = aff3ct::tools::LDPC_matrix_handler::read(filename, &info_bits_pos[i]);
-    //     if (info_bits_pos[i].empty()) {
-    //         // generate a default vector [0, 1, 2, 3, ..., K-1]
-    //         info_bits_pos[i].resize(ORIG_CODE_LEN * NUM_BITS);
-    //         std::iota(info_bits_pos[i].begin(), info_bits_pos[i].end(), 0);
-    //     }
-    //     // up_rules.push_back(tools::Update_rule_NMS_simd <float,0>(0.75));
-    // }
-
-    // const auto &msg_chk_to_var_id = H[0].get_col_to_rows();
-    // const auto &msg_var_to_chk_id = H[0].get_row_to_cols();
-    // for (int i = 0; i < TASK_THREAD_NUM; i++) {
-    //     Encoders.push_back(new module::Encoder_LDPC_from_QC<>(K, N, H[i]));
-    //     // Decoders.push_back(new module::Decoder_LDPC_BP_flooding_inter<>(K, N, N_ITE, H[i], info_bits_pos[i],up_rules[i]));
-    //     // Decoders[i].reset(new module::Decoder_LDPC_BP_flooding_inter<>(K, N, N_ITE, H[i], info_bits_pos[i],up_rules[i]));
-    //     std::unique_ptr<tools::Constellation<float>> cstl(new tools::Constellation_QAM <float>(NUM_BITS));
-    //     Modems.push_back(new module::Modem_generic<>(N, std::move(cstl)));
-    //     Modems[i]->set_noise(noise);
-    // }    
-
-
-
-
-
-    // initialize FFT buffer
-    // int FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    // fft_buffer_.FFT_inputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));//new complex_float * [FFT_buffer_block_num];
-    // fft_buffer_.FFT_outputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));//new complex_float * [FFT_buffer_block_num];
-    // for (int i = 0; i < FFT_buffer_block_num; i++) {
-    //     fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
-    //     fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
-    // }
-
-    // int FFT_buffer_block_num = subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int FFT_buffer_block_num = TASK_THREAD_NUM;
-    fft_buffer_.FFT_inputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));
-    
+    fft_buffer_.FFT_inputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *)); 
     for (int i = 0; i < FFT_buffer_block_num; i++) {
-        // fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
-        // fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
         fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
         memset(fft_buffer_.FFT_inputs[i], 0, sizeof(OFDM_CA_NUM * sizeof(complex_float)));
-        // fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
     }
 
     fft_buffer_.FFT_outputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));
-
     for (int i = 0; i < FFT_buffer_block_num; i++) {
-        // fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
-        // fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(BS_ANT_NUM * OFDM_CA_NUM * sizeof(complex_float));
-        // fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
         fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
     }
 
@@ -141,19 +70,10 @@ CoMP::CoMP()
     }
 
     // initialize CSI buffer
-    // csi_buffer_.CSI.resize(OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM);
-    // for (int i = 0; i < csi_buffer_.CSI.size(); i++)
-    //     csi_buffer_.CSI[i].resize(BS_ANT_NUM * UE_NUM);
-    // printf("CSI buffer initialized\n");
-
     int csi_buffer_size = UE_NUM * TASK_BUFFER_FRAME_NUM;
     csi_buffer_.CSI = (complex_float **)malloc(csi_buffer_size * sizeof(complex_float *));
     for (int i = 0; i < csi_buffer_size; i++)
         csi_buffer_.CSI[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
-    // int csi_buffer_size = OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM;
-    // csi_buffer_.CSI = (complex_float **)malloc(csi_buffer_size * sizeof(complex_float *));
-    // for (int i = 0; i < csi_buffer_size; i++)
-    //     csi_buffer_.CSI[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * UE_NUM * sizeof(complex_float));
 
 
     int data_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
@@ -374,11 +294,6 @@ CoMP::CoMP()
         mkl_statuses_dl[i] = DftiCommitDescriptor(mkl_handles_dl[i]);
     }
 
-    // // initialize downlink iffted data buffer
-    // dl_iffted_data_buffer_.data.resize(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    // for (int i = 0; i < dl_iffted_data_buffer_.data.size(); i++)
-    //     dl_iffted_data_buffer_.data[i].resize(UE_NUM * OFDM_CA_NUM);
-
     // initialize downlink precoded data buffer
     int dl_precoded_data_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     dl_precoded_data_buffer_.data = (complex_float **)malloc(dl_precoded_data_buffer_size * sizeof(complex_float *));
@@ -401,10 +316,6 @@ CoMP::CoMP()
     dl_socket_buffer_.buffer = (char *)aligned_alloc(64, dl_socket_buffer_size_ * sizeof(char));
     dl_socket_buffer_.buffer_status = (int *)aligned_alloc(64, dl_socket_buffer_size_ * sizeof(int));
 
-
-    // memset(dl_data_counter_scs_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-    // memset(modulate_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-
     for (int i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
         memset(dl_data_counter_scs_[i], 0, sizeof(int) * data_subframe_num_perframe);
         memset(modulate_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
@@ -414,21 +325,15 @@ CoMP::CoMP()
     memset(dl_data_counter_subframes_, 0, sizeof(int) * TASK_THREAD_NUM);
     memset(ifft_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
     memset(tx_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-    // memset(tx_counter_ants_, 0, sizeof(int) * SOCKET_BUFFER_FRAME_NUM); 
-
-    // for (int i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) 
-    //     memset(tx_counter_ants_[i], 0, sizeof(int) * data_subframe_num_perframe);
 
     printf("initialize QAM16 table\n");
-    float scale = 1/sqrt(10);
-    float modvec_16qam[4] = {-3*scale, -1*scale, 3*scale, scale};
-    for (int i = 0; i < 16; i++) {
-        qam16_table[0][i] = modvec_16qam[i / 4];
-        qam16_table[1][i] = modvec_16qam[i % 4];
-    }
-
-    // printf("new PackageSender\n");
-    // transmitter_.reset(new packageSenderBS(SOCKET_TX_THREAD_NUM, &complete_task_queue_, &tx_queue_));
+    init_qam16_table(qam16_table);
+    // float scale = 1/sqrt(10);
+    // float modvec_16qam[4] = {-3*scale, -1*scale, 3*scale, scale};
+    // for (int i = 0; i < 16; i++) {
+    //     qam16_table[0][i] = modvec_16qam[i / 4];
+    //     qam16_table[1][i] = modvec_16qam[i % 4];
+    // }
 
     for (int i = 0; i < TASK_THREAD_NUM; i++) {
         memset(IFFT_task_duration[i], 0, sizeof(double) * 4 * 8);
@@ -464,15 +369,6 @@ CoMP::~CoMP()
     delete[] dl_IQ_data;
     delete[] dl_IQ_data_long;
 
-   
-    // for (auto it = Encoders.begin(); it != Encoders.end(); ++it) {
-    //     delete *it;
-    // }
-
-    // for (auto it = Modems.begin(); it != Modems.end(); ++it) {
-    //     delete *it;
-    // }
-
 }
 
 
@@ -487,25 +383,7 @@ void CoMP::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_d
     }
 }
 
-/* assembly code to read the TSC */
-static inline uint64_t RDTSC()
-{
-  unsigned int hi, lo;
-  __asm__ volatile("rdtsc" : "=a" (lo), "=d" (hi));
-  return ((uint64_t)hi << 32) | lo;
-}
 
-
-static inline double get_time(void)
-{
-#if USE_RDTSC
-    return double(RDTSC())/2.3e3;
-#else
-    struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
-#endif
-}
 
 
 void CoMP::start()
@@ -1803,7 +1681,7 @@ void CoMP::start()
 
 
     printf("Print results\n");
-    FILE* fp_debug = fopen("../timeresult.txt", "w");
+    FILE* fp_debug = fopen("../matlab/timeresult.txt", "w");
     if (fp_debug==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -2214,163 +2092,6 @@ void* CoMP::demulThread(void* context)
 }
 
 
-
-inline int CoMP::generateOffset2d(int unit_total_num, int frame_id, int unit_id) 
-{
-    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-    return frame_id * unit_total_num + unit_id;
-}
-
-inline int CoMP::generateOffset3d(int unit_total_num, int frame_id, int current_data_subframe_id, int unit_id)
-{
-    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-    int total_data_subframe_id = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-    return total_data_subframe_id * unit_total_num + unit_id;
-}
-
-inline void CoMP::interpreteOffset2d(int unit_total_num, int offset, int *frame_id, int *unit_id)
-{
-    *unit_id = offset % unit_total_num;
-    *frame_id = offset / unit_total_num;
-}
-
-inline void CoMP::interpreteOffset3d(int unit_total_num, int offset, int *frame_id, int *total_data_subframe_id, int *current_data_subframe_id, int *unit_id)
-{
-    *unit_id = offset % unit_total_num;
-    *total_data_subframe_id = offset /unit_total_num;
-    *current_data_subframe_id = (*total_data_subframe_id) % data_subframe_num_perframe;
-    *frame_id = (*total_data_subframe_id) / data_subframe_num_perframe;
-}
-
-
-inline int CoMP::getFFTBufferIndex(int frame_id, int subframe_id, int ant_id) 
-{
-    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-    return frame_id * (BS_ANT_NUM * subframe_num_perframe) + subframe_id * BS_ANT_NUM + ant_id;
-}
-
-
-inline void CoMP::splitFFTBufferIndex(int FFT_buffer_target_id, int *frame_id, int *subframe_id, int *ant_id)
-{
-    (*frame_id) = FFT_buffer_target_id / (BS_ANT_NUM * subframe_num_perframe);
-    FFT_buffer_target_id = FFT_buffer_target_id - (*frame_id) * (BS_ANT_NUM * subframe_num_perframe);
-    (*subframe_id) = FFT_buffer_target_id / BS_ANT_NUM;
-    (*ant_id) = FFT_buffer_target_id - *subframe_id * BS_ANT_NUM;
-}
-
-inline complex_float CoMP::divide(complex_float e1, complex_float e2)
-{
-    complex_float re;
-    float module = e2.real * e2.real + e2.imag * e2.imag;
-    re.real = (e1.real * e2.real + e1.imag * e2.imag) / module;
-    re.imag = (e1.imag * e2.real - e1.real * e2.imag) / module;
-    return re;
-}
-
-
-inline imat CoMP::demod_16qam(cx_fmat x)
-{
-    imat re;
-    mat zero_mat = zeros<mat>(size(x));
-    // mat float_mat = 0.6325*ones<mat>(size(x));
-    mat float_mat(size(x));
-    float_mat.fill(0.6325);
-
-    umat c1 = real(x)>zero_mat;
-    imat c1_int = conv_to<imat>::from(c1);
-    umat c2 = abs(real(x))<float_mat;
-    imat c2_int = conv_to<imat>::from(c2);
-    umat c3 = imag(x)>zero_mat;
-    imat c3_int = conv_to<imat>::from(c3);
-    umat c4 = abs(imag(x))<float_mat;
-    imat c4_int = conv_to<imat>::from(c4);
-    re = 8*c1_int+4*c2_int+2*c3_int+1*c4_int;
-    // cout << "In demod_16qam: memory of x: " << x.memptr() << ",  memory of re: " << re.memptr() << endl;
-    // cout << "x:" << endl;
-    // cout << x.st() << endl;
-    // cout <<imag(x).st() << endl;
-    // cout << "Re:" << re.st() << endl;
-    return re;
-}
-
-
-inline void CoMP::demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num)
-{
-    float float_val = 0.6325;
-    for (int i = 0; i < ue_num; i++) {
-        float real_val = *(vec_in + i * 2);
-        float imag_val = *(vec_in + i * 2 + 1);
-        
-        *(vec_out + i) = 0;
-        if (real_val > 0)
-            *(vec_out + i) |= 1UL << 3;
-            //*(vec_out + i) += 8;
-        if (std::abs(real_val) < float_val)
-            *(vec_out + i) |= 1UL << 2;
-            //*(vec_out + i) += 4;
-        if (imag_val > 0)
-            *(vec_out + i) |= 1UL << 1;
-            //*(vec_out + i) += 2;
-        if (std::abs(imag_val) < float_val)
-            *(vec_out + i) |= 1UL ;
-            //*(vec_out + i) += 1;
-
-    }
-    // __m128 vec_zero = _mm_set1_ps(0);
-    // __m128 vec_float = _mm_set1_ps(0.6325);
-    // for (int i = 0; i < ue_num; i += 4) {
-    //     __m128 vec_in_cur = 
-    //     __m128 vec_real_cmp = _mm_cmpgt_ps()
-    // }
-}
-
-
-inline void CoMP::demod_16qam_soft(float *vec_in, float *vec_out, int length )
-{
-    unsigned char re, im;
-    for (int i = 0; i < length; i++) {
-        float re_float = *(vec_in + i * 2);
-        float im_float = *(vec_in + i * 2+1);
-        re = (unsigned char)((re_float+1) * 255);
-        im = (unsigned char)((im_float+1) * 255);
-        *(vec_out + 4 * i) = m_bpsk_lut[re];
-        *(vec_out + 4 * i + 1) = m_qam16_lut2[re];
-        *(vec_out + 4 * i + 2) = m_bpsk_lut[im];
-        *(vec_out + 4 * i + 3) = m_qam16_lut2[im];
-    }
-}
-
-
-inline cx_fmat CoMP::mod_16qam(imat x)
-{
-    // cx_fmat re(size(x));
-    fmat real_re = conv_to<fmat>::from(x);
-    fmat imag_re = conv_to<fmat>::from(x);
-    // float scale = 1/sqrt(10);
-    // float modvec_16qam[4]  = {-3*scale, -1*scale, 3*scale, scale};
-
-    // real_re.for_each([&modvec_16qam](fmat::elem_type& val) { val = modvec_16qam[(int)val/4]; } );
-    // imag_re.for_each([&modvec_16qam](fmat::elem_type& val) { val = modvec_16qam[(int)val%4]; } );
-    real_re.for_each([this](fmat::elem_type& val) { val = qam16_table[0][(int)val]; } );
-    imag_re.for_each([this](fmat::elem_type& val) { val = qam16_table[1][(int)val]; } );
-    cx_fmat re(real_re, imag_re);
-    // re.set_real(real_re);
-    // re.set_imag(imag_re);
-    // cout << "In mod_16qam: memory of x: " << x.memptr() << ",  memory of re: " << re.memptr() << endl;
-    // cout << "x:" << endl;
-    // cout << x.st() << endl;
-    // cout << "Re:" << real(re).st() << endl;
-    return re;
-}
-
-
-inline complex_float CoMP::mod_16qam_single(int x) 
-{
-    complex_float re;
-    re.real = qam16_table[0][x];
-    re.imag = qam16_table[1][x];
-    return re;
-}
 
 /*****************************************************
  * Uplink tasks
@@ -3164,75 +2885,6 @@ void CoMP::doDemul(int tid, int offset)
 //     }
 
 
-
-
-// #if ENABLE_DECODE
-//     __m256i index_out = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
-
-//     #if COMBINE_EQUAL_DECODE
-//         if (sc_id < MAX_CODED_SC) {
-//             // int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
-//             float *temp_ptr = (float *)&equaled_buffer_temp[tid][0];
-//             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
-//             // cout<< "Equalized data: ";
-//             // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
-//             //     cout<<*(temp_ptr+sc_idx)<<"  ";
-//             // }
-//             // cout<<endl;
-            
-//             for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-//                 float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
-//                 for (int j = 0; j < max_sc_ite / 4; j++) {
-//                     float *tar_ptr = (float *)(&equaled_buffer_T_temp[tid][j * 4 + ue_idx * max_sc_ite]);
-//                     __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
-//                     _mm256_store_ps(tar_ptr, equaled_data);
-//                 }
-                
-//             }
-//             // float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][ue_idx * max_sc_ite]);
-//             float *equal_t_ptr = (float *)(&equaled_buffer_T_temp[tid][0]);
-//             float *demul_ptr = (&demul_soft_buffer_temp[tid][0]);
-//             demod_16qam_soft(equal_t_ptr, demul_ptr, max_sc_ite * UE_NUM );
-//             int block_id = sc_id / demul_block_size;
-//             // int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS + ue_idx * ORIG_CODE_LEN * NUM_CODE_BLOCK * NUM_BITS];
-//             int *decoded_buf_ptr = &decoded_buffer_[total_data_subframe_id][block_id * ORIG_CODE_LEN * NUM_BITS * UE_NUM];
-//             Decoders[tid]->decode_siho(demul_ptr, decoded_buf_ptr);
-//             // if (tid == 10) {
-//             //     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
-//             //     // cout<< "Equalized data: ";
-//             //     // for (int sc_idx = 0; sc_idx < CODED_LEN * UE_NUM; sc_idx++) {
-//             //     //     cout<<*(equal_t_ptr+sc_idx)<<"  ";
-//             //     // }
-//             //     // cout<<endl;
-//             //     // cout<< "Demodulated data: ";
-//             //     // for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
-//             //     //     cout<<*(demul_ptr+sc_idx)<<"  ";
-//             //     // }
-//             //     // cout<<endl;
-//             //     cout<< "Decoded data after decode: ";
-//             //     for (int sc_idx = 0; sc_idx < ORIG_CODE_LEN * NUM_BITS * UE_NUM; sc_idx++) {
-//             //         cout<<*(decoded_buf_ptr+sc_idx)<<"  ";
-//             //     }
-//             //     cout<<endl;
-//             // }
-//         }
-//     #else          
-//         if (sc_id < MAX_CODED_SC) {
-//             int cache_line_num = max_sc_ite * sizeof(float) * 2 / 64;
-//             for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-//                 float *src_ptr = (float *)&equaled_buffer_temp[tid][ue_idx];
-//                 float *tar_ptr =  (float *)&equal_buffer_.data[total_data_subframe_id][sc_id + ue_idx * OFDM_DATA_NUM];
-//                 for (int j = 0; j < max_sc_ite / 4; j++) {
-//                     __m256 equaled_data = _mm256_i32gather_ps(src_ptr + j * 8 * UE_NUM, index_out, 4);
-//                     _mm256_stream_ps(tar_ptr + j * 8, equaled_data);
-
-//                 }
-//             }
-//         }
-//     #endif
-// #endif
-
-
     // inform main thread
 #if DEBUG_UPDATE_STATS   
     double duration = get_time() - start_time;
@@ -3398,7 +3050,7 @@ void CoMP::do_modulate(int tid, int offset)
     int *input_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][0];
     complex_float *output_ptr = &dl_modulated_buffer_.data[total_data_subframe_id][0];
     for (int i = 0; i < OFDM_DATA_NUM; i++) {
-        *(output_ptr + i * UE_NUM + user_id) = mod_16qam_single(*(input_ptr+i));
+        *(output_ptr + i * UE_NUM + user_id) = mod_16qam_single(*(input_ptr+i), qam16_table);
         // printf(" (%d, %.4f+j%.4f) ", *(input_ptr+i), (*(output_ptr + i * OFDM_CA_NUM + user_id)).real, (*(output_ptr + i * OFDM_CA_NUM + user_id)).imag);
     }
 
@@ -3442,7 +3094,7 @@ void CoMP::do_precode(int tid, int offset)
         for (int user_id = 0; user_id < UE_NUM; user_id ++) {
             int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
             // cout<<*raw_data_ptr<<", ";
-            *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr));
+            *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam16_table);
             // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
         }
         // cout<<endl;

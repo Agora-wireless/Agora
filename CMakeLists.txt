@@ -60,7 +60,7 @@ endforeach()
 add_executable(sender src/sender/sender_cli.cpp src/sender/packageSender.cpp src/common/cpu_attach.cpp)
 target_link_libraries(sender -lpthread )
 
-set(SOURCES src/receiver/main.cpp src/receiver/packageReceiver.cpp src/receiver/CoMP.cpp src/common/cpu_attach.cpp)
+set(SOURCES src/receiver/main.cpp src/receiver/packageReceiver.cpp src/receiver/CoMP.cpp src/common/cpu_attach.cpp src/receiver/compute_common.cpp)
 add_executable(CoMP ${SOURCES})
 target_link_libraries(CoMP -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB})
 
