@@ -1124,6 +1124,11 @@ void* PackageReceiver::loopTXRX(void *in_context)
     int rx_packet_num_per_frame = 0;
     int tx_packet_num_per_frame = 0;
     int do_tx = 0;
+    int rx_pkts_in_frame_count[10000];
+    int last_finished_frame_id = 0;
+
+    int tx_pkts_in_frame_count[10000];
+    int last_finished_tx_frame_id = 0;
 
 
     double start_time= get_time();
@@ -1207,6 +1212,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
             frame_id = *((int *)rx_cur_ptr_buffer);
             subframe_id = *((int *)rx_cur_ptr_buffer + 1);
             ant_id = *((int *)rx_cur_ptr_buffer + 3);
+            rx_pkts_in_frame_count[frame_id % 10000]++;
             // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
@@ -1234,9 +1240,14 @@ void* PackageReceiver::loopTXRX(void *in_context)
                 exit(0);
             }
 
-            if(rx_packet_num_per_frame == max_rx_packet_num_per_frame) {
+            // if(rx_packet_num_per_frame == max_rx_packet_num_per_frame) {
+            if(rx_pkts_in_frame_count[frame_id] == max_rx_packet_num_per_frame) {
                 do_tx = 1;
                 rx_packet_num_per_frame = 0;
+                rx_pkts_in_frame_count[frame_id] = 0;
+                // printf("In TXRX thread %d: RX finished frame %d, current frame %d\n", tid, last_finished_frame_id, prev_frame_id);
+                // last_finished_frame_id++;
+                
             }
         }
         else {
@@ -1273,6 +1284,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
                 exit(0);
             }
             tx_packet_num_per_frame++;
+            tx_pkts_in_frame_count[tx_frame_id]++;
 
     #if DEBUG_BS_SENDER
             printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, tx_frame_id, tx_subframe_id, tx_ant_id, tx_offset,
@@ -1285,9 +1297,14 @@ void* PackageReceiver::loopTXRX(void *in_context)
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
-            if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
+            // if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
+            if (tx_pkts_in_frame_count[tx_frame_id] == max_tx_packet_num_per_frame) {
                 do_tx = 0;
                 tx_packet_num_per_frame = 0;
+                tx_pkts_in_frame_count[tx_frame_id] = 0;
+                // printf("In TXRX thread %d: TX finished frame %d, current frame %d\n", tid, last_finished_tx_frame_id, prev_frame_id);
+                // last_finished_tx_frame_id = (last_finished_tx_frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                
             }
         }  
 

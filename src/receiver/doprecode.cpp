@@ -25,6 +25,13 @@ DoPrecode::DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block
     Precode_task_duration = in_Precode_task_duration;
     Precode_task_count = in_Precode_task_count;
 
+    modulated_buffer_temp = (complex_float *)aligned_alloc(64, UE_NUM * sizeof(complex_float));
+    precoded_buffer_temp =  (complex_float *)aligned_alloc(64, demul_block_size * BS_ANT_NUM * sizeof(complex_float));
+    // precoded_buffer_temp = (complex_float **)aligned_alloc(64, demul_block_size * sizeof(complex_float *));
+    // for (int i = 0; i < demul_block_size; i++) {
+    //     precoded_buffer_temp[i] =  (complex_float *)aligned_alloc(64, BS_ANT_NUM * sizeof(complex_float))
+    // }
+
 }
 
 DoPrecode::~DoPrecode() 
@@ -40,7 +47,9 @@ void DoPrecode::Precode(int offset)
 #endif
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
     interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
 
+    int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
     
     // double start_time = get_time();
     int max_sc_ite;
@@ -49,72 +58,103 @@ void DoPrecode::Precode(int offset)
     else
         max_sc_ite = OFDM_DATA_NUM - sc_id;
     // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d, max_sc_ite: %d\n", tid, frame_id, current_data_subframe_id, sc_id, max_sc_ite);
-    for (int i = 0; i < max_sc_ite; i++) { 
-        int cur_sc_id = sc_id + i;
 
-        complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
-        for (int user_id = 0; user_id < UE_NUM; user_id ++) {
-            int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
-            // cout<<*raw_data_ptr<<", ";
-            *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam16_table);
-            // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+
+    for (int i = 0; i < max_sc_ite; i = i + 4) { 
+#if DEBUG_UPDATE_STATS_DETAILED    
+        double start_time1 = get_time();
+#endif
+        for (int j = 0; j < 4; j++) {
+#if DEBUG_UPDATE_STATS_DETAILED    
+            double start_time2 = get_time();
+#endif
+            int cur_sc_id = sc_id + i + j;
+            int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
+
+
+            for (int line_idx = 0; line_idx < precoder_cache_line_num; line_idx ++) {
+                _mm_prefetch((char *)(precoder_buffer_[precoder_offset] + line_idx * 8), _MM_HINT_T0);
+            }
+
+            // complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
+            _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id * UE_NUM]+cur_sc_id), _MM_HINT_T0);
+            complex_float *data_ptr = modulated_buffer_temp;
+            for (int user_id = 0; user_id < UE_NUM - 1; user_id ++) {
+                int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
+                // cout<<*raw_data_ptr<<", ";
+                _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id * UE_NUM + user_id + 1], _MM_HINT_T0);
+                *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam16_table);
+                
+                // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+            }
+            // cout<<endl;
+
+            int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + UE_NUM - 1][cur_sc_id];
+            *(data_ptr + UE_NUM - 1) = mod_16qam_single(*(raw_data_ptr), qam16_table);
+
+
+            
+            // mat_precoder size: UE_NUM \times BS_ANT_NUM        
+            cx_float* precoder_ptr = (cx_float *)precoder_buffer_[precoder_offset];
+            cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
+
+            // mat_data size: UE_NUM \times 1
+            // cx_float* data_ptr = (cx_float *)(&dl_modulated_buffer_.data[total_data_subframe_id][UE_NUM * (sc_id+i)]);
+            // cx_fmat mat_data((cx_float *)data_ptr, UE_NUM, 1, false);
+            cx_fmat mat_data((cx_float *)data_ptr, 1, UE_NUM, false);
+            // cout << "Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << sc_id+i << ", data: " << real(mat_data).st() << endl;
+
+            // mat_precoded size: BS_ANT_NUM \times 1
+            cx_float *precoded_ptr = (cx_float *)precoded_buffer_temp + (i+j) * BS_ANT_NUM;
+            // cx_float* precoded_ptr = (cx_float *)(&dl_precoded_data_buffer_[total_data_subframe_id][cur_sc_id * BS_ANT_NUM]);
+            // cx_fmat mat_precoded(precoded_ptr, BS_ANT_NUM, 1, false);
+            cx_fmat mat_precoded(precoded_ptr, 1, BS_ANT_NUM, false);
+
+#if DEBUG_UPDATE_STATS_DETAILED   
+        double duration1 = get_time() - start_time2;
+        Precode_task_duration[tid * 8][1] += duration1;
+#endif
+            mat_precoded = mat_data * mat_precoder;
+            // mat_precoded = mat_precoder.st() * mat_data;
+            // cout<<"Precoder: \n"<<mat_precoder<<endl;
+            // cout<<"Precoder transposed: \n"<<mat_precoder.st()<<endl;
+            // cout<<"Data: "<<mat_data<<endl;
+            // cout << "Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << sc_id+i << ", data: " << real(mat_precoded).st() << endl;
+            // cout << "Precoded data:" ;
+            // for (int j = 0; j < BS_ANT_NUM; j++) {
+            //     cout <<*((float *)(precoded_ptr+j)) << "+j"<<*((float *)(precoded_ptr+j)+1)<<",   ";
+            // }
+            // cout<<endl;
         }
-        // cout<<endl;
+// #if DEBUG_UPDATE_STATS_DETAILED   
+//         double duration2 = get_time() - start_time1;
+//         Precode_task_duration[tid * 8][2] += duration2;
+//         double start_time3 = get_time();
+// #endif
 
-        int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
-        // mat_precoder size: UE_NUM \times BS_ANT_NUM        
-        cx_float* precoder_ptr = (cx_float *)precoder_buffer_[precoder_offset];
-        cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
-
-        // mat_data size: UE_NUM \times 1
-        // cx_float* data_ptr = (cx_float *)(&dl_modulated_buffer_.data[total_data_subframe_id][UE_NUM * (sc_id+i)]);
-        cx_fmat mat_data((cx_float *)data_ptr, UE_NUM, 1, false);
-        // cout << "Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << sc_id+i << ", data: " << real(mat_data).st() << endl;
-
-        // mat_precoded size: BS_ANT_NUM \times 1
-        cx_float* precoded_ptr = (cx_float *)(&dl_precoded_data_buffer_[total_data_subframe_id][cur_sc_id * BS_ANT_NUM]);
-        cx_fmat mat_precoded(precoded_ptr, BS_ANT_NUM, 1, false);
-
-        mat_precoded = mat_precoder.st() * mat_data;
-        // cout<<"Precoder: \n"<<mat_precoder<<endl;
-        // cout<<"Precoder transposed: \n"<<mat_precoder.st()<<endl;
-        // cout<<"Data: "<<mat_data<<endl;
-        // cout << "Frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", SC: " << sc_id+i << ", data: " << real(mat_precoded).st() << endl;
-        // cout << "Precoded data:" ;
-        // for (int j = 0; j < BS_ANT_NUM; j++) {
-        //     cout <<*((float *)(precoded_ptr+j)) << "+j"<<*((float *)(precoded_ptr+j)+1)<<",   ";
-        // }
-        // cout<<endl;
+//         /* copy data to ifft input, 4 subcarriers per iteration */ 
+//         double *precoded_ptr = (double *)precoded_buffer_temp + i * BS_ANT_NUM;
+//         // double* precoded_ptr = (double *)&dl_precoded_data_buffer_[total_data_subframe_id][(sc_id + i) * BS_ANT_NUM];
+//         for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
+//             int ifft_buffer_offset = generateOffset3d(BS_ANT_NUM, frame_id, current_data_subframe_id, ant_id);
+//             double* ifft_ptr = (double *)&dl_ifft_buffer_[ifft_buffer_offset][sc_id + i + OFDM_DATA_START];
+            
+//             double *input_shifted_ptr = precoded_ptr + ant_id;
+//             __m256d t_data = _mm256_i64gather_pd(input_shifted_ptr, index, 8);
+//             _mm256_stream_pd(ifft_ptr, t_data);
+//         }
+// #if DEBUG_UPDATE_STATS_DETAILED   
+//         double duration3 = get_time() - start_time3;
+//         Precode_task_duration[tid * 8][3] += duration3;
+// #endif
     }
 
-    // copy data to ifft input
-    // int cache_line_num = transpose_block_size / 8;
-    // int iteration_per_page = 64 / cache_line_num;
-    // int offset_in_page = OFDM_DATA_START / 8;
-    // int block_num = OFDM_DATA_NUM / transpose_block_size;
+#if DEBUG_UPDATE_STATS_DETAILED   
+        double start_time3 = get_time();
+#endif
 
-    // for(int c2 = 0; c2 < block_num; c2++) {
-    //     // c3 = 0, 1, ..., transpose_block_size/8 -1 = 7
-    //     // c3*8 = 0, 8, ..., 64-8
-    //     if (c2 % iteration_per_page == 0 && c2 < block_num - iteration_per_page)
-    //         float temp = *(src_ptr + 1024);
-    //     for(int c3 = 0; c3 < cache_line_num; c3++) {
-    //         // data: 256 bits = 32 bytes = 8 float values = 4 subcarriers
-
-    //         // __m256 data = _mm256_load_ps(src_ptr);
-    //         // original data order: SCs of ant1, SCs of ant2, ..., SCs of ant 96
-    //         // transposed data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
-    //         // prefetch a cache line
-    //         _mm_prefetch((char*)(src_ptr + 16), _MM_HINT_T0);
-    //         float *tar_ptr_cur = tar_ptr + (c2 * BS_ANT_NUM + ant_id)* transpose_block_size * 2 + c3 * 16;
-    //         _mm256_stream_ps(tar_ptr_cur, _mm256_load_ps(src_ptr));
-    //         _mm256_stream_ps(tar_ptr_cur + 8, _mm256_load_ps(src_ptr + 8));
-    //         // printf("In deFFT thread %d: frame %d, subframe %d, subcarrier %d %d, address offset: %d\n", tid, frame_id, subframe_id, c2, c3, tar_ptr_cur - src_ptr);
-    //         src_ptr += 16;
-    //     }            
-    // } 
-    __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
-    float* precoded_ptr = (float *)&dl_precoded_data_buffer_[total_data_subframe_id][sc_id * BS_ANT_NUM];
+    float *precoded_ptr = (float *)precoded_buffer_temp;
+    // float* precoded_ptr = (float *)&dl_precoded_data_buffer_[total_data_subframe_id][sc_id * BS_ANT_NUM];
     for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
         int ifft_buffer_offset = generateOffset3d(BS_ANT_NUM, frame_id, current_data_subframe_id, ant_id);
         float* ifft_ptr = (float *)&dl_ifft_buffer_[ifft_buffer_offset][sc_id + OFDM_DATA_START];
@@ -124,9 +164,13 @@ void DoPrecode::Precode(int offset)
             _mm256_stream_pd((double *)(ifft_ptr + i * 8), t_data);
         }
     }
+#if DEBUG_UPDATE_STATS_DETAILED   
+        double duration3 = get_time() - start_time3;
+        Precode_task_duration[tid * 8][3] += duration3;
+#endif
 
 #if DEBUG_UPDATE_STATS
-    Precode_task_count[tid*16] = Precode_task_count[tid*16]+1;
+    Precode_task_count[tid*16] = Precode_task_count[tid*16] + max_sc_ite;
     Precode_task_duration[tid*8][0] += get_time() - start_time;
 #endif
     // inform main thread
