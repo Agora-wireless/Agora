@@ -72,6 +72,9 @@ private:
     double **Precode_task_duration;
     int *Precode_task_count;
 
+    complex_float *modulated_buffer_temp;
+    complex_float *precoded_buffer_temp;
+
 
 };
 

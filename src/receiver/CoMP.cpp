@@ -862,7 +862,7 @@ void CoMP::start()
 #if ENABLE_DOWNLINK
                         Event_data do_precode_task;
                         do_precode_task.event_type = TASK_PRECODE;
-                        for(int j = 0; j < OFDM_DATA_NUM / demul_block_size; j++) {
+                        for(int j = 0; j < demul_block_num; j++) {
                             do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, dl_data_subframe_start, j * demul_block_size);
                             schedule_task(do_precode_task, &precode_queue_, ptok_precode);
                         }
@@ -1211,53 +1211,18 @@ void CoMP::start()
                 }
                 break;
 
-            case EVENT_DECODE: {
-                    int offset_decode = event.data;                   
-                    int frame_id, total_data_subframe_id, data_subframe_id, ue_offset;
-                    interpreteOffset3d(OFDM_DATA_NUM*UE_NUM, offset_decode, &frame_id, &total_data_subframe_id, &data_subframe_id, &ue_offset);
-                    int ue_id = ue_offset % CODED_LEN;
-                    int block_id = ue_offset / CODED_LEN;
-
-                    decode_counter_blocks_[frame_id][data_subframe_id]++;
-
-#if DEBUG_PRINT_PER_TASK_DONE
-                    printf("Main thread: Decode done frame: %d, subframe: %d, block: %d, user: %d,offset %d, count: %d\n", frame_id, data_subframe_id, block_id, ue_id, offset_decode, decode_counter_blocks_[frame_id][data_subframe_id]);
-#endif
-                    if (decode_counter_blocks_[frame_id][data_subframe_id] == UE_NUM * NUM_CODE_BLOCK) {
-#if DEBUG_PRINT_PER_SUBFRAME_DONE
-                        printf("Main thread: Decode done frame: %d, subframe: %d\n", frame_id, data_subframe_id);
-#endif
-                        decode_counter_subframes_[frame_id] ++;
-                        if (decode_counter_subframes_[frame_id] == data_subframe_num_perframe) {
-#if DEBUG_PRINT_PER_FRAME_DONE
-                            printf("Main thread: Decode done frame: %d, %d, subframe %d in %.5f us, total %.5f us\n", frame_id, frame_count_decode, data_subframe_id, 
-                                get_time()-zf_processed[frame_count_decode], get_time()-pilot_received[frame_count_decode]);
-#endif                  
-                            frame_count_decode++;
-                            if (frame_count_decode == 1e9) 
-                                frame_count_decode = 0;
-
-                            decode_counter_subframes_[frame_id] = 0;
-                        }
-                        
-                        decode_counter_blocks_[frame_id][data_subframe_id] = 0;
-                    }
-
-                }
-                break;
-
             case EVENT_PRECODE: {
                     // Precoding is done, schedule ifft 
                     int offset_precode = event.data;
                     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
                     interpreteOffset3d(OFDM_DATA_NUM, offset_precode, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
-                    dl_data_counter_scs_[frame_id][current_data_subframe_id] += demul_block_size;
+                    dl_data_counter_scs_[frame_id][current_data_subframe_id]++;
 #if DEBUG_PRINT_PER_TASK_DONE
                     printf("Main thread: Precoding done frame: %d, subframe: %d, subcarrier: %d, offset: %d, total SCs: %d\n", 
                         frame_id, current_data_subframe_id,  sc_id, offset_precode, dl_data_counter_scs_[frame_id][current_data_subframe_id]);
 #endif
                     
-                    if (dl_data_counter_scs_[frame_id][current_data_subframe_id] == OFDM_DATA_NUM) {
+                    if (dl_data_counter_scs_[frame_id][current_data_subframe_id] == demul_block_num) {
                         // add ifft task for each antenna
                         
                         dl_data_counter_scs_[frame_id][current_data_subframe_id] = 0;
@@ -1270,7 +1235,7 @@ void CoMP::start()
                         if (current_data_subframe_id < data_subframe_num_perframe - 1) {
                             Event_data do_precode_task;
                             do_precode_task.event_type = TASK_PRECODE;
-                            for(int j = 0; j < OFDM_DATA_NUM / demul_block_size; j++) {
+                            for(int j = 0; j < demul_block_num; j++) {
                                 do_precode_task.data = generateOffset3d(OFDM_DATA_NUM, frame_id, current_data_subframe_id + 1, j * demul_block_size);
                                 schedule_task(do_precode_task, &precode_queue_, ptok_precode);
                             }
@@ -1446,13 +1411,13 @@ void CoMP::start()
                                 float sum_time_this_frame_this_thread = csi_time_this_frame_this_thread[0] * csi_count_this_frame_this_thread +
                                      ifft_time_this_frame_this_thread[0] * ifft_count_this_frame_this_thread;
         #if DEBUG_PRINT_STATS_PER_THREAD
-                                printf("In frame %d, thread %d, \t\t\t csi: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), ifft: %d tasks %.5f, sum: %.5f\n",
+                                printf("In frame %d, thread %d, \t\t\t csi: %d tasks %.5f (%.5f, %.5f, %.5f), ifft: %d tasks %.5f, sum: %.5f\n",
                                         frame_id, i, csi_count_this_frame_this_thread, 
                                         csi_time_this_frame_this_thread[0], csi_time_this_frame_this_thread[1], csi_time_this_frame_this_thread[2], csi_time_this_frame_this_thread[3],
                                         ifft_count_this_frame_this_thread, ifft_time_this_frame_this_thread[0], sum_time_this_frame_this_thread);
         #endif
-                                csi_count_per_thread[i] = CSI_task_count[i];
-                                ifft_count_per_thread[i] = IFFT_task_count[i];
+                                csi_count_per_thread[i] = CSI_task_count[i*16];
+                                ifft_count_per_thread[i] = IFFT_task_count[i*16];
                             }        
 
 
@@ -1473,11 +1438,12 @@ void CoMP::start()
                                      + zf_time_this_frame_this_thread[0] * zf_count_this_frame_this_thread;
         #if DEBUG_PRINT_STATS_PER_THREAD
                                 printf("In frame %d, thread %d, \t\t\t  zf: %d tasks %.5f (%.5f, %.5f, %.5f), sum: %.5f\n",
-                                        frame_id, i, csi_count_this_frame_this_thread, 
-                                        zf_count_this_frame_this_thread, zf_time_this_frame_this_thread[0], zf_time_this_frame_this_thread[1], zf_time_this_frame_this_thread[2], zf_time_this_frame_this_thread[3]);
+                                        frame_id, i, zf_count_this_frame_this_thread, 
+                                        zf_time_this_frame_this_thread[0], zf_time_this_frame_this_thread[1], zf_time_this_frame_this_thread[2], zf_time_this_frame_this_thread[3],
+                                        sum_time_this_frame_this_thread);
         #endif
                                 
-                                zf_count_per_thread[i] = ZF_task_count[i];
+                                zf_count_per_thread[i] = ZF_task_count[i*16];
                             }     
 
                             for (int i = FFT_THREAD_NUM + ZF_THREAD_NUM; i < TASK_THREAD_NUM; i++) {
@@ -1494,11 +1460,12 @@ void CoMP::start()
 
                                 float sum_time_this_frame_this_thread = precode_time_this_frame_this_thread[0] * precode_count_this_frame_this_thread;
         #if DEBUG_PRINT_STATS_PER_THREAD
-                                printf("In frame %d, thread %d, \t\t\t precode: %d tasks %.5f, sum: %.5f\n",
-                                        frame_id, i, csi_count_this_frame_this_thread, 
-                                        precode_count_this_frame_this_thread, precode_time_this_frame_this_thread[0], sum_time_this_frame_this_thread);
+                                printf("In frame %d, thread %d, \t\t\t precode: %d tasks %.5f (%.5f, %.5f, %.5f), sum: %.5f\n",
+                                        frame_id, i, precode_count_this_frame_this_thread, 
+                                        precode_time_this_frame_this_thread[0], precode_time_this_frame_this_thread[1], precode_time_this_frame_this_thread[2], precode_time_this_frame_this_thread[3], 
+                                        sum_time_this_frame_this_thread);
         #endif
-                                precode_count_per_thread[i] = Precode_task_count[i];
+                                precode_count_per_thread[i] = Precode_task_count[i*16];
                             }   
 
 
@@ -1547,16 +1514,18 @@ void CoMP::start()
                                      + zf_time_this_frame_this_thread[0] * zf_count_this_frame_this_thread + 
                                      ifft_time_this_frame_this_thread[0] * ifft_count_this_frame_this_thread + precode_time_this_frame_this_thread[0] * precode_count_this_frame_this_thread;
         #if DEBUG_PRINT_STATS_PER_THREAD
-                                printf("In frame %d, thread %d, \t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), precode: %d tasks %.5f, ifft: %d tasks %.5f, sum: %.5f\n",
+                                printf("In frame %d, thread %d, \t\t\t fft: %d tasks %.5f (%.5f, %.5f, %.5f), zf: %d tasks %.5f (%.5f, %.5f, %.5f), precode: %d tasks %.5f (%.5f, %.5f, %.5f), ifft: %d tasks %.5f, sum: %.5f\n",
                                         frame_id, i, csi_count_this_frame_this_thread, 
                                         csi_time_this_frame_this_thread[0], csi_time_this_frame_this_thread[1], csi_time_this_frame_this_thread[2], csi_time_this_frame_this_thread[3],
                                         zf_count_this_frame_this_thread, zf_time_this_frame_this_thread[0], zf_time_this_frame_this_thread[1], zf_time_this_frame_this_thread[2], zf_time_this_frame_this_thread[3], 
-                                        precode_count_this_frame_this_thread, precode_time_this_frame_this_thread[0], ifft_count_this_frame_this_thread, ifft_time_this_frame_this_thread[0], sum_time_this_frame_this_thread);
+                                        precode_count_this_frame_this_thread, 
+                                        precode_time_this_frame_this_thread[0], precode_time_this_frame_this_thread[1], precode_time_this_frame_this_thread[2], precode_time_this_frame_this_thread[3], 
+                                        ifft_count_this_frame_this_thread, ifft_time_this_frame_this_thread[0], sum_time_this_frame_this_thread);
         #endif
-                                csi_count_per_thread[i] = CSI_task_count[i];
-                                zf_count_per_thread[i] = ZF_task_count[i];
-                                ifft_count_per_thread[i] = IFFT_task_count[i];
-                                precode_count_per_thread[i] = Precode_task_count[i];
+                                csi_count_per_thread[i] = CSI_task_count[i*16];
+                                zf_count_per_thread[i] = ZF_task_count[i*16];
+                                ifft_count_per_thread[i] = IFFT_task_count[i*16];
+                                precode_count_per_thread[i] = Precode_task_count[i*16];
                             }                  
 
                             for (int i = 0; i < 4; i++) {
@@ -2068,13 +2037,13 @@ void* CoMP::fftThread(void* context)
             if (!ret)
                 continue;
             else
-                computeFFT->FFT(event.data);
+                computeFFT->IFFT(event.data);
 #else
             continue;
 #endif
         }
         else
-            computeFFT->IFFT(event.data);
+            computeFFT->FFT(event.data);
     }
 
 }

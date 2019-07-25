@@ -404,14 +404,31 @@ void DoFFT::IFFT(int offset)
     float *ifft_output_ptr = (float *)(&dl_ifft_buffer_[offset][0]);
     int socket_subframe_offset = (frame_id % SOCKET_BUFFER_FRAME_NUM) * data_subframe_num_perframe + current_data_subframe_id;
     char *socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * package_length];
+    int socket_offset = sizeof(int) * 16 + ant_id * package_length;
 
-    for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
-        float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
-        int socket_offset = sizeof(int) * 16 + ant_id * package_length;
-        // ifft scaled results by 2048, 16 = 2^15/2048
-        *((short *)(socket_ptr + socket_offset) + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
-        *((short *)(socket_ptr + socket_offset) + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
+    // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
+    //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
+    //     // ifft scaled results by 2048, 16 = 2^15/2048
+    //     *((short *)(socket_ptr + socket_offset) + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
+    //     *((short *)(socket_ptr + socket_offset) + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
+    // }
+
+    
+    socket_ptr = socket_ptr + socket_offset;
+    for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
+        __m256 scale_factor = _mm256_set1_ps(16);
+        __m256 ifft1 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id);
+        __m256 ifft2 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id + 8);
+        __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
+        __m256 scaled_ifft2 = _mm256_mul_ps(ifft2, scale_factor);
+        __m256i integer1 = _mm256_cvtps_epi32(scaled_ifft1);
+        __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
+        integer1 = _mm256_packs_epi32(integer1, integer2);
+        integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
+        _mm256_stream_si256((__m256i *) (socket_ptr + sc_id * 4), integer1);
     }
+
+
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id << ", data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
