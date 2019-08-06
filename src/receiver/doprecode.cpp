@@ -126,11 +126,11 @@ void DoPrecode::Precode(int offset)
             // }
             // cout<<endl;
         }
-// #if DEBUG_UPDATE_STATS_DETAILED   
-//         double duration2 = get_time() - start_time1;
-//         Precode_task_duration[tid * 8][2] += duration2;
-//         double start_time3 = get_time();
-// #endif
+#if DEBUG_UPDATE_STATS_DETAILED   
+        double duration2 = get_time() - start_time1;
+        Precode_task_duration[tid * 8][2] += duration2;
+        double start_time3 = get_time();
+#endif
 
 //         /* copy data to ifft input, 4 subcarriers per iteration */ 
 //         double *precoded_ptr = (double *)precoded_buffer_temp + i * BS_ANT_NUM;

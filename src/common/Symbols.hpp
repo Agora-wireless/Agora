@@ -4,7 +4,7 @@
 
 #define ENABLE_CPU_ATTACH
 
-#define BS_ANT_NUM 32
+#define BS_ANT_NUM 8
 #define OFDM_CA_NUM 2048
 #define FFT_LEN 2048
 #define OFDM_DATA_NUM 1200
@@ -49,7 +49,7 @@
 
 
 #define BIGSTATION 0
-#define ENABLE_DOWNLINK 1
+#define ENABLE_DOWNLINK 0
 #define USE_IPV4 1
 #define USE_DPDK 0
 #define CONNECT_UDP 1
@@ -74,7 +74,7 @@
 #define DEBUG_PRINT_PER_FRAME_START 0
 
 #define DEBUG_PRINT_STATS_PER_THREAD 0
-#define DEBUG_UPDATE_STATS 0
+#define DEBUG_UPDATE_STATS 1
 #define DEBUG_UPDATE_STATS_DETAILED 0
 #define DEBUG_PRINT_PILOT 0
 #define MEASURE_TIME 1
@@ -89,7 +89,7 @@
 static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
-static const int dl_data_subframe_start = data_subframe_num_perframe-1;
+static const int dl_data_subframe_start = data_subframe_num_perframe-5;
 static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - dl_data_subframe_start;
 
 static const int MAX_FRAME_ID = 1e4;

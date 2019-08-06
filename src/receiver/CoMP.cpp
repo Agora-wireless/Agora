@@ -145,10 +145,13 @@ CoMP::CoMP()
 
 #if ENABLE_DOWNLINK
     printf("Downlink enabled.\n");
-    dl_IQ_data = new int * [data_subframe_num_perframe * UE_NUM];
+    int dl_IQ_data_size = data_subframe_num_perframe * UE_NUM;
+    dl_IQ_data = (int **)malloc(dl_IQ_data_size * sizeof(int *));
+    // dl_IQ_data = new int * [data_subframe_num_perframe * UE_NUM];
     dl_IQ_data_long = new long long * [data_subframe_num_perframe * UE_NUM];
-    for (int i = 0; i < data_subframe_num_perframe * UE_NUM; i++) {
-        dl_IQ_data[i] = new int[OFDM_CA_NUM];
+    for (int i = 0; i < dl_IQ_data_size; i++) {
+        dl_IQ_data[i] = (int *)aligned_alloc(64, OFDM_CA_NUM * sizeof(int));
+        // dl_IQ_data[i] = new int[OFDM_CA_NUM];
         dl_IQ_data_long[i] = new long long[PackageReceiver::OFDM_FRAME_LEN];
     }
     // read data from file
@@ -246,6 +249,7 @@ CoMP::CoMP()
     memset(demul_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
     memset(fft_created_counter_packets_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
     memset(rx_counter_packets_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
+    memset(rx_counter_packets_pilots_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
 
     memset(decode_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
 
@@ -436,6 +440,7 @@ void CoMP::start()
     // auto pilot_received = std::chrono::system_clock::now();
     // std::chrono::time_point<std::chrono::high_resolution_clock> pilot_received[TASK_BUFFER_FRAME_NUM];
     double pilot_received[10000] __attribute__( ( aligned (4096) ) ) ;
+    double pilot_all_received[10000] __attribute__( ( aligned (4096) ) ) ;
     double processing_started[10000] __attribute__( ( aligned (4096) ) ) ;
     double rx_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double fft_processed[10000] __attribute__( ( aligned (4096) ) ) ;
@@ -580,6 +585,19 @@ void CoMP::start()
                     int frame_id = *((int *)socket_buffer_ptr);
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int rx_frame_id = (frame_id % TASK_BUFFER_FRAME_NUM);
+
+                    if (isPilot(subframe_id)) { 
+                        rx_counter_packets_pilots_[rx_frame_id]++;
+
+                        if(rx_counter_packets_pilots_[rx_frame_id] == BS_ANT_NUM * UE_NUM) {
+                            rx_counter_packets_pilots_[rx_frame_id] = 0;
+                            pilot_all_received[frame_id] = get_time();
+#if DEBUG_PRINT_PER_FRAME_DONE 
+                        printf("Main thread: received all pilots in frame: %d, frame buffer: %d in %.5f us\n", frame_id, rx_frame_id, 
+                                pilot_all_received[frame_id]-pilot_received[frame_id]);
+#endif  
+                        }
+                    }
 
                     // printf("Main thread: data received from frame %d, subframe %d, ant %d, buffer ptr: %llx, offset %lld\n", frame_id, subframe_id, ant_id, 
                     //      socket_buffer_ptr, offset_in_current_buffer * PackageReceiver::package_length);
@@ -736,8 +754,8 @@ void CoMP::start()
                                 fft_processed[frame_count_pilot_fft] = get_time();   
                                 csi_counter_users_[frame_id] = 0; 
 #if DEBUG_PRINT_PER_FRAME_DONE
-                                printf("Main thread: pilot frame: %d, %d, finished FFT for all pilot subframes in %.5f us\n", frame_id, frame_count_pilot_fft, 
-                                    fft_processed[frame_count_pilot_fft]-pilot_received[frame_count_pilot_fft]);
+                                printf("Main thread: pilot frame: %d, %d, finished FFT for all pilot subframes in %.5f us, pilot all received: %.2f\n", frame_id, frame_count_pilot_fft, 
+                                    fft_processed[frame_count_pilot_fft]-pilot_received[frame_count_pilot_fft], pilot_all_received[frame_count_pilot_fft]-pilot_received[frame_count_pilot_fft]);
 #endif
                                 // count # of frame with CSI estimation
                                 frame_count_pilot_fft ++;
@@ -1629,13 +1647,13 @@ void CoMP::start()
         // }
         if (SOCKET_RX_THREAD_NUM == 1) {
             
-                fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
-                        csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii]);
+                fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
+                        csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], pilot_all_received[ii]);
         }
         else {
                     
-                fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
-                    csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii] );
+                fprintf(fp_debug, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
+                    csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii], pilot_all_received[ii]);
         }
     }
     #if DEBUG_UPDATE_STATS_DETAILED
@@ -1840,10 +1858,12 @@ void* CoMP::taskThread(void* context)
     int dl_precoded_data_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     complex_float *dl_modulated_buffer_ptrs[dl_precoded_data_buffer_size];
     complex_float *dl_precoded_data_buffer_ptrs[dl_precoded_data_buffer_size];
+#if ENABLE_DOWNLINK
     for (int i = 0; i < dl_precoded_data_buffer_size; i++) {
         dl_modulated_buffer_ptrs[i] = obj_ptr->dl_modulated_buffer_.data[i];
         dl_precoded_data_buffer_ptrs[i] = obj_ptr->dl_precoded_data_buffer_.data[i];
     }
+#endif
 
     float *qam16_table_ptrs[2];
     for (int i = 0; i < 2; i++) 
@@ -2200,11 +2220,12 @@ void* CoMP::demulThread(void* context)
     int dl_precoded_data_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     complex_float *dl_modulated_buffer_ptrs[dl_precoded_data_buffer_size];
     complex_float *dl_precoded_data_buffer_ptrs[dl_precoded_data_buffer_size];
+#if ENABLE_DOWNLINK
     for (int i = 0; i < dl_precoded_data_buffer_size; i++) {
         dl_modulated_buffer_ptrs[i] = obj_ptr->dl_modulated_buffer_.data[i];
         dl_precoded_data_buffer_ptrs[i] = obj_ptr->dl_precoded_data_buffer_.data[i];
     }
-
+#endif
     float *qam16_table_ptrs[2];
     for (int i = 0; i < 2; i++) 
         qam16_table_ptrs[i] = obj_ptr->qam16_table[i];
