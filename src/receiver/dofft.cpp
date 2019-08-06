@@ -344,16 +344,16 @@ void DoFFT::FFT(int offset)
     if (pilot_symbol == 0) {
         FFT_task_count[tid * 16] = FFT_task_count[tid * 16]+1;
         FFT_task_duration[tid * 8][0] += duration;
-        if (duration > 500) {
-            printf("Thread %d FFT takes %.2f\n", tid, duration);
-        }
+        // if (duration > 500) {
+        //     printf("Thread %d FFT takes %.2f\n", tid, duration);
+        // }
     }
     else {
         CSI_task_count[tid * 16] = CSI_task_count[tid * 16]+1;
         CSI_task_duration[tid * 8][0] += duration;
-        if (duration > 500) {
-            printf("Thread %d pilot FFT takes %.2f\n", tid, duration);
-        }
+        // if (duration > 500) {
+        //     printf("Thread %d pilot FFT takes %.2f\n", tid, duration);
+        // }
     }
 #endif
     Event_data fft_finish_event;
