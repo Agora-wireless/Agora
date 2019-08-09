@@ -13,21 +13,14 @@ void intHandler(int) {
 }
 
 
-CoMP::CoMP()
+CoMP::CoMP(Config *cfg)
 {
     csi_format_offset = 1.0/32768;
     // openblas_set_num_threads(1);
     printf("enter constructor\n");
     // initialize socket buffer
 
-
-    // read pilots from file
-    // pilots_.resize(OFDM_CA_NUM);
-    pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    FILE* fp = fopen("../pilot_f_2048.bin","rb");
-    fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
-    fclose(fp);
-
+    float *pilots_ = cfg->pilots_;
 
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
@@ -2496,9 +2489,9 @@ void CoMP::getEqualData(float **ptr, int *size)
 
 extern "C"
 {
-    EXPORT CoMP* CoMP_new() {
+    EXPORT CoMP* CoMP_new(Config *cfg) {
         // printf("Size of CoMP: %d\n",sizeof(CoMP *));
-        CoMP *comp = new CoMP();
+        CoMP *comp = new CoMP(cfg);
         
         return comp;
     }

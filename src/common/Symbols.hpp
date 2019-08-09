@@ -3,6 +3,7 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
+//#define GENERATE_PILOT
 
 #define BS_ANT_NUM 8
 #define OFDM_CA_NUM 2048
@@ -19,6 +20,8 @@
 #define MAX_CODED_SC 1152
 #define TASK_BUFFER_FRAME_NUM 60
 #define SOCKET_BUFFER_FRAME_NUM 100
+#define DL_PILOT_SYMS 2
+#define TX_FRAME_DELTA 8
 
 
 #define EVENT_PACKAGE_RECEIVED 0
@@ -62,7 +65,7 @@
 #define BIGSTATION 0
 #define ENABLE_DOWNLINK 0
 #define USE_IPV4 1
-#define USE_DPDK 0
+//#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
 #define EXPORT_CONSTELLATION 0
@@ -95,6 +98,16 @@
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
 #define WRITE_DEMUL 0
+
+#define CORR_THRESHOLD    0x4
+#define CORR_RST          0x0
+#define CORR_SCNT         0x8
+#define CORR_CONF         60
+#define RF_RST_REG        48
+#define TDD_CONF_REG      120
+#define SCH_ADDR_REG      136
+#define SCH_MODE_REG      140
+#define TX_GAIN_CTRL      88
 
 
 static const int subframe_num_perframe = 70;

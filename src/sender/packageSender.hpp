@@ -43,8 +43,11 @@ public:
     static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     // int for: frame_id, subframe_id, cell_id, ant_id
     // unsigned int for: I/Q samples
-
-    static const int tx_buf_offset = USE_DPDK ? 22 : 0;
+#if USE_DPDK
+    static const int tx_buf_offset = 22;
+#else
+    static const int tx_buf_offset = 0;
+#endif
     static const int buffer_length = tx_buf_offset + sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     static const int data_offset = sizeof(int) * 16;
 //    static const int subframe_num_perframe = 40;

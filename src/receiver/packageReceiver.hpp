@@ -25,12 +25,14 @@
 #include <chrono>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <mutex>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "Symbols.hpp"
 #include "gettime.h"
+#include "radio_lib.hpp"
 
-
+#if USE_DPDK
 #include <inttypes.h>
 #if USE_DPDK
 #include <rte_arp.h>
@@ -78,24 +80,27 @@ public:
     {
         PackageReceiver *ptr;
         int tid;
+#ifdef USE_ARGOS
+        int radios;
+#endif
     };
 
 public:
-    PackageReceiver(int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
+    PackageReceiver(Config *cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
     /**
      * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
     */ 
-    PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
+    PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
             moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
             moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks);
     ~PackageReceiver();
     
 
-
+#if USE_DPDK
     int nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool);
-
     int process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth_h, int len, int tid);
+#endif
 
 
     /**
@@ -113,10 +118,18 @@ public:
      * context: PackageReceiverContext type
     */
     static void* loopRecv(void *context);
+#if USE_DPDK
     static void* loopRecv_DPDK(void *context);
+#endif
     static void* loopSend(void *context);
     static void* loopTXRX(void *context);
+#if USE_ARGOS
+    static void* loopRecv_Argos(void *context);
+    static void* loopSend_Argos(void *context);
+#endif
 
+    void calibrateRadios(std::vector<std::vector<std::complex<float>>>&, std::vector<std::vector<std::complex<float>>>&, int);
+    void startRadios();
 
  
 private:
@@ -126,6 +139,9 @@ private:
     struct sockaddr_in6 servaddr_[10];    /* server address */
 #endif
     int* socket_;
+
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 
 #if USE_DPDK
@@ -161,6 +177,10 @@ private:
 
     PackageReceiverContext* tx_context;
     PackageReceiverContext* rx_context;
+
+    RadioConfig *radioconfig_;
+    Config *config_;
+    int radios_per_thread;
 };
 
 
