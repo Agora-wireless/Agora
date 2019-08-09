@@ -8,8 +8,9 @@
 
 int main(int argc, char const *argv[])
 {
-    Millipede millipede_cli;
-    millipede_cli.start();
+    Config *cfg = new Config("data/tddconfig.json");
+    Millipede *millipede_cli = new Millipede(cfg);
+    millipede_cli->start();
 
     return 0;
 }

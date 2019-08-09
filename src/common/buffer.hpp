@@ -25,6 +25,7 @@ struct Event_data
 {
     int event_type;
     int data;
+    int more_data;
 };
 
 // buffer of each socket thread
@@ -104,6 +105,33 @@ struct DLSocketBuffer
 //     std::vector<int> buffer;
 //     std::vector<int> buffer_status;
 // };
+
+inline int generateOffset2d(int max_dim1, int max_dim2, int dim1_id, int dim2_id) 
+{
+    dim1_id = dim1_id % max_dim1;
+    return dim1_id * max_dim2 + dim2_id;
+}
+
+inline int generateOffset3d(int max_dim1, int max_dim2, int max_dim3, int dim1_id, int dim2_id, int dim3_id)
+{
+    dim1_id = dim1_id % max_dim1;
+    int dim2d_id = dim1_id * max_dim2 + dim2_id;
+    return dim2d_id * max_dim3 + dim3_id;
+}
+
+inline void interpretOffset2d(int max_dim2, int offset, int *dim1_id, int *dim2_id)
+{
+    *dim2_id = offset % max_dim2;
+    *dim1_id = offset / max_dim2;
+}
+
+inline void interpretOffset3d(int max_dim2, int max_dim3, int offset, int *dim1_id, int *dim2d_id, int *dim2_id, int *dim3_id)
+{
+    *dim3_id = offset % max_dim3;
+    *dim2d_id = offset / max_dim3;
+    *dim2_id = (*dim2d_id) % max_dim2;
+    *dim1_id = (*dim2d_id) / max_dim2;
+}
 
 
 #endif

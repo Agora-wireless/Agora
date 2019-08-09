@@ -43,6 +43,7 @@
 #include "doprecode.hpp"
 #include "memory_manage.h"
 #include "stats.hpp"
+#include "config.hpp"
 
 
 class Millipede
