@@ -10,8 +10,8 @@ else ()
 endif()
 
 
-set(CMAKE_C_FLAGS "-std=c99 -w -g -mavx2 -march=broadwell -O3")
-set(CMAKE_CXX_FLAGS "-std=c++11 -w -O3 -mavx2 -mavx -g -march=broadwell")
+set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell ")
+set(CMAKE_CXX_FLAGS "-std=c++11 -g -O3 -mavx2 -mavx -march=broadwell")
 
 find_package(Armadillo)
 find_package(dpdk)
@@ -100,7 +100,8 @@ set(SOURCES src/receiver/main.cpp
 			src/receiver/radio_lib.cpp
 			src/common/config.cpp
 			src/common/utils.cpp
-			src/common/comms-lib.cpp)
+			src/common/comms-lib.cpp
+			src/common/signalHandler.cpp)
 			
 add_executable(millipede ${SOURCES})
 target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SoapySDR_LIBRARIES})

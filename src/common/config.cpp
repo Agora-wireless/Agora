@@ -140,14 +140,15 @@ Config::Config(std::string jsonfile)
 #else
     // read pilots from file
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    FILE* fp = fopen("../data/pilot_f_2048.bin","rb");
+    FILE* fp = fopen("data/pilot_f_2048.bin","rb");
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
     std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);
     for (int i = 0; i < OFDM_CA_NUM; i++)  pilotsF[i] = pilots_[i];
     std::vector<std::complex<float>> pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
-    pilot = Utils::cint16_to_uint32(pilot_ci16, false, "QI");
+    pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
 #endif
+    running = true;
 }
 
 Config::~Config(){}

@@ -175,7 +175,7 @@ RadioConfig::RadioConfig(Config *cfg):
 
     for (int i = 0; i < this->_radioNum; i++)
     {
-        this->rxStreams.push_back(baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32, channels, sargs));
+        this->rxStreams.push_back(baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs));
         this->txStreams.push_back(baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CF32, channels, sargs));
     }
 

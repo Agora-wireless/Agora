@@ -164,9 +164,7 @@ void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<float
 
 void PackageReceiver::startRadios()
 {
-#ifdef USE_ARGOS
     radioconfig_->radioStart();
-#endif
 }
 
 #if USE_DPDK
@@ -339,6 +337,11 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     #endif
 #endif
     
+#ifdef USE_ARGOS
+    sleep(1);
+    pthread_cond_broadcast(&cond);
+    startRadios();
+#endif
     return created_threads;
 }
 
@@ -871,11 +874,10 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     int tid = ((PackageReceiverContext *)in_context)->tid;
     //printf("Recv thread: thread %d start\n", tid);
     int nradio_cur_thread = ((PackageReceiverContext *)in_context)->radios;
-    printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
+    //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     int id = tid;
     Config *cfg = obj_ptr->config_;
     // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
@@ -891,39 +893,39 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     }
 #endif
 
-    // Use mutex to sychronize data receiving across threads
+    //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&obj_ptr->mutex);
     printf("Thread %d: waiting for release\n", tid);
 
     pthread_cond_wait(&obj_ptr->cond, &obj_ptr->mutex);
     pthread_mutex_unlock(&obj_ptr->mutex); // unlocking for all other threads
 
-    // usleep(10000-tid*2000);
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(*message_queue_);
-    //moodycamel::ProducerToken local_ctok(*task_queue_);
-    //moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
+    //moodycamel::ProducerToken local_ptok(*message_queue_);
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
 
     int hdr_size = cfg->hdr_size;
     void* buffer = obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
+    double *frame_start = obj_ptr->frame_start_[tid];
 
+    // walk through all the pages
+    double temp;
+    for (int i = 0; i < 20; i++) {
+        temp = frame_start[i * 512];
+    }
+
+#if ENABLE_DOWNLINK
+    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
     char *tx_buffer = obj_ptr->tx_buffer_;
 
     int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
-    if (cfg->isUE)
-    {
-        txSymsPerFrame = cfg->ulSymsPerFrame;
-        txSymbols = cfg->ULSymbols[0];
-    }
-    else
-    {
-        txSymsPerFrame = cfg->dlSymsPerFrame;
-        txSymbols = cfg->DLSymbols[0];
-    }
+    txSymsPerFrame = cfg->dlSymsPerFrame;
+    txSymbols = cfg->DLSymbols[0];
+#endif
 
     void* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -936,28 +938,29 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     // this is assuming buffer_frame_num is at least 2 
     void* cur_ptr_buffer2;
     int* cur_ptr_buffer_status2;
-    void* buffer2 = obj_ptr->buffer_[tid] + cfg->getRxPackageLength(); 
+    void* buffer2 = obj_ptr->buffer_[tid] + package_length; 
     int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
         cur_ptr_buffer_status2 = buffer_status2;
     }
     else {
-        cur_ptr_buffer2 = calloc(cfg->getRxPackageLength(), sizeof(char)); 
+        cur_ptr_buffer2 = calloc(package_length, sizeof(char)); 
     }
     int offset = 0;
-    int package_num = 0;
     long long frameTime;
-    auto begin = std::chrono::system_clock::now();
+    int prev_frame_id = -1;
 
-    int maxQueueLength = 0;
     int ret = 0;
     int maxFrameId = 0;
     while(cfg->running)
     {
         // if buffer is full, exit
         if(cur_ptr_buffer_status[0] == 1) {
-            printf("RX thread %d buffer full\n", tid);
+            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
+            for (int l = 0 ; l < buffer_frame_num; l++) 
+                printf("%d ", buffer_status[l]);
+            printf("\n\n");
             exit(0);
         }
         int ant_id, frame_id, symbol_id, cell_id, tx_frame_id;
@@ -974,29 +977,53 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             frame_id = (int)(frameTime>>32);
             symbol_id = (int)((frameTime>>16)&0xFFFF);
             ant_id = rid * cfg->nChannels;
+            int rx_symbol_id = cfg->getPilotSFIndex(frame_id, symbol_id);
+            if (rx_symbol_id < 0)
+                rx_symbol_id = cfg->getUlSFIndex(frame_id, symbol_id) + cfg->pilotSymsPerFrame;
             *((int *)cur_ptr_buffer) = frame_id;
-            *((int *)cur_ptr_buffer + 1) = symbol_id;
+            *((int *)cur_ptr_buffer + 1) = rx_symbol_id;
             *((int *)cur_ptr_buffer + 2) = 0; //cell_id 
             *((int *)cur_ptr_buffer + 3) = ant_id;
             if (cfg->nChannels == 2)
             {
                 *((int *)cur_ptr_buffer2) = frame_id;
-                *((int *)cur_ptr_buffer2 + 1) = symbol_id;
+                *((int *)cur_ptr_buffer2 + 1) = rx_symbol_id;
                 *((int *)cur_ptr_buffer2 + 2) = 0; //cell_id 
                 *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
             }
+    #if DEBUG_RECV
+        printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d\n", tid, frame_id, symbol_id, cell_id, ant_id);
+    #endif
+
+    #if MEASURE_TIME
+        // read information from received packet
+        int ant_id, frame_id, subframe_id, cell_id;
+        frame_id = *((int *)cur_ptr_buffer);
+        subframe_id = *((int *)cur_ptr_buffer + 1);
+        // cell_id = *((int *)cur_ptr_buffer + 2);
+        ant_id = *((int *)cur_ptr_buffer + 3);
+        // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+        if (frame_id > prev_frame_id) {
+            *(frame_start + frame_id) = get_time();
+            prev_frame_id = frame_id;
+            if (frame_id % 512 == 200) {
+                _mm_prefetch((char*)(frame_start+frame_id+512), _MM_HINT_T0);
+                // double temp = frame_start[frame_id+3];
+            }
+        }
+    #endif
             // get the position in buffer
             offset = cur_ptr_buffer_status - buffer_status;
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
             cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + ((char*)cur_ptr_buffer - (char*)buffer + cfg->getRxPackageLength() * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer = buffer + ((char*)cur_ptr_buffer - (char*)buffer + package_length * cfg->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
             Event_data package_message;
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
             package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
-            if ( !message_queue_->enqueue(local_ptok, package_message ) ) {
+            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
@@ -1005,20 +1032,20 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
                 cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + ((char*)cur_ptr_buffer2 - (char*)buffer2 + cfg->getRxPackageLength() * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer2 = buffer2 + ((char*)cur_ptr_buffer2 - (char*)buffer2 + package_length * cfg->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
                 Event_data package_message2;
                 package_message2.event_type = EVENT_PACKAGE_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
                 package_message2.data = offset + tid * buffer_frame_num;
-                if ( !message_queue_->enqueue(local_ptok, package_message2 ) ) {
+                if ( !message_queue_->enqueue(*local_ptok, package_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
             }
-
+#if ENABLE_DOWNLINK
             // notify TXthread to start transmitting frame_id+offset
-            if (txSymsPerFrame > 0 && ((cfg->isUE && cfg->getDlSFIndex(frame_id, symbol_id) == 0) || (!cfg->isUE && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)))
+            if (txSymsPerFrame > 0 && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)
             {
 #ifdef SEPARATE_TX_THREAD
                 Event_data do_tx_task;
@@ -1048,13 +1075,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 }
 #endif
             }
-            //stats
-
-            //printf("enqueue offset %d\n", offset);
-            int cur_queue_len = message_queue_->size_approx();
-            maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
-
-            package_num++;
+#endif
         }
     }
 }

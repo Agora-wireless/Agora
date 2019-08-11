@@ -44,7 +44,7 @@
 #include "memory_manage.h"
 #include "stats.hpp"
 #include "config.hpp"
-
+#include "signalHandler.hpp"
 
 class Millipede
 {
@@ -84,6 +84,7 @@ public:
     ~Millipede();
 
     void start();
+    void stop();
     // while loop of task thread
     static void *taskThread(void *context);
     static void *fftThread(void *context);
