@@ -10,8 +10,8 @@
 #define FFT_LEN 2048
 #define OFDM_DATA_NUM 1200
 #define OFDM_DATA_START 424
-#define OFDM_PREFIX_LEN 0
-#define UE_NUM 8
+#define OFDM_PREFIX_LEN 153
+#define UE_NUM 2
 #define CODED_LEN 32
 #define ORIG_CODE_LEN 16
 #define N_ITE 10
@@ -109,10 +109,15 @@
 #define SCH_MODE_REG      140
 #define TX_GAIN_CTRL      88
 
-
+#ifdef USE_ARGOS
+static const int subframe_num_perframe = 7;
+static const int pilot_subframe_num_perframe = UE_NUM;
+static const int data_subframe_num_perframe = 5; 
+#else
 static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
+#endif
 static const int dl_data_subframe_start = data_subframe_num_perframe-5;
 static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - dl_data_subframe_start;
 static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;

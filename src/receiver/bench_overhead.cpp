@@ -20,6 +20,7 @@ CoMP::CoMP(Config *cfg)
     printf("enter constructor\n");
     // initialize socket buffer
 
+    this->cfg_ = cfg;
     float *pilots_ = cfg->pilots_;
 
 #if DEBUG_PRINT_PILOT
@@ -453,6 +454,13 @@ static double get_time(void)
     return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
 }
 
+void CoMP::stop()
+{
+    std::cout << "stopping threads " << std::endl;
+    cfg_->running = false;
+    usleep(1000);
+    receiver_.reset();
+}
 
 void CoMP::start()
 {
@@ -482,8 +490,8 @@ void CoMP::start()
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_ptrs, 
         socket_buffer_status_ptrs, socket_buffer_status_size_, socket_buffer_size_, frame_start_ptrs, main_core_id + 1);
 
-    // start downlink transmitter
 #if ENABLE_DOWNLINK
+    // start downlink transmitter
     char *dl_socket_buffer_ptr = dl_socket_buffer_.buffer;
     int *dl_socket_buffer_status_ptr = dl_socket_buffer_.buffer_status;
     float *dl_data_ptr = (float *)(&dl_precoded_data_buffer_.data[0][0]);
@@ -615,8 +623,13 @@ void CoMP::start()
     int ifft_count_per_thread[TASK_THREAD_NUM];
     int precode_count_per_thread[TASK_THREAD_NUM];
 
+
+#ifdef USE_ARGOS
+    while (cfg_->running && !SignalHandler::gotExitSignal()) {
+#else
     signal(SIGINT, intHandler);
     while(keep_running) {
+#endif
         // get a bulk of events
         ret = complete_task_queue_.try_dequeue_bulk(ctok_complete, events_list, dequeue_bulk_size);
         if (ret == 0)
@@ -636,7 +649,7 @@ void CoMP::start()
             Event_data& event = events_list[bulk_count];
 
             switch(event.event_type) {
-            case EVENT_PACKAGE_RECEIVED: {         
+            case EVENT_PACKAGE_RECEIVED: {
                     int offset = event.data;                    
                     int socket_thread_id = offset / buffer_frame_num;
                     int offset_in_current_buffer = offset % buffer_frame_num;
@@ -650,7 +663,7 @@ void CoMP::start()
                     // char *socket_buffer_ptr = socket_buffer_ptrs[socket_thread_id] + offset_in_current_buffer * PackageReceiver::package_length;
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer + offset_in_current_buffer * PackageReceiver::package_length;
                     int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
-                    int frame_id = *((int *)socket_buffer_ptr);
+                    int frame_id = *((int *)socket_buffer_ptr) % 10000;
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int rx_frame_id = (frame_id % TASK_BUFFER_FRAME_NUM);
 
@@ -663,7 +676,7 @@ void CoMP::start()
 #endif
                     if (rx_counter_packets_[rx_frame_id] == 1) {   
 
-                        // pilot_received[rx_frame_id] = get_time();      
+                        // pilot_received[rx_frame_id] = get_time();
                         pilot_received[frame_id] = get_time();  
 #if DEBUG_PRINT_PER_FRAME_START 
                         if (frame_id > 0)
@@ -1596,6 +1609,7 @@ void CoMP::start()
             i, FFT_task_count[i], percent_FFT, ZF_task_count[i], percent_ZF, Demul_task_count[i], percent_Demul);
     }
 #endif 
+    this->stop();
     exit(0);
     
 }

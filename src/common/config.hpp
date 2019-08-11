@@ -77,14 +77,14 @@ public:
     int core_offset;
     bool isUE;
     const int maxFrame = 1 << 31;
-    const int data_offset = sizeof(int) * 4;
+    const int data_offset = sizeof(int) * 16;
     int dl_data_symbol_perframe;
     std::atomic<bool> running;
     int rx_port;
     int tx_port;
     std::string rx_addr;
     std::string tx_addr;
-    int hdr_size = 8;
+    int hdr_size = 16;
     // header 4 int for: frame_id, symbol_id, cell_id, ant_id
     // ushort for: I/Q samples
     int getRxPackageLength() { return sizeof(int) * hdr_size + sizeof(float) * sampsPerSymbol * 2; }
