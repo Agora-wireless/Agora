@@ -30,7 +30,12 @@
 #include "concurrentqueue.h"
 #include "Symbols.hpp"
 #include "gettime.h"
+
+#ifdef USE_ARGOS  
 #include "radio_lib.hpp"
+#else
+#include "config.hpp"
+#endif
 
 #if USE_DPDK
 #include <inttypes.h>
@@ -126,10 +131,10 @@ public:
 #if USE_ARGOS
     static void* loopRecv_Argos(void *context);
     static void* loopSend_Argos(void *context);
-#endif
-
     void calibrateRadios(std::vector<std::vector<std::complex<float>>>&, std::vector<std::vector<std::complex<float>>>&, int);
     void startRadios();
+#endif
+
 
  
 private:
@@ -178,8 +183,10 @@ private:
     PackageReceiverContext* tx_context;
     PackageReceiverContext* rx_context;
 
-    RadioConfig *radioconfig_;
     Config *config_;
+#if USE_ARGOS
+    RadioConfig *radioconfig_;
+#endif
     int radios_per_thread;
 };
 

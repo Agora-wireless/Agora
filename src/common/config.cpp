@@ -46,14 +46,14 @@ Config::Config(std::string jsonfile)
     Utils::loadDevices(serial_file, radio_ids);
     nRadios = radio_ids.size();
     nAntennas = nChannels * nRadios;
-    if (beacon_mode == "beamsweep" and nAntennas > 1)
+    if (beacon_mode == "beamsweep" && nAntennas > 1)
     {
         int hadamardSize =  int(pow(2,ceil(log2(nAntennas))));
         std::vector<std::vector<double>> hadamard_weights = CommsLib::getSequence(hadamardSize, CommsLib::HADAMARD);
         beacon_weights.resize(nAntennas);
-        for (int i = 0; i < nAntennas; i++) 
+        for (int i = 0; i < nAntennas; i++)
             for (int j = 0; j < nAntennas; j++) 
-                beacon_weights[i][j] = (unsigned)hadamard_weights[i][j];
+                beacon_weights[i].push_back((unsigned)hadamard_weights[i][j]);
         printf("Hadamard Matrix Size %d\n", hadamardSize);
         printf("beacon_weights size %d\n", beacon_weights.size());
         printf("beacon_weights[0] size %d\n", beacon_weights[0].size());
@@ -140,7 +140,11 @@ Config::Config(std::string jsonfile)
 #else
     // read pilots from file
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
+#ifdef USE_ARGOS
+    FILE* fp = fopen("data/pilot2_f_2048.bin","rb");
+#else
     FILE* fp = fopen("data/pilot_f_2048.bin","rb");
+#endif
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
     std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);
