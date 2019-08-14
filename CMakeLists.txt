@@ -10,29 +10,33 @@ else ()
 endif()
 
 
-set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell ")
+set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell")
 set(CMAKE_CXX_FLAGS "-std=c++11 -g -O3 -mavx2 -mavx -march=broadwell")
 
 find_package(Armadillo)
-find_package(dpdk)
 
-if (NOT dpdk_FOUND)
+set(USE_DPDK False)
+set(USE_ARGOS False)
+
+if (${USE_DPDK})
+  find_package(dpdk)
+  if (NOT dpdk_FOUND)
     message(STATUS "DPDK Not Found! Excluding from Compile List")
-    set(DPDK_EXISTS False)
-else ()
-    set(DPDK_EXISTS True)
+    set(USE_DPDK False)
+  else ()
+    add_definitions(-DUSE_DPDK)
+  endif()
 endif()
 
-find_package(SoapySDR "0.7" CONFIG)
-if (NOT SoapySDR_FOUND)
+if (${USE_ARGOS})
+  find_package(SoapySDR "0.7" CONFIG)
+  if (NOT SoapySDR_FOUND)
     message(STATUS "SoapySDR development files not found")
-    set(SOAPY_EXISTS False)
-else ()
-    set(SOAPY_EXISTS True)
+    set(USE_ARGOS False)
+  else ()
+    add_definitions(-DUSE_ARGOS)
+  endif ()
 endif ()
-
-#add_definitions(-DUSE_DPDK)
-add_definitions(-DUSE_ARGOS)
 
 # Link with the "Threads library (required to link with AFF3CT after)
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
@@ -60,7 +64,7 @@ link_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/in
 
 
 # DPDK
-if (DPDK_EXISTS AND USE_DPDK)
+if (${USE_DPDK})
   set (RTE_SDK /home/argos/Jian//dpdk-stable-18.11.1/)
   set (RTE_TARGET x86_64-native-linuxapp-gcc)
   set ( DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
@@ -68,11 +72,16 @@ if (DPDK_EXISTS AND USE_DPDK)
   link_directories(${RTE_SDK}/${RTE_TARGET}/lib)
 endif()
 
-if (SOAPY_EXISTS AND USE_ARGOS)
+if (${USE_ARGOS})
+  message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+  #find_package(PythonLibs REQUIRED)
+  #message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
   message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
   message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-  include_directories(${SoapySDR_INCLUDE_DIRS})
-  set ( SOAPY_LIB ${SoapySDR_LIBRARIES} )
+  include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
+  set (SOAPY_LIB ${SoapySDR_LIBRARIES})
+  set (ARGOS_SOURCES src/receiver/radio_lib.cpp )
+  set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
 endif()
 
 include_directories(
@@ -104,12 +113,10 @@ set(SOURCES src/receiver/main.cpp
 			src/common/signalHandler.cpp)
 			
 add_executable(millipede ${SOURCES})
-target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SoapySDR_LIBRARIES})
+target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
-#add_library(sounderUL MODULE  ${SOURCES})
-#target_link_libraries(sounderUL -lpthread  -lmufft -larmadillo -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ) 
-
-
+add_library(comp MODULE src/receiver/main.cpp src/receiver/packageReceiver.cpp src/receiver/CoMP.cpp src/common/cpu_attach.cpp src/receiver/compute_common.cpp  src/receiver/dofft.cpp src/receiver/dozf.cpp src/receiver/dodemul.cpp src/receiver/doprecode.cpp src/common/config.cpp src/common/utils.cpp src/common/comms-lib.cpp src/common/signalHandler.cpp ${ARGOS_SOURCES})
+target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
 #add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)
 #target_link_libraries(receiver -lpthread )
@@ -123,7 +130,6 @@ target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo 
 
 #add_executable(CoMP main.cpp packageReceiver.cpp CoMP.cpp cpu_attach.cpp)
 #target_link_libraries(CoMP -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt aff3ct::aff3ct-static-lib -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB})
-
 
 #add_executable(trans testTranspose.cpp)
 #target_link_libraries(trans -larmadillo) 

@@ -2486,7 +2486,7 @@ void CoMP::getEqualData(float **ptr, int *size)
     // max_equaled_frame = 0;
     *ptr = (float *)&equal_buffer_.data[max_equaled_frame*data_subframe_num_perframe][0];
     // *ptr = equal_output;
-    *size = UE_NUM*FFT_LEN*2;
+    *size = UE_NUM*OFDM_DATA_NUM*2;
     
     // printf("In getEqualData()\n");
     // for(int ii = 0; ii < UE_NUM*FFT_LEN; ii++)
@@ -2510,6 +2510,8 @@ extern "C"
         return comp;
     }
     EXPORT void CoMP_start(CoMP *comp) {comp->start();}
+    EXPORT void CoMP_stop(CoMP *comp) {comp->stop();}
+    EXPORT void CoMP_destroy(CoMP *comp) {delete comp;}
     EXPORT void CoMP_getEqualData(CoMP *comp, float **ptr, int *size) {return comp->getEqualData(ptr, size);}
     EXPORT void CoMP_getDemulData(CoMP *comp, int **ptr, int *size) {return comp->getDemulData(ptr, size);}
 }

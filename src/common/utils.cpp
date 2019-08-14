@@ -39,9 +39,9 @@ std::vector<uint32_t> Utils::cint16_to_uint32(std::vector<std::complex<int16_t>>
     {
        uint16_t re = (uint16_t)in[i].real(); 
        uint16_t im = (uint16_t)(conj ? -in[i].imag() : in[i].imag());
-       if (order == "iq")
+       if (order == "IQ")
            out[i] = (uint32_t)re << 16 | im;
-       else if (order == "qi")
+       else if (order == "QI")
            out[i] = (uint32_t)im << 16 | re;
     }
     return out;
@@ -54,9 +54,9 @@ std::vector<uint32_t> Utils::cfloat32_to_uint32(std::vector<std::complex<float>>
     {
        uint16_t re = (uint16_t)(int16_t(in[i].real()*32768.0)); 
        uint16_t im = (uint16_t)(int16_t((conj ? -in[i].imag() : in[i].imag())*32768));
-       if (order == "iq")
+       if (order == "IQ")
            out[i] = (uint32_t)re << 16 | im;
-       else if (order == "qi")
+       else if (order == "QI")
            out[i] = (uint32_t)im << 16 | re;
     }
     return out;

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import json
 
 
-lib = cdll.LoadLibrary('../build/libsounderUL.so')
+lib = cdll.LoadLibrary('./libcomp.so')
 
 
 class Config(object):
@@ -14,7 +14,8 @@ class Config(object):
         self.obj = lib.Config_new(c_char_p(val))
 
 class CoMP(object):
-    def __init__(self):
+    def __init__(self, configfile):
+        conf = Config(configfile)
         # lib.CoMP_new.argtypes = [c_void_p]
         lib.CoMP_new.restype = c_void_p
         lib.CoMP_start.argtypes = [c_void_p]
@@ -23,10 +24,16 @@ class CoMP(object):
         lib.CoMP_getEqualData.restype = c_void_p
         lib.CoMP_getDemulData.argtypes = [c_void_p,POINTER(POINTER(c_longlong)),POINTER(c_int)]
         lib.CoMP_getDemulData.restype = c_void_p
-        self.obj = lib.CoMP_new()
+        self.obj = lib.CoMP_new(conf.obj)
 
-    def startCC(self):
+    def startCoMP(self):
     	lib.CoMP_start(self.obj)
+
+    def stopCoMP(self):
+        lib.CoMP_stop(self.obj)
+
+    def destroyCoMP(self):
+        lib.CoMP_destroy(self.obj)
 
     def getEqualData(self):
         mem = POINTER(c_float)()

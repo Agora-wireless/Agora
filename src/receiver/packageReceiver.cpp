@@ -137,13 +137,13 @@ PackageReceiver::~PackageReceiver()
 #ifdef USE_ARGOS
     radioconfig_->radioStop();
     delete radioconfig_;
-    delete config_;
 #endif
+    delete config_;
 }
 
+#ifdef USE_ARGOS
 void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<float>>> &buffer_tx, std::vector<std::vector<std::complex<float>>> &buffer_rx, int ref_ant)
 {
-#ifdef USE_ARGOS
     std::cout << "start reciprocity CSI collection" << std::endl;
     //radioconfig_->reciprocityCalibrate(buffer_tx, buffer_rx);
     std::vector<std::vector<std::complex<float>>> buff;
@@ -159,13 +159,13 @@ void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<float
     //radioconfig_->radioStop(); // make sure all regiter states for reciprocity calibration are cleared
     std::cout << "end reciprocity CSI collection" << std::endl;
     radioconfig_->drain_buffers();
-#endif
 }
 
 void PackageReceiver::startRadios()
 {
     radioconfig_->radioStart();
 }
+#endif
 
 #if USE_DPDK
 int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
@@ -1023,7 +1023,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
             package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
-            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+            if ( !message_queue_->enqueue(package_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }

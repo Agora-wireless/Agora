@@ -10,8 +10,13 @@
 #define FFT_LEN 2048
 #define OFDM_DATA_NUM 1200
 #define OFDM_DATA_START 424
+#ifdef USE_ARGOS
 #define OFDM_PREFIX_LEN 153
 #define UE_NUM 2
+#else
+#define OFDM_PREFIX_LEN 0
+#define UE_NUM 8
+#endif
 #define CODED_LEN 32
 #define ORIG_CODE_LEN 16
 #define N_ITE 10
@@ -68,7 +73,7 @@
 //#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
-#define EXPORT_CONSTELLATION 0
+#define EXPORT_CONSTELLATION 1
 #define ENABLE_DECODE 0
 #define COMBINE_EQUAL_DECODE 1
 
@@ -76,7 +81,7 @@
 #define INIT_FRAME_NUM 10
 
 
-#define DEBUG_PRINT_PER_FRAME_DONE 1
+#define DEBUG_PRINT_PER_FRAME_DONE 0
 #define DEBUG_PRINT_PER_SUBFRAME_DONE 0
 #define DEBUG_PRINT_PER_TASK_DONE 0
 #define DEBUG_PRINT_SUMMARY_100_FRAMES 0
@@ -91,6 +96,7 @@
 #define DEBUG_UPDATE_STATS 0
 #define DEBUG_UPDATE_STATS_DETAILED 0
 #define DEBUG_PRINT_PILOT 0
+#define DEBUG_PLOT 0
 #define MEASURE_TIME 1
 
 #define DEBUG_PRINT_IN_TASK 0
@@ -110,9 +116,9 @@
 #define TX_GAIN_CTRL      88
 
 #ifdef USE_ARGOS
-static const int subframe_num_perframe = 7;
+static const int subframe_num_perframe = 3;
 static const int pilot_subframe_num_perframe = UE_NUM;
-static const int data_subframe_num_perframe = 5; 
+static const int data_subframe_num_perframe = 1; 
 #else
 static const int subframe_num_perframe = 70;
 static const int pilot_subframe_num_perframe = UE_NUM;
