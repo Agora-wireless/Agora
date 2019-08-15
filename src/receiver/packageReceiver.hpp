@@ -32,6 +32,7 @@
 
 
 #include <inttypes.h>
+#if USE_DPDK
 #include <rte_arp.h>
 #include <rte_byteorder.h>
 #include <rte_cycles.h>
@@ -46,6 +47,7 @@
 #include <rte_prefetch.h>
 #include <rte_udp.h>
 #include <rte_flow.h>
+#endif
 
 
 #define RX_RING_SIZE 8192*4
@@ -136,12 +138,13 @@ private:
     int* socket_;
 
 
+#if USE_DPDK
     struct ether_addr server_eth_addr;
     uint32_t src_addr;
     uint32_t dst_addr;
     int src_port_start = 6000;
     int dst_port_start = 8000;
-
+#endif
 
     char** buffer_;
     int** buffer_status_;

@@ -151,8 +151,8 @@ void DoDemul::Demul(int offset)
             uint8_t *demul_ptr = (&demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
             // if (i * 8 + j < max_sc_ite -1)
             //     _mm_prefetch((char *)(demul_ptr+UE_NUM), _MM_HINT_T1);
-            // demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
-            demod_16qam_loop((float *)equal_ptr, (uint8_t *)data_ptr, UE_NUM);
+            demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+            // demod_16qam_loop((float *)equal_ptr, (uint8_t *)data_ptr, UE_NUM);
 #if DEBUG_UPDATE_STATS_DETAILED   
     double duration3 = get_time() - start_time3;   
     Demul_task_duration[tid * 8][3] += duration3;

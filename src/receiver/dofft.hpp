@@ -11,6 +11,7 @@
 #include "gettime.h"
 #include "offset.h"
 #include "mkl_dfti.h"
+#include "mufft/fft.h"
 
 
 class DoFFT
@@ -122,6 +123,8 @@ private:
 
     DFTI_DESCRIPTOR_HANDLE mkl_handle_dl;
     MKL_LONG mkl_status_dl;
+
+    // mufft_plan_1d *muplans_;
 
 
 };
