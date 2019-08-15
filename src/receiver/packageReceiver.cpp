@@ -7,12 +7,14 @@
 #include "packageReceiver.hpp"
 #include "cpu_attach.hpp"
 
+#if USE_DPDK
 inline const struct rte_eth_conf port_conf_default() {
     struct rte_eth_conf rte = rte_eth_conf();
     // rte.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
     rte.rxmode.max_rx_pkt_len = MAX_JUMBO_FRAME_SIZE;
     return rte;
 }
+#endif
 
 
 static struct rte_flow *
@@ -132,7 +134,7 @@ PackageReceiver::~PackageReceiver()
 
 
 
-
+#if USE_DPDK
 int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     struct rte_eth_conf port_conf = port_conf_default();
     const uint16_t rxRings = rx_thread_num_, txRings = tx_thread_num_+rx_thread_num_;
@@ -225,6 +227,7 @@ int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool)
     return 0;
 }
 
+#endif
 
 
 std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start)
@@ -391,7 +394,7 @@ static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_po
 
 
 
-
+#if USE_DPDK
 int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int len, int tid) {
   printf("Processing ARP request\n");
   struct arp_hdr *ah = (struct arp_hdr *)((unsigned char *)eth + ETHER_HDR_LEN);
@@ -422,6 +425,7 @@ int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, i
   }
   return 0;
 }
+#endif
 
 
 
@@ -618,7 +622,7 @@ void* PackageReceiver::loopRecv(void *in_context)
 }
 
 
-
+#if USE_DPDK
 
 void* PackageReceiver::loopRecv_DPDK(void *in_context)
 {
@@ -807,7 +811,7 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
     }
 }
 
-
+#endif
 
 
 
@@ -1315,7 +1319,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
 }
 
-
+#if USE_DPDK
 
 static struct rte_flow *
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
@@ -1403,5 +1407,7 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
                 flow = rte_flow_create(port_id, &attr, pattern, action, error);
         return flow;
 }
+
+#endif
 
 

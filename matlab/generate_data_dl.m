@@ -9,7 +9,7 @@ N_OFDM_SYMS = (N_SYMS-NUM_UE)*NUM_UE;
 NUM_SUBFRAME = 10;
 N_DATA_SYMS = N_OFDM_SYMS * length(SC_IND_DATA);
 GENERATE_PILOT = 0;
-GENERATE_DATA = 1;
+GENERATE_DATA = 0;
 CP_LEN = 0;
 frmLen = 100;       % frame length
 
@@ -18,14 +18,14 @@ if GENERATE_PILOT
     pilot_f = randi(3,length(SC_IND_DATA),1)-2;
     pilot_f(pilot_f==0) = 1;
     pilot_t = ifft(pilot_f, N_SC);
-    fileID = fopen('pilot_f_2048.bin','w');
+    fileID = fopen('../data/pilot_f_2048.bin','w');
     fwrite(fileID,pilot_f,'float');
     fclose(fileID);
-    fileID = fopen('pilot_t_2048.bin','w');
+    fileID = fopen('../data/pilot_t_2048.bin','w');
     fwrite(fileID,pilot_t,'float');
     fclose(fileID);
 else
-    fileID = fopen('pilot_f_2048.bin');
+    fileID = fopen('../data/pilot_f_2048.bin');
     pilot_f = fread(fileID,[2048,1],'float');
     pilot_f(1:424) = 0;
     pilot_f(1625:2048) = 0; 
@@ -44,7 +44,7 @@ if GENERATE_DATA
     fwrite(fileID_data,tx_data,'int');
     fclose(fileID_data);
 else
-    fileID_data = fopen(sprintf('orig_data_2048_ant%d.bin',NUM_BS_ANT));
+    fileID_data = fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT));
     tx_data = fread(fileID_data,[N_DATA_SYMS,1],'int');
     fclose(fileID);
 end
@@ -121,7 +121,7 @@ if GENERATE_DATA
     fwrite(fileID,H_vec_float,'float');
     fclose(fileID);
 else
-    fileID = fopen(sprintf('H_2048_ant%d.bin',NUM_BS_ANT));
+    fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
     H_from_file = fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
     H_noisy = H_from_file(1:2:end)+1j*H_from_file(2:2:end);
     H_noisy = reshape(H_noisy, N_SC, NUM_UE, NUM_BS_ANT);
@@ -154,8 +154,10 @@ rx_mat_all = ifft(rx_mat_all_f,N_SC,1);
     
 %% CSI estimation
 CSI_est = zeros(N_SC,NUM_UE,NUM_BS_ANT);
+pilot_est = zeros(N_SC,NUM_UE,NUM_BS_ANT);
 for i = 1:NUM_UE
-    CSI_est(:,i,:) = squeeze(fft(rx_mat_all(:,i,:),N_SC,1)).*repmat(pilot_f,1,NUM_BS_ANT);
+    pilot_est(:,i,:) = squeeze(squeeze(fft(rx_mat_all(:,i,:),N_SC,1)));
+    CSI_est(:,i,:) = squeeze(squeeze(fft(rx_mat_all(:,i,:),N_SC,1))).*repmat(pilot_f,1,NUM_BS_ANT);
 end
 fprintf("CSI_estimation error: %d/%d\n",sum(sum(sum(abs(CSI_est(425:1624,:,:)-H_noisy(425:1624,:,:))>0.5*1e-1))),length(H_noisy(:)));
 
@@ -216,7 +218,7 @@ end
 rx_data = reshape(rx_data,N_SC,N_OFDM_SYMS/NUM_UE, NUM_UE);
 tx_data_mat = reshape(tx_data,N_SC,N_SYMS-NUM_UE,NUM_UE);
 fprintf("Uplink: correct data demodulation: %d/%d\n",sum(sum(sum(rx_data(425:1624,:,:)==tx_data_mat(425:1624,:,:)))),length(rx_data(:))/N_SC*1200);
-
+squeeze(rx_data(425:430,1,:))
 % rx_data = permute(rx_data,[2,3,1]);
 
 % % Reshape to a vector
@@ -233,14 +235,14 @@ fprintf("Uplink: correct data demodulation: %d/%d\n",sum(sum(sum(rx_data(425:162
 %% Downlink data analysis
 
 fprintf("Downlink.....\n");
-fileID = fopen(sprintf('rx_data_2048_ant%d.bin',NUM_BS_ANT));
+fileID = fopen(sprintf('../data/rx_data_2048_ant%d.bin',NUM_BS_ANT));
 rx_data_from_file = fread(fileID,[1,N_SC*N_SYMS*NUM_BS_ANT*2],'float');
 rx_data_from_file_float = rx_data_from_file(1:2:end)+1j*rx_data_from_file(2:2:end);
 rx_data_from_file_float = reshape(rx_data_from_file_float,N_SC,NUM_BS_ANT,N_SYMS);
 rx_data_from_file_float = permute(rx_data_from_file_float,[1,3,2]);
 rx_pilot_from_file = rx_data_from_file_float(:,1:8,:);
 
-fileID = fopen(sprintf('H_2048_ant%d.bin',NUM_BS_ANT));
+fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
 H_from_file = fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
 H_from_file_float = H_from_file(1:2:end)+1j*H_from_file(2:2:end);
 H_from_file_float = reshape(H_from_file_float, N_SC, NUM_UE, NUM_BS_ANT);

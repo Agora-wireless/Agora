@@ -45,10 +45,13 @@ DoFFT::DoFFT(int in_tid, int in_transpose_block_size,
     }
 
     mkl_status = DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, OFDM_CA_NUM);
+    // mkl_status = DftiSetValue(mkl_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
     mkl_status = DftiCommitDescriptor(mkl_handle);
 
     mkl_status_dl = DftiCreateDescriptor(&mkl_handle_dl, DFTI_SINGLE, DFTI_COMPLEX, 1, OFDM_CA_NUM);
     mkl_status_dl = DftiCommitDescriptor(mkl_handle_dl);
+
+    // muplans_ = mufft_create_plan_1d_c2c(OFDM_CA_NUM, MUFFT_FORWARD, MUFFT_FLAG_CPU_ANY);
 
 }
 
@@ -60,7 +63,8 @@ DoFFT::~DoFFT()
         free(fft_buffer_.FFT_inputs[i]);
         free(fft_buffer_.FFT_outputs[i]);
     }
-    
+    DftiFreeDescriptor(&mkl_handle);
+    DftiFreeDescriptor(&mkl_handle_dl);
 }
 
 void DoFFT::FFT(int offset)
@@ -125,7 +129,7 @@ void DoFFT::FFT(int offset)
         // _mm256_load_ps((cur_fft_buffer_float + i));
 
 
-        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val); // port 5
+        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
         /// convert by xor-ing and subtracting magic value:
         // VPXOR avoids port5 bottlenecks on Intel CPUs before SKL
         __m256i val_f_int1 = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
@@ -137,6 +141,18 @@ void DoFFT::FFT(int offset)
         // _mm256_load_ps((cur_fft_buffer_float + i));
 
     }
+
+
+    // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+    // printf("FFT input\n");
+    // for ( int i = 0; i< OFDM_CA_NUM; i++) {
+    //     // std::cout <<"("<<i<<", "<<(*(fft_buffer_.FFT_inputs[0] +i)).real<<","<<(*(fft_buffer_.FFT_inputs[0] +i)).imag<<") ";
+    //     std::cout <<" "<<(*(fft_buffer_.FFT_inputs[0] +i)).real<<"+"<<(*(fft_buffer_.FFT_inputs[0] +i)).imag<<"*1j";
+    //     // cout <<"("<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).real<<","<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).imag<<") ";
+    //     // printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)), *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)+1));
+    // }
+    // printf("\n size of float _Complex: %d", sizeof(float _Complex));
+    // printf("\n");
 
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -156,9 +172,10 @@ void DoFFT::FFT(int offset)
     //         + (OFDM_CA_NUM - delay_offset) * 2 * sizeof(float), 0, sizeof(float) * 2 * delay_offset);
     // mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[tid] + ant_id * OFDM_CA_NUM, 
     //     fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
-    // mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[tid], fft_buffer_.FFT_inputs[tid]);
+    // mufft_execute_plan_1d(muplans_, fft_buffer_.FFT_outputs[0], fft_buffer_.FFT_inputs[0]);
 
     DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]);
+    // DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0], fft_buffer_.FFT_outputs[0]);
 
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -172,9 +189,9 @@ void DoFFT::FFT(int offset)
     // mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM, 
     //     fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
     // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-    // printf("FFT input\n");
+    // printf("FFT output\n");
     // for ( int i = 0; i< OFDM_CA_NUM; i++) {
-    //     cout <<"("<<(*(fft_buffer_.FFT_inputs[tid] +i)).real<<","<<(*(fft_buffer_.FFT_inputs[tid] +i)).imag<<") ";
+    //     std::cout <<"("<<i<<", "<<(*(fft_buffer_.FFT_outputs[0] +i)).real<<","<<(*(fft_buffer_.FFT_outputs[0] +i)).imag<<") ";
     //     // cout <<"("<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).real<<","<<(*(fft_buffer_.FFT_inputs[FFT_buffer_target_id]+i)).imag<<") ";
     //     // printf("(%.4f, %.4f) ", *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)), *((float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM+i)+1));
     // }
