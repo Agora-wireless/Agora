@@ -43,8 +43,8 @@ RadioConfig::RadioConfig(Config *cfg):
         SoapySDR::Kwargs info = baStn[i]->getHardwareInfo();
         for (auto ch : channels)
         {
-            //baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, 30e6);
-            //baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, 30e6);
+            baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, 3*cfg->rate);
+            baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, 3*cfg->rate);
 
             baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
             baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);

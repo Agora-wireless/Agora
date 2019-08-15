@@ -666,7 +666,8 @@ void* PackageReceiver::loopRecv(void *in_context)
         package_message.event_type = EVENT_PACKAGE_RECEIVED;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         package_message.data = offset + tid * buffer_frame_num;
-        if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+        if ( !message_queue_->enqueue(package_message ) ) {
+        //if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }

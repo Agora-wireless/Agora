@@ -16,7 +16,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -g -O3 -mavx2 -mavx -march=broadwell")
 find_package(Armadillo)
 
 set(USE_DPDK False)
-set(USE_ARGOS False)
+set(USE_ARGOS True)
 
 if (${USE_DPDK})
   find_package(dpdk)

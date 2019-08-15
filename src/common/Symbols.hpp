@@ -11,7 +11,8 @@
 #define OFDM_DATA_NUM 1200
 #define OFDM_DATA_START 424
 #ifdef USE_ARGOS
-#define OFDM_PREFIX_LEN 153
+#define TX_PREFIX_LEN 128
+#define OFDM_PREFIX_LEN 152
 #define UE_NUM 2
 #else
 #define OFDM_PREFIX_LEN 0

@@ -93,6 +93,11 @@ public:
     inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
 
     static const int buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+#ifdef USE_ARGOS
+    static const int OFDM_FRAME_LEN = OFDM_CA_NUM + 2*TX_PREFIX_LEN;
+    static const int package_length = sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+#endif
+    
 private:
     int tid;
     int transpose_block_size;
