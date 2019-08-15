@@ -278,20 +278,20 @@ void DoFFT::FFT(int offset)
             }
         }
         
-        // cout<<"Before: "<<endl;
+        // std::cout<<"Before: "<<std::endl;
         // for (int i =0;i<OFDM_CA_NUM; i++) {
-        //     cout<<"("<<i<<", "<<fft_buffer_.FFT_outputs[tid][i].real<<","<<fft_buffer_.FFT_outputs[tid][i].imag<<") ";
+        //     std::cout<<"("<<i<<", "<<fft_buffer_.FFT_inputs[tid][i].real<<","<<fft_buffer_.FFT_inputs[tid][i].imag<<") ";
         // }
-        // cout<<endl;
+        // std::cout<<std::endl;
         // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-        // cout<<"After: "<<endl;
-        // // for (int i =0;i<OFDM_CA_NUM; i++) {
-        // //     cout<<"("<<i<<", "<<fft_buffer_.FFT_outputs[tid][i].real*pilots_[i]<<","<<fft_buffer_.FFT_outputs[tid][i].imag*pilots_[i]<<") ";
-        // // }
-        // for (int i =0;i<OFDM_DATA_NUM*BS_ANT_NUM; i++) {
-        //     cout<<"("<<i<<", "<<csi_buffer_.CSI[subframe_offset][i].real<<"+j"<<csi_buffer_.CSI[subframe_offset][i].imag<<") ";
+        // std::cout<<"After: "<<std::endl;
+        // for (int i =0;i<OFDM_CA_NUM; i++) {
+        //     cout<<"("<<i<<", "<<fft_buffer_.FFT_outputs[tid][i].real*pilots_[i]<<","<<fft_buffer_.FFT_outputs[tid][i].imag*pilots_[i]<<") ";
         // }
-        // cout<<endl;
+        // for (int i =0;i<OFDM_DATA_NUM*BS_ANT_NUM; i++) {
+        //     std::cout<<"("<<i<<", "<<csi_buffer_[subframe_offset][i].real<<"+j"<<csi_buffer_[subframe_offset][i].imag<<") ";
+        // }
+        // std::cout<<std::endl;
 
     }
     else if (pilot_symbol == 0) {

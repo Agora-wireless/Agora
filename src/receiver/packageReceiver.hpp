@@ -80,6 +80,14 @@ class PackageReceiver
 {
 public:
     
+#ifdef USE_ARGOS
+    static const int OFDM_FRAME_LEN = OFDM_CA_NUM + 2*TX_PREFIX_LEN;
+    // header 4 int for: frame_id, subframe_id, cell_id, ant_id
+    // ushort for: I/Q samples
+    static const int package_length = sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+
+    static const int data_offset = sizeof(int) * 16;
+#endif
     // use for create pthread 
     struct PackageReceiverContext
     {

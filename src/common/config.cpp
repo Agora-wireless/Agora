@@ -140,11 +140,7 @@ Config::Config(std::string jsonfile)
 #else
     // read pilots from file
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-#ifdef USE_ARGOS
-    FILE* fp = fopen("data/pilot2_f_2048.bin","rb");
-#else
     FILE* fp = fopen("data/pilot_f_2048.bin","rb");
-#endif
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
     std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);
