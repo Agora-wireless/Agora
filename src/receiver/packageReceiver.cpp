@@ -300,7 +300,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 
 
 
-std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length)
+std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length)
 {
     // check length
     tx_buffer_frame_num_ = in_buffer_frame_num;
@@ -308,7 +308,7 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     tx_buffer_length_ = in_buffer_length;
     tx_buffer_ = in_buffer;  // for save data
     tx_buffer_status_ = in_buffer_status; // for save status
-    tx_data_buffer_ = in_data_buffer;
+    // tx_data_buffer_ = in_data_buffer;
 
     // SOCKET_BUFFER_FRAME_NUM = 
 
@@ -1109,7 +1109,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
     // TX pointers
     char *tx_buffer = obj_ptr->tx_buffer_;
-    float *tx_data_buffer = obj_ptr->tx_data_buffer_;
+    // float *tx_data_buffer = obj_ptr->tx_data_buffer_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
     int ret;
