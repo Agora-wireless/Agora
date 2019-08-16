@@ -51,7 +51,7 @@ Compile Millipede:
 
 2. Run
 * In one terminal, run "./millipede" to start the receiver
-* In another terminal, run "./sender 2 2 1 20" to start the sender, the four arguments are: # of sockets, # of threads (should be same as # of sockets), offset of CPU core index (change the value according to which socket the NIC is installed), and delay between symbols
+* In another terminal, run "./sender 4 4 1 20" to start the sender, the four arguments are: # of sockets, # of threads (should be same as # of sockets), offset of CPU core index (change the value according to which socket the NIC is installed), and delay between symbols
 
 3. Other information
 * CoMP.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
