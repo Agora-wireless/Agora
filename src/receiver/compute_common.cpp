@@ -1,6 +1,6 @@
 #include "compute_common.hpp"
 
-void init_qam16_table(float (*qam16_table)[16])
+void init_qam16_table(float **qam16_table)
 {
     float scale = 1/sqrt(10);
     float modvec_16qam[4] = {-3*scale, -1*scale, 3*scale, scale};
