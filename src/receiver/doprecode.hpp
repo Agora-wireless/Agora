@@ -21,7 +21,7 @@ public:
     DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
-        complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, float **in_qam16_table,
+        complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
         double **in_Precode_task_duration, int *in_Precode_task_count);
     ~DoPrecode();
 

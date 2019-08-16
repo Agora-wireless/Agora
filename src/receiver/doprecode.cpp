@@ -5,7 +5,7 @@ using namespace arma;
 DoPrecode::DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
-        complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, float **in_qam16_table,
+        complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
         double **in_Precode_task_duration, int *in_Precode_task_count)
 {
     tid = in_tid;
@@ -19,7 +19,10 @@ DoPrecode::DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block
     dl_precoded_data_buffer_ = in_dl_precoded_data_buffer;
     dl_ifft_buffer_ = in_dl_ifft_buffer;
     dl_IQ_data = in_dl_IQ_data;
-    qam16_table = in_qam16_table;
+    // qam16_table = in_qam16_table;
+    qam16_table = (float **)malloc(2 * sizeof(float *));
+    for (int i = 0; i < 2; i++) 
+        qam16_table[i] = (float *)aligned_alloc(64, 16 * sizeof(float));
 
 
     Precode_task_duration = in_Precode_task_duration;
