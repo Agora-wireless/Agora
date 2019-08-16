@@ -117,7 +117,7 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + RX_THREAD_NUM - 1}
     */ 
     std::vector<pthread_t> startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start);
-    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, float *in_data_buffer, int in_buffer_frame_num, int in_buffer_length);
+    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length);
     /**
      * receive thread
      * context: PackageReceiverContext type
@@ -155,7 +155,7 @@ private:
     int* tx_buffer_status_;
     long long tx_buffer_length_;
     int tx_buffer_frame_num_;
-    float *tx_data_buffer_;
+    // float *tx_data_buffer_;
 
     int rx_thread_num_;
     int tx_thread_num_;
