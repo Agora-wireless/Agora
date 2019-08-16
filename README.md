@@ -25,21 +25,7 @@ Install muFFT:
 	make
 	sudo make install
 
-Install aff3ct:
-
-	git clone https://github.com/aff3ct/my_project_with_aff3ct.git .
-	cd my_project_with_aff3ct
-	git submodule update --init --recursive
-	cd lib/aff3ct
-	mkdir build
-	cd build
-	cmake .. -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-funroll-loops -march=native" -DAFF3CT_COMPILE_EXE="OFF" -DAFF3CT_COMPILE_STATIC_LIB="ON" -DAFF3CT_COMPILE_SHARED_LIB="ON"
-	make -j4
 	
-Go back to the Millipede repository
-
-	mkdir cmake && mkdir cmake/Modules
-	cp ../../my_project_with_aff3ct/lib/aff3ct/build/lib/cmake/aff3ct-*/* cmake/Modules
 
 Compile Millipede:
 
