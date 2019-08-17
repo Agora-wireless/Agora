@@ -38,121 +38,49 @@ CoMP::CoMP()
     printf("initialize buffers\n");
     socket_buffer_size_ = (long long)PackageReceiver::package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    socket_buffer_ = (char **)malloc(SOCKET_RX_THREAD_NUM * sizeof(char *));
-    socket_buffer_status_ = (int **)malloc(SOCKET_RX_THREAD_NUM * sizeof(int *));
-    for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
-        socket_buffer_[i] = (char *)aligned_alloc(64, socket_buffer_size_ * sizeof(char));
-        socket_buffer_status_[i] = (int *)aligned_alloc(64, socket_buffer_status_size_ * sizeof(int));
-        memset(socket_buffer_status_[i], 0, socket_buffer_status_size_ * sizeof(int));
-    }
 
-    int csi_buffer_size = UE_NUM * TASK_BUFFER_FRAME_NUM;
-    csi_buffer_ = (complex_float **)malloc(csi_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < csi_buffer_size; i++)
-        csi_buffer_[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
+    alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
+    alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);
+    alloc_buffer_2d(&csi_buffer_ , UE_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
+    alloc_buffer_2d(&data_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
+    alloc_buffer_2d(&pred_csi_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
+    alloc_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&demul_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, NUM_BITS * ORIG_CODE_LEN * NUM_CODE_BLOCK * UE_NUM, 64, 0);
 
+    /* initilize all uplink status checkers */
+    alloc_buffer_1d(&rx_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&rx_counter_packets_pilots_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&csi_counter_users_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&data_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&precoder_counter_scs_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&demul_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&fft_created_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&precoder_exist_in_frame_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&decode_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    int data_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    data_buffer_ = (complex_float **)malloc(data_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < data_buffer_size; i++)
-        data_buffer_[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
+    alloc_buffer_1d(&fft_counter_ants_, TASK_BUFFER_FRAME_NUM * subframe_num_perframe, 64, 1);
 
+    alloc_buffer_2d(&data_exist_in_subframe_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_2d(&demul_counter_scs_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_2d(&decode_counter_blocks_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
 
-  
-    int pred_csi_buffer_size = OFDM_DATA_NUM;
-    pred_csi_buffer_ = (complex_float **)malloc(pred_csi_buffer_size * sizeof(complex_float *));
-    for(int i = 0; i < pred_csi_buffer_size; i++)
-        pred_csi_buffer_[i] = (complex_float *)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), BS_ANT_NUM * UE_NUM * sizeof(complex_float));
+    /* initilize all timestamps and counters for worker threads */
+    alloc_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
-
-    int precoder_buffer_size = OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM;
-    precoder_buffer_ = (complex_float **)malloc(precoder_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < precoder_buffer_size; i++)
-        precoder_buffer_[i] = (complex_float *)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), UE_NUM * BS_ANT_NUM * sizeof(complex_float));
-
-
-    int equal_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    equal_buffer_ = (complex_float **)malloc(equal_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < equal_buffer_size; i++)
-        equal_buffer_[i] = (complex_float *)aligned_alloc(64, OFDM_DATA_NUM * UE_NUM * sizeof(complex_float));
-
-
-    int demul_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    demul_hard_buffer_ = (uint8_t **)malloc(demul_buffer_size * sizeof(uint8_t *));
-    for (int i = 0; i < demul_buffer_size; i++)
-        demul_hard_buffer_[i] = (uint8_t *)aligned_alloc(64, OFDM_CA_NUM * UE_NUM * sizeof(uint8_t));
-    demul_soft_buffer_ = (float **)malloc(demul_buffer_size * sizeof(float *));
-    for (int i = 0; i < demul_buffer_size; i++)
-        demul_soft_buffer_[i] = (float *)aligned_alloc(64, NUM_BITS * OFDM_CA_NUM * UE_NUM * sizeof(float));
-
-
-    int decoded_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    decoded_buffer_ = (int **)malloc(decoded_buffer_size * sizeof(int *));
-    for (int i = 0; i < decoded_buffer_size; i++)
-        decoded_buffer_[i] = (int *)aligned_alloc(64, NUM_BITS * ORIG_CODE_LEN * NUM_CODE_BLOCK * UE_NUM * sizeof(int));
-
-
-    /* initilize all uplink checkers */
-    memset(fft_counter_ants_, 0, sizeof(int) * subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    memset(csi_counter_users_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-    memset(data_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-    memset(precoder_counter_scs_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-    memset(precoder_exist_in_frame_, 0, sizeof(bool) * TASK_BUFFER_FRAME_NUM); 
-
-
-    memset(demul_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-    memset(fft_created_counter_packets_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-    memset(rx_counter_packets_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-    memset(rx_counter_packets_pilots_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-    memset(decode_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
-
-    for(int i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
-        memset(demul_counter_scs_[i], 0, sizeof(int) * (subframe_num_perframe - UE_NUM));
-        memset(data_exist_in_subframe_[i], 0, sizeof(bool) * (subframe_num_perframe - UE_NUM));
-        memset(precoder_exist_in_sc_[i], 0, sizeof(bool) * (OFDM_DATA_NUM));
-        memset(decode_counter_blocks_[i], 0, sizeof(int) * (subframe_num_perframe - UE_NUM));
-    }
-
-
-    CSI_task_duration = (double **)malloc(TASK_THREAD_NUM * 8 * sizeof(double *));
-    FFT_task_duration = (double **)malloc(TASK_THREAD_NUM * 8 * sizeof(double *));
-    ZF_task_duration = (double **)malloc(TASK_THREAD_NUM * 8 * sizeof(double *));
-    Demul_task_duration = (double **)malloc(TASK_THREAD_NUM * 8 * sizeof(double *));
-    for (int i = 0; i < TASK_THREAD_NUM * 8; i++) {
-        CSI_task_duration[i] = (double *)aligned_alloc(64, 4 * sizeof(double));
-        FFT_task_duration[i] = (double *)aligned_alloc(64, 4 * sizeof(double));
-        ZF_task_duration[i] = (double *)aligned_alloc(64, 4 * sizeof(double));
-        Demul_task_duration[i] = (double *)aligned_alloc(64, 4 * sizeof(double));
-        memset(CSI_task_duration[i], 0, 4 * sizeof(double));
-        memset(FFT_task_duration[i], 0, 4 * sizeof(double));
-        memset(ZF_task_duration[i], 0, 4 * sizeof(double));
-        memset(Demul_task_duration[i], 0, 4 * sizeof(double));
-    }
-
-
-    CSI_task_count = (int *)aligned_alloc(64, TASK_THREAD_NUM * 16 * sizeof(int));
-    FFT_task_count = (int *)aligned_alloc(64, TASK_THREAD_NUM * 16 * sizeof(int));
-    ZF_task_count = (int *)aligned_alloc(64, TASK_THREAD_NUM * 16 * sizeof(int));
-    Demul_task_count = (int *)aligned_alloc(64, TASK_THREAD_NUM * 16 * sizeof(int));
-    memset(CSI_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
-    memset(FFT_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
-    memset(ZF_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
-    memset(Demul_task_count, 0, sizeof(int) * TASK_THREAD_NUM * 16);
-
+    alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
 
 
 #if ENABLE_DOWNLINK
     printf("Downlink enabled.\n");
-    int dl_IQ_data_size = data_subframe_num_perframe * UE_NUM;
-    dl_IQ_data = (int **)malloc(dl_IQ_data_size * sizeof(int *));
-    // dl_IQ_data = new int * [data_subframe_num_perframe * UE_NUM];
-    dl_IQ_data_long = new long long * [data_subframe_num_perframe * UE_NUM];
-    for (int i = 0; i < dl_IQ_data_size; i++) {
-        dl_IQ_data[i] = (int *)aligned_alloc(64, OFDM_CA_NUM * sizeof(int));
-        // dl_IQ_data[i] = new int[OFDM_CA_NUM];
-        dl_IQ_data_long[i] = new long long[PackageReceiver::OFDM_FRAME_LEN];
-    }
-    // read data from file
+    alloc_buffer_2d(&dl_IQ_data , data_subframe_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
     std::string filename1 = "../data/orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     fp = fopen(filename1.c_str(),"rb");
     if (fp==NULL) {
@@ -161,83 +89,42 @@ CoMP::CoMP()
     }
     for (int i = 0; i < data_subframe_num_perframe * UE_NUM; i++) {
         fread(dl_IQ_data[i], sizeof(int), OFDM_CA_NUM, fp);
-        // range [-2,2]
-        for(int j = 0; j < OFDM_CA_NUM; j++) {
-            dl_IQ_data_long[i][j] = (long long)dl_IQ_data[i][j];
-            // printf("i:%d, j:%d, Coded: %d, orignal: %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
-        }
     }
     fclose(fp);
-
-    int IFFT_buffer_block_num = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    dl_ifft_buffer_ = (complex_float **)malloc(IFFT_buffer_block_num * sizeof(complex_float *));
-    for (int i = 0; i < IFFT_buffer_block_num; i++) {
-        dl_ifft_buffer_[i] = (complex_float *)mufft_alloc(OFDM_CA_NUM * sizeof(complex_float));
-        memset(dl_ifft_buffer_[i], 0, sizeof(complex_float) * OFDM_CA_NUM);
-    }
-
-    int dl_precoded_data_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    dl_precoded_data_buffer_ = (complex_float **)malloc(dl_precoded_data_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < dl_precoded_data_buffer_size; i++)
-        dl_precoded_data_buffer_[i] = (complex_float *)aligned_alloc(64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
-
-    int dl_modulated_buffer_size = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    dl_modulated_buffer_ = (complex_float **)malloc(dl_modulated_buffer_size * sizeof(complex_float *));
-    for (int i = 0; i < dl_modulated_buffer_size; i++)
-        dl_modulated_buffer_[i] = (complex_float *)aligned_alloc(64, UE_NUM * OFDM_DATA_NUM * sizeof(complex_float));
 
 
     dl_socket_buffer_size_ = (long long) data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM * PackageReceiver::package_length * BS_ANT_NUM;
     dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * TASK_BUFFER_FRAME_NUM;
-    dl_socket_buffer_ = (char *)aligned_alloc(64, dl_socket_buffer_size_ * sizeof(char));
-    dl_socket_buffer_status_ = (int *)aligned_alloc(64, dl_socket_buffer_size_ * sizeof(int));
-    memset(dl_socket_buffer_status_, 0, dl_socket_buffer_size_ * sizeof(int));
-
-    /* initilize all downlink checkers */
-    for (int i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
-        memset(dl_data_counter_scs_[i], 0, sizeof(int) * data_subframe_num_perframe);
-        memset(modulate_checker_[i], 0, sizeof(int) * data_subframe_num_perframe);
-        memset(tx_counter_ants_[i], 0, sizeof(int) * data_subframe_num_perframe);
-    }
-
-    memset(dl_data_counter_subframes_, 0, sizeof(int) * TASK_THREAD_NUM);
-    memset(ifft_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-    memset(tx_counter_subframes_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM); 
-
-    // printf("initialize QAM16 table\n");
-    // init_qam16_table(qam16_table_);
-    // float scale = 1/sqrt(10);
-    // float modvec_16qam[4] = {-3*scale, -1*scale, 3*scale, scale};
-    // for (int i = 0; i < 16; i++) {
-    //     qam16_table[0][i] = modvec_16qam[i / 4];
-    //     qam16_table[1][i] = modvec_16qam[i % 4];
-    // }
+    alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
+    alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
+    alloc_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64, 1);
+    alloc_buffer_2d(&dl_precoded_data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
+    alloc_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64, 0);
 
 
-    IFFT_task_duration = (double **)malloc(TASK_THREAD_NUM * 8 * sizeof(double *));
-    Precode_task_duration = (double **)malloc(TASK_THREAD_NUM * 8 * sizeof(double *));
-    for (int i = 0; i < TASK_THREAD_NUM * 8; i++) {
-        IFFT_task_duration[i] = (double *)aligned_alloc(64, 4 * sizeof(double));
-        Precode_task_duration[i] = (double *)aligned_alloc(64, 4 * sizeof(double));
-        memset(IFFT_task_duration[i], 0, 4 * sizeof(double));
-        memset(Precode_task_duration[i], 0, 4 * sizeof(double));
-    }
+    /* initilize all downlink status checkers */
+    alloc_buffer_1d(&dl_data_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&ifft_checker_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&tx_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    IFFT_task_count = (int *)aligned_alloc(64, TASK_THREAD_NUM * 16 * sizeof(int));
-    Precode_task_count = (int *)aligned_alloc(64, TASK_THREAD_NUM * 16 * sizeof(int));
-    memset(IFFT_task_count, 0, TASK_THREAD_NUM * 16 * sizeof(int));
-    memset(Precode_task_count, 0, TASK_THREAD_NUM * 16 * sizeof(int));
+    alloc_buffer_2d(&dl_data_counter_scs_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_2d(&modulate_checker_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_2d(&tx_counter_ants_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
 
-#endif
+    /* initilize all timestamps and counters for worker threads */
+    alloc_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
-   
+    alloc_buffer_1d(&IFFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&Precode_task_count, TASK_THREAD_NUM * 16, 64, 1);
+#endif  
 
+    /* initialize packageReceiver*/
     moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
         rx_ptok[i].reset(new moodycamel::ProducerToken(message_queue_));
         rx_ptoks_ptr[i] = rx_ptok[i].get();
     }
-
 
     moodycamel::ProducerToken *tx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
@@ -248,13 +135,11 @@ CoMP::CoMP()
     printf("new PackageReceiver\n");
     receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
-
-
+    /* create worker threads */
 #if BIGSTATION
     for(int i = 0; i < FFT_THREAD_NUM; i++) {
         context[i].obj_ptr = this;
         context[i].id = i;
-        //printf("create thread %d\n", i);
         if(pthread_create( &task_threads[i], NULL, CoMP::fftThread, &context[i]) != 0) {
             perror("task thread create failed");
             exit(0);
@@ -263,7 +148,6 @@ CoMP::CoMP()
     for(int i = FFT_THREAD_NUM; i < FFT_THREAD_NUM + ZF_THREAD_NUM; i++) {
         context[i].obj_ptr = this;
         context[i].id = i;
-        //printf("create thread %d\n", i);
         if(pthread_create( &task_threads[i], NULL, CoMP::zfThread, &context[i]) != 0) {
             perror("ZF thread create failed");
             exit(0);
@@ -272,14 +156,12 @@ CoMP::CoMP()
     for(int i = FFT_THREAD_NUM + ZF_THREAD_NUM; i < TASK_THREAD_NUM; i++) {
         context[i].obj_ptr = this;
         context[i].id = i;
-        //printf("create thread %d\n", i);
         if(pthread_create( &task_threads[i], NULL, CoMP::demulThread, &context[i]) != 0) {
             perror("Demul thread create failed");
             exit(0);
         }
     }
 #else
-    // create task thread 
     for(int i = 0; i < TASK_THREAD_NUM; i++) {
         context[i].obj_ptr = this;
         context[i].id = i;
@@ -294,26 +176,70 @@ CoMP::CoMP()
 
 CoMP::~CoMP()
 {
-    // for(int i = 0; i < TASK_THREAD_NUM; i++) {
-    //     mufft_free_plan_1d(muplans_[i]);
-    //     mufft_free_plan_1d(muplans_ifft_[i]);
-    // }
-    // release FFT_buffer
-    // int FFT_buffer_block_num = BS_ANT_NUM * subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    // for(int i = 0; i < FFT_buffer_block_num; i++) {
-    //     mufft_free(fft_buffer_.FFT_inputs[i]);
-    //     mufft_free(fft_buffer_.FFT_outputs[i]);
-    //     mufft_free(dl_ifft_buffer_.IFFT_inputs[i]);
-    //     mufft_free(dl_ifft_buffer_.IFFT_outputs[i]);
-    // }
+    /* uplink */
+    free_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM);
+    free_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM);
+    free_buffer_2d(&csi_buffer_, UE_NUM * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&pred_csi_buffer_ , OFDM_DATA_NUM);
+    free_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&demul_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
 
-    for(int i = 0; i < data_subframe_num_perframe * UE_NUM; i++) {
-        delete[] dl_IQ_data_long[i];
-        delete[] dl_IQ_data[i];
-    }
-    delete[] dl_IQ_data;
-    delete[] dl_IQ_data_long;
+    free_buffer_1d(&rx_counter_packets_);
+    free_buffer_1d(&rx_counter_packets_pilots_);
+    free_buffer_1d(&csi_counter_users_);
+    free_buffer_1d(&data_counter_subframes_);
+    free_buffer_1d(&precoder_counter_scs_);
+    free_buffer_1d(&demul_counter_subframes_);
+    free_buffer_1d(&fft_created_counter_packets_);
+    free_buffer_1d(&precoder_exist_in_frame_);
+    free_buffer_1d(&decode_counter_subframes_);
 
+    free_buffer_1d(&fft_counter_ants_);
+
+    free_buffer_2d(&data_exist_in_subframe_, TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&demul_counter_scs_, TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&decode_counter_blocks_, TASK_BUFFER_FRAME_NUM);
+
+
+    free_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8);
+    free_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8);
+    free_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8);
+    free_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8);
+
+    free_buffer_1d(&CSI_task_count);
+    free_buffer_1d(&FFT_task_count);
+    free_buffer_1d(&ZF_task_count);
+    free_buffer_1d(&Demul_task_count);
+
+    /* downlink */
+#if ENABLE_DOWNLINK
+    free_buffer_2d(&dl_IQ_data , data_subframe_num_perframe * UE_NUM);
+
+    free_buffer_1d(&dl_socket_buffer_);
+    free_buffer_1d(&dl_socket_buffer_status_);
+
+    free_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&dl_precoded_data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+
+
+    free_buffer_1d(&dl_data_counter_subframes_);
+    free_buffer_1d(&ifft_checker_);
+    free_buffer_1d(&tx_counter_subframes_);
+
+    free_buffer_2d(&dl_data_counter_scs_, TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&modulate_checker_, TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&tx_counter_ants_, TASK_BUFFER_FRAME_NUM);
+
+    free_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8);
+    free_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8);
+
+    free_buffer_1d(&IFFT_task_count);
+    free_buffer_1d(&Precode_task_count);
+#endif
 }
 
 
@@ -1743,11 +1669,9 @@ void* CoMP::taskThread(void* context)
     moodycamel::ConcurrentQueue<Event_data>* precode_queue_ = &(obj_ptr->precode_queue_);
     // moodycamel::ConcurrentQueue<Event_data>* tx_queue_ = &(obj_ptr->tx_queue_);
 
-
     obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
     moodycamel::ProducerToken *task_ptok_ptr;
     task_ptok_ptr = obj_ptr->task_ptok[tid].get();
-
 
     /* initialize operators */
     DoFFT *computeFFT = new DoFFT(tid, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
@@ -2008,7 +1932,6 @@ void* CoMP::demulThread(void* context)
     }
 
 }
-
 
 
 
