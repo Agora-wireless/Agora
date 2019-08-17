@@ -41,6 +41,7 @@
 #include "dozf.hpp"
 #include "dodemul.hpp"
 #include "doprecode.hpp"
+#include "memory_manage.h"
 
 
 class CoMP
@@ -191,35 +192,31 @@ private:
 
     /* Uplink status checkers used by master thread */ 
     /* used to check if RX for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
-    int rx_counter_packets_[TASK_BUFFER_FRAME_NUM];   
-    /* used to check if RX for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
-    int rx_counter_packets_pilots_[TASK_BUFFER_FRAME_NUM];   
-    /* used to check if FFT for all antennas in a subframe is done (max: BS_ANT_NUM) */
-    int fft_counter_ants_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
+    int *rx_counter_packets_;   
+    /* used to check if RX for all antennas and all pilots in a frame is done (max: BS_ANT_NUM * UE_NUM) */
+    int *rx_counter_packets_pilots_;   
     /* used to check if FFT for all users/pilots in a frame is done (max: UE_NUM) */
-    int csi_counter_users_[TASK_BUFFER_FRAME_NUM];
+    int *csi_counter_users_;
     /* used to check if FFT for all data subframes in a frame is done (max: data_subframe_num_perframe) */
-    int data_counter_subframes_[TASK_BUFFER_FRAME_NUM];
+    int *data_counter_subframes_;
     /* used to check if ZF for all subcarriers in a frame is done (max: OFDM_DATA_NUM) */
-    int precoder_counter_scs_[TASK_BUFFER_FRAME_NUM];
-    /* used to check if demodulation for all subcarriers in a data subframe is done (max: OFDM_DATA_NUM) */
-    int demul_counter_scs_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int *precoder_counter_scs_;
     /* used to check if demodulation for all data subframes in a frame is done (max: data_subframe_num_perframe) */
-    int demul_counter_subframes_[TASK_BUFFER_FRAME_NUM];
+    int *demul_counter_subframes_;
     /* used to check if creating FFT for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
-    int fft_created_counter_packets_[TASK_BUFFER_FRAME_NUM];
-
-    /* used to check the existance of data after FFT of a subframe in a frame */
-    bool data_exist_in_subframe_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
+    int *fft_created_counter_packets_;
     /* used to check the existance of precoder in a frame */
-    bool precoder_exist_in_frame_[TASK_BUFFER_FRAME_NUM];
-    bool precoder_exist_in_sc_[TASK_BUFFER_FRAME_NUM][OFDM_DATA_NUM];
+    bool *precoder_exist_in_frame_;
+    int *decode_counter_subframes_;
 
-    int decode_counter_blocks_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe-UE_NUM)];
-    int decode_counter_subframes_[TASK_BUFFER_FRAME_NUM];
+    /* used to check if FFT for all antennas in a subframe is done (max: BS_ANT_NUM) */
+    int *fft_counter_ants_;
 
-
-
+    /* used to check if demodulation for all subcarriers in a data subframe is done (max: OFDM_DATA_NUM) */
+    int **demul_counter_scs_;
+    /* used to check the existance of data after FFT of a subframe in a frame */
+    bool **data_exist_in_subframe_;
+    int **decode_counter_blocks_;
 
 
 
@@ -287,12 +284,12 @@ private:
 
 
     /* Downlink status checkers used by master thread */ 
-    int dl_data_counter_scs_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int dl_data_counter_subframes_[TASK_BUFFER_FRAME_NUM];
-    int modulate_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int ifft_checker_[TASK_BUFFER_FRAME_NUM];
-    int tx_counter_ants_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int tx_counter_subframes_[TASK_BUFFER_FRAME_NUM];
+    int **dl_data_counter_scs_;
+    int *dl_data_counter_subframes_;
+    int **modulate_checker_;
+    int *ifft_checker_;
+    int **tx_counter_ants_;
+    int *tx_counter_subframes_;
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
 
 
