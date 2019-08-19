@@ -10,14 +10,18 @@
 #define FFT_LEN 2048
 #define OFDM_DATA_NUM 1200
 #define OFDM_DATA_START 424
+
 #ifdef USE_ARGOS
-#define TX_PREFIX_LEN 128
-#define OFDM_PREFIX_LEN 152
-#define UE_NUM 2
+  #define TX_PREFIX_LEN 128
+  #define CP_LEN 128
+  #define OFDM_PREFIX_LEN (152 + CP_LEN)
+  #define UE_NUM 2
 #else
-#define OFDM_PREFIX_LEN 0
-#define UE_NUM 8
+  #define CP_LEN 0
+  #define OFDM_PREFIX_LEN (0 + CP_LEN)
+  #define UE_NUM 8
 #endif
+
 #define CODED_LEN 32
 #define ORIG_CODE_LEN 16
 #define N_ITE 10
