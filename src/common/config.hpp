@@ -60,6 +60,7 @@ public:
     int beacon_len;
     std::string beacon_mode;
     double freq;
+    double bbf_ratio;
     double txgainA;
     double rxgainA;
     double txgainB;

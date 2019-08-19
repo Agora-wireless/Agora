@@ -16,6 +16,7 @@ Config::Config(std::string jsonfile)
     nChannels = tddConf.value("channels", 1);
     isUE = tddConf.value("UE", false);
     freq = tddConf.value("frequency", 3.6e9);
+    bbf_ratio = 0.75;
     txgainA = tddConf.value("txgainA", 20);
     rxgainA = tddConf.value("rxgainA", 20);
     txgainB = tddConf.value("txgainB", 20);

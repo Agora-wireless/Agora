@@ -29,11 +29,11 @@ public:
     void radioTx(int, void ** buffs, int flags, long long & frameTime);
     int radioRx(int, void ** buffs, long long & frameTime);
     bool doCalib() { return calib; }
-    void reciprocityCalibrate(std::vector<void *> &tx, std::vector<void *> &rx);
-    std::vector<std::vector<std::complex<float>>> collectCSI();
+    std::vector<std::vector<std::complex<int16_t>>> collectCSI(bool &);
     static void drain_rx_buffer(SoapySDR::Device * ibsSdrs, SoapySDR::Stream * istream, std::vector<void *> buffs, int symSamp);
     void drain_buffers();
     void adjustDelays(std::vector<int>, int);
+    void go();
     ~RadioConfig();
 private:
     Config *_cfg;

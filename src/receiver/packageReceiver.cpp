@@ -113,6 +113,24 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 #else
 #ifdef USE_ARGOS
     radioconfig_ = new RadioConfig(config_);
+  #if !ENABLE_DOWNLINK
+    int count = 0;
+    bool adjust = false;
+    while (!adjust)
+    {
+        if (++count > 10)
+        {
+            std::cout << "attempted 10 unsucessful sample offset calibration, stopping ..." << std::endl;
+            break;
+        }
+        adjust = true;
+        radioconfig_->collectCSI(adjust);
+    }
+    radioconfig_->collectCSI(adjust);
+    usleep(100000);
+  #endif
+    radioconfig_->radioStart();
+
 #endif
 #endif
 }
@@ -142,12 +160,13 @@ PackageReceiver::~PackageReceiver()
 }
 
 #ifdef USE_ARGOS
-void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<float>>> &buffer_tx, std::vector<std::vector<std::complex<float>>> &buffer_rx, int ref_ant)
+void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<int16_t>>> &buffer_tx, std::vector<std::vector<std::complex<int16_t>>> &buffer_rx, int ref_ant)
 {
     std::cout << "start reciprocity CSI collection" << std::endl;
     //radioconfig_->reciprocityCalibrate(buffer_tx, buffer_rx);
-    std::vector<std::vector<std::complex<float>>> buff;
-    buff = radioconfig_->collectCSI();
+    std::vector<std::vector<std::complex<int16_t>>> buff;
+    bool adjust = false;
+    buff = radioconfig_->collectCSI(adjust);
     int M = config_->getNumAntennas();
     for (int i = 0; i < M; i++)
     {
@@ -156,14 +175,8 @@ void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<float
         buffer_rx[i].insert(buffer_rx[i].begin(), buff[ref_ant*M+i].begin(), buff[ref_ant*M+i].end());
         buffer_tx[i].insert(buffer_tx[i].begin(), buff[ref_ant+M*i].begin(), buff[ref_ant+M*i].end());
     }
-    //radioconfig_->radioStop(); // make sure all regiter states for reciprocity calibration are cleared
     std::cout << "end reciprocity CSI collection" << std::endl;
     radioconfig_->drain_buffers();
-}
-
-void PackageReceiver::startRadios()
-{
-    radioconfig_->radioStart();
 }
 #endif
 
@@ -340,7 +353,8 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 #ifdef USE_ARGOS
     sleep(1);
     pthread_cond_broadcast(&cond);
-    startRadios();
+    sleep(1);
+    radioconfig_->go();
 #endif
     return created_threads;
 }
@@ -992,27 +1006,28 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 *((int *)cur_ptr_buffer2 + 2) = 0; //cell_id 
                 *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
             }
-    #if DEBUG_RECV
-        printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d\n", tid, frame_id, symbol_id, cell_id, ant_id);
-    #endif
+        #if DEBUG_RECV
+            printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d\n", tid, frame_id, symbol_id, cell_id, ant_id);
+        #endif
 
-    #if MEASURE_TIME
-        // read information from received packet
-        int ant_id, frame_id, subframe_id, cell_id;
-        frame_id = *((int *)cur_ptr_buffer);
-        subframe_id = *((int *)cur_ptr_buffer + 1);
-        // cell_id = *((int *)cur_ptr_buffer + 2);
-        ant_id = *((int *)cur_ptr_buffer + 3);
-        // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
-        if (frame_id > prev_frame_id) {
-            *(frame_start + frame_id) = get_time();
-            prev_frame_id = frame_id;
-            if (frame_id % 512 == 200) {
-                _mm_prefetch((char*)(frame_start+frame_id+512), _MM_HINT_T0);
-                // double temp = frame_start[frame_id+3];
+        #if MEASURE_TIME
+            // read information from received packet
+            int ant_id, frame_id, subframe_id, cell_id;
+            frame_id = *((int *)cur_ptr_buffer);
+            subframe_id = *((int *)cur_ptr_buffer + 1);
+            // cell_id = *((int *)cur_ptr_buffer + 2);
+            ant_id = *((int *)cur_ptr_buffer + 3);
+            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+            if (frame_id > prev_frame_id) {
+                *(frame_start + frame_id) = get_time();
+                prev_frame_id = frame_id;
+                if (frame_id % 512 == 200) {
+                    _mm_prefetch((char*)(frame_start+frame_id+512), _MM_HINT_T0);
+                    // double temp = frame_start[frame_id+3];
+                }
             }
-        }
-    #endif
+        #endif
+
             // get the position in buffer
             offset = cur_ptr_buffer_status - buffer_status;
             // move ptr & set status to full
@@ -1044,11 +1059,11 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                     exit(0);
                 }
             }
-#if ENABLE_DOWNLINK
+        #if ENABLE_DOWNLINK
             // notify TXthread to start transmitting frame_id+offset
             if (txSymsPerFrame > 0 && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)
             {
-#ifdef SEPARATE_TX_THREAD
+            #ifdef SEPARATE_TX_THREAD
                 Event_data do_tx_task;
                 do_tx_task.event_type = TASK_SEND;
                 do_tx_task.data = ant_id; //tx_symbol_id * cfg->getNumAntennas() + ant_id;
@@ -1057,7 +1072,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                     printf("task enqueue failed\n");
                     exit(0);
                 }
-#else
+            #else
                 for (int tx_symbol_id = 0; tx_symbol_id < txSymsPerFrame; tx_symbol_id++)
                 {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
@@ -1074,9 +1089,9 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                     }
                     radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
                 }
-#endif
+            #endif
             }
-#endif
+        #endif
         }
     }
 }
