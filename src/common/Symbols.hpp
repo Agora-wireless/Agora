@@ -74,8 +74,8 @@
 #define DEBUG_PRINT_PER_FRAME_START 0
 
 #define DEBUG_PRINT_STATS_PER_THREAD 0
-#define DEBUG_UPDATE_STATS 1
-#define DEBUG_UPDATE_STATS_DETAILED 1
+#define DEBUG_UPDATE_STATS 0
+#define DEBUG_UPDATE_STATS_DETAILED 0
 #define DEBUG_PRINT_PILOT 0
 #define MEASURE_TIME 1
 
@@ -91,7 +91,11 @@ static const int pilot_subframe_num_perframe = UE_NUM;
 static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
 static const int dl_data_subframe_start = data_subframe_num_perframe-5;
 static const int dl_data_subframe_num_perframe = data_subframe_num_perframe - dl_data_subframe_start;
-
+static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+// header 4 int for: frame_id, subframe_id, cell_id, ant_id
+// short for: I/Q samples
+static const int package_header_offset = 64;
+static const int package_length = package_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
 static const int MAX_FRAME_ID = 1e4;
 
 #endif

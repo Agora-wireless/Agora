@@ -1,10 +1,10 @@
 #include "packageReceiver.hpp"
-#include "CoMP.hpp"
+#include "millipede.hpp"
 
 int main(int argc, char const *argv[])
 {
-    CoMP comp_cli;
-    comp_cli.start();
+    Millipede millipede_cli;
+    millipede_cli.start();
 
     return 0;
 }
