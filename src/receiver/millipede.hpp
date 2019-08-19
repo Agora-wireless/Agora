@@ -4,8 +4,8 @@
  * 
  */
 
-#ifndef COMP_HEAD
-#define COMP_HEAD
+#ifndef MILLIPEDE_HEAD
+#define MILLIPEDE_HEAD
 
 #include <unistd.h>
 #include <memory>
@@ -42,9 +42,10 @@
 #include "dodemul.hpp"
 #include "doprecode.hpp"
 #include "memory_manage.h"
+#include "stats.hpp"
 
 
-class CoMP
+class Millipede
 {
 public:
     // TASK & SOCKET thread number 
@@ -78,8 +79,8 @@ public:
     static const int dequeue_bulk_size = 32;
     static const int dequeue_bulk_size_single = 8;
 
-    CoMP();
-    ~CoMP();
+    Millipede();
+    ~Millipede();
 
     void start();
     // while loop of task thread
@@ -91,20 +92,36 @@ public:
 
     struct EventHandlerContext
     {
-        CoMP *obj_ptr;
+        Millipede *obj_ptr;
         int id;
     };
 
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
-    
+    void schedule_fft_task(int offset, int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id, int prev_frame_id,
+    moodycamel::ProducerToken const& ptok);
+    void schedule_delayed_fft_tasks(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok);
+    void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
+    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
+    void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
+    void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
+
+    void initialize_uplink_buffers();
+    void initialize_downlink_buffers();
+    void free_uplink_buffers();
+    void free_downlink_buffers();
+
+
+    void save_demul_data_to_file();
+    void getDemulData(int **ptr, int *size);
+    void getEqualData(float **ptr, int *size);
+
     inline bool isPilot(int subframe_id) {return (subframe_id >=0) && (subframe_id < UE_NUM); }
     inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
     inline int getUEId(int subframe_id) {return subframe_id; }
     inline int getULSFIndex(int subframe_id) {return subframe_id - UE_NUM; }
 
-    void getDemulData(int **ptr, int *size);
-    void getEqualData(float **ptr, int *size);
+    
 
 private:
 
@@ -113,7 +130,10 @@ private:
     float *pilots_;
     int max_equaled_frame = 0;
     float csi_format_offset;
+    int buffer_frame_num;
+    int max_packet_num_per_frame;
     std::unique_ptr<PackageReceiver> receiver_;
+    std::unique_ptr<Stats> stats_manager_;
     pthread_t task_threads[TASK_THREAD_NUM];
     EventHandlerContext context[TASK_THREAD_NUM];
     /*****************************************************
@@ -219,7 +239,8 @@ private:
     int **decode_counter_blocks_;
 
 
-
+    int **delay_fft_queue;
+    int *delay_fft_queue_cnt;
 
 
     /* Downlink */   
@@ -358,32 +379,19 @@ private:
     int *ZF_task_count;
     int *Demul_task_count;
 
-    // int CSI_task_count[TASK_THREAD_NUM*16];
-    // int FFT_task_count[TASK_THREAD_NUM*16];
-    // int ZF_task_count[TASK_THREAD_NUM*16];
-    // int Demul_task_count[TASK_THREAD_NUM*16];
-
     double **CSI_task_duration;
     double **FFT_task_duration;
     double **ZF_task_duration;
     double **Demul_task_duration;
 
-    // double CSI_task_duration[TASK_THREAD_NUM*8][4];
-    // double FFT_task_duration[TASK_THREAD_NUM*8][4];
-    // double ZF_task_duration[TASK_THREAD_NUM*8][4];
-    // double Demul_task_duration[TASK_THREAD_NUM*8][4];
-
     int *IFFT_task_count;
     int *Precode_task_count;
-    // int IFFT_task_count[TASK_THREAD_NUM*16];
-    // int Precode_task_count[TASK_THREAD_NUM*16];
 
     double **IFFT_task_duration;
     double **Precode_task_duration;
-    // double IFFT_task_duration[TASK_THREAD_NUM*8][4];
-    // double Precode_task_duration[TASK_THREAD_NUM*8][4];
 
-    double frame_start[SOCKET_RX_THREAD_NUM][10240] __attribute__( ( aligned (4096) ) ) ;
+    double **frame_start;
+    // double frame_start[SOCKET_RX_THREAD_NUM][10240] __attribute__( ( aligned (4096) ) ) ;
 
 
 

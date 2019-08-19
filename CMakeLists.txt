@@ -41,7 +41,7 @@ link_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/in
 
 
 # DPDK
-set (RTE_SDK /home/argos/Jian//dpdk-stable-18.11.1/)
+set (RTE_SDK /home/argos/Jian/dpdk-stable-18.11.1/)
 set (RTE_TARGET x86_64-native-linuxapp-gcc)
 set ( DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
 include_directories(${RTE_SDK}/${RTE_TARGET}/include)
@@ -60,11 +60,22 @@ endforeach()
 add_executable(sender src/sender/sender_cli.cpp src/sender/packageSender.cpp src/common/cpu_attach.cpp)
 target_link_libraries(sender -lpthread )
 
-set(SOURCES src/receiver/main.cpp src/receiver/packageReceiver.cpp src/receiver/CoMP.cpp src/common/cpu_attach.cpp src/receiver/compute_common.cpp  src/receiver/dofft.cpp src/receiver/dozf.cpp src/receiver/dodemul.cpp src/receiver/doprecode.cpp)
-add_executable(CoMP ${SOURCES})
-target_link_libraries(CoMP -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB})
+set(SOURCES src/receiver/main.cpp 
+			src/receiver/packageReceiver.cpp 
+			src/receiver/millipede.cpp 
+			src/common/cpu_attach.cpp 
+			src/receiver/compute_common.cpp  
+			src/receiver/stats.cpp 
+			src/receiver/dofft.cpp 
+			src/receiver/dozf.cpp 
+			src/receiver/dodemul.cpp 
+			src/receiver/doprecode.cpp)
+			
+add_executable(millipede ${SOURCES})
+target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB})
 
-
+#add_library(sounderUL MODULE  ${SOURCES})
+#target_link_libraries(sounderUL -lpthread  -lmufft -larmadillo -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ) 
 
 
 
