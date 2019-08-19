@@ -161,6 +161,13 @@ private:
     double *ifft_time_this_frame_this_thread;
     double *precode_time_this_frame_this_thread;
 
+    double *csi_time_this_frame_this_thread_per_task;
+    double *fft_time_this_frame_this_thread_per_task;
+    double *zf_time_this_frame_this_thread_per_task;
+    double *demul_time_this_frame_this_thread_per_task;
+    double *ifft_time_this_frame_this_thread_per_task;
+    double *precode_time_this_frame_this_thread_per_task;
+
     double *csi_time_this_frame;
     double *fft_time_this_frame;
     double *zf_time_this_frame;
