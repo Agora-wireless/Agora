@@ -47,6 +47,17 @@
 #define TASK_DECODE 8
 #define TASK_ENCODE 9
 
+#define PRINT_RX_PILOTS 0
+#define PRINT_RX 1
+#define PRINT_FFT_PILOTS 2
+#define PRINT_FFT_DATA 3
+#define PRINT_ZF 4
+#define PRINT_DEMUL 5
+#define PRINT_PRECODE 6
+#define PRINT_IFFT 7
+#define PRINT_TX_FIRST 8
+#define PRINT_TX 9
+
 
 #define BIGSTATION 0
 #define ENABLE_DOWNLINK 0

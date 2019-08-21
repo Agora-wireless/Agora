@@ -106,6 +106,9 @@ public:
     void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
     void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
 
+    void update_rx_counters(int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id);
+    void print_per_frame_done(int task_type, int frame_id, int frame_id_in_buffer);
+
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
     void free_uplink_buffers();
