@@ -1,6 +1,6 @@
 /**
- * Author: Peiyao Zhao
- * E-Mail: pdszpy19930218@163.com
+ * Author: Jian Ding
+ * Email: jianding17@gmail.com
  * 
  */
 
@@ -96,6 +96,7 @@ public:
         int id;
     };
 
+    inline void update_frame_count(int *frame_count);
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
     void schedule_fft_task(int offset, int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id, int prev_frame_id,
@@ -105,6 +106,11 @@ public:
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
     void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
     void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
+
+    void update_rx_counters(int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id);
+    void print_per_frame_done(int task_type, int frame_id, int frame_id_in_buffer);
+    void print_per_subframe_done(int task_type, int frame_id, int frame_id_in_buffer, int subframe_id);
+    void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id); 
 
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
