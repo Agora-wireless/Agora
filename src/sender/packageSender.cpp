@@ -1,8 +1,10 @@
+/**
+ * Author: Jian Ding
+ * Email: jianding17@gmail.com
+ * 
+ */
 #include "packageSender.hpp"
 #include "cpu_attach.hpp"
-
-
-
 
 bool keep_running = true;
 

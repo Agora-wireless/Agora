@@ -1,3 +1,8 @@
+/**
+ * Author: Jian Ding
+ * Email: jianding17@gmail.com
+ * 
+ */
 #include "packageSender.hpp"
 
 int main(int argc, char const *argv[])

@@ -1,3 +1,9 @@
+/**
+ * Author: Jian Ding
+ * Email: jianding17@gmail.com
+ * 
+ */
+
 #ifndef STATS
 #define STATS
 

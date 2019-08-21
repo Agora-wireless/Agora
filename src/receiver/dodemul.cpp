@@ -1,3 +1,8 @@
+/**
+ * Author: Jian Ding
+ * Email: jianding17@gmail.com
+ * 
+ */
 #include "dodemul.hpp"
 
 using namespace arma;
