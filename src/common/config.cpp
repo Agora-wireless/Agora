@@ -21,8 +21,8 @@ Config::Config(std::string jsonfile)
     rxgainA = tddConf.value("rxgainA", 20);
     txgainB = tddConf.value("txgainB", 20);
     rxgainB = tddConf.value("rxgainB", 20);
-    calTxGainA = tddConf.value("calTxGainA", 40);
-    calTxGainB = tddConf.value("calTxGainB", 40);
+    calTxGainA = tddConf.value("calTxGainA", 10);
+    calTxGainB = tddConf.value("calTxGainB", 10);
     rate = tddConf.value("rate", 5e6);
     sampsPerSymbol = tddConf.value("symbol_size", 0);
     prefix = tddConf.value("prefix", 0);
@@ -30,7 +30,7 @@ Config::Config(std::string jsonfile)
     beacon_ant = tddConf.value("beacon_antenna", 0);
     beacon_len = tddConf.value("beacon_len", 256);
     beacon_mode = tddConf.value("beacon_mode", "single");
-    sampleCalEn = tddConf.value("sample_calibrate", true);
+    sampleCalEn = tddConf.value("sample_calibrate", false);
     modulation = tddConf.value("modulation", "QPSK");
     core_offset = tddConf.value("core_offset", 1);
     rx_addr = tddConf.value("rx_addr", "127.0.0.1");
