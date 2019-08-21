@@ -1542,7 +1542,7 @@ void CoMP::start()
 
 
     printf("Print results\n");
-    FILE* fp_debug = fopen("../timeresult.txt", "w");
+    FILE* fp_debug = fopen("timeresult.txt", "w");
     if (fp_debug==NULL) {
         printf("open file faild");
         std::cerr << "Error: " << strerror(errno) << std::endl;

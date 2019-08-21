@@ -976,10 +976,11 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
         // if buffer is full, exit
         if(cur_ptr_buffer_status[0] == 1) {
             printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
-            for (int l = 0 ; l < buffer_frame_num; l++) 
-                printf("%d ", buffer_status[l]);
-            printf("\n\n");
-            exit(0);
+            //for (int l = 0 ; l < buffer_frame_num; l++) 
+            //    printf("%d ", buffer_status[l]);
+            //printf("\n\n");
+            cfg->running = false;
+            break;
         }
         int ant_id, frame_id, symbol_id, cell_id, tx_frame_id;
         // receive data
