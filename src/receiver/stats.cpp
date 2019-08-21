@@ -1,3 +1,8 @@
+/**
+ * Author: Jian Ding
+ * Email: jianding17@gmail.com
+ * 
+ */
 #include "stats.hpp"
 
 Stats::Stats(double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
