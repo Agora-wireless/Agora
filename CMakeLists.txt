@@ -82,6 +82,7 @@ if (${USE_ARGOS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
   set (ARGOS_SOURCES src/receiver/radio_lib.cpp )
   set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
+  add_definitions(-DTHREADED_INIT)
 endif()
 
 include_directories(
