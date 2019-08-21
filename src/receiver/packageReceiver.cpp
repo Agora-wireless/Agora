@@ -114,20 +114,23 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 #ifdef USE_ARGOS
     radioconfig_ = new RadioConfig(config_);
   #if !ENABLE_DOWNLINK
-    int count = 0;
-    bool adjust = false;
-    while (!adjust)
+    if (config_->sampleCalEn)
     {
-        if (++count > 10)
+        int count = 0;
+        bool adjust = false;
+        while (!adjust)
         {
-            std::cout << "attempted 10 unsucessful sample offset calibration, stopping ..." << std::endl;
-            break;
+            if (++count > 10)
+            {
+                std::cout << "attempted 10 unsucessful sample offset calibration, stopping ..." << std::endl;
+                break;
+            }
+            adjust = true;
+            radioconfig_->collectCSI(adjust);
         }
-        adjust = true;
         radioconfig_->collectCSI(adjust);
+        usleep(100000);
     }
-    radioconfig_->collectCSI(adjust);
-    usleep(100000);
   #endif
     radioconfig_->radioStart();
 
@@ -353,7 +356,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 #ifdef USE_ARGOS
     sleep(1);
     pthread_cond_broadcast(&cond);
-    sleep(1);
+    //sleep(1);
     radioconfig_->go();
 #endif
     return created_threads;
@@ -1054,7 +1057,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 package_message2.event_type = EVENT_PACKAGE_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
                 package_message2.data = offset + tid * buffer_frame_num;
-                if ( !message_queue_->enqueue(*local_ptok, package_message2 ) ) {
+                if ( !message_queue_->enqueue(package_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }

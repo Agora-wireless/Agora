@@ -21,6 +21,7 @@ class RadioConfig
 {
 public:
     RadioConfig(Config *cfg);
+    static void *initBSRadio(void * context);
     void radioStart();
     void radioStop();
     void readSensors();
@@ -35,6 +36,12 @@ public:
     void adjustDelays(std::vector<int>, int);
     void go();
     ~RadioConfig();
+    struct RadioConfigContext
+    {
+        RadioConfig *ptr;
+        int tid;
+    };
+
 private:
     Config *_cfg;
     std::vector<SoapySDR::Device *> hubs;
@@ -49,4 +56,6 @@ private:
     bool isUE;
     bool calib;
     RadioType _radioType; 
+    std::atomic<int> remainingJobs;
+    RadioConfigContext *context;
 };

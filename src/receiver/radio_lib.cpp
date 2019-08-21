@@ -23,154 +23,38 @@ RadioConfig::RadioConfig(Config *cfg):
     isUE = _cfg->isUE;
     if (!isUE and _cfg->hub_ids.size() != 0)
     { 
+        args["driver"] = "remote";
+        args["timeout"] = "1000000";
         args["serial"] = _cfg->hub_ids.at(0);
         hubs.push_back(SoapySDR::Device::make(args)); 
     }
 
+    baStn.resize(_radioNum);
+    txStreams.resize(_radioNum);
+    rxStreams.resize(_radioNum);
+    context = new RadioConfigContext[_radioNum];
+    remainingJobs = _radioNum;
     for (int i = 0; i < this->_radioNum; i++)
     {
-        args["serial"] = _cfg->radio_ids.at(i);
-        baStn.push_back(SoapySDR::Device::make(args));
+        //args["driver"] = "iris";
+        //args["timeout"] = "1000000";
+        //args["serial"] = _cfg->radio_ids.at(i);
+        //baStn.push_back(SoapySDR::Device::make(args));
+        context[i].ptr = this;
+        context[i].tid = i;
+#ifdef THREADED_INIT
+        pthread_t init_thread_;
+        if(pthread_create( &init_thread_, NULL, RadioConfig::initBSRadio, (void *)(&context[i])) != 0)
+        {
+            perror("init thread create failed");
+            exit(0);
+        }
+#else
+        RadioConfig::initBSRadio((void *)&context[i]);
+#endif
     }
 
-    int radioNum = this->_radioNum;
-    for (int i = 0; i < radioNum; i++)
-    { 
-        //use the TRX antenna port for both tx and rx
-        for (auto ch : channels) baStn[i]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
-
-        std::cout << "setting samples rates to " << cfg->rate/1e6 << " Msps..." << std::endl;
-        SoapySDR::Kwargs info = baStn[i]->getHardwareInfo();
-        for (auto ch : {0, 1})
-        {
-            baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, (1+2*cfg->bbf_ratio)*cfg->rate);
-            baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, (1+2*cfg->bbf_ratio)*cfg->rate);
-
-            baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
-            baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
-
-            //baStn[i]->setFrequency(SOAPY_SDR_RX, ch, cfg->freq);  
-            //baStn[i]->setFrequency(SOAPY_SDR_TX, ch, cfg->freq); 
-            baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg->freq-cfg->bbf_ratio*cfg->rate);
-            baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", cfg->bbf_ratio*cfg->rate);
-            baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg->freq-cfg->bbf_ratio*cfg->rate);
-            baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", cfg->bbf_ratio*cfg->rate);
- 
-            if (info["frontend"].find("CBRS") != std::string::npos)
-            {
-                baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", 0); //[-18,0]  
-                baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA1", 30); //[0,33]
-                baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
-            }
-
-            baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA", ch ? cfg->rxgainB : cfg->rxgainA);  //[0,30]
-            baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);  //[0,12]
-            baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);  //[-12,19]
-
-            if (info["frontend"].find("CBRS") != std::string::npos)
-            {
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", 0);  //[-18,0] by 3
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA1", 15);  //[0|15]
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0);   //[0|15]
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA3", 30);  //[0|30]
-            }
-            baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);     //[0,12] 
-            baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD", ch ? cfg->txgainB : cfg->txgainA);  //[0,30]
-
-        }
-
-        for (auto ch : channels)
-        {
-            //baStn[i]->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
-            //baStn[i]->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
-            baStn[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
-        }
-
-        // we disable channel 1 because of the internal LDO issue.
-        // This will be fixed in the next revision (E) of Iris.
-        if (_cfg->nChannels == 1)
-        {
-            if (_cfg->freq > 3e9 and _cfg->radio_ids[i].find("RF3E") == std::string::npos)
-            {
-                std::cout << "setting up SPI_TDD" << std::endl;
-                std::vector<unsigned> txActive, rxActive;
-                unsigned ch = baStn[i]->readRegister("LMS7IC", 0x0020);
-                baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
-                unsigned regRfeA = baStn[i]->readRegister("LMS7IC", 0x010C);
-                unsigned regRfeALo = baStn[i]->readRegister("LMS7IC", 0x010D);
-                unsigned regRbbA = baStn[i]->readRegister("LMS7IC", 0x0115);
-                unsigned regTrfA = baStn[i]->readRegister("LMS7IC", 0x0100);
-                unsigned regTbbA = baStn[i]->readRegister("LMS7IC", 0x0105);
-
-                // disable TX
-                txActive = {
-                    //0xa10C0000 | 0xfe, //RFE in power down
-                    //0xa10D0000 | 0x0, //RFE SISO and disables
-                    0xa1150000 | 0xe, //RBB in power down
-                    //0xa1000000 | regTrfA //TRF stays the same
-                    0xa1050000 | regTbbA //TBB stays the same
-                };
-                baStn[i]->writeRegisters("LMS7_PROG_SPI", 16, txActive); //trig1 offset
-                // disable RX
-                rxActive = {
-                    //0xa10C0000 | regRfeA, //RFE stays the same
-                    //0xa10D0000 | regRfeALo, //RFE stays the same
-                    0xa1150000 | regRbbA, //RBB stays the same
-                    //0xa1000000 | 0xe //TRF in power down + SISO
-                    0xa1050000 | 0x1e //TBB in power down
-                };
-                baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
-
-                //baStn[i]->writeSetting("SPI_TDD_MODE", "SISO"); // a FPGA hack that bypasses the LDO issue
-            }
-            baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
-            baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
-        } 
-        else if (_cfg->nChannels == 2)
-        {
-            if (_cfg->freq > 3e9 and _cfg->radio_ids[i].find("RF3E") == std::string::npos)
-            {
-                std::vector<unsigned> txActive, rxActive;
-                unsigned ch = baStn[i]->readRegister("LMS7IC", 0x0020);
-                baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
-                unsigned regRfeA = baStn[i]->readRegister("LMS7IC", 0x010C);
-                unsigned regRfeALo = baStn[i]->readRegister("LMS7IC", 0x010D);
-                unsigned regRbbA = baStn[i]->readRegister("LMS7IC", 0x0115);
-                unsigned regTrfA = baStn[i]->readRegister("LMS7IC", 0x0100);
-                unsigned regTbbA = baStn[i]->readRegister("LMS7IC", 0x0105);
-
-                ch = baStn[i]->readRegister("LMS7IC", 0x0020);
-                baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 2);
-                unsigned regRfeB = baStn[i]->readRegister("LMS7IC", 0x010C);
-                unsigned regRbbB = baStn[i]->readRegister("LMS7IC", 0x0115);
-                unsigned regTrfB = baStn[i]->readRegister("LMS7IC", 0x0100);
-                unsigned regTbbB = baStn[i]->readRegister("LMS7IC", 0x0105);
-
-                txActive = {
-                    //0xe10C0000 | 0xfe, //RFE in power down
-                    //0xe10D0000 | 0x0, //RFE SISO and disables
-                    0xe1150000 | 0xe, //RBB in power down
-                    //0xe1000000 | regTrfA, //TRF stays the same
-                    0xe1050000 | regTbbA}; //TBB stays the same
-
-                rxActive = {
-                    //0xe10C0000 | regRfeA, //RFE stays the same
-                    //0xe10D0000 | regRfeALo, //RFE stays the same
-                    0xe1150000 | regRbbA, //RBB stays the same
-                    //0xe1000000 | 0xe, //TRF in power down + SISO
-                    0xe1050000 | 0x1e}; //TBB in power down
-
-                baStn[i]->writeRegisters("LMS7_PROG_SPI", 16, txActive); //trig1 offset
-                baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
-                //baStn[i]->writeSetting("SPI_TDD_MODE", "MIMO");
-            }
-        }
-        // resets the DATA_clk domain logic. 
-        baStn[i]->writeRegister("IRIS30", 48, (1<<29) | 0x1);
-        baStn[i]->writeRegister("IRIS30", 48, (1<<29));
-        baStn[i]->writeRegister("IRIS30", 48, 0);
-    }
-
+    while(remainingJobs>0);
     for (int i = 0; i < this->_radioNum; i++)
     {
         std::cout << _cfg->radio_ids.at(i) << ": Front end " << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
@@ -217,13 +101,170 @@ RadioConfig::RadioConfig(Config *cfg):
     else
         hubs[0]->writeSetting("SYNC_DELAYS", "");
 
-    for (int i = 0; i < this->_radioNum; i++)
+    std::cout << "radio init done!" << std::endl;
+
+}
+
+void *RadioConfig::initBSRadio(void *in_context)
+{
+    RadioConfig* rc = ((RadioConfigContext *)in_context)->ptr;
+    int i = ((RadioConfigContext *)in_context)->tid;
+    Config *cfg = rc->_cfg;
+
+    //load channels
+    std::vector<size_t> channels;
+    if (cfg->nChannels == 1) channels = {0};
+    else if (cfg->nChannels == 2) channels = {0, 1};
+    else
     {
-        this->rxStreams.push_back(baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs));
-        this->txStreams.push_back(baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CF32, channels, sargs));
+        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
+        cfg->nChannels = 2;
+        channels = {0, 1};
     }
 
-    std::cout << "radio init done!" << std::endl;
+    SoapySDR::Kwargs args;
+    SoapySDR::Kwargs sargs;
+    args["driver"] = "iris";
+    args["timeout"] = "1000000";
+    args["serial"] = cfg->radio_ids.at(i);
+    rc->baStn[i] = SoapySDR::Device::make(args);
+
+    //use the TRX antenna port for both tx and rx
+    for (auto ch : channels) rc->baStn[i]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
+
+    SoapySDR::Kwargs info = rc->baStn[i]->getHardwareInfo();
+    for (auto ch : {0, 1})
+    {
+        rc->baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, (1+2*cfg->bbf_ratio)*cfg->rate);
+        rc->baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, (1+2*cfg->bbf_ratio)*cfg->rate);
+
+        rc->baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
+        rc->baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
+
+        rc->baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg->freq-cfg->bbf_ratio*cfg->rate);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", cfg->bbf_ratio*cfg->rate);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg->freq-cfg->bbf_ratio*cfg->rate);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", cfg->bbf_ratio*cfg->rate);
+ 
+        if (info["frontend"].find("CBRS") != std::string::npos)
+        {
+            if (cfg->freq > 3e9) 
+                rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", 0); //[-18,0]
+            else if (cfg->freq > 2e9 && cfg->freq < 3e9)
+                rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18); //[-18,0]
+            else
+                rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -12); //[-18,0]
+            rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
+        }
+
+        rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA", ch ? cfg->rxgainB : cfg->rxgainA);  //[0,30]
+        rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);  //[0,12]
+        rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);  //[-12,19]
+
+        if (info["frontend"].find("CBRS") != std::string::npos)
+        {
+            rc->baStn[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);  //[-18,0] by 3
+            rc->baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0);   //[0|15]
+        }
+        rc->baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);     //[0,12] 
+        rc->baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD", ch ? cfg->txgainB : cfg->txgainA);  //[0,30]
+
+    }
+
+    for (auto ch : channels)
+    {
+        //baStn[i]->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
+        //baStn[i]->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
+        rc->baStn[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
+    }
+
+    // we disable channel 1 because of the internal LDO issue.
+    // This will be fixed in the next revision (E) of Iris.
+    if (cfg->nChannels == 1)
+    {
+        if (cfg->freq > 3e9 and cfg->radio_ids[i].find("RF3E") == std::string::npos)
+        {
+            std::cout << "setting up SPI_TDD" << std::endl;
+            std::vector<unsigned> txActive, rxActive;
+            unsigned ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
+            rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
+            unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
+            unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
+            unsigned regRbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
+            unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
+            unsigned regTbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
+
+            // disable TX
+            txActive = {
+                //0xa10C0000 | 0xfe, //RFE in power down
+                //0xa10D0000 | 0x0, //RFE SISO and disables
+                0xa1150000 | 0xe, //RBB in power down
+                //0xa1000000 | regTrfA //TRF stays the same
+                0xa1050000 | regTbbA //TBB stays the same
+            };
+            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 16, txActive); //trig1 offset
+            // disable RX
+            rxActive = {
+                //0xa10C0000 | regRfeA, //RFE stays the same
+                //0xa10D0000 | regRfeALo, //RFE stays the same
+                0xa1150000 | regRbbA, //RBB stays the same
+                //0xa1000000 | 0xe //TRF in power down + SISO
+                0xa1050000 | 0x1e //TBB in power down
+            };
+            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
+
+            rc->baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
+            rc->baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
+        }
+    } 
+    else if (cfg->nChannels == 2)
+    {
+        if (cfg->freq > 3e9 and cfg->radio_ids[i].find("RF3E") == std::string::npos)
+        {
+            std::vector<unsigned> txActive, rxActive;
+            unsigned ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
+            rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
+            unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
+            unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
+            unsigned regRbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
+            unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
+            unsigned regTbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
+
+            ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
+            rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 2);
+            unsigned regRfeB = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
+            unsigned regRbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
+            unsigned regTrfB = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
+            unsigned regTbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
+
+            txActive = {
+                //0xe10C0000 | 0xfe, //RFE in power down
+                //0xe10D0000 | 0x0, //RFE SISO and disables
+                0xe1150000 | 0xe, //RBB in power down
+                //0xe1000000 | regTrfA, //TRF stays the same
+                0xe1050000 | regTbbA}; //TBB stays the same
+
+            rxActive = {
+                //0xe10C0000 | regRfeA, //RFE stays the same
+                //0xe10D0000 | regRfeALo, //RFE stays the same
+                0xe1150000 | regRbbA, //RBB stays the same
+                //0xe1000000 | 0xe, //TRF in power down + SISO
+                0xe1050000 | 0x1e}; //TBB in power down
+
+            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 16, txActive); //trig1 offset
+            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
+            //baStn[i]->writeSetting("SPI_TDD_MODE", "MIMO");
+        }
+    }
+    // resets the DATA_clk domain logic. 
+    rc->baStn[i]->writeRegister("IRIS30", 48, (1<<29) | 0x1);
+    rc->baStn[i]->writeRegister("IRIS30", 48, (1<<29));
+    rc->baStn[i]->writeRegister("IRIS30", 48, 0);
+
+    rc->rxStreams[i] = rc->baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+    rc->txStreams[i] = rc->baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CF32, channels, sargs);
+    rc->remainingJobs--;
+
 }
 
 void RadioConfig::radioStart()
@@ -363,8 +404,8 @@ void RadioConfig::radioStart()
                  
             }
 
-            //baStn[i]->setHardwareTime(0, "TRIGGER");
-            baStn[i]->activateStream(this->rxStreams[i], flags, 0);
+            baStn[i]->setHardwareTime(0, "TRIGGER");
+            baStn[i]->activateStream(this->rxStreams[i]);
             baStn[i]->activateStream(this->txStreams[i]);
         }
     }
@@ -566,7 +607,8 @@ std::vector<std::vector<std::complex<int16_t>>> RadioConfig::collectCSI(bool &ad
     for (int i = 0; i < R; i++)
     {
         baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calTxGainA);
-        //baStn[i]->setGain(SOAPY_SDR_TX, 1, "PAD", _cfg->calTxGainB);
+        if (_cfg->nChannels == 2)
+            baStn[i]->setGain(SOAPY_SDR_TX, 1, "PAD", _cfg->calTxGainB);
         baStn[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
         baStn[i]->writeSetting("TDD_MODE", "false");
         baStn[i]->activateStream(this->txStreams[i]);
@@ -642,7 +684,8 @@ std::vector<std::vector<std::complex<int16_t>>> RadioConfig::collectCSI(bool &ad
         //baStn[i]->deactivateStream(this->txStreams[i]);
         //baStn[i]->deactivateStream(this->rxStreams[i]);
         baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->txgainA);  //[0,30]
-        //baStn[i]->setGain(SOAPY_SDR_TX, 1, "PAD", _cfg->txgainB);  //[0,30]
+        if (_cfg->nChannels == 2)
+            baStn[i]->setGain(SOAPY_SDR_TX, 1, "PAD", _cfg->txgainB);  //[0,30]
     }
 
     return buff;
