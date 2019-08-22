@@ -9,7 +9,6 @@ build/*
 *.o
 *.so
 *.m~
-*.json
 
 # Packages #
 ############

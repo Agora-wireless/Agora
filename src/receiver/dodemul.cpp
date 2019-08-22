@@ -136,11 +136,13 @@ void DoDemul::Demul(int offset)
 #endif
             cx_fmat mat_equaled(equal_ptr, UE_NUM, 1, false);
 
+
 #if DEBUG_UPDATE_STATS_DETAILED    
     double start_time2 = get_time();
 #endif      
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
+            // cout<<mat_equaled.st()<<endl;
 
 
 #if DEBUG_UPDATE_STATS_DETAILED   
@@ -163,13 +165,13 @@ void DoDemul::Demul(int offset)
     Demul_task_duration[tid * 8][3] += duration3;
 #endif
 
-            // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
-            // cout<< "Demuled data: ";
-            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-            //     // cout<<demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM+ue_idx]<<" "<<endl;
-            //     cout<<+*(demul_ptr+ue_idx)<<"  ";
-            // }
-            // cout<<endl; 
+             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
+             // cout<< "Demuled data: ";
+             // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+             //     // cout<<demul_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM+ue_idx]<<" "<<endl;
+             //     cout<<+*(demul_ptr+ue_idx)<<"  ";
+             // }
+             // cout<<endl; 
 #endif      
         #if DEBUG_UPDATE_STATS    
             Demul_task_count[tid * 16] = Demul_task_count[tid * 16] + 1;
@@ -362,12 +364,12 @@ void DoDemul::DemulSingleSC(int offset)
 
     // Hard decision
     demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
-    // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
-    // cout<< "Demuled data: ";
-    // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-    //     cout<<*(demul_ptr+ue_idx)<<"  ";
-    // }
-    // cout<<endl;
+    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
+    cout<< "Demuled data: ";
+    for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
+         cout<<*(demul_ptr+ue_idx)<<"  ";
+     }
+     cout<<endl;
 
     // inform main thread
     double duration3 = get_time() - start_time;

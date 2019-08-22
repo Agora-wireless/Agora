@@ -14,8 +14,6 @@ inline const struct rte_eth_conf port_conf_default() {
     rte.rxmode.max_rx_pkt_len = MAX_JUMBO_FRAME_SIZE;
     return rte;
 }
-#endif
-
 
 static struct rte_flow *
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
@@ -24,11 +22,12 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
                 uint16_t src_port, uint16_t src_port_mask,
                 uint16_t dst_port, uint16_t dst_port_mask,
                 struct rte_flow_error *error);
+#endif
 
-PackageReceiver::PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
     socket_ = new int[RX_THREAD_NUM];
-
+    config_ = cfg;
     rx_thread_num_ = RX_THREAD_NUM;
     tx_thread_num_ = TX_THREAD_NUM;
 
@@ -110,13 +109,38 @@ PackageReceiver::PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, int in_co
         }
     }
 
+#else
+#ifdef USE_ARGOS
+    radioconfig_ = new RadioConfig(config_);
+  #if !ENABLE_DOWNLINK
+    if (config_->sampleCalEn)
+    {
+        int count = 0;
+        bool adjust = false;
+        while (!adjust)
+        {
+            if (++count > 10)
+            {
+                std::cout << "attempted 10 unsucessful sample offset calibration, stopping ..." << std::endl;
+                break;
+            }
+            adjust = true;
+            radioconfig_->collectCSI(adjust);
+        }
+        radioconfig_->collectCSI(adjust);
+        usleep(100000);
+    }
+  #endif
+    radioconfig_->radioStart();
+
+#endif
 #endif
 }
 
-PackageReceiver::PackageReceiver(int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset, 
+PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset, 
         moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
         moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks):
-PackageReceiver(RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+PackageReceiver(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
@@ -130,9 +154,33 @@ PackageReceiver::~PackageReceiver()
     delete[] socket_;
     delete[] tx_context;
     delete[] rx_context;
+#ifdef USE_ARGOS
+    radioconfig_->radioStop();
+    delete radioconfig_;
+#endif
+    delete config_;
 }
 
-
+#ifdef USE_ARGOS
+void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<int16_t>>> &buffer_tx, std::vector<std::vector<std::complex<int16_t>>> &buffer_rx, int ref_ant)
+{
+    std::cout << "start reciprocity CSI collection" << std::endl;
+    //radioconfig_->reciprocityCalibrate(buffer_tx, buffer_rx);
+    std::vector<std::vector<std::complex<int16_t>>> buff;
+    bool adjust = false;
+    buff = radioconfig_->collectCSI(adjust);
+    int M = config_->getNumAntennas();
+    for (int i = 0; i < M; i++)
+    {
+        if (!buffer_rx.empty()) buffer_rx[i].erase(buffer_rx[i].begin(), buffer_rx[i].end());
+        if (!buffer_tx.empty()) buffer_tx[i].erase(buffer_tx[i].begin(), buffer_tx[i].end());
+        buffer_rx[i].insert(buffer_rx[i].begin(), buff[ref_ant*M+i].begin(), buff[ref_ant*M+i].end());
+        buffer_tx[i].insert(buffer_tx[i].begin(), buff[ref_ant+M*i].begin(), buff[ref_ant+M*i].end());
+    }
+    std::cout << "end reciprocity CSI collection" << std::endl;
+    radioconfig_->drain_buffers();
+}
+#endif
 
 #if USE_DPDK
 int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
@@ -255,6 +303,11 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     }
 #endif
 
+#ifdef USE_ARGOS
+    int nradio_per_thread = config_->nRadios/rx_thread_num_;
+    int rem_thread_nradio = config_->nRadios%rx_thread_num_;
+#endif
+
     std::vector<pthread_t> created_threads;
 #if !ENABLE_DOWNLINK
     #if USE_DPDK
@@ -282,8 +335,14 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
             // record the thread id 
             rx_context[i].ptr = this;
             rx_context[i].tid = i;
+        #ifdef USE_ARGOS
+            rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
+            // start socket thread
+            if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
+        #else
             // start socket thread
             if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv, (void *)(&rx_context[i])) != 0)
+        #endif
             {
                 perror("socket recv thread create failed");
                 exit(0);
@@ -293,6 +352,12 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     #endif
 #endif
     
+#ifdef USE_ARGOS
+    sleep(1);
+    pthread_cond_broadcast(&cond);
+    //sleep(1);
+    radioconfig_->go();
+#endif
     return created_threads;
 }
 
@@ -353,7 +418,12 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
         tx_context[i].ptr = this;
         tx_context[i].tid = i;
 
-        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopTXRX, (void *)(&tx_context[i])) != 0) {
+    #ifdef USE_ARGOS
+        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopSend_Argos, (void *)(&tx_context[i])) != 0)
+    #else
+        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopTXRX, (void *)(&tx_context[i])) != 0)
+    #endif
+        {
             perror("socket Transmit thread create failed");
             exit(0);
         }
@@ -531,8 +601,8 @@ void* PackageReceiver::loopRecv(void *in_context)
 
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
+    // moodycamel::ProducerToken *local_ptok = new moodycamel::ProducerToken(*message_queue_);
     moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
-
 
     char* buffer = obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
@@ -612,7 +682,8 @@ void* PackageReceiver::loopRecv(void *in_context)
         package_message.event_type = EVENT_PACKAGE_RECEIVED;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         package_message.data = offset + tid * buffer_frame_num;
-        if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+        // if ( !message_queue_->enqueue(package_message ) ) {
+        if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -791,7 +862,7 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
             Event_data package_message;
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
             package_message.data = offset + tid * buffer_frame_num;
-            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+            if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
@@ -810,10 +881,224 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
         }
     }
 }
-
 #endif
 
+#ifdef USE_ARGOS
+void* PackageReceiver::loopRecv_Argos(void *in_context)
+{
+    // get the pointer of class & tid
+    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
+    int tid = ((PackageReceiverContext *)in_context)->tid;
+    //printf("Recv thread: thread %d start\n", tid);
+    int nradio_cur_thread = ((PackageReceiverContext *)in_context)->radios;
+    //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
+    int id = tid;
+    Config *cfg = obj_ptr->config_;
+    // get pointer of message queue
+    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
+    int core_id = obj_ptr->core_id_;
+    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
+#ifdef ENABLE_CPU_ATTACH
+    // printf("Recv thread: pinning thread %d to core %d\n", tid, core_id + tid);
+    if(pin_to_core(core_id + tid) != 0)
+    {
+        printf("Recv thread: pinning thread %d to core %d failed\n", tid, core_id + tid);
+        exit(0);
+    }
+    else {
+        printf("Recv thread: pinning thread %d to core %d succeed\n", tid, core_id + tid);
+    }
+#endif
 
+    //// Use mutex to sychronize data receiving across threads
+    pthread_mutex_lock(&obj_ptr->mutex);
+    printf("Thread %d: waiting for release\n", tid);
+
+    pthread_cond_wait(&obj_ptr->cond, &obj_ptr->mutex);
+    pthread_mutex_unlock(&obj_ptr->mutex); // unlocking for all other threads
+
+    // use token to speed up
+    //moodycamel::ProducerToken local_ptok(*message_queue_);
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+
+    int hdr_size = cfg->hdr_size;
+    void* buffer = obj_ptr->buffer_[tid];
+    int* buffer_status = obj_ptr->buffer_status_[tid];
+    int buffer_length = obj_ptr->buffer_length_;
+    int buffer_frame_num = obj_ptr->buffer_frame_num_;
+    double *frame_start = obj_ptr->frame_start_[tid];
+
+    // walk through all the pages
+    double temp;
+    for (int i = 0; i < 20; i++) {
+        temp = frame_start[i * 512];
+    }
+
+#if ENABLE_DOWNLINK
+    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
+    char *tx_buffer = obj_ptr->tx_buffer_;
+
+    int txSymsPerFrame = 0;
+    std::vector<size_t> txSymbols;
+    txSymsPerFrame = cfg->dlSymsPerFrame;
+    txSymbols = cfg->DLSymbols[0];
+#endif
+
+    void* cur_ptr_buffer = buffer;
+    int* cur_ptr_buffer_status = buffer_status;
+    int nradio_per_thread = cfg->nRadios/obj_ptr->rx_thread_num_;
+    int rem_thread_nradio = cfg->nRadios%obj_ptr->rx_thread_num_;//obj_ptr->thread_num_*(cfg->nRadios/obj_ptr->thread_num_);
+    printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
+    RadioConfig *radio = obj_ptr->radioconfig_;
+
+    // to handle second channel at each radio
+    // this is assuming buffer_frame_num is at least 2 
+    void* cur_ptr_buffer2;
+    int* cur_ptr_buffer_status2;
+    void* buffer2 = obj_ptr->buffer_[tid] + package_length; 
+    int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
+    if (cfg->nChannels == 2) {
+        cur_ptr_buffer2 = buffer2;
+        cur_ptr_buffer_status2 = buffer_status2;
+    }
+    else {
+        cur_ptr_buffer2 = calloc(package_length, sizeof(char)); 
+    }
+    int offset = 0;
+    long long frameTime;
+    int prev_frame_id = -1;
+
+    int ret = 0;
+    int maxFrameId = 0;
+    while(cfg->running)
+    {
+        // if buffer is full, exit
+        if(cur_ptr_buffer_status[0] == 1) {
+            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
+            //for (int l = 0 ; l < buffer_frame_num; l++) 
+            //    printf("%d ", buffer_status[l]);
+            //printf("\n\n");
+            cfg->running = false;
+            break;
+        }
+        int ant_id, frame_id, symbol_id, cell_id, tx_frame_id;
+        // receive data
+        for (int it = 0 ; it < nradio_cur_thread; it++) // FIXME: this must be threaded
+        {
+            //int rid = tid * obj_ptr->radios_per_thread + it;
+            int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
+            // this is probably a really bad implementation, and needs to be revamped
+            void * samp1 = cur_ptr_buffer + hdr_size*sizeof(int);
+            void * samp2 = cur_ptr_buffer2 + hdr_size*sizeof(int);
+            void *samp[2] = {samp1, samp2};
+            while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
+            frame_id = (int)(frameTime>>32);
+            symbol_id = (int)((frameTime>>16)&0xFFFF);
+            ant_id = rid * cfg->nChannels;
+            int rx_symbol_id = cfg->getPilotSFIndex(frame_id, symbol_id);
+            if (rx_symbol_id < 0)
+                rx_symbol_id = cfg->getUlSFIndex(frame_id, symbol_id) + cfg->pilotSymsPerFrame;
+            *((int *)cur_ptr_buffer) = frame_id;
+            *((int *)cur_ptr_buffer + 1) = rx_symbol_id;
+            *((int *)cur_ptr_buffer + 2) = 0; //cell_id 
+            *((int *)cur_ptr_buffer + 3) = ant_id;
+            if (cfg->nChannels == 2)
+            {
+                *((int *)cur_ptr_buffer2) = frame_id;
+                *((int *)cur_ptr_buffer2 + 1) = rx_symbol_id;
+                *((int *)cur_ptr_buffer2 + 2) = 0; //cell_id 
+                *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
+            }
+        #if DEBUG_RECV
+            printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d\n", tid, frame_id, symbol_id, cell_id, ant_id);
+        #endif
+
+        #if MEASURE_TIME
+            // read information from received packet
+            int ant_id, frame_id, subframe_id, cell_id;
+            frame_id = *((int *)cur_ptr_buffer);
+            subframe_id = *((int *)cur_ptr_buffer + 1);
+            // cell_id = *((int *)cur_ptr_buffer + 2);
+            ant_id = *((int *)cur_ptr_buffer + 3);
+            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+            if (frame_id > prev_frame_id) {
+                *(frame_start + frame_id) = get_time();
+                prev_frame_id = frame_id;
+                if (frame_id % 512 == 200) {
+                    _mm_prefetch((char*)(frame_start+frame_id+512), _MM_HINT_T0);
+                    // double temp = frame_start[frame_id+3];
+                }
+            }
+        #endif
+
+            // get the position in buffer
+            offset = cur_ptr_buffer_status - buffer_status;
+            // move ptr & set status to full
+            cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
+            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
+            cur_ptr_buffer = buffer + ((char*)cur_ptr_buffer - (char*)buffer + package_length * cfg->nChannels) % buffer_length;
+            // push EVENT_RX_ENB event into the queue
+            Event_data package_message;
+            package_message.event_type = EVENT_PACKAGE_RECEIVED;
+            // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
+            package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
+            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+                printf("socket message enqueue failed\n");
+                exit(0);
+            }
+            if (cfg->nChannels == 2)
+            {
+                offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
+                cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
+                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
+                cur_ptr_buffer2 = buffer2 + ((char*)cur_ptr_buffer2 - (char*)buffer2 + package_length * cfg->nChannels) % buffer_length;
+                // push EVENT_RX_ENB event into the queue
+                Event_data package_message2;
+                package_message2.event_type = EVENT_PACKAGE_RECEIVED;
+                // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
+                package_message2.data = offset + tid * buffer_frame_num;
+                if ( !message_queue_->enqueue(*local_ptok, package_message2 ) ) {
+                    printf("socket message enqueue failed\n");
+                    exit(0);
+                }
+            }
+        #if ENABLE_DOWNLINK
+            // notify TXthread to start transmitting frame_id+offset
+            if (txSymsPerFrame > 0 && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)
+            {
+            #ifdef SEPARATE_TX_THREAD
+                Event_data do_tx_task;
+                do_tx_task.event_type = TASK_SEND;
+                do_tx_task.data = ant_id; //tx_symbol_id * cfg->getNumAntennas() + ant_id;
+                do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
+                if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
+                    printf("task enqueue failed\n");
+                    exit(0);
+                }
+            #else
+                for (int tx_symbol_id = 0; tx_symbol_id < txSymsPerFrame; tx_symbol_id++)
+                {
+                    int tx_frame_id = frame_id + TX_FRAME_DELTA;
+                    int tx_symbol = txSymbols[tx_symbol_id];
+                    offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+                    void* txbuf[2];
+                    long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
+                    int flags = 1; // HAS_TIME
+                    //if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+                    txbuf[0] = tx_buffer + offset * cfg->getTxPackageLength(); 
+                    if (cfg->nChannels == 2)
+                    {
+                        txbuf[1] = tx_buffer + (offset + 1) * cfg->getTxPackageLength();  
+                    }
+                    radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+                }
+            #endif
+            }
+        #endif
+        }
+    }
+}
+#endif
 
 
 void* PackageReceiver::loopSend(void *in_context)
@@ -822,6 +1107,7 @@ void* PackageReceiver::loopSend(void *in_context)
 
     PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
     int tid = ((PackageReceiverContext *)in_context)->tid;
+    Config *cfg = obj_ptr->config_;
     printf("package sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
@@ -846,7 +1132,7 @@ void* PackageReceiver::loopSend(void *in_context)
     int socket_local;
     servaddr_local.sin_family = AF_INET;
     servaddr_local.sin_port = htons(6000+tid);
-    servaddr_local.sin_addr.s_addr = inet_addr("10.0.0.4");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    servaddr_local.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
 
     cliaddr_local.sin_family = AF_INET;
@@ -966,7 +1252,7 @@ void* PackageReceiver::loopSend(void *in_context)
         package_message.event_type = EVENT_PACKAGE_SENT;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         package_message.data = offset;
-        if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+        if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -1003,6 +1289,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
     int core_id = obj_ptr->core_id_;
     int rx_thread_num = obj_ptr->rx_thread_num_;
     int tx_thread_num = obj_ptr->tx_thread_num_;
+    Config *cfg = obj_ptr->config_;
 
 #ifdef ENABLE_CPU_ATTACH 
     if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
@@ -1027,7 +1314,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
     remote_addr.sin_family = AF_INET;
     remote_addr.sin_port = htons(6000+tid);
-    remote_addr.sin_addr.s_addr = inet_addr("10.0.0.4");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    remote_addr.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero)); 
 
     int socket_local;
@@ -1319,8 +1606,121 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
 }
 
-#if USE_DPDK
+#ifdef USE_ARGOS
+void* PackageReceiver::loopSend_Argos(void *in_context)
+{
+    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
+    int tid = ((PackageReceiverContext *)in_context)->tid;
+    printf("package sender thread %d start\n", tid);
 
+    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
+    // get pointer to message queue
+    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
+    int core_id = obj_ptr->tx_core_id_;
+
+#ifdef ENABLE_CPU_ATTACH
+    if(pin_to_core(core_id + tid) != 0) {
+        printf("TX thread: stitch thread %d to core %d failed\n", tid, core_id+ tid);
+        exit(0);
+    }
+    else {
+        printf("TX thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
+    }
+#endif
+
+    // downlink socket buffer
+    char *buffer = obj_ptr->tx_buffer_;
+    // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+    int buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
+    int buffer_length = obj_ptr->tx_buffer_length_;
+    int* buffer_status = obj_ptr->tx_buffer_status_;
+
+    Config *cfg = obj_ptr->config_;
+    RadioConfig *radio = obj_ptr->radioconfig_;
+
+    int ret;
+    int offset;
+    char *cur_ptr_buffer;
+    int ant_id, symbol_id, frame_id, frame_offset, total_symbol_id;
+    int cell_id = 0;
+    struct timespec tv, tv2;
+    double time_avg = 0;
+    int time_count = 0;
+
+    int txSymsPerFrame = 0;
+    std::vector<size_t> txSymbols;
+    if (cfg->isUE)
+    {
+        txSymsPerFrame = cfg->ulSymsPerFrame;
+        txSymbols = cfg->ULSymbols[0];
+    }
+    else
+    {
+        txSymsPerFrame = cfg->dlSymsPerFrame;
+        txSymbols = cfg->DLSymbols[0];
+    }
+
+    // use token to speed up
+    // moodycamel::ProducerToken local_ptok(*message_queue_);
+    //moodycamel::ConsumerToken local_ctok = (*task_queue_);
+    // moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+    while(cfg->running) {
+    
+        Event_data task_event;
+        //ret = task_queue_->try_dequeue(task_event); 
+        ret = task_queue_->try_dequeue_from_producer(*obj_ptr->tx_ptoks_[tid], task_event); 
+        if(!ret)
+            continue;
+
+
+
+        // printf("tx queue length: %d\n", task_queue_->size_approx());
+        if (task_event.event_type!=TASK_SEND) {
+            printf("Wrong event type!");
+            exit(0);
+        }
+
+        ant_id = task_event.data; //% cfg->getNumAntennas();
+        frame_id = task_event.more_data; 
+
+        //symbol_id = task_event.data / cfg->getNumAntennas();
+        for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
+        {
+            int tx_frame_id = frame_id;
+            int tx_symbol_id = txSymbols[symbol_id];
+            offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
+            void* txbuf[2];
+            long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+            int flags = 1; // HAS_TIME
+            if (tx_symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+            txbuf[0] = buffer + offset * cfg->getTxPackageLength(); //   obj_ptr->pilot_buffer_; //
+            buffer_status[offset] = 0;
+            if (cfg->nChannels == 2)
+            {
+                txbuf[1] = buffer + (offset + 1) * cfg->getTxPackageLength();
+                buffer_status[offset+1] = 0;
+            }
+            clock_gettime(CLOCK_MONOTONIC, &tv);
+            radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+            clock_gettime(CLOCK_MONOTONIC, &tv2);
+
+        }
+
+        Event_data package_message;
+        package_message.event_type = EVENT_PACKAGE_SENT;
+        package_message.data = offset;
+        package_message.more_data = frame_id;
+        if ( cfg->running && !message_queue_->enqueue(*local_ptok, package_message ) ) {
+            printf("socket message enqueue failed\n");
+            exit(0);
+        }
+    }
+    
+}
+#endif
+
+#if USE_DPDK
 static struct rte_flow *
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
                 uint32_t src_ip, uint32_t src_mask,
@@ -1409,5 +1809,4 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
 }
 
 #endif
-
 

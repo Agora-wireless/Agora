@@ -93,6 +93,7 @@ public:
     inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
 
     static const int buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    
 private:
     int tid;
     int transpose_block_size;
