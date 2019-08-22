@@ -1,0 +1,21 @@
+{
+ "hubs" : "data/hub_serials.txt",
+ "irises" : "data/iris_serials5.txt",
+ "cells" : 1,
+ "channels" : 1,
+ "frequency" : 3.6e9,
+ "rxgainA" : 25,
+ "txgainA" : 35,
+ "rate" : 5e6,
+ "symbol_size" : 2432,
+ "prefix" : 128,
+ "postfix" : 128,
+ "beacon_mode" : "beamsweep",
+ "beacon_antenna" : 0,
+ "sample_calibrate" : false,
+ "calTxGainA" : 40,
+ "calTxGainB" : 40,
+ "frames" : [
+     "BGPPUGGGGG"
+]
+}

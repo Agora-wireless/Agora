@@ -79,7 +79,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 #if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("10.0.0.3");
+        servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");//("10.0.0.3");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
         cliaddr_.sin_family = AF_INET;
@@ -166,7 +166,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     // }
     
     // read from file
-    std::string filename = "/home/argos/Jian/CoMP_0722/data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename = "data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
         printf("open file faild: ");

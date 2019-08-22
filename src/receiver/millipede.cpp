@@ -14,7 +14,7 @@ void intHandler(int) {
 }
 
 
-Millipede::Millipede()
+Millipede::Millipede(Config *cfg)
 {
     printf("Main thread: on core %d\n", sched_getcpu());
     putenv( "MKL_THREADING_LAYER=sequential" );
@@ -22,6 +22,10 @@ Millipede::Millipede()
     csi_format_offset = 1.0/32768;
     // openblas_set_num_threads(1);
     printf("enter constructor\n");
+
+    this->cfg_ = cfg;
+    pilots_ = cfg->pilots_;
+
     printf("initialize buffers\n");
     initialize_uplink_buffers();
 
@@ -31,20 +35,22 @@ Millipede::Millipede()
 #endif  
 
     /* initialize packageReceiver*/
-    moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    // moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
-        rx_ptok[i].reset(new moodycamel::ProducerToken(message_queue_));
-        rx_ptoks_ptr[i] = rx_ptok[i].get();
+        // rx_ptok[i].reset(new moodycamel::ProducerToken(message_queue_));
+        // rx_ptoks_ptr[i] = rx_ptok[i].get();
+        rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
     }
 
-    moodycamel::ProducerToken *tx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
-        tx_ptok[i].reset(new moodycamel::ProducerToken(tx_queue_));
-        tx_ptoks_ptr[i] = tx_ptok[i].get();
+        // tx_ptok[i].reset(new moodycamel::ProducerToken(tx_queue_));
+        // tx_ptoks_ptr[i] = tx_ptok[i].get();
+        tx_ptoks_ptr[i] = new moodycamel::ProducerToken(tx_queue_);
     }
 
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, 
+    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, 
                     &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     /* create worker threads */
@@ -100,6 +106,13 @@ Millipede::~Millipede()
 #endif
 }
 
+void Millipede::stop()
+{
+    std::cout << "stopping threads " << std::endl;
+    cfg_->running = false;
+    usleep(1000);
+    receiver_.reset();
+}
 
 void Millipede::start()
 {
@@ -162,15 +175,21 @@ void Millipede::start()
     int miss_count = 0;
     int total_count = 0;
     
-
+#ifdef USE_ARGOS
+    while (cfg_->running && !SignalHandler::gotExitSignal()) {
+#else
     signal(SIGINT, intHandler);
     while(keep_running) {
+#endif
         /* get a bulk of events */
         if (last_dequeue == 0) {
-            // ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size_single);
+// #ifdef USE_ARGOS
+//             ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size_single);
+// #else
             ret = 0;
             for (int rx_itr = 0; rx_itr < SOCKET_RX_THREAD_NUM; rx_itr ++)             
-                ret += message_queue_.try_dequeue_bulk_from_producer(*rx_ptok[rx_itr], events_list + ret, dequeue_bulk_size_single);
+                ret += message_queue_.try_dequeue_bulk_from_producer(*(rx_ptoks_ptr[rx_itr]), events_list + ret, dequeue_bulk_size_single);
+// #endif
             last_dequeue = 1;
         }
         else {   
@@ -197,12 +216,12 @@ void Millipede::start()
                     int socket_thread_id = offset / buffer_frame_num;
                     int offset_in_current_buffer = offset % buffer_frame_num;
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * package_length;
-                    int frame_id = *((int *)socket_buffer_ptr);
+                    int frame_id = *((int *)socket_buffer_ptr) % 10000;
                     int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
                     int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-
+                    
                     update_rx_counters(frame_id, frame_id_in_buffer, subframe_id, ant_id); 
 #if BIGSTATION 
                     /* in BigStation, schedule FFT whenever a packet is received */
@@ -364,7 +383,7 @@ void Millipede::start()
                     Event_data do_tx_task;
                     do_tx_task.event_type = TASK_SEND;
                     do_tx_task.data = offset_ifft;      
-                    int ptok_id = ant_id % SOCKET_TX_THREAD_NUM;          
+                    int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;          
                     schedule_task(do_tx_task, &tx_queue_, *tx_ptok[ptok_id]);
 
                     ifft_checker_[frame_id] += 1;
@@ -421,6 +440,7 @@ void Millipede::start()
             } /* end of switch */
         } /* end of for */
     } /* end of while */
+    this->stop();
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = ENABLE_DOWNLINK ? frame_count_tx : frame_count_demul;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
@@ -1013,11 +1033,6 @@ void Millipede::print_per_task_done(int task_type, int frame_id, int subframe_id
 
 void Millipede::initialize_uplink_buffers()
 {
-    /* read pilots from file */
-    alloc_buffer_1d(&pilots_, OFDM_CA_NUM, 64, 1);
-    FILE *fp = fopen("../data/pilot_f_2048.bin","rb");
-    fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
-    fclose(fp);
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
     for (int i = 0; i<OFDM_CA_NUM;i++) 
@@ -1214,16 +1229,16 @@ void Millipede::getEqualData(float **ptr, int *size)
     // max_equaled_frame = 0;
     *ptr = (float *)&equal_buffer_[max_equaled_frame * data_subframe_num_perframe][0];
     // *ptr = equal_output;
-    *size = UE_NUM*FFT_LEN*2;
+    *size = UE_NUM*OFDM_DATA_NUM*2;
     
-    // printf("In getEqualData()\n");
-    // for(int ii = 0; ii < UE_NUM*FFT_LEN; ii++)
-    // {
-    //     // printf("User %d: %d, ", ii,demul_ptr2(ii));
-    //     printf("[%.4f+j%.4f] ", *(*ptr+ii*UE_NUM*2), *(*ptr+ii*UE_NUM*2+1));
-    // }
-    // printf("\n");
-    // printf("\n");
+    //printf("In getEqualData()\n");
+    //for(int ii = 0; ii < UE_NUM*OFDM_DATA_NUM; ii++)
+    //{
+    //    // printf("User %d: %d, ", ii,demul_ptr2(ii));
+    //    printf("[%.4f+j%.4f] ", *(*ptr+ii*UE_NUM*2), *(*ptr+ii*UE_NUM*2+1));
+    //}
+    //printf("\n");
+    //printf("\n");
     
 }
 
@@ -1231,13 +1246,15 @@ void Millipede::getEqualData(float **ptr, int *size)
 
 extern "C"
 {
-    EXPORT Millipede* Millipede_new() {
+    EXPORT Millipede* Millipede_new(Config *cfg) {
         // printf("Size of Millipede: %d\n",sizeof(Millipede *));
-        Millipede *millipede = new Millipede();
+        Millipede *millipede = new Millipede(cfg);
         
         return millipede;
     }
     EXPORT void Millipede_start(Millipede *millipede) {millipede->start();}
+    EXPORT void Millipede_stop(Millipede *comp) {comp->stop();}
+    EXPORT void Millipede_destroy(Millipede *comp) {delete comp;}
     EXPORT void Millipede_getEqualData(Millipede *millipede, float **ptr, int *size) {return millipede->getEqualData(ptr, size);}
     EXPORT void Millipede_getDemulData(Millipede *millipede, int **ptr, int *size) {return millipede->getDemulData(ptr, size);}
 }
