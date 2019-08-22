@@ -50,7 +50,7 @@ class Millipede
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 1;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 25;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 4;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     static const int CORE_OFFSET = 17;
@@ -377,7 +377,8 @@ private:
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
     std::unique_ptr<moodycamel::ProducerToken> rx_ptok[SOCKET_RX_THREAD_NUM]; 
     std::unique_ptr<moodycamel::ProducerToken> tx_ptok[SOCKET_RX_THREAD_NUM]; 
-
+    moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    moodycamel::ProducerToken *tx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
 
 
     /*****************************************************

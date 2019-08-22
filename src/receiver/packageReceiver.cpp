@@ -601,8 +601,8 @@ void* PackageReceiver::loopRecv(void *in_context)
 
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
+    // moodycamel::ProducerToken *local_ptok = new moodycamel::ProducerToken(*message_queue_);
     moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
-
 
     char* buffer = obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
@@ -682,8 +682,8 @@ void* PackageReceiver::loopRecv(void *in_context)
         package_message.event_type = EVENT_PACKAGE_RECEIVED;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         package_message.data = offset + tid * buffer_frame_num;
-        if ( !message_queue_->enqueue(package_message ) ) {
-        //if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+        // if ( !message_queue_->enqueue(package_message ) ) {
+        if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -862,7 +862,7 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
             Event_data package_message;
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
             package_message.data = offset + tid * buffer_frame_num;
-            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+            if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
@@ -1042,7 +1042,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
             package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
-            if ( !message_queue_->enqueue(package_message ) ) {
+            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
@@ -1057,7 +1057,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 package_message2.event_type = EVENT_PACKAGE_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
                 package_message2.data = offset + tid * buffer_frame_num;
-                if ( !message_queue_->enqueue(package_message2 ) ) {
+                if ( !message_queue_->enqueue(*local_ptok, package_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
@@ -1107,6 +1107,7 @@ void* PackageReceiver::loopSend(void *in_context)
 
     PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
     int tid = ((PackageReceiverContext *)in_context)->tid;
+    Config *cfg = obj_ptr->config_;
     printf("package sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
@@ -1131,7 +1132,7 @@ void* PackageReceiver::loopSend(void *in_context)
     int socket_local;
     servaddr_local.sin_family = AF_INET;
     servaddr_local.sin_port = htons(6000+tid);
-    servaddr_local.sin_addr.s_addr = inet_addr("10.0.0.4");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    servaddr_local.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
 
     cliaddr_local.sin_family = AF_INET;
@@ -1251,7 +1252,7 @@ void* PackageReceiver::loopSend(void *in_context)
         package_message.event_type = EVENT_PACKAGE_SENT;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         package_message.data = offset;
-        if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+        if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -1288,6 +1289,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
     int core_id = obj_ptr->core_id_;
     int rx_thread_num = obj_ptr->rx_thread_num_;
     int tx_thread_num = obj_ptr->tx_thread_num_;
+    Config *cfg = obj_ptr->config_;
 
 #ifdef ENABLE_CPU_ATTACH 
     if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
@@ -1312,7 +1314,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
     remote_addr.sin_family = AF_INET;
     remote_addr.sin_port = htons(6000+tid);
-    remote_addr.sin_addr.s_addr = inet_addr("10.0.0.4");//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    remote_addr.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero)); 
 
     int socket_local;
@@ -1659,9 +1661,10 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
     }
 
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(*message_queue_);
+    // moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ConsumerToken local_ctok = (*task_queue_);
-    //moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
+    // moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
+    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
     while(cfg->running) {
     
         Event_data task_event;
@@ -1708,7 +1711,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         package_message.event_type = EVENT_PACKAGE_SENT;
         package_message.data = offset;
         package_message.more_data = frame_id;
-        if ( cfg->running && !message_queue_->enqueue(local_ptok, package_message ) ) {
+        if ( cfg->running && !message_queue_->enqueue(*local_ptok, package_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
