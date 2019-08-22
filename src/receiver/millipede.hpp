@@ -50,7 +50,7 @@ class Millipede
 {
 public:
     // TASK & SOCKET thread number 
-    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 25;
+    static const int TASK_THREAD_NUM = ENABLE_DOWNLINK ? 25: 1;
     static const int SOCKET_RX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 4;
     static const int SOCKET_TX_THREAD_NUM = ENABLE_DOWNLINK ? 4 : 0;
     static const int CORE_OFFSET = 17;
@@ -80,7 +80,7 @@ public:
     static const int dequeue_bulk_size = 32;
     static const int dequeue_bulk_size_single = 8;
 
-    Millipede();
+    Millipede(Config *);
     ~Millipede();
 
     void start();
@@ -136,6 +136,7 @@ private:
     /* lookup table for 16 QAM, real and imag */
     float **qam16_table_;
     float *pilots_;
+    Config *cfg_;
     int max_equaled_frame = 0;
     float csi_format_offset;
     int buffer_frame_num;
