@@ -14,7 +14,6 @@ inline const struct rte_eth_conf port_conf_default() {
     rte.rxmode.max_rx_pkt_len = MAX_JUMBO_FRAME_SIZE;
     return rte;
 }
-#endif
 
 static struct rte_flow *
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,

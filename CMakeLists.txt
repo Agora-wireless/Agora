@@ -107,16 +107,32 @@ set(SOURCES src/receiver/main.cpp
 			src/receiver/dozf.cpp 
 			src/receiver/dodemul.cpp 
 			src/receiver/doprecode.cpp
-			src/receiver/radio_lib.cpp
 			src/common/config.cpp
 			src/common/utils.cpp
 			src/common/comms-lib.cpp
-			src/common/signalHandler.cpp)
+			src/common/signalHandler.cpp
+       			${ARGOS_SOURCES})
 			
 add_executable(millipede ${SOURCES})
 target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
-add_library(comp MODULE src/receiver/main.cpp src/receiver/packageReceiver.cpp src/receiver/CoMP.cpp src/common/cpu_attach.cpp src/receiver/compute_common.cpp  src/receiver/dofft.cpp src/receiver/dozf.cpp src/receiver/dodemul.cpp src/receiver/doprecode.cpp src/common/config.cpp src/common/utils.cpp src/common/comms-lib.cpp src/common/signalHandler.cpp ${ARGOS_SOURCES})
+add_library(comp MODULE 
+       src/receiver/main.cpp
+       src/receiver/packageReceiver.cpp
+       src/receiver/millipede.cpp
+       src/common/cpu_attach.cpp
+       src/receiver/compute_common.cpp
+	src/receiver/stats.cpp 
+       src/receiver/dofft.cpp
+       src/receiver/dozf.cpp
+       src/receiver/dodemul.cpp
+       src/receiver/doprecode.cpp
+       src/common/config.cpp
+       src/common/utils.cpp
+       src/common/comms-lib.cpp
+       src/common/signalHandler.cpp 
+       ${ARGOS_SOURCES})
+
 target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
 #add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)

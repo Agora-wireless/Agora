@@ -17,34 +17,34 @@ class CoMP(object):
     def __init__(self, configfile):
         conf = Config(configfile)
         # lib.CoMP_new.argtypes = [c_void_p]
-        lib.CoMP_new.restype = c_void_p
-        lib.CoMP_start.argtypes = [c_void_p]
-        lib.CoMP_start.restype = c_void_p
-        lib.CoMP_getEqualData.argtypes = [c_void_p,POINTER(POINTER(c_float)),POINTER(c_int)]
-        lib.CoMP_getEqualData.restype = c_void_p
-        lib.CoMP_getDemulData.argtypes = [c_void_p,POINTER(POINTER(c_longlong)),POINTER(c_int)]
-        lib.CoMP_getDemulData.restype = c_void_p
-        self.obj = lib.CoMP_new(conf.obj)
+        lib.Millipede_new.restype = c_void_p
+        lib.Millipede_start.argtypes = [c_void_p]
+        lib.Millipede_start.restype = c_void_p
+        lib.Millipede_getEqualData.argtypes = [c_void_p,POINTER(POINTER(c_float)),POINTER(c_int)]
+        lib.Millipede_getEqualData.restype = c_void_p
+        lib.Millipede_getDemulData.argtypes = [c_void_p,POINTER(POINTER(c_longlong)),POINTER(c_int)]
+        lib.Millipede_getDemulData.restype = c_void_p
+        self.obj = lib.Millipede_new(conf.obj)
 
     def startCoMP(self):
-    	lib.CoMP_start(self.obj)
+    	lib.Millipede_start(self.obj)
 
     def stopCoMP(self):
-        lib.CoMP_stop(self.obj)
+        lib.Millipede_stop(self.obj)
 
     def destroyCoMP(self):
-        lib.CoMP_destroy(self.obj)
+        lib.Millipede_destroy(self.obj)
 
     def getEqualData(self):
         mem = POINTER(c_float)()
         size = c_int(0)
-        lib.CoMP_getEqualData(self.obj, mem, size)
+        lib.Millipede_getEqualData(self.obj, mem, size)
         return mem,size
     
     def getDemulData(self):
         mem = POINTER(c_longlong)()
         size = c_int(0)
-        lib.CoMP_getDemulData(self.obj, byref(mem),byref(size))
+        lib.Millipede_getDemulData(self.obj, byref(mem),byref(size))
         return mem,size
 
 # filename = "../tddconfig.json"
