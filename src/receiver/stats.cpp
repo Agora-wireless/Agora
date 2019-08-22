@@ -535,9 +535,9 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
 {
 	printf("saving timestamps to file.........\n");
 	printf("Total processed frames %d ", last_frame_id);
-    FILE* fp_debug = fopen("../matlab/timeresult.txt", "w");
+    FILE* fp_debug = fopen("timeresult.txt", "w");
     if (fp_debug==NULL) {
-        printf("open file faild");
+        printf("open file faild\n");
         std::cerr << "Error: " << strerror(errno) << std::endl;
         exit(0);
     }
@@ -567,9 +567,9 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
     }
 	#if DEBUG_UPDATE_STATS_DETAILED
         printf("Print results detailed\n");
-        FILE* fp_debug_detailed = fopen("../timeresult_detail.txt", "w");
+        FILE* fp_debug_detailed = fopen("timeresult_detail.txt", "w");
         if (fp_debug_detailed==NULL) {
-            printf("open file faild");
+            printf("open file faild\n");
             std::cerr << "Error: " << strerror(errno) << std::endl;
             exit(0);
         }

@@ -35,16 +35,18 @@ Millipede::Millipede(Config *cfg)
 #endif  
 
     /* initialize packageReceiver*/
-    moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    // moodycamel::ProducerToken *rx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
-        rx_ptok[i].reset(new moodycamel::ProducerToken(message_queue_));
-        rx_ptoks_ptr[i] = rx_ptok[i].get();
+        // rx_ptok[i].reset(new moodycamel::ProducerToken(message_queue_));
+        // rx_ptoks_ptr[i] = rx_ptok[i].get();
+        rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
     }
 
-    moodycamel::ProducerToken *tx_ptoks_ptr[SOCKET_RX_THREAD_NUM];
+    
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++) { 
-        tx_ptok[i].reset(new moodycamel::ProducerToken(tx_queue_));
-        tx_ptoks_ptr[i] = tx_ptok[i].get();
+        // tx_ptok[i].reset(new moodycamel::ProducerToken(tx_queue_));
+        // tx_ptoks_ptr[i] = tx_ptok[i].get();
+        tx_ptoks_ptr[i] = new moodycamel::ProducerToken(tx_queue_);
     }
 
     printf("new PackageReceiver\n");
@@ -181,13 +183,13 @@ void Millipede::start()
 #endif
         /* get a bulk of events */
         if (last_dequeue == 0) {
-#ifdef USE_ARGOS
-            ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size_single);
-#else
+// #ifdef USE_ARGOS
+//             ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size_single);
+// #else
             ret = 0;
             for (int rx_itr = 0; rx_itr < SOCKET_RX_THREAD_NUM; rx_itr ++)             
-                ret += message_queue_.try_dequeue_bulk_from_producer(*rx_ptok[rx_itr], events_list + ret, dequeue_bulk_size_single);
-#endif
+                ret += message_queue_.try_dequeue_bulk_from_producer(*(rx_ptoks_ptr[rx_itr]), events_list + ret, dequeue_bulk_size_single);
+// #endif
             last_dequeue = 1;
         }
         else {   
@@ -219,7 +221,7 @@ void Millipede::start()
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
                     int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-
+                    
                     update_rx_counters(frame_id, frame_id_in_buffer, subframe_id, ant_id); 
 #if BIGSTATION 
                     /* in BigStation, schedule FFT whenever a packet is received */
@@ -381,7 +383,7 @@ void Millipede::start()
                     Event_data do_tx_task;
                     do_tx_task.event_type = TASK_SEND;
                     do_tx_task.data = offset_ifft;      
-                    int ptok_id = ant_id % SOCKET_TX_THREAD_NUM;          
+                    int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;          
                     schedule_task(do_tx_task, &tx_queue_, *tx_ptok[ptok_id]);
 
                     ifft_checker_[frame_id] += 1;
