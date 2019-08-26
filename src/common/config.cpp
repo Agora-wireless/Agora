@@ -33,8 +33,8 @@ Config::Config(std::string jsonfile)
     sampleCalEn = tddConf.value("sample_calibrate", false);
     modulation = tddConf.value("modulation", "QPSK");
     core_offset = tddConf.value("core_offset", 1);
-    rx_addr = tddConf.value("rx_addr", "127.0.0.1");
-    tx_addr = tddConf.value("tx_addr", "127.0.0.1");
+    rx_addr = tddConf.value("rx_addr", "10.0.0.3"); //rx_addr = tddConf.value("rx_addr", "127.0.0.1");
+    tx_addr = tddConf.value("tx_addr", "10.0.0.4"); // tx_addr = tddConf.value("tx_addr", "127.0.0.1");
     tx_port = tddConf.value("tx_port", 7991);
     rx_port = tddConf.value("rx_port", 7891);
     json jframes = tddConf.value("frames", json::array());
@@ -141,7 +141,9 @@ Config::Config(std::string jsonfile)
 #else
     // read pilots from file
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    FILE* fp = fopen("data/pilot_f_2048.bin","rb");
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/pilot_f_2048.bin";
+    FILE* fp = fopen(filename.c_str(),"rb");
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
     std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);

@@ -83,6 +83,8 @@ std::vector<std::vector<size_t>> Utils::loadSymbols(std::vector<std::string> fra
 void Utils::loadDevices(std::string filename, std::vector<std::string> &data)
 {
    std::string line;
+   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+   filename = cur_directory + "/" + filename;
    std::ifstream myfile (filename, std::ifstream::in);
    if (myfile.is_open())
    {
