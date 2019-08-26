@@ -43,7 +43,9 @@ void DoDemul::Demul(int offset)
 {
 
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
+    total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
+    // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
 #if DEBUG_UPDATE_STATS    
@@ -309,7 +311,9 @@ void DoDemul::DemulSingleSC(int offset)
 {
     double start_time = get_time();
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
+    total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
+    // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
     
     int gather_step_size = 8 * transpose_block_size;

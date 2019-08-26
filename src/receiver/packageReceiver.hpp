@@ -30,6 +30,7 @@
 #include "concurrentqueue.h"
 #include "Symbols.hpp"
 #include "gettime.h"
+#include "offset.h"
 
 #ifdef USE_ARGOS  
 #include "radio_lib.hpp"

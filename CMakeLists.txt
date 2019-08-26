@@ -11,12 +11,15 @@ endif()
 
 
 set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell")
-set(CMAKE_CXX_FLAGS "-std=c++11 -g -O3 -mavx2 -mavx -march=broadwell")
+set(CMAKE_CXX_FLAGS "-std=c++11 -w -g -O3 -mavx2 -mavx -march=broadwell")
+
+message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
+add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Armadillo)
 
 set(USE_DPDK False)
-set(USE_ARGOS True)
+set(USE_ARGOS False)
 
 if (${USE_DPDK})
   find_package(dpdk)
@@ -59,8 +62,8 @@ find_package(Threads REQUIRED)
 # include_directories(${AFF3CT_INCLUDE_DIRS})
 
 # Intel MKL
-include_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/include/")
-link_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/")
+include_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include/")
+link_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64/")
 
 
 # DPDK

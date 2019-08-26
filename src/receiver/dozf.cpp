@@ -42,11 +42,13 @@ void DoZF::ZF(int offset)
 //     double start_time = get_time();
 // #endif 
     int frame_id, sc_id;
-    interpreteOffset2d(OFDM_DATA_NUM, offset, &frame_id, &sc_id);
+    interpreteOffset2d(offset, &frame_id, &sc_id);
+    // interpreteOffset2d(OFDM_DATA_NUM, offset, &frame_id, &sc_id);
 
 #if DEBUG_PRINT_IN_TASK
         printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
+    int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     int max_sc_ite;
     if (sc_id + zf_block_size <= OFDM_DATA_NUM) 
         max_sc_ite = zf_block_size;
@@ -59,7 +61,7 @@ void DoZF::ZF(int offset)
         double start_time1 = get_time();
 #endif 
         int cur_sc_id = sc_id + i;
-        int cur_offset = offset + i;
+        int cur_offset = offset_in_buffer + i;
         // // directly gather data from FFT buffer
         // __m256i index = _mm256_setr_epi32(0, 1, OFDM_CA_NUM * 2, OFDM_CA_NUM * 2 + 1, OFDM_CA_NUM * 4, OFDM_CA_NUM * 4 + 1, OFDM_CA_NUM * 6, OFDM_CA_NUM * 6 + 1);
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
@@ -213,12 +215,13 @@ void DoZF::ZF(int offset)
 void DoZF::Predict(int offset) 
 {
     int frame_id, sc_id;
-    interpreteOffset2d(OFDM_DATA_NUM, offset, &frame_id, &sc_id);
+    interpreteOffset2d(offset, &frame_id, &sc_id);
     int offset_next_frame = ((frame_id+1)%TASK_BUFFER_FRAME_NUM)*OFDM_CA_NUM+sc_id;
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
+    int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     cx_float *ptr_in = (cx_float *)pred_csi_buffer_[sc_id];
-    memcpy(ptr_in, (cx_float *)csi_buffer_[offset], sizeof(cx_float)*BS_ANT_NUM*UE_NUM);
+    memcpy(ptr_in, (cx_float *)csi_buffer_[offset_in_buffer], sizeof(cx_float)*BS_ANT_NUM*UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     cx_float *ptr_out = (cx_float *)precoder_buffer_[offset_next_frame];
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);

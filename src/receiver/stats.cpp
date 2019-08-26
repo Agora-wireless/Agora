@@ -535,7 +535,9 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
 {
 	printf("saving timestamps to file.........\n");
 	printf("Total processed frames %d ", last_frame_id);
-    FILE* fp_debug = fopen("timeresult.txt", "w");
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/timeresult.txt";
+    FILE* fp_debug = fopen(filename.c_str(), "w");
     if (fp_debug==NULL) {
         printf("open file faild\n");
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -567,7 +569,8 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
     }
 	#if DEBUG_UPDATE_STATS_DETAILED
         printf("Print results detailed\n");
-        FILE* fp_debug_detailed = fopen("timeresult_detail.txt", "w");
+        std::string filename_detailed = cur_directory + "/data/timeresult_detail.txt";
+        FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
         if (fp_debug_detailed==NULL) {
             printf("open file faild\n");
             std::cerr << "Error: " << strerror(errno) << std::endl;

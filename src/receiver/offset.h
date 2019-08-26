@@ -9,47 +9,43 @@
 
 #include "Symbols.hpp"
 
-inline int generateOffset2d(int unit_total_num, int frame_id, int unit_id) 
+/* v1: 16 bits, v2: 16bits */
+inline int generateOffset2d(int v1, int v2) 
 {
-    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-    return frame_id * unit_total_num + unit_id;
+    return ((v1 << 16) | (v2 & 0xffff));
 };
 
-inline int generateOffset3d(int unit_total_num, int frame_id, int current_data_subframe_id, int unit_id)
+inline void interpreteOffset2d(int offset, int *v1, int *v2)
 {
-    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-    int total_data_subframe_id = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-    return total_data_subframe_id * unit_total_num + unit_id;
-};
-
-inline void interpreteOffset2d(int unit_total_num, int offset, int *frame_id, int *unit_id)
-{
-    *unit_id = offset % unit_total_num;
-    *frame_id = offset / unit_total_num;
-};
-
-inline void interpreteOffset3d(int unit_total_num, int offset, int *frame_id, int *total_data_subframe_id, int *current_data_subframe_id, int *unit_id)
-{
-    *unit_id = offset % unit_total_num;
-    *total_data_subframe_id = offset /unit_total_num;
-    *current_data_subframe_id = (*total_data_subframe_id) % data_subframe_num_perframe;
-    *frame_id = (*total_data_subframe_id) / data_subframe_num_perframe;
+    *v1 = offset >> 16;
+    *v2 = offset & 0xffff;
 };
 
 
-inline int getFFTBufferIndex(int frame_id, int subframe_id, int ant_id) 
+/* v1: (32 - bits2) bits, v2: bits2 bits */
+inline int generateOffset2d_setbits(int v1, int v2, int bits2) 
 {
-    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-    return frame_id * (BS_ANT_NUM * subframe_num_perframe) + subframe_id * BS_ANT_NUM + ant_id;
+    return ((v1 << bits2) | (v2 & ((1 << bits2) - 1)));
+};
+
+inline void interpreteOffset2d_setbits(int offset, int *v1, int *v2, int bits2)
+{
+    *v1 = offset >> bits2;
+    *v2 = offset & ((1 << bits2) - 1);
 };
 
 
-inline void splitFFTBufferIndex(int FFT_buffer_target_id, int *frame_id, int *subframe_id, int *ant_id)
+/* v1: 8 bits, v2: 8 bits, v3: 16bits */
+inline int generateOffset3d(int v1, int v2, int v3)
 {
-    (*frame_id) = FFT_buffer_target_id / (BS_ANT_NUM * subframe_num_perframe);
-    FFT_buffer_target_id = FFT_buffer_target_id - (*frame_id) * (BS_ANT_NUM * subframe_num_perframe);
-    (*subframe_id) = FFT_buffer_target_id / BS_ANT_NUM;
-    (*ant_id) = FFT_buffer_target_id - *subframe_id * BS_ANT_NUM;
+    return ((v1 << 24) | ((v2 & 0xff) << 16) | (v3 & 0xffff));
+};
+
+inline void interpreteOffset3d(int offset, int *v1, int *v2, int *v3)
+{
+    *v1 = offset >> 24;
+    *v2 = (offset >> 16) & 0xff;
+    *v3 = offset & 0xffff;
 };
 
 

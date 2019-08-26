@@ -239,7 +239,7 @@ private:
     int *decode_counter_subframes_;
 
     /* used to check if FFT for all antennas in a subframe is done (max: BS_ANT_NUM) */
-    int *fft_counter_ants_;
+    int **fft_counter_ants_;
 
     /* used to check if demodulation for all subcarriers in a data subframe is done (max: OFDM_DATA_NUM) */
     int **demul_counter_scs_;
