@@ -25,7 +25,7 @@ struct Event_data
 {
     int event_type;
     int data;
-    int more_data;
+    // int more_data;
 };
 
 // buffer of each socket thread

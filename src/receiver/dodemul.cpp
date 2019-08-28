@@ -6,11 +6,18 @@
 #include "dodemul.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(int in_tid, int in_demul_block_size, int in_transpose_block_size,
+DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demul_hard_buffer,
         double **in_Demul_task_duration, int *in_Demul_task_count)
 {
+    config_ = cfg;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    subframe_num_perframe = cfg->symbol_num_perframe;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+
     tid = in_tid;
     demul_block_size = in_demul_block_size;
     transpose_block_size = in_transpose_block_size;

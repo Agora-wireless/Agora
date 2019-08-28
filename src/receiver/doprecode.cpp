@@ -7,12 +7,19 @@
 
 using namespace arma;
 
-DoPrecode::DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block_size,
+DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
         complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
         double **in_Precode_task_duration, int *in_Precode_task_count)
 {
+    config_ = cfg;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    OFDM_DATA_START = cfg->OFDM_DATA_START;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+
     tid = in_tid;
     demul_block_size = in_demul_block_size;
     transpose_block_size = in_transpose_block_size;

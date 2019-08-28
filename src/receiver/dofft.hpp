@@ -17,12 +17,13 @@
 #include "offset.h"
 #include "mkl_dfti.h"
 #include "mufft/fft.h"
+#include "config.hpp"
 
 
 class DoFFT
 {
 public:
-    DoFFT(int in_tid, int in_transpose_block_size, 
+    DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
         complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
@@ -89,14 +90,21 @@ public:
      */
     void IFFT(int offset);
 
-    inline bool isPilot(int subframe_id) {return (subframe_id >=0) && (subframe_id < UE_NUM); }
-    inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
-
-    static const int buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     
 private:
+    Config *config_;
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_CA_NUM;
+    int OFDM_DATA_NUM;
+    int OFDM_DATA_START;
+    int OFDM_PREFIX_LEN;
+    int subframe_num_perframe, data_subframe_num_perframe;
+    int package_length;
+    int buffer_subframe_num_;
+
     int tid;
     int transpose_block_size;
+
     moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
     moodycamel::ProducerToken *task_ptok;
 
@@ -125,6 +133,8 @@ private:
 
     DFTI_DESCRIPTOR_HANDLE mkl_handle_dl;
     MKL_LONG mkl_status_dl;
+
+    
 
     // mufft_plan_1d *muplans_;
 
