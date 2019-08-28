@@ -17,5 +17,8 @@
  "calTxGainB" : 40,
  "frames" : [
      "BGPPUGGGGG"
-]
+ ],
+ "worker_thread_num" : 25,
+ "demul_block_size" : 48,
+ "bs_ant_num": 16
 }

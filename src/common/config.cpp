@@ -32,11 +32,74 @@ Config::Config(std::string jsonfile)
     beacon_mode = tddConf.value("beacon_mode", "single");
     sampleCalEn = tddConf.value("sample_calibrate", false);
     modulation = tddConf.value("modulation", "QPSK");
-    core_offset = tddConf.value("core_offset", 1);
-    rx_addr = tddConf.value("rx_addr", "127.0.0.1");
-    tx_addr = tddConf.value("tx_addr", "127.0.0.1");
+
+
+    /* Millipede configurations */
+    core_offset = tddConf.value("core_offset", 17);
+    worker_thread_num = tddConf.value("worker_thread_num", 25);
+    socket_thread_num = tddConf.value("socket_thread_num", 4);
+    fft_thread_num = tddConf.value("fft_thread_num", 4);
+    demul_thread_num = tddConf.value("demul_thread_num", 11);
+    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
+
+    demul_block_size = tddConf.value("demul_block_size", 48);
+    zf_block_size = tddConf.value("zf_block_size", 1);
+
+    rx_addr = tddConf.value("rx_addr", "10.0.0.3"); //rx_addr = tddConf.value("rx_addr", "127.0.0.1");
+    tx_addr = tddConf.value("tx_addr", "10.0.0.4"); // tx_addr = tddConf.value("tx_addr", "127.0.0.1");
     tx_port = tddConf.value("tx_port", 7991);
     rx_port = tddConf.value("rx_port", 7891);
+
+
+    
+#ifdef USE_ARGOS
+    /* base station configurations */
+    BS_ANT_NUM = tddConf.value("bs_ant_num", 8);
+    UE_NUM = tddConf.value("ue_num", 2);
+    OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
+    OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
+    OFDM_DATA_START = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM)/2);
+
+    TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 128);
+    CP_LEN = tddConf.value("cp_len", 128);
+    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 152 + CP_LEN);
+    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+
+    /* frame configurations */
+    subframe_num_perframe = tddConf.value("subframe_num_perframe", 5);
+    pilot_num = tddConf.value("pilot_num", ue_num);
+    data_subframe_num_perframe = tddConf.value("data_subframe_num_perframe", subframe_num_perframe - pilot_num);
+    ul_data_subframe_num_perframe = tddConf.value("ul_subframe_num_perframe", subframe_num_perframe - pilot_num);
+    dl_data_subframe_num_perframe = tddConf.value("dl_subframe_num_perframe", 3);
+    dl_data_subframe_start = tddConf.value("dl_data_subframe_start", 0);
+    dl_data_subframe_end = dl_data_subframe_start + dl_data_subframe_num_perframe;
+#else
+    /* base station configurations */
+    BS_ANT_NUM = tddConf.value("bs_ant_num", 8);
+    UE_NUM = tddConf.value("ue_num", 8);
+    OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
+    OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
+    OFDM_DATA_START = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM)/2);
+
+    TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 0);
+    CP_LEN = tddConf.value("cp_len", 0);
+    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0 + CP_LEN);
+    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+
+    /* frame configurations */
+    symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
+    pilot_symbol_num_perframe = tddConf.value("pilot_num", UE_NUM);
+    data_symbol_num_perframe = tddConf.value("data_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
+    ul_data_symbol_num_perframe = tddConf.value("ul_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
+    dl_data_symbol_num_perframe = tddConf.value("dl_subframe_num_perframe", 10);
+    dl_data_symbol_start = tddConf.value("dl_data_subframe_start", 10);
+    dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
+#endif
+
+    
+    package_header_offset = tddConf.value("package_header_offset", 64);
+    package_length = package_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
+
     json jframes = tddConf.value("frames", json::array());
     framePeriod = jframes.size();
     for(int f = 0; f < framePeriod; f++)
@@ -141,7 +204,9 @@ Config::Config(std::string jsonfile)
 #else
     // read pilots from file
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    FILE* fp = fopen("data/pilot_f_2048.bin","rb");
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/pilot_f_2048.bin";
+    FILE* fp = fopen(filename.c_str(),"rb");
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
     std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);
@@ -200,6 +265,7 @@ int Config::getPilotSFIndex(int frame_id, int symbol_id)
 
 int Config::getUlSFIndex(int frame_id, int symbol_id)
 {
+#ifdef USE_ARGOS
     //return subframe_id-6; // fix
     std::vector<size_t>::iterator it;
     int fid = frame_id % framePeriod;
@@ -212,10 +278,14 @@ int Config::getUlSFIndex(int frame_id, int symbol_id)
         return it-ULSymbols[fid].begin();
     }else 
         return -1;
+#else
+        return symbol_id - UE_NUM;
+#endif
 }
 
 bool Config::isPilot(int frame_id, int symbol_id) 
 {
+#ifdef USE_ARGOS
     int fid = frame_id % framePeriod;
     if (symbol_id > symbolsPerFrame)
     {
@@ -237,10 +307,14 @@ bool Config::isPilot(int frame_id, int symbol_id)
     }
     else
         return frames[fid].at(symbol_id) == 'P';
+#else
+    return (symbol_id >=0) && (symbol_id < UE_NUM); 
+#endif
 } 
 
 bool Config::isUplink(int frame_id, int symbol_id) 
 {
+#ifdef USE_ARGOS
     int fid = frame_id % framePeriod;
     if (symbol_id > symbolsPerFrame)
     {
@@ -251,6 +325,9 @@ bool Config::isUplink(int frame_id, int symbol_id)
     printf("isUplink(%d, %d) = %c\n",frame_id, symbol_id, frames[fid].at(symbol_id));
 #endif
     return frames[fid].at(symbol_id) == 'U';
+#else
+    return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM); 
+#endif
 }
 
 bool Config::isDownlink(int frame_id, int symbol_id) 

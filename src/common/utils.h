@@ -30,6 +30,7 @@
 #include <atomic>
 #include <vector>
 #include <time.h>
+#include "Symbols.hpp"
 
 int pin_to_core(int core_id);
 

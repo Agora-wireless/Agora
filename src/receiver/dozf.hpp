@@ -16,13 +16,14 @@
 #include "Symbols.hpp"
 #include "gettime.h"
 #include "offset.h"
+#include "config.hpp"
 // #include "mkl_dfti.h"
 
 
 class DoZF
 {
 public:
-    DoZF(int in_tid, int in_zf_block_size, int in_transpose_block_size,
+    DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_csi_buffer, complex_float **in_precoder_buffer, complex_float **in_pred_csi_buffer, 
         double **in_ZF_task_duration, int *in_ZF_task_count);
@@ -70,6 +71,10 @@ public:
     
  
 private:
+    Config *config_;
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_CA_NUM, OFDM_DATA_NUM;
+
     int tid;
     int transpose_block_size;
     int zf_block_size;

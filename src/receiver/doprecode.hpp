@@ -17,13 +17,14 @@
 #include "gettime.h"
 #include "offset.h"
 #include "compute_common.hpp"
+#include "config.hpp"
 // #include "mkl_dfti.h"
 
 
 class DoPrecode
 {
 public:
-    DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block_size,
+    DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
         complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
@@ -61,6 +62,12 @@ public:
     
  
 private:
+    Config *config_;
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_DATA_NUM;
+    int OFDM_DATA_START;
+    int data_subframe_num_perframe;
+
     int tid;
     int transpose_block_size;
     int demul_block_size;

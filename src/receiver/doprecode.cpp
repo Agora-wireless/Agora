@@ -7,12 +7,19 @@
 
 using namespace arma;
 
-DoPrecode::DoPrecode(int in_tid, int in_demul_block_size, int in_transpose_block_size,
+DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
         complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
         double **in_Precode_task_duration, int *in_Precode_task_count)
 {
+    config_ = cfg;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    OFDM_DATA_START = cfg->OFDM_DATA_START;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+
     tid = in_tid;
     demul_block_size = in_demul_block_size;
     transpose_block_size = in_transpose_block_size;
@@ -54,7 +61,8 @@ void DoPrecode::Precode(int offset)
     double start_time = get_time();
 #endif
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
+    // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
 
     int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
@@ -164,7 +172,8 @@ void DoPrecode::Precode(int offset)
     float *precoded_ptr = (float *)precoded_buffer_temp;
     // float* precoded_ptr = (float *)&dl_precoded_data_buffer_[total_data_subframe_id][sc_id * BS_ANT_NUM];
     for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
-        int ifft_buffer_offset = generateOffset3d(BS_ANT_NUM, frame_id, current_data_subframe_id, ant_id);
+        int ifft_buffer_offset = ant_id + BS_ANT_NUM * (current_data_subframe_id + frame_id * data_subframe_num_perframe);
+        // int ifft_buffer_offset = generateOffset3d(BS_ANT_NUM, frame_id, current_data_subframe_id, ant_id);
         float* ifft_ptr = (float *)&dl_ifft_buffer_[ifft_buffer_offset][sc_id + OFDM_DATA_START];
         for (int i = 0; i< demul_block_size/4; i++) {
             float *input_shifted_ptr = precoded_ptr + 4 * i * 2 * BS_ANT_NUM + ant_id * 2;

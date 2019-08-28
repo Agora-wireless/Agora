@@ -30,6 +30,7 @@
 #include "concurrentqueue.h"
 #include "Symbols.hpp"
 #include "gettime.h"
+#include "offset.h"
 
 #ifdef USE_ARGOS  
 #include "radio_lib.hpp"
@@ -136,6 +137,14 @@ public:
 
  
 private:
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_CA_NUM;
+    int OFDM_DATA_NUM;
+    int subframe_num_perframe, data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
+    int package_length;
+
+
 #if USE_IPV4
     struct sockaddr_in servaddr_[10];    /* server address */
 #else

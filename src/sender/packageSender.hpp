@@ -31,6 +31,8 @@
 #include "gettime.h"
 #include "Symbols.hpp"
 #include "concurrentqueue.h"
+#include "config.hpp"
+#include "memory_manage.h"
 
 
 #define CPU_FREQ 2.3e9
@@ -40,7 +42,7 @@ typedef unsigned short ushort;
 class PackageSender
 {
 public:
-    static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+    // static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     // int for: frame_id, subframe_id, cell_id, ant_id
     // unsigned int for: I/Q samples
 #if USE_DPDK
@@ -48,12 +50,12 @@ public:
 #else
     static const int tx_buf_offset = 0;
 #endif
-    static const int buffer_length = tx_buf_offset + sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-    static const int data_offset = sizeof(int) * 16;
+    // static const int buffer_length = tx_buf_offset + sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+    // static const int data_offset = sizeof(int) * 16;
 //    static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
 
-    static const int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    // static const int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
 
 
 
@@ -64,12 +66,22 @@ public:
     };
 
 public:
-    PackageSender(int in_socket_num, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
+    PackageSender(Config *in_config, int in_socket_num, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
     ~PackageSender();
 
     static void* loopSend(void *context);
     
 private:
+    Config *config_;
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_FRAME_LEN;
+    int subframe_num_perframe, data_subframe_num_perframe;
+    int package_length;
+    int package_header_offset;
+    int buffer_length;
+    int max_subframe_id;
+    int max_length_;
+
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 #if USE_IPV4
@@ -95,7 +107,7 @@ private:
     moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( 1024);
     moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( 1024);
     std::unique_ptr<moodycamel::ProducerToken> task_ptok[10]; 
-    int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
+    // int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
     // int max_length_ = max_subframe_id * BS_ANT_NUM;
 
     int ant_id;
@@ -114,8 +126,10 @@ private:
     int delay;
     PackageSenderContext* context;
 
-    int packet_count_per_subframe[BUFFER_FRAME_NUM][max_subframe_id];
-    int packet_count_per_frame[BUFFER_FRAME_NUM];
+    int **packet_count_per_subframe;
+    int *packet_count_per_frame;
+    // int packet_count_per_subframe[BUFFER_FRAME_NUM][max_subframe_id];
+    // int packet_count_per_frame[BUFFER_FRAME_NUM];
 };
 
 
