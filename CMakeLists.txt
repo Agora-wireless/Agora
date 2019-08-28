@@ -68,7 +68,7 @@ find_package(Threads REQUIRED)
 # link_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64/")
 find_path(MKL_INCLUDE_DIR 
           NAMES mkl_dfti.h
-          PATHS /opt/intel/*/linux/mkl/)
+          PATHS /opt/intel/*/linux/mkl/include)
 set (MKL_LINK_DIR ${MKL_INCLUDE_DIR}/../lib/intel64)
 message(STATUS "MKL_INCLUDE_DIR: ${MKL_INCLUDE_DIR}")
 message(STATUS "MKL_LINK_DIR: ${MKL_LINK_DIR}")
