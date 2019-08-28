@@ -33,6 +33,17 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + RX_THREAD_NUM;
+
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    subframe_num_perframe = cfg->symbol_num_perframe;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
+    dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
+    package_length = cfg->package_length;
+
     /* initialize random seed: */
     srand (time(NULL));
     rx_context = new PackageReceiverContext[rx_thread_num_];
@@ -526,6 +537,15 @@ void* PackageReceiver::loopRecv(void *in_context)
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
 
 
 #ifdef ENABLE_CPU_ATTACH 
@@ -704,6 +724,17 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
+
+
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
 
 
     uint16_t nic;
@@ -908,6 +939,17 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
         printf("Recv thread: pinning thread %d to core %d succeed\n", tid, core_id + tid);
     }
 #endif
+
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
+
 
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&obj_ptr->mutex);
@@ -1125,6 +1167,17 @@ void* PackageReceiver::loopSend(void *in_context)
     #endif
 #endif
 
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
+
+
 #if USE_IPV4
     struct sockaddr_in servaddr_local;
     struct sockaddr_in cliaddr_local;
@@ -1299,6 +1352,15 @@ void* PackageReceiver::loopTXRX(void *in_context)
     }
 #endif
 
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
 
 
 #if USE_IPV4
@@ -1405,7 +1467,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
     int tx_cell_id = 0;
 
 
-    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : (UE_NUM + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame = max_subframe_id * BS_ANT_NUM / rx_thread_num;
     int max_tx_packet_num_per_frame = dl_data_subframe_num_perframe * BS_ANT_NUM / tx_thread_num;
     printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame, max_tx_packet_num_per_frame);
@@ -1628,6 +1690,17 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         printf("TX thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
     }
 #endif
+
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
+
 
     // downlink socket buffer
     char *buffer = obj_ptr->tx_buffer_;

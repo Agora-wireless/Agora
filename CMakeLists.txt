@@ -62,8 +62,20 @@ find_package(Threads REQUIRED)
 # include_directories(${AFF3CT_INCLUDE_DIRS})
 
 # Intel MKL
-include_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include/")
-link_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64/")
+# include_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/include/")
+# link_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/")
+# include_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include/")
+# link_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64/")
+find_path(MKL_INCLUDE_DIR 
+          NAMES mkl_dfti.h
+          PATHS /opt/intel/*/linux/mkl/)
+set (MKL_LINK_DIR ${MKL_INCLUDE_DIR}/../lib/intel64)
+message(STATUS "MKL_INCLUDE_DIR: ${MKL_INCLUDE_DIR}")
+message(STATUS "MKL_LINK_DIR: ${MKL_LINK_DIR}")
+include_directories(${MKL_INCLUDE_DIR})
+link_directories(${MKL_LINK_DIR})
+
+
 
 
 # DPDK
@@ -97,8 +109,16 @@ foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
 endforeach()
 
-add_executable(sender src/sender/sender_cli.cpp src/sender/packageSender.cpp src/common/cpu_attach.cpp)
-target_link_libraries(sender -lpthread )
+set(SENDER_SOURCES src/sender/sender_cli.cpp
+                   src/sender/packageSender.cpp 
+                   src/common/cpu_attach.cpp 
+                   src/common/config.cpp
+                   src/common/utils.cpp
+                   src/common/comms-lib.cpp
+                   src/common/signalHandler.cpp)
+
+add_executable(sender ${SENDER_SOURCES})
+target_link_libraries(sender -lpthread -lmufft)
 
 set(SOURCES src/receiver/main.cpp 
 			src/receiver/packageReceiver.cpp 
@@ -125,7 +145,7 @@ add_library(comp MODULE
        src/receiver/millipede.cpp
        src/common/cpu_attach.cpp
        src/receiver/compute_common.cpp
-	src/receiver/stats.cpp 
+	     src/receiver/stats.cpp 
        src/receiver/dofft.cpp
        src/receiver/dozf.cpp
        src/receiver/dodemul.cpp

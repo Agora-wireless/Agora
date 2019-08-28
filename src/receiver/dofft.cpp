@@ -5,13 +5,25 @@
  */
 #include "dofft.hpp"
 
-DoFFT::DoFFT(int in_tid, int in_transpose_block_size, 
+DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
     char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
     complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
     double **in_FFT_task_duration, double **in_CSI_task_duration, int *in_FFT_task_count, int *in_CSI_task_count,
     double **in_IFFT_task_duration, int *in_IFFT_task_count) 
 {
+    config_ = cfg;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    OFDM_DATA_START = cfg->OFDM_DATA_START;
+    OFDM_PREFIX_LEN = cfg->OFDM_PREFIX_LEN;
+    subframe_num_perframe = cfg->symbol_num_perframe;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    package_length = cfg->package_length;
+    buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+
     tid = in_tid;
     transpose_block_size = in_transpose_block_size;
     complete_task_queue_ = in_complete_task_queue;
@@ -106,9 +118,9 @@ void DoFFT::FFT(int offset)
     float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[0]);
 
     int pilot_symbol = -1;
-    if (isPilot(subframe_id))
+    if (config_->isPilot(frame_id, subframe_id))
         pilot_symbol = 1;
-    else if (isData(subframe_id))
+    else if (config_->isUplink(frame_id, subframe_id))
         pilot_symbol = 0;
 
 
@@ -490,3 +502,4 @@ void DoFFT::IFFT(int offset)
     }
 
 }
+

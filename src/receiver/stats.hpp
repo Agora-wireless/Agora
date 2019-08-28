@@ -13,12 +13,13 @@
 #include "gettime.h"
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include "config.hpp"
 
 
 class Stats
 {
 public:
-    Stats(double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
+    Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
           double **in_ZF_task_duration, int *in_ZF_task_count, double **in_Demul_task_duration, int *in_Demul_task_count,
           double **in_IFFT_task_duration, int *in_IFFT_task_count, double **in_Precode_task_duration, int *in_Precode_task_count,
           double **in_frame_start, 
@@ -91,6 +92,12 @@ public:
     double get_time_in_doprecode(int frame_id) {return precode_time_in_function[frame_id % 10000];};
  
 private:
+    Config *config_;
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_DATA_NUM;
+    int subframe_num_perframe, data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
+
     int task_thread_num;
     int fft_thread_num;
     int zf_thread_num;

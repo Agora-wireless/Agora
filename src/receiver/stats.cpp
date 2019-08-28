@@ -5,14 +5,25 @@
  */
 #include "stats.hpp"
 
-Stats::Stats(double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
+Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
           double **in_ZF_task_duration, int *in_ZF_task_count, double **in_Demul_task_duration, int *in_Demul_task_count,
           double **in_IFFT_task_duration, int *in_IFFT_task_count, double **in_Precode_task_duration, int *in_Precode_task_count,
           double **in_frame_start, 
           int in_task_duration_dim1, int in_task_duration_dim2, int in_task_count_dim,
           int in_task_thread_num, int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num)
 {
-    printf("Initialize stats manager\n");
+    printf("Initialize stats manager, duration dims: %d %d %d\n", 
+        in_task_duration_dim1, in_task_duration_dim2, in_task_count_dim);
+
+    config_ = cfg;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    subframe_num_perframe = cfg->symbol_num_perframe;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
+    dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
+
 
     task_thread_num = in_task_thread_num;
     fft_thread_num = in_fft_thread_num;
