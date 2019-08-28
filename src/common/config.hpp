@@ -75,16 +75,45 @@ public:
     int nAntennas;
     int nUEs;
     int nChannels;
+
     int core_offset;
+    int worker_thread_num;
+    int socket_thread_num;
+    int fft_thread_num;
+    int demul_thread_num;
+    int zf_thread_num;
+    int demul_block_size;
+    int zf_block_size;
+
+
+    int BS_ANT_NUM;
+    int UE_NUM;
+    int OFDM_CA_NUM;
+    int OFDM_DATA_NUM;
+    int OFDM_DATA_START;
+    int TX_PREFIX_LEN;
+    int CP_LEN;
+    int OFDM_PREFIX_LEN;
+    int OFDM_FRAME_LEN;
+
+    int symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
+    int ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
+    int dl_data_symbol_start, dl_data_symbol_end;
+
+    int package_header_offset;
+    int package_length;
+
+    std::string rx_addr;
+    std::string tx_addr;
+    int rx_port;
+    int tx_port;
+
     bool isUE;
     const int maxFrame = 1 << 31;
     const int data_offset = sizeof(int) * 16;
-    int dl_data_symbol_perframe;
+    // int dl_data_symbol_perframe;
     std::atomic<bool> running;
-    int rx_port;
-    int tx_port;
-    std::string rx_addr;
-    std::string tx_addr;
+    
     int hdr_size = 16;
     // header 4 int for: frame_id, symbol_id, cell_id, ant_id
     // ushort for: I/Q samples

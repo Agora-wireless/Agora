@@ -8,7 +8,9 @@
 
 int main(int argc, char const *argv[])
 {
-    Config *cfg = new Config("data/tddconfig.json");
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/tddconfig.json";
+    Config *cfg = new Config(filename.c_str());
     Millipede *millipede_cli;
     int ret;
     try

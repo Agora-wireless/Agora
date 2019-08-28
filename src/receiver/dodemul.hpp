@@ -17,13 +17,14 @@
 #include "gettime.h"
 #include "offset.h"
 #include "compute_common.hpp"
+#include "config.hpp"
 // #include "mkl_dfti.h"
 
 
 class DoDemul
 {
 public:
-    DoDemul(int in_tid, int in_demul_block_size, int in_transpose_block_size,
+    DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demul_hard_buffer,
         double **in_Demul_task_duration, int *in_Demul_task_count);
@@ -62,6 +63,11 @@ public:
     
  
 private:
+    Config *config_;
+    int BS_ANT_NUM, UE_NUM;
+    int OFDM_DATA_NUM;
+    int subframe_num_perframe, data_subframe_num_perframe;
+
     int tid;
     int transpose_block_size;
     int demul_block_size;

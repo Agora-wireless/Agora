@@ -51,35 +51,48 @@ static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
     __m256i *pDest = reinterpret_cast<__m256i*>(pvDest);
     int64_t nVects = nBytes / sizeof(*pSrc);
     for (; nVects > 0; nVects--, pSrc++, pDest++) {
-    const __m256i loaded = _mm256_stream_load_si256(pSrc);
-    _mm256_stream_si256(pDest, loaded);
+        const __m256i loaded = _mm256_stream_load_si256(pSrc);
+        _mm256_stream_si256(pDest, loaded);
     }
     _mm_sfence();
 }
 
-PackageSender::PackageSender(int in_socket_num, int in_thread_num, int in_core_offset, int in_delay):
+PackageSender::PackageSender(Config *cfg, int in_socket_num, int in_thread_num, int in_core_offset, int in_delay):
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
 socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
 {
     printf("Main thread: on core %d\n", sched_getcpu());
 #ifdef ENABLE_CPU_ATTACH
-    if(stick_this_thread_to_core(in_core_offset) != 0)
-    {
+    if(stick_this_thread_to_core(in_core_offset) != 0) {
         printf("stitch main thread to core %d failed\n", in_core_offset);
         exit(0);
     }
-    else
-    {
+    else {
         printf("stitch main thread to core %d succeeded\n", in_core_offset);
     }
 #endif
+
+    config_ = cfg;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    UE_NUM = cfg->UE_NUM;
+    OFDM_FRAME_LEN = cfg->OFDM_FRAME_LEN;
+    subframe_num_perframe = cfg->symbol_num_perframe;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    package_length = cfg->package_length;
+    package_header_offset = cfg->package_header_offset;
+    buffer_length = tx_buf_offset + package_length;
+    max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
+
+    alloc_buffer_2d(&packet_count_per_subframe, BUFFER_FRAME_NUM, max_subframe_id, 64, 1);
+    alloc_buffer_1d(&packet_count_per_frame, BUFFER_FRAME_NUM, 64, 1);
 
     socket_ = new int[socket_num];
     for (int i = 0; i < socket_num; i++) {
 #if USE_IPV4
         servaddr_[i].sin_family = AF_INET;
         servaddr_[i].sin_port = htons(8000+i);
-        servaddr_[i].sin_addr.s_addr = inet_addr("127.0.0.1");//("10.0.0.3");
+        servaddr_[i].sin_addr.s_addr = inet_addr(config_->rx_addr.c_str());//("10.0.0.3");
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero)); 
 
         cliaddr_.sin_family = AF_INET;
@@ -166,18 +179,17 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     // }
     
     // read from file
-    std::string filename = "data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
         printf("open file faild: ");
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
-    {
+    for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
         fread(IQ_data[i], sizeof(float), OFDM_FRAME_LEN * 2, fp);
         // range [-2,2]
-        for(int j = 0; j < OFDM_FRAME_LEN * 2; j++)
-        {
+        for(int j = 0; j < OFDM_FRAME_LEN * 2; j++) {
             IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 32768);
             // printf("i:%d, j:%d, Coded: %d, orignal: %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
         }
@@ -188,11 +200,6 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     trans_buffer_ = (char **)malloc(max_length_ * sizeof(char *));
     for (int i = 0; i < max_length_; i++)
         trans_buffer_[i] = (char *)aligned_alloc(64, buffer_length * sizeof(char));
-    // trans_buffer_.resize(max_length_);
-    // for (int i = 0; i < max_length_; ++i)
-    // {
-    //     trans_buffer_[i].resize(buffer_length);
-    // }
     printf("start sender\n");
 
     for (int i = 0; i < thread_num; i++) 
@@ -200,34 +207,18 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
     context = new PackageSenderContext[thread_num];
     std::vector<pthread_t> created_threads;
-    for(int i = 0; i < thread_num; i++)
-    {
+    for(int i = 0; i < thread_num; i++) {
         pthread_t send_thread_;
         
         context[i].ptr = this;
         context[i].tid = i;
 
-        if(pthread_create( &send_thread_, NULL, PackageSender::loopSend, (void *)(&context[i])) != 0)
-        {
+        if(pthread_create( &send_thread_, NULL, PackageSender::loopSend, (void *)(&context[i])) != 0) {
             perror("socket send thread create failed");
             exit(0);
         }
         created_threads.push_back(send_thread_);
     }
-
-
-
-// #ifdef ENABLE_CPU_ATTACH
-//     if(stick_this_thread_to_core(core_offset) != 0)
-//     {
-//         printf("stitch main thread to core %d failed\n", core_offset);
-//         exit(0);
-//     }
-//     else
-//     {
-//         printf("stitch main thread to core %d succeeded\n", core_offset);
-//     }
-// #endif
 
     // give time for all threads to lock
     sleep(1);
@@ -254,15 +245,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
-        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
         
         ant_id++;
-        if(ant_id == BS_ANT_NUM)
-        {
+        if(ant_id == BS_ANT_NUM) {
             ant_id = 0;
             subframe_id++;
-            if(subframe_id == max_subframe_id)
-            {
+            if(subframe_id == max_subframe_id) {
                 subframe_id = 0;
                 frame_id++;
                 if(frame_id == MAX_FRAME_ID)
@@ -275,13 +264,13 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
     double start_time = get_time();
     int tx_frame_count = 0;
-    uint64_t ticks_100 = (uint64_t) 80000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_200 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_100 = (uint64_t) 150000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_200 = (uint64_t) 12000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_500 = (uint64_t) 6000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
     uint64_t ticks_per_symbol = (uint64_t) 71.3 * CPU_FREQ / 1e6;
-
+    uint64_t ticks_5 = (uint64_t) 5000000 * CPU_FREQ / 1e6 / 70;
 
     // ticks_100 = (uint64_t) 100000 * CPU_FREQ / 1e6 / 70;
     // ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
@@ -299,8 +288,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
     signal(SIGINT, intHandler);
     uint64_t tick_start = RDTSC();
-    while(keep_running && tx_frame_count < 9600)
-    {
+    while(keep_running && tx_frame_count < 9600) {
         // pthread_mutex_lock( &lock_ );
         // if(buffer_len_ == max_length_-10) // full
         // {
@@ -329,7 +317,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = tx_ant_id;
-        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
+        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         
         int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
@@ -343,45 +331,11 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             packet_count_per_frame[tx_frame_id]++;
             // double cur_time = get_time();
             // printf("Finished transmit all antennas in frame: %d, subframe: %d, at %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id, cur_time,cur_time-start_time);
-
-            // if (tx_frame_count < 200)
-            //     std::this_thread::sleep_for(std::chrono::microseconds(1000));
-            // else {
-            //     // double start_delay = get_time();
-            //     std::this_thread::sleep_for(std::chrono::microseconds(delay));
-            //     // printf("Delay: %.2f, frame: %d, subframe: %d\n", get_time()-start_delay, frame_id, subframe_id);
-            // }
-            // double start_delay = get_time();
-            // printf("Scheduling + TX: %.2f, frame: %d, subframe: %d\n", start_delay-start_time, tx_frame_count, tx_current_subframe_id);
-            // if (tx_frame_count < 100) {
-            //     delay_busy_cpu(300000);
-            //     // delay_busy_cpu(46000);
-            // }
-            // else if (tx_frame_count < 200) {
-            //     delay_busy_cpu(100000);
-            // }
-            // else if (tx_frame_count < 500) {
-            //     delay_busy_cpu(11000);
-            // }
-            // else {
-            //     delay_busy_cpu(int(delay*2.3e3/6));
-            // }
-            // if (tx_frame_count < 100) {
-            //     delay_pause(600);
-            //     // delay_busy_cpu(46000);
-            // }
-            // else if (tx_frame_count < 200) {
-            //     delay_pause(100);
-            // }
-            // else if (tx_frame_count < 500) {
-            //     delay_pause(50);
-            // }
-            // else {
-            //     delay_pause(int(delay));
-            // }
-            // printf("Delay: %.2f, frame: %d, subframe: %d\n", get_time()-start_delay, frame_id, subframe_id);
-            // start_time = get_time();
-            if (tx_frame_count < 100) {
+            if (tx_frame_count == 5) {
+                while ((RDTSC() - tick_start) < ticks_5) 
+                    _mm_pause; 
+            }
+            else if (tx_frame_count < 100) {
                 while ((RDTSC() - tick_start) < ticks_100) 
                     _mm_pause; 
             }
@@ -450,7 +404,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         // (*(ptr+1)) = subframe_id;
         // (*(ptr+2)) = cell_id;
         // (*(ptr+3)) = ant_id;
-        // memcpy(trans_buffer_[data_ptr].data() + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        // memcpy(trans_buffer_[data_ptr].data() + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
         // // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
 
         // if ( !task_queue_.enqueue(data_ptr) ) {
@@ -480,6 +434,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     }
 
     printf("Print results\n");
+
     FILE* fp_debug = fopen("/home/argos/Jian/CoMP_0722/matlab/tx_result.txt", "w");
     if (fp_debug==NULL) {
         printf("open file faild");
@@ -494,8 +449,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 
 PackageSender::~PackageSender()
 {
-    for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
-    {
+    for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
         delete[] IQ_data_coded[i];
         delete[] IQ_data[i];
     }
@@ -504,6 +458,7 @@ PackageSender::~PackageSender()
 
     delete[] socket_;
     delete[] context;
+    delete config_;
     pthread_mutex_destroy(&lock_);
 }
 
@@ -522,16 +477,24 @@ void* PackageSender::loopSend(void *in_context)
 
     printf("TX thread %d: on core %d\n", tid, sched_getcpu());
 #ifdef ENABLE_CPU_ATTACH
-    if(stick_this_thread_to_core(obj_ptr->core_offset + 1 + tid) != 0)
-    {
+    if(stick_this_thread_to_core(obj_ptr->core_offset + 1 + tid) != 0) {
         printf("stitch thread %d to core %d failed\n", tid, obj_ptr->core_offset + 1 + tid);
         exit(0);
     }
-    else
-    {
+    else {
         printf("stitch thread %d to core %d succeeded\n", tid, obj_ptr->core_offset + 1 + tid);
     }
 #endif
+
+    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    int UE_NUM = obj_ptr->UE_NUM;
+    int OFDM_FRAME_LEN = obj_ptr->OFDM_FRAME_LEN;
+    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    int package_length = obj_ptr->package_length;
+    int package_header_offset = obj_ptr->package_header_offset;
+    int buffer_length = obj_ptr->buffer_length;
+    int max_subframe_id = obj_ptr->max_subframe_id;
 
 
     // Use mutex to sychronize data receiving across threads
@@ -563,8 +526,7 @@ void* PackageSender::loopSend(void *in_context)
     char invalid_packet[obj_ptr->buffer_length]; 
 
     printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, obj_ptr->thread_num);
-    while(true)
-    {
+    while(true) {
         int data_ptr;
         ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->task_ptok[tid]),data_ptr); 
         if(!ret)
@@ -592,7 +554,7 @@ void* PackageSender::loopSend(void *in_context)
                 exit(0);
             }
 #else
-            if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0) < 0){
+            if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0) < 0) {
             // if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);
@@ -614,17 +576,6 @@ void* PackageSender::loopSend(void *in_context)
         }
         package_count++;
         total_tx_packets++;
-        // if (package_count % ant_num_this_thread == 0) {
-    	   //  if (total_tx_packets < 120 * ant_num_this_thread * max_subframe_id) {
-    		  //   // usleep(2000);
-        //        std::this_thread::sleep_for(std::chrono::microseconds(1000));
-    		  //   // printf("In thread %d delayed\n", tid);
-    	   //  }
-	       //  else {
-        //         std::this_thread::sleep_for(std::chrono::microseconds(obj_ptr->delay));
-        //         // usleep(obj_ptr->delay);
-        //     }
-        // }
 
 #if DEBUG_SENDER     
         end_time_msg = get_time();
@@ -635,8 +586,7 @@ void* PackageSender::loopSend(void *in_context)
 	
     	if (total_tx_packets > 1e9)
     	    total_tx_packets = 0;
-        if(package_count == ant_num_this_thread * max_subframe_id * 1000)
-        {
+        if(package_count == ant_num_this_thread * max_subframe_id * 1000) {
             double end = get_time();
             //double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * ant_num_this_thread * max_subframe_id * 1000;
 	        double byte_len = buffer_length * ant_num_this_thread * max_subframe_id * 1000.f;
