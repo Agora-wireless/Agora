@@ -354,7 +354,8 @@ void Millipede::start()
                     dl_data_counter_scs_[frame_id][current_data_subframe_id]++;
                     print_per_task_done(PRINT_PRECODE, frame_id, current_data_subframe_id, sc_id);          
                     if (dl_data_counter_scs_[frame_id][current_data_subframe_id] == demul_block_num) {
-                        schedule_ifft_task(frame_id, current_data_subframe_id, ptok_ifft);
+                        schedule_ifft_task(frame_count_precode, current_data_subframe_id, ptok_ifft);
+                        // schedule_ifft_task(frame_id, current_data_subframe_id, ptok_ifft);
                         if (current_data_subframe_id < dl_data_subframe_end - 1) 
                             schedule_precode_task(frame_id, current_data_subframe_id + 1, ptok_precode); 
 
@@ -374,7 +375,7 @@ void Millipede::start()
                     /* IFFT is done, schedule data transmission */
                     int offset_ifft = event.data;
                     int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
-                    interpreteOffset3d(offset_ifft, &frame_id, &current_data_subframe_id, &ant_id);
+                    interpreteOffset3d(offset_ifft, &current_data_subframe_id, &ant_id, &frame_id);
  
                     Event_data do_tx_task;
                     do_tx_task.event_type = TASK_SEND;
@@ -382,6 +383,7 @@ void Millipede::start()
                     int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;          
                     schedule_task(do_tx_task, &tx_queue_, *tx_ptoks_ptr[ptok_id]);
 
+                    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
                     ifft_checker_[frame_id] += 1;
                     print_per_task_done(PRINT_IFFT, frame_id, current_data_subframe_id, ant_id);
                     if (ifft_checker_[frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe) {
@@ -397,8 +399,9 @@ void Millipede::start()
                     /* Data is sent */
                     int offset_tx = event.data;
                     int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
-                    interpreteOffset3d(offset_tx, &frame_id, &current_data_subframe_id, &ant_id);
-
+                    interpreteOffset3d(offset_tx, &current_data_subframe_id, &ant_id, &frame_id);
+                    // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, current_data_subframe_id, ant_id);
+                    frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
                     tx_counter_ants_[frame_id][current_data_subframe_id] += 1;
                     print_per_task_done(PRINT_TX, frame_id, current_data_subframe_id, ant_id);
                     if (tx_counter_ants_[frame_id][current_data_subframe_id] == BS_ANT_NUM) {
@@ -866,7 +869,7 @@ void Millipede::schedule_ifft_task(int frame_id, int data_subframe_id, moodycame
     Event_data do_ifft_task;
     do_ifft_task.event_type = TASK_IFFT;
     for (int i = 0; i < BS_ANT_NUM; i++) {
-        do_ifft_task.data = generateOffset3d(frame_id, data_subframe_id, i);
+        do_ifft_task.data = generateOffset3d(data_subframe_id, i, frame_id);
         schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);
     }
 }
@@ -1071,7 +1074,6 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
 
 void Millipede::initialize_queues() 
 {
-    printf("size of event_data:%d\n", sizeof(Event_data));
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe);
     complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
 
