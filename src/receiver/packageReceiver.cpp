@@ -1616,29 +1616,30 @@ void* PackageReceiver::loopTXRX(void *in_context)
             }
 
             tx_offset = task_event.data;
-            interpreteOffset3d(tx_offset, &tx_frame_id, &tx_subframe_id, &tx_ant_id);
+            interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
             // tx_ant_id = tx_offset % BS_ANT_NUM;
             // tx_total_data_subframe_id = tx_offset / BS_ANT_NUM; 
             // tx_current_data_subframe_id = tx_total_data_subframe_id % data_subframe_num_perframe;
-            // tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
+            tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
             // tx_frame_id = tx_total_data_subframe_id / data_subframe_num_perframe;
-
-            int socket_subframe_offset = tx_frame_id * data_subframe_num_perframe + tx_current_data_subframe_id;
-            int data_subframe_offset = tx_frame_id * data_subframe_num_perframe + tx_current_data_subframe_id;
-            tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
+            int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
+            int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
+            // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
+            tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * package_length;  
             // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
             *((int *)tx_cur_buffer_ptr) = tx_frame_id;
             *((int *)tx_cur_buffer_ptr + 1) = tx_subframe_id;
             *((int *)tx_cur_buffer_ptr + 2) = tx_cell_id;
             *((int *)tx_cur_buffer_ptr + 3) = tx_ant_id;
-
+            
             // send data (one OFDM symbol)
             if (sendto(socket_local, (char*)tx_cur_buffer_ptr, package_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
                 perror("socket sendto failed");
                 exit(0);
             }
             tx_packet_num_per_frame++;
-            tx_pkts_in_frame_count[tx_frame_id]++;
+            tx_pkts_in_frame_count[tx_frame_id_in_buffer]++;
+
 
     #if DEBUG_BS_SENDER
             printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, tx_frame_id, tx_subframe_id, tx_ant_id, tx_offset,
@@ -1652,11 +1653,12 @@ void* PackageReceiver::loopTXRX(void *in_context)
                 exit(0);
             }
             // if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
-            if (tx_pkts_in_frame_count[tx_frame_id] == max_tx_packet_num_per_frame) {
+            if (tx_pkts_in_frame_count[tx_frame_id_in_buffer] == max_tx_packet_num_per_frame) {
                 do_tx = 0;
                 tx_packet_num_per_frame = 0;
-                tx_pkts_in_frame_count[tx_frame_id] = 0;
+                tx_pkts_in_frame_count[tx_frame_id_in_buffer] = 0;
                 // printf("In TXRX thread %d: TX finished frame %d, current frame %d\n", tid, last_finished_tx_frame_id, prev_frame_id);
+                // prev_frame_id = tx_frame_id;
                 // last_finished_tx_frame_id = (last_finished_tx_frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                 
             }

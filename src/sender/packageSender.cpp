@@ -153,30 +153,15 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 #endif
     }
 
-    /* initialize random seed: */
-    srand (time(NULL));
-
-
-    memset(packet_count_per_frame, 0, sizeof(int) * BUFFER_FRAME_NUM);
-    for (int i = 0; i < BUFFER_FRAME_NUM; i++) {
-        memset(packet_count_per_subframe[i], 0, sizeof(int) * max_subframe_id);
-    }
-
     int IQ_data_size = subframe_num_perframe * BS_ANT_NUM;
+    alloc_buffer_2d(&IQ_data, IQ_data_size, OFDM_FRAME_LEN * 2, 64, 1);
+    alloc_buffer_2d(&IQ_data_coded, IQ_data_size, OFDM_FRAME_LEN * 2, 64, 1);
     IQ_data = (float **)malloc(IQ_data_size * sizeof(float *));
     IQ_data_coded = (ushort **)malloc(IQ_data_size * sizeof(ushort *));
     for (int i = 0; i < IQ_data_size; i++) {
         IQ_data[i] = (float *)aligned_alloc(64, OFDM_FRAME_LEN * 2 * sizeof(float));
         IQ_data_coded[i] = (ushort *)aligned_alloc(64, OFDM_FRAME_LEN * 2 * sizeof(ushort));
     }
-
-    // IQ_data = new float*[subframe_num_perframe * BS_ANT_NUM];
-    // IQ_data_coded = new ushort*[subframe_num_perframe * BS_ANT_NUM];
-    // for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++)
-    // {
-    //     IQ_data[i] = new float[OFDM_FRAME_LEN * 2];
-    //     IQ_data_coded[i] = new ushort[OFDM_FRAME_LEN * 2];
-    // }
     
     // read from file
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -205,6 +190,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     for (int i = 0; i < thread_num; i++) 
         task_ptok[i].reset(new moodycamel::ProducerToken(task_queue_));
 
+    /* create send threads */
     context = new PackageSenderContext[thread_num];
     std::vector<pthread_t> created_threads;
     for(int i = 0; i < thread_num; i++) {
@@ -225,12 +211,9 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     printf("Master: Now releasing the condition\n");
     pthread_cond_broadcast(&cond);
 
-    // create send threads
+
     int cell_id = 0;
-    // int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
-    int ret;
-    // pthread_mutex_init(&lock_, NULL);
-    // gen data
+    
 
     // load data to buffer
 
@@ -285,27 +268,10 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
             exit(0);
         }
     }
-
+    int ret;
     signal(SIGINT, intHandler);
     uint64_t tick_start = RDTSC();
     while(keep_running && tx_frame_count < 9600) {
-        // pthread_mutex_lock( &lock_ );
-        // if(buffer_len_ == max_length_-10) // full
-        // {
-        //     pthread_mutex_unlock( &lock_ );
-        //     // wait some time
-        //     //for(int p = 0; p < 1e4; p++)
-        //     //    rand();
-        //     // printf("buffer full, buffer length: %d\n", buffer_len_);
-        //     continue;
-        // }
-        // else // not full
-        // {
-        //     // printf("buffer_len_: %d\n", buffer_len_);
-        //     buffer_len_ ++;  // take the place first
-        // }
-        // pthread_mutex_unlock( &lock_ );
-
         int data_ptr;
         ret = message_queue_.try_dequeue(data_ptr); 
         if(!ret)
@@ -360,10 +326,6 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                 tx_frame_count++;
                 packet_count_per_frame[tx_frame_id] = 0;
 #if ENABLE_DOWNLINK
-                // if (frame_id < 500)
-                //     std::this_thread::sleep_for(std::chrono::microseconds(data_subframe_num_perframe*120));
-                // else
-                //     std::this_thread::sleep_for(std::chrono::microseconds(int(data_subframe_num_perframe*71.43)));
                 if (frame_id < 500) {
                     while ((RDTSC() - tick_start) < 2 * data_subframe_num_perframe * ticks_all) 
                         _mm_pause; 
@@ -377,13 +339,9 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
 #endif
                // printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
                // start_time = get_time();
-	       tick_start = RDTSC();
+	           tick_start = RDTSC();
             }
-
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
-	    //tick_start = RDTSC();
-
-
             int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             for (int i = 0; i < BS_ANT_NUM; i++) {
                 int ptok_id = i % thread_num;
@@ -392,32 +350,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                     exit(0);
                 }
             }
-   
-            // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
         }
 
-
-
-        // int data_index = subframe_id * BS_ANT_NUM + ant_id;
-        // int* ptr = (int *)trans_buffer_[data_ptr].data();
-        // (*ptr) = frame_id;
-        // (*(ptr+1)) = subframe_id;
-        // (*(ptr+2)) = cell_id;
-        // (*(ptr+3)) = ant_id;
-        // memcpy(trans_buffer_[data_ptr].data() + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
-        // // printf("buffer_len_: %d, cur_ptr_: %d\n",buffer_len_,cur_ptr_);
-
-        // if ( !task_queue_.enqueue(data_ptr) ) {
-        //     printf("send task enqueue failed\n");
-        //     exit(0);
-        // }
-
-        // if (DEBUG_SENDER) 
-        // {
-        //     printf("Enqueue for frame %d, subframe %d, ant %d, buffer %d\n", frame_id, subframe_id, ant_id,buffer_len_);
-        // }
-
-        // cur_ptr_ = (cur_ptr_ + 1) % max_length_;
         ant_id++;
         if(ant_id == BS_ANT_NUM)
         {
