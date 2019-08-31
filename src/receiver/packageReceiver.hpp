@@ -143,6 +143,7 @@ private:
     int subframe_num_perframe, data_subframe_num_perframe;
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     int package_length;
+    int package_header_offset;
 
 
 #if USE_IPV4

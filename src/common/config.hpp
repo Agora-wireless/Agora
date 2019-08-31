@@ -15,6 +15,7 @@
 #ifdef JSON
 #include <nlohmann/json.hpp>
 #include "Symbols.hpp"
+#include "memory_manage.h"
 #include "buffer.hpp"
 #include "utils.h"
 //#include <itpp/itbase.h>
@@ -56,6 +57,8 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float *pilots_;
+    int **dl_IQ_data;
+    
     int beacon_ant;
     int beacon_len;
     std::string beacon_mode;
@@ -114,14 +117,6 @@ public:
     // int dl_data_symbol_perframe;
     std::atomic<bool> running;
     
-    int hdr_size = 16;
-    // header 4 int for: frame_id, symbol_id, cell_id, ant_id
-    // ushort for: I/Q samples
-    int getRxPackageLength() { return sizeof(int) * hdr_size + sizeof(float) * sampsPerSymbol * 2; }
-    // header 4 int for: frame_id, symbol_id, rsvd, ue_id
-    // ushort for: I/Q samples
-    int getTxPackageLength() { return sizeof(float) * sampsPerSymbol * 2; }
-    //int getL2PackageLength() { return sizeof(int) * 4 + sizeof(mac_dtype) * FFT_LEN * nUEs; }
     int getNumAntennas() { return nRadios*nChannels; }
     int getDlSFIndex(int, int);
     int getUlSFIndex(int, int);

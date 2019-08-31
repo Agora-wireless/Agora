@@ -261,7 +261,7 @@ void Millipede::start()
                             }
                         }
                         else if (cfg_->isUplink(frame_id, subframe_id)) {                     
-                            data_exist_in_subframe_[frame_id][cfg_->getUlSFIndex(frame_id, subframe_id)] = true;  
+                            data_exist_in_subframe_[frame_id][subframe_id-UE_NUM] = true;  
                             data_counter_subframes_[frame_id]++; 
                             print_per_subframe_done(PRINT_FFT_DATA, frame_count_pilot_fft - 1, frame_id, subframe_id);                 
                             if (data_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) {      
@@ -834,7 +834,7 @@ void Millipede::schedule_zf_task(int frame_id, moodycamel::ProducerToken const& 
 void Millipede::schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul) 
 {
     for (int sche_subframe_id = start_sche_id; sche_subframe_id < end_sche_id; sche_subframe_id++) {
-        int data_subframe_id = cfg_->getUlSFIndex(frame_id, sche_subframe_id);
+        int data_subframe_id = (sche_subframe_id- UE_NUM);
         if (data_exist_in_subframe_[frame_id][data_subframe_id]) {
             Event_data do_demul_task;
             do_demul_task.event_type = TASK_DEMUL;
@@ -1040,12 +1040,17 @@ void Millipede::print_per_task_done(int task_type, int frame_id, int subframe_id
 void Millipede::initialize_vars_from_cfg(Config *cfg)
 {
     pilots_ = cfg->pilots_;
+#if ENABLE_DOWNLINK
+    dl_IQ_data = cfg->dl_IQ_data;
+#endif
+
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
     for (int i = 0; i < OFDM_CA_NUM; i++) 
         cout<<pilots_[i]<<",";
     cout<<endl;
 #endif
+
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
@@ -1111,6 +1116,7 @@ void Millipede::initialize_uplink_buffers()
 
     socket_buffer_size_ = (long long) package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    printf("socket_buffer_size %d, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
     alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
     alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);
     alloc_buffer_2d(&csi_buffer_ , UE_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
@@ -1158,22 +1164,10 @@ void Millipede::initialize_uplink_buffers()
 
 void Millipede::initialize_downlink_buffers()
 {
-    alloc_buffer_2d(&dl_IQ_data , data_subframe_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename1 = cur_directory + "/data/orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
-    FILE *fp = fopen(filename1.c_str(),"rb");
-    if (fp==NULL) {
-        printf("open file faild");
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-    }
-    for (int i = 0; i < data_subframe_num_perframe * UE_NUM; i++) {
-        fread(dl_IQ_data[i], sizeof(int), OFDM_CA_NUM, fp);
-    }
-    fclose(fp);
 
 
-    dl_socket_buffer_size_ = (long long) data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM * package_length * BS_ANT_NUM;
-    dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * TASK_BUFFER_FRAME_NUM;
+    dl_socket_buffer_size_ = (long long) data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM * package_length * BS_ANT_NUM;
+    dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
     alloc_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64, 1);

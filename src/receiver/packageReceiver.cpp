@@ -43,7 +43,9 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
     ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
     dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
     package_length = cfg->package_length;
+    package_header_offset = cfg->package_header_offset;
 
+    //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
     srand (time(NULL));
     rx_context = new PackageReceiverContext[rx_thread_num_];
@@ -361,6 +363,24 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
             created_threads.push_back(recv_thread_);
         }
     #endif
+#else
+    #ifdef USE_ARGOS
+        for(int i = 0; i < rx_thread_num_; i++)
+        {
+            pthread_t recv_thread_;
+            // record the thread id 
+            rx_context[i].ptr = this;
+            rx_context[i].tid = i;
+            rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
+            // start socket thread
+            if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
+            {
+                perror("socket recv thread create failed");
+                exit(0);
+            }
+            created_threads.push_back(recv_thread_);
+        }
+    #endif
 #endif
     
 #ifdef USE_ARGOS
@@ -546,7 +566,6 @@ void* PackageReceiver::loopRecv(void *in_context)
     int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     int package_length = obj_ptr->package_length;
-
 
 #ifdef ENABLE_CPU_ATTACH 
     if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
@@ -949,8 +968,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     int package_length = obj_ptr->package_length;
-
-
+    int package_header_offset = obj_ptr->package_header_offset;
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&obj_ptr->mutex);
     printf("Thread %d: waiting for release\n", tid);
@@ -962,7 +980,6 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     //moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
 
-    int hdr_size = cfg->hdr_size;
     void* buffer = obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
@@ -975,15 +992,15 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
         temp = frame_start[i * 512];
     }
 
-#if ENABLE_DOWNLINK
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
-    char *tx_buffer = obj_ptr->tx_buffer_;
-
-    int txSymsPerFrame = 0;
-    std::vector<size_t> txSymbols;
-    txSymsPerFrame = cfg->dlSymsPerFrame;
-    txSymbols = cfg->DLSymbols[0];
-#endif
+//#if ENABLE_DOWNLINK
+//    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
+//    char *tx_buffer = obj_ptr->tx_buffer_;
+//
+//    int txSymsPerFrame = 0;
+//    std::vector<size_t> txSymbols;
+//    txSymsPerFrame = cfg->dlSymsPerFrame;
+//    txSymbols = cfg->DLSymbols[0];
+//#endif
 
     void* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -1029,8 +1046,8 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             //int rid = tid * obj_ptr->radios_per_thread + it;
             int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
-            void * samp1 = cur_ptr_buffer + hdr_size*sizeof(int);
-            void * samp2 = cur_ptr_buffer2 + hdr_size*sizeof(int);
+            void * samp1 = cur_ptr_buffer + package_header_offset;
+            void * samp2 = cur_ptr_buffer2 + package_header_offset;
             void *samp[2] = {samp1, samp2};
             while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
             frame_id = (int)(frameTime>>32);
@@ -1050,9 +1067,6 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 *((int *)cur_ptr_buffer2 + 2) = 0; //cell_id 
                 *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
             }
-        #if DEBUG_RECV
-            printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d\n", tid, frame_id, symbol_id, cell_id, ant_id);
-        #endif
 
         #if MEASURE_TIME
             // read information from received packet
@@ -1082,7 +1096,8 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             Event_data package_message;
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-            package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
+            //package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
+            package_message.data = generateOffset2d_setbits(tid, offset, 28);
             if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
@@ -1097,45 +1112,49 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 Event_data package_message2;
                 package_message2.event_type = EVENT_PACKAGE_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-                package_message2.data = offset + tid * buffer_frame_num;
+                //package_message2.data = offset + tid * buffer_frame_num;
+                package_message.data = generateOffset2d_setbits(tid, offset, 28);
                 if ( !message_queue_->enqueue(*local_ptok, package_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
             }
-        #if ENABLE_DOWNLINK
-            // notify TXthread to start transmitting frame_id+offset
-            if (txSymsPerFrame > 0 && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)
-            {
-            #ifdef SEPARATE_TX_THREAD
-                Event_data do_tx_task;
-                do_tx_task.event_type = TASK_SEND;
-                do_tx_task.data = ant_id; //tx_symbol_id * cfg->getNumAntennas() + ant_id;
-                do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
-                if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
-                    printf("task enqueue failed\n");
-                    exit(0);
-                }
-            #else
-                for (int tx_symbol_id = 0; tx_symbol_id < txSymsPerFrame; tx_symbol_id++)
-                {
-                    int tx_frame_id = frame_id + TX_FRAME_DELTA;
-                    int tx_symbol = txSymbols[tx_symbol_id];
-                    offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
-                    void* txbuf[2];
-                    long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
-                    int flags = 1; // HAS_TIME
-                    //if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-                    txbuf[0] = tx_buffer + offset * cfg->getTxPackageLength(); 
-                    if (cfg->nChannels == 2)
-                    {
-                        txbuf[1] = tx_buffer + (offset + 1) * cfg->getTxPackageLength();  
-                    }
-                    radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
-                }
-            #endif
-            }
+        #if DEBUG_RECV
+            printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, offset %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, offset + tid*buffer_frame_num);
         #endif
+        //#if ENABLE_DOWNLINK
+        //    // notify TXthread to start transmitting frame_id+offset
+        //    if (txSymsPerFrame > 0 && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)
+        //    {
+        //    #ifdef SEPARATE_TX_THREAD
+        //        Event_data do_tx_task;
+        //        do_tx_task.event_type = TASK_SEND;
+        //        do_tx_task.data = ant_id; //tx_symbol_id * cfg->getNumAntennas() + ant_id;
+        //        do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
+        //        if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
+        //            printf("task enqueue failed\n");
+        //            exit(0);
+        //        }
+        //    #else
+        //        for (int tx_symbol_id = 0; tx_symbol_id < txSymsPerFrame; tx_symbol_id++)
+        //        {
+        //            int tx_frame_id = frame_id + TX_FRAME_DELTA;
+        //            int tx_symbol = txSymbols[tx_symbol_id];
+        //            offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+        //            void* txbuf[2];
+        //            long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
+        //            int flags = 1; // HAS_TIME
+        //            //if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+        //            txbuf[0] = tx_buffer + offset * cfg->getTxPackageLength(); 
+        //            if (cfg->nChannels == 2)
+        //            {
+        //                txbuf[1] = tx_buffer + (offset + 1) * cfg->getTxPackageLength();  
+        //            }
+        //            radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+        //        }
+        //    #endif
+        //    }
+        //#endif
         }
     }
 }
@@ -1542,8 +1561,12 @@ void* PackageReceiver::loopTXRX(void *in_context)
     while(true) {
         if (do_tx == 0) {
             // if buffer is full, exit
-            if (rx_cur_buffer_status_ptr[0] == 1) {
-                printf("Receive thread %d buffer full, offset: %d\n", tid, rx_offset);
+            if (rx_cur_buffer_status_ptr[0] > 0) {
+                printf("Receive thread %d buffer full, offset: %d, buffer value: %d, total length: %d\n", tid, rx_offset, rx_cur_buffer_status_ptr[0], rx_buffer_frame_num);
+                printf("Buffer status:\n");
+                for(int i = 0; i < rx_buffer_frame_num; i++) 
+                    printf("%d ", *(rx_buffer_status_ptr+i));
+                printf("\n");
                 exit(0);
             }
 
@@ -1565,7 +1588,9 @@ void* PackageReceiver::loopTXRX(void *in_context)
             subframe_id = *((int *)rx_cur_buffer_ptr + 1);
             ant_id = *((int *)rx_cur_buffer_ptr + 3);
             rx_pkts_in_frame_count[frame_id % 10000]++;
-            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+            // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, subframe_id, ant_id, rx_offset);
+            // printf("RX thread %d received frame %d subframe %d, ant %d offset %d, buffer status %d %d ptr_offset %d\n", 
+                // tid, frame_id, subframe_id, ant_id, rx_offset, *(rx_buffer_status_ptr+1424), *(rx_cur_buffer_status_ptr+1), rx_cur_buffer_status_ptr - rx_buffer_status_ptr);
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
@@ -1702,22 +1727,24 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
     int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     int package_length = obj_ptr->package_length;
-
+    int package_header_offset = obj_ptr->package_header_offset;
 
     // downlink socket buffer
-    char *buffer = obj_ptr->tx_buffer_;
+    char *tx_buffer_ptr = obj_ptr->tx_buffer_;
+    char *tx_cur_buffer_ptr;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    int buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
-    int buffer_length = obj_ptr->tx_buffer_length_;
-    int* buffer_status = obj_ptr->tx_buffer_status_;
+    int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
+    //int* buffer_status = obj_ptr->tx_buffer_status_;
 
     Config *cfg = obj_ptr->config_;
     RadioConfig *radio = obj_ptr->radioconfig_;
 
     int ret;
     int offset;
+    int tx_offset;
     char *cur_ptr_buffer;
-    int ant_id, symbol_id, frame_id, frame_offset, total_symbol_id;
+    //int ant_id, symbol_id, frame_id;
+    int frame_id, tx_ant_id, tx_frame_id, tx_subframe_id, tx_total_data_subframe_id, tx_current_data_subframe_id;
     int cell_id = 0;
     struct timespec tv, tv2;
     double time_avg = 0;
@@ -1757,40 +1784,52 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
             exit(0);
         }
 
-        ant_id = task_event.data; //% cfg->getNumAntennas();
-        frame_id = task_event.more_data; 
+        //ant_id = task_event.data; //% cfg->getNumAntennas();
+
+        tx_offset = task_event.data;
+        interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
+        tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
+        int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
+        int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
+        tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * package_length + package_header_offset; 
+        frame_id = tx_frame_id + TX_FRAME_DELTA;
 
         //symbol_id = task_event.data / cfg->getNumAntennas();
-        for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
-        {
-            int tx_frame_id = frame_id;
-            int tx_symbol_id = txSymbols[symbol_id];
-            offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
+        //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
+        //{
+            int symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
             void* txbuf[2];
-            long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+            long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
             int flags = 1; // HAS_TIME
-            if (tx_symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-            txbuf[0] = buffer + offset * cfg->getTxPackageLength(); //   obj_ptr->pilot_buffer_; //
-            buffer_status[offset] = 0;
-            if (cfg->nChannels == 2)
+            if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+            if (cfg->nChannels == 1 || tx_ant_id % 2 == 0)
             {
-                txbuf[1] = buffer + (offset + 1) * cfg->getTxPackageLength();
-                buffer_status[offset+1] = 0;
+                txbuf[0] = tx_cur_buffer_ptr; 
+                //buffer_status[offset] = 0;
             }
-            clock_gettime(CLOCK_MONOTONIC, &tv);
-            radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
-            clock_gettime(CLOCK_MONOTONIC, &tv2);
+            else if (cfg->nChannels == 2 && tx_ant_id % 2 == 1)
+            {
+                txbuf[1] = tx_cur_buffer_ptr + package_length; //FIXME
+                //buffer_status[offset+1] = 0;
+            }
+            //clock_gettime(CLOCK_MONOTONIC, &tv);
+            radio->radioTx(tx_ant_id/cfg->nChannels, txbuf, flags, frameTime);
+            //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
-        }
+        //}
 
-        Event_data package_message;
-        package_message.event_type = EVENT_PACKAGE_SENT;
-        package_message.data = offset;
-        package_message.more_data = frame_id;
-        if ( cfg->running && !message_queue_->enqueue(*local_ptok, package_message ) ) {
+    #if DEBUG_BS_SENDER
+            printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, symbol_id, tx_ant_id, tx_offset,
+                message_queue_->size_approx());
+    #endif
+        Event_data tx_message;
+        tx_message.event_type = EVENT_PACKAGE_SENT;
+        tx_message.data = tx_offset;
+        if ( !message_queue_->enqueue(*local_ptok, tx_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
+
     }
     
 }
