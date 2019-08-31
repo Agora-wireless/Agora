@@ -168,7 +168,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     std::string filename = cur_directory + "/data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
-        printf("open file faild: ");
+        printf("open file faild: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
@@ -248,8 +248,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     double start_time = get_time();
     int tx_frame_count = 0;
     uint64_t ticks_100 = (uint64_t) 150000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_200 = (uint64_t) 12000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_500 = (uint64_t) 6000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
     uint64_t ticks_per_symbol = (uint64_t) 71.3 * CPU_FREQ / 1e6;
