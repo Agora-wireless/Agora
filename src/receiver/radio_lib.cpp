@@ -300,7 +300,7 @@ void RadioConfig::radioStart()
             }
             std::cout << _tddSched[r] << std::endl;
         }
-        int ueTrigOffset = _cfg->prefix + _cfg->beacon_len + _cfg->postfix + 17 + _cfg->prefix;
+        int ueTrigOffset = 505; //_cfg->prefix + _cfg->beacon_len + _cfg->postfix + 17 + _cfg->prefix;
         int sf_start = ueTrigOffset/_cfg->sampsPerSymbol;
         int sp_start = ueTrigOffset%_cfg->sampsPerSymbol;
         for (int i = 0; i < this->_radioNum; i++)

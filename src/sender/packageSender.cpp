@@ -141,7 +141,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         if(bind(socket_[i], (struct sockaddr *) &cliaddr_, sizeof(cliaddr_)) != 0)
             perror("socket bind failed");
 
-#if !USE_DPDK && CONNECT_UDP
+#if !defined(USE_DPDK) && CONNECT_UDP
         if(connect(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
             perror("UDP socket connect failed");
         else 
@@ -484,7 +484,7 @@ void* PackageSender::loopSend(void *in_context)
 #endif
         if (!downlink_mode || subframe_id < UE_NUM) {
             /* send a message to the server */
-#if USE_DPDK || !CONNECT_UDP
+#if defined(USE_DPDK) || !CONNECT_UDP
             // if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0) < 0){
             if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");

@@ -36,7 +36,7 @@ Config::Config(std::string jsonfile)
 
 
     /* Millipede configurations */
-    core_offset = tddConf.value("core_offset", 17);
+    core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     fft_thread_num = tddConf.value("fft_thread_num", 4);
@@ -196,11 +196,11 @@ Config::Config(std::string jsonfile)
     }
     fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
     fclose(fp);
+#endif
     std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);
     for (int i = 0; i < OFDM_CA_NUM; i++)  pilotsF[i] = pilots_[i];
     std::vector<std::complex<float>> pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
-#endif
 
     alloc_buffer_2d(&dl_IQ_data , data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
     alloc_buffer_2d(&ul_IQ_data , ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
