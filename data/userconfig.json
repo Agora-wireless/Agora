@@ -1,0 +1,21 @@
+{
+ "hubs" : "data/hub_serials.txt",
+ "irises" : "data/user_iris_serials.txt",
+ "cells" : 1,
+ "channels" : 1,
+ "frequency" : 3.6e9,
+ "rxgainA" : 25,
+ "txgainA" : 35,
+ "rate" : 5e6,
+ "symbol_size" : 2432,
+ "prefix" : 128,
+ "postfix" : 128,
+ "dl_prefix" : 240,
+ "cp_len" : 128,
+ "frames" : [
+     "BGPPGGDDDG"
+ ],
+ "UE" : true,
+ "worker_thread_num" : 25,
+ "demul_block_size" : 48
+}

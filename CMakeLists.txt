@@ -19,7 +19,7 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False)
-set(USE_ARGOS False)
+set(USE_ARGOS True)
 
 if (${USE_DPDK})
   find_package(dpdk)
@@ -95,7 +95,11 @@ if (${USE_ARGOS})
   message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
   include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
-  set (ARGOS_SOURCES src/receiver/radio_lib.cpp )
+  set (ARGOS_SOURCES src/receiver/radio_lib.cpp)
+  set (CLIENT_SOURCES
+         src/receiver/compute_common.cpp
+         src/receiver/ru.cpp
+         src/receiver/phy-ue.cpp)
   set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
   add_definitions(-DTHREADED_INIT)
 endif()
@@ -109,54 +113,62 @@ foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
 endforeach()
 
-set(SENDER_SOURCES src/sender/sender_cli.cpp
-                   src/sender/packageSender.cpp 
-                   src/common/cpu_attach.cpp 
+set(COMMON_SOURCES src/common/cpu_attach.cpp 
                    src/common/config.cpp
                    src/common/utils.cpp
                    src/common/comms-lib.cpp
                    src/common/signalHandler.cpp)
 
+set(SENDER_SOURCES src/sender/sender_cli.cpp
+                   src/sender/packageSender.cpp 
+                   ${COMMON_SOURCES})
+
 add_executable(sender ${SENDER_SOURCES})
 target_link_libraries(sender -lpthread -lmufft)
 
 set(SOURCES src/receiver/main.cpp 
-			src/receiver/packageReceiver.cpp 
-			src/receiver/millipede.cpp 
-			src/common/cpu_attach.cpp 
-			src/receiver/compute_common.cpp  
-			src/receiver/stats.cpp 
-			src/receiver/dofft.cpp 
-			src/receiver/dozf.cpp 
-			src/receiver/dodemul.cpp 
-			src/receiver/doprecode.cpp
-			src/common/config.cpp
-			src/common/utils.cpp
-			src/common/comms-lib.cpp
-			src/common/signalHandler.cpp
-       			${ARGOS_SOURCES})
+       src/receiver/packageReceiver.cpp 
+       src/receiver/millipede.cpp 
+       src/receiver/compute_common.cpp  
+       src/receiver/stats.cpp 
+       src/receiver/dofft.cpp 
+       src/receiver/dozf.cpp 
+       src/receiver/dodemul.cpp 
+       src/receiver/doprecode.cpp
+       ${COMMON_SOURCES}
+       ${ARGOS_SOURCES})
 			
 add_executable(millipede ${SOURCES})
 target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
 add_library(comp MODULE 
-       src/receiver/main.cpp
        src/receiver/packageReceiver.cpp
        src/receiver/millipede.cpp
-       src/common/cpu_attach.cpp
        src/receiver/compute_common.cpp
-	     src/receiver/stats.cpp 
+       src/receiver/stats.cpp 
        src/receiver/dofft.cpp
        src/receiver/dozf.cpp
        src/receiver/dodemul.cpp
        src/receiver/doprecode.cpp
-       src/common/config.cpp
-       src/common/utils.cpp
-       src/common/comms-lib.cpp
-       src/common/signalHandler.cpp 
+       ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
-
 target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+
+
+if (${USE_ARGOS})
+  add_executable(user 
+       src/receiver/user-main.cpp
+       ${CLIENT_SOURCES}
+       ${COMMON_SOURCES}
+       ${ARGOS_SOURCES})
+  target_link_libraries(user -lpthread -lmufft -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
+
+  add_library(ue_phy MODULE 
+       ${CLIENT_SOURCES}
+       ${COMMON_SOURCES}
+       ${ARGOS_SOURCES})
+  target_link_libraries(ue_phy -lpthread -lmufft -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
+endif()
 
 #add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)
 #target_link_libraries(receiver -lpthread )
