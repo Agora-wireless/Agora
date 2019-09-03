@@ -81,6 +81,7 @@ private:
     int buffer_length;
     int max_subframe_id;
     int max_length_;
+    bool downlink_mode;
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;

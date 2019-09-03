@@ -44,10 +44,11 @@ Millipede::Millipede(Config *cfg)
     printf("initialize uplink buffers\n");
     initialize_uplink_buffers();
 
-#if ENABLE_DOWNLINK
-    printf("initialize downlink buffers\n");
-    initialize_downlink_buffers();
-#endif  
+    if (downlink_mode)
+    {
+        printf("initialize downlink buffers\n");
+        initialize_downlink_buffers();
+    }
 
     
     /* initialize packageReceiver*/
@@ -103,9 +104,8 @@ Millipede::~Millipede()
 {
     free_uplink_buffers();
     /* downlink */
-#if ENABLE_DOWNLINK
-    free_downlink_buffers();
-#endif
+    if (downlink_mode)
+        free_downlink_buffers();
 }
 
 void Millipede::stop()
@@ -132,10 +132,10 @@ void Millipede::start()
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_, 
         socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, frame_start);
     /* start downlink transmitter */
-#if ENABLE_DOWNLINK
-    std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_, 
-        dl_socket_buffer_status_, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
-#endif
+    std::vector<pthread_t> tx_threads;
+    if (downlink_mode)
+        std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_, 
+            dl_socket_buffer_status_, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
     /* tokens used for enqueue */
     /* uplink */
     moodycamel::ProducerToken ptok(fft_queue_);
@@ -153,7 +153,7 @@ void Millipede::start()
 
 
     buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    max_packet_num_per_frame = ENABLE_DOWNLINK ? (BS_ANT_NUM * UE_NUM) : (BS_ANT_NUM * subframe_num_perframe);
+    max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * UE_NUM) : (BS_ANT_NUM * subframe_num_perframe);
 
     /* counters for printing summary */
     int demul_count = 0;
@@ -224,12 +224,12 @@ void Millipede::start()
                     /* in BigStation, schedule FFT whenever a packet is received */
                     schedule_fft_task(offset, frame_id, frame_id_in_buffer, subframe_id, ant_id, prev_frame_id, ptok);
 #else
+                    bool previous_frame_done;
                     /* if this is the first frame or the previous frame is all processed, schedule FFT for this packet */
-    #if ENABLE_DOWNLINK
-                    bool previous_frame_done = ifft_checker_[prev_frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe;
-    #else
-                    bool previous_frame_done = demul_counter_subframes_[prev_frame_id] == ul_data_subframe_num_perframe;
-    #endif
+                    if (downlink_mode)
+                        previous_frame_done = ifft_checker_[prev_frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe;
+                    else
+                        previous_frame_done = demul_counter_subframes_[prev_frame_id] == ul_data_subframe_num_perframe;
                     if ((frame_id == 0 && frame_count_pilot_fft < 100) || (frame_count_pilot_fft > 0 && previous_frame_done)) {
                         schedule_fft_task(offset, frame_id, frame_id_in_buffer, subframe_id, ant_id, prev_frame_id, ptok);
                     }
@@ -299,10 +299,9 @@ void Millipede::start()
                         /* if all the data in a frame has arrived when ZF is done */
                         if (data_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) 
                             schedule_demul_task(frame_id, UE_NUM, subframe_num_perframe, ptok_demul);   
-#if ENABLE_DOWNLINK
-                        /* if downlink data transmission is enabled, schedule downlink modulation for the first data subframe */
-                        schedule_precode_task(frame_id, dl_data_subframe_start, ptok_precode);               
-#endif   
+                        if (downlink_mode)
+                            /* if downlink data transmission is enabled, schedule downlink modulation for the first data subframe */
+                            schedule_precode_task(frame_id, dl_data_subframe_start, ptok_precode);               
                     }
                 }
                 break;
@@ -441,7 +440,7 @@ void Millipede::start()
     } /* end of while */
     this->stop();
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
-    int last_frame_id = ENABLE_DOWNLINK ? frame_count_tx : frame_count_demul;
+    int last_frame_id = downlink_mode ? frame_count_tx : frame_count_demul;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
     exit(0);
@@ -454,6 +453,7 @@ void* Millipede::taskThread(void* context)
     int tid = ((EventHandlerContext *)context)->id;
     printf("task thread %d starts\n", tid);
     Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
+    bool downlink_mode = obj_ptr->downlink_mode;
     
 #ifdef ENABLE_CPU_ATTACH
     // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
@@ -513,7 +513,7 @@ void* Millipede::taskThread(void* context)
     bool ret_precode = false;
 
     while(true) {
-        if (ENABLE_DOWNLINK) {
+        if (downlink_mode) {
             ret_ifft = ifft_queue_->try_dequeue(event);
             if (!ret_ifft) {
                 ret_precode = precode_queue_->try_dequeue(event);
@@ -573,9 +573,10 @@ void* Millipede::fftThread(void* context)
     
     Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
     moodycamel::ConcurrentQueue<Event_data>* fft_queue_ = &(obj_ptr->fft_queue_);
-#if ENABLE_DOWNLINK
-    moodycamel::ConcurrentQueue<Event_data>* ifft_queue_ = &(obj_ptr->ifft_queue_);
-#endif
+    moodycamel::ConcurrentQueue<Event_data>* ifft_queue_;
+    bool downlink_mode = obj_ptr->downlink_mode;
+    if (downlink_mode)
+        ifft_queue_ = &(obj_ptr->ifft_queue_);
     int tid = ((EventHandlerContext *)context)->id;
     printf("FFT thread %d starts\n", tid);
     
@@ -612,15 +613,16 @@ void* Millipede::fftThread(void* context)
     while(true) {
         ret = fft_queue_->try_dequeue(event);
         if (!ret) {
-#if ENABLE_DOWNLINK
-            ret = ifft_queue_->try_dequeue(event);
-            if (!ret)
-                continue;
+            if (downlink_mode)
+            {
+                ret = ifft_queue_->try_dequeue(event);
+                if (!ret)
+                    continue;
+                else
+                    computeFFT->IFFT(event.data);
+            }
             else
-                computeFFT->IFFT(event.data);
-#else
-            continue;
-#endif
+                continue;
         }
         else
             computeFFT->FFT(event.data);
@@ -679,9 +681,10 @@ void* Millipede::demulThread(void* context)
     
     Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
     moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
-#if ENABLE_DOWNLINK
-    moodycamel::ConcurrentQueue<Event_data>* precode_queue_ = &(obj_ptr->precode_queue_);
-#endif
+    moodycamel::ConcurrentQueue<Event_data>* precode_queue_;
+    bool downlink_mode = obj_ptr->downlink_mode;
+    if (downlink_mode)
+        precode_queue_ = &(obj_ptr->precode_queue_);
     int tid = ((EventHandlerContext *)context)->id;
     printf("Demul thread %d starts\n", tid);
     
@@ -722,26 +725,29 @@ void* Millipede::demulThread(void* context)
     int cur_frame_id = 0;
 
     while(true) {         
-#if ENABLE_DOWNLINK
-        ret_precode = precode_queue_->try_dequeue(event);
-        if (!ret_precode)
-            continue;
+        if (downlink_mode)
+        {
+            ret_precode = precode_queue_->try_dequeue(event);
+            if (!ret_precode)
+                continue;
+            else
+                computePrecode->Precode(event.data);
+        }
         else
-            computePrecode->Precode(event.data);
-#else
-        ret_demul = demul_queue_->try_dequeue(event);
-        if (!ret_demul) {
-            continue;
+        {
+            ret_demul = demul_queue_->try_dequeue(event);
+            if (!ret_demul) {
+                continue;
+            }
+            else {
+                // int frame_id = event.data / (OFDM_CA_NUM * ul_data_subframe_num_perframe);
+                // // check precoder status for the current frame
+                // if (frame_id > cur_frame_id || frame_id == 0) {
+                //     while (!precoder_status_[frame_id]);
+                // }
+                computeDemul->Demul(event.data);
+            }
         }
-        else {
-            // int frame_id = event.data / (OFDM_CA_NUM * ul_data_subframe_num_perframe);
-            // // check precoder status for the current frame
-            // if (frame_id > cur_frame_id || frame_id == 0) {
-            //     while (!precoder_status_[frame_id]);
-            // }
-            computeDemul->Demul(event.data);
-        }
-#endif   
     }
 
 }
@@ -787,11 +793,10 @@ void Millipede::schedule_fft_task(int offset, int frame_id, int frame_id_in_buff
                 frame_id, frame_id_in_buffer, get_time()-stats_manager_->get_pilot_received(frame_id));
 #endif  
 #if !BIGSTATION
-    #if ENABLE_DOWNLINK 
+    if (downlink_mode)
         ifft_checker_[prev_frame_id] = 0;
-    #else
+    else
         demul_counter_subframes_[prev_frame_id] = 0;
-    #endif
 #endif
     }
 }
@@ -806,11 +811,10 @@ void Millipede::schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer,
         }
         delay_fft_queue_cnt[frame_id_next] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE 
-    #if ENABLE_DOWNLINK
+    if (downlink_mode)
         printf("Main thread in IFFT: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id_next], frame_id_next);
-    #else
+    else
         printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id_next], frame_id_next);
-    #endif
 #endif                                
     } 
 }
@@ -1040,9 +1044,7 @@ void Millipede::print_per_task_done(int task_type, int frame_id, int subframe_id
 void Millipede::initialize_vars_from_cfg(Config *cfg)
 {
     pilots_ = cfg->pilots_;
-#if ENABLE_DOWNLINK
     dl_IQ_data = cfg->dl_IQ_data;
-#endif
 
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
@@ -1059,6 +1061,7 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
     dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
+    downlink_mode = cfg_->downlink_mode;
     dl_data_subframe_start = cfg->dl_data_symbol_start;
     dl_data_subframe_end = cfg->dl_data_symbol_end;
     package_length = cfg->package_length;
