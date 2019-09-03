@@ -3,7 +3,7 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-//#define GENERATE_PILOT
+#define GENERATE_PILOT
 #define GENERATE_DATA
 
 #define STRINGIFY(x) #x

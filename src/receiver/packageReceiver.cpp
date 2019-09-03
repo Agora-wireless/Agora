@@ -7,7 +7,7 @@
 #include "packageReceiver.hpp"
 #include "cpu_attach.hpp"
 
-#if USE_DPDK
+#ifdef USE_DPDK
 inline const struct rte_eth_conf port_conf_default() {
     struct rte_eth_conf rte = rte_eth_conf();
     // rte.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
@@ -52,7 +52,7 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
     rx_context = new PackageReceiverContext[rx_thread_num_];
     tx_context = new PackageReceiverContext[tx_thread_num_];
 
-#if USE_DPDK
+#ifdef USE_DPDK
     std::string core_list = std::to_string(core_id_)+"-"+std::to_string(core_id_+rx_thread_num_+tx_thread_num_);
     int argc = 5;
     char *argv[] = {
@@ -125,6 +125,7 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 
 #else
 #ifdef USE_ARGOS
+    printf("config radios ...\n");
     radioconfig_ = new RadioConfig(config_);
     if (!downlink_mode && config_->sampleCalEn)
     {
@@ -194,7 +195,7 @@ void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<int16
 }
 #endif
 
-#if USE_DPDK
+#ifdef USE_DPDK
 int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     struct rte_eth_conf port_conf = port_conf_default();
     const uint16_t rxRings = rx_thread_num_, txRings = tx_thread_num_+rx_thread_num_;
@@ -323,7 +324,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     std::vector<pthread_t> created_threads;
     if (!downlink_mode)
     {
-    #if USE_DPDK
+    #ifdef USE_DPDK
         unsigned int nb_lcores = rte_lcore_count();
         printf("Number of DPDK cores: %d\n", nb_lcores);
         unsigned int lcore_id;
@@ -414,7 +415,7 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     printf("start Transmit thread\n");
 // create new threads
     std::vector<pthread_t> created_threads;
-#if USE_DPDK
+#ifdef USE_DPDK
     unsigned int lcore_id;
     int worker_id = 0;
     int thread_id;
@@ -497,7 +498,7 @@ static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_po
 
 
 
-#if USE_DPDK
+#ifdef USE_DPDK
 int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int len, int tid) {
   printf("Processing ARP request\n");
   struct arp_hdr *ah = (struct arp_hdr *)((unsigned char *)eth + ETHER_HDR_LEN);
@@ -734,7 +735,7 @@ void* PackageReceiver::loopRecv(void *in_context)
 }
 
 
-#if USE_DPDK
+#ifdef USE_DPDK
 
 void* PackageReceiver::loopRecv_DPDK(void *in_context)
 {
@@ -1135,7 +1136,7 @@ void* PackageReceiver::loopSend(void *in_context)
     // get pointer to message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->tx_core_id_;
-#if !USE_DPDK
+#ifndef USE_DPDK
     #ifdef ENABLE_CPU_ATTACH
         if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
             printf("TX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
@@ -1800,7 +1801,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
 }
 #endif
 
-#if USE_DPDK
+#ifdef USE_DPDK
 static struct rte_flow *
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
                 uint32_t src_ip, uint32_t src_mask,
