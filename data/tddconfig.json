@@ -18,6 +18,7 @@
  "frames" : [
      "BGPPGGDDDG"
  ],
+ "downlink_mode": false,
  "worker_thread_num" : 25,
  "demul_block_size" : 48,
  "bs_ant_num": 8

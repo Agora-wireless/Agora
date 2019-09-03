@@ -26,6 +26,7 @@ Config::Config(std::string jsonfile)
     rate = tddConf.value("rate", 5e6);
     sampsPerSymbol = tddConf.value("symbol_size", 0);
     prefix = tddConf.value("prefix", 0);
+    dl_prefix = tddConf.value("dl_prefix", 0);
     postfix = tddConf.value("postfix", 0);
     beacon_ant = tddConf.value("beacon_antenna", 0);
     beacon_len = tddConf.value("beacon_len", 256);
@@ -112,6 +113,7 @@ Config::Config(std::string jsonfile)
 
     package_header_offset = tddConf.value("package_header_offset", 64);
     package_length = package_header_offset + sizeof(short) * sampsPerSymbol * 2;
+    downlink_mode = dl_data_symbol_num_perframe > 0;
 #else
     /* base station configurations */
     BS_ANT_NUM = tddConf.value("bs_ant_num", 8);
@@ -132,8 +134,8 @@ Config::Config(std::string jsonfile)
     dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
     package_header_offset = tddConf.value("package_header_offset", 64);
     package_length = package_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
+    downlink_mode = tddConf.value("downlink_mode", false);
 #endif
-
     std::cout << "Config file loaded!" << std::endl;
     std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
     std::cout << "UE_NUM " << nUEs << std::endl;
@@ -161,7 +163,6 @@ Config::Config(std::string jsonfile)
 
     pilots_ = (float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
 #ifdef GENERATE_PILOT 
-    alloc_buffer_2d(&dl_IQ_data , dl_data_subframe_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
     for (int i = 0; i < OFDM_CA_NUM; i++)
     {
         if (i < OFDM_DATA_START || i >= OFDM_DATA_START+OFDM_DATA_NUM) pilots_[i] = 0;
@@ -202,6 +203,9 @@ Config::Config(std::string jsonfile)
 #endif
 
     alloc_buffer_2d(&dl_IQ_data , data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
+    alloc_buffer_2d(&ul_IQ_data , ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
+    alloc_buffer_2d(&ul_IQ_modul , ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
+    
 #ifdef GENERATE_DATA
     int mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK); 
     int mod_order = (int)pow(2, mod_type); 
@@ -212,6 +216,19 @@ Config::Config(std::string jsonfile)
             dl_IQ_data[i][j] = rand()%mod_order;
     }
     
+    for (int i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++)
+    {
+        for (int j = 0; j < OFDM_DATA_NUM; j++)
+            ul_IQ_data[i][j] = rand()%mod_order;
+        std::vector<std::complex<float>> modul_data = CommsLib::modulate(std::vector<int> (ul_IQ_data[i], ul_IQ_data[i]+OFDM_DATA_NUM), mod_type);
+        for (int j = 0; j < OFDM_CA_NUM; j++)
+        {
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_START+OFDM_DATA_NUM) continue;
+            int k = j - OFDM_DATA_START;
+            ul_IQ_modul[i][j].real = modul_data[k].real();
+            ul_IQ_modul[i][j].imag = modul_data[k].imag();
+        }
+    }
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
     std::string filename1 = cur_directory1 + "/data/orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
@@ -225,7 +242,24 @@ Config::Config(std::string jsonfile)
     }
     fclose(fd);
 
+    // read uplink
+    std::string filename2 = cur_directory1 + "/data/tx_ul_data_"+std::to_string(BS_ANT_NUM)+"x"+std::to_string(nUEs)+".bin";
+    fp = fopen(filename2.c_str(),"rb");
+    if (fp==NULL) {
+        std::cerr << "Openning File " << filename2 << " fails. Error: " << strerror(errno) << std::endl;
+    }
+    int total_sc =  OFDM_DATA_NUM * UE_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
+    L2_data = new mac_dtype[total_sc];
+    fread(L2_data, sizeof(mac_dtype), total_sc, fp);
+    fclose(fp);
+    for (int i = 0; i < total_sc; i++)
+    {
+        int sid = i/(data_sc_len * nUEs);
+        int cid = i%(data_sc_len * nUEs) + OFDM_DATA_START;
+        ul_IQ_modul[sid][cid] = L2_data[i];
+    }
 #endif
+
     running = true;
 }
 
@@ -292,8 +326,8 @@ int Config::getUlSFIndex(int frame_id, int symbol_id)
 
 bool Config::isPilot(int frame_id, int symbol_id) 
 {
-#ifdef USE_UNDEF //USE_ARGOS
     int fid = frame_id % framePeriod;
+#ifdef USE_UNDEF //USE_ARGOS
     if (symbol_id > symbolsPerFrame)
     {
         printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n",symbol_id, frame_id);
@@ -315,12 +349,24 @@ bool Config::isPilot(int frame_id, int symbol_id)
     else
         return frames[fid].at(symbol_id) == 'P';
 #else
-    return (symbol_id >=0) && (symbol_id < UE_NUM); 
+    if (isUE)
+    {
+        std::vector<size_t>::iterator it;
+        it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
+        int ind = DL_PILOT_SYMS;
+        if (it != DLSymbols[fid].end()) 
+            ind = it-DLSymbols[fid].begin();
+        return (ind < DL_PILOT_SYMS);
+        //return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
+    }
+    else
+        return (symbol_id >=0) && (symbol_id < UE_NUM); 
 #endif
 } 
 
 bool Config::isUplink(int frame_id, int symbol_id) 
 {
+    int fid = frame_id % framePeriod;
 #ifdef USE_UNDEF //USE_ARGOS
     int fid = frame_id % framePeriod;
     if (symbol_id > symbolsPerFrame)
@@ -333,7 +379,10 @@ bool Config::isUplink(int frame_id, int symbol_id)
 #endif
     return frames[fid].at(symbol_id) == 'U';
 #else
-    return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM); 
+    if (isUE)
+        return frames[fid].at(symbol_id) == 'U';
+    else
+        return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM); 
 #endif
 }
 

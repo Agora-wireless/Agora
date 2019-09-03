@@ -29,6 +29,7 @@ class Config
 {
 public:
     int sampsPerSymbol;
+    int dl_prefix;
     int prefix;
     int postfix;
     int symbolsPerFrame;
@@ -58,6 +59,8 @@ public:
     std::vector<uint32_t> beacon;
     float *pilots_;
     int **dl_IQ_data;
+    int **ul_IQ_data;
+    complex_float **ul_IQ_modul;
     
     int beacon_ant;
     int beacon_len;
@@ -102,6 +105,7 @@ public:
     int symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
     int ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     int dl_data_symbol_start, dl_data_symbol_end;
+    bool downlink_mode;
 
     int package_header_offset;
     int package_length;

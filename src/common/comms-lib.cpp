@@ -167,6 +167,8 @@ std::vector<int> CommsLib::getDataSc(int fftSize)
                          51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63};
        data_sc.assign(sc_ind, sc_ind+48);
     }
+    else
+          for (int i = 0; i < fftSize; i++) data_sc.push_back(i);
     return data_sc; 
 }
 
