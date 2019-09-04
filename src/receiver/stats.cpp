@@ -545,7 +545,7 @@ void Stats::update_stats_in_functions_downlink_millipede(int frame_id)
 void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
 {
 	printf("saving timestamps to file.........\n");
-	printf("Total processed frames %d ", last_frame_id);
+	printf("Total processed frames %d \n", last_frame_id);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
@@ -554,8 +554,7 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
         std::cerr << "Error: " << strerror(errno) << std::endl;
         exit(0);
     }
-    if (downlink_mode)
-    {
+    if (downlink_mode) {
         for(int ii = 0; ii < last_frame_id; ii++) { 
             if (socket_rx_thread_num == 1) {
                 fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
@@ -569,8 +568,7 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
             }
         }
     }
-    else
-    {
+    else {
         for(int ii = 0; ii < last_frame_id; ii++) {  
             if (socket_rx_thread_num == 1) {    
                     fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
@@ -581,8 +579,8 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
                         csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii], pilot_all_received[ii]);
             }
         }
-            #if DEBUG_UPDATE_STATS_DETAILED
-            printf("Print results detailed\n");
+        #if DEBUG_UPDATE_STATS_DETAILED
+            printf("printing detailed results to file.........\n");
             std::string filename_detailed = cur_directory + "/data/timeresult_detail.txt";
             FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
             if (fp_debug_detailed==NULL) {
@@ -597,7 +595,7 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
                     demul_time_in_function_details[0][ii], demul_time_in_function_details[1][ii], demul_time_in_function_details[2][ii] );
             }
             fclose(fp_debug_detailed);
-            #endif
+        #endif
     }
     fclose(fp_debug);
 }
@@ -612,18 +610,17 @@ void Stats::print_summary(int last_frame_id)
     int Demul_total_count = 0;
     int IFFT_total_count = 0;
     int Precode_total_count = 0;
-
     for (int i = 0; i < task_thread_num; i++) {
         CSI_total_count = CSI_total_count + CSI_task_count[i * 16];
         FFT_total_count = FFT_total_count + FFT_task_count[i * 16];
         ZF_total_count = ZF_total_count + ZF_task_count[i * 16];
         Demul_total_count = Demul_total_count + Demul_task_count[i * 16];
-        IFFT_total_count = IFFT_total_count + IFFT_task_count[i * 16];
-        Precode_total_count = Precode_total_count + Precode_task_count[i * 16];
+        if (downlink_mode) {
+            IFFT_total_count = IFFT_total_count + IFFT_task_count[i * 16];
+            Precode_total_count = Precode_total_count + Precode_task_count[i * 16];
+        }
     }
-    
-    if (downlink_mode)
-    {
+    if (downlink_mode) {
         double csi_frames = (double)CSI_total_count / BS_ANT_NUM / UE_NUM;
         double precode_frames = (double)Precode_total_count / OFDM_DATA_NUM / dl_data_subframe_num_perframe;
         double ifft_frames = (double)IFFT_total_count / BS_ANT_NUM / dl_data_subframe_num_perframe;
@@ -640,8 +637,7 @@ void Stats::print_summary(int last_frame_id)
                 	IFFT_task_count[i * 16], percent_IFFT);
         }
     }
-    else
-    {
+    else {
         double csi_frames = (double)CSI_total_count / BS_ANT_NUM / UE_NUM;
         double fft_frames = (double)FFT_total_count / BS_ANT_NUM / data_subframe_num_perframe;
         double demul_frames = (double)Demul_total_count / OFDM_DATA_NUM / data_subframe_num_perframe;
