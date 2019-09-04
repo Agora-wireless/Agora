@@ -78,10 +78,11 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     OFDM_FRAME_LEN = cfg->OFDM_FRAME_LEN;
     subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    downlink_mode = cfg->downlink_mode;
     package_length = cfg->package_length;
     package_header_offset = cfg->package_header_offset;
     buffer_length = tx_buf_offset + package_length;
-    max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
 
     alloc_buffer_2d(&packet_count_per_subframe, BUFFER_FRAME_NUM, max_subframe_id, 64, 1);
@@ -140,7 +141,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         if(bind(socket_[i], (struct sockaddr *) &cliaddr_, sizeof(cliaddr_)) != 0)
             perror("socket bind failed");
 
-#if !USE_DPDK && CONNECT_UDP
+#if !defined(USE_DPDK) && CONNECT_UDP
         if(connect(socket_[i], (struct sockaddr *) &servaddr_[i], sizeof(servaddr_[i])) != 0)
             perror("UDP socket connect failed");
         else 
@@ -168,7 +169,7 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     std::string filename = cur_directory + "/data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
-        printf("open file faild: ");
+        printf("open file faild: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
@@ -248,8 +249,8 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     double start_time = get_time();
     int tx_frame_count = 0;
     uint64_t ticks_100 = (uint64_t) 150000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_200 = (uint64_t) 12000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_500 = (uint64_t) 6000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
     uint64_t ticks_per_symbol = (uint64_t) 71.3 * CPU_FREQ / 1e6;
@@ -325,18 +326,19 @@ socket_num(in_socket_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
                 frame_end[tx_frame_count] = get_time();
                 tx_frame_count++;
                 packet_count_per_frame[tx_frame_id] = 0;
-#if ENABLE_DOWNLINK
-                if (frame_id < 500) {
-                    while ((RDTSC() - tick_start) < 2 * data_subframe_num_perframe * ticks_all) 
-                        _mm_pause; 
-                    // delay_busy_cpu(data_subframe_num_perframe*120*2.3e3/6);
+                if (downlink_mode)
+                {
+                    if (frame_id < 500) {
+                        while ((RDTSC() - tick_start) < 2 * data_subframe_num_perframe * ticks_all) 
+                            _mm_pause; 
+                        // delay_busy_cpu(data_subframe_num_perframe*120*2.3e3/6);
+                    }
+                    else {
+                        while ((RDTSC() - tick_start) < data_subframe_num_perframe * ticks_all) 
+                            _mm_pause; 
+                        // delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
+                    }
                 }
-                else {
-                    while ((RDTSC() - tick_start) < data_subframe_num_perframe * ticks_all) 
-                        _mm_pause; 
-                    // delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
-                }
-#endif
                // printf("Finished transmit all antennas in frame: %d, next scheduled: %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
                // start_time = get_time();
 	           tick_start = RDTSC();
@@ -425,6 +427,7 @@ void* PackageSender::loopSend(void *in_context)
     int OFDM_FRAME_LEN = obj_ptr->OFDM_FRAME_LEN;
     int subframe_num_perframe = obj_ptr->subframe_num_perframe;
     int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    bool downlink_mode = obj_ptr->downlink_mode;
     int package_length = obj_ptr->package_length;
     int package_header_offset = obj_ptr->package_header_offset;
     int buffer_length = obj_ptr->buffer_length;
@@ -448,7 +451,7 @@ void* PackageSender::loopSend(void *in_context)
     int ret;
     int socket_per_thread = obj_ptr->socket_num / obj_ptr->thread_num;
     int total_tx_packets = 0;
-    // int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
+    // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
     int ant_num_this_thread = BS_ANT_NUM / obj_ptr->thread_num + (tid < BS_ANT_NUM % obj_ptr->thread_num ? 1: 0);
     double start_time_send = get_time();
@@ -479,9 +482,9 @@ void* PackageSender::loopSend(void *in_context)
 #if DEBUG_SENDER
         start_time_send = get_time();
 #endif
-        if (!ENABLE_DOWNLINK || subframe_id < UE_NUM) {
+        if (!downlink_mode || subframe_id < UE_NUM) {
             /* send a message to the server */
-#if USE_DPDK || !CONNECT_UDP
+#if defined(USE_DPDK) || !CONNECT_UDP
             // if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0) < 0){
             if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");

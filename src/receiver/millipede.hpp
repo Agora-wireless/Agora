@@ -116,6 +116,7 @@ private:
     int subframe_num_perframe, data_subframe_num_perframe;
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     int dl_data_subframe_start, dl_data_subframe_end;
+    bool downlink_mode;
     int package_length;
 
     int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
