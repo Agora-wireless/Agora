@@ -3,7 +3,8 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-//#define GENERATE_PILOT
+#define GENERATE_PILOT
+#define GENERATE_DATA
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -33,7 +34,7 @@
 #define MAX_CODED_SC 1152
 #define TASK_BUFFER_FRAME_NUM 60
 #define SOCKET_BUFFER_FRAME_NUM 100
-#define DL_PILOT_SYMS 2
+#define DL_PILOT_SYMS 0
 #define TX_FRAME_DELTA 8
 
 
@@ -76,7 +77,7 @@
 
 
 #define BIGSTATION 0
-#define ENABLE_DOWNLINK 1
+#define ENABLE_DOWNLINK 0
 #define USE_IPV4 1
 //#define USE_DPDK 0
 #define CONNECT_UDP 1

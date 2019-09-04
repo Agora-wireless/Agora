@@ -38,7 +38,7 @@
 #include "config.hpp"
 #endif
 
-#if USE_DPDK
+#ifdef USE_DPDK
 #include <inttypes.h>
 #include <rte_arp.h>
 #include <rte_byteorder.h>
@@ -102,7 +102,7 @@ public:
     ~PackageReceiver();
     
 
-#if USE_DPDK
+#ifdef USE_DPDK
     int nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool);
     int process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth_h, int len, int tid);
 #endif
@@ -123,7 +123,7 @@ public:
      * context: PackageReceiverContext type
     */
     static void* loopRecv(void *context);
-#if USE_DPDK
+#ifdef USE_DPDK
     static void* loopRecv_DPDK(void *context);
 #endif
     static void* loopSend(void *context);
@@ -142,7 +142,9 @@ private:
     int OFDM_DATA_NUM;
     int subframe_num_perframe, data_subframe_num_perframe;
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
+    bool downlink_mode;
     int package_length;
+    int package_header_offset;
 
 
 #if USE_IPV4
@@ -156,7 +158,7 @@ private:
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 
-#if USE_DPDK
+#ifdef USE_DPDK
     struct ether_addr server_eth_addr;
     uint32_t src_addr;
     uint32_t dst_addr;

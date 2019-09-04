@@ -23,7 +23,7 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
     dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
-
+    downlink_mode = cfg->downlink_mode;
 
     task_thread_num = in_task_thread_num;
     fft_thread_num = in_fft_thread_num;
@@ -545,7 +545,7 @@ void Stats::update_stats_in_functions_downlink_millipede(int frame_id)
 void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
 {
 	printf("saving timestamps to file.........\n");
-	printf("Total processed frames %d ", last_frame_id);
+	printf("Total processed frames %d \n", last_frame_id);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
@@ -554,48 +554,49 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
         std::cerr << "Error: " << strerror(errno) << std::endl;
         exit(0);
     }
-#if ENABLE_DOWNLINK
-    for(int ii = 0; ii < last_frame_id; ii++) { 
-        if (socket_rx_thread_num == 1) {
-            fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
-                precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
-                csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii], frame_start[0][ii]);
-        } 
-        else {
-            fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
-                precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
-                csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii]);
+    if (downlink_mode) {
+        for(int ii = 0; ii < last_frame_id; ii++) { 
+            if (socket_rx_thread_num == 1) {
+                fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
+                    precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
+                    csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii], frame_start[0][ii]);
+            } 
+            else {
+                fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], 
+                    precode_processed[ii], ifft_processed[ii], tx_processed[ii],tx_processed_first[ii],
+                    csi_time_in_function[ii], zf_time_in_function[ii], precode_time_in_function[ii], ifft_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii]);
+            }
         }
     }
-#else
-    for(int ii = 0; ii < last_frame_id; ii++) {  
-        if (socket_rx_thread_num == 1) {    
-                fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
-                        csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], pilot_all_received[ii]);
+    else {
+        for(int ii = 0; ii < last_frame_id; ii++) {  
+            if (socket_rx_thread_num == 1) {    
+                    fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
+                            csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], pilot_all_received[ii]);
+            }
+            else {                 
+                    fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
+                        csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii], pilot_all_received[ii]);
+            }
         }
-        else {                 
-                fprintf(fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", pilot_received[ii], rx_processed[ii], fft_processed[ii], zf_processed[ii], demul_processed[ii],
-                    csi_time_in_function[ii], fft_time_in_function[ii], zf_time_in_function[ii], demul_time_in_function[ii], processing_started[ii], frame_start[0][ii], frame_start[1][ii], pilot_all_received[ii]);
-        }
-    }
-	#if DEBUG_UPDATE_STATS_DETAILED
-        printf("Print results detailed\n");
-        std::string filename_detailed = cur_directory + "/data/timeresult_detail.txt";
-        FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
-        if (fp_debug_detailed==NULL) {
-            printf("open file faild\n");
-            std::cerr << "Error: " << strerror(errno) << std::endl;
-            exit(0);
-        }
+        #if DEBUG_UPDATE_STATS_DETAILED
+            printf("printing detailed results to file.........\n");
+            std::string filename_detailed = cur_directory + "/data/timeresult_detail.txt";
+            FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
+            if (fp_debug_detailed==NULL) {
+                printf("open file faild\n");
+                std::cerr << "Error: " << strerror(errno) << std::endl;
+                exit(0);
+            }
 
-        for(int ii = 0; ii < last_frame_id; ii++) {    
-            fprintf(fp_debug_detailed, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n", fft_time_in_function_details[0][ii], fft_time_in_function_details[1][ii],
-                fft_time_in_function_details[2][ii], zf_time_in_function_details[0][ii], zf_time_in_function_details[1][ii], zf_time_in_function_details[2][ii],
-                demul_time_in_function_details[0][ii], demul_time_in_function_details[1][ii], demul_time_in_function_details[2][ii] );
-        }
-        fclose(fp_debug_detailed);
-	#endif
-#endif
+            for(int ii = 0; ii < last_frame_id; ii++) {    
+                fprintf(fp_debug_detailed, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n", fft_time_in_function_details[0][ii], fft_time_in_function_details[1][ii],
+                    fft_time_in_function_details[2][ii], zf_time_in_function_details[0][ii], zf_time_in_function_details[1][ii], zf_time_in_function_details[2][ii],
+                    demul_time_in_function_details[0][ii], demul_time_in_function_details[1][ii], demul_time_in_function_details[2][ii] );
+            }
+            fclose(fp_debug_detailed);
+        #endif
+    }
     fclose(fp_debug);
 }
 
@@ -609,49 +610,50 @@ void Stats::print_summary(int last_frame_id)
     int Demul_total_count = 0;
     int IFFT_total_count = 0;
     int Precode_total_count = 0;
-
     for (int i = 0; i < task_thread_num; i++) {
         CSI_total_count = CSI_total_count + CSI_task_count[i * 16];
         FFT_total_count = FFT_total_count + FFT_task_count[i * 16];
         ZF_total_count = ZF_total_count + ZF_task_count[i * 16];
         Demul_total_count = Demul_total_count + Demul_task_count[i * 16];
-        IFFT_total_count = IFFT_total_count + IFFT_task_count[i * 16];
-        Precode_total_count = Precode_total_count + Precode_task_count[i * 16];
+        if (downlink_mode) {
+            IFFT_total_count = IFFT_total_count + IFFT_task_count[i * 16];
+            Precode_total_count = Precode_total_count + Precode_task_count[i * 16];
+        }
     }
-    
-#if ENABLE_DOWNLINK
-    double csi_frames = (double)CSI_total_count / BS_ANT_NUM / UE_NUM;
-    double precode_frames = (double)Precode_total_count / OFDM_DATA_NUM / dl_data_subframe_num_perframe;
-    double ifft_frames = (double)IFFT_total_count / BS_ANT_NUM / dl_data_subframe_num_perframe;
-    double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
-    printf("Downlink: total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), precode: %d (%.2f frames), IFFT: %d (%.2f frames)\n", 
-        	CSI_total_count, csi_frames, ZF_total_count, zf_frames, Precode_total_count, precode_frames, IFFT_total_count, ifft_frames);
-    for (int i = 0; i < task_thread_num; i++) {
-        double percent_CSI = 100 * double(CSI_task_count[i * 16])/CSI_total_count;
-        double percent_ZF = 100 * double(ZF_task_count[i * 16]) / ZF_total_count;
-        double percent_Precode = 100 * double(Precode_task_count[i * 16])/Precode_total_count;
-        double percent_IFFT = 100 * double(IFFT_task_count[i * 16]) / IFFT_total_count;
-        printf("thread %d performed FFT: %d (%.2f%%), ZF: %d (%.2f%%), precode: %d (%.2f%%), IFFT: %d (%.2f%%)\n", 
-            	i, CSI_task_count[i * 16], percent_CSI, ZF_task_count[i * 16], percent_ZF, Precode_task_count[i * 16], percent_Precode, 
-            	IFFT_task_count[i * 16], percent_IFFT);
+    if (downlink_mode) {
+        double csi_frames = (double)CSI_total_count / BS_ANT_NUM / UE_NUM;
+        double precode_frames = (double)Precode_total_count / OFDM_DATA_NUM / dl_data_subframe_num_perframe;
+        double ifft_frames = (double)IFFT_total_count / BS_ANT_NUM / dl_data_subframe_num_perframe;
+        double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
+        printf("Downlink: total performed FFT: %d (%.2f frames), ZF: %d (%.2f frames), precode: %d (%.2f frames), IFFT: %d (%.2f frames)\n", 
+            	CSI_total_count, csi_frames, ZF_total_count, zf_frames, Precode_total_count, precode_frames, IFFT_total_count, ifft_frames);
+        for (int i = 0; i < task_thread_num; i++) {
+            double percent_CSI = 100 * double(CSI_task_count[i * 16])/CSI_total_count;
+            double percent_ZF = 100 * double(ZF_task_count[i * 16]) / ZF_total_count;
+            double percent_Precode = 100 * double(Precode_task_count[i * 16])/Precode_total_count;
+            double percent_IFFT = 100 * double(IFFT_task_count[i * 16]) / IFFT_total_count;
+            printf("thread %d performed FFT: %d (%.2f%%), ZF: %d (%.2f%%), precode: %d (%.2f%%), IFFT: %d (%.2f%%)\n", 
+                	i, CSI_task_count[i * 16], percent_CSI, ZF_task_count[i * 16], percent_ZF, Precode_task_count[i * 16], percent_Precode, 
+                	IFFT_task_count[i * 16], percent_IFFT);
+        }
     }
-#else
-    double csi_frames = (double)CSI_total_count / BS_ANT_NUM / UE_NUM;
-    double fft_frames = (double)FFT_total_count / BS_ANT_NUM / data_subframe_num_perframe;
-    double demul_frames = (double)Demul_total_count / OFDM_DATA_NUM / data_subframe_num_perframe;
-    double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
-    printf("Uplink: total performed CSI %d (%.2f frames), FFT: %d (%.2f frames), ZF: %d (%.2f frames), Demulation: %d (%.2f frames)\n", 
-        CSI_total_count, csi_frames, FFT_total_count, fft_frames, ZF_total_count, zf_frames, Demul_total_count, demul_frames);
-    for (int i = 0; i < task_thread_num; i++) {
-        double percent_CSI = 100 * double(CSI_task_count[i * 16]) / CSI_total_count;
-        double percent_FFT = 100 * double(FFT_task_count[i * 16]) / FFT_total_count;
-        double percent_ZF = 100 * double(ZF_task_count[i * 16]) / ZF_total_count;
-        double percent_Demul = 100 * double(Demul_task_count[i * 16]) / Demul_total_count;
-        printf("thread %d performed CSI: %d (%.2f%%), FFT: %d (%.2f%%), ZF: %d (%.2f%%), Demulation: %d (%.2f%%)\n", 
-            i, CSI_task_count[i * 16], percent_CSI, FFT_task_count[i * 16], percent_FFT, ZF_task_count[i * 16], percent_ZF, 
-            Demul_task_count[i * 16], percent_Demul);
-    }
-#endif 
+    else {
+        double csi_frames = (double)CSI_total_count / BS_ANT_NUM / UE_NUM;
+        double fft_frames = (double)FFT_total_count / BS_ANT_NUM / data_subframe_num_perframe;
+        double demul_frames = (double)Demul_total_count / OFDM_DATA_NUM / data_subframe_num_perframe;
+        double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
+        printf("Uplink: total performed CSI %d (%.2f frames), FFT: %d (%.2f frames), ZF: %d (%.2f frames), Demulation: %d (%.2f frames)\n", 
+            CSI_total_count, csi_frames, FFT_total_count, fft_frames, ZF_total_count, zf_frames, Demul_total_count, demul_frames);
+        for (int i = 0; i < task_thread_num; i++) {
+            double percent_CSI = 100 * double(CSI_task_count[i * 16]) / CSI_total_count;
+            double percent_FFT = 100 * double(FFT_task_count[i * 16]) / FFT_total_count;
+            double percent_ZF = 100 * double(ZF_task_count[i * 16]) / ZF_total_count;
+            double percent_Demul = 100 * double(Demul_task_count[i * 16]) / Demul_total_count;
+            printf("thread %d performed CSI: %d (%.2f%%), FFT: %d (%.2f%%), ZF: %d (%.2f%%), Demulation: %d (%.2f%%)\n", 
+                i, CSI_task_count[i * 16], percent_CSI, FFT_task_count[i * 16], percent_FFT, ZF_task_count[i * 16], percent_ZF, 
+                Demul_task_count[i * 16], percent_Demul);
+        }
+    } 
 } 
 
 
