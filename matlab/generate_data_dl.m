@@ -268,13 +268,18 @@ precoded_data = zeros(N_SC,NUM_BS_ANT,N_SYMS-NUM_UE);
 dl_rx_data_f = zeros(N_SC,NUM_UE,N_SYMS-NUM_UE);
 for i = 1:1200
     precoded_data(424+i,:,:) = squeeze(precoder_from_file(424+i,:,:))*squeeze(tx_data_dl(i,:,:));
-    dl_rx_data_f(424+i,:,:) = squeeze(H_from_file_float(424+i,:,:))*squeeze(precoded_data(424+i,:,:));
+    dl_rx_data_f(424+i,:,:) = squeeze(precoded_data(424+i,:,:));
+%     dl_rx_data_f(424+i,:,:) = squeeze(H_from_file_float(424+i,:,:))*squeeze(precoded_data(424+i,:,:));
 end
 
 ifft_data = ifft(precoded_data,N_SC,1);
 dl_rx_data = ifft(dl_rx_data_f,N_SC,1);
 
 dl_rx_data_fft = fft(dl_rx_data,N_SC,1);
+% dl_rx_data_fft = zeros(N_SC,NUM_UE,N_SYMS-NUM_UE);
+for i = 1:1200
+    dl_rx_data_fft(424+i,:,:) = (squeeze(H_from_file_float(424+i,:,:))*squeeze(dl_rx_data_fft(424+i,:,:)));
+end
 
 
 switch(MOD_ORDER)
