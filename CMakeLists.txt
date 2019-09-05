@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.8)
 cmake_policy(SET CMP0054 NEW)
-project (CoMP)
+project (Millipede)
 
 # Enable C++11
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
@@ -19,7 +19,7 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False)
-set(USE_ARGOS True)
+set(USE_ARGOS False)
 
 if (${USE_DPDK})
   find_package(dpdk)
@@ -41,31 +41,8 @@ if (${USE_ARGOS})
   endif ()
 endif ()
 
-# Link with the "Threads library (required to link with AFF3CT after)
-set(CMAKE_THREAD_PREFER_PTHREAD ON)
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-
-# set (AFF3CT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake-config/")
-# find_package (AFF3CT CONFIG REQUIRED)
-# message(STATUS "AFF3CT_DIR: ${AFF3CT_DIR}")
-
-
-
-# Add the compile option from AFF3CT
-# add_compile_options(${AFF3CT_COMPILE_OPTIONS})
-
-# Add the definitions of AFF3CT
-# add_definitions(${AFF3CT_DEFINITIONS})
-
-# Add the include directories from AFF3CT
-# include_directories(${AFF3CT_INCLUDE_DIRS})
 
 # Intel MKL
-# include_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/include/")
-# link_directories("/opt/intel/compilers_and_libraries_2019.1.144/linux/mkl/lib/intel64/")
-# include_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include/")
-# link_directories("/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64/")
 find_path(MKL_INCLUDE_DIR 
           NAMES mkl_dfti.h
           PATHS /opt/intel/*/linux/mkl/include)
@@ -95,11 +72,11 @@ if (${USE_ARGOS})
   message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
   include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
-  set (ARGOS_SOURCES src/receiver/radio_lib.cpp)
+  set (ARGOS_SOURCES src/millipede/radio_lib.cpp)
   set (CLIENT_SOURCES
-         src/receiver/compute_common.cpp
-         src/receiver/ru.cpp
-         src/receiver/phy-ue.cpp)
+         src/millipede/compute_common.cpp
+         src/millipede/ru.cpp
+         src/millipede/phy-ue.cpp)
   set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
   add_definitions(-DTHREADED_INIT)
 endif()
@@ -119,37 +96,50 @@ set(COMMON_SOURCES src/common/cpu_attach.cpp
                    src/common/comms-lib.cpp
                    src/common/signalHandler.cpp)
 
-set(SENDER_SOURCES src/sender/sender_cli.cpp
-                   src/sender/packageSender.cpp 
+set(SENDER_SOURCES simulator/sender_cli.cpp
+                   simulator/packageSender.cpp 
                    ${COMMON_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
 target_link_libraries(sender -lpthread -lmufft)
 
-set(SOURCES src/receiver/main.cpp 
-       src/receiver/packageReceiver.cpp 
-       src/receiver/millipede.cpp 
-       src/receiver/compute_common.cpp  
-       src/receiver/stats.cpp 
-       src/receiver/dofft.cpp 
-       src/receiver/dozf.cpp 
-       src/receiver/dodemul.cpp 
-       src/receiver/doprecode.cpp
+
+set(SIMULATOR_SOURCES simulator/main.cpp
+                   simulator/simulator.cpp
+                   simulator/packageSender.cpp
+                   simulator/packageReceiver.cpp 
+                   ${COMMON_SOURCES})
+
+add_executable(simulator ${SIMULATOR_SOURCES})
+target_link_libraries(simulator -lpthread -lmufft)
+
+
+set(SOURCES src/millipede/main.cpp 
+       src/millipede/packageReceiver.cpp 
+       src/millipede/millipede.cpp 
+       src/millipede/compute_common.cpp  
+       src/millipede/stats.cpp 
+       src/millipede/dofft.cpp 
+       src/millipede/dozf.cpp 
+       src/millipede/dodemul.cpp 
+       src/millipede/doprecode.cpp
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
 			
 add_executable(millipede ${SOURCES})
 target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
+
+
 add_library(comp MODULE 
-       src/receiver/packageReceiver.cpp
-       src/receiver/millipede.cpp
-       src/receiver/compute_common.cpp
-       src/receiver/stats.cpp 
-       src/receiver/dofft.cpp
-       src/receiver/dozf.cpp
-       src/receiver/dodemul.cpp
-       src/receiver/doprecode.cpp
+       src/millipede/packageReceiver.cpp
+       src/millipede/millipede.cpp
+       src/millipede/compute_common.cpp
+       src/millipede/stats.cpp 
+       src/millipede/dofft.cpp
+       src/millipede/dozf.cpp
+       src/millipede/dodemul.cpp
+       src/millipede/doprecode.cpp
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
 target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
@@ -157,7 +147,7 @@ target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_il
 
 if (${USE_ARGOS})
   add_executable(user 
-       src/receiver/user-main.cpp
+       src/millipede/user-main.cpp
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
@@ -170,21 +160,4 @@ if (${USE_ARGOS})
   target_link_libraries(ue_phy -lpthread -lmufft -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
 endif()
 
-#add_executable(receiver receiver_cli.cpp packageReceiver.cpp cpu_attach.cpp)
-#target_link_libraries(receiver -lpthread )
 
-#link_directories("/usr/local/lib/hpctoolkit")
-#add_executable(bench_overhead main.cpp packageReceiver.cpp packageSenderBS.cpp bench_overhead.cpp cpu_attach.cpp)
-#target_link_libraries(bench_overhead -lpthread /usr/local/lib/libmufft.a -larmadillo aff3ct::aff3ct-static-lib)
-
-#add_executable(bench_data main.cpp packageReceiver.cpp packageSenderBS.cpp bench_data.cpp cpu_attach.cpp)
-#target_link_libraries(bench_data -lpthread /usr/local/lib/libmufft.a -larmadillo aff3ct::aff3ct-static-lib)
-
-#add_executable(CoMP main.cpp packageReceiver.cpp CoMP.cpp cpu_attach.cpp)
-#target_link_libraries(CoMP -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt aff3ct::aff3ct-static-lib -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB})
-
-#add_executable(trans testTranspose.cpp)
-#target_link_libraries(trans -larmadillo) 
-
-#add_library(sounderUL MODULE main.cpp packageReceiver.cpp packageSenderBS.cpp CoMP.cpp cpu_attach.cpp)
-#target_link_libraries(sounderUL -lpthread  -lmufft -larmadillo ${AFF3CT_LIBRARIES}) 
