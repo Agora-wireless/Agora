@@ -1355,7 +1355,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
     memset(local_addr.sin_zero, 0, sizeof(local_addr.sin_zero)); 
 
     remote_addr.sin_family = AF_INET;
-    remote_addr.sin_port = htons(6000+tid);
+    remote_addr.sin_port = htons(7000+tid);
     remote_addr.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero)); 
 
@@ -1375,7 +1375,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
     local_addr.sin6_port = htons(8000+tid);
 
     remote_addr.sin6_family = AF_INET6;
-    remote_addr.sin6_port = htons(6000+tid);
+    remote_addr.sin6_port = htons(7000+tid);
     inet_pton(AF_INET6, "fe80::5a9b:5a2f:c20a:d4d5", &remote_addr.sin6_addr);
 
     int socket_local;

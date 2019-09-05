@@ -35,6 +35,7 @@
 #include "memory_manage.h"
 
 
+
 #define CPU_FREQ 2.3e9
 
 typedef unsigned short ushort;
@@ -66,9 +67,12 @@ public:
     };
 
 public:
-    PackageSender(Config *in_config, int in_socket_num, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
+    PackageSender(Config *in_config, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
     ~PackageSender();
 
+    void startTX();
+    void startTXfromMain(double *in_frame_start, double *in_frame_end);
+    static void* loopSend_main(void *context);
     static void* loopSend(void *context);
     
 private:
@@ -107,7 +111,7 @@ private:
     // moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM);
     moodycamel::ConcurrentQueue<int> task_queue_ = moodycamel::ConcurrentQueue<int>( 1024);
     moodycamel::ConcurrentQueue<int> message_queue_ = moodycamel::ConcurrentQueue<int>( 1024);
-    std::unique_ptr<moodycamel::ProducerToken> task_ptok[10]; 
+    moodycamel::ProducerToken **task_ptok; 
     // int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
     // int max_length_ = max_subframe_id * BS_ANT_NUM;
 
@@ -129,6 +133,9 @@ private:
 
     int **packet_count_per_subframe;
     int *packet_count_per_frame;
+
+    double *frame_start;
+    double *frame_end;
     // int packet_count_per_subframe[BUFFER_FRAME_NUM][max_subframe_id];
     // int packet_count_per_frame[BUFFER_FRAME_NUM];
 };
