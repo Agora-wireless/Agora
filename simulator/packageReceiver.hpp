@@ -31,12 +31,7 @@
 #include "Symbols.hpp"
 #include "gettime.h"
 #include "offset.h"
-
-#ifdef USE_ARGOS  
-#include "radio_lib.hpp"
-#else
 #include "config.hpp"
-#endif
 
 #if USE_DPDK
 #include <inttypes.h>

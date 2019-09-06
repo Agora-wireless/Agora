@@ -153,7 +153,7 @@ void Millipede::start()
 
 
     buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * UE_NUM) : (BS_ANT_NUM * subframe_num_perframe);
+    max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * UE_NUM) : (BS_ANT_NUM * (ul_data_subframe_num_perframe + UE_NUM));
 
     /* counters for printing summary */
     int demul_count = 0;
