@@ -55,6 +55,7 @@ public:
     std::vector<std::vector<uint32_t>> beacon_weights;
     std::vector<uint32_t> coeffs; 
     std::vector<std::complex<int16_t>> pilot_ci16;
+    std::vector<std::complex<float>> pilot_cf32;
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float *pilots_;

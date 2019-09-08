@@ -22,7 +22,7 @@ class RadioConfig
 public:
     RadioConfig(Config *cfg);
     static void *initBSRadio(void * context);
-    void radioStart();
+    bool radioStart();
     void radioStop();
     void readSensors();
     void radioTx(void ** buffs);
@@ -30,11 +30,12 @@ public:
     void radioTx(int, void ** buffs, int flags, long long & frameTime);
     int radioRx(int, void ** buffs, long long & frameTime);
     bool doCalib() { return calib; }
-    std::vector<std::vector<std::complex<int16_t>>> collectCSI(bool &);
+    bool calib_proc(int, bool);
     static void drain_rx_buffer(SoapySDR::Device * ibsSdrs, SoapySDR::Stream * istream, std::vector<void *> buffs, int symSamp);
     void drain_buffers();
     void adjustDelays(std::vector<int>, int);
     void go();
+    std::vector<std::vector<std::complex<float>>> get_calib_mat() { return calib_mat; }
     ~RadioConfig();
     struct RadioConfigContext
     {
@@ -50,7 +51,7 @@ private:
     SoapySDR::Stream * refRxStream; 
     std::vector<SoapySDR::Stream *> txStreams;
     std::vector<SoapySDR::Stream *> rxStreams;
-    std::vector<std::complex<int16_t>> buff;
+    std::vector<std::vector<std::complex<float>>> calib_mat;
     int _radioNum;
     int _antennaNum;
     bool isUE;

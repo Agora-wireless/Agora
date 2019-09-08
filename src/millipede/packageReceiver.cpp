@@ -125,26 +125,7 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 
 #else
 #ifdef USE_ARGOS
-    printf("config radios ...\n");
     radioconfig_ = new RadioConfig(config_);
-    if (!downlink_mode && config_->sampleCalEn)
-    {
-        int count = 0;
-        bool adjust = false;
-        while (!adjust)
-        {
-            if (++count > 10)
-            {
-                std::cout << "attempted 10 unsucessful sample offset calibration, stopping ..." << std::endl;
-                break;
-            }
-            adjust = true;
-            radioconfig_->collectCSI(adjust);
-        }
-        radioconfig_->collectCSI(adjust);
-        usleep(100000);
-    }
-    radioconfig_->radioStart();
 
 #endif
 #endif
@@ -173,27 +154,6 @@ PackageReceiver::~PackageReceiver()
 #endif
     delete config_;
 }
-
-#ifdef USE_ARGOS
-void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<int16_t>>> &buffer_tx, std::vector<std::vector<std::complex<int16_t>>> &buffer_rx, int ref_ant)
-{
-    std::cout << "start reciprocity CSI collection" << std::endl;
-    //radioconfig_->reciprocityCalibrate(buffer_tx, buffer_rx);
-    std::vector<std::vector<std::complex<int16_t>>> buff;
-    bool adjust = false;
-    buff = radioconfig_->collectCSI(adjust);
-    int M = config_->getNumAntennas();
-    for (int i = 0; i < M; i++)
-    {
-        if (!buffer_rx.empty()) buffer_rx[i].erase(buffer_rx[i].begin(), buffer_rx[i].end());
-        if (!buffer_tx.empty()) buffer_tx[i].erase(buffer_tx[i].begin(), buffer_tx[i].end());
-        buffer_rx[i].insert(buffer_rx[i].begin(), buff[ref_ant*M+i].begin(), buff[ref_ant*M+i].end());
-        buffer_tx[i].insert(buffer_tx[i].begin(), buff[ref_ant+M*i].begin(), buff[ref_ant+M*i].end());
-    }
-    std::cout << "end reciprocity CSI collection" << std::endl;
-    radioconfig_->drain_buffers();
-}
-#endif
 
 #ifdef USE_DPDK
 int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
@@ -300,10 +260,15 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
     frame_start_ = in_frame_start;
-
     // core_id_ = in_core_id;
-    printf("start Recv thread\n");
-    // new thread
+    printf("start recv thread\n");
+
+    std::vector<pthread_t> created_threads;
+#ifdef USE_ARGOS
+    if (!radioconfig_->radioStart()) return created_threads;
+    int nradio_per_thread = config_->nRadios/rx_thread_num_;
+    int rem_thread_nradio = config_->nRadios%rx_thread_num_;
+#endif
 
 #ifdef ENABLE_CPU_ATTACH
     if(stick_this_thread_to_core(core_id_) != 0)
@@ -316,12 +281,6 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     }
 #endif
 
-#ifdef USE_ARGOS
-    int nradio_per_thread = config_->nRadios/rx_thread_num_;
-    int rem_thread_nradio = config_->nRadios%rx_thread_num_;
-#endif
-
-    std::vector<pthread_t> created_threads;
     if (!downlink_mode)
     {
     #ifdef USE_DPDK

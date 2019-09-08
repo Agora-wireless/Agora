@@ -131,7 +131,6 @@ public:
 #if USE_ARGOS
     static void* loopRecv_Argos(void *context);
     static void* loopSend_Argos(void *context);
-    void calibrateRadios(std::vector<std::vector<std::complex<int16_t>>>&, std::vector<std::vector<std::complex<int16_t>>>&, int);
 #endif
 
 
