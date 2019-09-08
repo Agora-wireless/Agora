@@ -22,6 +22,36 @@
 
 #include "comms-lib.h"
 
+int CommsLib::find_pilot_seq(std::vector<std::complex<double> > iq, std::vector<std::complex<double> > pilot, int seq_len)
+{
+
+    float thresh = 0.8;
+    int best_peak;
+
+    // Re-arrange into complex vector, flip, and compute conjugate
+    std::vector<std::complex<double> > pilot_conj;
+    for (int i = 0; i < seq_len; i++) {
+        // conjugate
+        pilot_conj.push_back(std::conj(pilot[seq_len - i - 1]));
+    }
+
+    // Equivalent to numpy's sign function
+    std::vector<std::complex<double> > iq_sign = CommsLib::csign(iq);
+
+    // Convolution
+    std::vector<double> pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
+
+    // Find all peaks
+    double max_peak;
+    for (size_t i = 0; i < pilot_corr.size(); i++) {
+        if (abs(pilot_corr[i]) > max_peak) {
+            max_peak = abs(pilot_corr[i]);
+            best_peak = i;
+        }
+    }
+    return best_peak;
+}
+
 int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
 {
     /*

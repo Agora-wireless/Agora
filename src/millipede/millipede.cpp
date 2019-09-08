@@ -131,6 +131,13 @@ void Millipede::start()
     /* start uplink receiver */
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_, 
         socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, frame_start);
+#ifdef USE_ARGOS
+    if (rx_threads.size() == 0) {
+	this->stop();
+	return;
+    }
+#endif
+
     /* start downlink transmitter */
     std::vector<pthread_t> tx_threads;
     if (downlink_mode)
