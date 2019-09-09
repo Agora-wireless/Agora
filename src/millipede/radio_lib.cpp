@@ -263,7 +263,7 @@ void* RadioConfig::initBSRadio(void* in_context)
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    if (_cfg->downlink_mode) {
+    if (!isUE && _cfg->downlink_mode) {
         std::cout << "start reciprocity CSI collection" << std::endl;
         int iter = 0;
 	int max_iter = 3;
@@ -411,7 +411,7 @@ bool RadioConfig::radioStart()
     }
 
     std::cout << "radio start done!" << std::endl;
-    return (_cfg->downlink_mode && good_calib);
+    return true;
 }
 
 void RadioConfig::go()
@@ -640,7 +640,7 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
         } else if (i != ref_ant)
             offset[i] = start_up[i];
 
-#ifdef DEBUG_PLOT
+#if DEBUG_PLOT
         std::vector<double> up_I(read_len);
         std::transform( up.begin(), up.end(), up_I.begin(), []( std::complex<double> cd ) {
         return cd.real(); });
