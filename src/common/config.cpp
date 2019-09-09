@@ -11,7 +11,7 @@ Config::Config(std::string jsonfile)
     hub_file = tddConf.value("hubs", "hub_serials.txt");
     Utils::loadDevices(hub_file, hub_ids);
     serial_file = tddConf.value("irises", "iris_serials.txt");
-    ref_ant = tddConf.value("ref_ant", "0");
+    ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
     nChannels = tddConf.value("channels", 1);
     isUE = tddConf.value("UE", false);
@@ -59,6 +59,8 @@ Config::Config(std::string jsonfile)
     Utils::loadDevices(serial_file, radio_ids);
     nRadios = radio_ids.size();
     nAntennas = nChannels * nRadios;
+    if (ref_ant >= nAntennas)
+	ref_ant = 0;
     if (beacon_mode == "beamsweep" && nAntennas > 1) {
         int hadamardSize = int(pow(2, ceil(log2(nAntennas))));
         std::vector<std::vector<double> > hadamard_weights = CommsLib::getSequence(hadamardSize, CommsLib::HADAMARD);

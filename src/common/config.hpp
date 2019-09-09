@@ -44,7 +44,7 @@ public:
     std::string pilot_file;
     std::string serial_file;
     std::string hub_file;
-    std::string ref_ant;
+    size_t ref_ant;
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
     std::vector<std::string> frames;
