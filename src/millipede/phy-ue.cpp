@@ -15,7 +15,8 @@ Phy_UE::Phy_UE(Config *cfg)
     if (FFT_LEN == 64)
         data_sc_ind_ = CommsLib::getDataSc(FFT_LEN);
     else
-        for (int i = data_sc_start; i < data_sc_start+data_sc_len; i++) data_sc_ind_.push_back(i);
+        for (int i = data_sc_start; i < data_sc_start+data_sc_len; i++)
+	    data_sc_ind_.push_back(i);
 
 
     pilot_sc_len = pilot_sc_ind_.size();
@@ -58,12 +59,6 @@ Phy_UE::Phy_UE(Config *cfg)
     for (int i = 0; i < TASK_THREAD_NUM; i++) 
         muifftplans_[i] = mufft_create_plan_1d_c2c(FFT_LEN, MUFFT_INVERSE, MUFFT_FLAG_CPU_ANY);
 
-    // initialize tx buffer
-    //{
-    //    tx_buffer_.resize(cfg->getTxPackageLength()
-    //        * ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
-    //    tx_buffer_status.resize(ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
-    //}
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
 
@@ -76,8 +71,6 @@ Phy_UE::Phy_UE(Config *cfg)
     std::cout << cfg->pilot.size() << "\n";
     for (int i = 0; i < pilot_len; i++)
     {
-        //uint16_t re = (uint16_t)((cfg->pilot[i+cfg->prefix]) >> 16);
-        //uint16_t im = (uint16_t)(cfg->pilot[i+cfg->prefix] & 0xFFFF); 
         ul_pilot[i].real = cfg->pilot_ci16[i].real()/32768.0; //((int16_t)re)/32768.0 ; 
         ul_pilot[i].imag = cfg->pilot_ci16[i].imag()/32768.0; //((int16_t)im)/32768.0 ;
     }
@@ -91,11 +84,6 @@ Phy_UE::Phy_UE(Config *cfg)
     ////////////////////////////////////////
 
     // initialize rx buffer
-    //for (int i = 0; i < rx_thread_num; i++) {
-    //    rx_buffer_[i].buffer.resize(cfg->getRxPackageLength()
-    //        * dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM); 
-    //    rx_buffer_[i].buffer_status.resize(dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
-    //}
     alloc_buffer_2d(&rx_buffer_, rx_thread_num, rx_buffer_size, 64, 0);
     alloc_buffer_2d(&rx_buffer_status_, rx_thread_num, rx_buffer_status_size, 64, 0);
 
@@ -180,6 +168,12 @@ Phy_UE::~Phy_UE()
         mufft_free(fft_buffer_.FFT_inputs[i]);
         mufft_free(fft_buffer_.FFT_outputs[i]);
     }
+    int IFFT_buffer_block_num = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
+    for(int i = 0; i < IFFT_buffer_block_num; i++)
+    {
+        mufft_free(ifft_buffer_.IFFT_inputs[i]);
+        mufft_free(ifft_buffer_.IFFT_outputs[i]);
+    }
     //delete ul_pilot_aligned;
     //delete ul_pilot;
 }
@@ -204,7 +198,7 @@ void Phy_UE::stop()
 {
     std::cout << "stopping threads " << std::endl;
     cfg->running = false;
-    usleep(10000);
+    usleep(1000);
     ru_.reset();
 }
 
@@ -317,10 +311,11 @@ void Phy_UE::start()
                     demul_begin = std::chrono::system_clock::now();
                 }
 
-                if (prev_frame_id == -1) printf("received start indication frame with frame_id %d\n", frame_id);
+                if (ul_data_symbol_perframe > 0 && prev_frame_id == -1)
+		    printf("received start indication frame with frame_id %d\n", frame_id);
                 // check if downlink is enabled, and a new frame has
                 // started. if yes, schedule l2 traffic
-                if (ul_data_symbol_perframe > 0 and frame_id != prev_frame_id) {
+                if (ul_data_symbol_perframe > 0 && frame_id != prev_frame_id) {
                     // schedule L2 downlink traffic for frame=frame_id+TX_RX_FRAME_OFFSET 
                     int tx_frame_id = frame_id + TX_RX_FRAME_OFFSET;
                     for (int i = 0; i < ul_data_symbol_perframe; i++)
@@ -513,7 +508,7 @@ void Phy_UE::start()
             }
         }
     }
-    this->stop(); 
+    this->stop();
 }
 
 void* Phy_UE::taskThread(void* context)
@@ -921,7 +916,7 @@ extern "C"
         return usr;
     }
     EXPORT void Phy_UE_start(Phy_UE *usr) {usr->start();}
-    EXPORT void Phy_UE_stop(Phy_UE *usr) {usr->stop();}
+    EXPORT void Phy_UE_stop(Phy_UE *usr) {SignalHandler::setExitSignal(true); /*usr->stop();*/}
     EXPORT void Phy_UE_destroy(Phy_UE *usr) {delete usr;}
     EXPORT void Phy_UE_getEqualData(Phy_UE *usr, float **ptr, int *size, int ue) {return usr->getEqualData(ptr, size, ue);}
     EXPORT void Phy_UE_getEqualPCData(Phy_UE *usr, float **ptr, int *size, int ue) {return usr->getEqualPCData(ptr, size, ue);}

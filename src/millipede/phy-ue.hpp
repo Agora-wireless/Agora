@@ -192,10 +192,12 @@ private:
     int package_header_offset;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
+    float *pilots_;
     complex_float *ul_pilot;
     char* ul_pilot_aligned;
     int **ul_IQ_data;
     complex_float **ul_IQ_modul;
+
 
     int pilot_sc_len;
     int data_sc_len;
@@ -302,8 +304,6 @@ private:
      */
     std::vector<myVec> equal_pc_buffer_;
 
-
-    float *pilots_;
 
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<int> data_sc_ind_;

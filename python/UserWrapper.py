@@ -10,14 +10,15 @@ lib = cdll.LoadLibrary('./libue_phy.so')
 class Config(object):
     def __init__(self, val):  	
         lib.Config_new.argtypes = [c_char_p]
-        #lib.Config_new.restype = c_void_p
+        lib.Config_new.restype = c_void_p
         self.obj = lib.Config_new(c_char_p(val))
 
 class UserClass(object):
     def __init__(self, configfile):
         conf = Config(configfile) 
-        #lib.Phy_UE_new.argtypes = [c_void_p]
+        lib.Phy_UE_new.argtypes = [c_void_p]
         #lib.Phy_UE_new.restype = [c_void_p]
+        lib.Phy_UE_new.restype = c_void_p
         lib.Phy_UE_start.argtypes = [c_void_p]
         lib.Phy_UE_start.restype = c_void_p
         lib.Phy_UE_getEqualData.argtypes = [c_void_p,POINTER(POINTER(c_float)),POINTER(c_int), c_int]
