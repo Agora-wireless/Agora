@@ -89,7 +89,7 @@ class MainWindow(QtGui.QMainWindow):
 
 	def closeEvent(self, event):
                 self.userClass.stopUserProc()
-                self.userClass.destroyUserProc()
+                #self.userClass.destroyUserProc()
                 self.running = False
                 event.accept()
 
