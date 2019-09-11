@@ -53,7 +53,7 @@ void DoDemul::Demul(int offset)
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
     total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
-    int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
+    // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
 #if DEBUG_UPDATE_STATS    
     double start_time = get_time();
@@ -67,9 +67,9 @@ void DoDemul::Demul(int offset)
     __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
     int gather_step_size = 8 * transpose_block_size;
 
-    int mat_elem = UE_NUM * BS_ANT_NUM;
-    int cache_line_num = mat_elem / 8;
-    int ue_data_cache_line_num = UE_NUM/8;
+    // int mat_elem = UE_NUM * BS_ANT_NUM;
+    // int cache_line_num = mat_elem / 8;
+    // int ue_data_cache_line_num = UE_NUM/8;
     int max_sc_ite;
     if (sc_id + demul_block_size <= OFDM_DATA_NUM) 
         max_sc_ite = demul_block_size;
@@ -321,7 +321,7 @@ void DoDemul::DemulSingleSC(int offset)
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
     total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
-    int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
+    // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
     
     int gather_step_size = 8 * transpose_block_size;
 

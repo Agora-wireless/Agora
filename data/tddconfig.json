@@ -4,8 +4,8 @@
  "cells" : 1,
  "channels" : 1,
  "frequency" : 3.6e9,
- "rxgainA" : 25,
- "txgainA" : 35,
+ "rxgainA" : 20,
+ "txgainA" : 40,
  "rate" : 5e6,
  "symbol_size" : 2432,
  "prefix" : 128,
@@ -19,7 +19,7 @@
      "BGPPGGDDDG"
  ],
  "downlink_mode": true,
- "worker_thread_num" : 15,
+ "worker_thread_num" : 25,
  "demul_block_size" : 48,
  "bs_ant_num": 8
 }

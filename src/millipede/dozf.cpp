@@ -92,8 +92,8 @@ void DoZF::ZF(int offset)
 
         // gather data for all users and antennas
         // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
-        int mat_elem = UE_NUM * BS_ANT_NUM;
-        int cache_line_num = mat_elem / 8;
+        // int mat_elem = UE_NUM * BS_ANT_NUM;
+        // int cache_line_num = mat_elem / 8;
         // for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
         //     _mm_prefetch((char *)precoder_buffer_.precoder[cur_offset + 8 * line_idx], _MM_HINT_ET1);
         //     // _mm_prefetch((char *)(tar_csi_ptr + 16 * line_idx), _MM_HINT_ET1);

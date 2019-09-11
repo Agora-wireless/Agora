@@ -10,8 +10,8 @@ else ()
 endif()
 
 
-set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell")
-set(CMAKE_CXX_FLAGS "-std=c++11 -w -g -O3 -mavx2 -mavx -march=broadwell")
+set(CMAKE_C_FLAGS "-std=c99 -Wall -g -mavx2 -march=broadwell")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -faligned-new -g -mavx2 -mavx -march=broadwell")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
