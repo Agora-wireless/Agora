@@ -60,7 +60,7 @@ void DoPrecode::Precode(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
+    int frame_id, current_data_subframe_id, sc_id; //, total_data_subframe_id;
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
@@ -145,7 +145,7 @@ void DoPrecode::Precode(int offset)
 #if DEBUG_UPDATE_STATS_DETAILED   
         double duration2 = get_time() - start_time1;
         Precode_task_duration[tid * 8][2] += duration2;
-        double start_time3 = get_time();
+        //double start_time3 = get_time();
 #endif
 
 //         /* copy data to ifft input, 4 subcarriers per iteration */ 

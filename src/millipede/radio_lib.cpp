@@ -37,7 +37,7 @@ RadioConfig::RadioConfig(Config* cfg)
     rxStreams.resize(_radioNum);
     context = new RadioConfigContext[_radioNum];
     remainingJobs = _radioNum;
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         //args["driver"] = "iris";
         //args["timeout"] = "1000000";
         //args["serial"] = _cfg->radio_ids.at(i);
@@ -57,9 +57,9 @@ RadioConfig::RadioConfig(Config* cfg)
 
     while (remainingJobs > 0)
         ;
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end " << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
-        for (int c = 0; c < _cfg->nChannels; c++) {
+        for (size_t c = 0; c < _cfg->nChannels; c++) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_RX)) {
                 printf("RX Channel %zu\n", c);
                 printf("Actual RX sample rate: %fMSps...\n", (baStn[i]->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
@@ -77,7 +77,7 @@ RadioConfig::RadioConfig(Config* cfg)
             }
         }
 
-        for (int c = 0; c < _cfg->nChannels; c++) {
+        for (size_t c = 0; c < _cfg->nChannels; c++) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_TX)) {
                 printf("TX Channel %zu\n", c);
                 printf("Actual TX sample rate: %fMSps...\n", (baStn[i]->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
@@ -108,7 +108,7 @@ RadioConfig::RadioConfig(Config* cfg)
 void* RadioConfig::initBSRadio(void* in_context)
 {
     RadioConfig* rc = ((RadioConfigContext*)in_context)->ptr;
-    int i = ((RadioConfigContext*)in_context)->tid;
+    size_t i = ((RadioConfigContext*)in_context)->tid;
     Config* cfg = rc->_cfg;
 
     //load channels
@@ -183,10 +183,10 @@ void* RadioConfig::initBSRadio(void* in_context)
             std::vector<unsigned> txActive, rxActive;
             unsigned ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
             rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
-            unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
-            unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
+            //unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
+            //unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
             unsigned regRbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
-            unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
+            //unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
             unsigned regTbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
 
             // disable TX
@@ -216,18 +216,18 @@ void* RadioConfig::initBSRadio(void* in_context)
             std::vector<unsigned> txActive, rxActive;
             unsigned ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
             rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
-            unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
-            unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
+            //unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
+            //unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
             unsigned regRbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
-            unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
+            //unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
             unsigned regTbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
 
             ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
             rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 2);
-            unsigned regRfeB = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
-            unsigned regRbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
-            unsigned regTrfB = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
-            unsigned regTbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
+            //unsigned regRfeB = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
+            //unsigned regRbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
+            //unsigned regTrfB = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
+            //unsigned regTbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
 
             txActive = {
                 //0xe10C0000 | 0xfe, //RFE in power down
@@ -258,6 +258,7 @@ void* RadioConfig::initBSRadio(void* in_context)
     rc->rxStreams[i] = rc->baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
     rc->txStreams[i] = rc->baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
     rc->remainingJobs--;
+    return 0;
 }
 
 bool RadioConfig::radioStart()
@@ -267,7 +268,7 @@ bool RadioConfig::radioStart()
         std::cout << "start reciprocity CSI collection" << std::endl;
         int iter = 0;
 	int max_iter = 3;
-        int ref_ant = _cfg->ref_ant;
+        size_t ref_ant = _cfg->ref_ant;
         while (!good_calib) {
             good_calib = calib_proc(ref_ant, _cfg->sampleCalEn);
             iter++;
@@ -282,7 +283,6 @@ bool RadioConfig::radioStart()
 	    std::cout << "calibration procedure successful!" << std::endl;	
     }
 
-    long long frameTime(0);
     // send through the first radio for now
     //int beacon_ant = 1;
     int flags(0); // = SOAPY_SDR_WAIT_TRIGGER;
@@ -295,9 +295,9 @@ bool RadioConfig::radioStart()
     std::vector<std::string> _tddSched;
     if (isUE) {
         _tddSched.resize(this->_radioNum);
-        for (int r = 0; r < _radioNum; r++) {
+        for (size_t r = 0; r < _radioNum; r++) {
             _tddSched[r] = _cfg->frames[0];
-            for (int s = 0; s < _cfg->frames[0].size(); s++) {
+            for (size_t s = 0; s < _cfg->frames[0].size(); s++) {
                 char c = _cfg->frames[0].at(s);
                 if (c == 'B')
                     _tddSched[r].replace(s, 1, "G");
@@ -313,7 +313,7 @@ bool RadioConfig::radioStart()
         int ueTrigOffset = 505; //_cfg->prefix + _cfg->beacon_len + _cfg->postfix + 17 + _cfg->prefix;
         int sf_start = ueTrigOffset / _cfg->sampsPerSymbol;
         int sp_start = ueTrigOffset % _cfg->sampsPerSymbol;
-        for (int i = 0; i < this->_radioNum; i++) {
+        for (size_t i = 0; i < this->_radioNum; i++) {
             json conf;
             conf["tdd_enabled"] = true;
             conf["frame_mode"] = "continuous_resync";
@@ -335,13 +335,13 @@ bool RadioConfig::radioStart()
             baStn[i]->activateStream(this->txStreams[i]);
 
             baStn[i]->writeRegister("IRIS30", CORR_CONF, 0x1);
-            for (int j = 0; j < _cfg->coeffs.size(); j++)
+            for (size_t j = 0; j < _cfg->coeffs.size(); j++)
                 baStn[i]->writeRegister("ARGCOE", j * 4, 0);
             usleep(100000);
             baStn[i]->writeRegister("IRIS30", 64, 1); // reset faros_corr
             baStn[i]->writeRegister("IRIS30", 64, 0); // unreset faros_corr
             baStn[i]->writeRegister("IRIS30", 92, 1); // threshold is left-shifted by this many bits
-            for (int j = 0; j < _cfg->coeffs.size(); j++)
+            for (size_t j = 0; j < _cfg->coeffs.size(); j++)
                 baStn[i]->writeRegister("ARGCOE", j * 4, _cfg->coeffs[j]);
             baStn[i]->setHardwareTime(SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, _cfg->rate), "TRIGGER");
 
@@ -350,9 +350,9 @@ bool RadioConfig::radioStart()
     } else {
         drain_buffers();
         _tddSched.resize(_cfg->framePeriod);
-        for (int f = 0; f < _cfg->framePeriod; f++) {
+        for (size_t f = 0; f < _cfg->framePeriod; f++) {
             _tddSched[f] = _cfg->frames[f];
-            for (int s = 0; s < _cfg->frames[f].size(); s++) {
+            for (size_t s = 0; s < _cfg->frames[f].size(); s++) {
                 char c = _cfg->frames[f].at(s);
                 if (c == 'B')
                     _tddSched[f].replace(s, 1, "P");
@@ -374,7 +374,7 @@ bool RadioConfig::radioStart()
         conf["symbol_size"] = _cfg->sampsPerSymbol;
         std::string confString = conf.dump();
 
-        for (int i = 0; i < this->_radioNum; i++) {
+        for (size_t i = 0; i < this->_radioNum; i++) {
             baStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
             baStn[i]->writeSetting("TDD_MODE", "true");
             baStn[i]->writeSetting("TDD_CONFIG", confString);
@@ -393,7 +393,7 @@ bool RadioConfig::radioStart()
                 baStn[i]->writeRegisters("TX_RAM_A", 0, beacon);
                 if (_cfg->nChannels == 2)
                     baStn[i]->writeRegisters("TX_RAM_B", 0, beacon);
-                int residue = int(pow(2, ceil(log2(_cfg->nAntennas)))) - _cfg->nAntennas;
+                //int residue = int(pow(2, ceil(log2(_cfg->nAntennas)))) - _cfg->nAntennas;
                 beacon_weights.assign(_cfg->beacon_weights.at(i * _cfg->nChannels).begin(), _cfg->beacon_weights.at(i * _cfg->nChannels).begin() + _cfg->nAntennas);
                 baStn[i]->writeRegisters("TX_RAM_WGT_A", 0, beacon_weights);
                 if (_cfg->nChannels == 2) {
@@ -429,12 +429,12 @@ void RadioConfig::radioTx(void** buffs)
 {
     int flags = 0;
     long long frameTime(0);
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         baStn[i]->writeStream(this->txStreams[i], buffs, _cfg->sampsPerSymbol, flags, frameTime, 1000000);
     }
 }
 
-void RadioConfig::radioTx(int r /*radio id*/, void** buffs, int flags, long long& frameTime)
+int RadioConfig::radioTx(size_t r /*radio id*/, void** buffs, int flags, long long& frameTime)
 {
     int txFlags = 0;
     if (flags == 1)
@@ -450,26 +450,27 @@ void RadioConfig::radioTx(int r /*radio id*/, void** buffs, int flags, long long
     int s = baStn[r]->readStreamStatus(this->txStreams[r], chanMask, statusFlag, frameTime, timeoutUs);
     std::cout << "radio " << r << " tx returned " << w << " and status " << s << " when flags was " << flags << std::endl;
 #endif
+    return w;
 }
 
 void RadioConfig::radioRx(void** buffs)
 {
     int flags = 0;
     long long frameTime(0);
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         void** buff = buffs + (i * 2);
         baStn[i]->readStream(this->rxStreams[i], buff, _cfg->sampsPerSymbol, flags, frameTime, 1000000);
     }
 }
 
-int RadioConfig::radioRx(int r /*radio id*/, void** buffs, long long& frameTime)
+int RadioConfig::radioRx(size_t r /*radio id*/, void** buffs, long long& frameTime)
 {
     int flags = 0;
     if (r < this->_radioNum) {
         long long frameTimeNs = 0;
         int ret = baStn[r]->readStream(this->rxStreams[r], buffs, _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
         frameTime = frameTimeNs; //SoapySDR::timeNsToTicks(frameTimeNs, _rate);
-        if (ret != _cfg->sampsPerSymbol)
+        if (ret != (int)_cfg->sampsPerSymbol)
             std::cout << "invalid return " << ret << " from radio " << r << std::endl;
 #ifdef DEBUG_RADIO_RX
         else
@@ -488,12 +489,12 @@ void RadioConfig::drain_buffers()
     std::vector<void*> dummybuffs(2);
     dummybuffs[0] = dummyBuff0.data();
     dummybuffs[1] = dummyBuff1.data();
-    for (int i = 0; i < _cfg->nRadios; i++) {
+    for (size_t i = 0; i < _cfg->nRadios; i++) {
         RadioConfig::drain_rx_buffer(baStn[i], rxStreams[i], dummybuffs, _cfg->sampsPerSymbol);
     }
 }
 
-void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs, SoapySDR::Stream* istream, std::vector<void*> buffs, int symSamp)
+void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs, SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp)
 {
     long long frameTime = 0;
     int flags = 0, r = 0, i = 0;
@@ -505,11 +506,11 @@ void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs, SoapySDR::Stream* i
     //std::cout << "Number of reads needed to drain: " << i << std::endl;
 }
 
-void RadioConfig::adjustDelays(std::vector<int> offset, int ref_ant)
+void RadioConfig::adjustDelays(std::vector<int> offset, size_t ref_ant)
 {
-    int ref_offset = ref_ant == 0 ? 1 : 0;
-    int R = _cfg->nRadios;
-    for (int i = 0; i < R; i++) {
+    size_t ref_offset = ref_ant == 0 ? 1 : 0;
+    size_t R = _cfg->nRadios;
+    for (size_t i = 0; i < R; i++) {
         int delta = offset[ref_offset] - offset[i];
         std::cout << "sample_adjusting delay of node " << i << " by " << delta << std::endl;
         int iter = delta < 0 ? -delta : delta;
@@ -522,17 +523,17 @@ void RadioConfig::adjustDelays(std::vector<int> offset, int ref_ant)
     }
 }
 
-bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
+bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
 {
     bool good_csi = true;
 
-    int seq_len = _cfg->pilot_cf32.size();
+    size_t seq_len = _cfg->pilot_cf32.size();
     int fft_len = _cfg->OFDM_CA_NUM;
     std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len << std::endl;
     std::vector<std::complex<double> > pilot_cd64;
     std::vector<std::complex<int16_t> > pilot_cs16;
 
-    for (int i = 0; i < seq_len; i++) {
+    for (size_t i = 0; i < seq_len; i++) {
         std::complex<float> cf = _cfg->pilot_cf32[i];
         pilot_cs16.push_back(std::complex<int16_t>((int16_t)(cf.real() * 32768), (int16_t)(cf.imag() * 32768)));
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
@@ -542,7 +543,7 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
     std::vector<std::complex<int16_t> > post(_cfg->postfix, 0);
     pilot_cs16.insert(pilot_cs16.begin(), pre.begin(), pre.end());
     pilot_cs16.insert(pilot_cs16.end(), post.begin(), post.end());
-    int read_len = pilot_cs16.size();
+    size_t read_len = pilot_cs16.size();
 
     // Transmitting from only one chain, create a null vector for chainB
     std::vector<std::complex<int16_t> > dummy_cs16(read_len, 0);
@@ -552,13 +553,13 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
     txbuff0[1] = dummy_cs16.data();
 
     std::vector<std::vector<std::complex<int16_t> > > buff;
-    int ant = _cfg->nChannels;
-    int M = _cfg->nAntennas;
-    int R = _cfg->nRadios;
+    //int ant = _cfg->nChannels;
+    size_t M = _cfg->nAntennas;
+    size_t R = _cfg->nRadios;
     assert(M == R); // for now
     buff.resize(M * M);
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < M; j++) {
+    for (size_t i = 0; i < M; i++) {
+        for (size_t j = 0; j < M; j++) {
             if (i == j)
                 buff[i * M + j] = pilot_cs16;
             else
@@ -569,7 +570,7 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
     std::vector<std::complex<int16_t> > dummybuff(read_len);
     drain_buffers();
 
-    for (int i = 0; i < R; i++) {
+    for (size_t i = 0; i < R; i++) {
         baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calTxGainA);
         baStn[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
         baStn[i]->writeSetting("TDD_MODE", "false");
@@ -578,12 +579,12 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
 
     long long txTime(0);
     long long rxTime(0);
-    for (int i = 0; i < R; i++) {
+    for (size_t i = 0; i < R; i++) {
         int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
         int ret = baStn[i]->writeStream(this->txStreams[i], txbuff0.data(), pilot_cs16.size(), tx_flags, txTime, 1000000);
-        if (ret < read_len)
+        if (ret < (int)read_len)
             std::cout << "bad write\n";
-        for (int j = 0; j < R; j++) {
+        for (size_t j = 0; j < R; j++) {
             if (j == i)
                 continue;
             int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
@@ -593,7 +594,7 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
         go();
 
         int flags = 0;
-        for (int j = 0; j < R; j++) {
+        for (size_t j = 0; j < R; j++) {
             if (j == i)
                 continue;
             std::vector<void*> rxbuff(2);
@@ -601,24 +602,24 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
             //rxbuff[1] = ant == 2 ? buff[(i*M+j)*ant+1].data() : dummyBuff.data();
             rxbuff[1] = dummybuff.data();
             ret = baStn[j]->readStream(this->rxStreams[j], rxbuff.data(), read_len, flags, rxTime, 1000000);
-            if (ret < read_len)
+            if (ret < (int)read_len)
                 std::cout << "bad read (" << ret << ") at node " << j << " from node " << i << std::endl;
         }
     }
 
-    for (int i = 0; i < R; i++) {
+    for (size_t i = 0; i < R; i++) {
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->deactivateStream(this->rxStreams[i]);
         baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->txgainA); //[0,30]
     }
 
     //int ref_ant = 0;
-    int ref_offset = ref_ant == 0 ? 1 : 0;
+    size_t ref_offset = ref_ant == 0 ? 1 : 0;
     std::vector<int> offset(R);
-    std::vector<int> start_up(R);
-    std::vector<int> start_dn(R);
+    std::vector<size_t> start_up(R);
+    std::vector<size_t> start_dn(R);
 
-    for (int i = 0; i < R; i++) {
+    for (size_t i = 0; i < R; i++) {
         std::vector<std::complex<double> > up(read_len);
         std::vector<std::complex<double> > dn(read_len);
         std::transform(buff[ref_ant * R + i].begin(), buff[ref_ant * R + i].end(), up.begin(),
@@ -626,8 +627,8 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
         std::transform(buff[i * R + ref_ant].begin(), buff[i * R + ref_ant].end(), dn.begin(),
             [](std::complex<int16_t> ci) { return std::complex<double>(ci.real() / 32768.0, ci.imag() / 32768.0); });
 
-        int peak_up = CommsLib::find_pilot_seq(up, pilot_cd64, seq_len);
-        int peak_dn = CommsLib::find_pilot_seq(dn, pilot_cd64, seq_len);
+        size_t peak_up = CommsLib::find_pilot_seq(up, pilot_cd64, seq_len);
+        size_t peak_dn = CommsLib::find_pilot_seq(dn, pilot_cd64, seq_len);
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
         std::cout << "receive starting position from/to node " << i
@@ -672,7 +673,7 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
         if (sample_adjust)
             adjustDelays(offset, ref_offset);
         calib_mat.resize(R);
-        for (int i = 0; i < R; i++) {
+        for (size_t i = 0; i < R; i++) {
             std::vector<std::complex<float> > dn_t(fft_len);
             std::vector<std::complex<float> > up_t(fft_len);
             std::transform(buff[i * R + ref_ant].begin() + start_dn[i], buff[i * R + ref_ant].begin() + start_dn[i] + fft_len, dn_t.begin(),
@@ -705,7 +706,7 @@ bool RadioConfig::calib_proc(int ref_ant, bool sample_adjust)
 
 void RadioConfig::readSensors()
 {
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << "TEMPs on Iris " << i << std::endl;
         std::cout << "ZYNQ_TEMP: " << baStn[i]->readSensor("ZYNQ_TEMP") << std::endl;
         std::cout << "LMS7_TEMP  : " << baStn[i]->readSensor("LMS7_TEMP") << std::endl;
@@ -724,7 +725,7 @@ void RadioConfig::radioStop()
     std::vector<uint32_t> zeros(4096, 0);
     json conf;
     conf["dummy"] = "";
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         baStn[i]->deactivateStream(this->rxStreams[i]);
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->writeSetting("TDD_MODE", "false");
@@ -746,7 +747,7 @@ void RadioConfig::radioStop()
 
 RadioConfig::~RadioConfig()
 {
-    for (int i = 0; i < this->_radioNum; i++) {
+    for (size_t i = 0; i < this->_radioNum; i++) {
         baStn[i]->closeStream(this->rxStreams[i]);
         baStn[i]->closeStream(this->txStreams[i]);
         SoapySDR::Device::unmake(baStn[i]);

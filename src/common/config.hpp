@@ -30,14 +30,14 @@ typedef unsigned short ushort;
 class Config
 {
 public:
-    int sampsPerSymbol;
+    size_t sampsPerSymbol;
+    size_t symbolsPerFrame;
+    size_t pilotSymsPerFrame;
+    size_t ulSymsPerFrame;
+    size_t dlSymsPerFrame;
     int dl_prefix;
     int prefix;
     int postfix;
-    int symbolsPerFrame;
-    int pilotSymsPerFrame;
-    int ulSymsPerFrame;
-    int dlSymsPerFrame;
     std::string modulation;
     
     std::string conf;
@@ -46,7 +46,6 @@ public:
     std::string pilot_file;
     std::string serial_file;
     std::string hub_file;
-    size_t ref_ant;
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
     std::vector<std::string> frames;
@@ -65,9 +64,6 @@ public:
     int **ul_IQ_data;
     complex_float **ul_IQ_modul;
     
-    int beacon_ant;
-    int beacon_len;
-    std::string beacon_mode;
     double freq;
     double bbf_ratio;
     double txgainA;
@@ -76,14 +72,18 @@ public:
     double rxgainB;
     double calTxGainA;
     double calTxGainB;
-    bool sampleCalEn;
     double rate;
-    int framePeriod;
-    int nCells;
-    int nRadios;
-    int nAntennas;
-    int nUEs;
-    int nChannels;
+    size_t framePeriod;
+    size_t nCells;
+    size_t nRadios;
+    size_t nAntennas;
+    size_t nUEs;
+    size_t nChannels;
+    size_t ref_ant;
+    size_t beacon_ant;
+    size_t beacon_len;
+    std::string beacon_mode;
+    bool sampleCalEn;
 
     int core_offset;
     int worker_thread_num;

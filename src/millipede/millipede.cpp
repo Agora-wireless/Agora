@@ -171,7 +171,7 @@ void Millipede::start()
     int frame_count_pilot_fft = 0;
     int frame_count_zf = 0;
     int frame_count_demul = 0;
-    int frame_count_decode = 0;
+    // int frame_count_decode = 0;
     int frame_count_precode = 0;
     int frame_count_ifft = 0;
     int frame_count_tx = 0;
@@ -315,7 +315,7 @@ void Millipede::start()
 
                 case EVENT_DEMUL: {
                     int offset_demul = event.data;                   
-                    int frame_id, total_data_subframe_id, data_subframe_id, sc_id;
+                    int frame_id, data_subframe_id, sc_id;
                     interpreteOffset3d(offset_demul, &frame_id, &data_subframe_id, &sc_id);
                     demul_counter_scs_[frame_id][data_subframe_id]++;
                     print_per_task_done(PRINT_DEMUL, frame_id, data_subframe_id, sc_id);
@@ -344,7 +344,7 @@ void Millipede::start()
                             demul_count = 0;
                             double diff = get_time() - demul_begin;
                             int samples_num_per_UE = OFDM_DATA_NUM * ul_data_subframe_num_perframe * 1000;
-                            printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %d\n", 
+                            printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %zu\n", 
                                 frame_count_demul, samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, fft_queue_.size_approx());
                             demul_begin = get_time();
                         }                       
@@ -355,7 +355,7 @@ void Millipede::start()
                 case EVENT_PRECODE: {
                     /* Precoding is done, schedule ifft */
                     int offset_precode = event.data;
-                    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
+                    int frame_id, current_data_subframe_id, sc_id;
                     interpreteOffset3d(offset_precode, &frame_id, &current_data_subframe_id, &sc_id);
                     dl_data_counter_scs_[frame_id][current_data_subframe_id]++;
                     print_per_task_done(PRINT_PRECODE, frame_id, current_data_subframe_id, sc_id);          
@@ -380,7 +380,7 @@ void Millipede::start()
                 case EVENT_IFFT: {
                     /* IFFT is done, schedule data transmission */
                     int offset_ifft = event.data;
-                    int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
+                    int frame_id, current_data_subframe_id, ant_id;
                     interpreteOffset3d(offset_ifft, &current_data_subframe_id, &ant_id, &frame_id);
  
                     Event_data do_tx_task;
@@ -404,7 +404,7 @@ void Millipede::start()
                 case EVENT_PACKAGE_SENT: {
                     /* Data is sent */
                     int offset_tx = event.data;
-                    int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
+                    int frame_id, current_data_subframe_id, ant_id;
                     interpreteOffset3d(offset_tx, &current_data_subframe_id, &ant_id, &frame_id);
                     // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, current_data_subframe_id, ant_id);
                     frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -432,7 +432,7 @@ void Millipede::start()
                             tx_count = 0;
                             double diff = get_time() - tx_begin;
                             int samples_num_per_UE = OFDM_DATA_NUM * dl_data_subframe_num_perframe * 1000;
-                            printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %d\n", 
+                            printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %zu\n", 
                                 samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, tx_queue_.size_approx());
                             tx_begin = get_time();
                         }
@@ -482,9 +482,9 @@ void* Millipede::taskThread(void* context)
     moodycamel::ConcurrentQueue<Event_data>* fft_queue_ = &(obj_ptr->fft_queue_);
     moodycamel::ConcurrentQueue<Event_data>* zf_queue_ = &(obj_ptr->zf_queue_);
     moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* decode_queue_ = &(obj_ptr->decode_queue_);
+    // moodycamel::ConcurrentQueue<Event_data>* decode_queue_ = &(obj_ptr->decode_queue_);
     moodycamel::ConcurrentQueue<Event_data>* ifft_queue_ = &(obj_ptr->ifft_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* modulate_queue_ = &(obj_ptr->modulate_queue_);
+    // moodycamel::ConcurrentQueue<Event_data>* modulate_queue_ = &(obj_ptr->modulate_queue_);
     moodycamel::ConcurrentQueue<Event_data>* precode_queue_ = &(obj_ptr->precode_queue_);
     // moodycamel::ConcurrentQueue<Event_data>* tx_queue_ = &(obj_ptr->tx_queue_);
 
@@ -514,8 +514,8 @@ void* Millipede::taskThread(void* context)
     bool ret = false;
     bool ret_zf = false;
     bool ret_demul = false;
-    bool ret_decode = false;
-    bool ret_modul = false;
+    // bool ret_decode = false;
+    // bool ret_modul = false;
     bool ret_ifft = false;
     bool ret_precode = false;
 
@@ -729,7 +729,7 @@ void* Millipede::demulThread(void* context)
     Event_data event;
     bool ret_demul = false;
     bool ret_precode = false;
-    int cur_frame_id = 0;
+    // int cur_frame_id = 0;
 
     while(true) {         
         if (downlink_mode)
@@ -948,7 +948,7 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
                 stats_manager_->get_zf_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
             break;
         case(PRINT_DEMUL):
-            printf("Main thread: Demodulation done frame: %d, %d in %.2f us (%d UL subframes) since ZF done, total %.2f us\n",
+            printf("Main thread: Demodulation done frame: %d, %d (%d UL subframes) in %.2f us since ZF done, total %.2f us\n",
                 frame_id, frame_id_in_buffer, ul_data_subframe_num_perframe,
                 stats_manager_->get_demul_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
                 stats_manager_->get_demul_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
@@ -972,7 +972,7 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
                 stats_manager_->get_tx_processed_first(frame_id) - stats_manager_->get_pilot_received(frame_id));
             break;
         case(PRINT_TX):
-            printf("Main thread: TX done frame: %d %d in %.2f us (%d DL subframes) since ZF done, total: %.2f us\n", 
+            printf("Main thread: TX done frame: %d %d (%d DL subframes) in %.2f us since ZF done, total: %.2f us\n", 
                 frame_id, frame_id_in_buffer, dl_data_subframe_num_perframe,
                 stats_manager_->get_tx_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
                 stats_manager_->get_tx_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
@@ -1126,7 +1126,7 @@ void Millipede::initialize_uplink_buffers()
 
     socket_buffer_size_ = (long long) package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    printf("socket_buffer_size %d, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
+    printf("socket_buffer_size %lld, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
     alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
     alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);
     alloc_buffer_2d(&csi_buffer_ , UE_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);

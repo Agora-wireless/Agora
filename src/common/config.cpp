@@ -52,7 +52,7 @@ Config::Config(std::string jsonfile)
 
     json jframes = tddConf.value("frames", json::array());
     framePeriod = jframes.size();
-    for (int f = 0; f < framePeriod; f++) {
+    for (size_t f = 0; f < framePeriod; f++) {
         frames.push_back(jframes.at(0).get<std::string>());
     }
     Utils::loadDevices(hub_file, hub_ids);
@@ -65,12 +65,12 @@ Config::Config(std::string jsonfile)
         int hadamardSize = int(pow(2, ceil(log2(nAntennas))));
         std::vector<std::vector<double> > hadamard_weights = CommsLib::getSequence(hadamardSize, CommsLib::HADAMARD);
         beacon_weights.resize(nAntennas);
-        for (int i = 0; i < nAntennas; i++)
-            for (int j = 0; j < nAntennas; j++)
+        for (size_t i = 0; i < nAntennas; i++)
+            for (size_t j = 0; j < nAntennas; j++)
                 beacon_weights[i].push_back((unsigned)hadamard_weights[i][j]);
         printf("Hadamard Matrix Size %d\n", hadamardSize);
-        printf("beacon_weights size %d\n", beacon_weights.size());
-        printf("beacon_weights[0] size %d\n", beacon_weights[0].size());
+        printf("beacon_weights size %zu\n", beacon_weights.size());
+        printf("beacon_weights[0] size %zu\n", beacon_weights[0].size());
     }
     symbolsPerFrame = frames.at(0).size();
     nUEs = std::count(frames.at(0).begin(), frames.at(0).end(), 'P');

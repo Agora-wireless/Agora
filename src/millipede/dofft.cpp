@@ -98,14 +98,14 @@ void DoFFT::FFT(int offset)
     // read info of one frame
     char *cur_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset * package_length;
 
-    int ant_id, frame_id, subframe_id, cell_id;
+    int ant_id, frame_id, subframe_id; //, cell_id;
     frame_id = *((int *)cur_buffer_ptr);
     subframe_id = *((int *)cur_buffer_ptr + 1);
-    cell_id = *((int *)cur_buffer_ptr + 2);
+    // cell_id = *((int *)cur_buffer_ptr + 2);
     ant_id = *((int *)cur_buffer_ptr + 3);
     // printf("thread %d process frame_id %d, subframe_id %d, cell_id %d, ant_id %d\n", tid, frame_id, subframe_id, cell_id, ant_id);
     // remove CP, do FFT
-    int delay_offset = 0;
+    // int delay_offset = 0;
     // int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
     // int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
 
@@ -253,11 +253,11 @@ void DoFFT::FFT(int offset)
         // Use SIMD
         float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
         int sc_idx = OFDM_DATA_START;
-        int dst_idx = 0;
+        //int dst_idx = 0;
 
-        int cache_line_num = transpose_block_size / 8;
-        int iteration_per_page = 64 / cache_line_num;
-        int offset_in_page = OFDM_DATA_START / 8;
+        // int cache_line_num = transpose_block_size / 8;
+        // int iteration_per_page = 64 / cache_line_num;
+        // int offset_in_page = OFDM_DATA_START / 8;
         int block_num = OFDM_DATA_NUM / transpose_block_size;
         _mm_prefetch((char*)pilots_, _MM_HINT_T0);
         for (int block_idx = 0; block_idx < block_num; block_idx ++) {
@@ -348,8 +348,8 @@ void DoFFT::FFT(int offset)
         // c2 = 0, 1, ..., 1024/64*2-1 = 31
         // c2*transpose_block_size = 0, 64, 128, ..., 2048-64
         int cache_line_num = transpose_block_size / 8;
-        int iteration_per_page = 64 / cache_line_num;
-        int offset_in_page = OFDM_DATA_START / 8;
+        // int iteration_per_page = 64 / cache_line_num;
+        // int offset_in_page = OFDM_DATA_START / 8;
         int block_num = OFDM_DATA_NUM / transpose_block_size;
         for(int c2 = 0; c2 < block_num; c2++) {
             // c3 = 0, 1, ..., transpose_block_size/8 -1 = 7
@@ -425,7 +425,7 @@ void DoFFT::IFFT(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
+    int frame_id, current_data_subframe_id, ant_id; //, total_data_subframe_id;
     interpreteOffset3d(offset, &current_data_subframe_id, &ant_id, &frame_id);
     int frame_id_in_task_buffer = frame_id % TASK_BUFFER_FRAME_NUM;
     int frame_id_in_socket_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;

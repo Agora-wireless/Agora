@@ -6,7 +6,7 @@
 #include "packageReceiver.hpp"
 #include "millipede.hpp"
 
-int main(int argc, char const *argv[])
+int main()
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tddconfig.json";

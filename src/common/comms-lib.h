@@ -58,7 +58,7 @@ public:
     static std::vector<std::complex<float>> getPilotSc(int fftSize);
     static std::vector<std::complex<float>> FFT(std::vector<std::complex<float>>, int);
     static std::vector<std::complex<float>> IFFT(std::vector<std::complex<float>>, int);
-    static int find_pilot_seq(std::vector<std::complex<double>> iq, std::vector<std::complex<double>> pilot, int seqLen);
+    static size_t find_pilot_seq(std::vector<std::complex<double>> iq, std::vector<std::complex<double>> pilot, size_t seqLen);
     static int findLTS(std::vector<std::complex<double>> iq, int seqLen);
     static std::vector<double> convolve(std::vector<std::complex<double>> const &f, std::vector<std::complex<double>> const &g);
     static std::vector<std::complex<double>> csign(std::vector<std::complex<double>> iq);
