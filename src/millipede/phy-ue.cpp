@@ -754,21 +754,21 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
             cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
             float max_val = abs(mat_ifft_out).max();
             mat_ifft_out /= max_val;
-            //float* cur_fft_buffer_float_output = (float *)ifft_buffer_.IFFT_outputs[IFFT_buffer_target_id+ant_id];
+            float* cur_fft_buffer_float_output = (float *)ifft_buffer_.IFFT_outputs[IFFT_buffer_target_id+ant_id];
 
             int tx_offset = txbuf_offset + ant_id * package_length; 
             void * cur_tx_buffer = (void *)&tx_buffer_[tx_offset];
 #ifdef SIM
-            complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer + prefix_len*sizeof(complex_float) + cfg->package_header_offset * sizeof(int)); // First 4 floats have the frame, symbol and ant ids
-            //short* tx_buffer_ptr = (short*)(cur_tx_buffer + prefix_len*sizeof(std::complex<short>) + 8 * sizeof(int)); // First 4 floats have the frame, symbol and ant ids
+            //complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer + prefix_len*sizeof(complex_float) + cfg->package_header_offset * sizeof(int)); // First 4 floats have the frame, symbol and ant ids
+            short* tx_buffer_ptr = (short*)(cur_tx_buffer + prefix_len*sizeof(std::complex<short>) + 8 * sizeof(int)); // First 4 floats have the frame, symbol and ant ids
             int* tx_buffer_hdr = (int*)cur_tx_buffer;
             tx_buffer_hdr[0] = frame_id;    
             tx_buffer_hdr[1] = symbol_id;  
             tx_buffer_hdr[2] = ant_id;  
             tx_buffer_hdr[3] = 0; // rsvd  
 #else 
-            complex_float* tx_buffer_ptr = (complex_float*)((char*)cur_tx_buffer + cfg->prefix*sizeof(complex_float)); 
-            //short* tx_buffer_ptr = (short*)(cur_tx_buffer + prefix_len*sizeof(std::complex<short>)); 
+            //complex_float* tx_buffer_ptr = (complex_float*)((char*)cur_tx_buffer + cfg->prefix*sizeof(complex_float)); 
+            short* tx_buffer_ptr = (short*)(cur_tx_buffer + prefix_len*sizeof(std::complex<short>)); 
 #endif
             // fft shift
             //for(int j = 0; j < (FFT_LEN); j++) {
@@ -781,17 +781,21 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
             //    *(tx_buffer_ptr+1) = cur_fft_buffer_float_output[2*j+1];           
             //}
 
-            //for(int j = 0; j < FFT_LEN; j++) {
-            //    *(tx_buffer_ptr+CP_LEN+2*j)   = (short)(cur_fft_buffer_float_output[2*j]*32768);
-            //    *(tx_buffer_ptr+CP_LEN+2*j+1) = (short)(cur_fft_buffer_float_output[2*j+1]*32768);           
-            //}
-            //memcpy((void *)tx_buffer_ptr, (void *)(tx_buffer_ptr+FFT_LEN*2), CP_LEN*sizeof(std::complex<short>)); // add CP
-            for (int i = 0; i < ofdm_syms; i++)
-            {
+            for (int i = 0; i < ofdm_syms; i++) {
                 int sym_offset = i*(FFT_LEN+CP_LEN);
-                memcpy((void *)(tx_buffer_ptr + sym_offset), (void *)(ifft_out_buffer+(FFT_LEN-CP_LEN)), CP_LEN*sizeof(complex_float)); 
-                memcpy((void *)(tx_buffer_ptr + sym_offset + CP_LEN), (void *)ifft_out_buffer, FFT_LEN*sizeof(complex_float));
+                tx_buffer_ptr += (sym_offset * sizeof(std::complex<short>));
+                for(int j = 0; j < FFT_LEN; j++) {
+                    *(tx_buffer_ptr+CP_LEN+2*j)   = (short)(cur_fft_buffer_float_output[2*j]*32768);
+                    *(tx_buffer_ptr+CP_LEN+2*j+1) = (short)(cur_fft_buffer_float_output[2*j+1]*32768);           
+                }
+                memcpy((void *)tx_buffer_ptr, (void *)(tx_buffer_ptr+FFT_LEN*2), CP_LEN*sizeof(std::complex<short>)); // add CP
             }
+            //for (int i = 0; i < ofdm_syms; i++)
+            //{
+            //    int sym_offset = i*(FFT_LEN+CP_LEN);
+            //    memcpy((void *)(tx_buffer_ptr + sym_offset), (void *)(ifft_out_buffer+(FFT_LEN-CP_LEN)), CP_LEN*sizeof(complex_float)); 
+            //    memcpy((void *)(tx_buffer_ptr + sym_offset + CP_LEN), (void *)ifft_out_buffer, FFT_LEN*sizeof(complex_float));
+            //}
             //ru_->send(cur_tx_buffer, cfg->getTxPackageLength(), frame_id, symbol_id, ant_id);
         }
     //}
