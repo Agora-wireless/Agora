@@ -573,14 +573,14 @@ void Phy_UE::doFFT(int tid, int offset)
 
     // transfer ushort to float
     int delay_offset = (dl_prefix_len + CP_LEN) * 2; //GetFrameStart(cur_ptr_buffer_ushort, prefix_len, postfix_len);
-    //short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + sizeof(int) * cfg->package_header_offset);
-    float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) * package_header_offset);
+    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + cfg->package_header_offset);
+    //float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) * package_header_offset);
     float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
-    //for(int i = 0; i < (FFT_LEN) * 2; i++)
-    //    //cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[delay_offset + i]/32768.2f;
-    //    cur_fft_buffer_float[i] = cur_radio_buffer[delay_offset + i];
-    memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float)); 
+    for(int i = 0; i < (FFT_LEN) * 2; i++)
+        cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[delay_offset + i]/32768.2f;
+        //cur_fft_buffer_float[i] = cur_radio_buffer[delay_offset + i];
+    //memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float)); 
 
     // perform fft
     mufft_execute_plan_1d(mufftplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id], 
