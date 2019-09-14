@@ -30,7 +30,6 @@
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
-#include "cpu_attach.hpp"
 #include "packageReceiver.hpp"
 #include "packageSender.hpp"
 #include "buffer.hpp"

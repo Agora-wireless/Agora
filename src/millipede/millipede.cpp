@@ -28,16 +28,7 @@ Millipede::Millipede(Config *cfg)
     this->cfg_ = cfg;
     initialize_vars_from_cfg(cfg_);
 
-#ifdef ENABLE_CPU_ATTACH
-    int main_core_id = CORE_OFFSET + 1;
-    if(stick_this_thread_to_core(main_core_id) != 0) {
-        printf("Main thread: stitch main thread to core %d failed\n", main_core_id);
-        exit(0);
-    }
-    else {
-        printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
-    }
-#endif
+    pin_to_core_with_offset(Master, CORE_OFFSET, 0);
 
     initialize_queues();
 
@@ -53,44 +44,16 @@ Millipede::Millipede(Config *cfg)
     
     /* initialize packageReceiver*/
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET+1, 
+    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, 
                     &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     /* create worker threads */
 #if BIGSTATION
-    for(int i = 0; i < FFT_THREAD_NUM; i++) {
-        context[i].obj_ptr = this;
-        context[i].id = i;
-        if(pthread_create( &task_threads[i], NULL, Millipede::fftThread, &context[i]) != 0) {
-            perror("task thread create failed");
-            exit(0);
-        }
-    }
-    for(int i = FFT_THREAD_NUM; i < FFT_THREAD_NUM + ZF_THREAD_NUM; i++) {
-        context[i].obj_ptr = this;
-        context[i].id = i;
-        if(pthread_create( &task_threads[i], NULL, Millipede::zfThread, &context[i]) != 0) {
-            perror("ZF thread create failed");
-            exit(0);
-        }
-    }
-    for(int i = FFT_THREAD_NUM + ZF_THREAD_NUM; i < TASK_THREAD_NUM; i++) {
-        context[i].obj_ptr = this;
-        context[i].id = i;
-        if(pthread_create( &task_threads[i], NULL, Millipede::demulThread, &context[i]) != 0) {
-            perror("Demul thread create failed");
-            exit(0);
-        }
-    }
+    create_threads(FFT, 0, FFT_THREAD_NUM);
+    create_threads(ZF, FFT_THREAD_NUM, FFT_THREAD_NUM + ZF_THREAD_NUM);
+    create_threads(Demul, FFT_THREAD_NUM + ZF_THREAD_NUM, TASK_THREAD_NUM);
 #else
-    for(int i = 0; i < TASK_THREAD_NUM; i++) {
-        context[i].obj_ptr = this;
-        context[i].id = i;
-        if(pthread_create( &task_threads[i], NULL, Millipede::taskThread, &context[i]) != 0) {
-            perror("task thread create failed");
-            exit(0);
-        }
-    }
+    create_threads(Worker, 0, TASK_THREAD_NUM);
 #endif
     stats_manager_.reset(new Stats(cfg_, CSI_task_duration, CSI_task_count, FFT_task_duration, FFT_task_count, 
           ZF_task_duration, ZF_task_count, Demul_task_duration, Demul_task_count,
@@ -118,16 +81,6 @@ void Millipede::stop()
 
 void Millipede::start()
 {
-// #ifdef ENABLE_CPU_ATTACH
-//     int main_core_id = CORE_OFFSET + 1;
-//     if(stick_this_thread_to_core(main_core_id) != 0) {
-//         printf("Main thread: stitch main thread to core %d failed\n", main_core_id);
-//         exit(0);
-//     }
-//     else {
-//         printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
-//     }
-// #endif
     /* start uplink receiver */
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_, 
         socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, frame_start);
@@ -308,7 +261,7 @@ void Millipede::start()
 
                 case EVENT_DEMUL: {
                     int offset_demul = event.data;                   
-                    int frame_id, total_data_subframe_id, data_subframe_id, sc_id;
+                    int frame_id, data_subframe_id, sc_id;
                     interpreteOffset3d(offset_demul, &frame_id, &data_subframe_id, &sc_id);
                     demul_counter_scs_[frame_id][data_subframe_id]++;
                     print_per_task_done(PRINT_DEMUL, frame_id, data_subframe_id, sc_id);
@@ -331,7 +284,7 @@ void Millipede::start()
                             stats_manager_->update_stats_in_functions_uplink(frame_count_demul);
                             update_frame_count(&frame_count_demul);                    
                         }
-                        save_demul_data_to_file();
+                        save_demul_data_to_file(frame_id, data_subframe_id);
                         demul_count++;
                         if (demul_count == ul_data_subframe_num_perframe * 9000) {
                             demul_count = 0;
@@ -348,7 +301,7 @@ void Millipede::start()
                 case EVENT_PRECODE: {
                     /* Precoding is done, schedule ifft */
                     int offset_precode = event.data;
-                    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
+                    int frame_id, current_data_subframe_id, sc_id;
                     interpreteOffset3d(offset_precode, &frame_id, &current_data_subframe_id, &sc_id);
                     dl_data_counter_scs_[frame_id][current_data_subframe_id]++;
                     print_per_task_done(PRINT_PRECODE, frame_id, current_data_subframe_id, sc_id);          
@@ -373,7 +326,7 @@ void Millipede::start()
                 case EVENT_IFFT: {
                     /* IFFT is done, schedule data transmission */
                     int offset_ifft = event.data;
-                    int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
+                    int frame_id, current_data_subframe_id, ant_id;
                     interpreteOffset3d(offset_ifft, &current_data_subframe_id, &ant_id, &frame_id);
  
                     Event_data do_tx_task;
@@ -397,7 +350,7 @@ void Millipede::start()
                 case EVENT_PACKAGE_SENT: {
                     /* Data is sent */
                     int offset_tx = event.data;
-                    int frame_id, total_data_subframe_id, current_data_subframe_id, ant_id;
+                    int frame_id, current_data_subframe_id, ant_id;
                     interpreteOffset3d(offset_tx, &current_data_subframe_id, &ant_id, &frame_id);
                     // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, current_data_subframe_id, ant_id);
                     frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -447,80 +400,49 @@ void Millipede::start()
 }
 
 
-void* Millipede::taskThread(void* context)
+
+void *Millipede::worker(int tid) 
 {
-
-    int tid = ((EventHandlerContext *)context)->id;
-    printf("task thread %d starts\n", tid);
-    Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    
-#ifdef ENABLE_CPU_ATTACH
-    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
-    int offset_id = obj_ptr->SOCKET_RX_THREAD_NUM + obj_ptr->CORE_OFFSET + 2;
-
-    int tar_core_id = tid + offset_id;
-    if (tar_core_id>=36) 
-        tar_core_id = tar_core_id - 36 + 1;
-    if(stick_this_thread_to_core(tar_core_id) != 0) {
-        printf("Task thread: stitch thread %d to core %d failed\n", tid, tar_core_id);
-        exit(0);
-    }
-    else {
-        printf("Task thread: stitch thread %d to core %d succeeded\n", tid, tar_core_id);
-    }
-#endif
-    
-    
-    moodycamel::ConcurrentQueue<Event_data>* fft_queue_ = &(obj_ptr->fft_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* zf_queue_ = &(obj_ptr->zf_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* decode_queue_ = &(obj_ptr->decode_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* ifft_queue_ = &(obj_ptr->ifft_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* modulate_queue_ = &(obj_ptr->modulate_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* precode_queue_ = &(obj_ptr->precode_queue_);
-    // moodycamel::ConcurrentQueue<Event_data>* tx_queue_ = &(obj_ptr->tx_queue_);
-
-    // obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
-    moodycamel::ProducerToken *task_ptok_ptr = obj_ptr->task_ptoks_ptr[tid];
-    // task_ptok_ptr = obj_ptr->task_ptok[tid].get();
+    int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
+    pin_to_core_with_offset(Worker, core_offset, tid);
+    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize operators */
-    DoFFT *computeFFT = new DoFFT(obj_ptr->cfg_, tid, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->socket_buffer_, obj_ptr->socket_buffer_status_, obj_ptr->data_buffer_, obj_ptr->csi_buffer_, obj_ptr->pilots_,
-        obj_ptr->dl_ifft_buffer_, obj_ptr->dl_socket_buffer_, 
-        obj_ptr->FFT_task_duration, obj_ptr->CSI_task_duration, obj_ptr->FFT_task_count, obj_ptr->CSI_task_count,
-        obj_ptr->IFFT_task_duration, obj_ptr->IFFT_task_count);
+    DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
+        dl_ifft_buffer_, dl_socket_buffer_, 
+        FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
+        IFFT_task_duration, IFFT_task_count);
 
-    DoZF *computeZF = new DoZF(obj_ptr->cfg_, tid, obj_ptr->zf_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->csi_buffer_, obj_ptr->precoder_buffer_, obj_ptr->pred_csi_buffer_, obj_ptr->ZF_task_duration, obj_ptr->ZF_task_count);
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+        csi_buffer_, precoder_buffer_, pred_csi_buffer_, ZF_task_duration, ZF_task_count);
 
-    DoDemul *computeDemul = new DoDemul(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->data_buffer_, obj_ptr->precoder_buffer_, obj_ptr->equal_buffer_, obj_ptr->demul_hard_buffer_, obj_ptr->Demul_task_duration, obj_ptr->Demul_task_count);
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+        data_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_, Demul_task_duration, Demul_task_count);
 
-    DoPrecode *computePrecode = new DoPrecode(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->dl_modulated_buffer_, obj_ptr->precoder_buffer_, obj_ptr->dl_precoded_data_buffer_, obj_ptr->dl_ifft_buffer_, obj_ptr->dl_IQ_data, 
-        obj_ptr->Precode_task_duration, obj_ptr->Precode_task_count);
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+        dl_modulated_buffer_, precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, 
+        Precode_task_duration, Precode_task_count);
 
 
     Event_data event;
     bool ret = false;
     bool ret_zf = false;
     bool ret_demul = false;
-    bool ret_decode = false;
-    bool ret_modul = false;
+    // bool ret_decode = false;
+    // bool ret_modul = false;
     bool ret_ifft = false;
     bool ret_precode = false;
 
     while(true) {
         if (downlink_mode) {
-            ret_ifft = ifft_queue_->try_dequeue(event);
+            ret_ifft = ifft_queue_.try_dequeue(event);
             if (!ret_ifft) {
-                ret_precode = precode_queue_->try_dequeue(event);
+                ret_precode = precode_queue_.try_dequeue(event);
                 if (!ret_precode) {
-                    ret_zf = zf_queue_->try_dequeue(event);
+                    ret_zf = zf_queue_.try_dequeue(event);
                     if (!ret_zf) {
-                        ret = fft_queue_->try_dequeue(event);
+                        ret = fft_queue_.try_dequeue(event);
                         if (!ret) 
                             continue;
                         else
@@ -542,11 +464,11 @@ void* Millipede::taskThread(void* context)
             }
         }
         else {
-            ret_zf = zf_queue_->try_dequeue(event);
+            ret_zf = zf_queue_.try_dequeue(event);
             if (!ret_zf) {
-                ret = fft_queue_->try_dequeue(event);
+                ret = fft_queue_.try_dequeue(event);
                 if (!ret) {   
-                    ret_demul = demul_queue_->try_dequeue(event);
+                    ret_demul = demul_queue_.try_dequeue(event);
                     if (!ret_demul)
                         continue;
                     else 
@@ -568,54 +490,29 @@ void* Millipede::taskThread(void* context)
 
 
 
-void* Millipede::fftThread(void* context)
+void* Millipede::worker_fft(int tid)
 {
-    
-    Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
-    moodycamel::ConcurrentQueue<Event_data>* fft_queue_ = &(obj_ptr->fft_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* ifft_queue_;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    if (downlink_mode)
-        ifft_queue_ = &(obj_ptr->ifft_queue_);
-    int tid = ((EventHandlerContext *)context)->id;
-    printf("FFT thread %d starts\n", tid);
-    
-#ifdef ENABLE_CPU_ATTACH
-    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
-    int offset_id = obj_ptr->SOCKET_RX_THREAD_NUM + obj_ptr->CORE_OFFSET + 2;
-    int tar_core_id = tid + offset_id;
-    if (tar_core_id>=36) 
-        tar_core_id = tar_core_id - 36 + 1;
-    if(stick_this_thread_to_core(tar_core_id) != 0) {
-        printf("FFT thread: stitch thread %d to core %d failed\n", tid, tar_core_id);
-        exit(0);
-    }
-    else {
-        printf("FFT thread: stitch thread %d to core %d succeeded\n", tid, tar_core_id);
-    }
-#endif
-    moodycamel::ProducerToken *task_ptok_ptr = obj_ptr->task_ptoks_ptr[tid];
-    // obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
-    // moodycamel::ProducerToken *task_ptok_ptr;
-    // task_ptok_ptr = obj_ptr->task_ptok[tid].get();
+    int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
+    pin_to_core_with_offset(FFT, core_offset, tid);
+    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize FFT operator */
-    DoFFT* computeFFT = new DoFFT(obj_ptr->cfg_, tid, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->socket_buffer_, obj_ptr->socket_buffer_status_, obj_ptr->data_buffer_, obj_ptr->csi_buffer_, obj_ptr->pilots_,
-        obj_ptr->dl_ifft_buffer_, obj_ptr->dl_socket_buffer_, 
-        obj_ptr->FFT_task_duration, obj_ptr->CSI_task_duration, obj_ptr->FFT_task_count, obj_ptr->CSI_task_count,
-        obj_ptr->IFFT_task_duration, obj_ptr->IFFT_task_count);
+    DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
+        dl_ifft_buffer_, dl_socket_buffer_, 
+        FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
+        IFFT_task_duration, IFFT_task_count);
 
 
     Event_data event;
     bool ret = false;
 
     while(true) {
-        ret = fft_queue_->try_dequeue(event);
+        ret = fft_queue_.try_dequeue(event);
         if (!ret) {
             if (downlink_mode)
             {
-                ret = ifft_queue_->try_dequeue(event);
+                ret = ifft_queue_.try_dequeue(event);
                 if (!ret)
                     continue;
                 else
@@ -632,42 +529,23 @@ void* Millipede::fftThread(void* context)
 
 
 
-void* Millipede::zfThread(void* context)
+void* Millipede::worker_zf(int tid)
 {
     
-    Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
-    moodycamel::ConcurrentQueue<Event_data>* zf_queue_ = &(obj_ptr->zf_queue_);
-    int tid = ((EventHandlerContext *)context)->id;
-    printf("ZF thread %d starts\n", tid);
-    
-#ifdef ENABLE_CPU_ATTACH
-    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
-    int offset_id = obj_ptr->SOCKET_RX_THREAD_NUM + obj_ptr->CORE_OFFSET + 2;
-    int tar_core_id = tid + offset_id;
-    if (tar_core_id>=36) 
-        tar_core_id = tar_core_id - 36 + 1;
-    if(stick_this_thread_to_core(tar_core_id) != 0) {
-        printf("ZF thread: stitch thread %d to core %d failed\n", tid, tar_core_id);
-        exit(0);
-    }
-    else {
-        printf("ZF thread: stitch thread %d to core %d succeeded\n", tid, tar_core_id);
-    }
-#endif
-    moodycamel::ProducerToken *task_ptok_ptr = obj_ptr->task_ptoks_ptr[tid];
-    // obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
-    // moodycamel::ProducerToken *task_ptok_ptr;
-    // task_ptok_ptr = obj_ptr->task_ptok[tid].get();
+    int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
+    pin_to_core_with_offset(ZF, core_offset, tid);
+
+    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize ZF operator */
-    DoZF *computeZF = new DoZF(obj_ptr->cfg_, tid, obj_ptr->zf_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->csi_buffer_, obj_ptr->precoder_buffer_, obj_ptr->pred_csi_buffer_, obj_ptr->ZF_task_duration, obj_ptr->ZF_task_count);
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+        csi_buffer_, precoder_buffer_, pred_csi_buffer_, ZF_task_duration, ZF_task_count);
 
     Event_data event;
     bool ret_zf = false;
 
     while(true) {
-        ret_zf = zf_queue_->try_dequeue(event);
+        ret_zf = zf_queue_.try_dequeue(event);
         if (!ret_zf) 
             continue;
         else
@@ -676,47 +554,22 @@ void* Millipede::zfThread(void* context)
 
 }
 
-void* Millipede::demulThread(void* context)
+void* Millipede::worker_demul(int tid)
 {
     
-    Millipede* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
-    moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* precode_queue_;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    if (downlink_mode)
-        precode_queue_ = &(obj_ptr->precode_queue_);
-    int tid = ((EventHandlerContext *)context)->id;
-    printf("Demul thread %d starts\n", tid);
-    
-#ifdef ENABLE_CPU_ATTACH
-    // int offset_id = SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM + CORE_OFFSET + 2;
-    int offset_id = obj_ptr->SOCKET_RX_THREAD_NUM + obj_ptr->CORE_OFFSET + 2;
-    int tar_core_id = tid + offset_id;
-    if (tar_core_id>=36) 
-        tar_core_id = tar_core_id - 36 + 1;
-    if(stick_this_thread_to_core(tar_core_id) != 0) {
-        printf("Demul thread: stitch thread %d to core %d failed\n", tid, tar_core_id);
-        exit(0);
-    }
-    else {
-        printf("Demul thread: stitch thread %d to core %d succeeded\n", tid, tar_core_id);
-    }
-#endif
-
-    moodycamel::ProducerToken *task_ptok_ptr = obj_ptr->task_ptoks_ptr[tid];
-    // obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->complete_task_queue_));
-    // moodycamel::ProducerToken *task_ptok_ptr;
-    // task_ptok_ptr = obj_ptr->task_ptok[tid].get();
+    int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
+    pin_to_core_with_offset(Demul, core_offset, tid);
+    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize Demul operator */
-    DoDemul *computeDemul = new DoDemul(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->data_buffer_, obj_ptr->precoder_buffer_, obj_ptr->equal_buffer_, obj_ptr->demul_hard_buffer_, obj_ptr->Demul_task_duration, obj_ptr->Demul_task_count);
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+        data_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_, Demul_task_duration, Demul_task_count);
 
 
     /* initialize Precode operator */
-    DoPrecode *computePrecode = new DoPrecode(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->dl_modulated_buffer_, obj_ptr->precoder_buffer_, obj_ptr->dl_precoded_data_buffer_, obj_ptr->dl_ifft_buffer_, obj_ptr->dl_IQ_data,  
-        obj_ptr->Precode_task_duration, obj_ptr->Precode_task_count);
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+        dl_modulated_buffer_, precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data,  
+        Precode_task_duration, Precode_task_count);
 
 
     Event_data event;
@@ -727,7 +580,7 @@ void* Millipede::demulThread(void* context)
     while(true) {         
         if (downlink_mode)
         {
-            ret_precode = precode_queue_->try_dequeue(event);
+            ret_precode = precode_queue_.try_dequeue(event);
             if (!ret_precode)
                 continue;
             else
@@ -735,7 +588,7 @@ void* Millipede::demulThread(void* context)
         }
         else
         {
-            ret_demul = demul_queue_->try_dequeue(event);
+            ret_demul = demul_queue_.try_dequeue(event);
             if (!ret_demul) {
                 continue;
             }
@@ -750,6 +603,36 @@ void* Millipede::demulThread(void* context)
         }
     }
 
+}
+
+void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
+{
+    int ret;
+    for(int i = tid_start; i < tid_end; i++) {
+        context[i].obj_ptr = this;
+        context[i].id = i;
+        switch(thread) {
+            case Worker:
+                ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker>, &context[i]);
+                break;
+            case FFT:
+                ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_fft>, &context[i]);
+                break;
+            case ZF:
+                ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_zf>, &context[i]);
+                break;
+            case Demul:
+                ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_demul>, &context[i]);
+                break;
+            default:
+                printf("ERROR: Wrong thread type to create workers\n");
+                exit(0);
+        }
+        if (ret != 0) {
+            perror("task thread create failed");
+            exit(0);
+        }
+    }
 }
 
 
@@ -941,7 +824,7 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
                 stats_manager_->get_zf_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
             break;
         case(PRINT_DEMUL):
-            printf("Main thread: Demodulation done frame: %d, %d in %.2f us (%d UL subframes) since ZF done, total %.2f us\n",
+            printf("Main thread: Demodulation done frame: %d, %d (%d UL subframes) in %.2f us since ZF done, total %.2f us\n",
                 frame_id, frame_id_in_buffer, ul_data_subframe_num_perframe,
                 stats_manager_->get_demul_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
                 stats_manager_->get_demul_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
@@ -965,7 +848,7 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
                 stats_manager_->get_tx_processed_first(frame_id) - stats_manager_->get_pilot_received(frame_id));
             break;
         case(PRINT_TX):
-            printf("Main thread: TX done frame: %d %d in %.2f us (%d DL subframes) since ZF done, total: %.2f us\n", 
+            printf("Main thread: TX done frame: %d %d (%d DL subframes) in %.2f us since ZF done, total: %.2f us\n", 
                 frame_id, frame_id_in_buffer, dl_data_subframe_num_perframe,
                 stats_manager_->get_tx_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
                 stats_manager_->get_tx_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
@@ -1119,7 +1002,7 @@ void Millipede::initialize_uplink_buffers()
 
     socket_buffer_size_ = (long long) package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    printf("socket_buffer_size %d, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
+    printf("socket_buffer_size %lld, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
     alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
     alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);
     alloc_buffer_2d(&csi_buffer_ , UE_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
@@ -1269,12 +1152,13 @@ void Millipede::free_downlink_buffers()
 
 
 
-void Millipede::save_demul_data_to_file()
+void Millipede::save_demul_data_to_file(int frame_id, int data_subframe_id)
 {
 #if WRITE_DEMUL
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/demul_data.txt";
     FILE* fp = fopen(filename.c_str(),"a");
+    int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
     for (int cc = 0; cc < OFDM_DATA_NUM; cc++) {
         int *cx = &demul_hard_buffer_[total_data_subframe_id][cc * UE_NUM];
         fprintf(fp, "SC: %d, Frame %d, subframe: %d, ", cc, frame_id, data_subframe_id);

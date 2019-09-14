@@ -7,8 +7,6 @@
 #define OFFSET_H
 
 
-#include "Symbols.hpp"
-
 /* v1: 16 bits, v2: 16bits */
 inline int generateOffset2d(int v1, int v2) 
 {

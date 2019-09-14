@@ -23,8 +23,8 @@ int main(int argc, char const *argv[])
       }
       else {
         printf("Wrong arguments (requires 3 arguments: 1. number of task threads, 2. number of tx threads, 3. core offset, 4. frame duration)\n");
-        printf("Arguments set to default: 10, 4, 20, 5000\n");
-        simulator = new Simulator(cfg, 10, 4, 20, 5000);
+        printf("Arguments set to default: 10, 4, 21, 5000\n");
+        simulator = new Simulator(cfg, 10, 4, 21, 5000);
       }
       simulator->start();
       ret = EXIT_SUCCESS;

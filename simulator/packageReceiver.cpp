@@ -5,7 +5,6 @@
  */
 
 #include "packageReceiver.hpp"
-#include "cpu_attach.hpp"
 
 
 PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
@@ -71,17 +70,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     printf("start Recv thread\n");
     // new thread
 
-#ifdef ENABLE_CPU_ATTACH
-    if(stick_this_thread_to_core(core_id_) != 0)
-    {
-        printf("RX: stitch RX main thread to core %d failed\n", core_id_);
-        exit(0);
-    }
-    else{
-        printf("RX: stitch RX main thread to core %d succeeded\n", core_id_);
-    }
-#endif
-
+    // pin_to_core_with_offset(RX_Master, core_id_, 0);
     std::vector<pthread_t> created_threads;
 
 #if USE_DPDK
@@ -125,7 +114,7 @@ void* PackageReceiver::loopRecv(void *in_context)
     // get the pointer of class & tid
     PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
     int tid = ((PackageReceiverContext *)in_context)->tid;
-    printf("package receiver thread %d start\n", tid);
+    // printf("package receiver thread %d start\n", tid);
 
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
@@ -144,21 +133,8 @@ void* PackageReceiver::loopRecv(void *in_context)
     int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 
-
-#ifdef ENABLE_CPU_ATTACH 
-    int cur_core = core_id + tid + 2 + obj_ptr->rx_thread_num_;
-    if (cur_core >= 36)
-        cur_core -= 36;
-    if(stick_this_thread_to_core(cur_core) != 0) {
-        printf("RX thread: attach RX thread %d to core %d failed\n", tid, cur_core);
-        exit(0);
-    }
-    else {
-        printf("RX thread: attached RX thread %d to core %d\n", tid, cur_core);
-    }
-#endif
-
-
+    int core_offset = obj_ptr->core_id_ + obj_ptr->rx_thread_num_ + 2;
+    pin_to_core_with_offset(RX, core_offset, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;

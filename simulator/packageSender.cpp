@@ -4,7 +4,6 @@
  * 
  */
 #include "packageSender.hpp"
-#include "cpu_attach.hpp"
 
 bool keep_running = true;
 
@@ -61,7 +60,7 @@ PackageSender::PackageSender(Config *cfg, int in_thread_num, int in_core_offset,
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
 socket_num(in_thread_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
 {
-    printf("TX main thread: on core %d\n", sched_getcpu());
+    printf("TX constructer: on core %d\n", sched_getcpu());
 
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -180,7 +179,7 @@ PackageSender::~PackageSender()
 
 void PackageSender::startTX()
 {
-    printf("start sender\n");
+    // printf("start sender\n");
     // double frame_start[10240] __attribute__( ( aligned (4096) ) );
     // double frame_end[10240] __attribute__( ( aligned (4096) ) ) ;
     alloc_buffer_1d(&frame_start, 10240, 4096, 1);
@@ -419,7 +418,7 @@ void PackageSender::startTXfromMain(double *in_frame_start, double *in_frame_end
         perror("socket main send thread create failed");
         exit(0);
     }
-    printf("Created main tx thread\n");
+    // printf("Created main tx thread\n");
     created_threads.push_back(main_send_thread_);
 }
 
@@ -427,22 +426,13 @@ void PackageSender::startTXfromMain(double *in_frame_start, double *in_frame_end
 void* PackageSender::loopSend_main(void *in_context)
 {
     PackageSender* obj_ptr = ((PackageSenderContext *)in_context)->ptr;
-    int tid = ((PackageSenderContext *)in_context)->tid;
-    printf("package main sender thread %d start\n", tid);
+    // int tid = ((PackageSenderContext *)in_context)->tid;
+    // printf("package main sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<int> *task_queue_ = &obj_ptr->task_queue_;
     moodycamel::ConcurrentQueue<int> *message_queue_ = &obj_ptr->message_queue_;
 
-#ifdef ENABLE_CPU_ATTACH
-    int cur_core = obj_ptr->core_offset;
-    if(stick_this_thread_to_core(cur_core) != 0) {
-        printf("stitch TX main thread to core %d failed\n", cur_core);
-        exit(0);
-    }
-    else {
-        printf("stitch TX main thread to core %d succeeded\n", cur_core);
-    }
-#endif
+    pin_to_core_with_offset(TX_Master, obj_ptr->core_offset, 0);
 
     // double frame_start[10240] __attribute__( ( aligned (4096) ) );
     // double frame_end[10240] __attribute__( ( aligned (4096) ) ) ;
@@ -656,21 +646,13 @@ void* PackageSender::loopSend(void *in_context)
 
     PackageSender* obj_ptr = ((PackageSenderContext *)in_context)->ptr;
     int tid = ((PackageSenderContext *)in_context)->tid;
-    printf("package sender thread %d start\n", tid);
+    // printf("package sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<int> *task_queue_ = &obj_ptr->task_queue_;
     moodycamel::ConcurrentQueue<int> *message_queue_ = &obj_ptr->message_queue_;
 
     // printf("TX thread %d: on core %d\n", tid, sched_getcpu());
-#ifdef ENABLE_CPU_ATTACH
-    if(stick_this_thread_to_core(obj_ptr->core_offset + 1 + tid) != 0) {
-        printf("stitch TX thread %d to core %d failed\n", tid, obj_ptr->core_offset + 1 + tid);
-        exit(0);
-    }
-    else {
-        printf("stitch TX thread %d to core %d succeeded\n", tid, obj_ptr->core_offset + 1 + tid);
-    }
-#endif
+    pin_to_core_with_offset(TX, obj_ptr->core_offset + 1, tid);
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     int UE_NUM = obj_ptr->UE_NUM;
