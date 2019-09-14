@@ -30,7 +30,7 @@
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
-#include "cpu_attach.hpp"
+// #include "cpu_attach.hpp"
 #include "packageReceiver.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
@@ -45,6 +45,7 @@
 #include "stats.hpp"
 #include "config.hpp"
 #include "signalHandler.hpp"
+#include "utils.h"
 
 class Millipede
 {
@@ -62,17 +63,17 @@ public:
     void start();
     void stop();
 
-    static void *taskThread(void *context);
-    static void *fftThread(void *context);
-    static void *zfThread(void *context);
-    static void *demulThread(void *context); 
+    void *worker(int tid);
+    void *worker_fft(int tid);
+    void *worker_zf(int tid);
+    void *worker_demul(int tid);
+    void create_threads(thread_type thread, int tid_start, int tid_end);
 
-
-    struct EventHandlerContext
-    {
-        Millipede *obj_ptr;
-        int id;
-    };
+    // struct EventHandlerContext
+    // {
+    //     Millipede *obj_ptr;
+    //     int id;
+    // };
 
     inline void update_frame_count(int *frame_count);
     /* Add tasks into task queue based on event type */
@@ -98,7 +99,7 @@ public:
     void free_downlink_buffers();
 
 
-    void save_demul_data_to_file();
+    void save_demul_data_to_file(int frame_id, int data_subframe_id);
     void getDemulData(int **ptr, int *size);
     void getEqualData(float **ptr, int *size);
 
@@ -138,7 +139,7 @@ private:
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t *task_threads;
-    EventHandlerContext *context;
+    EventHandlerContext<Millipede> *context;
     /*****************************************************
      * Buffers
      *****************************************************/ 

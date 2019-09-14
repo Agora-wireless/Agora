@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <vector>
 #include <fstream>      // std::ifstream
+#include <immintrin.h>
+#include <emmintrin.h>
 #define JSON
 #ifdef JSON
 #include <nlohmann/json.hpp>

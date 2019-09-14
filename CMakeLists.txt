@@ -84,8 +84,7 @@ foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
 endforeach()
 
-set(COMMON_SOURCES src/common/cpu_attach.cpp 
-                   src/common/config.cpp
+set(COMMON_SOURCES src/common/config.cpp
                    src/common/utils.cpp
                    src/common/comms-lib.cpp
                    src/common/signalHandler.cpp)

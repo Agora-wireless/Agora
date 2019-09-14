@@ -20,16 +20,7 @@ CORE_OFFSET(in_core_offset)
     this->cfg_ = cfg;
 
     initialize_vars_from_cfg(cfg);
-#ifdef ENABLE_CPU_ATTACH
-    int main_core_id = CORE_OFFSET + 1;
-    if(stick_this_thread_to_core(main_core_id) != 0) {
-        printf("Main thread: stitch main thread to core %d failed\n", main_core_id);
-        exit(0);
-    }
-    else {
-        printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
-    }
-#endif
+    pin_to_core_with_offset(Master, CORE_OFFSET, 0);
 
     initialize_queues();
 
@@ -37,10 +28,10 @@ CORE_OFFSET(in_core_offset)
     initialize_uplink_buffers();
 
     printf("new PackageSender\n");
-    sender_.reset(new PackageSender(cfg_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 2, sender_delay));
+    sender_.reset(new PackageSender(cfg_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay));
 
     printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, 
+    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET, 
                     &message_queue_, &complete_task_queue_, rx_ptoks_ptr));
 
 }
