@@ -33,7 +33,8 @@ class UserClass(object):
     	lib.Phy_UE_start(self.obj)
 
     def stopUserProc(self):
-    	lib.Phy_UE_stop(self.obj)
+    	#lib.Phy_UE_stop(self.obj)
+    	lib.Phy_UE_stop()
 
     def destroyUserProc(self):
     	lib.Phy_UE_destroy(self.obj)

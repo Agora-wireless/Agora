@@ -151,11 +151,11 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
     pilot_buffer_ = in_pilot_buffer;
     tx_buffer_status_ = in_buffer_status; // for save status
 
-    tx_core_id_ = in_core_id;
-    printf("start Transmit thread\n");
-
     // create new threads
     std::vector<pthread_t> created_threads;
+#ifdef SEPARATE_TX_THREAD
+    tx_core_id_ = in_core_id;
+    printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
         
@@ -169,6 +169,7 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
         created_threads.push_back(send_thread_);
     }
     
+#endif
     return created_threads;
 }
 
@@ -210,6 +211,9 @@ void* RU::loopSend(void *in_context)
     RadioConfig *radio = obj_ptr->radioconfig_;
 #endif
     int package_length = cfg->package_length;
+#ifndef SIM
+    package_length -= cfg->package_header_offset;
+#endif
 
     int ret;
     int ant_id, symbol_id;
@@ -406,6 +410,7 @@ void* RU::loopProc(void *in_context)
 
     int package_length = cfg->package_length;
     int package_header_offset = cfg->package_header_offset;
+    int tx_package_length = package_length - package_header_offset;
     char* buffer = (char*)obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
@@ -425,6 +430,7 @@ void* RU::loopProc(void *in_context)
         txSymsPerFrame = cfg->dlSymsPerFrame;
         txSymbols = cfg->DLSymbols[0];
     }
+    int n_ant = cfg->getNumAntennas();
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -607,18 +613,33 @@ void* RU::loopProc(void *in_context)
                 for (int tx_symbol_id = 0; tx_symbol_id < txSymsPerFrame; tx_symbol_id++)
                 {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
-                    int tx_symbol = txSymbols[tx_symbol_id];
-                    offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+                    int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM; 
+                    size_t tx_symbol = txSymbols[tx_symbol_id];
+                    //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+                    int frame_samp_size = (tx_package_length * n_ant * txSymsPerFrame);
+                    int tx_offset = tx_frame_offset * frame_samp_size + tx_package_length * (n_ant * tx_symbol_id + ant_id);
                     void* txbuf[2];
                     long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
                     int flags = 1; // HAS_TIME
-                    //if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-                    txbuf[0] = tx_buffer + offset * package_length; 
+                    if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST
+                    txbuf[0] = (void*)(tx_buffer + tx_offset); 
                     if (cfg->nChannels == 2)
                     {
-                        txbuf[1] = tx_buffer + (offset + 1) * package_length;  
+                        txbuf[1] = (void*)(tx_buffer + tx_offset + tx_package_length);
                     }
-                    radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+#if DEBUG_SEND
+                    int start_ind = 2 * cfg->prefix;
+                    printf("transmit samples: %d %d %d %d %d %d %d %d ...\n\n",
+                                              *((short *)txbuf[0]+start_ind+0),
+                                              *((short *)txbuf[0]+start_ind+1),
+                                              *((short *)txbuf[0]+start_ind+2),
+                                              *((short *)txbuf[0]+start_ind+3),
+                                              *((short *)txbuf[0]+start_ind+4),
+                                              *((short *)txbuf[0]+start_ind+5),
+                                              *((short *)txbuf[0]+start_ind+6), 
+                                              *((short *)txbuf[0]+start_ind+7)); 
+#endif
+                    radio->radioTx(rid, txbuf, flags, frameTime);
                 }
 //#endif
             }

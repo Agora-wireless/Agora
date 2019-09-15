@@ -21,6 +21,7 @@
 #include "comms-lib.h"
 #include <armadillo>
 #include "config.hpp"
+#include "offset.h"
 //#include "mufft/fft.h"
 
 class Phy_UE
@@ -189,6 +190,7 @@ private:
     int core_offset;
     int rx_thread_num;
     int package_length;
+    int tx_package_length;
     int package_header_offset;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
