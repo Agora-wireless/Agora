@@ -10,12 +10,12 @@ else ()
 endif()
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
-  SET(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
+  set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
 set(CMAKE_C_FLAGS "-std=c99 -Wall -g -O3 -mavx2 -march=broadwell")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -O3 -mavx2 -mavx -march=broadwell")
-SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
