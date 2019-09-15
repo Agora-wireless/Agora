@@ -450,7 +450,7 @@ void Millipede::start()
     int last_frame_id = downlink_mode ? frame_count_tx : frame_count_demul;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
-    exit(0);
+    //exit(0);
 }
 
 
@@ -1205,7 +1205,7 @@ void Millipede::initialize_downlink_buffers()
 
 void Millipede::free_uplink_buffers()
 {
-    free_buffer_1d(&pilots_);
+    //free_buffer_1d(&pilots_);
     free_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM);
     free_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM);
     free_buffer_2d(&csi_buffer_, UE_NUM * TASK_BUFFER_FRAME_NUM);
@@ -1330,7 +1330,7 @@ extern "C"
         return millipede;
     }
     EXPORT void Millipede_start(Millipede *millipede) {millipede->start();}
-    EXPORT void Millipede_stop(Millipede *millipede) {millipede->stop();}
+    EXPORT void Millipede_stop(/*Millipede *millipede*/) {SignalHandler::setExitSignal(true); /*millipede->stop();*/}
     EXPORT void Millipede_destroy(Millipede *millipede) {delete millipede;}
     EXPORT void Millipede_getEqualData(Millipede *millipede, float **ptr, int *size) {return millipede->getEqualData(ptr, size);}
     EXPORT void Millipede_getDemulData(Millipede *millipede, int **ptr, int *size) {return millipede->getDemulData(ptr, size);}

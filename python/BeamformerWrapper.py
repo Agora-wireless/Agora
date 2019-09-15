@@ -16,7 +16,7 @@ class Config(object):
 class CoMP(object):
     def __init__(self, configfile):
         conf = Config(configfile)
-        # lib.CoMP_new.argtypes = [c_void_p]
+        lib.Millipede_new.argtypes = [c_void_p]
         lib.Millipede_new.restype = c_void_p
         lib.Millipede_start.argtypes = [c_void_p]
         lib.Millipede_start.restype = c_void_p
@@ -30,7 +30,7 @@ class CoMP(object):
     	lib.Millipede_start(self.obj)
 
     def stopCoMP(self):
-        lib.Millipede_stop(self.obj)
+        lib.Millipede_stop()
 
     def destroyCoMP(self):
         lib.Millipede_destroy(self.obj)
