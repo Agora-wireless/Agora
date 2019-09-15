@@ -270,7 +270,10 @@ Config::Config(std::string jsonfile)
     running = true;
 }
 
-Config::~Config() {}
+Config::~Config()
+{
+    free_buffer_1d(&pilots_);
+}
 
 int Config::getDownlinkPilotId(int frame_id, int symbol_id)
 {
