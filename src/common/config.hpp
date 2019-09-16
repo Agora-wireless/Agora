@@ -39,6 +39,7 @@ public:
     int prefix;
     int postfix;
     std::string modulation;
+    size_t mod_order;
     
     std::string conf;
     //std::string beacon_file;

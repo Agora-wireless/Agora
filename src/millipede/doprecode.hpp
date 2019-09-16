@@ -79,7 +79,7 @@ private:
     complex_float **dl_precoded_data_buffer_;
     complex_float **dl_ifft_buffer_;
     int **dl_IQ_data;
-    float **qam16_table;
+    float **qam_table;
 
     double **Precode_task_duration;
     int *Precode_task_count;
