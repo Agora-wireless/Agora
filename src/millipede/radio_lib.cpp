@@ -684,7 +684,6 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
             std::vector<std::complex<float> > up_f = CommsLib::FFT(up_t, fft_len);
             for (int f = 0; f < fft_len; f++) {
                 if (f < _cfg->OFDM_DATA_START || f >= _cfg->OFDM_DATA_START + _cfg->OFDM_DATA_NUM) {
-                    calib_mat[i].push_back(0);
 		    continue;
 		}
                 float dre = dn_f[f].real();

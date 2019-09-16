@@ -131,6 +131,7 @@ public:
 #if USE_ARGOS
     static void* loopRecv_Argos(void *context);
     static void* loopSend_Argos(void *context);
+    std::vector<std::vector<std::complex<float>>> get_calib_mat() { return calib_mat; }
 #endif
 
 
@@ -194,6 +195,7 @@ private:
     Config *config_;
 #if USE_ARGOS
     RadioConfig *radioconfig_;
+    std::vector<std::vector<std::complex<float>>> calib_mat;
 #endif
     int radios_per_thread;
 };

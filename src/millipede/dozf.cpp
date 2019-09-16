@@ -8,7 +8,7 @@
 using namespace arma;
 DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-    complex_float **in_csi_buffer, complex_float **in_precoder_buffer, complex_float **in_pred_csi_buffer, 
+    complex_float **in_csi_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoder_buffer, complex_float **in_recip_buffer, complex_float **in_pred_csi_buffer, 
     double **in_ZF_task_duration, int *in_ZF_task_count) 
 {
     config_ = cfg;
@@ -25,6 +25,8 @@ DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block
 
     csi_buffer_ = in_csi_buffer;
     precoder_buffer_ = in_precoder_buffer;
+    dl_precoder_buffer_ = in_dl_precoder_buffer;
+    recip_buffer_ = in_recip_buffer;
     pred_csi_buffer_ = in_pred_csi_buffer;
 
 
@@ -173,6 +175,15 @@ void DoZF::ZF(int offset)
         // double start_time3 = get_time();
     #endif
         
+        cx_float *ptr_out2 = (cx_float *)dl_precoder_buffer_[cur_offset];
+        cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
+
+        cx_float *calib_ptr = (cx_float *)recip_buffer_[cur_sc_id];
+        cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
+        cx_fvec vec_calib = mat_calib.col(0);
+        cx_fmat mat_calib_diag = diagmat(vec_calib);
+
+        mat_output2 = mat_output * mat_calib_diag;
     
         // float *tar_ptr = (float *)precoder_buffer_.precoder[cur_offset];
         // // float temp = *tar_ptr;
