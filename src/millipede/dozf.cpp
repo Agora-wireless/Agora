@@ -174,16 +174,18 @@ void DoZF::ZF(int offset)
         ZF_task_duration[tid * 8][3] += duration3;
         // double start_time3 = get_time();
     #endif
-        
-        cx_float *ptr_out2 = (cx_float *)dl_precoder_buffer_[cur_offset];
-        cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
 
-        cx_float *calib_ptr = (cx_float *)recip_buffer_[cur_sc_id];
-        cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
-        cx_fvec vec_calib = mat_calib.col(0);
-        cx_fmat mat_calib_diag = diagmat(vec_calib);
+        if (config_->downlink_mode) {
+            cx_float *ptr_out2 = (cx_float *)dl_precoder_buffer_[cur_offset];
+            cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
 
-        mat_output2 = mat_output * mat_calib_diag;
+            cx_float *calib_ptr = (cx_float *)recip_buffer_[cur_sc_id];
+            cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
+            cx_fvec vec_calib = mat_calib.col(0);
+            cx_fmat mat_calib_diag = diagmat(vec_calib);
+
+            mat_output2 = mat_output * mat_calib_diag;
+	}
     
         // float *tar_ptr = (float *)precoder_buffer_.precoder[cur_offset];
         // // float temp = *tar_ptr;
