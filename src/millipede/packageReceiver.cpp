@@ -1711,7 +1711,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         //symbol_id = task_event.data / cfg->getNumAntennas();
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         //{
-            int symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
+            size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
             void* txbuf[2];
             long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
             int flags = 1; // HAS_TIME

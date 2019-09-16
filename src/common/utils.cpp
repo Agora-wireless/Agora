@@ -107,7 +107,8 @@ void Utils::loadData(const char* filename, std::vector<std::complex<int16_t>> &d
     float real, imag;
     for(int i = 0; i < samples; i++)
     {
-    	fscanf(fp, "%f %f", &real, &imag);
+    	int ret = fscanf(fp, "%f %f", &real, &imag);
+	if (ret < 0) break;
         data[i] = std::complex<int16_t>(int16_t(real*32768), int16_t(imag*32768));
     }
     
@@ -120,7 +121,8 @@ void Utils::loadData(const char* filename, std::vector<unsigned> &data, int samp
     data.resize(samples);
     for(int i = 0; i < samples; i++)
     {
-        fscanf(fp, "%u", &data[i]);
+        int ret = fscanf(fp, "%u", &data[i]);
+	if (ret < 0) break;
     }
     
     fclose(fp);

@@ -106,26 +106,26 @@ struct DLSocketBuffer
 //     std::vector<int> buffer_status;
 // };
 
-inline int generateOffset2d(int max_dim1, int max_dim2, int dim1_id, int dim2_id) 
+inline size_t generateOffset2d(size_t max_dim1, size_t max_dim2, size_t dim1_id, size_t dim2_id) 
 {
     dim1_id = dim1_id % max_dim1;
     return dim1_id * max_dim2 + dim2_id;
 }
 
-inline int generateOffset3d(int max_dim1, int max_dim2, int max_dim3, int dim1_id, int dim2_id, int dim3_id)
+inline size_t generateOffset3d(size_t max_dim1, size_t max_dim2, size_t max_dim3, size_t dim1_id, size_t dim2_id, size_t dim3_id)
 {
     dim1_id = dim1_id % max_dim1;
-    int dim2d_id = dim1_id * max_dim2 + dim2_id;
+    size_t dim2d_id = dim1_id * max_dim2 + dim2_id;
     return dim2d_id * max_dim3 + dim3_id;
 }
 
-inline void interpretOffset2d(int max_dim2, int offset, int *dim1_id, int *dim2_id)
+inline void interpretOffset2d(size_t max_dim2, size_t offset, size_t *dim1_id, size_t *dim2_id)
 {
     *dim2_id = offset % max_dim2;
     *dim1_id = offset / max_dim2;
 }
 
-inline void interpretOffset3d(int max_dim2, int max_dim3, int offset, int *dim1_id, int *dim2d_id, int *dim2_id, int *dim3_id)
+inline void interpretOffset3d(size_t max_dim2, size_t max_dim3, size_t offset, size_t *dim1_id, size_t *dim2d_id, size_t *dim2_id, size_t *dim3_id)
 {
     *dim3_id = offset % max_dim3;
     *dim2d_id = offset / max_dim3;

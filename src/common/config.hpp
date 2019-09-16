@@ -35,9 +35,9 @@ public:
     size_t pilotSymsPerFrame;
     size_t ulSymsPerFrame;
     size_t dlSymsPerFrame;
-    int dl_prefix;
-    int prefix;
-    int postfix;
+    size_t dl_prefix;
+    size_t prefix;
+    size_t postfix;
     std::string modulation;
     size_t mod_order;
     
@@ -86,33 +86,33 @@ public:
     std::string beacon_mode;
     bool sampleCalEn;
 
-    int core_offset;
-    int worker_thread_num;
-    int socket_thread_num;
-    int fft_thread_num;
-    int demul_thread_num;
-    int zf_thread_num;
-    int demul_block_size;
-    int zf_block_size;
+    size_t core_offset;
+    size_t worker_thread_num;
+    size_t socket_thread_num;
+    size_t fft_thread_num;
+    size_t demul_thread_num;
+    size_t zf_thread_num;
+    size_t demul_block_size;
+    size_t zf_block_size;
 
 
-    int BS_ANT_NUM;
-    int UE_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int TX_PREFIX_LEN;
-    int CP_LEN;
-    int OFDM_PREFIX_LEN;
-    int OFDM_FRAME_LEN;
+    size_t BS_ANT_NUM;
+    size_t UE_NUM;
+    size_t OFDM_CA_NUM;
+    size_t OFDM_DATA_NUM;
+    size_t OFDM_DATA_START;
+    size_t TX_PREFIX_LEN;
+    size_t CP_LEN;
+    size_t OFDM_PREFIX_LEN;
+    size_t OFDM_FRAME_LEN;
 
-    int symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
-    int ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
-    int dl_data_symbol_start, dl_data_symbol_end;
+    size_t symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
+    size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
+    size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
 
-    int package_header_offset;
-    int package_length;
+    size_t package_header_offset;
+    size_t package_length;
 
     std::string rx_addr;
     std::string tx_addr;
@@ -120,19 +120,19 @@ public:
     int tx_port;
 
     bool isUE;
-    const int maxFrame = 1 << 31;
-    const int data_offset = sizeof(int) * 16;
+    const size_t maxFrame = 1 << 31;
+    const size_t data_offset = sizeof(int) * 16;
     // int dl_data_symbol_perframe;
     std::atomic<bool> running;
     
-    int getNumAntennas() { return nRadios*nChannels; }
-    int getDlSFIndex(int, int);
-    int getUlSFIndex(int, int);
-    int getDownlinkPilotId(int, int);
-    int getPilotSFIndex(int, int);
-    bool isPilot(int, int);
-    bool isDownlink(int, int);
-    bool isUplink(int, int);
+    size_t getNumAntennas() { return nRadios*nChannels; }
+    int getDlSFIndex(size_t, size_t);
+    int getUlSFIndex(size_t, size_t);
+    int getDownlinkPilotId(size_t, size_t);
+    int getPilotSFIndex(size_t, size_t);
+    bool isPilot(size_t, size_t);
+    bool isDownlink(size_t, size_t);
+    bool isUplink(size_t, size_t);
     Config(std::string);
     ~Config();
 };
