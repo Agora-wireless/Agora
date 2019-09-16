@@ -216,10 +216,10 @@ Config::Config(std::string jsonfile)
     alloc_buffer_2d(&ul_IQ_data, ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&ul_IQ_modul, ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
 
-#ifdef GENERATE_DATA
     int mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
-    int mod_order = (int)pow(2, mod_type);
+    mod_order = (size_t)pow(2, mod_type);
 
+#ifdef GENERATE_DATA
     for (int i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
         for (int j = 0; j < OFDM_CA_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
