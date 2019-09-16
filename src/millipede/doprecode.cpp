@@ -35,7 +35,7 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     qam16_table = (float **)malloc(2 * sizeof(float *));
     for (int i = 0; i < 2; i++) 
         qam16_table[i] = (float *)aligned_alloc(64, 16 * sizeof(float));
-
+    init_qam16_table(qam16_table);
 
     Precode_task_duration = in_Precode_task_duration;
     Precode_task_count = in_Precode_task_count;
@@ -92,22 +92,29 @@ void DoPrecode::Precode(int offset)
                 _mm_prefetch((char *)(precoder_buffer_[precoder_offset] + line_idx * 8), _MM_HINT_T0);
             }
 
-            // complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
-            _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id * UE_NUM]+cur_sc_id), _MM_HINT_T0);
-            complex_float *data_ptr = modulated_buffer_temp;
-            for (int user_id = 0; user_id < UE_NUM - 1; user_id ++) {
-                int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
-                // cout<<*raw_data_ptr<<", ";
-                _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id * UE_NUM + user_id + 1], _MM_HINT_T0);
-                *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam16_table);
-                
-                // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+            complex_float *data_ptr;
+            if (current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS)
+	    {
+                data_ptr = modulated_buffer_temp;
+                for (int user_id = 0; user_id < UE_NUM; user_id ++)
+                    *(data_ptr + user_id) = {config_->pilots_[cur_sc_id], 0};
+            } else {
+	        // complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
+                _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id * UE_NUM]+cur_sc_id), _MM_HINT_T0);
+                data_ptr = modulated_buffer_temp;
+                for (int user_id = 0; user_id < UE_NUM - 1; user_id ++) {
+                    int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
+                    // cout<<*raw_data_ptr<<", ";
+                    _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id * UE_NUM + user_id + 1], _MM_HINT_T0);
+                    *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam16_table);
+ 
+                    // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+                }
+                // cout<<endl;
+
+                int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + UE_NUM - 1][cur_sc_id];
+                *(data_ptr + UE_NUM - 1) = mod_16qam_single(*(raw_data_ptr), qam16_table);
             }
-            // cout<<endl;
-
-            int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + UE_NUM - 1][cur_sc_id];
-            *(data_ptr + UE_NUM - 1) = mod_16qam_single(*(raw_data_ptr), qam16_table);
-
 
             
             // mat_precoder size: UE_NUM \times BS_ANT_NUM        
