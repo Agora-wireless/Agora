@@ -145,7 +145,7 @@ Config::Config(std::string jsonfile)
     std::vector<std::complex<int16_t> > coeffs_ci16 = Utils::double_to_int16(gold_ifft);
     coeffs = Utils::cint16_to_uint32(coeffs_ci16, true, "QI");
     beacon_ci16.resize(256);
-    for (int i = 0; i < 128; i++) {
+    for (size_t i = 0; i < 128; i++) {
         beacon_ci16[i] = std::complex<int16_t>((int16_t)(gold_ifft[0][i] * 32768), (int16_t)(gold_ifft[1][i] * 32768));
         beacon_ci16[i + 128] = beacon_ci16[i];
     }
@@ -158,8 +158,9 @@ Config::Config(std::string jsonfile)
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
+    size_t r = 0;
 #ifdef GENERATE_PILOT
-    for (int i = 0; i < OFDM_CA_NUM; i++) {
+    for (size_t i = 0; i < OFDM_CA_NUM; i++) {
         if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
             pilots_[i] = 0;
         else
@@ -191,11 +192,12 @@ Config::Config(std::string jsonfile)
         printf("open file %s faild.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    if (r < OFDM_CA_NUM) printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
 #endif
     std::vector<std::complex<float> > pilotsF(OFDM_CA_NUM);
-    for (int i = 0; i < OFDM_CA_NUM; i++)
+    for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilotsF[i] = pilots_[i];
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN, pilot_cf32.end()); // add CP
@@ -216,23 +218,23 @@ Config::Config(std::string jsonfile)
     alloc_buffer_2d(&ul_IQ_data, ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&ul_IQ_modul, ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
 
-    int mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+    size_t mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
     mod_order = (size_t)pow(2, mod_type);
 
 #ifdef GENERATE_DATA
-    for (int i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
-        for (int j = 0; j < OFDM_CA_NUM; j++)
+    for (size_t i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
+        for (size_t j = 0; j < OFDM_CA_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
     }
 
-    for (int i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
-        for (int j = 0; j < OFDM_DATA_NUM; j++)
+    for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++)
             ul_IQ_data[i][j] = rand() % mod_order;
         std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM), mod_type);
-        for (int j = 0; j < OFDM_CA_NUM; j++) {
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
             if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM)
                 continue;
-            int k = j - OFDM_DATA_START;
+            size_t k = j - OFDM_DATA_START;
             ul_IQ_modul[i][j].real = modul_data[k].real();
             ul_IQ_modul[i][j].imag = modul_data[k].imag();
         }
@@ -245,8 +247,9 @@ Config::Config(std::string jsonfile)
         printf("open file %s faild.\n", filename1.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    for (int i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
-        fread(dl_IQ_data[i], sizeof(int), OFDM_CA_NUM, fd);
+    for (size_t i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
+        r = fread(dl_IQ_data[i], sizeof(int), OFDM_CA_NUM, fd);
+        if (r < OFDM_CA_NUM) printf("bad read from file %s (batch %d) \n", filename1.c_str(), i);
     }
     fclose(fd);
 
@@ -256,13 +259,14 @@ Config::Config(std::string jsonfile)
     if (fp == NULL) {
         std::cerr << "Openning File " << filename2 << " fails. Error: " << strerror(errno) << std::endl;
     }
-    int total_sc = OFDM_DATA_NUM * UE_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
+    size_t total_sc = OFDM_DATA_NUM * UE_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
     L2_data = new mac_dtype[total_sc];
-    fread(L2_data, sizeof(mac_dtype), total_sc, fp);
+    r = fread(L2_data, sizeof(mac_dtype), total_sc, fp);
+    if (r < total_sc) printf("bad read from file %s \n", filename2.c_str());
     fclose(fp);
-    for (int i = 0; i < total_sc; i++) {
-        int sid = i / (data_sc_len * nUEs);
-        int cid = i % (data_sc_len * nUEs) + OFDM_DATA_START;
+    for (size_t i = 0; i < total_sc; i++) {
+        size_t sid = i / (data_sc_len * nUEs);
+        size_t cid = i % (data_sc_len * nUEs) + OFDM_DATA_START;
         ul_IQ_modul[sid][cid] = L2_data[i];
     }
 #endif
@@ -275,10 +279,10 @@ Config::~Config()
     free_buffer_1d(&pilots_);
 }
 
-int Config::getDownlinkPilotId(int frame_id, int symbol_id)
+int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
     it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end()) {
         int id = it - DLSymbols[fid].begin();
@@ -286,16 +290,16 @@ int Config::getDownlinkPilotId(int frame_id, int symbol_id)
 #ifdef DEBUG3
             printf("getDownlinkPilotId(%d, %d) = %d\n", frame_id, symbol_id, id);
 #endif
-            return it - DLSymbols[fid].begin();
+            return id;
         }
     }
     return -1;
 }
 
-int Config::getDlSFIndex(int frame_id, int symbol_id)
+int Config::getDlSFIndex(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
     it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
         return it - DLSymbols[fid].begin();
@@ -303,10 +307,10 @@ int Config::getDlSFIndex(int frame_id, int symbol_id)
         return -1;
 }
 
-int Config::getPilotSFIndex(int frame_id, int symbol_id)
+int Config::getPilotSFIndex(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
     it = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
     if (it != pilotSymbols[fid].end()) {
 #ifdef DEBUG3
@@ -317,10 +321,10 @@ int Config::getPilotSFIndex(int frame_id, int symbol_id)
         return -1;
 }
 
-int Config::getUlSFIndex(int frame_id, int symbol_id)
+int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
     it = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
     if (it != ULSymbols[fid].end()) {
 #ifdef DEBUG3
@@ -331,9 +335,9 @@ int Config::getUlSFIndex(int frame_id, int symbol_id)
         return -1;
 }
 
-bool Config::isPilot(int frame_id, int symbol_id)
+bool Config::isPilot(size_t frame_id, size_t symbol_id)
 {
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
 #ifdef USE_UNDEF //USE_ARGOS
     if (symbol_id > symbolsPerFrame) {
         printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n", symbol_id, frame_id);
@@ -362,15 +366,15 @@ bool Config::isPilot(int frame_id, int symbol_id)
         return (ind < DL_PILOT_SYMS);
         //return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
     } else
-        return (symbol_id >= 0) && (symbol_id < UE_NUM);
+        return (symbol_id < UE_NUM);
 #endif
 }
 
-bool Config::isUplink(int frame_id, int symbol_id)
+bool Config::isUplink(size_t frame_id, size_t symbol_id)
 {
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
 #ifdef USE_UNDEF //USE_ARGOS
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
     if (symbol_id > symbolsPerFrame) {
         printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n", symbol_id, frame_id);
         return false;
@@ -387,9 +391,9 @@ bool Config::isUplink(int frame_id, int symbol_id)
 #endif
 }
 
-bool Config::isDownlink(int frame_id, int symbol_id)
+bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 {
-    int fid = frame_id % framePeriod;
+    size_t fid = frame_id % framePeriod;
 #ifdef DEBUG3
     printf("isDownlink(%d, %d) = %c\n", frame_id, symbol_id, frames[fid].at(symbol_id));
 #endif

@@ -153,8 +153,8 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
 
     // create new threads
     std::vector<pthread_t> created_threads;
-#ifdef SEPARATE_TX_THREAD
     tx_core_id_ = in_core_id;
+#ifdef SEPARATE_TX_THREAD
     printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;

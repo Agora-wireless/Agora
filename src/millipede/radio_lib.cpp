@@ -528,7 +528,7 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
     bool good_csi = true;
 
     size_t seq_len = _cfg->pilot_cf32.size();
-    int fft_len = _cfg->OFDM_CA_NUM;
+    size_t fft_len = _cfg->OFDM_CA_NUM;
     std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len << std::endl;
     std::vector<std::complex<double> > pilot_cd64;
     std::vector<std::complex<int16_t> > pilot_cs16;
@@ -682,7 +682,7 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
                 [](std::complex<int16_t> cf) { return std::complex<float>(cf.real() / 32768.0, cf.imag() / 32768.0); });
             std::vector<std::complex<float> > dn_f = CommsLib::FFT(dn_t, fft_len);
             std::vector<std::complex<float> > up_f = CommsLib::FFT(up_t, fft_len);
-            for (int f = 0; f < fft_len; f++) {
+            for (size_t f = 0; f < fft_len; f++) {
                 if (f < _cfg->OFDM_DATA_START || f >= _cfg->OFDM_DATA_START + _cfg->OFDM_DATA_NUM) {
 		    continue;
 		}
