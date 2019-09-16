@@ -140,9 +140,21 @@ void Millipede::start()
 
     /* start downlink transmitter */
     std::vector<pthread_t> tx_threads;
-    if (downlink_mode)
+    if (downlink_mode) {
         std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_, 
             dl_socket_buffer_status_, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
+
+        std::vector<std::vector<std::complex<float>>> calib_mat = receiver_->get_calib_mat();
+        for (int i = 0; i < BS_ANT_NUM; i++) {
+            for (int j = 0; j < OFDM_DATA_NUM; j++) {
+                float re = calib_mat[i][j].real();
+                float im = calib_mat[i][j].imag();
+                recip_buffer_[j][i].real = re; //re/(re*re + im*im);
+                recip_buffer_[j][i].imag = im; //-im/(re*re + im*im);
+            }
+        }
+    }
+
     /* tokens used for enqueue */
     /* uplink */
     moodycamel::ProducerToken ptok(fft_queue_);
@@ -500,13 +512,13 @@ void* Millipede::taskThread(void* context)
         obj_ptr->IFFT_task_duration, obj_ptr->IFFT_task_count);
 
     DoZF *computeZF = new DoZF(obj_ptr->cfg_, tid, obj_ptr->zf_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->csi_buffer_, obj_ptr->precoder_buffer_, obj_ptr->pred_csi_buffer_, obj_ptr->ZF_task_duration, obj_ptr->ZF_task_count);
+        obj_ptr->csi_buffer_, obj_ptr->precoder_buffer_, obj_ptr->dl_precoder_buffer_, obj_ptr->recip_buffer_, obj_ptr->pred_csi_buffer_, obj_ptr->ZF_task_duration, obj_ptr->ZF_task_count);
 
     DoDemul *computeDemul = new DoDemul(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
         obj_ptr->data_buffer_, obj_ptr->precoder_buffer_, obj_ptr->equal_buffer_, obj_ptr->demul_hard_buffer_, obj_ptr->Demul_task_duration, obj_ptr->Demul_task_count);
 
     DoPrecode *computePrecode = new DoPrecode(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->dl_modulated_buffer_, obj_ptr->precoder_buffer_, obj_ptr->dl_precoded_data_buffer_, obj_ptr->dl_ifft_buffer_, obj_ptr->dl_IQ_data, 
+        obj_ptr->dl_modulated_buffer_, obj_ptr->dl_precoder_buffer_, obj_ptr->dl_precoded_data_buffer_, obj_ptr->dl_ifft_buffer_, obj_ptr->dl_IQ_data, 
         obj_ptr->Precode_task_duration, obj_ptr->Precode_task_count);
 
 
@@ -668,7 +680,7 @@ void* Millipede::zfThread(void* context)
 
     /* initialize ZF operator */
     DoZF *computeZF = new DoZF(obj_ptr->cfg_, tid, obj_ptr->zf_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->csi_buffer_, obj_ptr->precoder_buffer_, obj_ptr->pred_csi_buffer_, obj_ptr->ZF_task_duration, obj_ptr->ZF_task_count);
+        obj_ptr->csi_buffer_, obj_ptr->precoder_buffer_, obj_ptr->dl_precoder_buffer_, obj_ptr->recip_buffer_, obj_ptr->pred_csi_buffer_, obj_ptr->ZF_task_duration, obj_ptr->ZF_task_count);
 
     Event_data event;
     bool ret_zf = false;
@@ -722,7 +734,7 @@ void* Millipede::demulThread(void* context)
 
     /* initialize Precode operator */
     DoPrecode *computePrecode = new DoPrecode(obj_ptr->cfg_, tid, obj_ptr->demul_block_size, obj_ptr->transpose_block_size, &(obj_ptr->complete_task_queue_), task_ptok_ptr,
-        obj_ptr->dl_modulated_buffer_, obj_ptr->precoder_buffer_, obj_ptr->dl_precoded_data_buffer_, obj_ptr->dl_ifft_buffer_, obj_ptr->dl_IQ_data,  
+        obj_ptr->dl_modulated_buffer_, obj_ptr->dl_precoder_buffer_, obj_ptr->dl_precoded_data_buffer_, obj_ptr->dl_ifft_buffer_, obj_ptr->dl_IQ_data,  
         obj_ptr->Precode_task_duration, obj_ptr->Precode_task_count);
 
 
@@ -1183,6 +1195,8 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64, 1);
     alloc_buffer_2d(&dl_precoded_data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64, 0);
+    alloc_buffer_2d(&dl_precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
+    alloc_buffer_2d(&recip_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM, 64, 0);
 
 
     /* initilize all downlink status checkers */

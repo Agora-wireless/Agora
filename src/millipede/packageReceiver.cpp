@@ -267,6 +267,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 #ifdef USE_ARGOS
     bool ret = radioconfig_->radioStart();
     if (!ret) return created_threads;
+    calib_mat = radioconfig_->get_calib_mat();
     int nradio_per_thread = config_->nRadios/rx_thread_num_;
     int rem_thread_nradio = config_->nRadios%rx_thread_num_;
 #endif
