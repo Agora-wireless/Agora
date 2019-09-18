@@ -9,9 +9,13 @@ else ()
     set (CMAKE_CXX_STANDARD 11)
 endif()
 
+if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
+  set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
+endif()
 
-set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell")
-set(CMAKE_CXX_FLAGS "-std=c++11 -w -g -O3 -mavx2 -mavx -march=broadwell")
+set(CMAKE_C_FLAGS "-std=c99 -Wall -g -O3 -mavx2 -march=broadwell")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -O3 -mavx2 -mavx -march=broadwell")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
@@ -19,7 +23,7 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False)
-set(USE_ARGOS False)
+set(USE_ARGOS True)
 
 
 # DPDK
@@ -49,8 +53,8 @@ if (${USE_ARGOS})
     add_definitions(-DUSE_ARGOS)
   endif ()
   message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-  #find_package(PythonLibs REQUIRED)
-  #message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+  find_package(PythonLibs REQUIRED)
+  message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
   message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
   message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
   include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
