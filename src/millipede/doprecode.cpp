@@ -32,10 +32,21 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     dl_ifft_buffer_ = in_dl_ifft_buffer;
     dl_IQ_data = in_dl_IQ_data;
     // qam16_table = in_qam16_table;
-    qam16_table = (float **)malloc(2 * sizeof(float *));
+    qam_table = (float **)malloc(2 * sizeof(float *));
+    size_t mod_order = config_->mod_order;
     for (int i = 0; i < 2; i++) 
-        qam16_table[i] = (float *)aligned_alloc(64, 16 * sizeof(float));
-
+        qam_table[i] = (float *)aligned_alloc(64, mod_order * sizeof(float));
+    switch(mod_order) {
+        case 4:
+            init_qpsk_table(qam_table);
+            break;
+	case 16:
+            init_qam16_table(qam_table);
+            break;
+        case 64:
+            init_qam64_table(qam_table);
+            break;
+    }
 
     Precode_task_duration = in_Precode_task_duration;
     Precode_task_count = in_Precode_task_count;
@@ -60,7 +71,7 @@ void DoPrecode::Precode(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
+    int frame_id, current_data_subframe_id, sc_id; //, total_data_subframe_id;
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
@@ -92,22 +103,29 @@ void DoPrecode::Precode(int offset)
                 _mm_prefetch((char *)(precoder_buffer_[precoder_offset] + line_idx * 8), _MM_HINT_T0);
             }
 
-            // complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
-            _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id * UE_NUM]+cur_sc_id), _MM_HINT_T0);
-            complex_float *data_ptr = modulated_buffer_temp;
-            for (int user_id = 0; user_id < UE_NUM - 1; user_id ++) {
-                int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
-                // cout<<*raw_data_ptr<<", ";
-                _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id * UE_NUM + user_id + 1], _MM_HINT_T0);
-                *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam16_table);
-                
-                // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+            complex_float *data_ptr;
+            if (current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS)
+	    {
+                data_ptr = modulated_buffer_temp;
+                for (int user_id = 0; user_id < UE_NUM; user_id ++)
+                    *(data_ptr + user_id) = {config_->pilots_[cur_sc_id], 0};
+            } else {
+	        // complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
+                _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id * UE_NUM]+cur_sc_id), _MM_HINT_T0);
+                data_ptr = modulated_buffer_temp;
+                for (int user_id = 0; user_id < UE_NUM - 1; user_id ++) {
+                    int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
+                    // cout<<*raw_data_ptr<<", ";
+                    _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id * UE_NUM + user_id + 1], _MM_HINT_T0);
+                    *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam_table);
+ 
+                    // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+                }
+                // cout<<endl;
+
+                int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + UE_NUM - 1][cur_sc_id];
+                *(data_ptr + UE_NUM - 1) = mod_16qam_single(*(raw_data_ptr), qam_table);
             }
-            // cout<<endl;
-
-            int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + UE_NUM - 1][cur_sc_id];
-            *(data_ptr + UE_NUM - 1) = mod_16qam_single(*(raw_data_ptr), qam16_table);
-
 
             
             // mat_precoder size: UE_NUM \times BS_ANT_NUM        
@@ -145,7 +163,7 @@ void DoPrecode::Precode(int offset)
 #if DEBUG_UPDATE_STATS_DETAILED   
         double duration2 = get_time() - start_time1;
         Precode_task_duration[tid * 8][2] += duration2;
-        double start_time3 = get_time();
+        //double start_time3 = get_time();
 #endif
 
 //         /* copy data to ifft input, 4 subcarriers per iteration */ 

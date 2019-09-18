@@ -3,8 +3,9 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-#define GENERATE_PILOT
+//#define GENERATE_PILOT
 #define GENERATE_DATA
+#define SEPARATE_TX_RX 0
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -34,7 +35,7 @@
 #define MAX_CODED_SC 1152
 #define TASK_BUFFER_FRAME_NUM 60
 #define SOCKET_BUFFER_FRAME_NUM 100
-#define DL_PILOT_SYMS 0
+#define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
 
 
@@ -113,6 +114,7 @@
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
 #define WRITE_DEMUL 0
+#define DEBUG_DOWNLINK 1
 
 #define CORR_THRESHOLD    0x4
 #define CORR_RST          0x0
