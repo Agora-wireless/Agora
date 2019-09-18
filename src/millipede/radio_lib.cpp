@@ -208,9 +208,9 @@ void* RadioConfig::initBSRadio(void* in_context)
             };
             rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
 
-            rc->baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
-            rc->baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
         }
+        rc->baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
+        rc->baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
     } else if (cfg->nChannels == 2) {
         if (cfg->freq > 3e9 and cfg->radio_ids[i].find("RF3E") == std::string::npos) {
             std::vector<unsigned> txActive, rxActive;

@@ -144,6 +144,7 @@ void Millipede::start()
         std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_, 
             dl_socket_buffer_status_, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
 
+#ifdef USE_ARGOS
         std::vector<std::vector<std::complex<float>>> calib_mat = receiver_->get_calib_mat();
         for (int i = 0; i < BS_ANT_NUM; i++) {
             for (int j = 0; j < OFDM_DATA_NUM; j++) {
@@ -153,6 +154,7 @@ void Millipede::start()
                 recip_buffer_[j][i].imag = im; //-im/(re*re + im*im);
             }
         }
+#endif
     }
 
     /* tokens used for enqueue */
