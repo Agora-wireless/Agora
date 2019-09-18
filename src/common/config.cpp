@@ -167,22 +167,6 @@ Config::Config(std::string jsonfile)
             pilots_[i] = 1 - 2 * (rand() % 2);
     }
 
-//// compose pilot subframe
-//std::vector<std::vector<double>> lts = CommsLib::getSequence(80, CommsLib::LTS_SEQ);
-//std::vector<std::complex<int16_t>> lts_ci16 = Utils::double_to_int16(lts);
-//int nSamps = sampsPerSymbol - prefix - postfix;
-//int rep = nSamps / 80;
-//int frac = nSamps % 80;
-//std::vector<std::complex<int16_t>> pre(prefix, 0);
-//std::vector<std::complex<int16_t>> post(postfix, 0);
-//pilot_ci16.insert(pilot_ci16.begin(), pre.begin(), pre.end());
-
-//for (int i = 0 ; i < rep; i++)
-//    pilot_ci16.insert(pilot_ci16.end(), lts_ci16.begin(), lts_ci16.end());
-
-//pilot_ci16.insert(pilot_ci16.end(),     lts_ci16.begin(), lts_ci16.begin()+frac);
-//pilot_ci16.insert(pilot_ci16.end(), post.begin(), post.end());
-//pilot = Utils::cint16_to_uint32(pilot_ci16, false, "QI");
 #else
     // read pilots from file
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -201,6 +185,14 @@ Config::Config(std::string jsonfile)
         pilotsF[i] = pilots_[i];
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN, pilot_cf32.end()); // add CP
+
+    std::vector<std::complex<int16_t>> pre_ci16(prefix, 0);
+    std::vector<std::complex<int16_t>> post_ci16(postfix, 0);
+    for (size_t i = 0; i < OFDM_CA_NUM + CP_LEN; i++)
+        pilot_ci16.push_back(std::complex<int16_t>((int16_t)(pilot_cf32[i].real()*32768), (int16_t)(pilot_cf32[i].imag()*32768)));
+    pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
+    pilot_ci16.insert(pilot_ci16.end(), post_ci16.begin(), post_ci16.end());
+
 #ifdef USE_ARGOS
     pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
     std::vector<uint32_t> pre(prefix, 0);
@@ -215,6 +207,8 @@ Config::Config(std::string jsonfile)
 #endif
 
     alloc_buffer_2d(&dl_IQ_data, data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
+    alloc_buffer_2d(&dl_IQ_modul, data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0); // used for debug
+    alloc_buffer_2d(&dl_IQ_symbol, data_symbol_num_perframe, sampsPerSymbol, 64, 0); // used for debug
     alloc_buffer_2d(&ul_IQ_data, ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&ul_IQ_modul, ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
 
@@ -225,6 +219,29 @@ Config::Config(std::string jsonfile)
     for (size_t i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
         for (size_t j = 0; j < OFDM_CA_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
+        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(dl_IQ_data[i], dl_IQ_data[i] + OFDM_CA_NUM), mod_type);
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+                dl_IQ_modul[i][j].real = 0;
+                dl_IQ_modul[i][j].imag = 0;
+	    } else {
+                dl_IQ_modul[i][j].real = modul_data[j].real();
+                dl_IQ_modul[i][j].imag = modul_data[j].imag();
+	    }
+        }
+
+	if (i % UE_NUM == 0) {
+	    int c = i / UE_NUM;
+            std::vector<std::complex<float> > ifft_dl_data = CommsLib::IFFT(modul_data, OFDM_CA_NUM);
+	    ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
+            for (size_t j = 0; j < sampsPerSymbol; j++) {
+                if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                    dl_IQ_symbol[c][j] = 0;
+	        } else {
+                    dl_IQ_symbol[c][j] = {(int16_t)(ifft_dl_data[j-prefix].real()*32768), (int16_t)(ifft_dl_data[j-prefix].imag()*32768)};
+	        }
+            }
+	}
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {

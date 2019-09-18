@@ -90,7 +90,8 @@ void Utils::loadDevices(std::string filename, std::vector<std::string> &data)
    {
      while ( getline (myfile,line) )
      {
-       //line.erase( std::remove (line.begin(), line.end(), ' '), line.end()); 
+       //line.erase( std::remove (line.begin(), line.end(), ' '), line.end());
+       if (line.at(0) == '#') continue;
        data.push_back(line);
        std::cout << line << '\n';
      }

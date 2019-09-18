@@ -951,6 +951,13 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
     double *frame_start = obj_ptr->frame_start_[tid];
 
+    // downlink socket buffer
+    char *tx_buffer_ptr = obj_ptr->tx_buffer_;
+    char *tx_cur_buffer_ptr;
+    size_t txSymsPerFrame = cfg->dlSymsPerFrame;
+    std::vector<size_t> txSymbols = cfg->DLSymbols[0];
+    std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
+
     // walk through all the pages
     double temp;
     for (int i = 0; i < 20; i++) {
@@ -1068,6 +1075,26 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             }
         #if DEBUG_RECV
             printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, offset %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, offset + tid*buffer_frame_num);
+        #endif
+        #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
+	    if (rx_symbol_id > 0) 
+                continue;
+            for (int sym_id = 0; sym_id < txSymsPerFrame; sym_id++)
+            {
+                symbol_id = txSymbols[sym_id];
+		int tx_frame_id = frame_id + TX_FRAME_DELTA;
+                void* txbuf[2];
+                long long frameTime = ((long long)tx_frame_id << 32) | (symbol_id << 16);
+                int flags = 1; // HAS_TIME
+                if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+	    	if (ant_id != cfg->ref_ant)
+	    	    txbuf[0] = zeros.data(); 
+	    	else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                        txbuf[0] = cfg->pilot_ci16.data();
+	    	else
+                        txbuf[0] = (void *)cfg->dl_IQ_symbol[sym_id];
+                radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+            }
         #endif
         }
     }
@@ -1676,7 +1703,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         //txSymsPerFrame = cfg->dlSymsPerFrame;
         txSymbols = cfg->DLSymbols[0];
     }
-
+    std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ConsumerToken local_ctok = (*task_queue_);
@@ -1718,7 +1745,16 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
             if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
             if (cfg->nChannels == 1 || tx_ant_id % 2 == 0)
             {
-                txbuf[0] = tx_cur_buffer_ptr; 
+            #if DEBUG_DOWNLINK
+		if (tx_ant_id != cfg->ref_ant)
+		    txbuf[0] = zeros.data(); 
+		else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                    txbuf[0] = cfg->pilot_ci16.data();
+		else
+                    txbuf[0] = (void *)cfg->dl_IQ_symbol[tx_current_data_subframe_id];
+            #else
+                txbuf[0] = tx_cur_buffer_ptr;
+            #endif
                 //buffer_status[offset] = 0;
             }
             else if (cfg->nChannels == 2 && tx_ant_id % 2 == 1)
@@ -1726,16 +1762,18 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
                 txbuf[1] = tx_cur_buffer_ptr + package_length; //FIXME
                 //buffer_status[offset+1] = 0;
             }
+        #if DEBUG_BS_SENDER
+            printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n", tid, frame_id, symbol_id, tx_ant_id, tx_offset,
+                message_queue_->size_approx());
+        #endif
             //clock_gettime(CLOCK_MONOTONIC, &tv);
+        #if SEPARATE_TX_RX
             radio->radioTx(tx_ant_id/cfg->nChannels, txbuf, flags, frameTime);
+        #endif
             //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
         //}
 
-    #if DEBUG_BS_SENDER
-            printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, symbol_id, tx_ant_id, tx_offset,
-                message_queue_->size_approx());
-    #endif
         Event_data tx_message;
         tx_message.event_type = EVENT_PACKAGE_SENT;
         tx_message.data = tx_offset;
