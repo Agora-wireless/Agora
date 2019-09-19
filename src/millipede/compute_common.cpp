@@ -5,6 +5,16 @@
  */
 #include "compute_common.hpp"
 
+void init_qpsk_table(float **qpsk_table)
+{
+    float scale = 1/sqrt(2);
+    float mod_qpsk[2] = {-scale, scale};
+    for (int i = 0; i < 4; i++) {
+        qpsk_table[0][i] = mod_qpsk[i / 2];
+        qpsk_table[1][i] = mod_qpsk[i % 2];
+    }
+}
+
 void init_qam16_table(float **qam16_table)
 {
     float scale = 1/sqrt(10);
@@ -12,6 +22,16 @@ void init_qam16_table(float **qam16_table)
     for (int i = 0; i < 16; i++) {
         qam16_table[0][i] = modvec_16qam[i / 4];
         qam16_table[1][i] = modvec_16qam[i % 4];
+    }
+}
+
+void init_qam64_table(float **qam64_table)
+{
+    float scale = 1/sqrt(42);
+    float mod_64qam[8] = {-7*scale, -5*scale, -3*scale, -1*scale, scale, 3*scale, 5*scale, 7*scale};
+    for (int i = 0; i < 64; i++) {
+        qam64_table[0][i] = mod_64qam[i / 8];
+        qam64_table[1][i] = mod_64qam[i % 8];
     }
 }
 
