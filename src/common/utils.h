@@ -33,6 +33,21 @@
 #include "Symbols.hpp"
 
 int pin_to_core(int core_id);
+void pin_to_core_with_offset(thread_type thread, int offset, int core_id);
+
+template <class T>
+struct EventHandlerContext {
+  T *obj_ptr;
+  int id;
+};
+
+template<class C, void *(C::*run_thread)(int)>
+void *pthread_fun_wrapper(void *context)
+{
+  C *obj = reinterpret_cast<C*>(((EventHandlerContext<C> *)context)->obj_ptr);
+  return (obj->*run_thread)(((EventHandlerContext<C> *)context)->id);
+}
+
 
 class Utils
 {

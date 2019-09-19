@@ -120,14 +120,13 @@ public:
     std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length);
     /**
      * receive thread
-     * context: PackageReceiverContext type
     */
-    static void* loopRecv(void *context);
+    void *loopRecv(int tid);
+    void *loopTXRX(int tid);
+    void *loopSend(int tid);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void *context);
-#endif
-    static void* loopSend(void *context);
-    static void* loopTXRX(void *context);
+#endif 
 #if USE_ARGOS
     static void* loopRecv_Argos(void *context);
     static void* loopSend_Argos(void *context);
@@ -189,8 +188,10 @@ private:
     int core_id_;
     int tx_core_id_;
 
-    PackageReceiverContext* tx_context;
-    PackageReceiverContext* rx_context;
+    EventHandlerContext<PackageReceiver> *tx_context;
+    EventHandlerContext<PackageReceiver> *rx_context;
+    // PackageReceiverContext* tx_context;
+    // PackageReceiverContext* rx_context;
 
     Config *config_;
 #if USE_ARGOS

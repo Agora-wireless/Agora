@@ -35,7 +35,7 @@ Config::Config(std::string jsonfile)
     modulation = tddConf.value("modulation", "QPSK");
 
     /* Millipede configurations */
-    core_offset = tddConf.value("core_offset", 17);
+    core_offset = tddConf.value("core_offset", 18);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     fft_thread_num = tddConf.value("fft_thread_num", 4);
