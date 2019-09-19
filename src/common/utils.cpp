@@ -23,6 +23,24 @@ int pin_to_core(int core_id) {
     return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
 }
 
+void pin_to_core_with_offset(thread_type thread, int core_offset, int thread_id) {
+#ifdef ENABLE_CPU_ATTACH
+    int actual_core_id = core_offset + thread_id;
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    /* reserve core 0 for kernel threads */
+    if (actual_core_id >= num_cores)
+        actual_core_id = actual_core_id - num_cores + 1;
+    if(pin_to_core(actual_core_id) != 0) {
+        printf("%s thread %d: fail to pin to core %d\n", THREAD_TYPE_STRING[thread], thread_id, actual_core_id);
+        exit(0);
+    }
+    else {
+        printf("%s thread %d: pinned to core %d\n", THREAD_TYPE_STRING[thread], thread_id, actual_core_id);
+    }
+#endif
+}
+
+
 std::vector<std::complex<int16_t>> Utils::double_to_int16(std::vector<std::vector<double>> in)
 {
     int len = in[0].size();

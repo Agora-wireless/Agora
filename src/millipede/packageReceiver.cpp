@@ -5,7 +5,6 @@
  */
 
 #include "packageReceiver.hpp"
-#include "cpu_attach.hpp"
 
 #ifdef USE_DPDK
 inline const struct rte_eth_conf port_conf_default() {
@@ -49,8 +48,8 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
     //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
     srand (time(NULL));
-    rx_context = new PackageReceiverContext[rx_thread_num_];
-    tx_context = new PackageReceiverContext[tx_thread_num_];
+    rx_context = new EventHandlerContext<PackageReceiver>[rx_thread_num_];
+    tx_context = new EventHandlerContext<PackageReceiver>[tx_thread_num_];
 
 #ifdef USE_DPDK
     std::string core_list = std::to_string(core_id_)+"-"+std::to_string(core_id_+rx_thread_num_+tx_thread_num_);
@@ -260,8 +259,11 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
     frame_start_ = in_frame_start;
-    // core_id_ = in_core_id;
-    printf("start recv thread\n");
+
+
+    printf("create RX threads\n");
+    // new thread
+    // pin_to_core_with_offset(RX, core_id_, 0);
 
     std::vector<pthread_t> created_threads;
 #ifdef USE_ARGOS
@@ -270,17 +272,6 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     calib_mat = radioconfig_->get_calib_mat();
     int nradio_per_thread = config_->nRadios/rx_thread_num_;
     int rem_thread_nradio = config_->nRadios%rx_thread_num_;
-#endif
-
-#ifdef ENABLE_CPU_ATTACH
-    if(stick_this_thread_to_core(core_id_) != 0)
-    {
-        printf("RX: stitch main thread to core %d failed\n", core_id_);
-        exit(0);
-    }
-    else{
-        printf("RX: stitch main thread to core %d succeeded\n", core_id_);
-    }
 #endif
 
     if (!downlink_mode)
@@ -294,8 +285,8 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
         RTE_LCORE_FOREACH_SLAVE(lcore_id) {
         // launch communication and task thread onto specific core
             if (worker_id < rx_thread_num_) {
-                rx_context[worker_id].ptr = this;
-                rx_context[worker_id].tid = worker_id;
+                rx_context[worker_id].obj_ptr = this;
+                rx_context[worker_id].id = worker_id;
                 rte_eal_remote_launch((lcore_function_t *)loopRecv_DPDK,
                                     &rx_context[worker_id], lcore_id);
                 printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
@@ -308,15 +299,15 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
         {
             pthread_t recv_thread_;
             // record the thread id 
-            rx_context[i].ptr = this;
-            rx_context[i].tid = i;
+            rx_context[i].obj_ptr = this;
+            rx_context[i].id = i;
         #ifdef USE_ARGOS
             rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
             // start socket thread
             if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
         #else
             // start socket thread
-            if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv, (void *)(&rx_context[i])) != 0)
+            if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PackageReceiver, &PackageReceiver::loopRecv>, &rx_context[i]) != 0)
         #endif
             {
                 perror("socket recv thread create failed");
@@ -333,8 +324,8 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
         {
             pthread_t recv_thread_;
             // record the thread id 
-            rx_context[i].ptr = this;
-            rx_context[i].tid = i;
+            rx_context[i].obj_ptr = this;
+            rx_context[i].id = i;
             rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
             // start socket thread
             if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
@@ -373,7 +364,7 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     // SOCKET_BUFFER_FRAME_NUM = 
 
     // tx_core_id_ = in_core_id;
-    printf("start Transmit thread\n");
+    printf("create TX or TXRX threads\n");
 // create new threads
     std::vector<pthread_t> created_threads;
 #ifdef USE_DPDK
@@ -384,8 +375,8 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     // launch communication and task thread onto specific core
         if (worker_id >= rx_thread_num_) {
             thread_id = worker_id - rx_thread_num_;
-            tx_context[thread_id].ptr = this;
-            tx_context[thread_id].tid = thread_id;
+            tx_context[thread_id].obj_ptr = this;
+            tx_context[thread_id].id = thread_id;
             rte_eal_remote_launch((lcore_function_t *)loopSend,
                                 &tx_context[thread_id], lcore_id);
             printf("TX: launched thread %d on core %d\n", thread_id, lcore_id);
@@ -397,8 +388,8 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     // for (int i = 0; i < tx_thread_num_; i++) {
     //     pthread_t send_thread_;
         
-    //     tx_context[i].ptr = this;
-    //     tx_context[i].tid = i;
+    //     tx_context[i].obj_ptr = this;
+    //     tx_context[i].id = i;
 
     //     if (pthread_create( &send_thread_, NULL, PackageReceiver::loopSend, (void *)(&tx_context[i])) != 0) {
     //         perror("socket Transmit thread create failed");
@@ -410,13 +401,14 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
         
-        tx_context[i].ptr = this;
-        tx_context[i].tid = i;
+        tx_context[i].obj_ptr = this;
+        tx_context[i].id = i;
 
     #ifdef USE_ARGOS
-        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopSend_Argos, (void *)(&tx_context[i])) != 0)
+        if (pthread_create(&send_thread_, NULL, PackageReceiver::loopSend_Argos, (void *)(&tx_context[i])) != 0)
     #else
-        if (pthread_create( &send_thread_, NULL, PackageReceiver::loopTXRX, (void *)(&tx_context[i])) != 0)
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PackageReceiver, &PackageReceiver::loopTXRX>, &tx_context[i]) != 0)
+        // if (pthread_create( &send_thread_, NULL, PackageReceiver::loopTXRX, (void *)(&tx_context[i])) != 0)
     #endif
         {
             perror("socket Transmit thread create failed");
@@ -511,38 +503,9 @@ int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, i
 
 
 
-void* PackageReceiver::loopRecv(void *in_context)
+void *PackageReceiver::loopRecv(int tid)
 {
-    // get the pointer of class & tid
-    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
-    int tid = ((PackageReceiverContext *)in_context)->tid;
-    printf("package receiver thread %d start\n", tid);
-    // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    int core_id = obj_ptr->core_id_;
-    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
-    // int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    // int UE_NUM = obj_ptr->UE_NUM;
-    // int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    // int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    // int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    // int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    // int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    // int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    // bool downlink_mode = obj_ptr->downlink_mode;
-    int package_length = obj_ptr->package_length;
-
-#ifdef ENABLE_CPU_ATTACH 
-    if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
-        printf("RX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
-        exit(0);
-    }
-    else {
-        printf("RX thread: attached thread %d to core %d\n", tid, core_id + tid + 1);
-    }
-#endif
-
-
+    pin_to_core_with_offset(RX, core_id_, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;
@@ -606,13 +569,13 @@ void* PackageReceiver::loopRecv(void *in_context)
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     // moodycamel::ProducerToken *local_ptok = new moodycamel::ProducerToken(*message_queue_);
-    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+    moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
 
-    char *buffer_ptr = obj_ptr->buffer_[tid];
-    int *buffer_status_ptr = obj_ptr->buffer_status_[tid];
-    long long buffer_length = obj_ptr->buffer_length_;
-    int buffer_frame_num = obj_ptr->buffer_frame_num_;
-    double *frame_start = obj_ptr->frame_start_[tid];
+    char *buffer_ptr = buffer_[tid];
+    int *buffer_status_ptr = buffer_status_[tid];
+    long long buffer_length = buffer_length_;
+    int buffer_frame_num = buffer_frame_num_;
+    double *frame_start = frame_start_[tid];
 
     // walk through all the pages
     double temp;
@@ -649,7 +612,7 @@ void* PackageReceiver::loopRecv(void *in_context)
 
 
         // start_time= get_time();
-        // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
+        // if ((recvlen = recvfrom(socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
         if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr, package_length, 0))<0) {
         // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
             perror("recv failed");
@@ -707,7 +670,6 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
-    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
@@ -910,19 +872,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     Config *cfg = obj_ptr->config_;
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    int core_id = obj_ptr->core_id_;
-    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
-#ifdef ENABLE_CPU_ATTACH
-    // printf("Recv thread: pinning thread %d to core %d\n", tid, core_id + tid);
-    if(pin_to_core(core_id + tid) != 0)
-    {
-        printf("Recv thread: pinning thread %d to core %d failed\n", tid, core_id + tid);
-        exit(0);
-    }
-    else {
-        printf("Recv thread: pinning thread %d to core %d succeed\n", tid, core_id + tid);
-    }
-#endif
+    pin_to_core_with_offset(RX, obj_ptr->core_id_, tid);
 
     //int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     //int UE_NUM = obj_ptr->UE_NUM;
@@ -1103,41 +1053,9 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
 #endif
 
 
-void* PackageReceiver::loopSend(void *in_context)
+void *PackageReceiver::loopSend(int tid)
 {
-
-
-    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
-    int tid = ((PackageReceiverContext *)in_context)->tid;
-    Config *cfg = obj_ptr->config_;
-    printf("package sender thread %d start\n", tid);
-
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
-    // get pointer to message queue
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    int core_id = obj_ptr->tx_core_id_;
-#ifndef USE_DPDK
-    #ifdef ENABLE_CPU_ATTACH
-        if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
-            printf("TX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
-            exit(0);
-        }
-        else {
-            printf("TX thread: attached thread %d to core %d\n", tid, core_id + tid + 1);
-        }
-    #endif
-#endif
-
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    // int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    // int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    // int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    // int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    // int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    int package_length = obj_ptr->package_length;
-
+    pin_to_core_with_offset(TX, tx_core_id_, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;
@@ -1145,7 +1063,7 @@ void* PackageReceiver::loopSend(void *in_context)
     int socket_local;
     servaddr_local.sin_family = AF_INET;
     servaddr_local.sin_port = htons(6000+tid);
-    servaddr_local.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    servaddr_local.sin_addr.s_addr = inet_addr(config_->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
 
     cliaddr_local.sin_family = AF_INET;
@@ -1191,17 +1109,8 @@ void* PackageReceiver::loopSend(void *in_context)
 
 
     // downlink socket buffer
-    char *dl_buffer = obj_ptr->tx_buffer_;
-    // downlink socket buffer status
-    // int *dl_buffer_status = obj_ptr->tx_buffer_status_;
-    // downlink data buffer
-    // float *dl_data_buffer = obj_ptr->tx_data_buffer_;
-    // buffer_length: package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    // int dl_buffer_length = obj_ptr->tx_buffer_length_;
-    // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    // int dl_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
-
-
+    char *dl_buffer = tx_buffer_;
+    
 
     // auto begin = std::chrono::system_clock::now();
     // int package_count = 0;
@@ -1215,14 +1124,14 @@ void* PackageReceiver::loopSend(void *in_context)
     // int maxTaskQLen = 0;
 
     // use token to speed up
-    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+    moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ConsumerToken local_ctok(*task_queue_);
     while(true) {
     
         Event_data task_event;
         // ret = task_queue_->try_dequeue(task_event); 
-        ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->tx_ptoks_[tid]),task_event); 
+        ret = task_queue_->try_dequeue_from_producer(*(tx_ptoks_[tid]),task_event); 
         if(!ret)
             continue;
         // printf("tx queue length: %d\n", task_queue_->size_approx());
@@ -1292,39 +1201,9 @@ void* PackageReceiver::loopSend(void *in_context)
 
 
 
-void* PackageReceiver::loopTXRX(void *in_context)
+void *PackageReceiver::loopTXRX(int tid)
 {
-    // get the pointer of class & tid
-    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
-    int tid = ((PackageReceiverContext *)in_context)->tid;
-    printf("package TXRX thread %d start\n", tid);
-    int core_id = obj_ptr->core_id_;
-    int rx_thread_num = obj_ptr->rx_thread_num_;
-    int tx_thread_num = obj_ptr->tx_thread_num_;
-    Config *cfg = obj_ptr->config_;
-
-#ifdef ENABLE_CPU_ATTACH 
-    if(stick_this_thread_to_core(core_id + tid + 1) != 0) {
-        printf("TXRX thread: attach thread %d to core %d failed\n", tid, core_id + tid + 1);
-        exit(0);
-    }
-    else {
-        printf("TXRX thread: attached thread %d to core %d\n", tid, core_id + tid + 1);
-    }
-#endif
-
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    // int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    // int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    // int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    int package_length = obj_ptr->package_length;
-
-
+    pin_to_core_with_offset(TXRX, core_id_, tid);
 #if USE_IPV4
     struct sockaddr_in local_addr;
     struct sockaddr_in remote_addr;
@@ -1336,7 +1215,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
     remote_addr.sin_family = AF_INET;
     remote_addr.sin_port = htons(7000+tid);
-    remote_addr.sin_addr.s_addr = inet_addr(cfg->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
+    remote_addr.sin_addr.s_addr = inet_addr(config_->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
     memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero)); 
 
     int socket_local;
@@ -1389,20 +1268,17 @@ void* PackageReceiver::loopTXRX(void *in_context)
         exit(0);
     }
 
-    // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
     // use token to speed up
-    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
+    moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
     moodycamel::ConsumerToken local_ctok(*task_queue_);
 
 
     // RX  pointers
-    char* rx_buffer_ptr = obj_ptr->buffer_[tid];
-    int* rx_buffer_status_ptr = obj_ptr->buffer_status_[tid];
-    long long rx_buffer_length = obj_ptr->buffer_length_;
-    int rx_buffer_frame_num = obj_ptr->buffer_frame_num_;
-    double *rx_frame_start = obj_ptr->frame_start_[tid];
+    char* rx_buffer_ptr = buffer_[tid];
+    int* rx_buffer_status_ptr = buffer_status_[tid];
+    long long rx_buffer_length = buffer_length_;
+    int rx_buffer_frame_num = buffer_frame_num_;
+    double *rx_frame_start = frame_start_[tid];
     char* rx_cur_buffer_ptr = rx_buffer_ptr;
     int* rx_cur_buffer_status_ptr = rx_buffer_status_ptr;
     int rx_offset = 0;
@@ -1417,10 +1293,9 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
 
     // TX pointers
-    char *tx_buffer_ptr = obj_ptr->tx_buffer_;
+    char *tx_buffer_ptr = tx_buffer_;
     // float *tx_data_buffer = obj_ptr->tx_data_buffer_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    // int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
     int ret;
     int tx_offset;
     char *tx_cur_buffer_ptr;
@@ -1430,8 +1305,8 @@ void* PackageReceiver::loopTXRX(void *in_context)
 
 
     int max_subframe_id = downlink_mode ? UE_NUM : (UE_NUM + ul_data_subframe_num_perframe);
-    int max_rx_packet_num_per_frame = max_subframe_id * BS_ANT_NUM / rx_thread_num;
-    int max_tx_packet_num_per_frame = dl_data_subframe_num_perframe * BS_ANT_NUM / tx_thread_num;
+    int max_rx_packet_num_per_frame = max_subframe_id * BS_ANT_NUM / rx_thread_num_;
+    int max_tx_packet_num_per_frame = dl_data_subframe_num_perframe * BS_ANT_NUM / tx_thread_num_;
     printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame, max_tx_packet_num_per_frame);
     int prev_frame_id = -1;
     int rx_packet_num_per_frame = 0;
@@ -1577,7 +1452,7 @@ void* PackageReceiver::loopTXRX(void *in_context)
             else {
                 Event_data task_event;
                 // ret = task_queue_->try_dequeue(task_event); 
-                ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->tx_ptoks_[tid]),task_event); 
+                ret = task_queue_->try_dequeue_from_producer(*(tx_ptoks_[tid]),task_event); 
                 if(!ret)
                     continue;
                 // printf("tx queue length: %d\n", task_queue_->size_approx());
@@ -1652,17 +1527,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
     moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
     // get pointer to message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    int core_id = obj_ptr->tx_core_id_;
-
-#ifdef ENABLE_CPU_ATTACH
-    if(pin_to_core(core_id + tid) != 0) {
-        printf("TX thread: stitch thread %d to core %d failed\n", tid, core_id+ tid);
-        exit(0);
-    }
-    else {
-        printf("TX thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
-    }
-#endif
+    pin_to_core_with_offset(TX, obj_ptr->tx_core_id_, tid);
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     int UE_NUM = obj_ptr->UE_NUM;
