@@ -124,26 +124,7 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 
 #else
 #ifdef USE_ARGOS
-    printf("config radios ...\n");
     radioconfig_ = new RadioConfig(config_);
-    if (!downlink_mode && config_->sampleCalEn)
-    {
-        int count = 0;
-        bool adjust = false;
-        while (!adjust)
-        {
-            if (++count > 10)
-            {
-                std::cout << "attempted 10 unsucessful sample offset calibration, stopping ..." << std::endl;
-                break;
-            }
-            adjust = true;
-            radioconfig_->collectCSI(adjust);
-        }
-        radioconfig_->collectCSI(adjust);
-        usleep(100000);
-    }
-    radioconfig_->radioStart();
 
 #endif
 #endif
@@ -172,27 +153,6 @@ PackageReceiver::~PackageReceiver()
 #endif
     delete config_;
 }
-
-#ifdef USE_ARGOS
-void PackageReceiver::calibrateRadios(std::vector<std::vector<std::complex<int16_t>>> &buffer_tx, std::vector<std::vector<std::complex<int16_t>>> &buffer_rx, int ref_ant)
-{
-    std::cout << "start reciprocity CSI collection" << std::endl;
-    //radioconfig_->reciprocityCalibrate(buffer_tx, buffer_rx);
-    std::vector<std::vector<std::complex<int16_t>>> buff;
-    bool adjust = false;
-    buff = radioconfig_->collectCSI(adjust);
-    int M = config_->getNumAntennas();
-    for (int i = 0; i < M; i++)
-    {
-        if (!buffer_rx.empty()) buffer_rx[i].erase(buffer_rx[i].begin(), buffer_rx[i].end());
-        if (!buffer_tx.empty()) buffer_tx[i].erase(buffer_tx[i].begin(), buffer_tx[i].end());
-        buffer_rx[i].insert(buffer_rx[i].begin(), buff[ref_ant*M+i].begin(), buff[ref_ant*M+i].end());
-        buffer_tx[i].insert(buffer_tx[i].begin(), buff[ref_ant+M*i].begin(), buff[ref_ant+M*i].end());
-    }
-    std::cout << "end reciprocity CSI collection" << std::endl;
-    radioconfig_->drain_buffers();
-}
-#endif
 
 #ifdef USE_DPDK
 int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
@@ -300,16 +260,20 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
     buffer_status_ = in_buffer_status; // for save status
     frame_start_ = in_frame_start;
 
+
     printf("create RX threads\n");
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
+    std::vector<pthread_t> created_threads;
 #ifdef USE_ARGOS
+    bool ret = radioconfig_->radioStart();
+    if (!ret) return created_threads;
+    calib_mat = radioconfig_->get_calib_mat();
     int nradio_per_thread = config_->nRadios/rx_thread_num_;
     int rem_thread_nradio = config_->nRadios%rx_thread_num_;
 #endif
 
-    std::vector<pthread_t> created_threads;
     if (!downlink_mode)
     {
     #ifdef USE_DPDK
@@ -459,6 +423,24 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
 }
 
 
+
+#ifdef USE_DPDK
+static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
+    // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src, %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31), (intptr_t(pvSrc) & 31) );
+    // assert(nBytes % 32 == 0);
+    // assert((intptr_t(pvDest) & 31) == 0);
+    // assert((intptr_t(pvSrc) & 31) == 0);
+    const __m256i *pSrc = reinterpret_cast<const __m256i*>(pvSrc);
+    __m256i *pDest = reinterpret_cast<__m256i*>(pvDest);
+    int64_t nVects = nBytes / sizeof(*pSrc);
+    for (; nVects > 0; nVects--, pSrc++, pDest++) {
+    const __m256i loaded = _mm256_stream_load_si256(pSrc);
+    _mm256_stream_si256(pDest, loaded);
+    }
+    _mm_sfence();
+}
+
+
 static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_port, int len, int tid)
 {
     uint8_t     b[12];
@@ -486,8 +468,6 @@ static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_po
 }
 
 
-
-#ifdef USE_DPDK
 int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int len, int tid) {
   printf("Processing ARP request\n");
   struct arp_hdr *ah = (struct arp_hdr *)((unsigned char *)eth + ETHER_HDR_LEN);
@@ -520,22 +500,6 @@ int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, i
 }
 #endif
 
-
-
-static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
-    // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src, %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31), (intptr_t(pvSrc) & 31) );
-    // assert(nBytes % 32 == 0);
-    // assert((intptr_t(pvDest) & 31) == 0);
-    // assert((intptr_t(pvSrc) & 31) == 0);
-    const __m256i *pSrc = reinterpret_cast<const __m256i*>(pvSrc);
-    __m256i *pDest = reinterpret_cast<__m256i*>(pvDest);
-    int64_t nVects = nBytes / sizeof(*pSrc);
-    for (; nVects > 0; nVects--, pSrc++, pDest++) {
-    const __m256i loaded = _mm256_stream_load_si256(pSrc);
-    _mm256_stream_si256(pDest, loaded);
-    }
-    _mm_sfence();
-}
 
 
 
@@ -625,12 +589,12 @@ void *PackageReceiver::loopRecv(int tid)
     // loop recv
     // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
     int offset = 0;
-    int package_num = 0;
-    int ret = 0;
-    int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
+    // int package_num = 0;
+    // int ret = 0;
+    // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     int prev_frame_id = -1;
-    int package_num_per_frame = 0;
-    double start_time= get_time();
+    // int package_num_per_frame = 0;
+    // double start_time= get_time();
 
 
     // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
@@ -657,11 +621,11 @@ void *PackageReceiver::loopRecv(int tid)
 
     #if MEASURE_TIME
         // read information from received packet
-        int ant_id, frame_id, subframe_id, cell_id;
+        int frame_id; //, subframe_id, ant_id, cell_id;
         frame_id = *((int *)cur_buffer_ptr);
-        subframe_id = *((int *)cur_buffer_ptr + 1);
+        // subframe_id = *((int *)cur_buffer_ptr + 1);
         // cell_id = *((int *)cur_buffer_ptr + 2);
-        ant_id = *((int *)cur_buffer_ptr + 3);
+        // ant_id = *((int *)cur_buffer_ptr + 3);
         // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
         if (frame_id > prev_frame_id) {
             *(frame_start + frame_id) = get_time();
@@ -905,20 +869,19 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     //printf("Recv thread: thread %d start\n", tid);
     int nradio_cur_thread = ((PackageReceiverContext *)in_context)->radios;
     //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    int id = tid;
     Config *cfg = obj_ptr->config_;
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     pin_to_core_with_offset(RX, obj_ptr->core_id_, tid);
 
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    //int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
+    //int UE_NUM = obj_ptr->UE_NUM;
+    //int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    //int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    //int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    //int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
+    //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     int package_length = obj_ptr->package_length;
     int package_header_offset = obj_ptr->package_header_offset;
     //// Use mutex to sychronize data receiving across threads
@@ -932,11 +895,18 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     //moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
 
-    void* buffer = obj_ptr->buffer_[tid];
+    char* buffer = (char*)obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
     double *frame_start = obj_ptr->frame_start_[tid];
+
+    // downlink socket buffer
+    char *tx_buffer_ptr = obj_ptr->tx_buffer_;
+    char *tx_cur_buffer_ptr;
+    size_t txSymsPerFrame = cfg->dlSymsPerFrame;
+    std::vector<size_t> txSymbols = cfg->DLSymbols[0];
+    std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
 
     // walk through all the pages
     double temp;
@@ -944,7 +914,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
         temp = frame_start[i * 512];
     }
 
-    void* cur_ptr_buffer = buffer;
+    char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
     int nradio_per_thread = cfg->nRadios/obj_ptr->rx_thread_num_;
     int rem_thread_nradio = cfg->nRadios%obj_ptr->rx_thread_num_;//obj_ptr->thread_num_*(cfg->nRadios/obj_ptr->thread_num_);
@@ -953,23 +923,20 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2 
-    void* cur_ptr_buffer2;
-    int* cur_ptr_buffer_status2;
-    void* buffer2 = obj_ptr->buffer_[tid] + package_length; 
+    char* cur_ptr_buffer2;
+    char* buffer2 = (char*)obj_ptr->buffer_[tid] + package_length; 
     int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
+    int *cur_ptr_buffer_status2 = buffer_status2;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
-        cur_ptr_buffer_status2 = buffer_status2;
     }
     else {
-        cur_ptr_buffer2 = calloc(package_length, sizeof(char)); 
+        cur_ptr_buffer2 = (char*)calloc(package_length, sizeof(char)); 
     }
     int offset = 0;
     long long frameTime;
     int prev_frame_id = -1;
 
-    int ret = 0;
-    int maxFrameId = 0;
     while(cfg->running)
     {
         // if buffer is full, exit
@@ -981,16 +948,16 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             cfg->running = false;
             break;
         }
-        int ant_id, frame_id, symbol_id, cell_id, tx_frame_id;
+        int ant_id, frame_id, symbol_id;
         // receive data
         for (int it = 0 ; it < nradio_cur_thread; it++) // FIXME: this must be threaded
         {
             //int rid = tid * obj_ptr->radios_per_thread + it;
             int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
-            void * samp1 = cur_ptr_buffer + package_header_offset;
-            void * samp2 = cur_ptr_buffer2 + package_header_offset;
-            void *samp[2] = {samp1, samp2};
+            char * samp1 = cur_ptr_buffer + package_header_offset;
+            char * samp2 = cur_ptr_buffer2 + package_header_offset;
+            void *samp[2] = {(void*)samp1, (void*)samp2};
             while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
             frame_id = (int)(frameTime>>32);
             symbol_id = (int)((frameTime>>16)&0xFFFF);
@@ -1012,12 +979,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
 
         #if MEASURE_TIME
             // read information from received packet
-            int ant_id, frame_id, subframe_id, cell_id;
             frame_id = *((int *)cur_ptr_buffer);
-            subframe_id = *((int *)cur_ptr_buffer + 1);
-            // cell_id = *((int *)cur_ptr_buffer + 2);
-            ant_id = *((int *)cur_ptr_buffer + 3);
-            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
@@ -1033,7 +995,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
             cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + ((char*)cur_ptr_buffer - (char*)buffer + package_length * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length * cfg->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
             Event_data package_message;
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
@@ -1049,7 +1011,7 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
                 cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + ((char*)cur_ptr_buffer2 - (char*)buffer2 + package_length * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + package_length * cfg->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
                 Event_data package_message2;
                 package_message2.event_type = EVENT_PACKAGE_RECEIVED;
@@ -1064,8 +1026,29 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
         #if DEBUG_RECV
             printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, offset %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, offset + tid*buffer_frame_num);
         #endif
+        #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
+	    if (rx_symbol_id > 0) 
+                continue;
+            for (int sym_id = 0; sym_id < txSymsPerFrame; sym_id++)
+            {
+                symbol_id = txSymbols[sym_id];
+		int tx_frame_id = frame_id + TX_FRAME_DELTA;
+                void* txbuf[2];
+                long long frameTime = ((long long)tx_frame_id << 32) | (symbol_id << 16);
+                int flags = 1; // HAS_TIME
+                if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+	    	if (ant_id != cfg->ref_ant)
+	    	    txbuf[0] = zeros.data(); 
+	    	else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                        txbuf[0] = cfg->pilot_ci16.data();
+	    	else
+                        txbuf[0] = (void *)cfg->dl_IQ_symbol[sym_id];
+                radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+            }
+        #endif
         }
     }
+    return 0;
 }
 #endif
 
@@ -1127,18 +1110,18 @@ void *PackageReceiver::loopSend(int tid)
 
     // downlink socket buffer
     char *dl_buffer = tx_buffer_;
-    int dl_buffer_frame_num = tx_buffer_frame_num_;
+    
 
-    auto begin = std::chrono::system_clock::now();
-    int package_count = 0;
+    // auto begin = std::chrono::system_clock::now();
+    // int package_count = 0;
     int ret;
     int offset;
     char *cur_buffer_ptr;
     // int *cur_ptr_buffer_status;
     int ant_id, frame_id, subframe_id, total_data_subframe_id, current_data_subframe_id;
     int cell_id = 0;
-    int maxMesgQLen = 0;
-    int maxTaskQLen = 0;
+    // int maxMesgQLen = 0;
+    // int maxTaskQLen = 0;
 
     // use token to speed up
     moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
@@ -1167,7 +1150,7 @@ void *PackageReceiver::loopSend(int tid)
         frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-        int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
+        // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
         *((int *)cur_buffer_ptr) = frame_id;
@@ -1299,7 +1282,7 @@ void *PackageReceiver::loopTXRX(int tid)
     char* rx_cur_buffer_ptr = rx_buffer_ptr;
     int* rx_cur_buffer_status_ptr = rx_buffer_status_ptr;
     int rx_offset = 0;
-    int ant_id, frame_id, subframe_id, cell_id;
+    int ant_id, frame_id, subframe_id;
 
 
     // walk through all the pages
@@ -1313,12 +1296,11 @@ void *PackageReceiver::loopTXRX(int tid)
     char *tx_buffer_ptr = tx_buffer_;
     // float *tx_data_buffer = obj_ptr->tx_data_buffer_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    int tx_buffer_frame_num = tx_buffer_frame_num_;
     int ret;
     int tx_offset;
     char *tx_cur_buffer_ptr;
     // float *tx_cur_ptr_data;
-    int tx_ant_id, tx_frame_id, tx_subframe_id, tx_total_data_subframe_id, tx_current_data_subframe_id;
+    int tx_ant_id, tx_frame_id, tx_subframe_id, tx_current_data_subframe_id; //, tx_total_data_subframe_id;
     int tx_cell_id = 0;
 
 
@@ -1331,13 +1313,13 @@ void *PackageReceiver::loopTXRX(int tid)
     int tx_packet_num_per_frame = 0;
     int do_tx = 0;
     int rx_pkts_in_frame_count[10000];
-    int last_finished_frame_id = 0;
+    // int last_finished_frame_id = 0;
 
     int tx_pkts_in_frame_count[10000];
-    int last_finished_tx_frame_id = 0;
+    // int last_finished_tx_frame_id = 0;
 
 
-    double start_time= get_time();
+    // double start_time= get_time();
 
     if (!downlink_mode)
     {
@@ -1549,12 +1531,12 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     int UE_NUM = obj_ptr->UE_NUM;
-    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
+    //int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
+    //int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
+    //int subframe_num_perframe = obj_ptr->subframe_num_perframe;
     int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
+    //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
+    //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     int package_length = obj_ptr->package_length;
     int package_header_offset = obj_ptr->package_header_offset;
 
@@ -1562,36 +1544,31 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
     char *tx_buffer_ptr = obj_ptr->tx_buffer_;
     char *tx_cur_buffer_ptr;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
+    //int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
     //int* buffer_status = obj_ptr->tx_buffer_status_;
 
     Config *cfg = obj_ptr->config_;
     RadioConfig *radio = obj_ptr->radioconfig_;
 
     int ret;
-    int offset;
     int tx_offset;
-    char *cur_ptr_buffer;
     //int ant_id, symbol_id, frame_id;
-    int frame_id, tx_ant_id, tx_frame_id, tx_subframe_id, tx_total_data_subframe_id, tx_current_data_subframe_id;
-    int cell_id = 0;
-    struct timespec tv, tv2;
-    double time_avg = 0;
-    int time_count = 0;
+    int frame_id, tx_ant_id, tx_frame_id, tx_subframe_id, tx_current_data_subframe_id;
+    //struct timespec tv, tv2;
 
-    int txSymsPerFrame = 0;
+    //int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
     if (cfg->isUE)
     {
-        txSymsPerFrame = cfg->ulSymsPerFrame;
+        //txSymsPerFrame = cfg->ulSymsPerFrame;
         txSymbols = cfg->ULSymbols[0];
     }
     else
     {
-        txSymsPerFrame = cfg->dlSymsPerFrame;
+        //txSymsPerFrame = cfg->dlSymsPerFrame;
         txSymbols = cfg->DLSymbols[0];
     }
-
+    std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ConsumerToken local_ctok = (*task_queue_);
@@ -1626,14 +1603,23 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         //symbol_id = task_event.data / cfg->getNumAntennas();
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         //{
-            int symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
+            size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
             void* txbuf[2];
             long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
             int flags = 1; // HAS_TIME
             if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
             if (cfg->nChannels == 1 || tx_ant_id % 2 == 0)
             {
-                txbuf[0] = tx_cur_buffer_ptr; 
+            #if DEBUG_DOWNLINK
+		if (tx_ant_id != cfg->ref_ant)
+		    txbuf[0] = zeros.data(); 
+		else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                    txbuf[0] = cfg->pilot_ci16.data();
+		else
+                    txbuf[0] = (void *)cfg->dl_IQ_symbol[tx_current_data_subframe_id];
+            #else
+                txbuf[0] = tx_cur_buffer_ptr;
+            #endif
                 //buffer_status[offset] = 0;
             }
             else if (cfg->nChannels == 2 && tx_ant_id % 2 == 1)
@@ -1641,16 +1627,18 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
                 txbuf[1] = tx_cur_buffer_ptr + package_length; //FIXME
                 //buffer_status[offset+1] = 0;
             }
+        #if DEBUG_BS_SENDER
+            printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n", tid, frame_id, symbol_id, tx_ant_id, tx_offset,
+                message_queue_->size_approx());
+        #endif
             //clock_gettime(CLOCK_MONOTONIC, &tv);
+        #if SEPARATE_TX_RX
             radio->radioTx(tx_ant_id/cfg->nChannels, txbuf, flags, frameTime);
+        #endif
             //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
         //}
 
-    #if DEBUG_BS_SENDER
-            printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, symbol_id, tx_ant_id, tx_offset,
-                message_queue_->size_approx());
-    #endif
         Event_data tx_message;
         tx_message.event_type = EVENT_PACKAGE_SENT;
         tx_message.data = tx_offset;
@@ -1660,7 +1648,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         }
 
     }
-    
+    return 0; 
 }
 #endif
 

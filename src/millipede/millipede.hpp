@@ -282,6 +282,8 @@ private:
      */
     // DataBuffer dl_iffted_data_buffer_;
 
+    complex_float **dl_precoder_buffer_;
+    complex_float **recip_buffer_;
 
     /**
      * Precoded data

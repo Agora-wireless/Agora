@@ -21,6 +21,7 @@
 #include "comms-lib.h"
 #include <armadillo>
 #include "config.hpp"
+#include "offset.h"
 //#include "mufft/fft.h"
 
 class Phy_UE
@@ -159,51 +160,50 @@ public:
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
 
-    //inline int generateOffset2d(int max_dim1, int max_dim2, int dim1_id, int dim2_id);
-    //inline int generateOffset3d(int max_dim1, int max_dim2, int max_dim3, int dim1_id, int dim2_id, int dim3_id);
-    //inline void interpretOffset2d(int max_dim2, int offset, int *dim1_id, int *dim2_id);
-    //inline void interpretOffset3d(int max_dim2, int max_dim3, int offset, int *dim1_id, int *dim2d_id, int *dim2_id, int *dim3_id);
     void initialize_vars_from_cfg(Config *cfg);
 private:
     Config *cfg;
-    int symbol_perframe;
-    int ul_pilot_symbol_perframe;
-    int dl_pilot_symbol_perframe;
+    size_t symbol_perframe;
+    size_t ul_pilot_symbol_perframe;
+    size_t dl_pilot_symbol_perframe;
     // static const int empty_subframe_num_perframe;
-    int ul_data_symbol_perframe;
-    int dl_data_symbol_perframe;
-    int dl_symbol_perframe;
-    int rx_symbol_perframe;
-    int tx_symbol_perframe;
-    int symbol_len; // samples in sym without prefix and postfix
-    int dl_prefix_len;
-    int prefix_len;
-    int postfix_len;
-    int ofdm_syms; // number of OFDM symbols in general symbol (i.e. subframe)
-    int FFT_LEN;
-    int CP_LEN;
-    int nUEs;
-    int numAntennas;
-    int hdr_size;
-    int nCPUs;
-    int core_offset;
-    int rx_thread_num;
-    int package_length;
-    int package_header_offset;
+    size_t ul_data_symbol_perframe;
+    size_t dl_data_symbol_perframe;
+    size_t dl_symbol_perframe;
+    size_t rx_symbol_perframe;
+    size_t tx_symbol_perframe;
+    size_t symbol_len; // samples in sym without prefix and postfix
+    size_t dl_prefix_len;
+    size_t prefix_len;
+    size_t postfix_len;
+    size_t ofdm_syms; // number of OFDM symbols in general symbol (i.e. subframe)
+    size_t FFT_LEN;
+    size_t CP_LEN;
+    size_t nUEs;
+    size_t numAntennas;
+    size_t hdr_size;
+    size_t nCPUs;
+    size_t core_offset;
+    size_t rx_thread_num;
+    size_t package_length;
+    size_t tx_package_length;
+    size_t package_header_offset;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
+    float *pilots_;
     complex_float *ul_pilot;
     char* ul_pilot_aligned;
     int **ul_IQ_data;
     complex_float **ul_IQ_modul;
+
 
     int pilot_sc_len;
     int data_sc_len;
     int data_sc_start;
     int non_null_sc_len;
 
-    int RX_BUFFER_FRAME_NUM;
-    int TX_BUFFER_FRAME_NUM;
+    size_t RX_BUFFER_FRAME_NUM;
+    size_t TX_BUFFER_FRAME_NUM;
 
     /*****************************************************
      * Uplink 
@@ -303,8 +303,6 @@ private:
     std::vector<myVec> equal_pc_buffer_;
 
 
-    float *pilots_;
-
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<int> data_sc_ind_;
     std::vector<int> pilot_sc_ind_;
@@ -328,22 +326,22 @@ private:
 
     // all checkers
     // int cropper_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
-    int* cropper_checker_;
-    int csi_checker_[TASK_BUFFER_FRAME_NUM];
-    int data_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t* cropper_checker_;
+    size_t csi_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t data_checker_[TASK_BUFFER_FRAME_NUM];
 
-    int precoder_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t precoder_checker_[TASK_BUFFER_FRAME_NUM];
     bool precoder_status_[TASK_BUFFER_FRAME_NUM];
 
-    int cropper_created_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t cropper_created_checker_[TASK_BUFFER_FRAME_NUM];
 
     // can possibly remove this checker
     // int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe - UE_NUM)];
-    int* demul_checker_[TASK_BUFFER_FRAME_NUM];
-    int demul_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* demul_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t demul_status_[TASK_BUFFER_FRAME_NUM];
 
-    int* demodul_checker_[TASK_BUFFER_FRAME_NUM];
-    int demodul_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* demodul_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t demodul_status_[TASK_BUFFER_FRAME_NUM];
 
     std::queue<std::tuple<int, int>> taskWaitList;
 

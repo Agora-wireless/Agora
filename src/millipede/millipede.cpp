@@ -84,11 +84,32 @@ void Millipede::start()
     /* start uplink receiver */
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_, 
         socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, frame_start);
+#ifdef USE_ARGOS
+    if (rx_threads.size() == 0) {
+	this->stop();
+	return;
+    }
+#endif
+
     /* start downlink transmitter */
     std::vector<pthread_t> tx_threads;
-    if (downlink_mode)
+    if (downlink_mode) {
         std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_, 
             dl_socket_buffer_status_, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
+
+#ifdef USE_ARGOS
+        std::vector<std::vector<std::complex<float>>> calib_mat = receiver_->get_calib_mat();
+        for (int i = 0; i < BS_ANT_NUM; i++) {
+            for (int j = 0; j < OFDM_DATA_NUM; j++) {
+                float re = calib_mat[i][j].real();
+                float im = calib_mat[i][j].imag();
+                recip_buffer_[j][i].real = re; //re/(re*re + im*im);
+                recip_buffer_[j][i].imag = im; //-im/(re*re + im*im);
+            }
+        }
+#endif
+    }
+
     /* tokens used for enqueue */
     /* uplink */
     moodycamel::ProducerToken ptok(fft_queue_);
@@ -117,7 +138,7 @@ void Millipede::start()
     int frame_count_pilot_fft = 0;
     int frame_count_zf = 0;
     int frame_count_demul = 0;
-    int frame_count_decode = 0;
+    // int frame_count_decode = 0;
     int frame_count_precode = 0;
     int frame_count_ifft = 0;
     int frame_count_tx = 0;
@@ -290,7 +311,7 @@ void Millipede::start()
                             demul_count = 0;
                             double diff = get_time() - demul_begin;
                             int samples_num_per_UE = OFDM_DATA_NUM * ul_data_subframe_num_perframe * 1000;
-                            printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %d\n", 
+                            printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %zu\n", 
                                 frame_count_demul, samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, fft_queue_.size_approx());
                             demul_begin = get_time();
                         }                       
@@ -378,7 +399,7 @@ void Millipede::start()
                             tx_count = 0;
                             double diff = get_time() - tx_begin;
                             int samples_num_per_UE = OFDM_DATA_NUM * dl_data_subframe_num_perframe * 1000;
-                            printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %d\n", 
+                            printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %zu\n", 
                                 samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, tx_queue_.size_approx());
                             tx_begin = get_time();
                         }
@@ -396,8 +417,9 @@ void Millipede::start()
     int last_frame_id = downlink_mode ? frame_count_tx : frame_count_demul;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
-    exit(0);
+    //exit(0);
 }
+
 
 
 
@@ -415,13 +437,13 @@ void *Millipede::worker(int tid)
         IFFT_task_duration, IFFT_task_count);
 
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
-        csi_buffer_, precoder_buffer_, pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
 
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         data_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_, Demul_task_duration, Demul_task_count);
 
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        dl_modulated_buffer_, precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, 
+        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, 
         Precode_task_duration, Precode_task_count);
 
 
@@ -539,7 +561,8 @@ void* Millipede::worker_zf(int tid)
 
     /* initialize ZF operator */
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        csi_buffer_, precoder_buffer_, pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+
 
     Event_data event;
     bool ret_zf = false;
@@ -568,14 +591,15 @@ void* Millipede::worker_demul(int tid)
 
     /* initialize Precode operator */
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        dl_modulated_buffer_, precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data,  
+        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data,  
         Precode_task_duration, Precode_task_count);
+
 
 
     Event_data event;
     bool ret_demul = false;
     bool ret_precode = false;
-    int cur_frame_id = 0;
+    // int cur_frame_id = 0;
 
     while(true) {         
         if (downlink_mode)
@@ -1059,6 +1083,8 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64, 1);
     alloc_buffer_2d(&dl_precoded_data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64, 0);
+    alloc_buffer_2d(&dl_precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
+    alloc_buffer_2d(&recip_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM, 64, 0);
 
 
     /* initilize all downlink status checkers */
@@ -1081,7 +1107,7 @@ void Millipede::initialize_downlink_buffers()
 
 void Millipede::free_uplink_buffers()
 {
-    free_buffer_1d(&pilots_);
+    //free_buffer_1d(&pilots_);
     free_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM);
     free_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM);
     free_buffer_2d(&csi_buffer_, UE_NUM * TASK_BUFFER_FRAME_NUM);
@@ -1207,7 +1233,7 @@ extern "C"
         return millipede;
     }
     EXPORT void Millipede_start(Millipede *millipede) {millipede->start();}
-    EXPORT void Millipede_stop(Millipede *millipede) {millipede->stop();}
+    EXPORT void Millipede_stop(/*Millipede *millipede*/) {SignalHandler::setExitSignal(true); /*millipede->stop();*/}
     EXPORT void Millipede_destroy(Millipede *millipede) {delete millipede;}
     EXPORT void Millipede_getEqualData(Millipede *millipede, float **ptr, int *size) {return millipede->getEqualData(ptr, size);}
     EXPORT void Millipede_getDemulData(Millipede *millipede, int **ptr, int *size) {return millipede->getDemulData(ptr, size);}

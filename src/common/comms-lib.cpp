@@ -22,6 +22,35 @@
 
 #include "comms-lib.h"
 
+size_t CommsLib::find_pilot_seq(std::vector<std::complex<double> > iq, std::vector<std::complex<double> > pilot, size_t seq_len)
+{
+
+    size_t best_peak = 0;
+
+    // Re-arrange into complex vector, flip, and compute conjugate
+    std::vector<std::complex<double> > pilot_conj;
+    for (size_t i = 0; i < seq_len; i++) {
+        // conjugate
+        pilot_conj.push_back(std::conj(pilot[seq_len - i - 1]));
+    }
+
+    // Equivalent to numpy's sign function
+    std::vector<std::complex<double> > iq_sign = CommsLib::csign(iq);
+
+    // Convolution
+    std::vector<double> pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
+
+    // Find all peaks
+    double max_peak = 0;
+    for (size_t i = 0; i < pilot_corr.size(); i++) {
+        if (abs(pilot_corr[i]) > max_peak) {
+            max_peak = abs(pilot_corr[i]);
+            best_peak = i;
+        }
+    }
+    return best_peak;
+}
+
 int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
 {
     /*
@@ -218,14 +247,14 @@ std::vector<std::complex<float>> CommsLib::IFFT(std::vector<std::complex<float>>
     memcpy(out.data(), fft_out, fftsize * sizeof(std::complex<float>));
     //for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
     float max_val = 0;
-    int max_ind = 0;
+    //int max_ind = 0;
     float scale = 0.5;
     for (int i = 0; i < fftsize; i++)
     {
         if (std::abs(out[i]) > max_val)
         {
             max_val = std::abs(out[i]);
-            max_ind = i;
+            //max_ind = i;
         }
     }
     std::cout << "IFFT output is normalized with " << std::to_string(max_val) << std::endl;
@@ -267,7 +296,7 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int> in, int typ
             qpsk_table[0][i] = mod_qpsk[i / 2];
             qpsk_table[1][i] = mod_qpsk[i % 2];
         }
-        for (int i = 0; i < in.size(); i++)
+        for (size_t i = 0; i < in.size(); i++)
         {
             if (in[i] >= 0 and in[i] < 4) out[i] = std::complex<float>(qpsk_table[0][in[i]], qpsk_table[1][in[i]]);
             else 
@@ -286,7 +315,7 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int> in, int typ
             qam16_table[0][i] = mod_16qam[i / 4];
             qam16_table[1][i] = mod_16qam[i % 4];
         }
-        for (int i = 0; i < in.size(); i++)
+        for (size_t i = 0; i < in.size(); i++)
         {
             if (in[i] >= 0 and in[i] < 16) out[i] = std::complex<float>(qam16_table[0][in[i]], qam16_table[1][in[i]]);
             else 
@@ -305,7 +334,7 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int> in, int typ
             qam64_table[0][i] = mod_64qam[i / 8];
             qam64_table[1][i] = mod_64qam[i % 8];
         }
-        for (int i = 0; i < in.size(); i++) 
+        for (size_t i = 0; i < in.size(); i++) 
         {
             if (in[i] >= 0 and in[i] < 64) out[i] = std::complex<float>(qam64_table[0][in[i]], qam64_table[1][in[i]]);
             else 

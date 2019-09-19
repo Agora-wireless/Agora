@@ -151,11 +151,11 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
     pilot_buffer_ = in_pilot_buffer;
     tx_buffer_status_ = in_buffer_status; // for save status
 
-    tx_core_id_ = in_core_id;
-    printf("start Transmit thread\n");
-
     // create new threads
     std::vector<pthread_t> created_threads;
+    tx_core_id_ = in_core_id;
+#ifdef SEPARATE_TX_THREAD
+    printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
         
@@ -169,6 +169,7 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
         created_threads.push_back(send_thread_);
     }
     
+#endif
     return created_threads;
 }
 
@@ -198,26 +199,31 @@ void* RU::loopSend(void *in_context)
 
     // downlink socket buffer
     char *buffer = obj_ptr->tx_buffer_;
-    int buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
-    int buffer_length = obj_ptr->tx_buffer_length_;
+    //int buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
+    //int buffer_length = obj_ptr->tx_buffer_length_;
     int* buffer_status = obj_ptr->tx_buffer_status_;
 
     Config *cfg = obj_ptr->config_;
 #ifdef SIM
     int* tx_socket_ = obj_ptr->tx_socket_;
+    char *cur_ptr_buffer;
 #else 
     RadioConfig *radio = obj_ptr->radioconfig_;
 #endif
     int package_length = cfg->package_length;
+#ifndef SIM
+    package_length -= cfg->package_header_offset;
+#endif
 
     int ret;
-    int offset;
-    char *cur_ptr_buffer;
-    int ant_id, symbol_id, frame_id, frame_offset, total_symbol_id;
-    int cell_id = 0;
+    int ant_id, symbol_id;
+    int offset = 0;
+    int frame_id = 0;
     struct timespec tv, tv2;
+#if TX_TIME_MEASURE
     double time_avg = 0;
     int time_count = 0;
+#endif
 
     int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
@@ -262,7 +268,7 @@ void* RU::loopSend(void *in_context)
                 int* tx_buffer_hdr = (int*)obj_ptr->pilot_buffer_; //.data();
                 tx_buffer_hdr[0] = frame_id;    
                 tx_buffer_hdr[1] = cfg->pilotSymbols[0][ant_id];  
-                tx_buffer_hdr[2] = cell_id;  
+                tx_buffer_hdr[2] = 0; //cell_id
                 tx_buffer_hdr[3] = ant_id; // rsvd  
                 //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
                 if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, package_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
@@ -300,7 +306,7 @@ void* RU::loopSend(void *in_context)
         for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         {
             int tx_frame_id = frame_id;
-            int tx_symbol_id = txSymbols[symbol_id];
+            size_t tx_symbol_id = txSymbols[symbol_id];
             offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
             void* txbuf[2];
             long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
@@ -354,7 +360,7 @@ void* RU::loopSend(void *in_context)
             exit(0);
         }
     }
-    
+    return 0; 
 }
 
 
@@ -366,16 +372,15 @@ void* RU::loopProc(void *in_context)
     // get the pointer of class & tid
     RU* obj_ptr = ((RUContext *)in_context)->ptr;
     int tid = ((RUContext *)in_context)->tid;
-    //printf("Recv thread: thread %d start\n", tid);
-#ifndef SIM
+    Config *cfg = obj_ptr->config_;
+    // get pointer of message queue
+    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
+#ifdef SIM
+    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
+#else
     int nradio_cur_thread = ((RUContext *)in_context)->radios;
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
 #endif
-    int id = tid;
-    Config *cfg = obj_ptr->config_;
-    // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
@@ -405,7 +410,8 @@ void* RU::loopProc(void *in_context)
 
     int package_length = cfg->package_length;
     int package_header_offset = cfg->package_header_offset;
-    void* buffer = obj_ptr->buffer_[tid];
+    int tx_package_length = package_length - package_header_offset;
+    char* buffer = (char*)obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
@@ -424,8 +430,9 @@ void* RU::loopProc(void *in_context)
         txSymsPerFrame = cfg->dlSymsPerFrame;
         txSymbols = cfg->DLSymbols[0];
     }
+    int n_ant = cfg->getNumAntennas();
 
-    void* cur_ptr_buffer = buffer;
+    char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
 #ifndef SIM
     int nradio_per_thread = cfg->nRadios/obj_ptr->thread_num_;
@@ -435,16 +442,16 @@ void* RU::loopProc(void *in_context)
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2 
-    void* cur_ptr_buffer2;
+    char* cur_ptr_buffer2;
     int* cur_ptr_buffer_status2;
-    void* buffer2 = obj_ptr->buffer_[tid] + package_length; 
+    char* buffer2 = (char*)obj_ptr->buffer_[tid] + package_length;
     int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
+    cur_ptr_buffer_status2 = buffer_status2;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
-        cur_ptr_buffer_status2 = buffer_status2;
     }
     else {
-        cur_ptr_buffer2 = calloc(package_length, sizeof(char)); 
+        cur_ptr_buffer2 = (char*)calloc(package_length, sizeof(char)); 
     }
 #else
     // loop recv
@@ -453,11 +460,8 @@ void* RU::loopProc(void *in_context)
     int offset = 0;
     int package_num = 0;
     long long frameTime;
-    auto begin = std::chrono::system_clock::now();
 
     int maxQueueLength = 0;
-    int ret = 0;
-    int maxFrameId = 0;
     while(cfg->running)
     {
         // if buffer is full, exit
@@ -467,7 +471,7 @@ void* RU::loopProc(void *in_context)
             cfg->running = false;
             break;
         }
-        int ant_id, frame_id, symbol_id, cell_id, tx_frame_id;
+        int ant_id, frame_id, symbol_id;
         // receive data
 #ifdef SIM
         int recvlen = -1;
@@ -478,7 +482,7 @@ void* RU::loopProc(void *in_context)
         // read information from received packet
         frame_id = *((int *)cur_ptr_buffer);
         symbol_id = *((int *)cur_ptr_buffer + 1);
-        cell_id = *((int *)cur_ptr_buffer + 2);
+        //cell_id = *((int *)cur_ptr_buffer + 2);
         ant_id = *((int *)cur_ptr_buffer + 3);
 
 #if DEBUG_RECV
@@ -497,7 +501,7 @@ void* RU::loopProc(void *in_context)
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
         cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
-        cur_ptr_buffer = buffer + ((char*)cur_ptr_buffer - (char*)buffer + package_length) % buffer_length;
+        cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length) % buffer_length;
         // push EVENT_RX_ENB event into the queue
         Event_data package_message;
         package_message.event_type = EVENT_RX_SYMBOL;
@@ -532,9 +536,9 @@ void* RU::loopProc(void *in_context)
             //int rid = tid * obj_ptr->radios_per_thread + it;
             int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
-            void * samp1 = cur_ptr_buffer +  package_header_offset*sizeof(int);
-            void * samp2 = cur_ptr_buffer2 + package_header_offset*sizeof(int);
-            void *samp[2] = {samp1, samp2};
+            char* samp1 = (cur_ptr_buffer +  package_header_offset*sizeof(int));
+            char* samp2 = (cur_ptr_buffer2 + package_header_offset*sizeof(int));
+            void *samp[2] = {(void*)samp1, (void*)samp2};
             while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
             frame_id = (int)(frameTime>>32);
             symbol_id = (int)((frameTime>>16)&0xFFFF);
@@ -566,7 +570,7 @@ void* RU::loopProc(void *in_context)
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
             cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + ((char*)cur_ptr_buffer - (char*)buffer + package_length * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length * cfg->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
             Event_data package_message;
             package_message.event_type = EVENT_PACKAGE_RECEIVED;
@@ -581,7 +585,7 @@ void* RU::loopProc(void *in_context)
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
                 cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + ((char*)cur_ptr_buffer2 - (char*)buffer2 + package_length * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + package_length * cfg->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
                 Event_data package_message2;
                 package_message2.event_type = EVENT_PACKAGE_RECEIVED;
@@ -609,18 +613,33 @@ void* RU::loopProc(void *in_context)
                 for (int tx_symbol_id = 0; tx_symbol_id < txSymsPerFrame; tx_symbol_id++)
                 {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
-                    int tx_symbol = txSymbols[tx_symbol_id];
-                    offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+                    int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM; 
+                    size_t tx_symbol = txSymbols[tx_symbol_id];
+                    //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+                    int frame_samp_size = (tx_package_length * n_ant * txSymsPerFrame);
+                    int tx_offset = tx_frame_offset * frame_samp_size + tx_package_length * (n_ant * tx_symbol_id + ant_id);
                     void* txbuf[2];
                     long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
                     int flags = 1; // HAS_TIME
-                    //if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-                    txbuf[0] = tx_buffer + offset * package_length; 
+                    if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST
+                    txbuf[0] = (void*)(tx_buffer + tx_offset); 
                     if (cfg->nChannels == 2)
                     {
-                        txbuf[1] = tx_buffer + (offset + 1) * package_length;  
+                        txbuf[1] = (void*)(tx_buffer + tx_offset + tx_package_length);
                     }
-                    radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+#if DEBUG_SEND
+                    int start_ind = 2 * cfg->prefix;
+                    printf("transmit samples: %d %d %d %d %d %d %d %d ...\n\n",
+                                              *((short *)txbuf[0]+start_ind+0),
+                                              *((short *)txbuf[0]+start_ind+1),
+                                              *((short *)txbuf[0]+start_ind+2),
+                                              *((short *)txbuf[0]+start_ind+3),
+                                              *((short *)txbuf[0]+start_ind+4),
+                                              *((short *)txbuf[0]+start_ind+5),
+                                              *((short *)txbuf[0]+start_ind+6), 
+                                              *((short *)txbuf[0]+start_ind+7)); 
+#endif
+                    radio->radioTx(rid, txbuf, flags, frameTime);
                 }
 //#endif
             }
@@ -634,5 +653,6 @@ void* RU::loopProc(void *in_context)
         }
 #endif
     }
+    return 0;
 }
 

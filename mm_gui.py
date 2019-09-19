@@ -84,14 +84,14 @@ class MainWindow(QtGui.QMainWindow):
 			self.Const_plots[plt] = self.win.addPlot(title='Constellation %i' % (plt+1))
 			self.Const_plots[plt].setTitle('<span style="font-size: 22pt;">User %i</span>' % (plt+1))
 			# Const_plots[plt].setRange(xRange=[-.25,.25],yRange=[-.25,.25],disableAutoRange=True)
-			self.Const_plots[plt].setRange(xRange=[-1.5,1.5],yRange=[-1.5,1.5],disableAutoRange=True)
+			self.Const_plots[plt].setRange(xRange=[-4.5,4.5],yRange=[-4.5,4.5],disableAutoRange=True)
 			self.Const_plots[plt].setAspectLocked(lock=True, ratio=1)
 			self.Const_data[plt] = pg.ScatterPlotItem(size=6, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 120))
 			self.Const_plots[plt].addItem(self.Const_data[plt])
 
 	def closeEvent(self, event):
                 self.comp.stopCoMP()
-                self.comp.destroyCoMP();
+                #self.comp.destroyCoMP();
                 self.running = False
                 event.accept()
 		#self.deleteLater()			
