@@ -27,11 +27,11 @@ CORE_OFFSET(in_core_offset)
     printf("initialize buffers\n");
     initialize_uplink_buffers();
 
-    printf("new PackageSender\n");
-    sender_.reset(new PackageSender(cfg_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay));
+    printf("new Sender\n");
+    sender_.reset(new Sender(cfg_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay));
 
-    printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET, 
+    printf("new Receiver\n");
+    receiver_.reset(new Receiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET, 
                     &message_queue_, &complete_task_queue_, rx_ptoks_ptr));
 
 }
@@ -107,11 +107,11 @@ void Simulator::start()
         for(int bulk_count = 0; bulk_count < ret; bulk_count++) {
             Event_data& event = events_list[bulk_count];
             switch(event.event_type) {
-                case EVENT_PACKAGE_RECEIVED: {         
+                case EVENT_PACKET_RECEIVED: {         
                     int offset = event.data;    
                     int socket_thread_id, offset_in_current_buffer;
                     interpreteOffset2d_setbits(offset, &socket_thread_id, &offset_in_current_buffer, 28);                
-                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * package_length;
+                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * packet_length;
                     int frame_id = *((int *)socket_buffer_ptr) % 10000;
                     int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
                     int ant_id = *((int *)socket_buffer_ptr + 3);
@@ -209,7 +209,7 @@ void Simulator::initialize_vars_from_cfg(Config *cfg)
     dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
     dl_data_subframe_start = cfg->dl_data_symbol_start;
     dl_data_subframe_end = cfg->dl_data_symbol_end;
-    package_length = cfg->package_length;
+    packet_length = cfg->packet_length;
 
     demul_block_size = cfg->demul_block_size;
     demul_block_num = OFDM_DATA_NUM / demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
@@ -236,7 +236,7 @@ void Simulator::initialize_uplink_buffers()
     alloc_buffer_1d(&task_threads, TASK_THREAD_NUM, 64, 0);
     alloc_buffer_1d(&context, TASK_THREAD_NUM, 64, 0);
 
-    socket_buffer_size_ = (long long) package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
+    socket_buffer_size_ = (long long) packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
     alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);

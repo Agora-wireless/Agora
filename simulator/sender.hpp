@@ -3,8 +3,8 @@
  * Email: jianding17@gmail.com
  * 
  */
-#ifndef PACKAGESENDER
-#define PACKAGESENDER
+#ifndef SENDER
+#define SENDER
 
 #include <iostream>
 #include <sys/socket.h>
@@ -33,6 +33,7 @@
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "memory_manage.h"
+#include "utils.h"
 
 
 
@@ -40,7 +41,7 @@
 
 typedef unsigned short ushort;
 
-class PackageSender
+class Sender
 {
 public:
     // static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
@@ -58,30 +59,22 @@ public:
 
     // static const int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM : subframe_num_perframe;
 
-
-
-    struct PackageSenderContext
-    {
-        PackageSender *ptr;
-        int tid;
-    };
-
 public:
-    PackageSender(Config *in_config, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
-    ~PackageSender();
+    Sender(Config *in_config, int in_thread_num, int in_core_offset = 30, int in_delay = 0);
+    ~Sender();
 
     void startTX();
     void startTXfromMain(double *in_frame_start, double *in_frame_end);
-    static void* loopSend_main(void *context);
-    static void* loopSend(void *context);
+    void *loopSend_main(int tid);
+    void *loopSend(int tid);
     
 private:
     Config *config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_FRAME_LEN;
     int subframe_num_perframe, data_subframe_num_perframe;
-    int package_length;
-    int package_header_offset;
+    int packet_length;
+    int packet_header_offset;
     int buffer_length;
     int max_subframe_id;
     int max_length_;
@@ -129,7 +122,7 @@ private:
 
     int core_offset;
     int delay;
-    PackageSenderContext* context;
+    EventHandlerContext<Sender> *context;
 
     int **packet_count_per_subframe;
     int *packet_count_per_frame;

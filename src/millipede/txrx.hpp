@@ -4,8 +4,8 @@
  * 
  */
 
-#ifndef PACKAGERECEIVER
-#define PACKAGERECEIVER
+#ifndef PACKETTXRX
+#define PACKETTXRX
 
 #include <iostream>
 #include <sys/socket.h>
@@ -76,30 +76,30 @@
 
 
 typedef unsigned short ushort;
-class PackageReceiver
+class PacketTXRX
 {
 public:
     
-    // use for create pthread 
-    struct PackageReceiverContext
-    {
-        PackageReceiver *ptr;
-        int tid;
-#ifdef USE_ARGOS
-        int radios;
-#endif
-    };
+//     // use for create pthread 
+//     struct PacketTXRXContext
+//     {
+//         PacketTXRX *ptr;
+//         int tid;
+// #ifdef USE_ARGOS
+//         int radios;
+// #endif
+//     };
 
 public:
-    PackageReceiver(Config *cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
+    PacketTXRX(Config *cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
     /**
      * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
     */ 
-    PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
+    PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
             moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
             moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks);
-    ~PackageReceiver();
+    ~PacketTXRX();
     
 
 #ifdef USE_DPDK
@@ -142,8 +142,8 @@ private:
     int subframe_num_perframe, data_subframe_num_perframe;
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     bool downlink_mode;
-    int package_length;
-    int package_header_offset;
+    int packet_length;
+    int packet_header_offset;
 
 
 #if USE_IPV4
@@ -188,10 +188,10 @@ private:
     int core_id_;
     int tx_core_id_;
 
-    EventHandlerContext<PackageReceiver> *tx_context;
-    EventHandlerContext<PackageReceiver> *rx_context;
-    // PackageReceiverContext* tx_context;
-    // PackageReceiverContext* rx_context;
+    EventHandlerContext<PacketTXRX> *tx_context;
+    EventHandlerContext<PacketTXRX> *rx_context;
+    // PacketTXRXContext* tx_context;
+    // PacketTXRXContext* rx_context;
 
     Config *config_;
 #if USE_ARGOS

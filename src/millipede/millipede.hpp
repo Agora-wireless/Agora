@@ -31,7 +31,7 @@
 // #include <cblas.h>
 // #include <stdio.h>
 // #include "cpu_attach.hpp"
-#include "packageReceiver.hpp"
+#include "txrx.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "gettime.h"
@@ -118,7 +118,7 @@ private:
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     int dl_data_subframe_start, dl_data_subframe_end;
     bool downlink_mode;
-    int package_length;
+    int packet_length;
 
     int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
     int FFT_THREAD_NUM, DEMUL_THREAD_NUM, ZF_THREAD_NUM;
@@ -134,7 +134,7 @@ private:
     float csi_format_offset;
     int buffer_frame_num;
     int max_packet_num_per_frame;
-    std::unique_ptr<PackageReceiver> receiver_;
+    std::unique_ptr<PacketTXRX> receiver_;
     std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
@@ -147,8 +147,8 @@ private:
     /** 
      * received data 
      * Frist dimension: SOCKET_THREAD_NUM
-     * Second dimension of buffer (type: char): package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+     * Second dimension of buffer (type: char): packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
     char **socket_buffer_;
@@ -296,8 +296,8 @@ private:
     /**
      * Data for transmission
      * First dimension of buffer (type: char): subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM
-     * Second dimension: package_length * BS_ANT_NUM
-     * package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+     * Second dimension: packet_length * BS_ANT_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
     char *dl_socket_buffer_;

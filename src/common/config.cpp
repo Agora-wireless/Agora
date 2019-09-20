@@ -108,8 +108,8 @@ Config::Config(std::string jsonfile)
     data_symbol_num_perframe = symbol_num_perframe - pilotSymsPerFrame; // - pilotSymbols[0][0]; //std::max(ulSymsPerFrame, dlSymsPerFrame); //symbol_num_perframe - pilot_symbol_num_perframe; //tddConf.value("data_subframe_num_perframe", symbol_num_perframe -  pilot_symbol_num_perframe);
     //symbol_num_perframe = data_symbol_num_perframe+pilot_symbol_num_perframe;//symbolsPerFrame; //tddConf.value("subframe_num_perframe", 5);
 
-    package_header_offset = tddConf.value("package_header_offset", 64);
-    package_length = package_header_offset + sizeof(short) * sampsPerSymbol * 2;
+    packet_header_offset = tddConf.value("packet_header_offset", 64);
+    packet_length = packet_header_offset + sizeof(short) * sampsPerSymbol * 2;
     downlink_mode = dl_data_symbol_num_perframe > 0;
 #else
     /* base station configurations */
@@ -129,8 +129,8 @@ Config::Config(std::string jsonfile)
     dl_data_symbol_num_perframe = tddConf.value("dl_subframe_num_perframe", 10);
     dl_data_symbol_start = tddConf.value("dl_data_subframe_start", 10);
     dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
-    package_header_offset = tddConf.value("package_header_offset", 64);
-    package_length = package_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
+    packet_header_offset = tddConf.value("packet_header_offset", 64);
+    packet_length = packet_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
     downlink_mode = tddConf.value("downlink_mode", false);
 #endif
     std::cout << "Config file loaded!" << std::endl;
