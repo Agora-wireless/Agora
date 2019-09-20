@@ -3,7 +3,7 @@
  * Email: jianding17@gmail.com
  * 
  */
-#include "packageSender.hpp"
+#include "sender.hpp"
 
 bool keep_running = true;
 
@@ -56,7 +56,7 @@ static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
     _mm_sfence();
 }
 
-PackageSender::PackageSender(Config *cfg, int in_thread_num, int in_core_offset, int in_delay):
+Sender::Sender(Config *cfg, int in_thread_num, int in_core_offset, int in_delay):
 ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
 socket_num(in_thread_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
 {
@@ -69,9 +69,9 @@ socket_num(in_thread_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     downlink_mode = cfg->downlink_mode;
-    package_length = cfg->package_length;
-    package_header_offset = cfg->package_header_offset;
-    buffer_length = tx_buf_offset + package_length;
+    packet_length = cfg->packet_length;
+    packet_header_offset = cfg->packet_header_offset;
+    buffer_length = tx_buf_offset + packet_length;
     max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
 
@@ -160,7 +160,7 @@ socket_num(in_thread_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
         task_ptok[i] = new moodycamel::ProducerToken(task_queue_);
 }
 
-PackageSender::~PackageSender()
+Sender::~Sender()
 {
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
         delete[] IQ_data_coded[i];
@@ -177,7 +177,7 @@ PackageSender::~PackageSender()
 
 
 
-void PackageSender::startTX()
+void Sender::startTX()
 {
     // printf("start sender\n");
     // double frame_start[10240] __attribute__( ( aligned (4096) ) );
@@ -185,15 +185,16 @@ void PackageSender::startTX()
     alloc_buffer_1d(&frame_start, 10240, 4096, 1);
     alloc_buffer_1d(&frame_end, 10240, 4096, 1);
     /* create send threads */
-    context = new PackageSenderContext[thread_num + 1];
+    context = new EventHandlerContext<Sender> [thread_num + 1];
     std::vector<pthread_t> created_threads;
-    for(int i = 0; i < thread_num; i++) {
+    for (int i = 0; i < thread_num; i++) {
         pthread_t send_thread_;
         
-        context[i].ptr = this;
-        context[i].tid = i;
+        context[i].obj_ptr = this;
+        context[i].id = i;
 
-        if(pthread_create( &send_thread_, NULL, PackageSender::loopSend, (void *)(&context[i])) != 0) {
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<Sender, &Sender::loopSend>, &context[i]) != 0) {
+        // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void *)(&context[i])) != 0) {
             perror("socket send thread create failed");
             exit(0);
         }
@@ -217,7 +218,7 @@ void PackageSender::startTX()
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
-        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
         
         ant_id++;
         if(ant_id == BS_ANT_NUM) {
@@ -271,7 +272,7 @@ void PackageSender::startTX()
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = tx_ant_id;
-        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
+        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         
         int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
@@ -373,7 +374,7 @@ void PackageSender::startTX()
     // pthread_t main_send_thread_;
     // context[thread_num].ptr = this;
     // context[thread_num].tid = thread_num;
-    // if(pthread_create( &main_send_thread_, NULL, PackageSender::loopSend_main, (void *)(&context[thread_num])) != 0) {
+    // if(pthread_create( &main_send_thread_, NULL, Sender::loopSend_main, (void *)(&context[thread_num])) != 0) {
     //     perror("socket main send thread create failed");
     //     exit(0);
     // }
@@ -383,22 +384,22 @@ void PackageSender::startTX()
 
 
 
-void PackageSender::startTXfromMain(double *in_frame_start, double *in_frame_end)
+void Sender::startTXfromMain(double *in_frame_start, double *in_frame_end)
 {
     printf("start sender\n");
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
     /* create send threads */
-    context = new PackageSenderContext[thread_num + 1];
+    context = new EventHandlerContext<Sender>[thread_num + 1];
     std::vector<pthread_t> created_threads;
     for(int i = 0; i < thread_num; i++) {
         pthread_t send_thread_;
         
-        context[i].ptr = this;
-        context[i].tid = i;
-
-        if(pthread_create( &send_thread_, NULL, PackageSender::loopSend, (void *)(&context[i])) != 0) {
+        context[i].obj_ptr = this;
+        context[i].id = i;
+        if(pthread_create(&send_thread_, NULL, pthread_fun_wrapper<Sender, &Sender::loopSend>, &context[i]) != 0) {
+        // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void *)(&context[i])) != 0) {
             perror("socket send thread create failed");
             exit(0);
         }
@@ -412,9 +413,10 @@ void PackageSender::startTXfromMain(double *in_frame_start, double *in_frame_end
     pthread_cond_broadcast(&cond);
 
     pthread_t main_send_thread_;
-    context[thread_num].ptr = this;
-    context[thread_num].tid = thread_num;
-    if(pthread_create( &main_send_thread_, NULL, PackageSender::loopSend_main, (void *)(&context[thread_num])) != 0) {
+    context[thread_num].obj_ptr = this;
+    context[thread_num].id = thread_num;
+    if(pthread_create(&main_send_thread_, NULL, pthread_fun_wrapper<Sender, &Sender::loopSend_main>, &context[thread_num]) != 0) {
+    // if(pthread_create( &main_send_thread_, NULL, Sender::loopSend_main, (void *)(&context[thread_num])) != 0) {
         perror("socket main send thread create failed");
         exit(0);
     }
@@ -423,50 +425,14 @@ void PackageSender::startTXfromMain(double *in_frame_start, double *in_frame_end
 }
 
 
-void* PackageSender::loopSend_main(void *in_context)
+void *Sender::loopSend_main(int tid)
 {
-    PackageSender* obj_ptr = ((PackageSenderContext *)in_context)->ptr;
-    // int tid = ((PackageSenderContext *)in_context)->tid;
-    // printf("package main sender thread %d start\n", tid);
-
-    moodycamel::ConcurrentQueue<int> *task_queue_ = &obj_ptr->task_queue_;
-    moodycamel::ConcurrentQueue<int> *message_queue_ = &obj_ptr->message_queue_;
-
-    pin_to_core_with_offset(TX_Master, obj_ptr->core_offset, 0);
+    pin_to_core_with_offset(Master_TX, core_offset, 0);
 
     // double frame_start[10240] __attribute__( ( aligned (4096) ) );
     // double frame_end[10240] __attribute__( ( aligned (4096) ) ) ;
 
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    int OFDM_FRAME_LEN = obj_ptr->OFDM_FRAME_LEN;
-    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    int package_length = obj_ptr->package_length;
-    int package_header_offset = obj_ptr->package_header_offset;
-    int buffer_length = obj_ptr->buffer_length;
-    int max_subframe_id = obj_ptr->max_subframe_id;
-    int delay = obj_ptr->delay;
-    moodycamel::ProducerToken **task_ptok = obj_ptr->task_ptok; 
-
-    int ant_id = obj_ptr->ant_id;
-    int subframe_id = obj_ptr->subframe_id;
-    int frame_id = obj_ptr->frame_id;
-    int cur_ptr_ = obj_ptr->cur_ptr_;
-    int max_length_ = obj_ptr->max_length_;
-    char **trans_buffer_ = obj_ptr->trans_buffer_;
-
-    int thread_num = obj_ptr->thread_num;
-    ushort **IQ_data_coded = obj_ptr->IQ_data_coded;
-
-    int **packet_count_per_subframe = obj_ptr->packet_count_per_subframe;
-    int *packet_count_per_frame = obj_ptr->packet_count_per_frame;
-
-    double *frame_start = obj_ptr->frame_start;
-    double *frame_end = obj_ptr->frame_end;
-
-        /* load data to buffer */
+    /* load data to buffer */
     int cell_id = 0;
     for (int i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
@@ -476,7 +442,7 @@ void* PackageSender::loopSend_main(void *in_context)
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
-        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
+        memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
         
         ant_id++;
         if(ant_id == BS_ANT_NUM) {
@@ -510,7 +476,7 @@ void* PackageSender::loopSend_main(void *in_context)
     // push tasks of the first subframe into task queue
     for (int i = 0; i < BS_ANT_NUM; i++) {
         int ptok_id = i % thread_num;
-        if ( !task_queue_->enqueue(*task_ptok[ptok_id], i) ) {
+        if ( !task_queue_.enqueue(*task_ptok[ptok_id], i) ) {
             printf("send task enqueue failed\n");
             exit(0);
         }
@@ -522,7 +488,7 @@ void* PackageSender::loopSend_main(void *in_context)
     uint64_t tick_start = RDTSC();
     while(keep_running && tx_frame_count < 9600) {
         int data_ptr;
-        ret = message_queue_->try_dequeue(data_ptr); 
+        ret = message_queue_.try_dequeue(data_ptr); 
         if(!ret)
             continue;
         int tx_ant_id = data_ptr % BS_ANT_NUM;
@@ -532,7 +498,7 @@ void* PackageSender::loopSend_main(void *in_context)
         (*(ptr+1)) = subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = tx_ant_id;
-        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + package_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
+        memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
         
         int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
@@ -597,7 +563,7 @@ void* PackageSender::loopSend_main(void *in_context)
             int next_subframe_ptr = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
             for (int i = 0; i < BS_ANT_NUM; i++) {
                 int ptok_id = i % thread_num;
-                if ( !task_queue_->enqueue(*task_ptok[ptok_id], i + next_subframe_ptr) ) {
+                if ( !task_queue_.enqueue(*task_ptok[ptok_id], i + next_subframe_ptr) ) {
                     printf("send task enqueue failed\n");
                     exit(0);
                 }
@@ -640,76 +606,55 @@ void* PackageSender::loopSend_main(void *in_context)
 
 
 
-void* PackageSender::loopSend(void *in_context)
+void *Sender::loopSend(int tid)
 {
 
-
-    PackageSender* obj_ptr = ((PackageSenderContext *)in_context)->ptr;
-    int tid = ((PackageSenderContext *)in_context)->tid;
-    // printf("package sender thread %d start\n", tid);
-
-    moodycamel::ConcurrentQueue<int> *task_queue_ = &obj_ptr->task_queue_;
-    moodycamel::ConcurrentQueue<int> *message_queue_ = &obj_ptr->message_queue_;
-
-    // printf("TX thread %d: on core %d\n", tid, sched_getcpu());
-    pin_to_core_with_offset(TX, obj_ptr->core_offset + 1, tid);
-
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    int OFDM_FRAME_LEN = obj_ptr->OFDM_FRAME_LEN;
-    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    int package_length = obj_ptr->package_length;
-    int package_header_offset = obj_ptr->package_header_offset;
-    int buffer_length = obj_ptr->buffer_length;
-    int max_subframe_id = obj_ptr->max_subframe_id;
-
+    pin_to_core_with_offset(Worker_TX, core_offset + 1, tid);
 
     // Use mutex to sychronize data receiving across threads
-    pthread_mutex_lock(&obj_ptr->mutex);
+    pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
 
-    pthread_cond_wait(&obj_ptr->cond, &obj_ptr->mutex);
-    pthread_mutex_unlock(&obj_ptr->mutex); // unlocking for all other threads
+    pthread_cond_wait(&cond, &mutex);
+    pthread_mutex_unlock(&mutex); // unlocking for all other threads
 
 
     // auto begin = std::chrono::system_clock::now();
     double begin = get_time();
-    int package_count = 0;
+    int packet_count = 0;
     //std::iota(ant_seq.begin(), ant_seq.end(), 0);
 
     int used_socker_id = 0;
     int ret;
-    int socket_per_thread = obj_ptr->socket_num / obj_ptr->thread_num;
+    int socket_per_thread = socket_num / thread_num;
     int total_tx_packets = 0;
     // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
-    int ant_num_this_thread = BS_ANT_NUM / obj_ptr->thread_num + (tid < BS_ANT_NUM % obj_ptr->thread_num ? 1: 0);
+    int ant_num_this_thread = BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1: 0);
     double start_time_send = get_time();
     double start_time_msg = get_time();
     double end_time_send = get_time();
     double end_time_msg = get_time();
     double end_time_prev = get_time();
 
-    char invalid_packet[obj_ptr->buffer_length]; 
+    char invalid_packet[buffer_length]; 
 
-    printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, obj_ptr->thread_num);
+    printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, thread_num);
     while(true) {
         int data_ptr;
-        ret = task_queue_->try_dequeue_from_producer(*(obj_ptr->task_ptok[tid]),data_ptr); 
+        ret = task_queue_.try_dequeue_from_producer(*(task_ptok[tid]),data_ptr); 
         if(!ret)
             continue;
 
         // get data
-        // pthread_mutex_lock( &obj_ptr->lock_ );
-        // obj_ptr->buffer_len_ --;
-        // pthread_mutex_unlock( &obj_ptr->lock_ );
+        // pthread_mutex_lock( &lock_ );
+        // buffer_len_ --;
+        // pthread_mutex_unlock( &lock_ );
 
-        used_socker_id = data_ptr % obj_ptr->socket_num;   
+        used_socker_id = data_ptr % socket_num;   
          
 
-        int* ptr = (int *)obj_ptr->trans_buffer_[data_ptr];
+        int* ptr = (int *)trans_buffer_[data_ptr];
         int subframe_id = (*(ptr+1)); 
 #if DEBUG_SENDER
         start_time_send = get_time();
@@ -717,14 +662,14 @@ void* PackageSender::loopSend(void *in_context)
         if (!downlink_mode || subframe_id < UE_NUM) {
             /* send a message to the server */
 #if defined(USE_DPDK) || !CONNECT_UDP
-            // if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0) < 0){
-            if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
+            // if (send(socket_[used_socker_id], trans_buffer_[data_ptr].data(), buffer_length, 0) < 0){
+            if (sendto(socket_[used_socker_id], trans_buffer_[data_ptr], buffer_length, 0, (struct sockaddr *)&servaddr_[used_socker_id], sizeof(servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);
             }
 #else
-            if (send(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr], obj_ptr->buffer_length, 0) < 0) {
-            // if (sendto(obj_ptr->socket_[used_socker_id], obj_ptr->trans_buffer_[data_ptr].data(), obj_ptr->buffer_length, 0, (struct sockaddr *)&obj_ptr->servaddr_[used_socker_id], sizeof(obj_ptr->servaddr_[used_socker_id])) < 0) {
+            if (send(socket_[used_socker_id], trans_buffer_[data_ptr], buffer_length, 0) < 0) {
+            // if (sendto(socket_[used_socker_id], trans_buffer_[data_ptr].data(), buffer_length, 0, (struct sockaddr *)&servaddr_[used_socker_id], sizeof(servaddr_[used_socker_id])) < 0) {
                 perror("socket sendto failed");
                 exit(0);
             }
@@ -739,11 +684,11 @@ void* PackageSender::loopSend(void *in_context)
         
        
 
-        if ( !message_queue_->enqueue(data_ptr) ) {
+        if ( !message_queue_.enqueue(data_ptr) ) {
             printf("send message enqueue failed\n");
             exit(0);
         }
-        package_count++;
+        packet_count++;
         total_tx_packets++;
 
 #if DEBUG_SENDER     
@@ -755,14 +700,14 @@ void* PackageSender::loopSend(void *in_context)
 	
     	if (total_tx_packets > 1e9)
     	    total_tx_packets = 0;
-        if(package_count == ant_num_this_thread * max_subframe_id * 1000) {
+        if(packet_count == ant_num_this_thread * max_subframe_id * 1000) {
             double end = get_time();
             //double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * ant_num_this_thread * max_subframe_id * 1000;
 	        double byte_len = buffer_length * ant_num_this_thread * max_subframe_id * 1000.f;
             double diff = end - begin;
             printf("thread %d send %d frames in %f secs, throughput %f Mbps\n", tid, total_tx_packets/(ant_num_this_thread* max_subframe_id), diff/1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
             begin = get_time();
-            package_count = 0;
+            packet_count = 0;
         }
     }
     

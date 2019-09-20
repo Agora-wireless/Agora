@@ -102,7 +102,7 @@ std::vector<pthread_t> RU::startProc(void** in_buffer, int** in_buffer_status, i
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
-    assert(in_buffer_length == config_->package_length * buffer_frame_num_); // should be integer
+    assert(in_buffer_length == config_->packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
@@ -180,7 +180,7 @@ void* RU::loopSend(void *in_context)
 {
     RU* obj_ptr = ((RUContext *)in_context)->ptr;
     int tid = ((RUContext *)in_context)->tid;
-    printf("package sender thread %d start\n", tid);
+    printf("packet sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
     // get pointer to message queue
@@ -210,9 +210,9 @@ void* RU::loopSend(void *in_context)
 #else 
     RadioConfig *radio = obj_ptr->radioconfig_;
 #endif
-    int package_length = cfg->package_length;
+    int packet_length = cfg->packet_length;
 #ifndef SIM
-    package_length -= cfg->package_header_offset;
+    packet_length -= cfg->packet_header_offset;
 #endif
 
     int ret;
@@ -271,7 +271,7 @@ void* RU::loopSend(void *in_context)
                 tx_buffer_hdr[2] = 0; //cell_id
                 tx_buffer_hdr[3] = ant_id; // rsvd  
                 //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
-                if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, package_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+                if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
                     perror("loopSend: socket sendto failed");
                     exit(0);
                 }
@@ -285,14 +285,14 @@ void* RU::loopSend(void *in_context)
             //for (ant_id = 0; ant_id < cfg->getNumAntennas(); ant_id++) 
             {
                 offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
-                cur_ptr_buffer = buffer + offset * package_length;  
+                cur_ptr_buffer = buffer + offset * packet_length;  
                 // send data (one OFDM symbol)
                 *((int *)cur_ptr_buffer) = frame_id;
                 *((int *)cur_ptr_buffer + 1) = txSymbols[symbol_id]; //symbol_id;
                 *((int *)cur_ptr_buffer + 2) = cell_id;
                 *((int *)cur_ptr_buffer + 3) = ant_id;
 
-                if (sendto(tx_socket_[tid], (char *)cur_ptr_buffer, package_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+                if (sendto(tx_socket_[tid], (char *)cur_ptr_buffer, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
                     perror("loopSend: socket sendto failed");
                     exit(0);
                 }
@@ -312,7 +312,7 @@ void* RU::loopSend(void *in_context)
             long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
             int flags = 1; // HAS_TIME
             if (tx_symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-            txbuf[0] = buffer + offset * package_length; //   obj_ptr->pilot_buffer_; //
+            txbuf[0] = buffer + offset * packet_length; //   obj_ptr->pilot_buffer_; //
             buffer_status[offset] = 0;
 #if DEBUG_SEND
         printf("RU: transmit tx_frame_id %d, tx_symbol_id %d, cell_id %d, ant_id %d\n", frame_id, symbol_id, cell_id, ant_id);
@@ -327,7 +327,7 @@ void* RU::loopSend(void *in_context)
 #endif 
             if (cfg->nChannels == 2)
             {
-                txbuf[1] = buffer + (offset + 1) * package_length;
+                txbuf[1] = buffer + (offset + 1) * packet_length;
                 buffer_status[offset+1] = 0;
             }
             clock_gettime(CLOCK_MONOTONIC, &tv);
@@ -351,11 +351,11 @@ void* RU::loopSend(void *in_context)
         }
 #endif
 
-        Event_data package_message;
-        package_message.event_type = EVENT_PACKAGE_SENT;
-        package_message.data = offset;
-        //package_message.more_data = frame_id;
-        if ( cfg->running && !message_queue_->enqueue(local_ptok, package_message ) ) {
+        Event_data packet_message;
+        packet_message.event_type = EVENT_PACKET_SENT;
+        packet_message.data = offset;
+        //packet_message.more_data = frame_id;
+        if ( cfg->running && !message_queue_->enqueue(local_ptok, packet_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -408,9 +408,9 @@ void* RU::loopProc(void *in_context)
     //moodycamel::ProducerToken local_ctok(*task_queue_);
     //moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
 
-    int package_length = cfg->package_length;
-    int package_header_offset = cfg->package_header_offset;
-    int tx_package_length = package_length - package_header_offset;
+    int packet_length = cfg->packet_length;
+    int packet_header_offset = cfg->packet_header_offset;
+    int tx_packet_length = packet_length - packet_header_offset;
     char* buffer = (char*)obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     int buffer_length = obj_ptr->buffer_length_;
@@ -444,21 +444,21 @@ void* RU::loopProc(void *in_context)
     // this is assuming buffer_frame_num is at least 2 
     char* cur_ptr_buffer2;
     int* cur_ptr_buffer_status2;
-    char* buffer2 = (char*)obj_ptr->buffer_[tid] + package_length;
+    char* buffer2 = (char*)obj_ptr->buffer_[tid] + packet_length;
     int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
     cur_ptr_buffer_status2 = buffer_status2;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
     }
     else {
-        cur_ptr_buffer2 = (char*)calloc(package_length, sizeof(char)); 
+        cur_ptr_buffer2 = (char*)calloc(packet_length, sizeof(char)); 
     }
 #else
     // loop recv
     socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
 #endif
     int offset = 0;
-    int package_num = 0;
+    int packet_num = 0;
     long long frameTime;
 
     int maxQueueLength = 0;
@@ -475,7 +475,7 @@ void* RU::loopProc(void *in_context)
         // receive data
 #ifdef SIM
         int recvlen = -1;
-        if ((recvlen = recvfrom(obj_ptr->rx_socket_[tid], cur_ptr_buffer, (size_t) package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0) {
+        if ((recvlen = recvfrom(obj_ptr->rx_socket_[tid], cur_ptr_buffer, (size_t) packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
         }
@@ -501,13 +501,13 @@ void* RU::loopProc(void *in_context)
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
         cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
-        cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length) % buffer_length;
+        cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length) % buffer_length;
         // push EVENT_RX_ENB event into the queue
-        Event_data package_message;
-        package_message.event_type = EVENT_RX_SYMBOL;
+        Event_data packet_message;
+        packet_message.event_type = EVENT_RX_SYMBOL;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-        package_message.data = offset + tid * buffer_frame_num;
-        if ( !message_queue_->enqueue(local_ptok, package_message ) ) {
+        packet_message.data = offset + tid * buffer_frame_num;
+        if ( !message_queue_->enqueue(local_ptok, packet_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -529,15 +529,15 @@ void* RU::loopProc(void *in_context)
         int cur_queue_len = message_queue_->size_approx();
         maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
 
-        package_num++;
+        packet_num++;
 #else
         for (int it = 0 ; it < nradio_cur_thread; it++) // FIXME: this must be threaded
         {
             //int rid = tid * obj_ptr->radios_per_thread + it;
             int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
-            char* samp1 = (cur_ptr_buffer +  package_header_offset*sizeof(int));
-            char* samp2 = (cur_ptr_buffer2 + package_header_offset*sizeof(int));
+            char* samp1 = (cur_ptr_buffer +  packet_header_offset*sizeof(int));
+            char* samp2 = (cur_ptr_buffer2 + packet_header_offset*sizeof(int));
             void *samp[2] = {(void*)samp1, (void*)samp2};
             while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
             frame_id = (int)(frameTime>>32);
@@ -570,13 +570,13 @@ void* RU::loopProc(void *in_context)
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
             cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * cfg->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
-            Event_data package_message;
-            package_message.event_type = EVENT_PACKAGE_RECEIVED;
+            Event_data packet_message;
+            packet_message.event_type = EVENT_PACKET_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-            package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
-            if (!message_queue_->enqueue(local_ptok, package_message ) ) {
+            packet_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
+            if (!message_queue_->enqueue(local_ptok, packet_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
@@ -585,13 +585,13 @@ void* RU::loopProc(void *in_context)
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
                 cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + package_length * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * cfg->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
-                Event_data package_message2;
-                package_message2.event_type = EVENT_PACKAGE_RECEIVED;
+                Event_data packet_message2;
+                packet_message2.event_type = EVENT_PACKET_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-                package_message2.data = offset + tid * buffer_frame_num;
-                if (!message_queue_->enqueue(local_ptok, package_message2 ) ) {
+                packet_message2.data = offset + tid * buffer_frame_num;
+                if (!message_queue_->enqueue(local_ptok, packet_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
@@ -602,7 +602,7 @@ void* RU::loopProc(void *in_context)
             {
 //#ifdef SEPARATE_TX_THREAD
 //                Event_data do_tx_task;
-//                do_tx_task.event_type = TASK_PACKAGE_SENT;
+//                do_tx_task.event_type = TASK_packet_SENT;
 //                do_tx_task.data = ant_id; //tx_symbol_id * cfg->getNumAntennas() + ant_id;
 //                do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
 //                if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
@@ -616,8 +616,8 @@ void* RU::loopProc(void *in_context)
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM; 
                     size_t tx_symbol = txSymbols[tx_symbol_id];
                     //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
-                    int frame_samp_size = (tx_package_length * n_ant * txSymsPerFrame);
-                    int tx_offset = tx_frame_offset * frame_samp_size + tx_package_length * (n_ant * tx_symbol_id + ant_id);
+                    int frame_samp_size = (tx_packet_length * n_ant * txSymsPerFrame);
+                    int tx_offset = tx_frame_offset * frame_samp_size + tx_packet_length * (n_ant * tx_symbol_id + ant_id);
                     void* txbuf[2];
                     long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
                     int flags = 1; // HAS_TIME
@@ -625,7 +625,7 @@ void* RU::loopProc(void *in_context)
                     txbuf[0] = (void*)(tx_buffer + tx_offset); 
                     if (cfg->nChannels == 2)
                     {
-                        txbuf[1] = (void*)(tx_buffer + tx_offset + tx_package_length);
+                        txbuf[1] = (void*)(tx_buffer + tx_offset + tx_packet_length);
                     }
 #if DEBUG_SEND
                     int start_ind = 2 * cfg->prefix;
@@ -649,7 +649,7 @@ void* RU::loopProc(void *in_context)
             int cur_queue_len = message_queue_->size_approx();
             maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
 
-            package_num++;
+            packet_num++;
         }
 #endif
     }

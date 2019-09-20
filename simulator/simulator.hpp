@@ -30,8 +30,8 @@
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
-#include "packageReceiver.hpp"
-#include "packageSender.hpp"
+#include "receiver.hpp"
+#include "sender.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "gettime.h"
@@ -88,7 +88,7 @@ private:
     int subframe_num_perframe, data_subframe_num_perframe;
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     int dl_data_subframe_start, dl_data_subframe_end;
-    int package_length;
+    int packet_length;
 
     int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
     int CORE_OFFSET;
@@ -102,8 +102,8 @@ private:
     float csi_format_offset;
     int buffer_frame_num;
     int max_packet_num_per_frame;
-    std::unique_ptr<PackageReceiver> receiver_;
-    std::unique_ptr<PackageSender> sender_;
+    std::unique_ptr<Receiver> receiver_;
+    std::unique_ptr<Sender> sender_;
     pthread_t *task_threads;
     EventHandlerContext *context;
     /*****************************************************
@@ -113,8 +113,8 @@ private:
     /** 
      * received data 
      * Frist dimension: SOCKET_THREAD_NUM
-     * Second dimension of buffer (type: char): package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+     * Second dimension of buffer (type: char): packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
     // char *socket_buffer_[SOCKET_RX_THREAD_NUM];

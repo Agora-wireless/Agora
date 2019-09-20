@@ -42,16 +42,16 @@ Millipede::Millipede(Config *cfg)
     }
 
     
-    /* initialize packageReceiver*/
-    printf("new PackageReceiver\n");
-    receiver_.reset(new PackageReceiver(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, 
+    /* initialize TXRX threads*/
+    printf("new TXRX\n");
+    receiver_.reset(new PacketTXRX(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, 
                     &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     /* create worker threads */
 #if BIGSTATION
-    create_threads(FFT, 0, FFT_THREAD_NUM);
-    create_threads(ZF, FFT_THREAD_NUM, FFT_THREAD_NUM + ZF_THREAD_NUM);
-    create_threads(Demul, FFT_THREAD_NUM + ZF_THREAD_NUM, TASK_THREAD_NUM);
+    create_threads(Worker_FFT, 0, FFT_THREAD_NUM);
+    create_threads(Worker_ZF, FFT_THREAD_NUM, FFT_THREAD_NUM + ZF_THREAD_NUM);
+    create_threads(Worker_Demul, FFT_THREAD_NUM + ZF_THREAD_NUM, TASK_THREAD_NUM);
 #else
     create_threads(Worker, 0, TASK_THREAD_NUM);
 #endif
@@ -182,11 +182,11 @@ void Millipede::start()
         for(int bulk_count = 0; bulk_count < ret; bulk_count++) {
             Event_data& event = events_list[bulk_count];
             switch(event.event_type) {
-                case EVENT_PACKAGE_RECEIVED: {         
+                case EVENT_PACKET_RECEIVED: {         
                     int offset = event.data;    
                     int socket_thread_id, offset_in_current_buffer;
                     interpreteOffset2d_setbits(offset, &socket_thread_id, &offset_in_current_buffer, 28);                
-                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * package_length;
+                    char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * packet_length;
                     int frame_id = *((int *)socket_buffer_ptr) % 10000;
                     int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
                     int ant_id = *((int *)socket_buffer_ptr + 3);
@@ -368,7 +368,7 @@ void Millipede::start()
                     }
                 }
                 break;
-                case EVENT_PACKAGE_SENT: {
+                case EVENT_PACKET_SENT: {
                     /* Data is sent */
                     int offset_tx = event.data;
                     int frame_id, current_data_subframe_id, ant_id;
@@ -515,7 +515,7 @@ void *Millipede::worker(int tid)
 void* Millipede::worker_fft(int tid)
 {
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
-    pin_to_core_with_offset(FFT, core_offset, tid);
+    pin_to_core_with_offset(Worker_FFT, core_offset, tid);
     moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize FFT operator */
@@ -555,7 +555,7 @@ void* Millipede::worker_zf(int tid)
 {
     
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
-    pin_to_core_with_offset(ZF, core_offset, tid);
+    pin_to_core_with_offset(Worker_ZF, core_offset, tid);
 
     moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
@@ -581,7 +581,7 @@ void* Millipede::worker_demul(int tid)
 {
     
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
-    pin_to_core_with_offset(Demul, core_offset, tid);
+    pin_to_core_with_offset(Worker_Demul, core_offset, tid);
     moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize Demul operator */
@@ -639,13 +639,13 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
             case Worker:
                 ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker>, &context[i]);
                 break;
-            case FFT:
+            case Worker_FFT:
                 ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_fft>, &context[i]);
                 break;
-            case ZF:
+            case Worker_ZF:
                 ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_zf>, &context[i]);
                 break;
-            case Demul:
+            case Worker_Demul:
                 ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_demul>, &context[i]);
                 break;
             default:
@@ -971,7 +971,7 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
     downlink_mode = cfg_->downlink_mode;
     dl_data_subframe_start = cfg->dl_data_symbol_start;
     dl_data_subframe_end = cfg->dl_data_symbol_end;
-    package_length = cfg->package_length;
+    packet_length = cfg->packet_length;
 
     TASK_THREAD_NUM = cfg->worker_thread_num;
     SOCKET_RX_THREAD_NUM = cfg->socket_thread_num;
@@ -1024,7 +1024,7 @@ void Millipede::initialize_uplink_buffers()
     // task_threads = (pthread_t *)malloc(TASK_THREAD_NUM * sizeof(pthread_t));
     // context = (EventHandlerContext *)malloc(TASK_THREAD_NUM * sizeof(EventHandlerContext));
 
-    socket_buffer_size_ = (long long) package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
+    socket_buffer_size_ = (long long) packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     printf("socket_buffer_size %lld, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
     alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
@@ -1076,7 +1076,7 @@ void Millipede::initialize_downlink_buffers()
 {
 
 
-    dl_socket_buffer_size_ = (long long) data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM * package_length * BS_ANT_NUM;
+    dl_socket_buffer_size_ = (long long) data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM * packet_length * BS_ANT_NUM;
     dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
