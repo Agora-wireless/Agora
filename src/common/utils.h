@@ -39,6 +39,9 @@ template <class T>
 struct EventHandlerContext {
   T *obj_ptr;
   int id;
+#ifdef USE_ARGOS
+  int radios;
+#endif
 };
 
 template<class C, void *(C::*run_thread)(int)>

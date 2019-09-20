@@ -21,7 +21,7 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     OFDM_PREFIX_LEN = cfg->OFDM_PREFIX_LEN;
     subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    package_length = cfg->package_length;
+    packet_length = cfg->packet_length;
     buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
 
     tid = in_tid;
@@ -96,7 +96,7 @@ void DoFFT::FFT(int offset)
     // offset = offset % buffer_subframe_num_;
     // printf("In doFFT: socket_thread: %d offset %d\n", socket_thread_id, offset);
     // read info of one frame
-    char *cur_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset * package_length;
+    char *cur_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset * packet_length;
 
     int ant_id, frame_id, subframe_id; //, cell_id;
     frame_id = *((int *)cur_buffer_ptr);
@@ -454,8 +454,8 @@ void DoFFT::IFFT(int offset)
     // calculate data for downlink socket buffer 
     float *ifft_output_ptr = (float *)(&dl_ifft_buffer_[offset_in_buffer][0]);
     int socket_subframe_offset = frame_id_in_socket_buffer * data_subframe_num_perframe + current_data_subframe_id;
-    char *socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * package_length];
-    int socket_offset = sizeof(int) * 16 + ant_id * package_length;
+    char *socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * packet_length];
+    int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
 
     // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
     //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
@@ -483,7 +483,7 @@ void DoFFT::IFFT(int offset)
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id << ", data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
-    //     int socket_offset = sizeof(int) * 16 + ant_id * PackageReceiver::package_length;
+    //     int socket_offset = sizeof(int) * 16 + ant_id * packetReceiver::packet_length;
     //     cout <<*((short *)(socket_ptr + socket_offset) + 2 * j)  << "+j"<<*((short *)(socket_ptr + socket_offset) + 2 * j + 1 )<<",   ";
     // }
     // cout<<"\n\n"<<endl;

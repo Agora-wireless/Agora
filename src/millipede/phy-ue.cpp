@@ -64,8 +64,8 @@ Phy_UE::Phy_UE(Config *cfg)
 #ifdef SIM
     // read pilot 
     int pilot_len =  (FFT_LEN+CP_LEN);
-    ul_pilot_aligned = new char[package_length];
-    memcpy((void*)&ul_pilot_aligned[prefix_len * sizeof(uint32_t) + package_header_offset * sizeof(int)], pilot_ci16.data(), pilot_len * sizeof(uint32_t));
+    ul_pilot_aligned = new char[packet_length];
+    memcpy((void*)&ul_pilot_aligned[prefix_len * sizeof(uint32_t) + packet_header_offset * sizeof(int)], pilot_ci16.data(), pilot_len * sizeof(uint32_t));
 #endif
 
 
@@ -267,7 +267,7 @@ void Phy_UE::start()
 
             switch(event.event_type) {
             // if EVENT_RX_SYMBOL, do crop
-            case EVENT_PACKAGE_RECEIVED: 
+            case EVENT_PACKET_RECEIVED: 
             { 
                 int offset = event.data;
                 Event_data do_crop_task;
@@ -277,7 +277,7 @@ void Phy_UE::start()
                 int buffer_frame_num = dl_symbol_perframe * TASK_BUFFER_FRAME_NUM * numAntennas;
                 int rx_thread_id = offset / buffer_frame_num;
                 int offset_in_current_buffer = offset % buffer_frame_num;
-                char *rx_buffer_ptr = rx_buffer_[rx_thread_id] + offset_in_current_buffer * package_length;
+                char *rx_buffer_ptr = rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length;
                 symbol_id = *((int *)rx_buffer_ptr + 1);
                 frame_id = *((int *)rx_buffer_ptr);
 
@@ -451,14 +451,14 @@ void Phy_UE::start()
     std::string filename = "bin/ul_tx_buf.bin";
     FILE *fp = fopen(filename.c_str(),"wb");
     int frame_samp_size = (cfg->getTxPackageLength() * numAntennas * ul_data_symbol_perframe);
-    fwrite(&tx_buffer_[offset*frame_samp_size], sizeof(complex_float), (CP_LEN+FFT_LEN+cfg->package_header_offset) * numAntennas * dl_data_symbol_perframe, fp);
+    fwrite(&tx_buffer_[offset*frame_samp_size], sizeof(complex_float), (CP_LEN+FFT_LEN+cfg->packet_header_offset) * numAntennas * dl_data_symbol_perframe, fp);
     //fwrite(tx_buffer_.buffer[offset].data(), sizeof(std::complex<short>), (CP_LEN+FFT_LEN+4) * numAntennas * dl_data_symbol_perframe, fp);
     fclose(fp);
 #endif
             }
             break;
 
-            case EVENT_PACKAGE_SENT:
+            case EVENT_PACKET_SENT:
             {
                 int offset = event.data;
                 size_t frame_id, total_symbol_id, symbol_id, ant_id;
@@ -544,7 +544,7 @@ void Phy_UE::doFFT(int tid, int offset)
     offset = offset - rx_thread_id * buffer_subframe_num;
     
     // read info of one frame
-    char *cur_ptr_buffer = rx_buffer_[rx_thread_id] + offset * package_length;
+    char *cur_ptr_buffer = rx_buffer_[rx_thread_id] + offset * packet_length;
 
     int ant_id, frame_id, symbol_id;
     frame_id = *((int *)cur_ptr_buffer);
@@ -561,8 +561,8 @@ void Phy_UE::doFFT(int tid, int offset)
 
     // transfer ushort to float
     size_t delay_offset = (dl_prefix_len + CP_LEN) * 2; //GetFrameStart(cur_ptr_buffer_ushort, prefix_len, postfix_len);
-    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + cfg->package_header_offset);
-    //float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) * package_header_offset);
+    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + cfg->packet_header_offset);
+    //float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) * packet_header_offset);
     float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
     for(size_t i = 0; i < (FFT_LEN) * 2; i++)
@@ -705,7 +705,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 
     int frame_id = frame;
 
-    int frame_samp_size = (tx_package_length * numAntennas * ul_data_symbol_perframe);
+    int frame_samp_size = (tx_packet_length * numAntennas * ul_data_symbol_perframe);
     
     //for (int ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe; ul_symbol_id++)
     //{
@@ -714,7 +714,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         int symbol_id = cfg->ULSymbols[frame_period_id][ul_symbol_id];
 #endif
         //int modulbuf_offset = (data_sc_len * numAntennas * ul_symbol_id); 
-        int txbuf_offset = frame_offset * frame_samp_size + (tx_package_length * numAntennas * ul_symbol_id);
+        int txbuf_offset = frame_offset * frame_samp_size + (tx_packet_length * numAntennas * ul_symbol_id);
  
         int IFFT_buffer_target_id = frame_offset * (numAntennas * ul_data_symbol_perframe) + ul_symbol_id * numAntennas;
         for (size_t ant_id = 0; ant_id < nUEs; ant_id++) // TODO consider nChannels=2 case
@@ -748,11 +748,11 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
             float max_val = abs(mat_ifft_out).max();
             mat_ifft_out /= max_val;
 
-            int tx_offset = txbuf_offset + ant_id * tx_package_length; 
+            int tx_offset = txbuf_offset + ant_id * tx_packet_length; 
             char * cur_tx_buffer = &tx_buffer_[tx_offset];
 #ifdef SIM
-            //complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer + prefix_len*sizeof(complex_float) + cfg->package_header_offset);
-            short* tx_buffer_ptr = (short *)(cur_tx_buffer + prefix_len*sizeof(std::complex<short>) + cfg->package_header_offset);
+            //complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer + prefix_len*sizeof(complex_float) + cfg->packet_header_offset);
+            short* tx_buffer_ptr = (short *)(cur_tx_buffer + prefix_len*sizeof(std::complex<short>) + cfg->packet_header_offset);
             int* tx_buffer_hdr = (int*)cur_tx_buffer;
             tx_buffer_hdr[0] = frame_id;    
             tx_buffer_hdr[1] = symbol_id;  
@@ -821,12 +821,12 @@ void Phy_UE::initialize_vars_from_cfg(Config *cfg)
     //downlink_mode = cfg_->downlink_mode;
     //dl_data_subframe_start = cfg->dl_data_symbol_start;
     //dl_data_subframe_end = cfg->dl_data_symbol_end;
-    package_length = cfg->package_length;
-    package_header_offset = cfg->package_header_offset;
+    packet_length = cfg->packet_length;
+    packet_header_offset = cfg->packet_header_offset;
 #ifdef SIM
-    tx_package_length = cfg->package_length;
+    tx_packet_length = cfg->packet_length;
 #else
-    tx_package_length = package_length-package_header_offset;
+    tx_packet_length = packet_length-packet_header_offset;
 #endif
 
     symbol_perframe = cfg->symbolsPerFrame;
@@ -859,9 +859,9 @@ void Phy_UE::initialize_vars_from_cfg(Config *cfg)
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe, ul_data_symbol_perframe, dl_data_symbol_perframe);
 
     tx_buffer_status_size = (ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
-    tx_buffer_size = tx_package_length * tx_buffer_status_size;
+    tx_buffer_size = tx_packet_length * tx_buffer_status_size;
     rx_buffer_status_size = (dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
-    rx_buffer_size= package_length * rx_buffer_status_size;
+    rx_buffer_size= packet_length * rx_buffer_status_size;
 }
 
 
