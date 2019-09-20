@@ -4,7 +4,7 @@
  * 
  */
 
-#include "packageReceiver.hpp"
+#include "txrx.hpp"
 
 #ifdef USE_DPDK
 inline const struct rte_eth_conf port_conf_default() {
@@ -23,7 +23,7 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
                 struct rte_flow_error *error);
 #endif
 
-PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
     socket_ = new int[RX_THREAD_NUM];
     config_ = cfg;
@@ -42,14 +42,14 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
     ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
     dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
     downlink_mode = cfg->downlink_mode;
-    package_length = cfg->package_length;
-    package_header_offset = cfg->package_header_offset;
+    packet_length = cfg->packet_length;
+    packet_header_offset = cfg->packet_header_offset;
 
     //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
     srand (time(NULL));
-    rx_context = new EventHandlerContext<PackageReceiver>[rx_thread_num_];
-    tx_context = new EventHandlerContext<PackageReceiver>[tx_thread_num_];
+    rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
+    tx_context = new EventHandlerContext<PacketTXRX>[tx_thread_num_];
 
 #ifdef USE_DPDK
     std::string core_list = std::to_string(core_id_)+"-"+std::to_string(core_id_+rx_thread_num_+tx_thread_num_);
@@ -130,10 +130,10 @@ PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_N
 #endif
 }
 
-PackageReceiver::PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset, 
+PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset, 
         moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
         moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks):
-PackageReceiver(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
@@ -142,7 +142,7 @@ PackageReceiver(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
 
 }
 
-PackageReceiver::~PackageReceiver()
+PacketTXRX::~PacketTXRX()
 {
     delete[] socket_;
     delete[] tx_context;
@@ -155,7 +155,7 @@ PackageReceiver::~PackageReceiver()
 }
 
 #ifdef USE_DPDK
-int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
+int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     struct rte_eth_conf port_conf = port_conf_default();
     const uint16_t rxRings = rx_thread_num_, txRings = tx_thread_num_+rx_thread_num_;
     int retval;
@@ -250,11 +250,11 @@ int PackageReceiver::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool)
 #endif
 
 
-std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start)
+std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
-    // assert(in_buffer_length == package_length * buffer_frame_num_); // should be integer
+    // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
     buffer_ = in_buffer;  // for save data
     buffer_status_ = in_buffer_status; // for save status
@@ -304,10 +304,10 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
         #ifdef USE_ARGOS
             rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
             // start socket thread
-            if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
+            if(pthread_create( &recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
         #else
             // start socket thread
-            if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PackageReceiver, &PackageReceiver::loopRecv>, &rx_context[i]) != 0)
+            if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>, &rx_context[i]) != 0)
         #endif
             {
                 perror("socket recv thread create failed");
@@ -328,7 +328,7 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
             rx_context[i].id = i;
             rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
             // start socket thread
-            if(pthread_create( &recv_thread_, NULL, PackageReceiver::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
+            if(pthread_create( &recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void *)(&rx_context[i])) != 0) 
             {
                 perror("socket recv thread create failed");
                 exit(0);
@@ -351,11 +351,11 @@ std::vector<pthread_t> PackageReceiver::startRecv(char** in_buffer, int** in_buf
 
 
 
-std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length)
+std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length)
 {
     // check length
     tx_buffer_frame_num_ = in_buffer_frame_num;
-    // assert(in_buffer_length == package_length * buffer_frame_num_); // should be integer
+    // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     tx_buffer_length_ = in_buffer_length;
     tx_buffer_ = in_buffer;  // for save data
     tx_buffer_status_ = in_buffer_status; // for save status
@@ -391,7 +391,7 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
     //     tx_context[i].obj_ptr = this;
     //     tx_context[i].id = i;
 
-    //     if (pthread_create( &send_thread_, NULL, PackageReceiver::loopSend, (void *)(&tx_context[i])) != 0) {
+    //     if (pthread_create( &send_thread_, NULL, PacketTXRX::loopSend, (void *)(&tx_context[i])) != 0) {
     //         perror("socket Transmit thread create failed");
     //         exit(0);
     //     }
@@ -405,10 +405,10 @@ std::vector<pthread_t> PackageReceiver::startTX(char* in_buffer, int* in_buffer_
         tx_context[i].id = i;
 
     #ifdef USE_ARGOS
-        if (pthread_create(&send_thread_, NULL, PackageReceiver::loopSend_Argos, (void *)(&tx_context[i])) != 0)
+        if (pthread_create(&send_thread_, NULL, PacketTXRX::loopSend_Argos, (void *)(&tx_context[i])) != 0)
     #else
-        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PackageReceiver, &PackageReceiver::loopTXRX>, &tx_context[i]) != 0)
-        // if (pthread_create( &send_thread_, NULL, PackageReceiver::loopTXRX, (void *)(&tx_context[i])) != 0)
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, &tx_context[i]) != 0)
+        // if (pthread_create( &send_thread_, NULL, PacketTXRX::loopTXRX, (void *)(&tx_context[i])) != 0)
     #endif
         {
             perror("socket Transmit thread create failed");
@@ -468,7 +468,7 @@ static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_po
 }
 
 
-int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int len, int tid) {
+int PacketTXRX::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int len, int tid) {
   printf("Processing ARP request\n");
   struct arp_hdr *ah = (struct arp_hdr *)((unsigned char *)eth + ETHER_HDR_LEN);
   // recv_arp_pkts++;
@@ -503,9 +503,9 @@ int PackageReceiver::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, i
 
 
 
-void *PackageReceiver::loopRecv(int tid)
+void *PacketTXRX::loopRecv(int tid)
 {
-    pin_to_core_with_offset(RX, core_id_, tid);
+    pin_to_core_with_offset(Worker_RX, core_id_, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;
@@ -589,11 +589,11 @@ void *PackageReceiver::loopRecv(int tid)
     // loop recv
     // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
     int offset = 0;
-    // int package_num = 0;
+    // int packet_num = 0;
     // int ret = 0;
     // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     int prev_frame_id = -1;
-    // int package_num_per_frame = 0;
+    // int packet_num_per_frame = 0;
     // double start_time= get_time();
 
 
@@ -612,9 +612,9 @@ void *PackageReceiver::loopRecv(int tid)
 
 
         // start_time= get_time();
-        // if ((recvlen = recvfrom(socket_[tid], (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
-        if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr, package_length, 0))<0) {
-        // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+        // if ((recvlen = recvfrom(socket_[tid], (char*)cur_ptr_buffer, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
+        if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr, packet_length, 0))<0) {
+        // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
         } 
@@ -641,15 +641,15 @@ void *PackageReceiver::loopRecv(int tid)
         // move ptr & set status to full
         cur_buffer_status_ptr[0] = 1; // has data, after doing fft, it is set to 0
         cur_buffer_status_ptr = buffer_status_ptr + (offset + 1) % buffer_frame_num;
-        cur_buffer_ptr = buffer_ptr + (cur_buffer_ptr - buffer_ptr + package_length) % buffer_length;
-        // push EVENT_PACKAGE_RECEIVED event into the queue
-        Event_data package_message;
-        package_message.event_type = EVENT_PACKAGE_RECEIVED;
+        cur_buffer_ptr = buffer_ptr + (cur_buffer_ptr - buffer_ptr + packet_length) % buffer_length;
+        // push EVENT_packet_RECEIVED event into the queue
+        Event_data packet_message;
+        packet_message.event_type = EVENT_PACKET_RECEIVED;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-        package_message.data = generateOffset2d_setbits(tid, offset, 28);
-        // package_message.data = offset + tid * buffer_frame_num;
-        // if ( !message_queue_->enqueue(package_message ) ) {
-        if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
+        packet_message.data = generateOffset2d_setbits(tid, offset, 28);
+        // packet_message.data = offset + tid * buffer_frame_num;
+        // if ( !message_queue_->enqueue(packet_message ) ) {
+        if ( !message_queue_->enqueue(*local_ptok, packet_message) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -661,12 +661,12 @@ void *PackageReceiver::loopRecv(int tid)
 
 #ifdef USE_DPDK
 
-void* PackageReceiver::loopRecv_DPDK(void *in_context)
+void* PacketTXRX::loopRecv_DPDK(void *in_context)
 {
     // get the pointer of class & tid
-    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
-    int tid = ((PackageReceiverContext *)in_context)->tid;
-    printf("package receiver thread %d start\n", tid);
+    PacketTXRX* obj_ptr = ((PacketTXRXContext *)in_context)->ptr;
+    int tid = ((PacketTXRXContext *)in_context)->tid;
+    printf("packet receiver thread %d start\n", tid);
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
@@ -681,7 +681,7 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
     int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     bool downlink_mode = obj_ptr->downlink_mode;
-    int package_length = obj_ptr->package_length;
+    int packet_length = obj_ptr->packet_length;
 
 
     uint16_t nic;
@@ -720,13 +720,13 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
     // loop recv
     // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
     int offset = 0;
-    int package_num = 0;
+    int packet_num = 0;
     auto begin = std::chrono::system_clock::now();
 
     int ret = 0;
     int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     int prev_frame_id = -1;
-    int package_num_per_frame = 0;
+    int packet_num_per_frame = 0;
     double start_time= get_time();
 
 
@@ -807,8 +807,8 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
             // }
             char *payload = (char *)eth_hdr + ETH_HDRLEN + IP4_HDRLEN + UDP_HDRLEN + 22;
             // printf("eth_hdr: 0x%lx, offset: %d\n", eth_hdr, ETH_HDRLEN + IP4_HDRLEN + UDP_HDRLEN);
-            // rte_memcpy(cur_ptr_buffer, payload, package_length);
-            fastMemcpy(cur_ptr_buffer, payload, package_length);
+            // rte_memcpy(cur_ptr_buffer, payload, packet_length);
+            fastMemcpy(cur_ptr_buffer, payload, packet_length);
             rte_pktmbuf_free(bufs[i]);
 
         #if MEASURE_TIME
@@ -834,18 +834,18 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
             cur_ptr_buffer_status = buffer_status + (offset + 1) % buffer_frame_num;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length) % buffer_length;
-            // push EVENT_PACKAGE_RECEIVED event into the queue
-            Event_data package_message;
-            package_message.event_type = EVENT_PACKAGE_RECEIVED;
-            package_message.data = offset + tid * buffer_frame_num;
-            if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length) % buffer_length;
+            // push EVENT_packet_RECEIVED event into the queue
+            Event_data packet_message;
+            packet_message.event_type = EVENT_PACKET_RECEIVED;
+            packet_message.data = offset + tid * buffer_frame_num;
+            if ( !message_queue_->enqueue(*local_ptok, packet_message) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
-            package_num++;
+            packet_num++;
             // print some information
-            if(package_num == BS_ANT_NUM * max_subframe_id * 1000) {
+            if(packet_num == BS_ANT_NUM * max_subframe_id * 1000) {
                 auto end = std::chrono::system_clock::now();
                 double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 1000;
                 std::chrono::duration<double> diff = end - begin;
@@ -853,7 +853,7 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
                 printf("RX thread %d receive 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), 
                     byte_len / diff.count() / 1024 / 1024);
                 begin = std::chrono::system_clock::now();
-                package_num = 0;
+                packet_num = 0;
             }    
         }
     }
@@ -861,18 +861,18 @@ void* PackageReceiver::loopRecv_DPDK(void *in_context)
 #endif
 
 #ifdef USE_ARGOS
-void* PackageReceiver::loopRecv_Argos(void *in_context)
+void* PacketTXRX::loopRecv_Argos(void *in_context)
 {
     // get the pointer of class & tid
-    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
-    int tid = ((PackageReceiverContext *)in_context)->tid;
+    PacketTXRX* obj_ptr = ((EventHandlerContext<PacketTXRX> *)in_context)->obj_ptr;
+    int tid = ((EventHandlerContext<PacketTXRX> *)in_context)->id;
     //printf("Recv thread: thread %d start\n", tid);
-    int nradio_cur_thread = ((PackageReceiverContext *)in_context)->radios;
+    int nradio_cur_thread = ((EventHandlerContext<PacketTXRX> *)in_context)->radios;
     //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     Config *cfg = obj_ptr->config_;
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    pin_to_core_with_offset(RX, obj_ptr->core_id_, tid);
+    pin_to_core_with_offset(Worker_RX, obj_ptr->core_id_, tid);
 
     //int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     //int UE_NUM = obj_ptr->UE_NUM;
@@ -882,8 +882,8 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     //int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
     //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    int package_length = obj_ptr->package_length;
-    int package_header_offset = obj_ptr->package_header_offset;
+    int packet_length = obj_ptr->packet_length;
+    int packet_header_offset = obj_ptr->packet_header_offset;
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&obj_ptr->mutex);
     printf("Thread %d: waiting for release\n", tid);
@@ -924,14 +924,14 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2 
     char* cur_ptr_buffer2;
-    char* buffer2 = (char*)obj_ptr->buffer_[tid] + package_length; 
+    char* buffer2 = (char*)obj_ptr->buffer_[tid] + packet_length; 
     int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
     int *cur_ptr_buffer_status2 = buffer_status2;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
     }
     else {
-        cur_ptr_buffer2 = (char*)calloc(package_length, sizeof(char)); 
+        cur_ptr_buffer2 = (char*)calloc(packet_length, sizeof(char)); 
     }
     int offset = 0;
     long long frameTime;
@@ -955,8 +955,8 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             //int rid = tid * obj_ptr->radios_per_thread + it;
             int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
-            char * samp1 = cur_ptr_buffer + package_header_offset;
-            char * samp2 = cur_ptr_buffer2 + package_header_offset;
+            char * samp1 = cur_ptr_buffer + packet_header_offset;
+            char * samp2 = cur_ptr_buffer2 + packet_header_offset;
             void *samp[2] = {(void*)samp1, (void*)samp2};
             while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
             frame_id = (int)(frameTime>>32);
@@ -995,14 +995,14 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
             cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + package_length * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * cfg->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
-            Event_data package_message;
-            package_message.event_type = EVENT_PACKAGE_RECEIVED;
+            Event_data packet_message;
+            packet_message.event_type = EVENT_PACKET_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-            //package_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
-            package_message.data = generateOffset2d_setbits(tid, offset, 28);
-            if ( !message_queue_->enqueue(*local_ptok, package_message ) ) {
+            //packet_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
+            packet_message.data = generateOffset2d_setbits(tid, offset, 28);
+            if ( !message_queue_->enqueue(*local_ptok, packet_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
@@ -1011,20 +1011,20 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
                 cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + package_length * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * cfg->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
-                Event_data package_message2;
-                package_message2.event_type = EVENT_PACKAGE_RECEIVED;
+                Event_data packet_message2;
+                packet_message2.event_type = EVENT_PACKET_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-                //package_message2.data = offset + tid * buffer_frame_num;
-                package_message.data = generateOffset2d_setbits(tid, offset, 28);
-                if ( !message_queue_->enqueue(*local_ptok, package_message2 ) ) {
+                //packet_message2.data = offset + tid * buffer_frame_num;
+                packet_message.data = generateOffset2d_setbits(tid, offset, 28);
+                if ( !message_queue_->enqueue(*local_ptok, packet_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
             }
         #if DEBUG_RECV
-            printf("packageReceiver %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, offset %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, offset + tid*buffer_frame_num);
+            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, offset %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, offset + tid*buffer_frame_num);
         #endif
         #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
 	    if (rx_symbol_id > 0) 
@@ -1053,9 +1053,9 @@ void* PackageReceiver::loopRecv_Argos(void *in_context)
 #endif
 
 
-void *PackageReceiver::loopSend(int tid)
+void *PacketTXRX::loopSend(int tid)
 {
-    pin_to_core_with_offset(TX, tx_core_id_, tid);
+    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;
@@ -1113,7 +1113,7 @@ void *PackageReceiver::loopSend(int tid)
     
 
     // auto begin = std::chrono::system_clock::now();
-    // int package_count = 0;
+    // int packet_count = 0;
     int ret;
     int offset;
     char *cur_buffer_ptr;
@@ -1151,7 +1151,7 @@ void *PackageReceiver::loopSend(int tid)
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-        cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * package_length;  
+        cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;  
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
         *((int *)cur_buffer_ptr) = frame_id;
         *((int *)cur_buffer_ptr + 1) = subframe_id;
@@ -1159,7 +1159,7 @@ void *PackageReceiver::loopSend(int tid)
         *((int *)cur_buffer_ptr + 3) = ant_id;
 
         // send data (one OFDM symbol)
-        if (sendto(socket_local, (char*)cur_buffer_ptr, package_length, 0, (struct sockaddr *)&servaddr_local, sizeof(servaddr_local)) < 0) {
+        if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&servaddr_local, sizeof(servaddr_local)) < 0) {
             perror("socket sendto failed");
             exit(0);
         }
@@ -1169,21 +1169,21 @@ void *PackageReceiver::loopSend(int tid)
             message_queue_->size_approx());
 #endif
         
-        Event_data package_message;
-        package_message.event_type = EVENT_PACKAGE_SENT;
+        Event_data packet_message;
+        packet_message.event_type = EVENT_PACKET_SENT;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-        package_message.data = offset;
-        if ( !message_queue_->enqueue(*local_ptok, package_message) ) {
+        packet_message.data = offset;
+        if ( !message_queue_->enqueue(*local_ptok, packet_message) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
 
-        // if (package_count % (BS_ANT_NUM) == 0)
+        // if (packet_count % (BS_ANT_NUM) == 0)
         // {
         //     usleep(71);
         // }
 
-        // if(package_count == BS_ANT_NUM * dl_data_subframe_num_perframe * 1000)
+        // if(packet_count == BS_ANT_NUM * dl_data_subframe_num_perframe * 1000)
         // {
         //     auto end = std::chrono::system_clock::now();
         //     double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * data_subframe_num_perframe * 1000;
@@ -1191,7 +1191,7 @@ void *PackageReceiver::loopSend(int tid)
         //     // printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s, max Queue Length: message %d, tx task %d\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024, maxMesgQLen, maxTaskQLen);
         //     printf("TX thread %d send 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), byte_len / diff.count() / 1024 / 1024);
         //     begin = std::chrono::system_clock::now();
-        //     package_count = 0;
+        //     packet_count = 0;
         // }
     }
     
@@ -1201,9 +1201,9 @@ void *PackageReceiver::loopSend(int tid)
 
 
 
-void *PackageReceiver::loopTXRX(int tid)
+void *PacketTXRX::loopTXRX(int tid)
 {
-    pin_to_core_with_offset(TXRX, core_id_, tid);
+    pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
 #if USE_IPV4
     struct sockaddr_in local_addr;
     struct sockaddr_in remote_addr;
@@ -1333,14 +1333,14 @@ void *PackageReceiver::loopTXRX(int tid)
             int recvlen = -1;
 
             // start_time= get_time();
-            // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
-            if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, package_length, 0))<0) {
-            // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+            // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
+            if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0))<0) {
+            // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
                 perror("recv failed");
                 exit(0);
             } 
 
-            // rx_package_num_per_frame++;
+            // rx_packet_num_per_frame++;
 
         #if MEASURE_TIME
             // read information from received packet 
@@ -1362,11 +1362,11 @@ void *PackageReceiver::loopTXRX(int tid)
             // move ptr & set status to full
             rx_cur_buffer_status_ptr[0] = 1; // has data, after doing fft, it is set to 0
             rx_cur_buffer_status_ptr = rx_buffer_status_ptr + (rx_offset + 1) % rx_buffer_frame_num;
-            rx_cur_buffer_ptr = rx_buffer_ptr + (rx_cur_buffer_ptr - rx_buffer_ptr + package_length) % rx_buffer_length;
+            rx_cur_buffer_ptr = rx_buffer_ptr + (rx_cur_buffer_ptr - rx_buffer_ptr + packet_length) % rx_buffer_length;
 
-            // push EVENT_PACKAGE_RECEIVED event into the queue
+            // push EVENT_PACKET_RECEIVED event into the queue
             Event_data rx_message;
-            rx_message.event_type = EVENT_PACKAGE_RECEIVED;
+            rx_message.event_type = EVENT_PACKET_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
             rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
             // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
@@ -1394,9 +1394,9 @@ void *PackageReceiver::loopTXRX(int tid)
                 int recvlen = -1;
 
                 // start_time= get_time();
-                // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, package_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
-                if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, package_length, 0))<0) {
-                // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, package_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+                // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
+                if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0))<0) {
+                // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
                     perror("recv failed");
                     exit(0);
                 } 
@@ -1426,11 +1426,11 @@ void *PackageReceiver::loopTXRX(int tid)
                 // move ptr & set status to full
                 rx_cur_buffer_status_ptr[0] = 1; // has data, after doing fft, it is set to 0
                 rx_cur_buffer_status_ptr = rx_buffer_status_ptr + (rx_offset + 1) % rx_buffer_frame_num;
-                rx_cur_buffer_ptr = rx_buffer_ptr + (rx_cur_buffer_ptr - rx_buffer_ptr + package_length) % rx_buffer_length;
+                rx_cur_buffer_ptr = rx_buffer_ptr + (rx_cur_buffer_ptr - rx_buffer_ptr + packet_length) % rx_buffer_length;
 
-                // push EVENT_PACKAGE_RECEIVED event into the queue
+                // push EVENT_PACKET_RECEIVED event into the queue
                 Event_data rx_message;
-                rx_message.event_type = EVENT_PACKAGE_RECEIVED;
+                rx_message.event_type = EVENT_PACKET_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
                 rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
                 // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
@@ -1471,7 +1471,7 @@ void *PackageReceiver::loopTXRX(int tid)
                 int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
                 int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
-                tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * package_length;  
+                tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;  
                 // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
                 *((int *)tx_cur_buffer_ptr) = tx_frame_id;
                 *((int *)tx_cur_buffer_ptr + 1) = tx_subframe_id;
@@ -1479,7 +1479,7 @@ void *PackageReceiver::loopTXRX(int tid)
                 *((int *)tx_cur_buffer_ptr + 3) = tx_ant_id;
                 
                 // send data (one OFDM symbol)
-                if (sendto(socket_local, (char*)tx_cur_buffer_ptr, package_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
+                if (sendto(socket_local, (char*)tx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
                     perror("socket sendto failed");
                     exit(0);
                 }
@@ -1492,7 +1492,7 @@ void *PackageReceiver::loopTXRX(int tid)
                     message_queue_->size_approx());
         #endif
                 Event_data tx_message;
-                tx_message.event_type = EVENT_PACKAGE_SENT;
+                tx_message.event_type = EVENT_PACKET_SENT;
                 tx_message.data = tx_offset;
                 if ( !message_queue_->enqueue(*local_ptok, tx_message ) ) {
                     printf("socket message enqueue failed\n");
@@ -1518,16 +1518,16 @@ void *PackageReceiver::loopTXRX(int tid)
 }
 
 #ifdef USE_ARGOS
-void* PackageReceiver::loopSend_Argos(void *in_context)
+void* PacketTXRX::loopSend_Argos(void *in_context)
 {
-    PackageReceiver* obj_ptr = ((PackageReceiverContext *)in_context)->ptr;
-    int tid = ((PackageReceiverContext *)in_context)->tid;
-    printf("package sender thread %d start\n", tid);
+    PacketTXRX* obj_ptr = ((EventHandlerContext<PacketTXRX> *)in_context)->obj_ptr;
+    int tid = ((EventHandlerContext<PacketTXRX> *)in_context)->id;
+    printf("packet sender thread %d start\n", tid);
 
     moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
     // get pointer to message queue
     moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    pin_to_core_with_offset(TX, obj_ptr->tx_core_id_, tid);
+    pin_to_core_with_offset(Worker_TX, obj_ptr->tx_core_id_, tid);
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     int UE_NUM = obj_ptr->UE_NUM;
@@ -1537,8 +1537,8 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
     int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
     //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    int package_length = obj_ptr->package_length;
-    int package_header_offset = obj_ptr->package_header_offset;
+    int packet_length = obj_ptr->packet_length;
+    int packet_header_offset = obj_ptr->packet_header_offset;
 
     // downlink socket buffer
     char *tx_buffer_ptr = obj_ptr->tx_buffer_;
@@ -1597,7 +1597,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
         int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
         int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
-        tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * package_length + package_header_offset; 
+        tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length + packet_header_offset; 
         frame_id = tx_frame_id + TX_FRAME_DELTA;
 
         //symbol_id = task_event.data / cfg->getNumAntennas();
@@ -1624,7 +1624,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
             }
             else if (cfg->nChannels == 2 && tx_ant_id % 2 == 1)
             {
-                txbuf[1] = tx_cur_buffer_ptr + package_length; //FIXME
+                txbuf[1] = tx_cur_buffer_ptr + packet_length; //FIXME
                 //buffer_status[offset+1] = 0;
             }
         #if DEBUG_BS_SENDER
@@ -1640,7 +1640,7 @@ void* PackageReceiver::loopSend_Argos(void *in_context)
         //}
 
         Event_data tx_message;
-        tx_message.event_type = EVENT_PACKAGE_SENT;
+        tx_message.event_type = EVENT_PACKET_SENT;
         tx_message.data = tx_offset;
         if ( !message_queue_->enqueue(*local_ptok, tx_message ) ) {
             printf("socket message enqueue failed\n");

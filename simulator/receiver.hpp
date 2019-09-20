@@ -4,8 +4,8 @@
  * 
  */
 
-#ifndef PACKAGERECEIVER
-#define PACKAGERECEIVER
+#ifndef RECEIVER
+#define RECEIVER
 
 #include <iostream>
 #include <sys/socket.h>
@@ -71,14 +71,14 @@
 
 
 typedef unsigned short ushort;
-class PackageReceiver
+class Receiver
 {
 public:
     
     // use for create pthread 
-    struct PackageReceiverContext
+    struct ReceiverContext
     {
-        PackageReceiver *ptr;
+        Receiver *ptr;
         int tid;
 #ifdef USE_ARGOS
         int radios;
@@ -86,15 +86,15 @@ public:
     };
 
 public:
-    PackageReceiver(Config *cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
+    Receiver(Config *cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
     /**
      * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
     */ 
-    PackageReceiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
+    Receiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
             moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
             moodycamel::ProducerToken **in_rx_ptoks);
-    ~PackageReceiver();
+    ~Receiver();
 
 
     /**
@@ -109,9 +109,9 @@ public:
     
     /**
      * receive thread
-     * context: PackageReceiverContext type
+     * context: ReceiverContext type
     */
-    static void* loopRecv(void *context);
+    void *loopRecv(int tid);
 
  
 private:
@@ -121,8 +121,8 @@ private:
     int subframe_num_perframe, data_subframe_num_perframe;
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     bool downlink_mode;
-    int package_length;
-    int package_header_offset;
+    int packet_length;
+    int packet_header_offset;
 
 #if USE_IPV4
     struct sockaddr_in servaddr_[10];    /* server address */
@@ -157,8 +157,8 @@ private:
     int core_id_;
     int tx_core_id_;
 
-    PackageReceiverContext* tx_context;
-    PackageReceiverContext* rx_context;
+    ReceiverContext* tx_context;
+    ReceiverContext* rx_context;
 
     Config *config_;
     int radios_per_thread;

@@ -23,7 +23,7 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False)
-set(USE_ARGOS True)
+set(USE_ARGOS False)
 
 
 # DPDK
@@ -95,7 +95,7 @@ set(COMMON_SOURCES src/common/config.cpp
 
 
 set(SOURCES src/millipede/main.cpp 
-            src/millipede/packageReceiver.cpp 
+            src/millipede/txrx.cpp 
             src/millipede/millipede.cpp 
             src/millipede/compute_common.cpp  
             src/millipede/stats.cpp 
@@ -111,7 +111,7 @@ target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo 
 
 
 add_library(comp MODULE 
-       src/millipede/packageReceiver.cpp
+       src/millipede/txrx.cpp
        src/millipede/millipede.cpp
        src/millipede/compute_common.cpp
        src/millipede/stats.cpp 
@@ -139,7 +139,7 @@ if (${USE_ARGOS})
   target_link_libraries(ue_phy -lpthread -lmufft -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
 else()
   set(SENDER_SOURCES simulator/sender_cli.cpp
-                     simulator/packageSender.cpp 
+                     simulator/sender.cpp 
                      ${COMMON_SOURCES})
 
   add_executable(sender ${SENDER_SOURCES})
@@ -148,8 +148,8 @@ else()
 
   set(SIMULATOR_SOURCES simulator/main.cpp
                         simulator/simulator.cpp
-                        simulator/packageSender.cpp
-                        simulator/packageReceiver.cpp 
+                        simulator/sender.cpp
+                        simulator/receiver.cpp 
                         ${COMMON_SOURCES})
 
   add_executable(sim ${SIMULATOR_SOURCES})

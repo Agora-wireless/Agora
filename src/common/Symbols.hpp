@@ -22,7 +22,7 @@
 #define TX_FRAME_DELTA 8
 
 
-#define EVENT_PACKAGE_RECEIVED 0
+#define EVENT_PACKET_RECEIVED 0
 #define EVENT_FFT 1
 #define EVENT_ZF 2
 #define EVENT_DEMUL 3
@@ -31,7 +31,7 @@
 #define EVENT_MODUL 5
 #define EVENT_IFFT 6
 #define EVENT_PRECODE 7
-#define EVENT_PACKAGE_SENT 8
+#define EVENT_PACKET_SENT 8
 
 #define EVENT_DECODE 9
 #define EVENT_ENCODE 10
@@ -112,14 +112,14 @@
 typedef enum {
 	Master,
 	Worker,
-	FFT,
-	ZF,
-	Demul,
-	RX,
-	TX,
-	TXRX,
-	RX_Master,
-	TX_Master,
+	Worker_FFT,
+	Worker_ZF,
+	Worker_Demul,
+	Worker_RX,
+	Worker_TX,
+	Worker_TXRX,
+	Master_RX,
+	Master_TX,
 } thread_type;
 
 static const char *THREAD_TYPE_STRING[] = {

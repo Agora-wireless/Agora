@@ -185,9 +185,9 @@ private:
     size_t nCPUs;
     size_t core_offset;
     size_t rx_thread_num;
-    size_t package_length;
-    size_t tx_package_length;
-    size_t package_header_offset;
+    size_t packet_length;
+    size_t tx_packet_length;
+    size_t packet_header_offset;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
     float *pilots_;
@@ -214,8 +214,8 @@ private:
     /** 
      * transmit data 
      * Frist dimension: TX_THREAD_NUM
-     * Second dimension of buffer (type: uchar): package_length * UE_NUM * DL_SYM_PER_FRAME * TX_BUFFER_FRAME_NUM
-     * package_length = sizeof(int) * 4 + sizeof(uchar) * OFDM_FRAME_LEN;
+     * Second dimension of buffer (type: uchar): packet_length * UE_NUM * DL_SYM_PER_FRAME * TX_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(uchar) * OFDM_FRAME_LEN;
      * Second dimension of buffer_status: DL_SYM_PER_FRAME * UE_NUM * TX_BUFFER_FRAME_NUM
      */
     char *tx_buffer_;
@@ -257,8 +257,8 @@ private:
     /** 
      * received data 
      * Frist dimension: RX_THREAD_NUM
-     * Second dimension of buffer (type: char): package_length * subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM
-     * package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+     * Second dimension of buffer (type: char): packet_length * subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM
      */
     char **rx_buffer_;
