@@ -902,8 +902,8 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
     double *frame_start = obj_ptr->frame_start_[tid];
 
     // downlink socket buffer
-    char *tx_buffer_ptr = obj_ptr->tx_buffer_;
-    char *tx_cur_buffer_ptr;
+    // char *tx_buffer_ptr = obj_ptr->tx_buffer_;
+    // char *tx_cur_buffer_ptr;
     size_t txSymsPerFrame = cfg->dlSymsPerFrame;
     std::vector<size_t> txSymbols = cfg->DLSymbols[0];
     std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);

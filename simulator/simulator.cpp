@@ -13,7 +13,9 @@ CORE_OFFSET(in_core_offset)
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
     printf("Main thread: on core %d\n", sched_getcpu());
-    putenv( "MKL_THREADING_LAYER=sequential" );
+    std::string env_parameter = "MKL_THREADING_LAYER=sequential";
+    char *env_parameter_char = (char *)env_parameter.c_str();
+    putenv(env_parameter_char);
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     printf("enter constructor\n");
 
@@ -116,7 +118,7 @@ void Simulator::start()
                     int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
-                    int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
+                    // int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
 
                     // printf("In main: received from frame %d %d, subframe %d, ant %d\n", frame_id, frame_id_in_buffer, subframe_id, ant_id);
                     
