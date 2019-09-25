@@ -19,9 +19,10 @@ Millipede::Millipede(Config *cfg)
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
     printf("Main thread: on core %d\n", sched_getcpu());
-    std::string env_parameter = "MKL_THREADING_LAYER=sequential";
-    char *env_parameter_char = (char *)env_parameter.c_str();
-    putenv(env_parameter_char);
+    // std::string env_parameter = "MKL_THREADING_LAYER=sequential";
+    // char *env_parameter_char = (char *)env_parameter.c_str();
+    // putenv(env_parameter_char);
+    putenv("MKL_THREADING_LAYER=sequential");
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     // openblas_set_num_threads(1);
     printf("enter constructor\n");

@@ -95,6 +95,7 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: UE_NUM * 1 */
     complex_float *equaled_buffer_temp;
+    int ue_num_simd256;
 
 
 };
