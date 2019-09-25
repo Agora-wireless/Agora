@@ -74,6 +74,7 @@ imat demod_16qam(cx_fmat x)
 void demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num)
 {
     float float_val = 0.6325;
+
     for (int i = 0; i < ue_num; i++) {
         float real_val = *(vec_in + i * 2);
         float imag_val = *(vec_in + i * 2 + 1);
@@ -93,12 +94,87 @@ void demod_16qam_loop(float *vec_in, uint8_t *vec_out, int ue_num)
             //*(vec_out + i) += 1;
 
     }
-    // __m128 vec_zero = _mm_set1_ps(0);
-    // __m128 vec_float = _mm_set1_ps(0.6325);
-    // for (int i = 0; i < ue_num; i += 4) {
-    //     __m128 vec_in_cur = 
-    //     __m128 vec_real_cmp = _mm_cmpgt_ps()
+}
+
+void print256_epi32(__m256i var)
+{
+    int32_t *val = (int32_t*) &var;
+    printf("Numerical: %i %i %i %i %i %i %i %i \n", 
+           val[0], val[1], val[2], val[3], val[4], val[5], 
+           val[6], val[7]);
+}
+
+void print256_epi8(__m256i var)
+{
+    int8_t *val = (int8_t*) &var;
+    printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n", 
+           val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7], 
+           val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15], 
+           val[16], val[17], val[18], val[19], val[20], val[21], val[22], val[23], 
+           val[24], val[25], val[26], val[27], val[28], val[29], val[30], val[31]
+           );
+}
+
+void demod_16qam_loop_simd(float *vec_in, uint8_t *vec_out, int ue_num, int num_simd256)
+{
+    // printf("input:");
+    // for (int i = 0; i < ue_num; i++) {
+    //     printf("(%.2f, %.2f) ", *(vec_in + i * 2), *(vec_in + i * 2 + 1));
     // }
+    // printf("\n");
+    float float_val = 0.6325;
+    __m256 vec_zero = _mm256_set1_ps(0);
+    __m256 vec_float = _mm256_set1_ps(0.6325);
+    __m256 vec_float_neg = _mm256_set1_ps(-0.6325);
+    // __m256i vec_true = _mm256_set1_epi32(0xFFFFFFFF);
+    __m256i vec_true_mask = _mm256_set1_epi32(0x1);
+    __m256i vec_GT_0 = _mm256_setr_epi32(8, 2, 8, 2, 8, 2, 8, 2);
+    __m256i vec_abs_LT_val = _mm256_setr_epi32(4, 1, 4, 1, 4, 1, 4, 1);
+    
+    for (int i = 0; i < num_simd256 * double_num_in_simd256; i = i + double_num_in_simd256) {
+        __m256 raw_data = _mm256_load_ps((vec_in + i * 2));
+        __m256i ret1 = (__m256i)_mm256_cmp_ps(raw_data, vec_zero, _CMP_GT_OS);
+        ret1 = _mm256_and_si256(ret1, vec_true_mask);
+
+        __m256i ret2 = (__m256i)_mm256_cmp_ps(raw_data, vec_float, _CMP_LT_OS);
+        __m256i ret3 = (__m256i)_mm256_cmp_ps(raw_data, vec_float_neg, _CMP_GT_OS);
+        __m256i ret4 = _mm256_and_si256(ret2, ret3);
+        ret4 = _mm256_and_si256(ret4, vec_true_mask);
+
+        __m256i ret1_final = _mm256_mullo_epi32(vec_GT_0, ret1);
+        __m256i ret4_final = _mm256_mullo_epi32(ret4, vec_abs_LT_val);
+
+        __m256i ret_sum = _mm256_add_epi32(ret1_final, ret4_final);
+        // printf("real + real, imag + imag \n");
+        // print256_epi32(ret_sum);
+        // printf("real + imag \n");
+        ret_sum = _mm256_hadd_epi32(ret_sum, ret_sum);
+        // print256_epi32(ret_sum);
+        int8_t *ret_final = (int8_t*) &ret_sum;
+        // print256_epi8(ret_sum);
+        *(vec_out + i) = ret_final[0];
+        *(vec_out + i + 1) = ret_final[4];
+        *(vec_out + i + 2) = ret_final[16];
+        *(vec_out + i + 3) = ret_final[20];
+
+        // printf("final: %i %i %i %i \n", *(vec_out + i), *(vec_out + i + 1), *(vec_out + i + 2), *(vec_out + i + 3));
+    }
+
+    for (int i = num_simd256 * double_num_in_simd256; i < ue_num; i++) {
+        float real_val = *(vec_in + i * 2);
+        float imag_val = *(vec_in + i * 2 + 1);
+        
+        *(vec_out + i) = 0;
+        if (real_val > 0)
+            *(vec_out + i) |= 1UL << 3;
+        if (std::abs(real_val) < float_val)
+            *(vec_out + i) |= 1UL << 2;
+        if (imag_val > 0)
+            *(vec_out + i) |= 1UL << 1;
+        if (std::abs(imag_val) < float_val)
+            *(vec_out + i) |= 1UL ;
+    }
+    
 }
 
 
