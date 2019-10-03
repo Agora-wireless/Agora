@@ -5,7 +5,7 @@
 #define ENABLE_CPU_ATTACH
 //#define GENERATE_PILOT
 #define GENERATE_DATA
-#define SEPARATE_TX_RX 0
+#define SEPARATE_TX_RX 1
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -114,7 +114,9 @@
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
 #define WRITE_DEMUL 0
-#define DEBUG_DOWNLINK 1
+#define DEBUG_RADIO_TX 0
+#define DEBUG_RADIO_RX 0
+#define DEBUG_DOWNLINK 0
 
 #define CORR_THRESHOLD    0x4
 #define CORR_RST          0x0

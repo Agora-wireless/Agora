@@ -96,7 +96,7 @@ Config::Config(std::string jsonfile)
     TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 128);
     CP_LEN = tddConf.value("cp_len", 128);
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 152 + CP_LEN);
-    OFDM_FRAME_LEN = OFDM_CA_NUM + 2 * TX_PREFIX_LEN;
+    OFDM_FRAME_LEN = sampsPerSymbol; //OFDM_CA_NUM + 2 * TX_PREFIX_LEN;
 
     /* frame configurations */
     symbol_num_perframe = symbolsPerFrame; //tddConf.value("subframe_num_perframe", 5);
@@ -158,6 +158,7 @@ Config::Config(std::string jsonfile)
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
+    float *pilots_2048 = (float*)aligned_alloc(64, 2048 * sizeof(float));
     size_t r = 0;
 #ifdef GENERATE_PILOT
     for (size_t i = 0; i < OFDM_CA_NUM; i++) {
@@ -176,9 +177,15 @@ Config::Config(std::string jsonfile)
         printf("open file %s faild.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    r = fread(pilots_2048, sizeof(float), 2048, fp);
     if (r < OFDM_CA_NUM) printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
+    for (size_t i = 0; i < OFDM_CA_NUM; i++) {
+        if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
+            pilots_[i] = 0;
+        else
+            pilots_[i] = pilots_2048[424+i-OFDM_DATA_START];
+    }
 #endif
     std::vector<std::complex<float> > pilotsF(OFDM_CA_NUM);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)

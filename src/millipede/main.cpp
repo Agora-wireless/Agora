@@ -9,7 +9,7 @@
 int main()
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/tddconfig.json";
+    std::string filename = cur_directory + "/data/tddconfig_512.json";
     Config *cfg = new Config(filename.c_str());
     Millipede *millipede_cli;
     int ret;
