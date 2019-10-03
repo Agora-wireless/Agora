@@ -443,7 +443,7 @@ int RadioConfig::radioTx(size_t r /*radio id*/, void** buffs, int flags, long lo
         txFlags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
     //long long frameTime(0);
     int w = baStn[r]->writeStream(this->txStreams[r], buffs, _cfg->sampsPerSymbol, txFlags, frameTime, 1000000);
-#ifdef DEBUG_RADIO
+#if DEBUG_RADIO_TX
     size_t chanMask;
     long timeoutUs(0);
     int statusFlag = 0;
@@ -472,7 +472,7 @@ int RadioConfig::radioRx(size_t r /*radio id*/, void** buffs, long long& frameTi
         frameTime = frameTimeNs; //SoapySDR::timeNsToTicks(frameTimeNs, _rate);
         if (ret != (int)_cfg->sampsPerSymbol)
             std::cout << "invalid return " << ret << " from radio " << r << std::endl;
-#ifdef DEBUG_RADIO_RX
+#if DEBUG_RADIO_RX
         else
             std::cout << "radio " << r << "received " << ret << std::endl;
 #endif

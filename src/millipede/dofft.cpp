@@ -19,9 +19,12 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     OFDM_DATA_START = cfg->OFDM_DATA_START;
     OFDM_PREFIX_LEN = cfg->OFDM_PREFIX_LEN;
+    TX_PREFIX_LEN = cfg->TX_PREFIX_LEN;
+    CP_LEN = cfg->CP_LEN;
     subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     package_length = cfg->package_length;
+    package_header_offset = cfg->package_header_offset;
     buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
 
     tid = in_tid;
@@ -111,7 +114,7 @@ void DoFFT::FFT(int offset)
 
 
     // transfer ushort to float
-    short *cur_buffer_ptr_ushort = (short *)(cur_buffer_ptr + 64 + OFDM_PREFIX_LEN * 2);
+    short *cur_buffer_ptr_ushort = (short *)(cur_buffer_ptr + package_header_offset + OFDM_PREFIX_LEN * sizeof(short) * 2);
     // float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
@@ -129,7 +132,7 @@ void DoFFT::FFT(int offset)
     // 0x4380'8000
     const __m256 magic = _mm256_set1_ps(float((1<<23) + (1<<15))/32768.f);
     const __m256i magic_i = _mm256_castps_si256(magic);
-    for (int i = 0; i < OFDM_CA_NUM * 2; i += 16) {
+    for (size_t i = 0; i < OFDM_CA_NUM * 2; i += 16) {
         // get input:
         __m128i val = _mm_load_si128((__m128i*)(cur_buffer_ptr_ushort + i)); // port 2,3
 
@@ -159,18 +162,6 @@ void DoFFT::FFT(int offset)
         // _mm256_load_ps((cur_fft_buffer_float + i));
 
     }
-
-#if DEBUG_PLOT
-    if (subframe_id == 0 && frame_id == 100 && ant_id == 1)
-    {
-        std::vector<float> rx(cur_fft_buffer_float, cur_fft_buffer_float+2304*2);
-        std::vector<double> rx_I(2304);
-        for (int i = 0; i < 2304; i++) rx_I[i] = (double)rx[2*i];
-        FILE *fi = fopen("rx100_0_1.bin","wb");
-        fwrite(rx_I.data(), sizeof(float), 2304*2, fi);
-        fclose(fi);
-    }
-#endif
 
     // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
     // printf("FFT input\n");
@@ -453,9 +444,9 @@ void DoFFT::IFFT(int offset)
 
     // calculate data for downlink socket buffer 
     float *ifft_output_ptr = (float *)(&dl_ifft_buffer_[offset_in_buffer][0]);
-    int socket_subframe_offset = frame_id_in_socket_buffer * data_subframe_num_perframe + current_data_subframe_id;
+    size_t socket_subframe_offset = frame_id_in_socket_buffer * data_subframe_num_perframe + current_data_subframe_id;
     char *socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * package_length];
-    int socket_offset = sizeof(int) * 16 + ant_id * package_length;
+    size_t socket_offset = package_header_offset + ant_id * package_length + TX_PREFIX_LEN * sizeof(short) * 2;
 
     // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
     //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
@@ -466,8 +457,8 @@ void DoFFT::IFFT(int offset)
 
     
     socket_ptr = socket_ptr + socket_offset;
-    for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
-        __m256 scale_factor = _mm256_set1_ps(16);
+    for (size_t sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
+        __m256 scale_factor = _mm256_set1_ps(32768.0/OFDM_CA_NUM);
         __m256 ifft1 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id);
         __m256 ifft2 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id + 8);
         __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
@@ -476,10 +467,10 @@ void DoFFT::IFFT(int offset)
         __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
         integer1 = _mm256_packs_epi32(integer1, integer2);
         integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
-        _mm256_stream_si256((__m256i *) (socket_ptr + sc_id * 4), integer1);
+        _mm256_stream_si256((__m256i *) (socket_ptr + (sc_id + CP_LEN) * 4), integer1);
+	if (sc_id >= OFDM_CA_NUM - CP_LEN) // add CP
+            _mm256_stream_si256((__m256i *) (socket_ptr + (sc_id + CP_LEN - OFDM_CA_NUM) * 4), integer1);
     }
-
-
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id << ", data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {

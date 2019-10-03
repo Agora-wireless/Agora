@@ -93,14 +93,17 @@ public:
     
 private:
     Config *config_;
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int OFDM_PREFIX_LEN;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int package_length;
-    int buffer_subframe_num_;
+    size_t BS_ANT_NUM, UE_NUM;
+    size_t OFDM_CA_NUM;
+    size_t OFDM_DATA_NUM;
+    size_t OFDM_DATA_START;
+    size_t OFDM_PREFIX_LEN;
+    size_t TX_PREFIX_LEN;
+    size_t CP_LEN;
+    size_t subframe_num_perframe, data_subframe_num_perframe;
+    size_t package_length;
+    size_t package_header_offset;
+    size_t buffer_subframe_num_;
 
     int tid;
     int transpose_block_size;

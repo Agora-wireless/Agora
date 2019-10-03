@@ -166,4 +166,9 @@ void Utils::printVector(std::vector<std::complex<int16_t>> &data)
     }
 }
 
-
+void Utils::writeBinaryFile(std::string name, size_t elem_size, size_t buffer_size, void *buff)
+{
+    FILE *f_handle = fopen(name.c_str(), "wb");
+    fwrite(buff, elem_size, buffer_size, f_handle);
+    fclose(f_handle);
+}

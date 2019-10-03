@@ -51,5 +51,6 @@ public:
     static void loadTDDConfig(const std::string filename, std::string &jconfig);
     static std::vector<std::string> split(const std::string& s, char delimiter);
     static void printVector(std::vector<std::complex<int16_t>> &data);
+    static void writeBinaryFile(std::string name, size_t elem_size, size_t buffer_size, void *buff);
 };
 #endif
