@@ -322,6 +322,11 @@ void Millipede::start()
                 }
                 break;
 
+                case EVENT_DECODE: {
+                    
+                }
+                break;
+
                 case EVENT_PRECODE: {
                     /* Precoding is done, schedule ifft */
                     int offset_precode = event.data;
@@ -443,18 +448,21 @@ void *Millipede::worker(int tid)
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
 
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        data_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_, Demul_task_duration, Demul_task_count);
+        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
 
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, 
         Precode_task_duration, Precode_task_count);
 
+    DoCoding *computeCoding = new DoCoding(cfg_, tid, &(complete_task_queue_), task_ptok_ptr,
+        (int8_t **)dl_IQ_data, encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
+        Encode_task_duration, Encode_task_count, Decode_task_duration, Decode_task_count);
 
     Event_data event;
     bool ret = false;
     bool ret_zf = false;
     bool ret_demul = false;
-    // bool ret_decode = false;
+    bool ret_decode = false;
     // bool ret_modul = false;
     bool ret_ifft = false;
     bool ret_precode = false;
@@ -494,10 +502,16 @@ void *Millipede::worker(int tid)
                 ret = fft_queue_.try_dequeue(event);
                 if (!ret) {   
                     ret_demul = demul_queue_.try_dequeue(event);
-                    if (!ret_demul)
-                        continue;
-                    else 
+                    if (!ret_demul) {
+                        ret_decode = decode_queue_.try_dequeue(event);
+                        if(!ret_decode)
+                            continue;
+                        else
+                            computeCoding->Decode(event.data);
+                    }
+                    else { 
                         computeDemul->Demul(event.data);
+                    }
                 }
                 else {
                     computeFFT->FFT(event.data);
@@ -589,7 +603,7 @@ void* Millipede::worker_demul(int tid)
 
     /* initialize Demul operator */
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        data_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_, Demul_task_duration, Demul_task_count);
+        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
 
 
     /* initialize Precode operator */
@@ -987,6 +1001,8 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
     zf_block_size = cfg->zf_block_size;
     demul_block_num = OFDM_DATA_NUM / demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
     zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
+
+    LDPC_config = cfg->LDPC_config;
 }
 
 
@@ -1037,8 +1053,10 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_2d(&pred_csi_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64, 0);
     alloc_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
     alloc_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&demul_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, NUM_BITS * ORIG_CODE_LEN * NUM_CODE_BLOCK * UE_NUM, 64, 0);
+    alloc_buffer_2d(&demod_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, MOD_ORDER * OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
 
     /* initilize all uplink status checkers */
     alloc_buffer_1d(&rx_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
@@ -1065,11 +1083,13 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
     alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&Decode_task_count, TASK_THREAD_NUM * 16, 64, 1);
 
     alloc_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM, 10240, 64, 1);
 }
@@ -1102,9 +1122,11 @@ void Millipede::initialize_downlink_buffers()
     /* initilize all timestamps and counters for worker threads */
     alloc_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
     alloc_buffer_1d(&IFFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&Precode_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&Encode_task_count, TASK_THREAD_NUM * 16, 64, 1);
 }
 
 
@@ -1118,7 +1140,8 @@ void Millipede::free_uplink_buffers()
     free_buffer_2d(&pred_csi_buffer_ , OFDM_DATA_NUM);
     free_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM);
     free_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&demul_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&demod_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
     free_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
 
     free_buffer_1d(&rx_counter_packets_);
@@ -1145,11 +1168,13 @@ void Millipede::free_uplink_buffers()
     free_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8);
     free_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8);
     free_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8);
+    free_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8);
 
     free_buffer_1d(&CSI_task_count);
     free_buffer_1d(&FFT_task_count);
     free_buffer_1d(&ZF_task_count);
     free_buffer_1d(&Demul_task_count);
+    free_buffer_1d(&Decode_task_count);
 }
 
 void Millipede::free_downlink_buffers()
@@ -1174,9 +1199,11 @@ void Millipede::free_downlink_buffers()
 
     free_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8);
     free_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8);
+    free_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8);
 
     free_buffer_1d(&IFFT_task_count);
     free_buffer_1d(&Precode_task_count);
+    free_buffer_1d(&Encode_task_count);
 }
 
 
@@ -1189,7 +1216,7 @@ void Millipede::save_demul_data_to_file(int frame_id, int data_subframe_id)
     FILE* fp = fopen(filename.c_str(),"a");
     int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
     for (int cc = 0; cc < OFDM_DATA_NUM; cc++) {
-        int *cx = &demul_hard_buffer_[total_data_subframe_id][cc * UE_NUM];
+        int *cx = &demod_hard_buffer_[total_data_subframe_id][cc * UE_NUM];
         fprintf(fp, "SC: %d, Frame %d, subframe: %d, ", cc, frame_id, data_subframe_id);
         for(int kk = 0; kk < UE_NUM; kk++)  
             fprintf(fp, "%d ", cx[kk]);

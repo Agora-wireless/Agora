@@ -12,10 +12,14 @@
 #include <boost/align/aligned_allocator.hpp>
 
 // size: 8 bytes
+#ifdef USE_LDPC
+#include "common_typedef_sdk.h"
+#else
 struct complex_float {
-    float real;
-    float imag;
+    float re;
+    float im;
 };
+#endif
 
 //typedef std::vector<complex_float> myVec;
 typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;

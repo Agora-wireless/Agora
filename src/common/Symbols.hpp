@@ -7,6 +7,8 @@
 #define GENERATE_DATA
 #define SEPARATE_TX_RX 0
 
+#define MOD_ORDER 4
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -62,12 +64,13 @@
 
 #define BIGSTATION 0
 #define ENABLE_DOWNLINK 0
+#define ENABLE_DECODE 1
 #define USE_IPV4 1
 //#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
-#define EXPORT_CONSTELLATION 1
-#define ENABLE_DECODE 0
+#define EXPORT_CONSTELLATION 0
+
 #define COMBINE_EQUAL_DECODE 1
 
 #define DO_PREDICTION 0
@@ -134,6 +137,23 @@ static const char *THREAD_TYPE_STRING[] = {
 	"Master (RX)",
 	"Master (TX)"
 };
+
+
+
+
+struct LDPCconfig {
+    uint16_t Bg;
+    bool earlyTermination;
+    int16_t decoderIter;
+    uint16_t Zc;
+    int nRows;
+    uint32_t cbEncLen;
+    uint32_t cbLen;
+    uint32_t cbCodewLen;
+};
+
+typedef struct LDPCconfig LDPCconfig;
+
 
 static const int MAX_FRAME_ID = 1e4;
 static const int float_num_in_simd256 = 8;

@@ -41,6 +41,7 @@
 #include "dozf.hpp"
 #include "dodemul.hpp"
 #include "doprecode.hpp"
+#include "docoding.hpp"
 #include "memory_manage.h"
 #include "stats.hpp"
 #include "config.hpp"
@@ -126,6 +127,9 @@ private:
     int demul_block_size, demul_block_num;
     int zf_block_size, zf_block_num;
 
+
+    LDPCconfig LDPC_config;
+
     /* lookup table for 16 QAM, real and imag */
     float **qam16_table_;
     float *pilots_;
@@ -192,9 +196,9 @@ private:
      * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    uint8_t **demul_hard_buffer_;
+    uint8_t **demod_hard_buffer_;
 
-    float **demul_soft_buffer_;
+    int8_t **demod_soft_buffer_;
 
     /** 
      * Predicted CSI data 
@@ -204,7 +208,7 @@ private:
     complex_float **pred_csi_buffer_;
 
 
-    int **decoded_buffer_;
+    uint8_t **decoded_buffer_;
 
 
 
@@ -291,6 +295,9 @@ private:
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
     complex_float **dl_precoded_data_buffer_;
+
+
+    int8_t **encoded_buffer_;
 
 
     /**
@@ -390,17 +397,21 @@ private:
     int *FFT_task_count;
     int *ZF_task_count;
     int *Demul_task_count;
+    int *Decode_task_count;
 
     double **CSI_task_duration;
     double **FFT_task_duration;
     double **ZF_task_duration;
     double **Demul_task_duration;
+    double **Decode_task_duration;
 
     int *IFFT_task_count;
     int *Precode_task_count;
+    int *Encode_task_count;
 
     double **IFFT_task_duration;
     double **Precode_task_duration;
+    double **Encode_task_duration;
 
     double **frame_start;
 
