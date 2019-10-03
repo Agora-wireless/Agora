@@ -133,6 +133,20 @@ Config::Config(std::string jsonfile)
     packet_length = packet_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
     downlink_mode = tddConf.value("downlink_mode", false);
 #endif
+
+    /* LDPC configurations */
+    LDPC_config.Bg = tddConf.value("base_graph", 1);
+    LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
+    LDPC_config.decoderIter = tddConf.value("decoderIter", 10);
+    LDPC_config.Zc = tddConf.value("Zc", 16);
+    LDPC_config.nRows = (LDPC_config.Bg==1) ? 46 : 42;
+    LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
+    LDPC_config.cbLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
+    LDPC_config.cbCodewLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
+
+    printf("Encoder: Zc: %d, code block len: %d, encoded block len: %d, decoder iterations: %d\n", 
+            LDPC_config.Zc, LDPC_config.cbLen, LDPC_config.cbCodewLen, LDPC_config.decoderIter);
+
     std::cout << "Config file loaded!" << std::endl;
     std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
     std::cout << "UE_NUM " << nUEs << std::endl;
@@ -222,11 +236,11 @@ Config::Config(std::string jsonfile)
         std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(dl_IQ_data[i], dl_IQ_data[i] + OFDM_CA_NUM), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
             if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
-                dl_IQ_modul[i][j].real = 0;
-                dl_IQ_modul[i][j].imag = 0;
+                dl_IQ_modul[i][j].re = 0;
+                dl_IQ_modul[i][j].im = 0;
 	    } else {
-                dl_IQ_modul[i][j].real = modul_data[j].real();
-                dl_IQ_modul[i][j].imag = modul_data[j].imag();
+                dl_IQ_modul[i][j].re = modul_data[j].real();
+                dl_IQ_modul[i][j].im = modul_data[j].imag();
 	    }
         }
 
@@ -252,8 +266,8 @@ Config::Config(std::string jsonfile)
             if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM)
                 continue;
             size_t k = j - OFDM_DATA_START;
-            ul_IQ_modul[i][j].real = modul_data[k].real();
-            ul_IQ_modul[i][j].imag = modul_data[k].imag();
+            ul_IQ_modul[i][j].re = modul_data[k].real();
+            ul_IQ_modul[i][j].im = modul_data[k].imag();
         }
     }
 #else

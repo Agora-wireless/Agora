@@ -38,9 +38,9 @@ void init_qam64_table(float **qam64_table)
 complex_float divide(complex_float e1, complex_float e2)
 {
     complex_float re;
-    float module = e2.real * e2.real + e2.imag * e2.imag;
-    re.real = (e1.real * e2.real + e1.imag * e2.imag) / module;
-    re.imag = (e1.imag * e2.real - e1.real * e2.imag) / module;
+    float module = e2.re * e2.re + e2.im * e2.im;
+    re.re = (e1.re * e2.re + e1.im * e2.im) / module;
+    re.im = (e1.im * e2.re - e1.re * e2.im) / module;
     return re;
 }
 
@@ -112,6 +112,16 @@ void print256_epi8(__m256i var)
            val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15], 
            val[16], val[17], val[18], val[19], val[20], val[21], val[22], val[23], 
            val[24], val[25], val[26], val[27], val[28], val[29], val[30], val[31]
+           );
+}
+
+
+void print128_epi8(__m128i var)
+{
+    int8_t *val = (int8_t*) &var;
+    printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n", 
+           val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7], 
+           val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15]
            );
 }
 
@@ -194,12 +204,150 @@ void demod_16qam_loop_simd(float *vec_in, uint8_t *vec_out, int ue_num, int num_
 // }
 
 
-// inline cx_fmat mod_16qam(imat x)
-// {
-//     // cx_fmat re(size(x));
-//     fmat real_re = conv_to<fmat>::from(x);
-//     fmat imag_re = conv_to<fmat>::from(x);
-//     // float scale = 1/sqrt(10);
+/* code from srsLTE: 
+    https://github.com/srsLTE/srsLTE/blob/6cde228bc165f921135c39c891ec41f2041651e0/lib/src/phy/modem/demod_soft.c
+    */
+void demod_16qam_soft_loop(float *vec_in, int8_t *llr, int ue_num) {
+    for (int i = 0; i < ue_num; i++) {
+        int8_t yre = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
+        int8_t yim = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
+
+        llr[4*i+0] = -yre;
+        llr[4*i+1] = -yim;
+        llr[4*i+2] = abs(yre)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
+        llr[4*i+3] = abs(yim)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
+    }
+}
+
+
+void demod_16qam_soft_sse(float *vec_in, int8_t *llr, int ue_num) {
+    float *symbolsPtr = vec_in;
+    __m128i *resultPtr = (__m128i*) llr;
+    __m128 symbol1, symbol2, symbol3, symbol4;
+    __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs, symbol_12, symbol_34;
+    __m128i offset = _mm_set1_epi8(2*SCALE_BYTE_CONV_QAM16/sqrt(10));
+    __m128i result1n, result1a, result2n, result2a;
+    __m128 scale_v = _mm_set1_ps(-SCALE_BYTE_CONV_QAM16);
+
+    __m128i shuffle_negated_1 = _mm_set_epi8(0xff,0xff,7,6,0xff,0xff,5,4,0xff,0xff,3,2,0xff,0xff,1,0);
+    __m128i shuffle_abs_1     = _mm_set_epi8(7,6,0xff,0xff,5,4,0xff,0xff,3,2,0xff,0xff,1,0,0xff,0xff);
+
+    __m128i shuffle_negated_2 = _mm_set_epi8(0xff,0xff,15,14,0xff,0xff,13,12,0xff,0xff,11,10,0xff,0xff,9,8);
+    __m128i shuffle_abs_2     = _mm_set_epi8(15,14,0xff,0xff,13,12,0xff,0xff,11,10,0xff,0xff,9,8,0xff,0xff);
+
+    for (int i = 0; i < ue_num / 8; i++) {
+        symbol1   = _mm_load_ps(symbolsPtr); symbolsPtr+=4;
+        symbol2   = _mm_load_ps(symbolsPtr); symbolsPtr+=4;
+        symbol3   = _mm_load_ps(symbolsPtr); symbolsPtr+=4;
+        symbol4   = _mm_load_ps(symbolsPtr); symbolsPtr+=4;
+        symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+        symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+        symbol_i3 = _mm_cvtps_epi32(_mm_mul_ps(symbol3, scale_v));
+        symbol_i4 = _mm_cvtps_epi32(_mm_mul_ps(symbol4, scale_v));
+        symbol_12  = _mm_packs_epi32(symbol_i1, symbol_i2);
+        symbol_34  = _mm_packs_epi32(symbol_i3, symbol_i4);
+        symbol_i   = _mm_packs_epi16(symbol_12, symbol_34);
+
+        symbol_abs  = _mm_abs_epi8(symbol_i);
+        symbol_abs  = _mm_sub_epi8(symbol_abs, offset);
+
+        result1n = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
+        result1a = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
+
+        result2n = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
+        result2a = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
+
+        _mm_store_si128(resultPtr, _mm_or_si128(result1n, result1a)); resultPtr++;
+        _mm_store_si128(resultPtr, _mm_or_si128(result2n, result2a)); resultPtr++;
+
+    }
+    // Demodulate last symbols
+    for (int i = 8 * (ue_num / 8); i < ue_num; i++) {
+        int8_t yre = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
+        int8_t yim = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
+
+        llr[4*i+0] = -yre;
+        llr[4*i+1] = -yim;
+        llr[4*i+2] = abs(yre)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
+        llr[4*i+3] = abs(yim)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
+    }
+
+    // for (int i = 0; i < ue_num; i++) {
+    //     printf("sse: in: %.2f, %.2f, out: %i %i %i %i\n", vec_in[2*i], vec_in[2*i+1], llr[4*i+0], llr[4*i+1], llr[4*i+2], llr[4*i+3]);
+    // }
+}
+
+
+void demod_16qam_soft_avx2(float *vec_in, int8_t *llr, int ue_num) {
+    float *symbolsPtr = vec_in;
+    __m256i *resultPtr = (__m256i*) llr;
+    __m256 symbol1, symbol2, symbol3, symbol4;
+    __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs, symbol_12, symbol_34;
+    __m256i offset = _mm256_set1_epi8(2*SCALE_BYTE_CONV_QAM16/sqrt(10));
+    __m256i result1n, result1a, result2n, result2a, result1na, result2na;
+    __m256 scale_v = _mm256_set1_ps(-SCALE_BYTE_CONV_QAM16);
+
+    __m256i shuffle_negated_1 = _mm256_set_epi8(0xff,0xff,7,6,0xff,0xff,5,4,0xff,0xff,3,2,0xff,0xff,1,0,
+                                                0xff,0xff,7,6,0xff,0xff,5,4,0xff,0xff,3,2,0xff,0xff,1,0);
+    __m256i shuffle_abs_1     = _mm256_set_epi8(7,6,0xff,0xff,5,4,0xff,0xff,3,2,0xff,0xff,1,0,0xff,0xff,
+                                                7,6,0xff,0xff,5,4,0xff,0xff,3,2,0xff,0xff,1,0,0xff,0xff);
+
+    __m256i shuffle_negated_2 = _mm256_set_epi8(0xff,0xff,15,14,0xff,0xff,13,12,0xff,0xff,11,10,0xff,0xff,9,8,
+                                                0xff,0xff,15,14,0xff,0xff,13,12,0xff,0xff,11,10,0xff,0xff,9,8);
+    __m256i shuffle_abs_2     = _mm256_set_epi8(15,14,0xff,0xff,13,12,0xff,0xff,11,10,0xff,0xff,9,8,0xff,0xff,
+                                                15,14,0xff,0xff,13,12,0xff,0xff,11,10,0xff,0xff,9,8,0xff,0xff);
+
+    for (int i = 0; i < ue_num / 16; i++) {
+        symbol1   = _mm256_load_ps(symbolsPtr); symbolsPtr += 8;
+        symbol2   = _mm256_load_ps(symbolsPtr); symbolsPtr += 8;
+        symbol3   = _mm256_load_ps(symbolsPtr); symbolsPtr += 8;
+        symbol4   = _mm256_load_ps(symbolsPtr); symbolsPtr += 8;
+        symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
+        symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
+        symbol_i3 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol3, scale_v));
+        symbol_i4 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol4, scale_v));
+        symbol_12  = _mm256_packs_epi32(symbol_i1, symbol_i2);
+        symbol_12 = _mm256_permute4x64_epi64(symbol_12, 0xd8);
+        symbol_34  = _mm256_packs_epi32(symbol_i3, symbol_i4);
+        symbol_34 = _mm256_permute4x64_epi64(symbol_34, 0xd8);
+        symbol_i   = _mm256_packs_epi16(symbol_12, symbol_34);
+        symbol_i = _mm256_permute4x64_epi64(symbol_i, 0xd8);
+
+        symbol_abs  = _mm256_abs_epi8(symbol_i);
+        symbol_abs  = _mm256_sub_epi8(symbol_abs, offset);
+
+        result1n = _mm256_shuffle_epi8(symbol_i, shuffle_negated_1);
+        result1a = _mm256_shuffle_epi8(symbol_abs, shuffle_abs_1);
+
+        result2n = _mm256_shuffle_epi8(symbol_i, shuffle_negated_2);
+        result2a = _mm256_shuffle_epi8(symbol_abs, shuffle_abs_2);
+
+        result1na = _mm256_or_si256(result1n, result1a);
+        result2na = _mm256_or_si256(result2n, result2a);
+        
+
+        _mm256_store_si256(resultPtr, _mm256_permute2x128_si256(result1na, result2na, 0x20)); resultPtr++;
+        _mm256_store_si256(resultPtr, _mm256_permute2x128_si256(result1na, result2na, 0x31)); resultPtr++;
+
+    }
+    // Demodulate last symbols
+    for (int i = 16 * (ue_num / 16); i < ue_num; i++) {
+        int8_t yre = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
+        int8_t yim = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
+
+        llr[4*i+0] = -yre;
+        llr[4*i+1] = -yim;
+        llr[4*i+2] = abs(yre)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
+        llr[4*i+3] = abs(yim)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
+    }
+
+    // for (int i = 0; i < ue_num; i++) {
+    //     printf("avx2: in: %.2f, %.2f, out: %i %i %i %i\n", vec_in[2*i], vec_in[2*i+1], llr[4*i+0], llr[4*i+1], llr[4*i+2], llr[4*i+3]);
+    // }
+}
+
+
+
 //     // float modvec_16qam[4]  = {-3*scale, -1*scale, 3*scale, scale};
 
 //     // real_re.for_each([&modvec_16qam](fmat::elem_type& val) { val = modvec_16qam[(int)val/4]; } );
@@ -220,8 +368,8 @@ void demod_16qam_loop_simd(float *vec_in, uint8_t *vec_out, int ue_num, int num_
 complex_float mod_16qam_single(int x, float **qam16_table) 
 {
     complex_float re;
-    re.real = qam16_table[0][x];
-    re.imag = qam16_table[1][x];
+    re.re = qam16_table[0][x];
+    re.im = qam16_table[1][x];
     return re;
 }
 

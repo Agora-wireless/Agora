@@ -116,10 +116,14 @@ public:
     size_t packet_header_offset;
     size_t packet_length;
 
+
     std::string rx_addr;
     std::string tx_addr;
     int rx_port;
     int tx_port;
+
+    /* LDPC parameters */
+    LDPCconfig LDPC_config;
 
     bool isUE;
     const size_t maxFrame = 1 << 31;

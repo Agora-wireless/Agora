@@ -24,6 +24,7 @@ find_package(Armadillo)
 
 set(USE_DPDK False)
 set(USE_ARGOS False)
+set(USE_LDPC True)
 
 
 # DPDK
@@ -83,6 +84,35 @@ include_directories(
 	src/common/
 	)
 
+
+# LDPC support
+if (${USE_LDPC})
+  add_definitions(-DUSE_LDPC)
+  set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
+  set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
+  set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+                ${LIB_DIR}/test/phy/common/utility.a
+                ${LIB_DIR}/source/phy/lib_common/libcommon.a)
+
+  include_directories(
+          ${SDK_DIR}/test/phy/common
+          ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+          ${SDK_DIR}/source/phy/lib_common
+          src/encoder/
+  )
+
+  set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
+
+  set(LDPC_SOURCES  src/encoder/cyclic_shift.cpp
+                    src/encoder/encoder.cpp
+                    src/encoder/iobuffer.cpp)
+
+endif()
+
+
+
+
+
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
@@ -103,11 +133,13 @@ set(SOURCES src/millipede/main.cpp
             src/millipede/dozf.cpp 
             src/millipede/dodemul.cpp 
             src/millipede/doprecode.cpp
+            src/millipede/docoding.cpp
             ${COMMON_SOURCES}
-            ${ARGOS_SOURCES})
+            ${ARGOS_SOURCES}
+            ${LDPC_SOURCES})
 			
-add_executable(millipede ${SOURCES})
-target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+add_executable(millipede ${SOURCES} ${HEADER_FILES})
+target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 
 add_library(comp MODULE 
@@ -119,9 +151,12 @@ add_library(comp MODULE
        src/millipede/dozf.cpp
        src/millipede/dodemul.cpp
        src/millipede/doprecode.cpp
+       src/millipede/docoding.cpp
        ${COMMON_SOURCES}
-       ${ARGOS_SOURCES})
-target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+       ${ARGOS_SOURCES}
+       ${LDPC_SOURCES}
+       ${HEADER_FILES})
+target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 
 if (${USE_ARGOS})
