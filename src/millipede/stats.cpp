@@ -8,6 +8,7 @@
 Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
           double **in_ZF_task_duration, int *in_ZF_task_count, double **in_Demul_task_duration, int *in_Demul_task_count,
           double **in_IFFT_task_duration, int *in_IFFT_task_count, double **in_Precode_task_duration, int *in_Precode_task_count,
+          double **in_Decode_task_duration, int *in_Decode_task_count, double **in_Encode_task_duration, int *in_Encode_task_count,
           double **in_frame_start, 
           int in_task_duration_dim1, int in_task_duration_dim2, int in_task_count_dim,
           int in_task_thread_num, int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num)
@@ -38,6 +39,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     FFT_task_duration = in_FFT_task_duration;
     ZF_task_duration = in_ZF_task_duration;
     Demul_task_duration = in_Demul_task_duration;
+    Decode_task_duration = in_Decode_task_duration;
+    Encode_task_duration = in_Encode_task_duration;
     IFFT_task_duration = in_IFFT_task_duration;
     Precode_task_duration = in_Precode_task_duration;
 
@@ -45,6 +48,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     FFT_task_count = in_FFT_task_count;
     ZF_task_count = in_ZF_task_count;
     Demul_task_count = in_Demul_task_count;
+    Decode_task_count = in_Decode_task_count;
+    Encode_task_count = in_Encode_task_count;
     IFFT_task_count = in_IFFT_task_count;
     Precode_task_count = in_Precode_task_count;
 
@@ -59,6 +64,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     alloc_buffer_1d(&fft_time_this_frame_this_thread, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&zf_time_this_frame_this_thread, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&demul_time_this_frame_this_thread, task_duration_dim2, 32, 1);
+    alloc_buffer_1d(&decode_time_this_frame_this_thread, task_duration_dim2, 32, 1);
+    alloc_buffer_1d(&encode_time_this_frame_this_thread, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&ifft_time_this_frame_this_thread, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&precode_time_this_frame_this_thread, task_duration_dim2, 32, 1);
 
@@ -66,6 +73,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     alloc_buffer_1d(&fft_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&zf_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&demul_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
+    alloc_buffer_1d(&decode_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
+    alloc_buffer_1d(&encode_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&ifft_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&precode_time_this_frame_this_thread_per_task, task_duration_dim2, 32, 1);
 
@@ -73,6 +82,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     alloc_buffer_1d(&fft_time_this_frame, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&zf_time_this_frame, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&demul_time_this_frame, task_duration_dim2, 32, 1);
+    alloc_buffer_1d(&decode_time_this_frame, task_duration_dim2, 32, 1);
+    alloc_buffer_1d(&encode_time_this_frame, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&ifft_time_this_frame, task_duration_dim2, 32, 1);
     alloc_buffer_1d(&precode_time_this_frame, task_duration_dim2, 32, 1);
 
@@ -80,6 +91,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     alloc_buffer_2d(&FFT_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
     alloc_buffer_2d(&ZF_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
     alloc_buffer_2d(&Demul_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
+    alloc_buffer_2d(&Decode_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
+    alloc_buffer_2d(&Encode_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
     alloc_buffer_2d(&IFFT_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
     alloc_buffer_2d(&Precode_task_duration_prev_frame_each_thread, task_duration_dim2, task_thread_num, 32, 1);
 
@@ -87,6 +100,8 @@ Stats::Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count,
     alloc_buffer_1d(&FFT_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
     alloc_buffer_1d(&ZF_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
     alloc_buffer_1d(&Demul_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
+    alloc_buffer_1d(&Decode_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
+    alloc_buffer_1d(&Encode_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
     alloc_buffer_1d(&IFFT_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
     alloc_buffer_1d(&Precode_task_count_prev_frame_each_thread, task_thread_num, 32, 1);
 
@@ -103,11 +118,13 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
 	#else  
 		update_stats_in_functions_uplink_millipede(frame_id); 
 	#endif    
-		double sum_time_this_frame = csi_time_this_frame[0] + fft_time_this_frame[0] + zf_time_this_frame[0] + demul_time_this_frame[0];
+		double sum_time_this_frame = csi_time_this_frame[0] + fft_time_this_frame[0] 
+                                    + zf_time_this_frame[0] + demul_time_this_frame[0] + decode_time_this_frame[0];
 	    csi_time_in_function[frame_id] = csi_time_this_frame[0];
 	    fft_time_in_function[frame_id] = fft_time_this_frame[0];
 	    zf_time_in_function[frame_id] = zf_time_this_frame[0];
 	    demul_time_in_function[frame_id] = demul_time_this_frame[0];
+        decode_time_in_function[frame_id] = decode_time_this_frame[0];
 	#if DEBUG_UPDATE_STATS_DETAILED
 	    for (int i = 0; i < task_duration_dim2 - 1; i++) {
 	        csi_time_in_function_details[i][frame_id] = csi_time_this_frame[i+1];
@@ -117,12 +134,13 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
 	    }
 	#endif
 	#if DEBUG_PRINT_PER_FRAME_DONE
-	    printf("In frame %d, \t\t\t\t\t csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), " 
-	    		"zf: %d tasks %.3f (%.3f, %.3f, %.3f), demul: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n", 
+	    printf("In frame %d, \t   csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), " 
+	    		"zf: %d tasks %.3f (%.3f, %.3f, %.3f), demul: %d tasks %.3f (%.3f, %.3f, %.3f), decode %d tasks %.3f sum: %.3f\n", 
 	            frame_id, csi_count_this_frame, csi_time_this_frame[0], csi_time_this_frame[1], csi_time_this_frame[2], csi_time_this_frame[3], 
 	            fft_count_this_frame, fft_time_this_frame[0], fft_time_this_frame[1], fft_time_this_frame[2], fft_time_this_frame[3], 
 	            zf_count_this_frame, zf_time_this_frame[0], zf_time_this_frame[1], zf_time_this_frame[2], zf_time_this_frame[3], 
 	            demul_count_this_frame, demul_time_this_frame[0], demul_time_this_frame[1], demul_time_this_frame[2], demul_time_this_frame[3],
+                decode_count_this_frame, decode_time_this_frame[0],
 	            sum_time_this_frame);
 	#endif     
 #endif                  
@@ -143,7 +161,7 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
 	    ifft_time_in_function[frame_id] = ifft_time_this_frame[0];
 	    precode_time_in_function[frame_id] = precode_time_this_frame[0];
 	#if DEBUG_PRINT_PER_FRAME_DONE
-	    printf("In frame %d, \t\t\t\t\t csi: %d tasks %.3f (%.3f, %.3f, %.3f), ifft: %d tasks %.3f (%.3f, %.3f, %.3f), "
+	    printf("In frame %d, \t   csi: %d tasks %.3f (%.3f, %.3f, %.3f), ifft: %d tasks %.3f (%.3f, %.3f, %.3f), "
 	    		"zf: %d tasks %.3f (%.3f, %.3f, %.3f), precode: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n", 
 	            frame_id, csi_count_this_frame, csi_time_this_frame[0], csi_time_this_frame[1], csi_time_this_frame[2], csi_time_this_frame[3], 
 	            ifft_count_this_frame, ifft_time_this_frame[0], ifft_time_this_frame[1], ifft_time_this_frame[2], ifft_time_this_frame[3], 
@@ -192,7 +210,7 @@ void Stats::update_stats_in_dofft(int frame_id, int thread_num, int thread_num_o
         }
 
         double sum_time_this_frame_this_thread = fft_time_this_frame_this_thread[0] + csi_time_this_frame_this_thread[0];
-        printf("In frame %d, thread %d, \t\t\t csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
+        printf("In frame %d, thread %d, \t   csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
                 frame_id, i, csi_count_this_frame_this_thread, 
                 csi_time_this_frame_this_thread_per_task[0], csi_time_this_frame_this_thread_per_task[1], 
                 csi_time_this_frame_this_thread_per_task[2], csi_time_this_frame_this_thread_per_task[3],
@@ -227,7 +245,7 @@ void Stats::update_stats_in_dozf(int frame_id, int thread_num, int thread_num_of
         for (int j = 0; j < task_duration_dim2; j++) 
         	zf_time_this_frame_this_thread_per_task[j] = zf_time_this_frame_this_thread[j] / zf_count_this_frame_this_thread;
         double sum_time_this_frame_this_thread = zf_time_this_frame_this_thread[0];
-        printf("In frame %d, thread %d, \t\t\t zf: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
+        printf("In frame %d, thread %d, \t   zf: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
                 frame_id, i, zf_count_this_frame_this_thread, 
                 zf_time_this_frame_this_thread_per_task[0], zf_time_this_frame_this_thread_per_task[1], 
                 zf_time_this_frame_this_thread_per_task[2], zf_time_this_frame_this_thread_per_task[3],
@@ -258,7 +276,7 @@ void Stats::update_stats_in_dodemul(int frame_id, int thread_num, int thread_num
         for (int j = 0; j < task_duration_dim2; j++) 
         	demul_time_this_frame_this_thread_per_task[j] = demul_time_this_frame_this_thread[j] / demul_count_this_frame_this_thread;
         double sum_time_this_frame_this_thread = demul_time_this_frame_this_thread[0];
-        printf("In frame %d, thread %d, \t\t\t demul: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
+        printf("In frame %d, thread %d, \t   demul: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
                 frame_id, i, demul_count_this_frame_this_thread, 
                 demul_time_this_frame_this_thread_per_task[0], demul_time_this_frame_this_thread_per_task[1], 
                 demul_time_this_frame_this_thread_per_task[2], demul_time_this_frame_this_thread_per_task[3],
@@ -302,7 +320,7 @@ void Stats::update_stats_in_doifft(int frame_id, int thread_num, int thread_num_
         	csi_time_this_frame_this_thread_per_task[j] = csi_time_this_frame_this_thread[j] / csi_count_this_frame_this_thread;
         }
         double sum_time_this_frame_this_thread = ifft_time_this_frame_this_thread[0] + csi_time_this_frame_this_thread[0];
-        printf("In frame %d, thread %d, \t\t\t csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
+        printf("In frame %d, thread %d, \t   csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
                 frame_id, i, csi_count_this_frame_this_thread, 
                 csi_time_this_frame_this_thread_per_task[0], csi_time_this_frame_this_thread_per_task[1], 
                 csi_time_this_frame_this_thread_per_task[2], csi_time_this_frame_this_thread_per_task[3],
@@ -338,7 +356,7 @@ void Stats::update_stats_in_doprecode(int frame_id, int thread_num, int thread_n
         for (int j = 0; j < task_duration_dim2; j++) 
         	precode_time_this_frame_this_thread_per_task[j] = precode_time_this_frame_this_thread[j] / precode_count_this_frame_this_thread;
         double sum_time_this_frame_this_thread = precode_time_this_frame_this_thread[0];
-        printf("In frame %d, thread %d, \t\t\t demul: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
+        printf("In frame %d, thread %d, \t   demul: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
                 frame_id, i, precode_count_this_frame_this_thread, 
                 precode_time_this_frame_this_thread_per_task[0], precode_time_this_frame_this_thread_per_task[1], 
                 precode_time_this_frame_this_thread_per_task[2], precode_time_this_frame_this_thread_per_task[3],
@@ -371,10 +389,12 @@ void Stats::update_stats_in_functions_uplink_millipede(int frame_id)
 	csi_count_this_frame = 0;
 	zf_count_this_frame = 0;
 	demul_count_this_frame = 0;
+    decode_count_this_frame = 0;
 	memset(fft_time_this_frame, 0, sizeof(double) * task_duration_dim2);
 	memset(csi_time_this_frame, 0, sizeof(double) * task_duration_dim2);
 	memset(zf_time_this_frame, 0, sizeof(double) * task_duration_dim2);
 	memset(demul_time_this_frame, 0, sizeof(double) * task_duration_dim2);
+    memset(decode_time_this_frame, 0, sizeof(double) * task_duration_dim2);
 
     for (int i = 0; i < task_thread_num; i++) {
     	/* compute stats for FFT */
@@ -388,7 +408,7 @@ void Stats::update_stats_in_functions_uplink_millipede(int frame_id)
         FFT_task_count_prev_frame_each_thread[i] = FFT_task_count[i * 16];
         
         /* compute stats for CSI */
-        double csi_time_this_frame_this_thread[4];
+        // double csi_time_this_frame_this_thread[4];
         for (int j = 0; j < task_duration_dim2; j++) {                    
             csi_time_this_frame_this_thread[j] = CSI_task_duration[i * 8][j] - CSI_task_duration_prev_frame_each_thread[j][i];
             csi_time_this_frame[j] += csi_time_this_frame_this_thread[j];
@@ -418,17 +438,30 @@ void Stats::update_stats_in_functions_uplink_millipede(int frame_id)
         demul_count_this_frame += demul_count_this_frame_this_thread;
         Demul_task_count_prev_frame_each_thread[i] = Demul_task_count[i * 16];
 
+
+        /* compute stats for Decode */
+        for (int j = 0; j < task_duration_dim2; j++) {
+            decode_time_this_frame_this_thread[j] = Decode_task_duration[i * 8][j] - Decode_task_duration_prev_frame_each_thread[j][i];
+            decode_time_this_frame[j] += decode_time_this_frame_this_thread[j];
+            Decode_task_duration_prev_frame_each_thread[j][i] = Decode_task_duration[i * 8][j];
+        }
+        decode_count_this_frame_this_thread = Decode_task_count[i * 16] - Decode_task_count_prev_frame_each_thread[i];
+        decode_count_this_frame += decode_count_this_frame_this_thread;
+        Decode_task_count_prev_frame_each_thread[i] = Decode_task_count[i * 16];
+
 #if DEBUG_PRINT_STATS_PER_THREAD
         for (int j = 0; j < task_duration_dim2; j++) {
         	fft_time_this_frame_this_thread_per_task[j] = fft_time_this_frame_this_thread[j] / fft_count_this_frame_this_thread;
         	csi_time_this_frame_this_thread_per_task[j] = csi_time_this_frame_this_thread[j] / csi_count_this_frame_this_thread;
         	zf_time_this_frame_this_thread_per_task[j] = zf_time_this_frame_this_thread[j] / zf_count_this_frame_this_thread;
         	demul_time_this_frame_this_thread_per_task[j] = demul_time_this_frame_this_thread[j] / demul_count_this_frame_this_thread;
+            decode_time_this_frame_this_thread_per_task[j] = decode_time_this_frame_this_thread[j] / decode_count_this_frame_this_thread;
         }
         double sum_time_this_frame_this_thread = fft_time_this_frame_this_thread[0] + csi_time_this_frame_this_thread[0]
-        										+ zf_time_this_frame_this_thread[0] + demul_time_this_frame_this_thread[0];
+        										+ zf_time_this_frame_this_thread[0] + demul_time_this_frame_this_thread[0] 
+                                                + decode_time_this_frame_this_thread[0];
        printf("In frame %d, thread %d, \t csi: %d tasks %.3f (%.3f, %.3f, %.3f), fft: %d tasks %.3f (%.3f, %.3f, %.3f), "
-       			"zf: %d tasks %.3f (%.3f, %.3f, %.3f), demul: %d tasks %.3f (%.3f, %.3f, %.3f), sum: %.3f\n",
+       			"zf: %d tasks %.3f (%.3f, %.3f, %.3f), demul: %d tasks %.3f (%.3f, %.3f, %.3f), decode: %d tasks %.3f sum: %.3f\n",
                 frame_id, i, csi_count_this_frame_this_thread, 
                 csi_time_this_frame_this_thread_per_task[0], csi_time_this_frame_this_thread_per_task[1], 
                 csi_time_this_frame_this_thread_per_task[2], csi_time_this_frame_this_thread_per_task[3],
@@ -441,6 +474,8 @@ void Stats::update_stats_in_functions_uplink_millipede(int frame_id)
                 demul_count_this_frame_this_thread, 
                 demul_time_this_frame_this_thread_per_task[0], demul_time_this_frame_this_thread_per_task[1], 
                 demul_time_this_frame_this_thread_per_task[2], demul_time_this_frame_this_thread_per_task[3],
+                decode_count_this_frame_this_thread, 
+                decode_time_this_frame_this_thread_per_task[0], 
                 sum_time_this_frame_this_thread);
 #endif
     }
@@ -449,6 +484,7 @@ void Stats::update_stats_in_functions_uplink_millipede(int frame_id)
     	csi_time_this_frame[j] = csi_time_this_frame[j] / task_thread_num;
     	zf_time_this_frame[j] = zf_time_this_frame[j] / task_thread_num;
     	demul_time_this_frame[j] = demul_time_this_frame[j] / task_thread_num;
+        decode_time_this_frame[j] = decode_time_this_frame[j] / task_thread_num;
     }
 }
 

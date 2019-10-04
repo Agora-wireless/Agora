@@ -71,7 +71,17 @@ private:
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request{};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response{};
+    const int16_t *pShiftMatrix;
+    const int16_t *pMatrixNumPerCol;
+    const int16_t *pAddr;
+    uint8_t i_LS;       // i_Ls decides the base matrix entries
+    LDPC_ADAPTER_P ldpc_adapter_func;
+    LDPC_ENCODER ldpc_encoder_func;
 
+    // buffers for encoders
+    __attribute__ ((aligned (64))) int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = {0};
+    __attribute__ ((aligned (64))) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = {0};
+    __attribute__ ((aligned (64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = {0};
 
 };
 

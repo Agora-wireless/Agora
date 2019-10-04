@@ -16,7 +16,7 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
     // BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     // OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    // OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
 
     tid = in_tid;
     complete_task_queue_ = in_complete_task_queue;
@@ -27,22 +27,13 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
     raw_data_buffer = in_raw_data_buffer;
     llr_buffer = in_demod_buffer;
 
-    // buffers for encoders
-    __attribute__ ((aligned (64))) int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = {0};
-    __attribute__ ((aligned (64))) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = {0};
-    __attribute__ ((aligned (64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = {0};
-
     Encode_task_duration = in_Encode_task_duration;
     Encode_task_count = in_Encode_task_count;
     Decode_task_duration = in_Decode_task_duration;
     Decode_task_count = in_Decode_task_count;
 
     int16_t numChannelLlrs = LDPC_config.cbCodewLen;
-    const int16_t *pShiftMatrix;
-    const int16_t *pMatrixNumPerCol;
-    const int16_t *pAddr;
-
-    uint8_t i_LS;       // i_Ls decides the base matrix entries
+    
     int Zc = LDPC_config.Zc;
     if ((Zc % 15) == 0)
         i_LS = 7;
@@ -71,8 +62,8 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
         pAddr = Bg2Address;
     }
 
-    LDPC_ADAPTER_P ldpc_adapter_func = ldpc_select_adapter_func(LDPC_config.Zc);
-    LDPC_ENCODER ldpc_encoder_func = ldpc_select_encoder_func(LDPC_config.Bg);
+    ldpc_adapter_func = ldpc_select_adapter_func(LDPC_config.Zc);
+    ldpc_encoder_func = ldpc_select_encoder_func(LDPC_config.Bg);
 
 
     // decoder setup --------------------------------------------------------------
@@ -111,7 +102,34 @@ void DoCoding::Encode(int offset)
     printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
     #endif
 
+    #if DEBUG_UPDATE_STATS    
+    double start_time = get_time();
+    #endif
 
+    int ue_id = cb_id / LDPC_config.nblocksInSymbol;
+    int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
+    int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
+    int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+    int8_t *input_ptr = raw_data_buffer[frame_id] + input_offset;
+    int8_t *output_ptr = encoded_buffer[frame_id] + output_offset;
+    ldpc_adapter_func(input_ptr, internalBuffer0, LDPC_config.Zc, LDPC_config.cbLen, 1);
+    // encode
+    ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t) LDPC_config.Zc, i_LS);
+    // scatter the output back to compacted 
+    // combine the input sequence and the parity bits into codeword outputs
+    memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES, (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES);
+    memcpy(internalBuffer2+(LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES, internalBuffer1, LDPC_config.cbEncLen / LDPC_config.Zc * PROC_BYTES);
+
+    ldpc_adapter_func(output_ptr, internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
+
+    #if DEBUG_UPDATE_STATS   
+    double duration = get_time() - start_time;
+    Encode_task_count[tid * 16] = Encode_task_count[tid * 16] + 1;
+    Encode_task_duration[tid * 8][0] += duration;
+    if (duration > 500) {
+            printf("Thread %d Encode takes %.2f\n", tid, duration);
+    }
+    #endif
 
     // inform main thread
     Event_data Encode_finish_event;
@@ -133,10 +151,33 @@ void DoCoding::Decode(int offset)
     int frame_id, symbol_id, cb_id;
     interpreteOffset3d(offset, &frame_id, &symbol_id, &cb_id);
     #if DEBUG_PRINT_IN_TASK
-    printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
+    printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
     #endif
 
+    #if DEBUG_UPDATE_STATS    
+    double start_time = get_time();
+    #endif
+
+    int ue_id = cb_id / LDPC_config.nblocksInSymbol;
+    int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
+    int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * MOD_ORDER;
+    int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
+    ldpc_decoder_5gnr_request.varNodes = llr_buffer[frame_id] + llr_buffer_offset;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer[frame_id] + decoded_buffer_offset;
+    // t_dec_start = clock();
+    bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
     // inform main thread
+
+
+    #if DEBUG_UPDATE_STATS   
+    double duration = get_time() - start_time;
+    Decode_task_count[tid * 16] = Decode_task_count[tid * 16] + 1;
+    Decode_task_duration[tid * 8][0] += duration;
+    if (duration > 500) {
+            printf("Thread %d Decode takes %.2f\n", tid, duration);
+    }
+    #endif
+
     Event_data Decode_finish_event;
     Decode_finish_event.event_type = EVENT_DECODE;
     Decode_finish_event.data = offset;

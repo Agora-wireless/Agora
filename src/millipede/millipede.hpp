@@ -41,7 +41,11 @@
 #include "dozf.hpp"
 #include "dodemul.hpp"
 #include "doprecode.hpp"
+
+#ifdef USE_LDPC
 #include "docoding.hpp"
+#endif
+
 #include "memory_manage.h"
 #include "stats.hpp"
 #include "config.hpp"
@@ -84,6 +88,7 @@ public:
     void schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer, int data_subframe_id, moodycamel::ProducerToken const& ptok);
     void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
+    void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
     void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
     void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
 
@@ -297,7 +302,7 @@ private:
     complex_float **dl_precoded_data_buffer_;
 
 
-    int8_t **encoded_buffer_;
+    int8_t **dl_encoded_buffer_;
 
 
     /**
@@ -317,41 +322,20 @@ private:
     int **dl_data_counter_scs_;
     int *dl_data_counter_subframes_;
     int **modulate_checker_;
-    int *ifft_checker_;
+    int *ifft_counter_ants_;
     int **tx_counter_ants_;
     int *tx_counter_subframes_;
+
+    int **encode_counter_blocks_;
+    int *encode_counter_subframes_;
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
 
-
-
+    int *prev_frame_counter;
+    int prev_frame_counter_max;
     /*****************************************************
      * Concurrent queues 
      *****************************************************/ 
     /* Uplink*/
-    /* task queue for uplink FFT */
-    // moodycamel::ConcurrentQueue<Event_data> fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for ZF */
-    // moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* main thread message queue for data receiving */
-    // moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* main thread message queue for task completion*/
-    // moodycamel::ConcurrentQueue<Event_data> complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    //  /* task queue for uplink FFT */
-    // moodycamel::ConcurrentQueue<Event_data> fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for ZF */
-    // moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512);
-    // /* main thread message queue for data receiving */
-    // moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*subframe_num_perframe);
-    // /* main thread message queue for task completion*/
-    // moodycamel::ConcurrentQueue<Event_data> complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*subframe_num_perframe*4);
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> zf_queue_;
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
@@ -363,22 +347,6 @@ private:
 
 
     /* Downlink*/
-    // /* task queue for downlink IFFT */
-    // moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink modulation */
-    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink precoding */
-    // moodycamel::ConcurrentQueue<Event_data> precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink data transmission */
-    // moodycamel::ConcurrentQueue<Event_data> tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink IFFT */
-    // moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for downlink modulation */
-    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for downlink precoding */
-    // moodycamel::ConcurrentQueue<Event_data> precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for downlink data transmission */
-    // moodycamel::ConcurrentQueue<Event_data> tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
