@@ -137,12 +137,13 @@ Config::Config(std::string jsonfile)
     /* LDPC configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
-    LDPC_config.decoderIter = tddConf.value("decoderIter", 10);
+    LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
     LDPC_config.Zc = tddConf.value("Zc", 16);
     LDPC_config.nRows = (LDPC_config.Bg==1) ? 46 : 42;
     LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
     LDPC_config.cbLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
     LDPC_config.cbCodewLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
+    LDPC_config.nblocksInSymbol = OFDM_DATA_NUM / LDPC_config.cbCodewLen;
 
     printf("Encoder: Zc: %d, code block len: %d, encoded block len: %d, decoder iterations: %d\n", 
             LDPC_config.Zc, LDPC_config.cbLen, LDPC_config.cbCodewLen, LDPC_config.decoderIter);

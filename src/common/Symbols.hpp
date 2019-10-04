@@ -60,6 +60,8 @@
 #define PRINT_IFFT 7
 #define PRINT_TX_FIRST 8
 #define PRINT_TX 9
+#define PRINT_DECODE 10
+#define PRINT_ENCODE 11
 
 
 #define BIGSTATION 0
@@ -150,6 +152,7 @@ struct LDPCconfig {
     uint32_t cbEncLen;
     uint32_t cbLen;
     uint32_t cbCodewLen;
+    int nblocksInSymbol;
 };
 
 typedef struct LDPCconfig LDPCconfig;
