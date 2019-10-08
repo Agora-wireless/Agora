@@ -4,7 +4,7 @@
 
 #define ENABLE_CPU_ATTACH
 //#define GENERATE_PILOT
-#define GENERATE_DATA
+// #define GENERATE_DATA
 #define SEPARATE_TX_RX 0
 
 #define MOD_ORDER 4

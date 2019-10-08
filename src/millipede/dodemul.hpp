@@ -16,7 +16,7 @@
 #include "Symbols.hpp"
 #include "gettime.h"
 #include "offset.h"
-#include "compute_common.hpp"
+#include "modulation.hpp"
 #include "config.hpp"
 // #include "mkl_dfti.h"
 

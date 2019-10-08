@@ -21,8 +21,7 @@ struct complex_float {
 };
 #endif
 
-//typedef std::vector<complex_float> myVec;
-typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
+
 
 // structure for event
 struct Event_data
@@ -99,7 +98,7 @@ struct DemulBuffer
 
 struct DLSocketBuffer
 {
-    std::vector<char> buffer;
+    char **buffer;
 };
 
 // struct RawDataBuffer

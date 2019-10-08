@@ -35,7 +35,6 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "gettime.h"
-#include "compute_common.hpp"
 #include "offset.h"
 #include "dofft.hpp"
 #include "dozf.hpp"
@@ -136,6 +135,7 @@ private:
     LDPCconfig LDPC_config;
 
     /* lookup table for 16 QAM, real and imag */
+    size_t mod_type;
     float **qam16_table_;
     float *pilots_;
     Config *cfg_;

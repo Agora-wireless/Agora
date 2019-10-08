@@ -74,7 +74,7 @@ if (${USE_ARGOS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
   set (ARGOS_SOURCES src/millipede/radio_lib.cpp)
   set (CLIENT_SOURCES
-         src/millipede/compute_common.cpp
+         src/common/modulation.cpp
          src/millipede/ru.cpp
          src/millipede/phy-ue.cpp)
   set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
@@ -101,11 +101,11 @@ include_directories(
 set(COMMON_SOURCES src/common/config.cpp
                    src/common/utils.cpp
                    src/common/comms-lib.cpp
-                   src/common/signalHandler.cpp)
+                   src/common/signalHandler.cpp
+                   src/common/modulation.cpp)
 add_library(comp MODULE 
        src/millipede/txrx.cpp
        src/millipede/millipede.cpp
-       src/millipede/compute_common.cpp
        src/millipede/stats.cpp 
        src/millipede/dofft.cpp
        src/millipede/dozf.cpp
@@ -158,8 +158,7 @@ endforeach()
 
 set(SOURCES src/millipede/main.cpp 
             src/millipede/txrx.cpp 
-            src/millipede/millipede.cpp 
-            src/millipede/compute_common.cpp  
+            src/millipede/millipede.cpp   
             src/millipede/stats.cpp 
             src/millipede/dofft.cpp 
             src/millipede/dozf.cpp 
