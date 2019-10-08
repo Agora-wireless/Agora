@@ -16,13 +16,16 @@
 #include <algorithm>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "compute_common.hpp"
+#include "modulation.hpp"
 #include "signalHandler.hpp"
 #include "comms-lib.h"
 #include <armadillo>
 #include "config.hpp"
 #include "offset.h"
 //#include "mufft/fft.h"
+
+//typedef std::vector<complex_float> myVec;
+typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
 
 class Phy_UE
 {

@@ -5,7 +5,7 @@
  */
 #include "millipede.hpp"
 
-typedef cx_float COMPLEX;
+// typedef cx_float COMPLEX;
 bool keep_running = true;
 
 void intHandler(int) {
@@ -1101,6 +1101,7 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
     zf_block_num = OFDM_DATA_NUM/zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
 
     LDPC_config = cfg->LDPC_config;
+    mod_type = cfg->mod_type;
 }
 
 
@@ -1152,7 +1153,7 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
     alloc_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
     alloc_buffer_2d(&demod_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, MOD_ORDER * OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64, 0);
     alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
     
 

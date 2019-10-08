@@ -172,6 +172,7 @@ Config::Config(std::string jsonfile)
     beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
 #endif
 
+
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
     size_t r = 0;
 #ifdef GENERATE_PILOT
@@ -181,7 +182,6 @@ Config::Config(std::string jsonfile)
         else
             pilots_[i] = 1 - 2 * (rand() % 2);
     }
-
 #else
     // read pilots from file
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -195,6 +195,8 @@ Config::Config(std::string jsonfile)
     if (r < OFDM_CA_NUM) printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
 #endif
+
+
     std::vector<std::complex<float> > pilotsF(OFDM_CA_NUM);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilotsF[i] = pilots_[i];
@@ -227,36 +229,36 @@ Config::Config(std::string jsonfile)
     alloc_buffer_2d(&ul_IQ_data, ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&ul_IQ_modul, ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
 
-    size_t mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+    mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
     mod_order = (size_t)pow(2, mod_type);
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
         for (size_t j = 0; j < OFDM_CA_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(dl_IQ_data[i], dl_IQ_data[i] + OFDM_CA_NUM), mod_type);
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
-                dl_IQ_modul[i][j].re = 0;
-                dl_IQ_modul[i][j].im = 0;
-	    } else {
-                dl_IQ_modul[i][j].re = modul_data[j].real();
-                dl_IQ_modul[i][j].im = modul_data[j].imag();
-	    }
-        }
-
-	if (i % UE_NUM == 0) {
-	    int c = i / UE_NUM;
-            std::vector<std::complex<float> > ifft_dl_data = CommsLib::IFFT(modul_data, OFDM_CA_NUM);
-	    ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
-            for (size_t j = 0; j < sampsPerSymbol; j++) {
-                if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                    dl_IQ_symbol[c][j] = 0;
-	        } else {
-                    dl_IQ_symbol[c][j] = {(int16_t)(ifft_dl_data[j-prefix].real()*32768), (int16_t)(ifft_dl_data[j-prefix].imag()*32768)};
-	        }
+            std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(dl_IQ_data[i], dl_IQ_data[i] + OFDM_CA_NUM), mod_type);
+            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+                if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+                    dl_IQ_modul[i][j].re = 0;
+                    dl_IQ_modul[i][j].im = 0;
+    	        } else {
+                    dl_IQ_modul[i][j].re = modul_data[j].real();
+                    dl_IQ_modul[i][j].im = modul_data[j].imag();
+    	        }
             }
-	}
+
+	        if (i % UE_NUM == 0) {
+    	        int c = i / UE_NUM;
+                std::vector<std::complex<float> > ifft_dl_data = CommsLib::IFFT(modul_data, OFDM_CA_NUM);
+    	        ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
+                for (size_t j = 0; j < sampsPerSymbol; j++) {
+                    if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                        dl_IQ_symbol[c][j] = 0;
+	                } else {
+                        dl_IQ_symbol[c][j] = {(int16_t)(ifft_dl_data[j-prefix].real()*32768), (int16_t)(ifft_dl_data[j-prefix].imag()*32768)};
+	                }
+                }
+	   }
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
@@ -281,10 +283,12 @@ Config::Config(std::string jsonfile)
     }
     for (size_t i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
         r = fread(dl_IQ_data[i], sizeof(int), OFDM_CA_NUM, fd);
-        if (r < OFDM_CA_NUM) printf("bad read from file %s (batch %d) \n", filename1.c_str(), i);
+        if (r < OFDM_CA_NUM) 
+            printf("bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
     fclose(fd);
 
+#ifdef USE_ARGOS
     // read uplink
     std::string filename2 = cur_directory1 + "/data/tx_ul_data_" + std::to_string(BS_ANT_NUM) + "x" + std::to_string(nUEs) + ".bin";
     fp = fopen(filename2.c_str(), "rb");
@@ -294,13 +298,15 @@ Config::Config(std::string jsonfile)
     size_t total_sc = OFDM_DATA_NUM * UE_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
     L2_data = new mac_dtype[total_sc];
     r = fread(L2_data, sizeof(mac_dtype), total_sc, fp);
-    if (r < total_sc) printf("bad read from file %s \n", filename2.c_str());
+    if (r < total_sc) 
+        printf("bad read from file %s \n", filename2.c_str());
     fclose(fp);
     for (size_t i = 0; i < total_sc; i++) {
         size_t sid = i / (data_sc_len * nUEs);
         size_t cid = i % (data_sc_len * nUEs) + OFDM_DATA_START;
         ul_IQ_modul[sid][cid] = L2_data[i];
     }
+#endif
 #endif
 
     running = true;

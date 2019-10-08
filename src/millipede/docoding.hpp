@@ -18,6 +18,7 @@
 #include "offset.h"
 #include "config.hpp"
 #include "memory_manage.h"
+#include "modulation.hpp"
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"

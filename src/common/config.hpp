@@ -39,6 +39,7 @@ public:
     size_t prefix;
     size_t postfix;
     std::string modulation;
+    size_t mod_type;
     size_t mod_order;
     
     std::string conf;
@@ -126,7 +127,7 @@ public:
     LDPCconfig LDPC_config;
 
     bool isUE;
-    const size_t maxFrame = 1 << 31;
+    const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;
     // int dl_data_symbol_perframe;
     std::atomic<bool> running;

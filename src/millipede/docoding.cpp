@@ -160,7 +160,7 @@ void DoCoding::Decode(int offset)
 
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
-    int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * MOD_ORDER;
+    int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * config_->mod_type;
     int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     ldpc_decoder_5gnr_request.varNodes = llr_buffer[frame_id] + llr_buffer_offset;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer[frame_id] + decoded_buffer_offset;

@@ -159,8 +159,8 @@ void DoDemul::Demul(int offset)
             #ifndef USE_LDPC
             /* decode with hard decision */
             uint8_t *demul_ptr = (&demod_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
-            demod_16qam_loop_simd((float *)equal_ptr, demul_ptr, UE_NUM, ue_num_simd256);
-            // demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+            demod_16qam_hard_avx2((float *)equal_ptr, demul_ptr, UE_NUM);
+            // demod_16qam_hard_loop((float *)equal_ptr, demul_ptr, UE_NUM);
             #if DEBUG_UPDATE_STATS_DETAILED   
             double duration3 = get_time() - start_time3;   
             Demul_task_duration[tid * 8][3] += duration3;
@@ -214,7 +214,7 @@ void DoDemul::Demul(int offset)
     float *equal_T_ptr = (float *)(equaled_buffer_temp_transposed);
     for (int i = 0; i < UE_NUM; i++) {
         float *equal_ptr = (float *)(equaled_buffer_temp + i);
-        int8_t *demul_ptr = (&demod_soft_buffer_[total_data_subframe_id][(OFDM_DATA_NUM * i + sc_id) * MOD_ORDER]);
+        int8_t *demul_ptr = (&demod_soft_buffer_[total_data_subframe_id][(OFDM_DATA_NUM * i + sc_id) * config_->mod_order]);
         for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) { 
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_T_ptr, equal_T_temp);
@@ -226,10 +226,10 @@ void DoDemul::Demul(int offset)
         // demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2), demul_ptr, max_sc_ite);
         demod_16qam_soft_avx2((equal_T_ptr - max_sc_ite * 2), demul_ptr, num_sc_avx2);
         if (rest > 0)
-            demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2), demul_ptr + MOD_ORDER * num_sc_avx2, rest); 
+            demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2), demul_ptr + config_->mod_order * num_sc_avx2, rest); 
 
         // cout<<"UE "<<i<<": ";
-        // for (int k = 0; k < max_sc_ite * MOD_ORDER; k++)
+        // for (int k = 0; k < max_sc_ite * config_->mod_order; k++)
         //     printf("%i ", demul_ptr[k]);
         // cout<<endl; 
     }
@@ -314,7 +314,7 @@ void DoDemul::DemulSingleSC(int offset)
     
 
     // Hard decision
-    demod_16qam_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+    demod_16qam_hard_loop((float *)equal_ptr, demul_ptr, UE_NUM);
     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
     cout<< "Demuled data: ";
     for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
