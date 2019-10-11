@@ -34,6 +34,7 @@ float **init_qam64_table();
 
 
 complex_float mod_single(int x, float **mod_table);
+complex_float mod_single_uint8(uint8_t x, float **mod_table);
 
 void demod_16qam_hard_loop(float *vec_in, uint8_t *vec_out, int num);
 void demod_16qam_hard_sse(float *vec_in, uint8_t *vec_out, int num);
