@@ -36,14 +36,15 @@ float **init_qam64_table();
 complex_float mod_single(int x, float **mod_table);
 
 void demod_16qam_hard_loop(float *vec_in, uint8_t *vec_out, int num);
+void demod_16qam_hard_sse(float *vec_in, uint8_t *vec_out, int num);
 void demod_16qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num);
 
 void demod_16qam_soft_loop(float *vec_in, int8_t *llr, int num);
 void demod_16qam_soft_sse(float *vec_in, int8_t *llr, int num);
 void demod_16qam_soft_avx2(float *vec_in, int8_t *llr, int num);
 
-
 void demod_64qam_hard_loop(float *vec_in, uint8_t *vec_out, int num);
+void demod_64qam_hard_sse(float *vec_in, uint8_t *vec_out, int num);
 void demod_64qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num);
 
 void demod_64qam_soft_loop(float *vec_in, int8_t *llr, int num);
