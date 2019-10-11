@@ -1281,8 +1281,6 @@ void Millipede::free_uplink_buffers()
 
 void Millipede::free_downlink_buffers()
 {
-    free_buffer_2d(&dl_IQ_data , data_subframe_num_perframe * UE_NUM);
-
     free_buffer_1d(&dl_socket_buffer_);
     free_buffer_1d(&dl_socket_buffer_status_);
 

@@ -52,11 +52,17 @@ end
 %% Modulate data
 
 modvec_bpsk   =  (1/sqrt(2))  .* [-1 1];
-modvec_16qam  = (1/sqrt(10))  .* [-3 -1 +3 +1];
+% modvec_16qam  = (1/sqrt(10))  .* [-3 -1 +3 +1];
+modvec_16qam  = (1/sqrt(10))  .* [1 3 -1 -3];
+
+getbit13 = @(x) (bitget(x,3) * 2 + bitget(x,1));
+getbit24 = @(x) (bitget(x,4) * 2 + bitget(x,2));
+
 
 mod_fcn_bpsk  = @(x) complex(modvec_bpsk(1+x),0);
 mod_fcn_qpsk  = @(x) complex(modvec_bpsk(1+bitshift(x, -1)), modvec_bpsk(1+mod(x, 2)));
-mod_fcn_16qam = @(x) complex(modvec_16qam(1+bitshift(x, -2)), modvec_16qam(1+mod(x,4)));
+% mod_fcn_16qam = @(x) complex(modvec_16qam(1+bitshift(x, -2)), modvec_16qam(1+mod(x,4)));
+mod_fcn_16qam = @(x) complex(modvec_16qam(1+getbit24(x)), modvec_16qam(1+getbit13(x)));
 
 switch MOD_ORDER
     case 2         % BPSK
@@ -204,7 +210,8 @@ end
 
 demod_fcn_bpsk = @(x) double(real(x)>0);
 demod_fcn_qpsk = @(x) double(2*(real(x)>0) + 1*(imag(x)>0));
-demod_fcn_16qam = @(x) (8*(real(x)>0)) + (4*(abs(real(x))<0.6325)) + (2*(imag(x)>0)) + (1*(abs(imag(x))<0.6325));
+% demod_fcn_16qam = @(x) (8*(real(x)>0)) + (4*(abs(real(x))<0.6325)) + (2*(imag(x)>0)) + (1*(abs(imag(x))<0.6325));
+demod_fcn_16qam = @(x) (8*(real(x)<=0)) + (2*(abs(real(x))>0.6325)) + (4*(imag(x)<=0)) + (1*(abs(imag(x))>0.6325));
 
 switch(MOD_ORDER)
     case 2         % BPSK
