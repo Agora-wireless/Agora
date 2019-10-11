@@ -32,7 +32,7 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
     uint8_t *output_demod_sse;
     uint8_t *output_demod_avx2;
 
-    unsigned int num = 64;
+    unsigned int num = 40;
     alloc_buffer_1d(&input, num, 32, 1);
     alloc_buffer_1d(&output_mod, num, 32, 1);
     if (mode == 0) {
@@ -66,6 +66,7 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
         printf("\n");
         if (mode == 0) {
             demod_16qam_hard_loop((float *)output_mod, output_demod_loop, num);
+            demod_16qam_hard_sse((float *)output_mod, output_demod_sse, num);
             demod_16qam_hard_avx2((float *)output_mod, output_demod_avx2, num);
         } else {
             demod_16qam_soft_loop((float *)output_mod, (int8_t *)output_demod_loop, num);
@@ -110,6 +111,12 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
         }
         printf("\n");
 
+        printf("output sse: \n");
+        for (unsigned i = 0; i < num; i++) {
+            printf("%i ", output_demod_sse[i]);
+        }
+        printf("\n");
+
         printf("output avx2: \n");
         for (unsigned i = 0; i < num; i++) {
             printf("%i ", output_demod_avx2[i]);
@@ -128,7 +135,7 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
     complex_float *output_mod;
 
     float **mod_table = init_modulation_table(6);
-    unsigned int num = 64;
+    unsigned int num = 100;
     uint8_t *output_demod_loop;
     uint8_t *output_demod_sse;
     uint8_t *output_demod_avx2;
@@ -169,6 +176,7 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
 
         if (mode == 0) {
             demod_64qam_hard_loop((float *)output_mod, output_demod_loop, num);
+            demod_64qam_hard_sse((float *)output_mod, output_demod_sse, num);
             demod_64qam_hard_avx2((float *)output_mod, output_demod_avx2, num);
         } else {
             demod_64qam_soft_loop((float *)output_mod, (int8_t *)output_demod_loop, num);
@@ -210,6 +218,12 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
         printf("\noutput loop: \n");
         for (unsigned i = 0; i < num; i++) {
             printf("%i ", output_demod_loop[i]);
+        }
+        printf("\n");
+
+        printf("output sse: \n");
+        for (unsigned i = 0; i < num; i++) {
+            printf("%i ", output_demod_sse[i]);
         }
         printf("\n");
 

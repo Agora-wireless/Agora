@@ -195,10 +195,6 @@ complex_float mod_single(int x, float **mod_table)
 
 
 
-
-
-
-
 /**
   ***********************************************************************************
   * Demodulation functions
@@ -240,68 +236,6 @@ complex_float mod_single(int x, float **mod_table)
 // }
 
 
-// void demod_16qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num, int num_simd256)
-// {
-//     // printf("input:");
-//     // for (int i = 0; i < num; i++) {
-//     //     printf("(%.2f, %.2f) ", *(vec_in + i * 2), *(vec_in + i * 2 + 1));
-//     // }
-//     // printf("\n");
-//     float float_val = 0.6325;
-//     __m256 vec_zero = _mm256_set1_ps(0);
-//     __m256 vec_float = _mm256_set1_ps(0.6325);
-//     __m256 vec_float_neg = _mm256_set1_ps(-0.6325);
-//     // __m256i vec_true = _mm256_set1_epi32(0xFFFFFFFF);
-//     __m256i vec_true_mask = _mm256_set1_epi32(0x1);
-//     __m256i vec_GT_0 = _mm256_setr_epi32(8, 2, 8, 2, 8, 2, 8, 2);
-//     __m256i vec_abs_LT_val = _mm256_setr_epi32(4, 1, 4, 1, 4, 1, 4, 1);
-    
-//     for (int i = 0; i < num_simd256 * double_num_in_simd256; i = i + double_num_in_simd256) {
-//         __m256 raw_data = _mm256_load_ps((vec_in + i * 2));
-//         __m256i ret1 = (__m256i)_mm256_cmp_ps(raw_data, vec_zero, _CMP_GT_OS);
-//         ret1 = _mm256_and_si256(ret1, vec_true_mask);
-
-//         __m256i ret2 = (__m256i)_mm256_cmp_ps(raw_data, vec_float, _CMP_LT_OS);
-//         __m256i ret3 = (__m256i)_mm256_cmp_ps(raw_data, vec_float_neg, _CMP_GT_OS);
-//         __m256i ret4 = _mm256_and_si256(ret2, ret3);
-//         ret4 = _mm256_and_si256(ret4, vec_true_mask);
-
-//         __m256i ret1_final = _mm256_mullo_epi32(vec_GT_0, ret1);
-//         __m256i ret4_final = _mm256_mullo_epi32(ret4, vec_abs_LT_val);
-
-//         __m256i ret_sum = _mm256_add_epi32(ret1_final, ret4_final);
-//         // printf("real + real, imag + imag \n");
-//         // print256_epi32(ret_sum);
-//         // printf("real + imag \n");
-//         ret_sum = _mm256_hadd_epi32(ret_sum, ret_sum);
-//         // print256_epi32(ret_sum);
-//         int8_t *ret_final = (int8_t*) &ret_sum;
-//         // print256_epi8(ret_sum);
-//         *(vec_out + i) = ret_final[0];
-//         *(vec_out + i + 1) = ret_final[4];
-//         *(vec_out + i + 2) = ret_final[16];
-//         *(vec_out + i + 3) = ret_final[20];
-
-//         // printf("final: %i %i %i %i \n", *(vec_out + i), *(vec_out + i + 1), *(vec_out + i + 2), *(vec_out + i + 3));
-//     }
-
-//     for (int i = num_simd256 * double_num_in_simd256; i < num; i++) {
-//         float real_val = *(vec_in + i * 2);
-//         float imag_val = *(vec_in + i * 2 + 1);
-        
-//         *(vec_out + i) = 0;
-//         if (real_val > 0)
-//             *(vec_out + i) |= 1UL << 3;
-//         if (std::abs(real_val) < float_val)
-//             *(vec_out + i) |= 1UL << 2;
-//         if (imag_val > 0)
-//             *(vec_out + i) |= 1UL << 1;
-//         if (std::abs(imag_val) < float_val)
-//             *(vec_out + i) |= 1UL ;
-//     }
-    
-// }
-
 
 
 /**
@@ -332,6 +266,103 @@ void demod_16qam_hard_loop(float *vec_in, uint8_t *vec_out, int num)
             *(vec_out + i) |= 1UL ;
     }
 }
+
+
+
+void demod_16qam_hard_sse(float *vec_in, uint8_t *vec_out, int num)
+{
+    float *symbolsPtr = vec_in;
+    __m64 *resultPtr = (__m64 *)vec_out;
+    __m128 symbol1, symbol2, symbol3, symbol4;
+    __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
+    __m128i symbol_abs_1, symbol_abs_2;
+    __m128i symbol_gt_0_1, symbol_gt_threshold_1, symbol_gt_0_2, symbol_gt_threshold_2;
+    __m128i bit0_1, bit1_1, bit2_1, bit3_1;
+    __m128i bit0_2, bit1_2, bit2_2, bit3_2;
+    __m128i bit0, bit1, bit2, bit3;
+    __m128i result;
+    __m128 scale_v = _mm_set1_ps(-SCALE_BYTE_CONV_QAM16);
+    __m128i vec_zero = _mm_set1_epi16(0);
+    __m128i vec_threshold = _mm_set1_epi16(2 * SCALE_BYTE_CONV_QAM16 / sqrt(10));
+    __m128i vec_true_mask = _mm_set1_epi16(0x1);
+
+    __m128i shuffle_real_1 = _mm_set_epi8(0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,13,12,9,8,5,4,1,0);
+    __m128i shuffle_real_2 = _mm_set_epi8(13,12,9,8,5,4,1,0,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff);
+
+    __m128i shuffle_imag_1 = _mm_set_epi8(0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,15,14,11,10,7,6,3,2);
+    __m128i shuffle_imag_2 = _mm_set_epi8(15,14,11,10,7,6,3,2,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff);
+
+    __m128i shuffle_16_to_8 = _mm_set_epi8(0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,14,12,10,8,6,4,2,0);
+
+    for (int i = 0; i < num / 8; i++) {
+        symbol1   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        symbol2   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        symbol3   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        symbol4   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        
+        symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+        symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+        symbol_i3 = _mm_cvtps_epi32(_mm_mul_ps(symbol3, scale_v));
+        symbol_i4 = _mm_cvtps_epi32(_mm_mul_ps(symbol4, scale_v));
+        symbol_12  = _mm_packs_epi32(symbol_i1, symbol_i2);
+        symbol_34  = _mm_packs_epi32(symbol_i3, symbol_i4);
+
+        symbol_abs_1  = _mm_abs_epi16(symbol_12);
+        symbol_gt_0_1 = _mm_cmpgt_epi16(symbol_12, vec_zero);
+        symbol_gt_threshold_1 = _mm_cmpgt_epi16(symbol_abs_1, vec_threshold);
+        symbol_gt_0_1 = _mm_and_si128(symbol_gt_0_1, vec_true_mask);
+        symbol_gt_threshold_1 = _mm_and_si128(symbol_gt_threshold_1, vec_true_mask);
+
+        bit3_1 = _mm_shuffle_epi8(symbol_gt_0_1, shuffle_real_1);
+        bit2_1 = _mm_shuffle_epi8(symbol_gt_0_1, shuffle_imag_1);
+        bit1_1 = _mm_shuffle_epi8(symbol_gt_threshold_1, shuffle_real_1);
+        bit0_1 = _mm_shuffle_epi8(symbol_gt_threshold_1, shuffle_imag_1);
+
+        symbol_abs_2  = _mm_abs_epi16(symbol_34);
+        symbol_gt_0_2 = _mm_cmpgt_epi16(symbol_34, vec_zero);
+        symbol_gt_threshold_2 = _mm_cmpgt_epi16(symbol_abs_2, vec_threshold);
+        symbol_gt_0_2 = _mm_and_si128(symbol_gt_0_2, vec_true_mask);
+        symbol_gt_threshold_2 = _mm_and_si128(symbol_gt_threshold_2, vec_true_mask);
+
+        bit3_2 = _mm_shuffle_epi8(symbol_gt_0_2, shuffle_real_2);
+        bit2_2 = _mm_shuffle_epi8(symbol_gt_0_2, shuffle_imag_2);
+        bit1_2 = _mm_shuffle_epi8(symbol_gt_threshold_2, shuffle_real_2);
+        bit0_2 = _mm_shuffle_epi8(symbol_gt_threshold_2, shuffle_imag_2);
+
+        bit3 = _mm_or_si128(bit3_1, bit3_2);
+        bit2 = _mm_or_si128(bit2_1, bit2_2);
+        bit1 = _mm_or_si128(bit1_1, bit1_2);
+        bit0 = _mm_or_si128(bit0_1, bit0_2);
+        
+
+        bit1 = _mm_slli_epi16(bit1, 1);
+        bit2 = _mm_slli_epi16(bit2, 2);
+        bit3 = _mm_slli_epi16(bit3, 3);
+
+        result = _mm_add_epi16(bit0, bit1);
+        result = _mm_add_epi16(result, bit2);
+        result = _mm_add_epi16(result, bit3);
+
+        result = _mm_shuffle_epi8(result, shuffle_16_to_8);   
+        _mm_storel_pi(resultPtr, (__m128) result); resultPtr++;
+    }
+    // Demodulate last symbols
+    for (int i = 8 * (num / 8); i < num; i++) {
+        float real_val = *(vec_in + i * 2);
+        float imag_val = *(vec_in + i * 2 + 1);
+        
+        *(vec_out + i) = 0;
+        if (real_val <= 0)
+            *(vec_out + i) |= 1UL << 3;
+        if (std::abs(real_val) > QAM16_THRESHOLD)
+            *(vec_out + i) |= 1UL << 1;
+        if (imag_val <= 0)
+            *(vec_out + i) |= 1UL << 2;
+        if (std::abs(imag_val) > QAM16_THRESHOLD)
+            *(vec_out + i) |= 1UL ;
+    }
+}
+
 
 
 
@@ -426,77 +457,9 @@ void demod_16qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num)
         _mm_store_si128(resultPtr, _mm256_extracti128_si256(result, 0)); resultPtr++;
     }
     // Demodulate last symbols
-    for (int i = 16 * (num / 16); i < num; i++) {
-        float real_val = *(vec_in + i * 2);
-        float imag_val = *(vec_in + i * 2 + 1);
-        
-        *(vec_out + i) = 0;
-        if (real_val <= 0)
-            *(vec_out + i) |= 1UL << 3;
-        if (std::abs(real_val) > QAM16_THRESHOLD)
-            *(vec_out + i) |= 1UL << 1;
-        if (imag_val <= 0)
-            *(vec_out + i) |= 1UL << 2;
-        if (std::abs(imag_val) > QAM16_THRESHOLD)
-            *(vec_out + i) |= 1UL ;
-    }
+    int next_start = 16 * (num / 16);
+    demod_16qam_hard_sse(vec_in + 2 * next_start, vec_out + next_start, num - next_start);
 }
-// void demod_16qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num)
-// {
-//     __m256 vec_zero = _mm256_set1_ps(0);
-//     __m256 vec_float = _mm256_set1_ps(QAM16_THRESHOLD);
-//     __m256 vec_float_neg = _mm256_set1_ps(-QAM16_THRESHOLD);
-//     __m256i vec_true_mask = _mm256_set1_epi32(0x1);
-//     __m256i vec_LE_0 = _mm256_setr_epi32(8, 4, 8, 4, 8, 4, 8, 4);
-//     __m256i vec_abs_GT_val = _mm256_setr_epi32(2, 1, 2, 1, 2, 1, 2, 1);
-
-    
-//     for (int i = 0; i < num / 4; i = i + 4) {
-//         __m256 raw_data = _mm256_load_ps((vec_in + i * 2));
-//         __m256i ret1 = (__m256i)_mm256_cmp_ps(raw_data, vec_zero, _CMP_LE_OS);
-//         ret1 = _mm256_and_si256(ret1, vec_true_mask);
-
-//         __m256i ret2 = (__m256i)_mm256_cmp_ps(raw_data, vec_float, _CMP_GT_OS);
-//         __m256i ret3 = (__m256i)_mm256_cmp_ps(raw_data, vec_float_neg, _CMP_LT_OS);
-//         __m256i ret4 = _mm256_and_si256(ret2, ret3);
-//         ret4 = _mm256_and_si256(ret4, vec_true_mask);
-
-//         __m256i ret1_final = _mm256_mullo_epi32(ret1, vec_LE_0);
-//         __m256i ret4_final = _mm256_mullo_epi32(ret4, vec_abs_GT_val);
-
-//         __m256i ret_sum = _mm256_add_epi32(ret1_final, ret4_final);
-//         // printf("real + real, imag + imag \n");
-//         // print256_epi32(ret_sum);
-//         // printf("real + imag \n");
-//         ret_sum = _mm256_hadd_epi32(ret_sum, ret_sum);
-//         // print256_epi32(ret_sum);
-//         int8_t *ret_final = (int8_t*) &ret_sum;
-//         // print256_epi8(ret_sum);
-//         *(vec_out + i) = ret_final[0];
-//         *(vec_out + i + 1) = ret_final[4];
-//         *(vec_out + i + 2) = ret_final[16];
-//         *(vec_out + i + 3) = ret_final[20];
-
-//         // printf("final: %i %i %i %i \n", *(vec_out + i), *(vec_out + i + 1), *(vec_out + i + 2), *(vec_out + i + 3));
-//     }
-
-//     for (int i = 4 * (num / 4); i < num; i++) {
-//         float real_val = *(vec_in + i * 2);
-//         float imag_val = *(vec_in + i * 2 + 1);
-        
-//         *(vec_out + i) = 0;
-//         if (real_val > 0)
-//             *(vec_out + i) |= 1UL << 3;
-//         if (std::abs(real_val) < float_val)
-//             *(vec_out + i) |= 1UL << 2;
-//         if (imag_val > 0)
-//             *(vec_out + i) |= 1UL << 1;
-//         if (std::abs(imag_val) < float_val)
-//             *(vec_out + i) |= 1UL ;
-//     }
-    
-// }
-
 
 
 /* code from srsLTE: 
@@ -626,19 +589,8 @@ void demod_16qam_soft_avx2(float *vec_in, int8_t *llr, int num) {
 
     }
     // Demodulate last symbols
-    for (int i = 16 * (num / 16); i < num; i++) {
-        int8_t yre = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
-        int8_t yim = (int8_t) (SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
-
-        llr[4*i+0] = -yre;
-        llr[4*i+1] = -yim;
-        llr[4*i+2] = abs(yre)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
-        llr[4*i+3] = abs(yim)-2*SCALE_BYTE_CONV_QAM16/sqrt(10);
-    }
-
-    // for (int i = 0; i < num; i++) {
-    //     printf("avx2: in: %.2f, %.2f, out: %i %i %i %i\n", vec_in[2*i], vec_in[2*i+1], llr[4*i+0], llr[4*i+1], llr[4*i+2], llr[4*i+3]);
-    // }
+    int next_start = 16 * (num / 16);
+    demod_16qam_soft_sse(vec_in + 2 * next_start, llr + next_start * 4, num - next_start);
 }
 
 
@@ -691,45 +643,119 @@ void demod_64qam_hard_loop(float *vec_in, uint8_t *vec_out, int num)
 
 
 
-void demod_64qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num, int num_simd256)
+void demod_64qam_hard_sse(float *vec_in, uint8_t *vec_out, int num)
 {
-    __m256 vec_zero = _mm256_set1_ps(0);
-    __m256 vec_float = _mm256_set1_ps(QAM16_THRESHOLD);
-    __m256 vec_float_neg = _mm256_set1_ps(-QAM16_THRESHOLD);
-    __m256i vec_true_mask = _mm256_set1_epi32(0x1);
-    __m256i vec_LE_0 = _mm256_setr_epi32(8, 4, 8, 4, 8, 4, 8, 4);
-    __m256i vec_abs_GT_val = _mm256_setr_epi32(2, 1, 2, 1, 2, 1, 2, 1);
-    
-    for (int i = 0; i < num_simd256 * double_num_in_simd256; i = i + double_num_in_simd256) {
-        __m256 raw_data = _mm256_load_ps((vec_in + i * 2));
-        __m256i ret1 = (__m256i)_mm256_cmp_ps(raw_data, vec_zero, _CMP_LE_OS);
-        ret1 = _mm256_and_si256(ret1, vec_true_mask);
+    float *symbolsPtr = vec_in;
+    __m64 *resultPtr = (__m64 *)vec_out;
+    __m128 symbol1, symbol2, symbol3, symbol4;
+    __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
+    __m128i symbol_abs_1, symbol_abs_2;
+    __m128i symbol_gt_0_1, symbol_gt_0_2;
+    __m128i symbol_lt_threshold1_1, symbol_lt_threshold1_2;
+    __m128i symbol_gt_threshold2_1, symbol_gt_threshold2_2;
+    __m128i symbol_gt_threshold3_1, symbol_gt_threshold3_2;
+    __m128i bit01_1, bit23_1, bit45_1, bit01_2, bit23_2, bit45_2;
+    __m128i bit0_1, bit1_1, bit2_1, bit3_1, bit4_1, bit5_1;
+    __m128i bit0_2, bit1_2, bit2_2, bit3_2, bit4_2, bit5_2;
+    __m128i bit0, bit1, bit2, bit3, bit4, bit5;
+    __m128i result;
+    __m128 scale_v = _mm_set1_ps(-SCALE_BYTE_CONV_QAM16);
+    __m128i vec_zero = _mm_set1_epi16(0);
+    __m128i offset1 = _mm_set1_epi16(2*SCALE_BYTE_CONV_QAM64/sqrt(42));
+    __m128i offset2 = _mm_set1_epi16(4*SCALE_BYTE_CONV_QAM64/sqrt(42));
+    __m128i offset3 = _mm_set1_epi16(6*SCALE_BYTE_CONV_QAM64/sqrt(42));
+    __m128i vec_true_mask = _mm_set1_epi16(0x1);
 
-        __m256i ret2 = (__m256i)_mm256_cmp_ps(raw_data, vec_float, _CMP_GT_OS);
-        __m256i ret3 = (__m256i)_mm256_cmp_ps(raw_data, vec_float_neg, _CMP_LT_OS);
-        __m256i ret4 = _mm256_and_si256(ret2, ret3);
-        ret4 = _mm256_and_si256(ret4, vec_true_mask);
+    __m128i shuffle_real_1 = _mm_set_epi8(0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,13,12,9,8,5,4,1,0);
+    __m128i shuffle_real_2 = _mm_set_epi8(13,12,9,8,5,4,1,0,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff);
 
-        __m256i ret1_final = _mm256_mullo_epi32(ret1, vec_LE_0);
-        __m256i ret4_final = _mm256_mullo_epi32(ret4, vec_abs_GT_val);
+    __m128i shuffle_imag_1 = _mm_set_epi8(0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,15,14,11,10,7,6,3,2);
+    __m128i shuffle_imag_2 = _mm_set_epi8(15,14,11,10,7,6,3,2,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff);
 
-        __m256i ret_sum = _mm256_add_epi32(ret1_final, ret4_final);
-        // printf("real + real, imag + imag \n");
-        // print256_epi32(ret_sum);
-        // printf("real + imag \n");
-        ret_sum = _mm256_hadd_epi32(ret_sum, ret_sum);
-        // print256_epi32(ret_sum);
-        int8_t *ret_final = (int8_t*) &ret_sum;
-        // print256_epi8(ret_sum);
-        *(vec_out + i) = ret_final[0];
-        *(vec_out + i + 1) = ret_final[4];
-        *(vec_out + i + 2) = ret_final[16];
-        *(vec_out + i + 3) = ret_final[20];
+    __m128i shuffle_16_to_8 = _mm_set_epi8(0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,14,12,10,8,6,4,2,0);
 
-        // printf("final: %i %i %i %i \n", *(vec_out + i), *(vec_out + i + 1), *(vec_out + i + 2), *(vec_out + i + 3));
+    for (int i = 0; i < num / 8; i++) {
+        symbol1   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        symbol2   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        symbol3   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        symbol4   = _mm_load_ps(symbolsPtr); symbolsPtr += 4;
+        
+        symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+        symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+        symbol_i3 = _mm_cvtps_epi32(_mm_mul_ps(symbol3, scale_v));
+        symbol_i4 = _mm_cvtps_epi32(_mm_mul_ps(symbol4, scale_v));
+        symbol_12  = _mm_packs_epi32(symbol_i1, symbol_i2);
+        symbol_34  = _mm_packs_epi32(symbol_i3, symbol_i4);
+
+        symbol_abs_1  = _mm_abs_epi16(symbol_12);
+        symbol_gt_0_1 = _mm_cmpgt_epi16(symbol_12, vec_zero);
+        symbol_lt_threshold1_1 = _mm_cmpgt_epi16(offset1, symbol_abs_1);
+        symbol_gt_threshold2_1 = _mm_cmpgt_epi16(symbol_abs_1, offset2);
+        symbol_gt_threshold3_1 = _mm_cmpgt_epi16(symbol_abs_1, offset3);
+        symbol_gt_0_1 = _mm_and_si128(symbol_gt_0_1, vec_true_mask);
+
+        symbol_lt_threshold1_1 = _mm_and_si128(symbol_lt_threshold1_1, vec_true_mask);
+        symbol_gt_threshold2_1 = _mm_and_si128(symbol_gt_threshold2_1, vec_true_mask);
+        symbol_gt_threshold3_1 = _mm_and_si128(symbol_gt_threshold3_1, vec_true_mask);
+        bit01_1 = _mm_or_si128(symbol_lt_threshold1_1, symbol_gt_threshold3_1);
+        bit23_1 = symbol_gt_threshold2_1;
+        bit45_1 = symbol_gt_0_1;
+
+        bit5_1 = _mm_shuffle_epi8(bit45_1, shuffle_real_1);
+        bit4_1 = _mm_shuffle_epi8(bit45_1, shuffle_imag_1);
+        bit3_1 = _mm_shuffle_epi8(bit23_1, shuffle_real_1);
+        bit2_1 = _mm_shuffle_epi8(bit23_1, shuffle_imag_1);
+        bit1_1 = _mm_shuffle_epi8(bit01_1, shuffle_real_1);
+        bit0_1 = _mm_shuffle_epi8(bit01_1, shuffle_imag_1);
+
+
+        symbol_abs_2  = _mm_abs_epi16(symbol_34);
+        symbol_gt_0_2 = _mm_cmpgt_epi16(symbol_34, vec_zero);
+        symbol_lt_threshold1_2 = _mm_cmpgt_epi16(offset1, symbol_abs_2);
+        symbol_gt_threshold2_2 = _mm_cmpgt_epi16(symbol_abs_2, offset2);
+        symbol_gt_threshold3_2 = _mm_cmpgt_epi16(symbol_abs_2, offset3);
+        symbol_gt_0_2 = _mm_and_si128(symbol_gt_0_2, vec_true_mask);
+
+        symbol_lt_threshold1_2 = _mm_and_si128(symbol_lt_threshold1_2, vec_true_mask);
+        symbol_gt_threshold2_2 = _mm_and_si128(symbol_gt_threshold2_2, vec_true_mask);
+        symbol_gt_threshold3_2 = _mm_and_si128(symbol_gt_threshold3_2, vec_true_mask);
+        bit01_2 = _mm_or_si128(symbol_lt_threshold1_2, symbol_gt_threshold3_2);
+        bit23_2 = symbol_gt_threshold2_2;
+        bit45_2 = symbol_gt_0_2;
+
+        bit5_2 = _mm_shuffle_epi8(bit45_2, shuffle_real_2);
+        bit4_2 = _mm_shuffle_epi8(bit45_2, shuffle_imag_2);
+        bit3_2 = _mm_shuffle_epi8(bit23_2, shuffle_real_2);
+        bit2_2 = _mm_shuffle_epi8(bit23_2, shuffle_imag_2);
+        bit1_2 = _mm_shuffle_epi8(bit01_2, shuffle_real_2);
+        bit0_2 = _mm_shuffle_epi8(bit01_2, shuffle_imag_2);
+
+
+        bit5 = _mm_or_si128(bit5_1, bit5_2);
+        bit4 = _mm_or_si128(bit4_1, bit4_2);
+        bit3 = _mm_or_si128(bit3_1, bit3_2);
+        bit2 = _mm_or_si128(bit2_1, bit2_2);
+        bit1 = _mm_or_si128(bit1_1, bit1_2);
+        bit0 = _mm_or_si128(bit0_1, bit0_2);
+        
+
+        bit1 = _mm_slli_epi16(bit1, 1);
+        bit2 = _mm_slli_epi16(bit2, 2);
+        bit3 = _mm_slli_epi16(bit3, 3);
+        bit4 = _mm_slli_epi16(bit4, 4);
+        bit5 = _mm_slli_epi16(bit5, 5);
+
+        result = _mm_add_epi16(bit0, bit1);
+        result = _mm_add_epi16(result, bit2);
+        result = _mm_add_epi16(result, bit3);
+        result = _mm_add_epi16(result, bit4);
+        result = _mm_add_epi16(result, bit5);
+
+        result = _mm_shuffle_epi8(result, shuffle_16_to_8);   
+        _mm_storel_pi(resultPtr, (__m128) result); resultPtr++;
     }
-
-    for (int i = num_simd256 * double_num_in_simd256; i < num; i++) {
+    // Demodulate last symbols
+    for (int i = 8 * (num / 8); i < num; i++) {
         float real_val = *(vec_in + i * 2);
         float imag_val = *(vec_in + i * 2 + 1);
         
@@ -757,9 +783,7 @@ void demod_64qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num, int num_sim
             *(vec_out + i) |= 1UL;
         }
     }
-    
 }
-
 
 
 void demod_64qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num)
@@ -893,34 +917,8 @@ void demod_64qam_hard_avx2(float *vec_in, uint8_t *vec_out, int num)
         _mm_store_si128(resultPtr, _mm256_extracti128_si256(result, 0)); resultPtr++;
     }
     // Demodulate last symbols
-    for (int i = 16 * (num / 16); i < num; i++) {
-        float real_val = *(vec_in + i * 2);
-        float imag_val = *(vec_in + i * 2 + 1);
-        
-        *(vec_out + i) = 0;
-
-        if (real_val <= 0)
-            *(vec_out + i) |= 1UL << 5;
-        if (std::abs(real_val) > QAM64_THRESHOLD_3) {
-            *(vec_out + i) |= 1UL << 3;
-            *(vec_out + i) |= 1UL << 1;
-        } else if (std::abs(real_val) > QAM64_THRESHOLD_2) {
-            *(vec_out + i) |= 1UL << 3;
-        } else if (std::abs(real_val) <= QAM64_THRESHOLD_1) {
-            *(vec_out + i) |= 1UL << 1;
-        }
-
-        if (imag_val <= 0)
-            *(vec_out + i) |= 1UL << 4;
-        if (std::abs(imag_val) > QAM64_THRESHOLD_3) {
-            *(vec_out + i) |= 1UL << 2;
-            *(vec_out + i) |= 1UL;
-        } else if (std::abs(imag_val) > QAM64_THRESHOLD_2) {
-            *(vec_out + i) |= 1UL << 2;
-        } else if (std::abs(imag_val) <= QAM64_THRESHOLD_1) {
-            *(vec_out + i) |= 1UL;
-        }
-    }
+    int next_start = 16 * (num / 16);
+    demod_64qam_hard_sse(vec_in + 2 * next_start, vec_out + next_start, num - next_start);
 }
 
 
@@ -1089,17 +1087,8 @@ void demod_64qam_soft_avx2(float *vec_in, int8_t *llr, int num)
         _mm256_store_si256(resultPtr, _mm256_permute2x128_si256(result_final3, result_final1, 0x30)); resultPtr++;
         _mm256_store_si256(resultPtr, _mm256_permute2x128_si256(result_final2, result_final3, 0x31)); resultPtr++;
     }
-    for (int i = 8 * (num / 16); i < num; i++) {
-        float yre = (int8_t) (SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i]));
-        float yim = (int8_t) (SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i + 1]));
-
-        llr[6*i+0] = -yre;
-        llr[6*i+1] = -yim;
-        llr[6*i+2] = abs(yre)-4*SCALE_BYTE_CONV_QAM64/sqrt(42);
-        llr[6*i+3] = abs(yim)-4*SCALE_BYTE_CONV_QAM64/sqrt(42);
-        llr[6*i+4] = abs(llr[6*i+2])-2*SCALE_BYTE_CONV_QAM64/sqrt(42);
-        llr[6*i+5] = abs(llr[6*i+3])-2*SCALE_BYTE_CONV_QAM64/sqrt(42);
-    }
+    int next_start = 16 * (num / 16);
+    demod_64qam_soft_sse(vec_in + 2 * next_start, llr + next_start * 6, num - next_start);
 }
 
 
