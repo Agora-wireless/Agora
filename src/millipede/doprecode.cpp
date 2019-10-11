@@ -36,7 +36,7 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     size_t mod_type = config_->mod_type;
     // for (int i = 0; i < 2; i++) 
     //     qam_table[i] = (float *)aligned_alloc(64, mod_order * sizeof(float));
-    init_modulation_table(qam_table, mod_type);
+    qam_table = init_modulation_table(mod_type);
  //    switch(mod_order) {
  //        case 4:
  //            init_qpsk_table(qam_table);
