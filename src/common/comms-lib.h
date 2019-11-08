@@ -12,6 +12,8 @@
 ---------------------------------------------------------------------
 */
 
+#ifndef COMMSLIB_HEADER
+#define COMMSLIB_HEADER
 
 #include <algorithm>
 #include <iostream>
@@ -63,10 +65,19 @@ public:
     static std::vector<double> convolve(std::vector<std::complex<double>> const &f, std::vector<std::complex<double>> const &g);
     static std::vector<std::complex<double>> csign(std::vector<std::complex<double>> iq);
     static void meshgrid(std::vector<int> x_in, std::vector<int> y_in, std::vector<std::vector<int>> &x, std::vector<std::vector<int>> &y);
-
+    static inline int hadamard2(int i, int j) { return (__builtin_parity(i & j) != 0 ? -1 : 1); }
+    static std::vector<float> magnitudeFFT(std::vector<std::complex<float>> const&, std::vector<float> const&, size_t);
+    static std::vector<float> hannWindowFunction(size_t);
+    static double windowFunctionPower(std::vector<float> const&);
+    //template <typename T>
+    //static T findTone(std::vector<T> const&, double, double, size_t, const size_t delta = 10);
+    static float findTone(std::vector<float> const&, double, double, size_t, const size_t delta = 10);
+    static float measureTone(std::vector<std::complex<float>> const&, std::vector<float> const&, double, double, size_t, const size_t delta = 10);
 //private:
 //    static inline float** init_qpsk();
 //    static inline float** init_qam16();
 //    static inline float** init_qam64();
 
 };
+
+#endif

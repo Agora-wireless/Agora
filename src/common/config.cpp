@@ -1,6 +1,5 @@
 
 #include "config.hpp"
-#include "comms-lib.h"
 #include <boost/range/algorithm/count.hpp>
 
 Config::Config(std::string jsonfile)
@@ -13,10 +12,10 @@ Config::Config(std::string jsonfile)
     serial_file = tddConf.value("irises", "iris_serials.txt");
     ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
-    nChannels = tddConf.value("channels", 1);
+    channel = tddConf.value("channel", "A");
+    nChannels = std::min(channel.size(), (size_t)2); 
     isUE = tddConf.value("UE", false);
     freq = tddConf.value("frequency", 3.6e9);
-    bbf_ratio = 0.75;
     txgainA = tddConf.value("txgainA", 20);
     rxgainA = tddConf.value("rxgainA", 20);
     txgainB = tddConf.value("txgainB", 20);
@@ -24,14 +23,18 @@ Config::Config(std::string jsonfile)
     calTxGainA = tddConf.value("calTxGainA", 10);
     calTxGainB = tddConf.value("calTxGainB", 10);
     rate = tddConf.value("rate", 5e6);
+    nco = tddConf.value("nco_frequency", 0.75 * rate);
+    bwFilter = rate + 2 * nco;
+    radioRfFreq = freq - nco;
     sampsPerSymbol = tddConf.value("symbol_size", 0);
     prefix = tddConf.value("prefix", 0);
     dl_prefix = tddConf.value("dl_prefix", 0);
     postfix = tddConf.value("postfix", 0);
     beacon_ant = tddConf.value("beacon_antenna", 0);
     beacon_len = tddConf.value("beacon_len", 256);
-    beacon_mode = tddConf.value("beacon_mode", "single");
+    beamsweep = tddConf.value("beamsweep", false);
     sampleCalEn = tddConf.value("sample_calibrate", false);
+    imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "QPSK");
 
     /* Millipede configurations */
@@ -61,17 +64,6 @@ Config::Config(std::string jsonfile)
     nAntennas = nChannels * nRadios;
     if (ref_ant >= nAntennas)
 	ref_ant = 0;
-    if (beacon_mode == "beamsweep" && nAntennas > 1) {
-        int hadamardSize = int(pow(2, ceil(log2(nAntennas))));
-        std::vector<std::vector<double> > hadamard_weights = CommsLib::getSequence(hadamardSize, CommsLib::HADAMARD);
-        beacon_weights.resize(nAntennas);
-        for (size_t i = 0; i < nAntennas; i++)
-            for (size_t j = 0; j < nAntennas; j++)
-                beacon_weights[i].push_back((unsigned)hadamard_weights[i][j]);
-        printf("Hadamard Matrix Size %d\n", hadamardSize);
-        printf("beacon_weights size %zu\n", beacon_weights.size());
-        printf("beacon_weights[0] size %zu\n", beacon_weights[0].size());
-    }
     symbolsPerFrame = frames.at(0).size();
     nUEs = std::count(frames.at(0).begin(), frames.at(0).end(), 'P');
     pilotSymbols = Utils::loadSymbols(frames, 'P');

@@ -8,7 +8,6 @@
 #include <chrono>
 #include <string>
 #include <cstdint>
-#include <complex>
 #include <csignal>
 #include "config.hpp"
 enum RadioType
@@ -22,6 +21,7 @@ class RadioConfig
 public:
     RadioConfig(Config *cfg);
     static void *initBSRadio(void * context);
+    static void *configureBSRadio(void * context);
     bool radioStart();
     void radioStop();
     void readSensors();
@@ -30,12 +30,17 @@ public:
     int radioTx(size_t, void ** buffs, int flags, long long & frameTime);
     int radioRx(size_t, void ** buffs, long long & frameTime);
     bool doCalib() { return calib; }
-    bool calib_proc(size_t, bool);
+    bool correctSampleOffset(size_t, bool);
     static void drain_rx_buffer(SoapySDR::Device * ibsSdrs, SoapySDR::Stream * istream, std::vector<void *> buffs, size_t symSamp);
     void drain_buffers();
     void adjustDelays(std::vector<int>, size_t);
     void go();
     std::vector<std::vector<std::complex<float>>> get_calib_mat() { return calib_mat; }
+    static void dciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int, size_t, double, double);
+    static void setIQBalance(SoapySDR::Device*, int, size_t, int, int);
+    static void adjustCalibrationGains(std::vector<SoapySDR::Device*>, SoapySDR::Device*, size_t, double, bool plot = false);
+    static std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*, size_t, size_t);
+    void dciqCalibrationProc(size_t);
     ~RadioConfig();
     struct RadioConfigContext
     {

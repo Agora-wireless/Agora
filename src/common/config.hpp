@@ -20,6 +20,7 @@
 #include "memory_manage.h"
 #include "buffer.hpp"
 #include "utils.h"
+#include "comms-lib.h"
 //#include <itpp/itbase.h>
 //using namespace itpp;
 using json = nlohmann::json;
@@ -76,6 +77,9 @@ public:
     double calTxGainA;
     double calTxGainB;
     double rate;
+    double nco;
+    double radioRfFreq;
+    double bwFilter;
     size_t framePeriod;
     size_t nCells;
     size_t nRadios;
@@ -85,8 +89,10 @@ public:
     size_t ref_ant;
     size_t beacon_ant;
     size_t beacon_len;
-    std::string beacon_mode;
+    bool beamsweep;
     bool sampleCalEn;
+    bool imbalanceCalEn;
+    std::string channel;
 
     size_t core_offset;
     size_t worker_thread_num;
