@@ -59,7 +59,7 @@ if (${USE_ARGOS})
   message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
   include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
-  set (ARGOS_SOURCES src/millipede/radio_lib.cpp)
+  set (ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
   set (CLIENT_SOURCES
          src/millipede/compute_common.cpp
          src/millipede/ru.cpp
