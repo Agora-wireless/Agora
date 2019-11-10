@@ -88,6 +88,7 @@ public:
     void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
     void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
+    void schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode);
     void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
     void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
 
@@ -258,7 +259,7 @@ private:
      * First dimension: data_subframe_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
-    int **dl_IQ_data;
+    int8_t **dl_IQ_data;
     long long **dl_IQ_data_long;
 
     /** 
@@ -348,7 +349,8 @@ private:
 
     /* Downlink*/
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 

@@ -138,7 +138,7 @@ float **init_qam16_table()
       int real_i = (((i >> 3) & 0x1) << 1) + ((i >> 1) & 0x1);
       qam16_table[i][0] = mod_16qam[real_i];
       qam16_table[i][1] = mod_16qam[imag_i];
-      printf("%d: (%.3f, %.3f)\n", i, qam16_table[i][0], qam16_table[i][1]);
+      // printf("%d: (%.3f, %.3f)\n", i, qam16_table[i][0], qam16_table[i][1]);
     }
     return qam16_table;
 }

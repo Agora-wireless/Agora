@@ -214,7 +214,7 @@ void DoDemul::Demul(int offset)
     float *equal_T_ptr = (float *)(equaled_buffer_temp_transposed);
     for (int i = 0; i < UE_NUM; i++) {
         float *equal_ptr = (float *)(equaled_buffer_temp + i);
-        int8_t *demul_ptr = (&demod_soft_buffer_[total_data_subframe_id][(OFDM_DATA_NUM * i + sc_id) * config_->mod_order]);
+        int8_t *demul_ptr = (&demod_soft_buffer_[total_data_subframe_id][(OFDM_DATA_NUM * i + sc_id) * config_->mod_type]);
         for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) { 
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_T_ptr, equal_T_temp);
@@ -226,7 +226,7 @@ void DoDemul::Demul(int offset)
         // demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2), demul_ptr, max_sc_ite);
         demod_16qam_soft_avx2((equal_T_ptr - max_sc_ite * 2), demul_ptr, num_sc_avx2);
         if (rest > 0)
-            demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2), demul_ptr + config_->mod_order * num_sc_avx2, rest); 
+            demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2), demul_ptr + config_->mod_type * num_sc_avx2, rest); 
 
         // cout<<"UE "<<i<<": ";
         // for (int k = 0; k < max_sc_ite * config_->mod_order; k++)

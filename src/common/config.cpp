@@ -32,7 +32,8 @@ Config::Config(std::string jsonfile)
     beacon_len = tddConf.value("beacon_len", 256);
     beacon_mode = tddConf.value("beacon_mode", "single");
     sampleCalEn = tddConf.value("sample_calibrate", false);
-    modulation = tddConf.value("modulation", "QPSK");
+    modulation = tddConf.value("modulation", "16QAM");
+    printf("modulation: %s\n", modulation.c_str());
 
     /* Millipede configurations */
     core_offset = tddConf.value("core_offset", 18);
@@ -88,6 +89,7 @@ Config::Config(std::string jsonfile)
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     OFDM_DATA_START = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
+    freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
 #ifdef USE_ARGOS
     /* base station configurations */
     BS_ANT_NUM = nAntennas; //tddConf.value("bs_ant_num", 8);
@@ -123,7 +125,8 @@ Config::Config(std::string jsonfile)
 
     /* frame configurations */
     symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
-    pilot_symbol_num_perframe = tddConf.value("pilot_num", UE_NUM);
+    size_t pilot_num_default = freq_orthogonal_pilot? 1 : UE_NUM;
+    pilot_symbol_num_perframe = tddConf.value("pilot_num", pilot_num_default);
     data_symbol_num_perframe = tddConf.value("data_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
     ul_data_symbol_num_perframe = tddConf.value("ul_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
     dl_data_symbol_num_perframe = tddConf.value("dl_subframe_num_perframe", 10);
@@ -134,19 +137,21 @@ Config::Config(std::string jsonfile)
     downlink_mode = tddConf.value("downlink_mode", false);
 #endif
 
+    mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+    mod_order = (size_t)pow(2, mod_type);
     /* LDPC configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
-    LDPC_config.Zc = tddConf.value("Zc", 16);
+    LDPC_config.Zc = tddConf.value("Zc", 32);
     LDPC_config.nRows = (LDPC_config.Bg==1) ? 46 : 42;
     LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
     LDPC_config.cbLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
     LDPC_config.cbCodewLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
-    LDPC_config.nblocksInSymbol = OFDM_DATA_NUM / LDPC_config.cbCodewLen;
+    LDPC_config.nblocksInSymbol = 1;//OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
-    printf("Encoder: Zc: %d, code block len: %d, encoded block len: %d, decoder iterations: %d\n", 
-            LDPC_config.Zc, LDPC_config.cbLen, LDPC_config.cbCodewLen, LDPC_config.decoderIter);
+    printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, encoded block len: %d, decoder iterations: %d\n", 
+            LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen, LDPC_config.cbCodewLen, LDPC_config.decoderIter);
 
     std::cout << "Config file loaded!" << std::endl;
     std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
@@ -229,17 +234,16 @@ Config::Config(std::string jsonfile)
     alloc_buffer_2d(&ul_IQ_data, ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&ul_IQ_modul, ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
 
-    mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
-    mod_order = (size_t)pow(2, mod_type);
+
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
 
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(dl_IQ_data[i], dl_IQ_data[i] + OFDM_CA_NUM), mod_type);
+        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>((int)dl_IQ_data[i], (int)(dl_IQ_data[i] + OFDM_CA_NUM)), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+            if ((j % OFDM_CA_NUM) < OFDM_DATA_START || (j % OFDM_CA_NUM) >= OFDM_DATA_START + OFDM_DATA_NUM) {
                 dl_IQ_modul[i][j].re = 0;
                 dl_IQ_modul[i][j].im = 0;
 	        } else {
@@ -248,8 +252,9 @@ Config::Config(std::string jsonfile)
 	        }
         }
 
-        if (i % UE_NUM == 0) {
-	        int c = i / UE_NUM;
+        // if (i % UE_NUM == 0) {
+	        // int c = i / UE_NUM;
+            int c = i;
             std::vector<std::complex<float> > ifft_dl_data = CommsLib::IFFT(modul_data, OFDM_CA_NUM);
 	        ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
             for (size_t j = 0; j < sampsPerSymbol; j++) {
@@ -259,7 +264,7 @@ Config::Config(std::string jsonfile)
                     dl_IQ_symbol[c][j] = {(int16_t)(ifft_dl_data[j-prefix].real()*32768), (int16_t)(ifft_dl_data[j-prefix].imag()*32768)};
                 }
             }
-        }
+        // }
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
@@ -284,9 +289,12 @@ Config::Config(std::string jsonfile)
     }
     for (size_t i = 0; i < data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_NUM; j++) {
-            r = fread(dl_IQ_data[i] + j * OFDM_CA_NUM, sizeof(int), OFDM_CA_NUM, fd);
+            r = fread(dl_IQ_data[i] + j * OFDM_CA_NUM, sizeof(int8_t), OFDM_CA_NUM, fd);
             if (r < OFDM_CA_NUM) 
                 printf("bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+            // for (size_t k = 0; k < OFDM_CA_NUM; k++) {
+            //     dl_IQ_data[i][j * OFDM_CA_NUM + k] = dl_IQ_data[i][j * OFDM_CA_NUM + k] % (uint8_t) mod_order;
+            // }
         }
     }
     fclose(fd);
@@ -313,6 +321,7 @@ Config::Config(std::string jsonfile)
 #endif
 
     running = true;
+    printf("finished config\n");
 }
 
 Config::~Config()

@@ -120,11 +120,12 @@ void Millipede::start()
     moodycamel::ProducerToken ptok_zf(zf_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     moodycamel::ProducerToken ptok_decode(decode_queue_);
-    moodycamel::ProducerToken ptok_encode(decode_queue_);
+    moodycamel::ProducerToken ptok_encode(encode_queue_);
 
     /* downlink */
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
-    moodycamel::ProducerToken ptok_modul(modulate_queue_);
+    // moodycamel::ProducerToken ptok_modul(modulate_queue_);
+    // moodycamel::ProducerToken ptok_encode(precode_queue_);
     moodycamel::ProducerToken ptok_precode(precode_queue_);
     moodycamel::ProducerToken ptok_tx(tx_queue_);
     /* tokens used for dequeue */
@@ -287,9 +288,14 @@ void Millipede::start()
                         /* if all the data in a frame has arrived when ZF is done */
                         if (data_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) 
                             schedule_demul_task(frame_id, UE_NUM, subframe_num_perframe, ptok_demul);   
-                        if (downlink_mode)
-                            /* if downlink data transmission is enabled, schedule downlink modulation for the first data subframe */
-                            schedule_precode_task(frame_id, dl_data_subframe_start, ptok_precode);               
+                        if (downlink_mode) {
+                            /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
+                            #ifdef USE_LDPC
+                            schedule_encode_task(frame_id, dl_data_subframe_start, ptok_encode);
+                            #else
+                            schedule_precode_task(frame_id, dl_data_subframe_start, ptok_precode); 
+                            #endif
+                        }              
                     }
                 }
                 break;
@@ -395,8 +401,13 @@ void Millipede::start()
                     if (dl_data_counter_scs_[frame_id][current_data_subframe_id] == demul_block_num) {
                         schedule_ifft_task(frame_count_precode, current_data_subframe_id, ptok_ifft);
                         // schedule_ifft_task(frame_id, current_data_subframe_id, ptok_ifft);
-                        if (current_data_subframe_id < dl_data_subframe_end - 1) 
+                        if (current_data_subframe_id < dl_data_subframe_end - 1) {
+                            #ifdef USE_LDPC
+                            schedule_encode_task(frame_id, current_data_subframe_id + 1, ptok_encode);
+                            #else
                             schedule_precode_task(frame_id, current_data_subframe_id + 1, ptok_precode); 
+                            #endif
+                        }
 
                         dl_data_counter_scs_[frame_id][current_data_subframe_id] = 0;    
                         print_per_subframe_done(PRINT_PRECODE, frame_count_precode, frame_id, current_data_subframe_id);                   
@@ -509,86 +520,86 @@ void *Millipede::worker(int tid)
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
 
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, 
+        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
         Precode_task_duration, Precode_task_count);
 
     #ifdef USE_LDPC
     DoCoding *computeCoding = new DoCoding(cfg_, tid, &(complete_task_queue_), task_ptok_ptr,
-        (int8_t **)dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
+        dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
         Encode_task_duration, Encode_task_count, Decode_task_duration, Decode_task_count);
     #endif
 
     Event_data event;
     bool ret = false;
-    bool ret_zf = false;
-    bool ret_demul = false;
-    bool ret_decode = false;
-    // bool ret_modul = false;
-    bool ret_ifft = false;
-    bool ret_precode = false;
+
+    int queue_num;
+    int *dequeue_order;
+#ifdef USE_LDPC
+    if (downlink_mode) {
+        queue_num = 5;
+        dequeue_order = (int []){TASK_IFFT, TASK_PRECODE, TASK_ENCODE, TASK_ZF, TASK_FFT};
+    }
+    else {
+        queue_num = 4;
+        dequeue_order = (int []){TASK_ZF, TASK_FFT, TASK_DEMUL, TASK_DECODE};
+    }
+#else
+    if (downlink_mode) {
+        queue_num = 4;
+        dequeue_order = (int []){TASK_IFFT, TASK_PRECODE, TASK_ZF, TASK_FFT};
+    }
+    else {
+        queue_num = 3;
+        dequeue_order = (int []){TASK_ZF, TASK_FFT, TASK_DEMUL};
+    }
+#endif
+
+    int dequeue_idx = 0;
 
     while(true) {
-        if (downlink_mode) {
-            ret_ifft = ifft_queue_.try_dequeue(event);
-            if (!ret_ifft) {
-                ret_precode = precode_queue_.try_dequeue(event);
-                if (!ret_precode) {
-                    ret_zf = zf_queue_.try_dequeue(event);
-                    if (!ret_zf) {
-                        ret = fft_queue_.try_dequeue(event);
-                        if (!ret) 
-                            continue;
-                        else
-                            computeFFT->FFT(event.data);
-                    }
-                    else if (event.event_type == TASK_ZF) {
-                        computeZF->ZF(event.data);
-                    }
-                    else if (event.event_type == TASK_PRED) {
-                        computeZF->Predict(event.data);
-                    }
-                }
-                else {
+        switch(dequeue_order[dequeue_idx]) {
+            case TASK_IFFT: 
+                if (ret = ifft_queue_.try_dequeue(event)) 
+                    computeFFT->IFFT(event.data);
+            break;
+            case TASK_PRECODE: 
+                if (ret = precode_queue_.try_dequeue(event)) 
                     computePrecode->Precode(event.data);
+            break;
+            #ifdef USE_LDPC
+            case TASK_ENCODE: 
+                if (ret = encode_queue_.try_dequeue(event)) {
+                    computeCoding->Encode(event.data);
                 }
-            }
-            else {
-                computeFFT->IFFT(event.data);
-            }
-        }
-        else {
-            ret_zf = zf_queue_.try_dequeue(event);
-            if (!ret_zf) {
-                ret = fft_queue_.try_dequeue(event);
-                if (!ret) {   
-                    ret_demul = demul_queue_.try_dequeue(event);
-                    if (!ret_demul) {
-                        #ifdef USE_LDPC
-                        ret_decode = decode_queue_.try_dequeue(event);
-                        if(!ret_decode)
-                            continue;
-                        else
-                            computeCoding->Decode(event.data);
-                        #else
-                        continue;
-                        #endif
-                    }
-                    else { 
-                        computeDemul->Demul(event.data);
-                    }
-                }
-                else {
+            break;
+            case TASK_DECODE: 
+                if (ret = decode_queue_.try_dequeue(event)) 
+                    computeCoding->Decode(event.data);
+            break;
+            #endif
+            case TASK_ZF: 
+                if (ret = zf_queue_.try_dequeue(event)) 
+                    computeZF->ZF(event.data);
+            break;
+            case TASK_FFT: 
+                if (ret = fft_queue_.try_dequeue(event)) 
                     computeFFT->FFT(event.data);
-                }
-            }
-            else if (event.event_type == TASK_ZF) {
-                computeZF->ZF(event.data);
-            }
-            else if (event.event_type == TASK_PRED) {
-                computeZF->Predict(event.data);
-            }
-        } 
+            break;
+            case TASK_DEMUL: 
+                if (ret = demul_queue_.try_dequeue(event)) 
+                    computeDemul->Demul(event.data);
+            break;
+            default: 
+                printf("ERROR: unsupported task type in dequeue\n");
+                exit(0);
+        }
+        if (ret) 
+            dequeue_idx = 0;
+        else
+            dequeue_idx = (dequeue_idx + 1 ) % queue_num;
     }
+    
+
 }
 
 
@@ -672,7 +683,7 @@ void* Millipede::worker_demul(int tid)
 
     /* initialize Precode operator */
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data,  
+        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
         Precode_task_duration, Precode_task_count);
 
 
@@ -846,7 +857,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_sche_id, int end_sch
 void Millipede::schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode) 
 {
     Event_data do_decode_task;
-    do_decode_task.event_type = TASK_PRECODE;
+    do_decode_task.event_type = TASK_DECODE;
     for(int i = 0; i < UE_NUM; i++) {
         for(int j = 0; j < LDPC_config.nblocksInSymbol; j++) {
             do_decode_task.data = generateOffset3d(frame_id, data_subframe_id, i * LDPC_config.nblocksInSymbol + j);
@@ -855,6 +866,18 @@ void Millipede::schedule_decode_task(int frame_id, int data_subframe_id, moodyca
     }
 }
 
+
+void Millipede::schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode) 
+{
+    Event_data do_encode_task;
+    do_encode_task.event_type = TASK_ENCODE;
+    for(int i = 0; i < UE_NUM; i++) {
+        for(int j = 0; j < LDPC_config.nblocksInSymbol; j++) {
+            do_encode_task.data = generateOffset3d(frame_id, data_subframe_id, i * LDPC_config.nblocksInSymbol + j);
+            schedule_task(do_encode_task, &encode_queue_, ptok_encode);
+        }
+    }
+}
 
 void Millipede::schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode) 
 {
@@ -1117,7 +1140,8 @@ void Millipede::initialize_queues()
     
 
     ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
-    modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
+    // modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
+    encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
 

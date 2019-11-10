@@ -81,6 +81,7 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
     int numMsgBytes = (numMsgBits + 7) / 8;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     alloc_buffer_1d(&(ldpc_decoder_5gnr_response.varNodes), buffer_len, 32, 1); 
+    alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
     // ldpc_decoder_5gnr_response.varNodes = aligned_alloc()aligned_malloc<int16_t>(buffer_len, 32);
     // memset(ldpc_decoder_5gnr_response.varNodes, 0, numMsgBytes);
 
@@ -92,6 +93,40 @@ DoCoding::~DoCoding()
 
 }
 
+
+int8_t cvt_to_int8(int8_t x, int start, int end) 
+{
+    int8_t re = 0;
+    int index = end - start -1;
+    for (int i = start; i < end; i++) {
+        re |= ((x >> i) & 0x1) << index;
+        index--;
+    }
+    return re;
+}
+
+void adapt_bits_for_mod(int8_t *vec_in, int8_t *vec_out, int len, int mod_order)
+{
+    int start_bit = 0, end_bit = 0;
+    int out_idx = 0;
+    for (int i = 0; i < len; i++) {
+        end_bit = start_bit + mod_order;
+        while (end_bit <= 8) {
+            vec_out[out_idx] = cvt_to_int8(vec_in[i], start_bit, end_bit);
+            out_idx++;
+            start_bit = end_bit;
+            end_bit = start_bit + mod_order;
+        } 
+        if (i + 1 < len) {
+            int nremaining_bits = 8 - start_bit;
+            int nbits_in_next = mod_order - (nremaining_bits);
+            int nremaining_bits_next = 8 - nbits_in_next;
+            vec_out[out_idx] = (cvt_to_int8(vec_in[i], start_bit, 8) << nremaining_bits ) + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
+            out_idx++;
+            start_bit = nbits_in_next;
+        }
+    }
+}
 
 void DoCoding::Encode(int offset)
 {
@@ -110,8 +145,10 @@ void DoCoding::Encode(int offset)
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
-    int8_t *input_ptr = raw_data_buffer[frame_id] + input_offset;
-    int8_t *output_ptr = encoded_buffer[frame_id] + output_offset;
+    int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
+    int8_t *input_ptr = raw_data_buffer[symbol_id] + input_offset;
+    int8_t *output_ptr = encoded_buffer_temp;
+    // int8_t *output_ptr = encoded_buffer[symbol_offset] + output_offset;
     ldpc_adapter_func(input_ptr, internalBuffer0, LDPC_config.Zc, LDPC_config.cbLen, 1);
     // encode
     ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t) LDPC_config.Zc, i_LS);
@@ -121,6 +158,8 @@ void DoCoding::Encode(int offset)
     memcpy(internalBuffer2+(LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES, internalBuffer1, LDPC_config.cbEncLen / LDPC_config.Zc * PROC_BYTES);
 
     ldpc_adapter_func(output_ptr, internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
+    int8_t *final_output_ptr = encoded_buffer[symbol_offset] + output_offset;
+    adapt_bits_for_mod(output_ptr, final_output_ptr, LDPC_config.cbCodewLen / 8, config_->mod_type);
 
     #if DEBUG_UPDATE_STATS   
     double duration = get_time() - start_time;
@@ -162,8 +201,11 @@ void DoCoding::Decode(int offset)
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * config_->mod_type;
     int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
-    ldpc_decoder_5gnr_request.varNodes = llr_buffer[frame_id] + llr_buffer_offset;
-    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer[frame_id] + decoded_buffer_offset;
+    int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
+    ldpc_decoder_5gnr_request.varNodes = llr_buffer[symbol_offset] + llr_buffer_offset;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer[symbol_offset] + decoded_buffer_offset;
+    // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n", 
+    //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, decoded_buffer_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
     // t_dec_start = clock();
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
     // inform main thread
