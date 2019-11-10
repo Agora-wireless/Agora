@@ -241,7 +241,7 @@ Config::Config(std::string jsonfile)
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
 
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>((int)dl_IQ_data[i], (int)(dl_IQ_data[i] + OFDM_CA_NUM)), mod_type);
+        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>((int *)dl_IQ_data[i], (int *)(dl_IQ_data[i] + OFDM_CA_NUM)), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++) {
             if ((j % OFDM_CA_NUM) < OFDM_DATA_START || (j % OFDM_CA_NUM) >= OFDM_DATA_START + OFDM_DATA_NUM) {
                 dl_IQ_modul[i][j].re = 0;
