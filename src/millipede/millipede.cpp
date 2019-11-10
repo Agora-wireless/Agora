@@ -534,23 +534,28 @@ void *Millipede::worker(int tid)
 
     int queue_num;
     int *dequeue_order;
+    int dequeue_order_DL_LDPC[] = {TASK_IFFT, TASK_PRECODE, TASK_ENCODE, TASK_ZF, TASK_FFT};
+    int dequeue_order_UL_LDPC[] = {TASK_ZF, TASK_FFT, TASK_DEMUL, TASK_DECODE};
+    int dequeue_order_DL[] = {TASK_IFFT, TASK_PRECODE, TASK_ZF, TASK_FFT};
+    int dequeue_order_UL[] = {TASK_ZF, TASK_FFT, TASK_DEMUL};
+
 #ifdef USE_LDPC
     if (downlink_mode) {
         queue_num = 5;
-        dequeue_order = (int []){TASK_IFFT, TASK_PRECODE, TASK_ENCODE, TASK_ZF, TASK_FFT};
+        dequeue_order = dequeue_order_DL_LDPC;
     }
     else {
         queue_num = 4;
-        dequeue_order = (int []){TASK_ZF, TASK_FFT, TASK_DEMUL, TASK_DECODE};
+        dequeue_order = dequeue_order_UL_LDPC;
     }
 #else
     if (downlink_mode) {
         queue_num = 4;
-        dequeue_order = (int []){TASK_IFFT, TASK_PRECODE, TASK_ZF, TASK_FFT};
+        dequeue_order = dequeue_order_DL;
     }
     else {
         queue_num = 3;
-        dequeue_order = (int []){TASK_ZF, TASK_FFT, TASK_DEMUL};
+        dequeue_order = dequeue_order_UL;
     }
 #endif
 
