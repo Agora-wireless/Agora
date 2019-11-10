@@ -16,8 +16,9 @@
 #include "Symbols.hpp"
 #include "gettime.h"
 #include "offset.h"
-#include "compute_common.hpp"
+#include "modulation.hpp"
 #include "config.hpp"
+#include "memory_manage.h"
 // #include "mkl_dfti.h"
 
 
@@ -27,7 +28,7 @@ public:
     DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
-        complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
+        complex_float **in_dl_ifft_buffer, int8_t **in_dl_IQ_data, int8_t **in_dl_encoded_data,
         double **in_Precode_task_duration, int *in_Precode_task_count);
     ~DoPrecode();
 
@@ -78,7 +79,7 @@ private:
     complex_float **precoder_buffer_;
     complex_float **dl_precoded_data_buffer_;
     complex_float **dl_ifft_buffer_;
-    int **dl_IQ_data;
+    int8_t **dl_IQ_data;
     float **qam_table;
 
     double **Precode_task_duration;

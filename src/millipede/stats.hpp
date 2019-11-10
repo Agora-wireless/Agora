@@ -22,6 +22,7 @@ public:
     Stats(Config *cfg, double **in_CSI_task_duration, int *in_CSI_task_count, double **in_FFT_task_duration, int *in_FFT_task_count, 
           double **in_ZF_task_duration, int *in_ZF_task_count, double **in_Demul_task_duration, int *in_Demul_task_count,
           double **in_IFFT_task_duration, int *in_IFFT_task_count, double **in_Precode_task_duration, int *in_Precode_task_count,
+          double **in_Decode_task_duration, int *in_Decode_task_count, double **in_Encode_task_duration, int *in_Encode_task_count,
           double **in_frame_start, 
           int in_task_duration_dim1, int in_task_duration_dim2, int in_task_count_dim,
           int in_task_thread_num, int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num);
@@ -59,6 +60,12 @@ public:
 
     void update_zf_processed(int frame_id) {zf_processed[frame_id % 10000] = get_time();};
     double get_zf_processed(int frame_id) {return zf_processed[frame_id % 10000];};
+
+    void update_decode_processed(int frame_id) {decode_processed[frame_id % 10000] = get_time();};
+    double get_decode_processed(int frame_id) {return decode_processed[frame_id % 10000];};
+
+    void update_encode_processed(int frame_id) {encode_processed[frame_id % 10000] = get_time();};
+    double get_encode_processed(int frame_id) {return encode_processed[frame_id % 10000];};
 
     void update_precode_processed(int frame_id) {precode_processed[frame_id % 10000] = get_time();};
     double get_precode_processed(int frame_id) {return precode_processed[frame_id % 10000];};
@@ -115,7 +122,9 @@ private:
     double fft_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double demul_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double zf_processed[10000] __attribute__( ( aligned (4096) ) ) ;
+    double decode_processed[10000] __attribute__( ( aligned (4096) ) ) ;
 
+    double encode_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double precode_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double ifft_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double tx_processed_first[10000] __attribute__( ( aligned (4096) ) ) ;
@@ -127,6 +136,8 @@ private:
     double demul_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
     double ifft_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
     double precode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
+    double decode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
+    double encode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double **csi_time_in_function_details;
@@ -140,6 +151,8 @@ private:
     double **FFT_task_duration;
     double **ZF_task_duration; 
     double **Demul_task_duration; 
+    double **Decode_task_duration; 
+    double **Encode_task_duration; 
     double **IFFT_task_duration; 
     double **Precode_task_duration; 
 
@@ -148,6 +161,8 @@ private:
     int *FFT_task_count;
     int *ZF_task_count; 
     int *Demul_task_count;
+    int *Decode_task_count;
+    int *Encode_task_count;
     int *IFFT_task_count; 
     int *Precode_task_count;
 
@@ -158,6 +173,8 @@ private:
     int fft_count_this_frame_this_thread = 0;
     int zf_count_this_frame_this_thread = 0;
     int demul_count_this_frame_this_thread = 0;
+    int decode_count_this_frame_this_thread = 0;
+    int encode_count_this_frame_this_thread = 0;
     int ifft_count_this_frame_this_thread = 0;
     int precode_count_this_frame_this_thread = 0;
 
@@ -165,6 +182,8 @@ private:
     int fft_count_this_frame = 0;
     int zf_count_this_frame = 0;
     int demul_count_this_frame = 0;
+    int decode_count_this_frame = 0;
+    int encode_count_this_frame = 0;
     int ifft_count_this_frame = 0;
     int precode_count_this_frame = 0;
 
@@ -172,6 +191,8 @@ private:
     double *fft_time_this_frame_this_thread;
     double *zf_time_this_frame_this_thread;
     double *demul_time_this_frame_this_thread;
+    double *decode_time_this_frame_this_thread;
+    double *encode_time_this_frame_this_thread;
     double *ifft_time_this_frame_this_thread;
     double *precode_time_this_frame_this_thread;
 
@@ -179,6 +200,8 @@ private:
     double *fft_time_this_frame_this_thread_per_task;
     double *zf_time_this_frame_this_thread_per_task;
     double *demul_time_this_frame_this_thread_per_task;
+    double *decode_time_this_frame_this_thread_per_task;
+    double *encode_time_this_frame_this_thread_per_task;
     double *ifft_time_this_frame_this_thread_per_task;
     double *precode_time_this_frame_this_thread_per_task;
 
@@ -186,6 +209,8 @@ private:
     double *fft_time_this_frame;
     double *zf_time_this_frame;
     double *demul_time_this_frame;
+    double *decode_time_this_frame;
+    double *encode_time_this_frame;
     double *ifft_time_this_frame;
     double *precode_time_this_frame;
 
@@ -193,6 +218,8 @@ private:
     int *FFT_task_count_prev_frame_each_thread;
     int *ZF_task_count_prev_frame_each_thread;
     int *Demul_task_count_prev_frame_each_thread;
+    int *Decode_task_count_prev_frame_each_thread;
+    int *Encode_task_count_prev_frame_each_thread;
     int *IFFT_task_count_prev_frame_each_thread;
     int *Precode_task_count_prev_frame_each_thread;
 
@@ -200,6 +227,8 @@ private:
     double **FFT_task_duration_prev_frame_each_thread;
     double **ZF_task_duration_prev_frame_each_thread;
     double **Demul_task_duration_prev_frame_each_thread;
+    double **Decode_task_duration_prev_frame_each_thread;
+    double **Encode_task_duration_prev_frame_each_thread;
     double **IFFT_task_duration_prev_frame_each_thread;
     double **Precode_task_duration_prev_frame_each_thread;
 

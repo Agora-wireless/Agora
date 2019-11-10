@@ -13,9 +13,21 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
-set(CMAKE_C_FLAGS "-std=c99 -Wall -g -O3 -mavx2 -march=broadwell")
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -O3 -mavx2 -mavx -march=broadwell")
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
+message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
+
+if (${CMAKE_C_COMPILER} STREQUAL "/usr/bin/gcc")
+  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -O3 -mavx2 -march=broadwell")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -O3 -mavx2 -mavx -march=broadwell  -m64")
+  set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
+  set (MKL_LIBS -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl)
+else ()
+  include (${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
+  set(MKL_LIBS  -lmkl_rt -lpthread -lm -ldl)
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -O3 -mavx2 -mavx -march=broadwell")
+endif()
+
+message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
@@ -24,6 +36,7 @@ find_package(Armadillo)
 
 set(USE_DPDK False)
 set(USE_ARGOS False)
+set(USE_LDPC False)
 
 
 # DPDK
@@ -61,7 +74,7 @@ if (${USE_ARGOS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
   set (ARGOS_SOURCES src/millipede/radio_lib.cpp)
   set (CLIENT_SOURCES
-         src/millipede/compute_common.cpp
+         src/common/modulation.cpp
          src/millipede/ru.cpp
          src/millipede/phy-ue.cpp)
   set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
@@ -83,37 +96,17 @@ include_directories(
 	src/common/
 	)
 
-get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-foreach(dir ${dirs})
-  message(STATUS "dir='${dir}'")
-endforeach()
+
 
 set(COMMON_SOURCES src/common/config.cpp
                    src/common/utils.cpp
                    src/common/comms-lib.cpp
-                   src/common/signalHandler.cpp)
-
-
-set(SOURCES src/millipede/main.cpp 
-            src/millipede/txrx.cpp 
-            src/millipede/millipede.cpp 
-            src/millipede/compute_common.cpp  
-            src/millipede/stats.cpp 
-            src/millipede/dofft.cpp 
-            src/millipede/dozf.cpp 
-            src/millipede/dodemul.cpp 
-            src/millipede/doprecode.cpp
-            ${COMMON_SOURCES}
-            ${ARGOS_SOURCES})
-			
-add_executable(millipede ${SOURCES})
-target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
-
-
+                   src/common/signalHandler.cpp
+                   src/common/modulation.cpp
+                   src/common/net.cpp)
 add_library(comp MODULE 
        src/millipede/txrx.cpp
        src/millipede/millipede.cpp
-       src/millipede/compute_common.cpp
        src/millipede/stats.cpp 
        src/millipede/dofft.cpp
        src/millipede/dozf.cpp
@@ -121,7 +114,64 @@ add_library(comp MODULE
        src/millipede/doprecode.cpp
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
-target_link_libraries(comp -lpthread -lmufft -larmadillo -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+target_link_libraries(comp -lpthread -lmufft -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+
+# LDPC support
+if (${USE_LDPC})
+  add_definitions(-DUSE_LDPC)
+  # set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
+  set(SDK_DIR /home/argos/Jian/5gnr_ldpc/intel_library)
+  set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
+  #set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+  #              ${LIB_DIR}/test/phy/common/utility.a
+  #              ${LIB_DIR}/source/phy/lib_common/libcommon.a)
+
+  set(LDPC_LIBS  ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+                 ${SDK_DIR}/decoder/src/common/libutility.a
+                 ${SDK_DIR}/decoder/src/lib_common/libcommon.a)
+
+  #include_directories(
+  #        ${SDK_DIR}/test/phy/common
+  #        ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  #        ${SDK_DIR}/source/phy/lib_common
+  #        src/encoder/
+  #)
+
+  include_directories(${SDK_DIR}/decoder/src/common
+                    ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr
+                    ${SDK_DIR}/decoder/src/lib_common
+                    src/encoder)
+
+  #set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
+  set(HEADER_FILES ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
+
+  set(LDPC_SOURCES  src/encoder/cyclic_shift.cpp
+                    src/encoder/encoder.cpp
+                    src/encoder/iobuffer.cpp
+                    src/millipede/docoding.cpp)
+
+endif()
+
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+  message(STATUS "dir='${dir}'")
+endforeach()
+
+set(SOURCES src/millipede/main.cpp 
+            src/millipede/txrx.cpp 
+            src/millipede/millipede.cpp   
+            src/millipede/stats.cpp 
+            src/millipede/dofft.cpp 
+            src/millipede/dozf.cpp 
+            src/millipede/dodemul.cpp 
+            src/millipede/doprecode.cpp
+            ${COMMON_SOURCES}
+            ${ARGOS_SOURCES}
+            ${LDPC_SOURCES})
+			
+add_executable(millipede ${SOURCES} ${HEADER_FILES})
+target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+
 
 
 if (${USE_ARGOS})

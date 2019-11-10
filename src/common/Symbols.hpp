@@ -4,8 +4,12 @@
 
 #define ENABLE_CPU_ATTACH
 //#define GENERATE_PILOT
+#ifdef USE_ARGOS
 #define GENERATE_DATA
+#endif
 #define SEPARATE_TX_RX 0
+
+#define MOD_ORDER 4
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -58,16 +62,19 @@
 #define PRINT_IFFT 7
 #define PRINT_TX_FIRST 8
 #define PRINT_TX 9
+#define PRINT_DECODE 10
+#define PRINT_ENCODE 11
 
 
 #define BIGSTATION 0
-#define ENABLE_DOWNLINK 0
+// #define ENABLE_DOWNLINK 0
+#define ENABLE_DECODE 1
 #define USE_IPV4 1
 //#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
-#define EXPORT_CONSTELLATION 1
-#define ENABLE_DECODE 0
+#define EXPORT_CONSTELLATION 0
+
 #define COMBINE_EQUAL_DECODE 1
 
 #define DO_PREDICTION 0
@@ -75,7 +82,7 @@
 
 
 #define DEBUG_PRINT_PER_FRAME_DONE 1
-#define DEBUG_PRINT_PER_SUBFRAME_DONE 0
+#define DEBUG_PRINT_PER_SUBFRAME_DONE 1
 #define DEBUG_PRINT_PER_TASK_DONE 0
 #define DEBUG_PRINT_SUMMARY_100_FRAMES 0
 
@@ -134,6 +141,24 @@ static const char *THREAD_TYPE_STRING[] = {
 	"Master (RX)",
 	"Master (TX)"
 };
+
+
+
+
+struct LDPCconfig {
+    uint16_t Bg;
+    bool earlyTermination;
+    int16_t decoderIter;
+    uint16_t Zc;
+    int nRows;
+    uint32_t cbEncLen;
+    uint32_t cbLen;
+    uint32_t cbCodewLen;
+    int nblocksInSymbol;
+};
+
+typedef struct LDPCconfig LDPCconfig;
+
 
 static const int MAX_FRAME_ID = 1e4;
 static const int float_num_in_simd256 = 8;

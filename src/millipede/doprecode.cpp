@@ -10,7 +10,7 @@ using namespace arma;
 DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
-        complex_float **in_dl_ifft_buffer, int **in_dl_IQ_data, 
+        complex_float **in_dl_ifft_buffer, int8_t **in_dl_IQ_data, int8_t **in_dl_encoded_data,
         double **in_Precode_task_duration, int *in_Precode_task_count)
 {
     config_ = cfg;
@@ -30,23 +30,13 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     precoder_buffer_ = in_precoder_buffer;
     dl_precoded_data_buffer_ = in_dl_precoded_data_buffer;
     dl_ifft_buffer_ = in_dl_ifft_buffer;
+#ifdef USE_LDPC
+    dl_IQ_data = in_dl_encoded_data;
+#else
     dl_IQ_data = in_dl_IQ_data;
-    // qam16_table = in_qam16_table;
-    qam_table = (float **)malloc(2 * sizeof(float *));
-    size_t mod_order = config_->mod_order;
-    for (int i = 0; i < 2; i++) 
-        qam_table[i] = (float *)aligned_alloc(64, mod_order * sizeof(float));
-    switch(mod_order) {
-        case 4:
-            init_qpsk_table(qam_table);
-            break;
-	case 16:
-            init_qam16_table(qam_table);
-            break;
-        case 64:
-            init_qam64_table(qam_table);
-            break;
-    }
+#endif
+    size_t mod_type = config_->mod_type;
+    qam_table = init_modulation_table(mod_type);
 
     Precode_task_duration = in_Precode_task_duration;
     Precode_task_count = in_Precode_task_count;
@@ -104,27 +94,25 @@ void DoPrecode::Precode(int offset)
             }
 
             complex_float *data_ptr;
-            if (current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS)
-	    {
+            if (current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
                 data_ptr = modulated_buffer_temp;
                 for (int user_id = 0; user_id < UE_NUM; user_id ++)
                     *(data_ptr + user_id) = {config_->pilots_[cur_sc_id], 0};
             } else {
-	        // complex_float *data_ptr = &dl_modulated_buffer_[total_data_subframe_id][UE_NUM * cur_sc_id];
-                _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id * UE_NUM]+cur_sc_id), _MM_HINT_T0);
+                _mm_prefetch((char *)(dl_IQ_data[current_data_subframe_id] + cur_sc_id), _MM_HINT_T0);
                 data_ptr = modulated_buffer_temp;
                 for (int user_id = 0; user_id < UE_NUM - 1; user_id ++) {
-                    int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
+                    // int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
+                    int8_t *raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * user_id];
                     // cout<<*raw_data_ptr<<", ";
-                    _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id * UE_NUM + user_id + 1], _MM_HINT_T0);
-                    *(data_ptr + user_id) = mod_16qam_single(*(raw_data_ptr), qam_table);
- 
+                    _mm_prefetch((char *)dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (user_id + 1)], _MM_HINT_T0);
+                    *(data_ptr + user_id) = mod_single_uint8((uint8_t)*(raw_data_ptr), qam_table); 
                     // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
                 }
                 // cout<<endl;
 
-                int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + UE_NUM - 1][cur_sc_id];
-                *(data_ptr + UE_NUM - 1) = mod_16qam_single(*(raw_data_ptr), qam_table);
+                int8_t *raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
+                *(data_ptr + UE_NUM - 1) = mod_single_uint8((uint8_t)*(raw_data_ptr), qam_table);
             }
 
             
