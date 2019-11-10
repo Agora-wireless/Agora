@@ -7,7 +7,8 @@
 #include "txrx.hpp"
 
 #ifdef USE_DPDK
-inline const struct rte_eth_conf port_conf_default() {
+inline const struct rte_eth_conf port_conf_default() 
+{
     struct rte_eth_conf rte = rte_eth_conf();
     // rte.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
     rte.rxmode.max_rx_pkt_len = MAX_JUMBO_FRAME_SIZE;
@@ -22,6 +23,9 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
                 uint16_t dst_port, uint16_t dst_port_mask,
                 struct rte_flow_error *error);
 #endif
+
+
+
 
 PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
@@ -506,65 +510,17 @@ int PacketTXRX::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int le
 void *PacketTXRX::loopRecv(int tid)
 {
     pin_to_core_with_offset(Worker_RX, core_id_, tid);
-
+    int sock_buf_size = 1024*1024*64*8-1;
+    int local_port_id = 8000 + tid;
 #if USE_IPV4
-    struct sockaddr_in servaddr_local;
-    int socket_local;
-    servaddr_local.sin_family = AF_INET;
-    servaddr_local.sin_port = htons(8000+tid);
-    servaddr_local.sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-    memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
-
-    if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("RX thread %d cannot create IPV4 socket\n", tid);
-        exit(0);
-    }
-    else{
-        printf("RX thread %d created IPV4 socket\n", tid);
-    }
-
+    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
+    // struct sockaddr_in local_addr;
+    // setup_sockaddr_local_ipv4(&local_addr, local_port_id);
 #else
-    struct sockaddr_in6 servaddr_local;
-    int socket_local;
-    servaddr_local.sin6_family = AF_INET6;
-    servaddr_local.sin6_addr = in6addr_any;
-    servaddr_local.sin6_port = htons(8000+tid);
-    
-    if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("RX thread %d cannot create IPV6 socket\n", tid);
-        exit(0);
-    }
-    else{
-        printf("RX thread %d Created IPV46 socket\n", tid);
-    }
+    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
+    // struct sockaddr_in6 local_addr;
+    // setup_sockaddr_local_ipv6(&local_addr, local_port_id);
 #endif
-
-    // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
-    int optval = 1;
-
-    setsockopt(socket_local, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-    // fcntl(socket_local, F_SETFL, O_NONBLOCK);
-    socklen_t optlen;
-    int sock_buf_size;
-    optlen = sizeof(sock_buf_size);
-    // int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
-    // printf("Current socket %d buffer size %d\n", tid, sock_buf_size);
-    sock_buf_size = 1024*1024*64*8-1;
-    if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, sizeof(sock_buf_size))<0) {
-        printf("Error setting buffer size to %d\n", sock_buf_size);
-    }
-    else {     
-        int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
-        printf("Set socket %d buffer size to %d\n", tid, sock_buf_size);
-    }
-
-    if(bind(socket_local, (struct sockaddr *) &servaddr_local, sizeof(servaddr_local)) != 0) {
-        printf("socket bind failed %d\n", tid);
-        exit(0);
-    }
-
-
-
 
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
@@ -614,7 +570,7 @@ void *PacketTXRX::loopRecv(int tid)
         // start_time= get_time();
         // if ((recvlen = recvfrom(socket_[tid], (char*)cur_ptr_buffer, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
         if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr, packet_length, 0))<0) {
-        // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+        // if ((recvlen = recvfrom(socket_local, (char*)cur_ptr_buffer, packet_length, 0, (struct sockaddr *) &local_addr, &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
         } 
@@ -1056,57 +1012,18 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
 void *PacketTXRX::loopSend(int tid)
 {
     pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
-
+    int sock_buf_size = 1024*1024*64*8-1;
+    int local_port_id = 0;
+    int remote_port_id = 7000 + tid;
 #if USE_IPV4
-    struct sockaddr_in servaddr_local;
-    struct sockaddr_in cliaddr_local;
-    int socket_local;
-    servaddr_local.sin_family = AF_INET;
-    servaddr_local.sin_port = htons(6000+tid);
-    servaddr_local.sin_addr.s_addr = inet_addr(config_->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-    memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero)); 
-
-    cliaddr_local.sin_family = AF_INET;
-    cliaddr_local.sin_port = htons(0);  // out going port is random
-    cliaddr_local.sin_addr.s_addr = htons(INADDR_ANY);
-    memset(cliaddr_local.sin_zero, 0, sizeof(cliaddr_local.sin_zero));  
-
-    if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("TX thread %d cannot create IPV4 socket\n", tid);
-        exit(0);
-    }
-    else{
-        printf("TX thread %d created IPV4 socket\n", tid);
-    }
+    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
+    struct sockaddr_in remote_addr;
+    setup_sockaddr_remote_ipv4(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #else
-    struct sockaddr_in6 servaddr_local;
-    struct sockaddr_in6 cliaddr_local;
-    int socket_local;
-    servaddr_local.sin6_family = AF_INET6;
-    inet_pton(AF_INET6, "fe80::5a9b:5a2f:c20a:d4d5", &servaddr_local.sin6_addr);
-    servaddr_local.sin6_port = htons(6000+tid);
-
-    cliaddr_local.sin6_family = AF_INET;
-    cliaddr_local.sin6_port = htons(6000+i);
-    cliaddr_local.sin6_addr = in6addr_any;
-    
-    if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("TX thread %d cannot create IPV6 socket\n", tid);
-        exit(0);
-    }
-    else{
-        printf("TX thread %d created IPV6 socket\n", tid);
-    }
+    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
+    struct sockaddr_in6 remote_addr;
+    setup_sockaddr_remote_ipv6(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #endif
-
-    /*Bind socket with address struct*/
-    if (bind(socket_local, (struct sockaddr *) &cliaddr_local, sizeof(cliaddr_local)) != 0) {
-        printf("socket bind failed %d\n", tid);
-        exit(0);
-    }
-
-
-
 
     // downlink socket buffer
     char *dl_buffer = tx_buffer_;
@@ -1159,7 +1076,7 @@ void *PacketTXRX::loopSend(int tid)
         *((int *)cur_buffer_ptr + 3) = ant_id;
 
         // send data (one OFDM symbol)
-        if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&servaddr_local, sizeof(servaddr_local)) < 0) {
+        if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
             perror("socket sendto failed");
             exit(0);
         }
@@ -1204,69 +1121,22 @@ void *PacketTXRX::loopSend(int tid)
 void *PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
+    int sock_buf_size = 1024*1024*64*8-1;
+    int local_port_id = 8000 + tid;
+    int remote_port_id = 7000 + tid;
 #if USE_IPV4
-    struct sockaddr_in local_addr;
+    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
     struct sockaddr_in remote_addr;
-    
-    local_addr.sin_family = AF_INET;
-    local_addr.sin_port = htons(8000+tid);
-    local_addr.sin_addr.s_addr = INADDR_ANY;//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-    memset(local_addr.sin_zero, 0, sizeof(local_addr.sin_zero)); 
-
-    remote_addr.sin_family = AF_INET;
-    remote_addr.sin_port = htons(7000+tid);
-    remote_addr.sin_addr.s_addr = inet_addr(config_->tx_addr.c_str());//inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
-    memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero)); 
-
-    int socket_local;
-    if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("TXRX thread %d cannot create IPV4 socket\n", tid);
-        exit(0);
-    }
-    else{
-        printf("TXRX thread %d created IPV4 socket\n", tid);
-    }
+    setup_sockaddr_remote_ipv4(&remote_addr, remote_port_id, config_->tx_addr.c_str());
+    // struct sockaddr_in local_addr;
+    // setup_sockaddr_local_ipv4(&local_addr, local_port_id);
 #else
-    struct sockaddr_in6 local_addr;
+    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
     struct sockaddr_in6 remote_addr;
-    local_addr.sin6_family = AF_INET6;
-    local_addr.sin6_addr = in6addr_any;
-    local_addr.sin6_port = htons(8000+tid);
-
-    remote_addr.sin6_family = AF_INET6;
-    remote_addr.sin6_port = htons(7000+tid);
-    inet_pton(AF_INET6, "fe80::5a9b:5a2f:c20a:d4d5", &remote_addr.sin6_addr);
-
-    int socket_local;
-    if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("TXRX thread %d cannot create IPV6 socket\n", tid);
-        exit(0);
-    }
-    else{
-        printf("TXRX thread %d Created IPV46 socket\n", tid);
-    }
+    setup_sockaddr_remote_ipv6(&remote_addr, remote_port_id, config_->tx_addr.c_str());
+    // struct sockaddr_in6 local_addr;
+    // setup_sockaddr_local_ipv6(&local_addr, local_port_id);
 #endif
-
-    // use SO_REUSEPORT option, so that multiple sockets could receive packets simultaneously, though the load is not balance
-    int optval = 1;
-    setsockopt(socket_local, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-    socklen_t optlen;
-    int sock_buf_size;
-    optlen = sizeof(sock_buf_size);
-
-    sock_buf_size = 1024*1024*64*8-1;
-    if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, sizeof(sock_buf_size))<0) {
-        printf("Error setting buffer size to %d\n", sock_buf_size);
-    }
-    else {     
-        int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
-        printf("Set socket %d buffer size to %d\n", tid, sock_buf_size);
-    }
-
-    if(bind(socket_local, (struct sockaddr *) &local_addr, sizeof(local_addr)) != 0) {
-        printf("socket bind failed %d\n", tid);
-        exit(0);
-    }
 
     // use token to speed up
     moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
@@ -1312,10 +1182,10 @@ void *PacketTXRX::loopTXRX(int tid)
     int rx_packet_num_per_frame = 0;
     int tx_packet_num_per_frame = 0;
     int do_tx = 0;
-    int rx_pkts_in_frame_count[10000];
+    int rx_pkts_in_frame_count[10000] = {0};
     // int last_finished_frame_id = 0;
 
-    int tx_pkts_in_frame_count[10000];
+    int tx_pkts_in_frame_count[10000] = {0};
     // int last_finished_tx_frame_id = 0;
 
 
@@ -1335,7 +1205,7 @@ void *PacketTXRX::loopTXRX(int tid)
             // start_time= get_time();
             // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
             if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0))<0) {
-            // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+            // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &local_addr, &addrlen)) < 0) {
                 perror("recv failed");
                 exit(0);
             } 
@@ -1402,13 +1272,13 @@ void *PacketTXRX::loopTXRX(int tid)
                 } 
 
                 rx_packet_num_per_frame++;
+                frame_id = *((int *)rx_cur_buffer_ptr);
 
             #if MEASURE_TIME
                 // read information from received packet 
-                frame_id = *((int *)rx_cur_buffer_ptr);
                 subframe_id = *((int *)rx_cur_buffer_ptr + 1);
                 ant_id = *((int *)rx_cur_buffer_ptr + 3);
-                rx_pkts_in_frame_count[frame_id % 10000]++;
+                
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, subframe_id, ant_id, rx_offset);
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d, buffer status %d %d ptr_offset %d\n", 
                     // tid, frame_id, subframe_id, ant_id, rx_offset, *(rx_buffer_status_ptr+1424), *(rx_cur_buffer_status_ptr+1), rx_cur_buffer_status_ptr - rx_buffer_status_ptr);
@@ -1417,10 +1287,10 @@ void *PacketTXRX::loopTXRX(int tid)
                     prev_frame_id = frame_id;
                     if (frame_id % 512 == 200) {
                         _mm_prefetch((char*)(rx_frame_start+frame_id+512), _MM_HINT_T0);
-                        // double temp = frame_start[frame_id+3];
                     }
                 }
             #endif
+                
                 // get the position in buffer
                 rx_offset = rx_cur_buffer_status_ptr - rx_buffer_status_ptr;
                 // move ptr & set status to full
@@ -1433,13 +1303,12 @@ void *PacketTXRX::loopTXRX(int tid)
                 rx_message.event_type = EVENT_PACKET_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
                 rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
-                // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
                 if ( !message_queue_->enqueue(*local_ptok, rx_message ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
 
-                // if(rx_packet_num_per_frame == max_rx_packet_num_per_frame) {
+                rx_pkts_in_frame_count[frame_id % 10000]++;
                 if(rx_pkts_in_frame_count[frame_id] == max_rx_packet_num_per_frame) {
                     do_tx = 1;
                     rx_packet_num_per_frame = 0;

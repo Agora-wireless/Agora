@@ -31,6 +31,7 @@
 #include "Symbols.hpp"
 #include "gettime.h"
 #include "offset.h"
+#include "net.hpp"
 
 #ifdef USE_ARGOS  
 #include "radio_lib.hpp"
