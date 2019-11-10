@@ -196,7 +196,7 @@ private:
     float *pilots_;
     complex_float *ul_pilot;
     char* ul_pilot_aligned;
-    int **ul_IQ_data;
+    int8_t **ul_IQ_data;
     complex_float **ul_IQ_modul;
 
 
