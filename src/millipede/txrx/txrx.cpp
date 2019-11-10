@@ -28,7 +28,6 @@ PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
     packet_length = cfg->packet_length;
     packet_header_offset = cfg->packet_header_offset;
 
-    //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
     srand (time(NULL));
     rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
@@ -102,9 +101,8 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     tx_buffer_ = in_buffer;  // for save data
     tx_buffer_status_ = in_buffer_status; // for save status
 
-    // tx_core_id_ = in_core_id;
     printf("create TX or TXRX threads\n");
-// create new threads
+    // create new threads
     std::vector<pthread_t> created_threads;
 #ifdef USE_DPDK
     unsigned int lcore_id;
@@ -246,9 +244,7 @@ void *PacketTXRX::loopRecv(int tid)
             printf("socket message enqueue failed\n");
             exit(0);
         }
-
     }
-
 }
 
 
@@ -278,7 +274,7 @@ void *PacketTXRX::loopSend(int tid)
     int offset;
     char *cur_buffer_ptr;
     // int *cur_ptr_buffer_status;
-    int ant_id, frame_id, subframe_id, total_data_subframe_id, current_data_subframe_id;
+    int ant_id, frame_id, symbol_id, total_data_subframe_id, current_data_subframe_id;
     int cell_id = 0;
     // int maxMesgQLen = 0;
     // int maxTaskQLen = 0;
@@ -303,20 +299,15 @@ void *PacketTXRX::loopSend(int tid)
         // printf("In transmitter\n");
 
         offset = task_event.data;
-        ant_id = offset % BS_ANT_NUM;
-        total_data_subframe_id = offset / BS_ANT_NUM; 
-        current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
-        subframe_id = current_data_subframe_id + UE_NUM;
-        frame_id = total_data_subframe_id / data_subframe_num_perframe;
+        interpreteOffset3d(offset, &current_data_subframe_id, &ant_id, &frame_id);
+        symbol_id = current_data_subframe_id + UE_NUM;
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;  
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
-        *((int *)cur_buffer_ptr) = frame_id;
-        *((int *)cur_buffer_ptr + 1) = subframe_id;
-        *((int *)cur_buffer_ptr + 2) = cell_id;
-        *((int *)cur_buffer_ptr + 3) = ant_id;
+        struct Packet *pkg = (struct Packet *)cur_buffer_ptr;
+        new (pkg) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
         // send data (one OFDM symbol)
         if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
@@ -325,7 +316,7 @@ void *PacketTXRX::loopSend(int tid)
         }
 
 #if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, subframe_id, ant_id, offset,
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
         
@@ -353,8 +344,7 @@ void *PacketTXRX::loopSend(int tid)
         //     begin = std::chrono::system_clock::now();
         //     packet_count = 0;
         // }
-    }
-    
+    }   
 }
 
 
@@ -395,7 +385,7 @@ void *PacketTXRX::loopTXRX(int tid)
     char* rx_cur_buffer_ptr = rx_buffer_ptr;
     int* rx_cur_buffer_status_ptr = rx_buffer_status_ptr;
     int rx_offset = 0;
-    int ant_id, frame_id, subframe_id;
+    int ant_id, frame_id, symbol_id;
 
 
     // walk through all the pages
@@ -413,8 +403,7 @@ void *PacketTXRX::loopTXRX(int tid)
     int tx_offset;
     char *tx_cur_buffer_ptr;
     // float *tx_cur_ptr_data;
-    int tx_ant_id, tx_frame_id, tx_subframe_id, tx_current_data_subframe_id; //, tx_total_data_subframe_id;
-    int tx_cell_id = 0;
+    int tx_ant_id, tx_frame_id, tx_symbol_id, tx_current_data_subframe_id; //, tx_total_data_subframe_id;
 
 
     int max_subframe_id = downlink_mode ? UE_NUM : (UE_NUM + ul_data_subframe_num_perframe);
@@ -434,8 +423,7 @@ void *PacketTXRX::loopTXRX(int tid)
 
     // double start_time= get_time();
 
-    if (!downlink_mode)
-    {
+    if (!downlink_mode) {
         while(true) {
             // if buffer is full, exit
             if (rx_cur_buffer_status_ptr[0] == 1) {
@@ -457,10 +445,11 @@ void *PacketTXRX::loopTXRX(int tid)
 
         #if MEASURE_TIME
             // read information from received packet 
-            frame_id = *((int *)rx_cur_buffer_ptr);
-            subframe_id = *((int *)rx_cur_buffer_ptr + 1);
-            ant_id = *((int *)rx_cur_buffer_ptr + 3);
-            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+            struct Packet *pkg = (struct Packet *)rx_cur_buffer_ptr;
+            frame_id = pkg->frame_id;
+            symbol_id = pkg->symbol_id;
+            ant_id = pkg->ant_id;
+            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, symbol_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
@@ -490,8 +479,7 @@ void *PacketTXRX::loopTXRX(int tid)
 
         }
     }
-    else
-    {
+    else {
         while(true) {
             if (do_tx == 0) {
                 // if buffer is full, exit
@@ -515,16 +503,16 @@ void *PacketTXRX::loopTXRX(int tid)
                 } 
 
                 rx_packet_num_per_frame++;
-                frame_id = *((int *)rx_cur_buffer_ptr);
+                
+                struct Packet *pkg = (struct Packet *)rx_cur_buffer_ptr;
+                frame_id = pkg->frame_id;
+                symbol_id = pkg->symbol_id;
+                ant_id = pkg->ant_id;
 
             #if MEASURE_TIME
-                // read information from received packet 
-                subframe_id = *((int *)rx_cur_buffer_ptr + 1);
-                ant_id = *((int *)rx_cur_buffer_ptr + 3);
-                
-                // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, subframe_id, ant_id, rx_offset);
+                // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, symbol_id, ant_id, rx_offset);
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d, buffer status %d %d ptr_offset %d\n", 
-                    // tid, frame_id, subframe_id, ant_id, rx_offset, *(rx_buffer_status_ptr+1424), *(rx_cur_buffer_status_ptr+1), rx_cur_buffer_status_ptr - rx_buffer_status_ptr);
+                    // tid, frame_id, symbol_id, ant_id, rx_offset, *(rx_buffer_status_ptr+1424), *(rx_cur_buffer_status_ptr+1), rx_cur_buffer_status_ptr - rx_buffer_status_ptr);
                 if (frame_id > prev_frame_id) {
                     *(rx_frame_start + frame_id) = get_time();
                     prev_frame_id = frame_id;
@@ -575,20 +563,14 @@ void *PacketTXRX::loopTXRX(int tid)
 
                 tx_offset = task_event.data;
                 interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
-                // tx_ant_id = tx_offset % BS_ANT_NUM;
-                // tx_total_data_subframe_id = tx_offset / BS_ANT_NUM; 
-                // tx_current_data_subframe_id = tx_total_data_subframe_id % data_subframe_num_perframe;
-                tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
-                // tx_frame_id = tx_total_data_subframe_id / data_subframe_num_perframe;
+                tx_symbol_id = tx_current_data_subframe_id + UE_NUM;
                 int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
                 int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;  
                 // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
-                *((int *)tx_cur_buffer_ptr) = tx_frame_id;
-                *((int *)tx_cur_buffer_ptr + 1) = tx_subframe_id;
-                *((int *)tx_cur_buffer_ptr + 2) = tx_cell_id;
-                *((int *)tx_cur_buffer_ptr + 3) = tx_ant_id;
+                struct Packet *pkg = (struct Packet *)tx_cur_buffer_ptr;
+                new (pkg) Packet(tx_frame_id, tx_symbol_id, 0 /* cell_id */, tx_ant_id);
                 
                 // send data (one OFDM symbol)
                 if (sendto(socket_local, (char*)tx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
@@ -600,7 +582,7 @@ void *PacketTXRX::loopTXRX(int tid)
 
 
         #if DEBUG_BS_SENDER
-                printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, tx_frame_id, tx_subframe_id, tx_ant_id, tx_offset,
+                printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, tx_frame_id, tx_symbol_id, tx_ant_id, tx_offset,
                     message_queue_->size_approx());
         #endif
                 Event_data tx_message;
@@ -617,13 +599,10 @@ void *PacketTXRX::loopTXRX(int tid)
                     tx_pkts_in_frame_count[tx_frame_id_in_buffer] = 0;
                     // printf("In TXRX thread %d: TX finished frame %d, current frame %d\n", tid, last_finished_tx_frame_id, prev_frame_id);
                     // prev_frame_id = tx_frame_id;
-                    // last_finished_tx_frame_id = (last_finished_tx_frame_id + 1) % TASK_BUFFER_FRAME_NUM;
-                    
+                    // last_finished_tx_frame_id = (last_finished_tx_frame_id + 1) % TASK_BUFFER_FRAME_NUM;                
                 }
             }  
-
         }
-
     }
 }
 
