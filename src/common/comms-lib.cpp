@@ -284,7 +284,7 @@ std::vector<std::complex<float>> CommsLib::FFT(std::vector<std::complex<float>> 
     return out;
 }
 
-std::vector<std::complex<float>> CommsLib::modulate(std::vector<int> in, int type)
+std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int type)
 {
     std::vector<std::complex<float>> out(in.size());
     if (type == QPSK)

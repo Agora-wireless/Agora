@@ -39,6 +39,7 @@ public:
     size_t prefix;
     size_t postfix;
     std::string modulation;
+    size_t mod_type;
     size_t mod_order;
     
     std::string conf;
@@ -61,8 +62,8 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float *pilots_;
-    int **dl_IQ_data;
-    int **ul_IQ_data;
+    int8_t **dl_IQ_data;
+    int8_t **ul_IQ_data;
     complex_float **ul_IQ_modul;
     complex_float **dl_IQ_modul;
     std::complex<int16_t> **dl_IQ_symbol;
@@ -98,6 +99,7 @@ public:
     size_t zf_block_size;
 
 
+    bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
     size_t UE_NUM;
     size_t OFDM_CA_NUM;
@@ -116,13 +118,17 @@ public:
     size_t packet_header_offset;
     size_t packet_length;
 
+
     std::string rx_addr;
     std::string tx_addr;
     int rx_port;
     int tx_port;
 
+    /* LDPC parameters */
+    LDPCconfig LDPC_config;
+
     bool isUE;
-    const size_t maxFrame = 1 << 31;
+    const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;
     // int dl_data_symbol_perframe;
     std::atomic<bool> running;

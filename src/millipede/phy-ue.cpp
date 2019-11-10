@@ -673,12 +673,13 @@ void Phy_UE::doDemul(int tid, int offset)
         *(tar_ptr + sc_id) = *(src_ptr + non_null_sc_id) * exp(phase_err_expo);
     }
 
-    cx_fmat mat_equaled_pc(tar_ptr, numAntennas, 1, false);
-    sword* demul_ptr = (sword *)(&dl_data_buffer_[offset][0]);
-    imat mat_demuled(demul_ptr, numAntennas, 1, false);
-    
-    mat_demuled = demod_16qam(mat_equaled_pc);
+    uint8_t *demul_ptr = (uint8_t *)(&dl_data_buffer_[offset][0]);
+    // cx_fmat mat_equaled_pc(tar_ptr, numAntennas, 1, false);
+    // sword* demul_ptr = (sword *)(&dl_data_buffer_[offset][0]);
+    // imat mat_demuled(demul_ptr, numAntennas, 1, false);
 
+    // mat_demuled = demod_16qam(mat_equaled_pc);
+    demod_16qam_hard_loop((float *)tar_ptr, (uint8_t *)demul_ptr, numAntennas);
     // inform main thread
     Event_data demul_finish_event;
     demul_finish_event.event_type = EVENT_DEMUL;

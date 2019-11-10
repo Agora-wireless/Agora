@@ -16,13 +16,16 @@
 #include <algorithm>
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "compute_common.hpp"
+#include "modulation.hpp"
 #include "signalHandler.hpp"
 #include "comms-lib.h"
 #include <armadillo>
 #include "config.hpp"
 #include "offset.h"
 //#include "mufft/fft.h"
+
+//typedef std::vector<complex_float> myVec;
+typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
 
 class Phy_UE
 {
@@ -193,7 +196,7 @@ private:
     float *pilots_;
     complex_float *ul_pilot;
     char* ul_pilot_aligned;
-    int **ul_IQ_data;
+    int8_t **ul_IQ_data;
     complex_float **ul_IQ_modul;
 
 
