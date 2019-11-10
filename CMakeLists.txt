@@ -36,7 +36,7 @@ find_package(Armadillo)
 
 set(USE_DPDK False)
 set(USE_ARGOS False)
-set(USE_LDPC True)
+set(USE_LDPC False)
 
 
 # DPDK
@@ -102,7 +102,8 @@ set(COMMON_SOURCES src/common/config.cpp
                    src/common/utils.cpp
                    src/common/comms-lib.cpp
                    src/common/signalHandler.cpp
-                   src/common/modulation.cpp)
+                   src/common/modulation.cpp
+                   src/common/net.cpp)
 add_library(comp MODULE 
        src/millipede/txrx.cpp
        src/millipede/millipede.cpp
