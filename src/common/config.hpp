@@ -62,7 +62,7 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float *pilots_;
-    int **dl_IQ_data;
+    int8_t **dl_IQ_data;
     int **ul_IQ_data;
     complex_float **ul_IQ_modul;
     complex_float **dl_IQ_modul;
@@ -99,6 +99,7 @@ public:
     size_t zf_block_size;
 
 
+    bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
     size_t UE_NUM;
     size_t OFDM_CA_NUM;

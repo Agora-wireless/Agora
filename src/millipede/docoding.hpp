@@ -58,6 +58,7 @@ private:
     moodycamel::ProducerToken *task_ptok;
 
     int8_t **raw_data_buffer;
+    int8_t *encoded_buffer_temp;
     int8_t **encoded_buffer;
     int8_t **llr_buffer;
     uint8_t **decoded_buffer;
