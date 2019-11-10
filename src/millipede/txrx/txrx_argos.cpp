@@ -266,21 +266,17 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
             int rx_symbol_id = cfg->getPilotSFIndex(frame_id, symbol_id);
             if (rx_symbol_id < 0)
                 rx_symbol_id = cfg->getUlSFIndex(frame_id, symbol_id) + cfg->pilotSymsPerFrame;
-            *((int *)cur_ptr_buffer) = frame_id;
-            *((int *)cur_ptr_buffer + 1) = rx_symbol_id;
-            *((int *)cur_ptr_buffer + 2) = 0; //cell_id 
-            *((int *)cur_ptr_buffer + 3) = ant_id;
-            if (cfg->nChannels == 2)
-            {
-                *((int *)cur_ptr_buffer2) = frame_id;
-                *((int *)cur_ptr_buffer2 + 1) = rx_symbol_id;
-                *((int *)cur_ptr_buffer2 + 2) = 0; //cell_id 
-                *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
+            struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
+            new (pkt) Packet(frame_id, rx_symbol_id, 0 /* cell_id */, ant_id);
+            
+            if (cfg->nChannels == 2) {
+                struct Packet *pkt2 = (struct Packet *)cur_ptr_buffer2;
+                new (pkt2) Packet(frame_id, rx_symbol_id, 0 /* cell_id */, ant_id + 1);
             }
 
         #if MEASURE_TIME
             // read information from received packet
-            frame_id = *((int *)cur_ptr_buffer);
+            // frame_id = *((int *)cur_ptr_buffer);
             if (frame_id > prev_frame_id) {
                 *(frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
