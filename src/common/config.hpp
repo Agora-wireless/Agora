@@ -63,7 +63,7 @@ public:
     std::vector<uint32_t> beacon;
     float *pilots_;
     int8_t **dl_IQ_data;
-    int **ul_IQ_data;
+    int8_t **ul_IQ_data;
     complex_float **ul_IQ_modul;
     complex_float **dl_IQ_modul;
     std::complex<int16_t> **dl_IQ_symbol;

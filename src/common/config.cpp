@@ -241,7 +241,7 @@ Config::Config(std::string jsonfile)
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
 
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>((int *)dl_IQ_data[i], (int *)(dl_IQ_data[i] + OFDM_CA_NUM)), mod_type);
+        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int8_t>(dl_IQ_data[i], (dl_IQ_data[i] + OFDM_CA_NUM * UE_NUM)), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++) {
             if ((j % OFDM_CA_NUM) < OFDM_DATA_START || (j % OFDM_CA_NUM) >= OFDM_DATA_START + OFDM_DATA_NUM) {
                 dl_IQ_modul[i][j].re = 0;
@@ -270,7 +270,7 @@ Config::Config(std::string jsonfile)
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
         for (size_t j = 0; j < OFDM_DATA_NUM; j++)
             ul_IQ_data[i][j] = rand() % mod_order;
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM), mod_type);
+        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM * UE_NUM), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
             if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM)
                 continue;
