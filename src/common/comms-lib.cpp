@@ -370,7 +370,7 @@ std::vector<std::complex<float>> CommsLib::composeRefSymbol(std::vector<std::com
         return fft_in;
 }
 
-std::vector<std::complex<float>> CommsLib::modulate(std::vector<int> in, int type)
+std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int type)
 {
     std::vector<std::complex<float>> out(in.size());
     if (type == QPSK) {

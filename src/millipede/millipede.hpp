@@ -30,21 +30,26 @@
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
-#include "cpu_attach.hpp"
-#include "packageReceiver.hpp"
+// #include "cpu_attach.hpp"
+#include "txrx.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "gettime.h"
-#include "compute_common.hpp"
 #include "offset.h"
 #include "dofft.hpp"
 #include "dozf.hpp"
 #include "dodemul.hpp"
 #include "doprecode.hpp"
+
+#ifdef USE_LDPC
+#include "docoding.hpp"
+#endif
+
 #include "memory_manage.h"
 #include "stats.hpp"
 #include "config.hpp"
 #include "signalHandler.hpp"
+#include "utils.h"
 
 class Millipede
 {
@@ -62,17 +67,17 @@ public:
     void start();
     void stop();
 
-    static void *taskThread(void *context);
-    static void *fftThread(void *context);
-    static void *zfThread(void *context);
-    static void *demulThread(void *context); 
+    void *worker(int tid);
+    void *worker_fft(int tid);
+    void *worker_zf(int tid);
+    void *worker_demul(int tid);
+    void create_threads(thread_type thread, int tid_start, int tid_end);
 
-
-    struct EventHandlerContext
-    {
-        Millipede *obj_ptr;
-        int id;
-    };
+    // struct EventHandlerContext
+    // {
+    //     Millipede *obj_ptr;
+    //     int id;
+    // };
 
     inline void update_frame_count(int *frame_count);
     /* Add tasks into task queue based on event type */
@@ -82,6 +87,8 @@ public:
     void schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer, int data_subframe_id, moodycamel::ProducerToken const& ptok);
     void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
+    void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
+    void schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode);
     void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
     void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
 
@@ -98,7 +105,7 @@ public:
     void free_downlink_buffers();
 
 
-    void save_demul_data_to_file();
+    void save_demul_data_to_file(int frame_id, int data_subframe_id);
     void getDemulData(int **ptr, int *size);
     void getEqualData(float **ptr, int *size);
 
@@ -117,7 +124,7 @@ private:
     int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     int dl_data_subframe_start, dl_data_subframe_end;
     bool downlink_mode;
-    int package_length;
+    int packet_length;
 
     int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
     int FFT_THREAD_NUM, DEMUL_THREAD_NUM, ZF_THREAD_NUM;
@@ -125,7 +132,11 @@ private:
     int demul_block_size, demul_block_num;
     int zf_block_size, zf_block_num;
 
+
+    LDPCconfig LDPC_config;
+
     /* lookup table for 16 QAM, real and imag */
+    size_t mod_type;
     float **qam16_table_;
     float *pilots_;
     Config *cfg_;
@@ -133,12 +144,12 @@ private:
     float csi_format_offset;
     int buffer_frame_num;
     int max_packet_num_per_frame;
-    std::unique_ptr<PackageReceiver> receiver_;
+    std::unique_ptr<PacketTXRX> receiver_;
     std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t *task_threads;
-    EventHandlerContext *context;
+    EventHandlerContext<Millipede> *context;
     /*****************************************************
      * Buffers
      *****************************************************/ 
@@ -146,8 +157,8 @@ private:
     /** 
      * received data 
      * Frist dimension: SOCKET_THREAD_NUM
-     * Second dimension of buffer (type: char): package_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+     * Second dimension of buffer (type: char): packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
     char **socket_buffer_;
@@ -191,9 +202,9 @@ private:
      * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    uint8_t **demul_hard_buffer_;
+    uint8_t **demod_hard_buffer_;
 
-    float **demul_soft_buffer_;
+    int8_t **demod_soft_buffer_;
 
     /** 
      * Predicted CSI data 
@@ -203,7 +214,7 @@ private:
     complex_float **pred_csi_buffer_;
 
 
-    int **decoded_buffer_;
+    uint8_t **decoded_buffer_;
 
 
 
@@ -248,7 +259,7 @@ private:
      * First dimension: data_subframe_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
-    int **dl_IQ_data;
+    int8_t **dl_IQ_data;
     long long **dl_IQ_data_long;
 
     /** 
@@ -292,11 +303,14 @@ private:
     complex_float **dl_precoded_data_buffer_;
 
 
+    int8_t **dl_encoded_buffer_;
+
+
     /**
      * Data for transmission
      * First dimension of buffer (type: char): subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM
-     * Second dimension: package_length * BS_ANT_NUM
-     * package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+     * Second dimension: packet_length * BS_ANT_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
     char *dl_socket_buffer_;
@@ -309,41 +323,20 @@ private:
     int **dl_data_counter_scs_;
     int *dl_data_counter_subframes_;
     int **modulate_checker_;
-    int *ifft_checker_;
+    int *ifft_counter_ants_;
     int **tx_counter_ants_;
     int *tx_counter_subframes_;
+
+    int **encode_counter_blocks_;
+    int *encode_counter_subframes_;
     // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
 
-
-
+    int *prev_frame_counter;
+    int prev_frame_counter_max;
     /*****************************************************
      * Concurrent queues 
      *****************************************************/ 
     /* Uplink*/
-    /* task queue for uplink FFT */
-    // moodycamel::ConcurrentQueue<Event_data> fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for ZF */
-    // moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* main thread message queue for data receiving */
-    // moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* main thread message queue for task completion*/
-    // moodycamel::ConcurrentQueue<Event_data> complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    //  /* task queue for uplink FFT */
-    // moodycamel::ConcurrentQueue<Event_data> fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for ZF */
-    // moodycamel::ConcurrentQueue<Event_data> zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for uplink demodulation */
-    // moodycamel::ConcurrentQueue<Event_data> decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512);
-    // /* main thread message queue for data receiving */
-    // moodycamel::ConcurrentQueue<Event_data> message_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*subframe_num_perframe);
-    // /* main thread message queue for task completion*/
-    // moodycamel::ConcurrentQueue<Event_data> complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*subframe_num_perframe*4);
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> zf_queue_;
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
@@ -355,24 +348,9 @@ private:
 
 
     /* Downlink*/
-    // /* task queue for downlink IFFT */
-    // moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink modulation */
-    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink precoding */
-    // moodycamel::ConcurrentQueue<Event_data> precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink data transmission */
-    // moodycamel::ConcurrentQueue<Event_data> tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    // /* task queue for downlink IFFT */
-    // moodycamel::ConcurrentQueue<Event_data> ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for downlink modulation */
-    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for downlink precoding */
-    // moodycamel::ConcurrentQueue<Event_data> precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
-    // /* task queue for downlink data transmission */
-    // moodycamel::ConcurrentQueue<Event_data> tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(512*data_subframe_num_perframe*4);
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
@@ -389,17 +367,21 @@ private:
     int *FFT_task_count;
     int *ZF_task_count;
     int *Demul_task_count;
+    int *Decode_task_count;
 
     double **CSI_task_duration;
     double **FFT_task_duration;
     double **ZF_task_duration;
     double **Demul_task_duration;
+    double **Decode_task_duration;
 
     int *IFFT_task_count;
     int *Precode_task_count;
+    int *Encode_task_count;
 
     double **IFFT_task_duration;
     double **Precode_task_duration;
+    double **Encode_task_duration;
 
     double **frame_start;
 
