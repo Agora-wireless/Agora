@@ -152,6 +152,9 @@ void* RadioConfig::initBSRadio(void* in_context)
     }
     rc->rxStreams[i] = rc->baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
     rc->txStreams[i] = rc->baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
+
+    rc->remainingJobs--;
+    return 0;
 }
 
 void* RadioConfig::configureBSRadio(void* in_context)
@@ -178,16 +181,16 @@ void* RadioConfig::configureBSRadio(void* in_context)
 
     SoapySDR::Kwargs info = rc->baStn[i]->getHardwareInfo();
     for (auto ch : { 0, 1 }) {
-        rc->baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, (1 + 2 * cfg->bbf_ratio) * cfg->rate);
-        rc->baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, (1 + 2 * cfg->bbf_ratio) * cfg->rate);
+        rc->baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, cfg->bwFilter);
+        rc->baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, cfg->bwFilter);
 
         //rc->baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
         //rc->baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
 
-        rc->baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg->freq - cfg->bbf_ratio * cfg->rate);
-        rc->baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", cfg->bbf_ratio * cfg->rate);
-        rc->baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg->freq - cfg->bbf_ratio * cfg->rate);
-        rc->baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", cfg->bbf_ratio * cfg->rate);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg->radioRfFreq);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", cfg->nco);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg->radioRfFreq);
+        rc->baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", cfg->nco);
 
         if (info["frontend"].find("CBRS") != std::string::npos) {
             if (cfg->freq > 3e9)
@@ -249,7 +252,6 @@ void* RadioConfig::configureBSRadio(void* in_context)
                 0xa1050000 | 0x1e //TBB in power down
             };
             rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
-
         }
         rc->baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         rc->baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
@@ -307,20 +309,20 @@ bool RadioConfig::radioStart()
     if (!isUE && _cfg->downlink_mode) {
         std::cout << "start sample offset correction" << std::endl;
         int iter = 0;
-	int max_iter = 3;
+        int max_iter = 3;
         size_t ref_ant = _cfg->ref_ant;
         while (!good_calib) {
             good_calib = correctSampleOffset(ref_ant, _cfg->sampleCalEn);
             iter++;
             if (iter == max_iter && !good_calib) {
-                std::cout << "attempted "<< max_iter <<" unsucessful calibration, stopping ..." << std::endl;
+                std::cout << "attempted " << max_iter << " unsucessful calibration, stopping ..." << std::endl;
                 break;
             }
         }
-	if (!good_calib)
-	    return good_calib;
-	else
-	    std::cout << "sample offset calibration successful!" << std::endl;	
+        if (!good_calib)
+            return good_calib;
+        else
+            std::cout << "sample offset calibration successful!" << std::endl;
     }
 
     // send through the first radio for now
@@ -339,14 +341,14 @@ bool RadioConfig::radioStart()
             _tddSched[r] = _cfg->frames[0];
             for (size_t s = 0; s < _cfg->frames[0].size(); s++) {
                 char c = _cfg->frames[0].at(s);
-                if (c == 'B')
-                    _tddSched[r].replace(s, 1, "G");
-                else if (c == 'P' and _cfg->pilotSymbols[0][r] != s)
+                if (c == 'P' and _cfg->pilotSymbols[0][r] != s)
                     _tddSched[r].replace(s, 1, "G");
                 else if (c == 'U')
                     _tddSched[r].replace(s, 1, "T");
                 else if (c == 'D')
                     _tddSched[r].replace(s, 1, "R");
+                else
+                    _tddSched[r].replace(s, 1, "G");
             }
             std::cout << _tddSched[r] << std::endl;
         }
@@ -384,36 +386,50 @@ bool RadioConfig::radioStart()
         }
     } else {
         drain_buffers();
-        _tddSched.resize(_cfg->framePeriod);
         for (size_t f = 0; f < _cfg->framePeriod; f++) {
-            _tddSched[f] = _cfg->frames[f];
-            for (size_t s = 0; s < _cfg->frames[f].size(); s++) {
-                char c = _cfg->frames[f].at(s);
-                if (c == 'P')
-                    _tddSched[f].replace(s, 1, "R");
-                else if (c == 'U')
-                    _tddSched[f].replace(s, 1, "R");
-                else if (c == 'D')
-                    _tddSched[f].replace(s, 1, "T");
-            }
-            std::cout << _tddSched[f] << std::endl;
+            std::string sched = _cfg->frames[f];
+            if (sched.find("C") != std::string::npos
+                && sched.find("L") != std::string::npos)
+                calib = true;
         }
-
         json conf;
         conf["tdd_enabled"] = true;
         conf["frame_mode"] = "free_running";
         conf["max_frame"] = 0;
-        conf["frames"] = _tddSched;
         conf["symbol_size"] = _cfg->sampsPerSymbol;
         conf["beacon_start"] = _cfg->prefix;
         conf["beacon_stop"] = _cfg->prefix + _cfg->beacon_len;
-        std::string confString = conf.dump();
 
         std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
         size_t ndx = 0;
         for (size_t i = 0; i < this->_radioNum; i++) {
+            bool isRefAnt = (i == _cfg->ref_ant);
             baStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
             baStn[i]->writeSetting("TDD_MODE", "true");
+            std::vector<std::string> tddSched;
+            for (size_t f = 0; f < _cfg->framePeriod; f++) {
+                std::string sched = _cfg->frames[f];
+                size_t schedSize = sched.size();
+                for (size_t s = 0; s < schedSize; s++) {
+                    char c = _cfg->frames[f].at(s);
+                    if (c == 'C')
+                        sched.replace(s, 1, isRefAnt ? "R" : "P");
+                    else if (c == 'L')
+                        sched.replace(s, 1, isRefAnt ? "P" : "R");
+                    else if (c == 'P')
+                        sched.replace(s, 1, isRefAnt ? "R" : "R");
+                    else if (c == 'U')
+                        sched.replace(s, 1, isRefAnt ? "R" : "R");
+                    else if (c == 'D')
+                        sched.replace(s, 1, isRefAnt ? "T" : "T");
+                    else if (c != 'B')
+                        sched.replace(s, 1, "G");
+                }
+                std::cout << sched << std::endl;
+                tddSched.push_back(sched);
+            }
+            conf["frames"] = tddSched;
+            std::string confString = conf.dump();
             baStn[i]->writeSetting("TDD_CONFIG", confString);
 
             baStn[i]->writeRegisters("BEACON_RAM", 0, beacon);
@@ -422,13 +438,31 @@ bool RadioConfig::radioStart()
                 std::vector<unsigned> beacon_weights(_cfg->nAntennas, isBeaconAntenna ? 1 : 0);
                 std::string tx_ram_wgt = "BEACON_RAM_WGT_";
                 if (_cfg->beamsweep) {
-                    for (int j = 0; j < _cfg->nAntennas; j++)
+                    for (size_t j = 0; j < _cfg->nAntennas; j++)
                         beacon_weights[j] = CommsLib::hadamard2(ndx, j);
                 }
                 baStn[i]->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
                 ++ndx;
             }
             baStn[i]->writeSetting("BEACON_START", std::to_string(_radioNum));
+            if (calib) {
+                if (isRefAnt) {
+                    baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
+		    // looks like the best solution is to just use one
+		    // antenna at the reference node and leave the 2nd
+		    // antenna unused. We either have to use one anntena
+		    // per board, or if we use both channels we need to
+		    // exclude reference board from beamforming
+                } else {
+                    std::vector<std::complex<float>> recipCalDlPilot;
+                    recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
+                    baStn[i]->writeRegisters("TX_RAM_A", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
+                    if (_cfg->nChannels == 2) {
+                        recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
+                        baStn[i]->writeRegisters("TX_RAM_B", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
+                    }
+                }
+            }
 
             baStn[i]->setHardwareTime(0, "TRIGGER");
             baStn[i]->activateStream(this->rxStreams[i]);
@@ -510,8 +544,8 @@ int RadioConfig::radioRx(size_t r /*radio id*/, void** buffs, long long& frameTi
 
 void RadioConfig::drain_buffers()
 {
-    std::vector<std::complex<int16_t> > dummyBuff0(_cfg->sampsPerSymbol);
-    std::vector<std::complex<int16_t> > dummyBuff1(_cfg->sampsPerSymbol);
+    std::vector<std::complex<int16_t>> dummyBuff0(_cfg->sampsPerSymbol);
+    std::vector<std::complex<int16_t>> dummyBuff1(_cfg->sampsPerSymbol);
     std::vector<void*> dummybuffs(2);
     dummybuffs[0] = dummyBuff0.data();
     dummybuffs[1] = dummyBuff1.data();
@@ -566,7 +600,6 @@ void RadioConfig::readSensors()
 
 void RadioConfig::radioStop()
 {
-    int schedLen = _cfg->symbolsPerFrame; //std::max(this->_radioNum+3, _cfg->symbolsPerFrame);
     std::vector<uint32_t> zeros(4096, 0);
     std::string corrConfStr = "{\"corr_enabled\":false}";
     std::string tddConfStr = "{\"tdd_enabled\":false}";
@@ -575,7 +608,7 @@ void RadioConfig::radioStop()
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->writeSetting("TDD_MODE", "false");
         baStn[i]->writeSetting("TDD_CONFIG", tddConfStr);
-	if (isUE)
+        if (isUE)
             baStn[i]->writeSetting("CORR_CONFIG", corrConfStr);
     }
 }

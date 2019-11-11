@@ -59,7 +59,7 @@ public:
     static std::vector<int> getPilotScInd(int fftSize);
     static std::vector<std::complex<float>> getPilotSc(int fftSize);
     static std::vector<std::complex<float>> FFT(std::vector<std::complex<float>>, int);
-    static std::vector<std::complex<float>> IFFT(std::vector<std::complex<float>>, int);
+    static std::vector<std::complex<float>> IFFT(std::vector<std::complex<float>>, int, bool scale = true);
     static size_t find_pilot_seq(std::vector<std::complex<double>> iq, std::vector<std::complex<double>> pilot, size_t seqLen);
     static int findLTS(std::vector<std::complex<double>> iq, int seqLen);
     static std::vector<double> convolve(std::vector<std::complex<double>> const &f, std::vector<std::complex<double>> const &g);
@@ -73,6 +73,7 @@ public:
     //static T findTone(std::vector<T> const&, double, double, size_t, const size_t delta = 10);
     static float findTone(std::vector<float> const&, double, double, size_t, const size_t delta = 10);
     static float measureTone(std::vector<std::complex<float>> const&, std::vector<float> const&, double, double, size_t, const size_t delta = 10);
+    static std::vector<std::complex<float>> composeRefSymbol(std::vector<std::complex<float>>, size_t, size_t, size_t, bool timeDomain = true);
 //private:
 //    static inline float** init_qpsk();
 //    static inline float** init_qam16();

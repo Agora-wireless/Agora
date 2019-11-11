@@ -179,7 +179,7 @@ Config::Config(std::string jsonfile)
             pilots_[i] = pilots_2048[424+i-OFDM_DATA_START];
     }
 #endif
-    std::vector<std::complex<float> > pilotsF(OFDM_CA_NUM);
+    pilotsF.resize(OFDM_CA_NUM);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilotsF[i] = pilots_[i];
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
