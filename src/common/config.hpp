@@ -115,11 +115,13 @@ public:
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
+    size_t OFDM_SYM_LEN;
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
+    std::string exec_mode;
 
     size_t packet_header_offset;
     size_t packet_length;

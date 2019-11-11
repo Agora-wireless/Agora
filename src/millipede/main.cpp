@@ -6,10 +6,15 @@
 
 #include "millipede.hpp"
 
-int main()
+int main(int argc, char * argv[])
 {
+    std::string confFile;
+    if (argc == 2)
+	confFile = std::string("/")+std::string(argv[1]);
+    else 
+        confFile = "/data/tddconfig_512.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/tddconfig_512.json";
+    std::string filename = cur_directory + confFile;
     Config *cfg = new Config(filename.c_str());
     Millipede *millipede_cli;
     int ret;
