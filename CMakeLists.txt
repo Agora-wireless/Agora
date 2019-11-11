@@ -38,6 +38,7 @@ set(USE_DPDK False)
 set(USE_ARGOS False)
 set(USE_LDPC False)
 
+set (TXRX_SOURCE src/millipede/txrx/txrx.cpp)
 
 # DPDK
 if (${USE_DPDK})
@@ -48,6 +49,7 @@ if (${USE_DPDK})
   else ()
     add_definitions(-DUSE_DPDK)
   endif()
+  set (TXRX_SOURCE src/millipede/txrx/txrx_DPDK.cpp)
   set (RTE_SDK /home/argos/Jian/dpdk-stable-18.11.1/)
   set (RTE_TARGET x86_64-native-linuxapp-gcc)
   set ( DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
@@ -73,6 +75,7 @@ if (${USE_ARGOS})
   include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
   set (SOAPY_LIB ${SoapySDR_LIBRARIES})
   set (ARGOS_SOURCES src/millipede/radio_lib.cpp)
+  set (TXRX_SOURCE src/millipede/txrx/txrx_argos.cpp)
   set (CLIENT_SOURCES
          src/common/modulation.cpp
          src/millipede/ru.cpp
@@ -94,6 +97,8 @@ link_directories(${MKL_LINK_DIR})
 
 include_directories(
 	src/common/
+  src/millipede/
+  src/millipede/txrx/
 	)
 
 
@@ -105,13 +110,13 @@ set(COMMON_SOURCES src/common/config.cpp
                    src/common/modulation.cpp
                    src/common/net.cpp)
 add_library(comp MODULE 
-       src/millipede/txrx.cpp
        src/millipede/millipede.cpp
        src/millipede/stats.cpp 
        src/millipede/dofft.cpp
        src/millipede/dozf.cpp
        src/millipede/dodemul.cpp
        src/millipede/doprecode.cpp
+       ${TXRX_SOURCE}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
 target_link_libraries(comp -lpthread -lmufft -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
@@ -158,13 +163,13 @@ foreach(dir ${dirs})
 endforeach()
 
 set(SOURCES src/millipede/main.cpp 
-            src/millipede/txrx.cpp 
             src/millipede/millipede.cpp   
             src/millipede/stats.cpp 
             src/millipede/dofft.cpp 
             src/millipede/dozf.cpp 
             src/millipede/dodemul.cpp 
             src/millipede/doprecode.cpp
+            ${TXRX_SOURCE}
             ${COMMON_SOURCES}
             ${ARGOS_SOURCES}
             ${LDPC_SOURCES})
