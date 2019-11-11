@@ -101,8 +101,8 @@ private:
     size_t TX_PREFIX_LEN;
     size_t CP_LEN;
     size_t subframe_num_perframe, data_subframe_num_perframe;
-    size_t package_length;
-    size_t package_header_offset;
+    size_t packet_length;
+    size_t packet_header_offset;
     size_t buffer_subframe_num_;
 
     int tid;
