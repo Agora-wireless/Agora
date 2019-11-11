@@ -53,7 +53,7 @@ public:
     ~CommsLib();
 
     static std::vector<std::vector<double> > getSequence(int N, int type);
-    static std::vector<std::complex<float>> modulate(std::vector<int>, int);
+    static std::vector<std::complex<float>> modulate(std::vector<int8_t>, int);
     static std::vector<int> getDataSc(int fftSize);
     static std::vector<int> getNullSc(int fftSize);
     static std::vector<int> getPilotScInd(int fftSize);

@@ -4,28 +4,15 @@
 
 #define ENABLE_CPU_ATTACH
 //#define GENERATE_PILOT
+#ifdef USE_ARGOS
 #define GENERATE_DATA
+#endif
 #define SEPARATE_TX_RX 1
+
+#define MOD_ORDER 4
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
-
-// #define BS_ANT_NUM 16
-// #define OFDM_CA_NUM 2048
-// #define FFT_LEN 2048
-// #define OFDM_DATA_NUM 1200
-// #define OFDM_DATA_START 424
-
-// #ifdef USE_ARGOS
-//   #define TX_PREFIX_LEN 128
-//   #define CP_LEN 128
-//   #define OFDM_PREFIX_LEN (152 + CP_LEN)
-//   #define UE_NUM 2
-// #else
-//   #define CP_LEN 0
-//   #define OFDM_PREFIX_LEN (0 + CP_LEN)
-//   #define UE_NUM 8
-// #endif
 
 #define CODED_LEN 32
 #define ORIG_CODE_LEN 16
@@ -39,7 +26,7 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
-#define EVENT_PACKAGE_RECEIVED 0
+#define EVENT_PACKET_RECEIVED 0
 #define EVENT_FFT 1
 #define EVENT_ZF 2
 #define EVENT_DEMUL 3
@@ -48,7 +35,7 @@
 #define EVENT_MODUL 5
 #define EVENT_IFFT 6
 #define EVENT_PRECODE 7
-#define EVENT_PACKAGE_SENT 8
+#define EVENT_PACKET_SENT 8
 
 #define EVENT_DECODE 9
 #define EVENT_ENCODE 10
@@ -75,16 +62,19 @@
 #define PRINT_IFFT 7
 #define PRINT_TX_FIRST 8
 #define PRINT_TX 9
+#define PRINT_DECODE 10
+#define PRINT_ENCODE 11
 
 
 #define BIGSTATION 0
-#define ENABLE_DOWNLINK 0
+// #define ENABLE_DOWNLINK 0
+#define ENABLE_DECODE 1
 #define USE_IPV4 1
 //#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
-#define EXPORT_CONSTELLATION 1
-#define ENABLE_DECODE 0
+#define EXPORT_CONSTELLATION 0
+
 #define COMBINE_EQUAL_DECODE 1
 
 #define DO_PREDICTION 0
@@ -92,7 +82,7 @@
 
 
 #define DEBUG_PRINT_PER_FRAME_DONE 1
-#define DEBUG_PRINT_PER_SUBFRAME_DONE 0
+#define DEBUG_PRINT_PER_SUBFRAME_DONE 1
 #define DEBUG_PRINT_PER_TASK_DONE 0
 #define DEBUG_PRINT_SUMMARY_100_FRAMES 0
 
@@ -100,7 +90,7 @@
 #define DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE 0
 #define DEBUG_PRINT_PER_TASK_ENTER_QUEUE 0
 
-#define DEBUG_PRINT_PER_FRAME_START 0
+#define DEBUG_PRINT_PER_FRAME_START 1
 
 #define DEBUG_PRINT_STATS_PER_THREAD 0
 #define DEBUG_UPDATE_STATS 1
@@ -128,42 +118,51 @@
 #define SCH_MODE_REG      140
 #define TX_GAIN_CTRL      88
 
+typedef enum {
+	Master,
+	Worker,
+	Worker_FFT,
+	Worker_ZF,
+	Worker_Demul,
+	Worker_RX,
+	Worker_TX,
+	Worker_TXRX,
+	Master_RX,
+	Master_TX,
+} thread_type;
 
-// #ifdef USE_ARGOS
-// static const int subframe_num_perframe = 5;
-// static const int pilot_subframe_num_perframe = UE_NUM;
-// static const int data_subframe_num_perframe = 1; 
-// static const int OFDM_FRAME_LEN = OFDM_CA_NUM + 2*TX_PREFIX_LEN;
-// 	#if ENABLE_DOWNLINK
-// 	static const int ul_data_subframe_num_perframe = 0;
-// 	static const int dl_data_subframe_num_perframe = 3;
-// 	static const int dl_data_subframe_start = data_subframe_num_perframe - 3;
-// 	#else 
-// 	static const int ul_data_subframe_num_perframe = data_subframe_num_perframe;
-// 	static const int dl_data_subframe_num_perframe = 0;
-// 	static const int dl_data_subframe_start = data_subframe_num_perframe;
-// 	#endif
+static const char *THREAD_TYPE_STRING[] = {
+	"Master",
+	"Worker",
+	"Worker (FFT)",
+	"Worker (ZF)",
+	"Worker (Demul)",
+	"RX",
+	"TX",
+	"TXRX",
+	"Master (RX)",
+	"Master (TX)"
+};
 
-// #else
-// static const int subframe_num_perframe = 70;
-// static const int pilot_subframe_num_perframe = UE_NUM;
-// static const int data_subframe_num_perframe = subframe_num_perframe - pilot_subframe_num_perframe;
-// static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
-// 	#if ENABLE_DOWNLINK
-// 	static const int ul_data_subframe_num_perframe = 0;
-// 	static const int dl_data_subframe_num_perframe = 10;
-// 	static const int dl_data_subframe_start = data_subframe_num_perframe - 10;
-// 	#else 
-// 	static const int ul_data_subframe_num_perframe = data_subframe_num_perframe;
-// 	static const int dl_data_subframe_num_perframe = 0;
-// 	static const int dl_data_subframe_start = data_subframe_num_perframe;
-// 	#endif
-// #endif
 
-// static const int dl_data_subframe_end = dl_data_subframe_start + dl_data_subframe_num_perframe;
-// /* header 4 int for: frame_id, subframe_id, cell_id, ant_id, use short for I/Q samples */
-// static const int package_header_offset = 64;
-// static const int package_length = package_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
+
+
+struct LDPCconfig {
+    uint16_t Bg;
+    bool earlyTermination;
+    int16_t decoderIter;
+    uint16_t Zc;
+    int nRows;
+    uint32_t cbEncLen;
+    uint32_t cbLen;
+    uint32_t cbCodewLen;
+    int nblocksInSymbol;
+};
+
+typedef struct LDPCconfig LDPCconfig;
+
+
 static const int MAX_FRAME_ID = 1e4;
-
+static const int float_num_in_simd256 = 8;
+static const int double_num_in_simd256 = 4;
 #endif

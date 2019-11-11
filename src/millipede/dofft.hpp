@@ -121,7 +121,7 @@ private:
     complex_float **dl_ifft_buffer_;
 
 
-    // int package_length;
+    // int packet_length;
     double **FFT_task_duration;
     double **CSI_task_duration;
     int *FFT_task_count;

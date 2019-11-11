@@ -16,7 +16,7 @@
 #include "Symbols.hpp"
 #include "gettime.h"
 #include "offset.h"
-#include "compute_common.hpp"
+#include "modulation.hpp"
 #include "config.hpp"
 // #include "mkl_dfti.h"
 
@@ -24,19 +24,19 @@
 class DoDemul
 {
 public:
-    DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
+    DoDemul(Config *cfg, int in_tid, int in_demod_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demul_hard_buffer,
-        double **in_Demul_task_duration, int *in_Demul_task_count);
+        int8_t **in_demod_soft_buffer, double **in_Demul_task_duration, int *in_Demul_task_count);
     ~DoDemul();
 
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
      * @param tid: task thread index, used for selecting spm_buffer and task ptok
      * @param offset: offset of the first subcarrier in the block in data_buffer_
-     * Buffers: data_buffer_, spm_buffer_, precoder_buffer_, equal_buffer_, demul_hard_buffer_
+     * Buffers: data_buffer_, spm_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_
      *     Input buffer: data_buffer_, precoder_buffer_
-     *     Output buffer: demul_hard_buffer_
+     *     Output buffer: demod_hard_buffer_
      *     Intermediate buffer: spm_buffer, equal_buffer_
      * Offsets: 
      *     data_buffer_: 
@@ -79,7 +79,8 @@ private:
     complex_float **data_buffer_;
     complex_float **precoder_buffer_;
     complex_float **equal_buffer_;
-    uint8_t **demul_hard_buffer_;
+    uint8_t **demod_hard_buffer_;
+    int8_t **demod_soft_buffer_;
 
     double **Demul_task_duration;
     int *Demul_task_count;
@@ -91,10 +92,12 @@ private:
     complex_float *spm_buffer;
 
     /** 
-     * Intermediate buffer for equalized data
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: UE_NUM * 1 */
+     * Intermediate buffers for equalized data
+     * dimension: UE_NUM * demul_block_size */
     complex_float *equaled_buffer_temp;
+    complex_float *equaled_buffer_temp_transposed;
+
+    int ue_num_simd256;
 
 
 };

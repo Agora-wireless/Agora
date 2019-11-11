@@ -12,13 +12,16 @@
 #include <boost/align/aligned_allocator.hpp>
 
 // size: 8 bytes
+#ifdef USE_LDPC
+#include "common_typedef_sdk.h"
+#else
 struct complex_float {
-    float real;
-    float imag;
+    float re;
+    float im;
 };
+#endif
 
-//typedef std::vector<complex_float> myVec;
-typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
+
 
 // structure for event
 struct Event_data
@@ -27,6 +30,24 @@ struct Event_data
     int data;
     // int more_data;
 };
+
+
+struct Packet {
+    uint32_t frame_id;
+    uint32_t symbol_id;
+    uint32_t cell_id;
+    uint32_t ant_id;
+    short data[];
+    Packet(int f, int s, int c, int a)
+        : frame_id(f)
+        , symbol_id(s)
+        , cell_id(c)
+        , ant_id(a)
+    {
+    }
+};
+
+
 
 // buffer of each socket thread
 struct SocketBuffer
@@ -95,7 +116,7 @@ struct DemulBuffer
 
 struct DLSocketBuffer
 {
-    std::vector<char> buffer;
+    char **buffer;
 };
 
 // struct RawDataBuffer
