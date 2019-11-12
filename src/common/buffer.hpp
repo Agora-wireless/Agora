@@ -24,8 +24,7 @@ struct complex_float {
 
 
 // structure for event
-struct Event_data
-{
+struct Event_data {
     int event_type;
     int data;
     // int more_data;
@@ -48,84 +47,49 @@ struct Packet {
 };
 
 
-
-// buffer of each socket thread
-struct SocketBuffer
-{
-    // Received data
-    char *buffer;
-    int *buffer_status;
-    // std::vector<char> buffer;
-    // std::vector<int> buffer_status;
+struct FFT_stats {
+    int **count_ants;
+    int *count_pilot_symbols;
+    int *count_data_symbols;
+    bool **data_exist_in_symbol;
+    int frame_count = 0;
+    int count_ants_max;
+    int count_pilot_max;
+    int count_data_max;
 };
+
+struct ZF_stats {
+    int *count_SCs;
+    int frame_count = 0;
+    int count_SC_max;
+    bool *precoder_exist_in_frame;
+};
+
+struct Demul_stats {
+    int **count_SCs;
+    int *count_symbols;
+    int frame_count = 0;
+    int count_SC_max;
+    int count_symbol_max;
+};
+
 
 struct FFTBuffer
 {
     // Data before IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
-    complex_float ** FFT_inputs;
-    complex_float ** FFT_outputs;
+    complex_float **FFT_inputs;
+    complex_float **FFT_outputs;
 };
 
 struct IFFTBuffer
 {
     // Data before IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
-    complex_float ** IFFT_inputs;
-    complex_float ** IFFT_outputs;
+    complex_float **IFFT_inputs;
+    complex_float **IFFT_outputs;
 };
 
-struct CSIBuffer
-{
-    // CSI symbols after IFFT
-    // record TASK_BUFFER_FRAME_NUM entire frames
-    // inner vector is a BS_ANT_NUM * UE_NUM matrix
-    // std::vector<myVec> CSI;
-    complex_float ** CSI;
-};
-
-struct DataBuffer
-{
-    // Data symbols after IFFT    
-    // record TASK_BUFFER_FRAME_NUM entire frames
-    complex_float ** data;
-    // std::vector<myVec> data;
-};
-
-struct PrecoderBuffer
-{
-    // record TASK_BUFFER_FRAME_NUM entire frames
-    // inner vector is a UE_NUM * BS_ANT_NUM matrix
-    // std::vector<myVec> precoder;
-    complex_float ** precoder;
-};
-
-struct EqualBuffer
-{
-    // record TASK_BUFFER_FRAME_NUM entire frames
-    // std::vector<myVec> data;
-    complex_float ** data;
-};
-
-struct DemulBuffer
-{
-    // record TASK_BUFFER_FRAME_NUM entire frames
-    // std::vector<std::vector<long long>> data;
-    int ** data;
-};
-
-struct DLSocketBuffer
-{
-    char **buffer;
-};
-
-// struct RawDataBuffer
-// {
-//     // Raw data symbols before modulation    
-//     // record TASK_BUFFER_FRAME_NUM entire frames
-//     std::vector<int> buffer;
-//     std::vector<int> buffer_status;
-// };
 
 inline size_t generateOffset2d(size_t max_dim1, size_t max_dim2, size_t dim1_id, size_t dim2_id) 
 {
