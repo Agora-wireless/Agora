@@ -117,7 +117,7 @@ public:
     
 
 private:
-    int BS_ANT_NUM, UE_NUM;
+    int BS_ANT_NUM, UE_NUM, PILOT_NUM;
     int OFDM_CA_NUM;
     int OFDM_DATA_NUM;
     int subframe_num_perframe, data_subframe_num_perframe;
@@ -216,9 +216,9 @@ private:
 
     uint8_t **decoded_buffer_;
 
-
-
-    
+    FFT_stats fft_stats_;
+    ZF_stats zf_stats_;
+    Demul_stats demul_stats_;
 
     /* Uplink status checkers used by master thread */ 
     /* used to check if RX for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */

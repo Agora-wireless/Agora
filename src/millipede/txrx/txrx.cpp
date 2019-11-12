@@ -306,8 +306,8 @@ void *PacketTXRX::loopSend(int tid)
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;  
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
-        struct Packet *pkg = (struct Packet *)cur_buffer_ptr;
-        new (pkg) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+        struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+        new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
         // send data (one OFDM symbol)
         if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
@@ -445,10 +445,10 @@ void *PacketTXRX::loopTXRX(int tid)
 
         #if MEASURE_TIME
             // read information from received packet 
-            struct Packet *pkg = (struct Packet *)rx_cur_buffer_ptr;
-            frame_id = pkg->frame_id;
-            symbol_id = pkg->symbol_id;
-            ant_id = pkg->ant_id;
+            struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
+            frame_id = pkt->frame_id;
+            symbol_id = pkt->symbol_id;
+            ant_id = pkt->ant_id;
             // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, symbol_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
@@ -504,10 +504,10 @@ void *PacketTXRX::loopTXRX(int tid)
 
                 rx_packet_num_per_frame++;
                 
-                struct Packet *pkg = (struct Packet *)rx_cur_buffer_ptr;
-                frame_id = pkg->frame_id;
-                symbol_id = pkg->symbol_id;
-                ant_id = pkg->ant_id;
+                struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
+                frame_id = pkt->frame_id;
+                symbol_id = pkt->symbol_id;
+                ant_id = pkt->ant_id;
 
             #if MEASURE_TIME
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, symbol_id, ant_id, rx_offset);
@@ -569,8 +569,8 @@ void *PacketTXRX::loopTXRX(int tid)
                 // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;  
                 // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
-                struct Packet *pkg = (struct Packet *)tx_cur_buffer_ptr;
-                new (pkg) Packet(tx_frame_id, tx_symbol_id, 0 /* cell_id */, tx_ant_id);
+                struct Packet *pkt = (struct Packet *)tx_cur_buffer_ptr;
+                new (pkt) Packet(tx_frame_id, tx_symbol_id, 0 /* cell_id */, tx_ant_id);
                 
                 // send data (one OFDM symbol)
                 if (sendto(socket_local, (char*)tx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
