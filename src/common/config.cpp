@@ -377,13 +377,13 @@ int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
 bool Config::isPilot(size_t frame_id, size_t symbol_id)
 {
     size_t fid = frame_id % framePeriod;
-#ifdef USE_UNDEF //USE_ARGOS
+    char s = frames[fid].at(symbol_id);
     if (symbol_id > symbolsPerFrame) {
         printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n", symbol_id, frame_id);
         return false;
     }
 #ifdef DEBUG3
-    printf("isPilot(%d, %d) = %c\n", frame_id, symbol_id, frames[fid].at(symbol_id));
+    printf("isPilot(%d, %d) = %c\n", frame_id, symbol_id, s);
 #endif
     if (isUE) {
         std::vector<size_t>::iterator it;
@@ -394,52 +394,56 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
         return (ind < DL_PILOT_SYMS);
         //return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
     } else
-        return frames[fid].at(symbol_id) == 'P';
-#else
+        return s == 'P';
+        //return (symbol_id < UE_NUM);
+}
+
+bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
+{
+    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
     if (isUE) {
-        std::vector<size_t>::iterator it;
-        it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
-        int ind = DL_PILOT_SYMS;
-        if (it != DLSymbols[fid].end())
-            ind = it - DLSymbols[fid].begin();
-        return (ind < DL_PILOT_SYMS);
-        //return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
+        return false;
     } else
-        return (symbol_id < UE_NUM);
-#endif
+        return (s == 'C');
+}
+
+bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
+{
+    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
+    if (isUE) {
+        return false;
+    } else
+        return (s == 'L');
 }
 
 bool Config::isUplink(size_t frame_id, size_t symbol_id)
 {
     size_t fid = frame_id % framePeriod;
-#ifdef USE_UNDEF //USE_ARGOS
-    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
     if (symbol_id > symbolsPerFrame) {
         printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n", symbol_id, frame_id);
         return false;
     }
 #ifdef DEBUG3
-    printf("isUplink(%d, %d) = %c\n", frame_id, symbol_id, frames[fid].at(symbol_id));
+    printf("isUplink(%d, %d) = %c\n", frame_id, symbol_id, s);
 #endif
-    return frames[fid].at(symbol_id) == 'U';
-#else
-    if (isUE)
-        return frames[fid].at(symbol_id) == 'U';
-    else
-        return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM);
-#endif
+    return s == 'U';
+    //return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM);
 }
 
 bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 {
     size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
-    printf("isDownlink(%d, %d) = %c\n", frame_id, symbol_id, frames[fid].at(symbol_id));
+    printf("isDownlink(%d, %d) = %c\n", frame_id, symbol_id, s);
 #endif
     if (isUE)
-        return frames[fid].at(symbol_id) == 'D' && !this->isPilot(frame_id, symbol_id);
+        return s == 'D' && !this->isPilot(frame_id, symbol_id);
     else
-        return frames[fid].at(symbol_id) == 'D';
+        return s == 'D';
 }
 
 extern "C" {

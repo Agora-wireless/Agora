@@ -116,6 +116,7 @@ add_library(comp MODULE
        src/millipede/dozf.cpp
        src/millipede/dodemul.cpp
        src/millipede/doprecode.cpp
+       src/millipede/reciprocity.cpp
        ${TXRX_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
@@ -169,6 +170,7 @@ set(SOURCES src/millipede/main.cpp
             src/millipede/dozf.cpp 
             src/millipede/dodemul.cpp 
             src/millipede/doprecode.cpp
+	    src/millipede/reciprocity.cpp
 	    ${TXRX_SOURCES}
             ${COMMON_SOURCES}
             ${ARGOS_SOURCES}

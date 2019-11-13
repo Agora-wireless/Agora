@@ -148,6 +148,8 @@ public:
     int getDownlinkPilotId(size_t, size_t);
     int getPilotSFIndex(size_t, size_t);
     bool isPilot(size_t, size_t);
+    bool isCalDlPilot(size_t, size_t);
+    bool isCalUlPilot(size_t, size_t);
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
     Config(std::string);

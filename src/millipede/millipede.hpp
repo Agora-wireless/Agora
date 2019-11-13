@@ -40,6 +40,7 @@
 #include "dozf.hpp"
 #include "dodemul.hpp"
 #include "doprecode.hpp"
+#include "reciprocity.hpp"
 
 #ifdef USE_LDPC
 #include "docoding.hpp"
@@ -86,6 +87,7 @@ public:
     moodycamel::ProducerToken const& ptok);
     void schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer, int data_subframe_id, moodycamel::ProducerToken const& ptok);
     void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
+    void schedule_rc_task(int frame_id, moodycamel::ProducerToken const& ptok_rc);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
     void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
     void schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode);
@@ -252,6 +254,7 @@ private:
     int **delay_fft_queue;
     int *delay_fft_queue_cnt;
 
+    int *recip_cal_counters_;
 
     /* Downlink */   
     /** 
@@ -294,6 +297,7 @@ private:
 
     complex_float **dl_precoder_buffer_;
     complex_float **recip_buffer_;
+    complex_float **calib_buffer_;
 
     /**
      * Precoded data
@@ -349,6 +353,7 @@ private:
 
     /* Downlink*/
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
+    moodycamel::ConcurrentQueue<Event_data> rc_queue_;
     // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
@@ -365,12 +370,14 @@ private:
      *****************************************************/ 
     int *CSI_task_count;
     int *FFT_task_count;
+    int *RC_task_count;
     int *ZF_task_count;
     int *Demul_task_count;
     int *Decode_task_count;
 
     double **CSI_task_duration;
     double **FFT_task_duration;
+    double **RC_task_duration;
     double **ZF_task_duration;
     double **Demul_task_duration;
     double **Decode_task_duration;

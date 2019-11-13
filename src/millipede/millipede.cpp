@@ -124,6 +124,7 @@ void Millipede::start()
 
     /* downlink */
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
+    moodycamel::ProducerToken ptok_rc(rc_queue_);
     // moodycamel::ProducerToken ptok_modul(modulate_queue_);
     // moodycamel::ProducerToken ptok_encode(precode_queue_);
     moodycamel::ProducerToken ptok_precode(precode_queue_);
@@ -203,12 +204,12 @@ void Millipede::start()
                     interpreteOffset2d_setbits(offset, &socket_thread_id, &offset_in_current_buffer, 28);                
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * packet_length;
                     int frame_id = *((int *)socket_buffer_ptr) % 10000;
-                    int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
+                    int subframe_id = *((int *)socket_buffer_ptr + 1); 
                     int ant_id = *((int *)socket_buffer_ptr + 3);
                     int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
                     int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-                    
-                    update_rx_counters(frame_id, frame_id_in_buffer, subframe_id, ant_id); 
+ 
+                    update_rx_counters(frame_id, frame_id_in_buffer, subframe_id, ant_id);
                     #if BIGSTATION 
                     /* in BigStation, schedule FFT whenever a packet is received */
                     schedule_fft_task(offset, frame_id, frame_id_in_buffer, subframe_id, ant_id, prev_frame_id, ptok);
@@ -249,8 +250,17 @@ void Millipede::start()
                                 schedule_zf_task(frame_id, ptok_zf);
                             }
                         }
-                        else if (cfg_->isUplink(frame_id, subframe_id)) {                     
-                            data_exist_in_subframe_[frame_id][subframe_id-UE_NUM] = true;  
+                        else if (cfg_->isCalDlPilot(frame_id, subframe_id) ||
+				cfg_->isCalUlPilot(frame_id, subframe_id)) {
+                            recip_cal_counters_[frame_id]++;
+                            if (recip_cal_counters_[frame_id] == 2) {
+                                recip_cal_counters_[frame_id] = 0; 
+                                schedule_rc_task(frame_id, ptok_rc);
+                            }
+			}
+                        else if (cfg_->isUplink(frame_id, subframe_id)) {
+			    int ulSFIndex = cfg_->getUlSFIndex(frame_id, subframe_id);
+                            data_exist_in_subframe_[frame_id][ulSFIndex] = true;  
                             data_counter_subframes_[frame_id]++; 
                             print_per_subframe_done(PRINT_FFT_DATA, frame_count_pilot_fft - 1, frame_id, subframe_id);                 
                             if (data_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) {      
@@ -271,6 +281,10 @@ void Millipede::start()
                             }                                      
                         }
                     }
+                }
+                break;          
+                case EVENT_RC: {
+
                 }
                 break;          
                 case EVENT_ZF: {
@@ -342,7 +356,7 @@ void Millipede::start()
                             printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %zu\n", 
                                 frame_count_demul, samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, fft_queue_.size_approx());
                             demul_begin = get_time();
-                        }                       
+                        }
                     }
                 }
                 break;
@@ -509,9 +523,9 @@ void *Millipede::worker(int tid)
     /* initialize operators */
     DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
-        dl_ifft_buffer_, dl_socket_buffer_, 
+        dl_ifft_buffer_, dl_socket_buffer_, calib_buffer_, 
         FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
-        IFFT_task_duration, IFFT_task_count);
+        IFFT_task_duration, IFFT_task_count, RC_task_duration, RC_task_count);
 
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
@@ -522,6 +536,9 @@ void *Millipede::worker(int tid)
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
         Precode_task_duration, Precode_task_count);
+
+    Reciprocity *rc = new Reciprocity(cfg_, tid, &complete_task_queue_, task_ptok_ptr, 
+        calib_buffer_, recip_buffer_, RC_task_duration, RC_task_count);
 
     #ifdef USE_LDPC
     DoCoding *computeCoding = new DoCoding(cfg_, tid, &(complete_task_queue_), task_ptok_ptr,
@@ -582,6 +599,10 @@ void *Millipede::worker(int tid)
                     computeCoding->Decode(event.data);
             break;
             #endif
+            case TASK_RC: 
+                if (ret = rc_queue_.try_dequeue(event)) 
+                    rc->computeReciprocityCalib(event.data);
+            break;
             case TASK_ZF: 
                 if (ret = zf_queue_.try_dequeue(event)) 
                     computeZF->ZF(event.data);
@@ -618,9 +639,9 @@ void* Millipede::worker_fft(int tid)
     /* initialize FFT operator */
     DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
-        dl_ifft_buffer_, dl_socket_buffer_, 
+        dl_ifft_buffer_, dl_socket_buffer_, calib_buffer_, 
         FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
-        IFFT_task_duration, IFFT_task_count);
+        IFFT_task_duration, IFFT_task_count, RC_task_duration, RC_task_count);
 
 
     Event_data event;
@@ -820,6 +841,18 @@ void Millipede::schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer,
     } 
 }
 
+
+void Millipede::schedule_rc_task(int frame_id, moodycamel::ProducerToken const& ptok_rc) 
+{
+    /* schedule normal ZF for all data subcarriers */                                                                                      
+    Event_data do_rc_task;
+    do_rc_task.event_type = TASK_RC;
+    do_rc_task.data = frame_id;
+    schedule_task(do_rc_task, &rc_queue_, ptok_rc);
+#if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
+    printf("Main thread: created Reciprocity Cal tasks for frame: %d\n", frame_id);
+#endif
+}
 
 void Millipede::schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf) 
 {
@@ -1141,6 +1174,7 @@ void Millipede::initialize_queues()
 
     fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);;
+    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);;
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     
@@ -1210,12 +1244,14 @@ void Millipede::initialize_uplink_buffers()
     /* initilize all timestamps and counters for worker threads */
     alloc_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    alloc_buffer_2d(&RC_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
     alloc_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
     alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    alloc_buffer_1d(&RC_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
     alloc_buffer_1d(&Decode_task_count, TASK_THREAD_NUM * 16, 64, 1);
@@ -1237,6 +1273,7 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64, 0);
     alloc_buffer_2d(&dl_precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
     alloc_buffer_2d(&dl_encoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
+    alloc_buffer_2d(&calib_buffer_ , TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * BS_ANT_NUM, 64, 0);
     alloc_buffer_2d(&recip_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM, 64, 0);
 
 

@@ -424,7 +424,7 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
 
         tx_offset = task_event.data;
         interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
-        tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
+        tx_subframe_id = cfg->DLSymbols[0][tx_current_data_subframe_id]; //tx_current_data_subframe_id + UE_NUM;
         int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
         int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
         tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length + packet_header_offset; 
@@ -433,7 +433,7 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
         //symbol_id = task_event.data / cfg->getNumAntennas();
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         //{
-            size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
+            size_t symbol_id = txSymbols[tx_current_data_subframe_id];
             void* txbuf[2];
             long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
             int flags = 1; // HAS_TIME
