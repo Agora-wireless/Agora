@@ -46,32 +46,48 @@ struct Packet {
     }
 };
 
+struct RX_stats {
+    int *task_count;
+    int *task_pilot_count;
+    int *fft_created_count;
+    // int frame_count = 0;
+    int max_task_count;
+    int max_task_pilot_count;
+};
 
 struct FFT_stats {
-    int **count_ants;
-    int *count_pilot_symbols;
-    int *count_data_symbols;
+    int **task_count;
+    int *symbol_pilot_count;
+    int *symbol_data_count;
     bool **data_exist_in_symbol;
     int frame_count = 0;
-    int count_ants_max;
-    int count_pilot_max;
-    int count_data_max;
+    int max_task_count;
+    int max_symbol_pilot_count;
+    int max_symbol_data_count;
 };
 
 struct ZF_stats {
-    int *count_SCs;
+    int *task_count;
     int frame_count = 0;
-    int count_SC_max;
+    int max_task_count;
     bool *precoder_exist_in_frame;
 };
 
-struct Demul_stats {
-    int **count_SCs;
-    int *count_symbols;
+struct Data_stats {
+    int **task_count;
+    int *symbol_count;
     int frame_count = 0;
-    int count_SC_max;
-    int count_symbol_max;
+    int max_task_count;
+    int max_symbol_count;
 };
+
+// struct Decode_stats {
+//     int **block_count;
+//     int *count_symbols;
+//     int frame_count = 0;
+//     int count_block_max;
+//     int max_symbol_count;
+// };
 
 
 struct FFTBuffer
