@@ -39,7 +39,7 @@
 
 #define EVENT_DECODE 9
 #define EVENT_ENCODE 10
-
+#define EVENT_RC 11
 
 #define TASK_FFT 0
 #define TASK_ZF 1
@@ -51,6 +51,7 @@
 #define TASK_SEND 7
 #define TASK_DECODE 8
 #define TASK_ENCODE 9
+#define TASK_RC 10
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1
@@ -119,6 +120,15 @@
 #define SCH_ADDR_REG      136
 #define SCH_MODE_REG      140
 #define TX_GAIN_CTRL      88
+
+typedef enum {
+    UL,
+    DL,
+    PILOT,
+    CAL_DL,
+    CAL_UL,
+    UNKNOWN
+} symbol_type;
 
 typedef enum {
 	Master,

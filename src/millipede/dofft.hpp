@@ -26,9 +26,9 @@ public:
     DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
-        complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
+        complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, complex_float **calib_buffer, 
         double **in_FFT_task_duration, double **in_CSI_task_duration, int *in_FFT_task_count, int *in_CSI_task_count,
-        double **in_IFFT_task_duration, int *in_IFFT_task_count);
+        double **in_IFFT_task_duration, int *in_IFFT_task_count, double **in_RC_task_duration, int *in_RC_task_count);
     ~DoFFT();
 
     /**
@@ -115,6 +115,7 @@ private:
     int **socket_buffer_status_;
     complex_float **data_buffer_;
     complex_float **csi_buffer_;
+    complex_float **calib_buffer_;
     float *pilots_;
 
     char *dl_socket_buffer_;;
@@ -128,6 +129,8 @@ private:
     int *CSI_task_count;
     double **IFFT_task_duration;
     int *IFFT_task_count;
+    double **RC_task_duration;
+    int *RC_task_count;
 
     FFTBuffer fft_buffer_;
 

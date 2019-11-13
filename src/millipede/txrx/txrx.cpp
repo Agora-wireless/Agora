@@ -104,23 +104,6 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     printf("create TX or TXRX threads\n");
     // create new threads
     std::vector<pthread_t> created_threads;
-#ifdef USE_DPDK
-    unsigned int lcore_id;
-    int worker_id = 0;
-    int thread_id;
-    RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-    // launch communication and task thread onto specific core
-        if (worker_id >= rx_thread_num_) {
-            thread_id = worker_id - rx_thread_num_;
-            tx_context[thread_id].obj_ptr = this;
-            tx_context[thread_id].id = thread_id;
-            rte_eal_remote_launch((lcore_function_t *)loopSend,
-                                &tx_context[thread_id], lcore_id);
-            printf("TX: launched thread %d on core %d\n", thread_id, lcore_id);
-        }
-        worker_id++;
-    }
-#else
     
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
@@ -136,7 +119,6 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
         
         created_threads.push_back(send_thread_);
     }
-#endif
     
     return created_threads;
 }
@@ -563,12 +545,13 @@ void *PacketTXRX::loopTXRX(int tid)
 
                 tx_offset = task_event.data;
                 interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
-                tx_symbol_id = tx_current_data_subframe_id + UE_NUM;
+                //tx_symbol_id = tx_current_data_subframe_id + UE_NUM;
+                tx_symbol_id = config_->DLSymbols[0][tx_current_data_subframe_id];
                 int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
                 int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
-                tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;  
-                // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
+                tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;
+                // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
                 struct Packet *pkg = (struct Packet *)tx_cur_buffer_ptr;
                 new (pkg) Packet(tx_frame_id, tx_symbol_id, 0 /* cell_id */, tx_ant_id);
                 
