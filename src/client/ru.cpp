@@ -55,7 +55,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config *cfg)
         }
     }
 #else
-    radioconfig_ = new RadioConfig(config_);
+    radioconfig_ = new ClientRadioConfig(config_);
 
 #endif    
 
@@ -208,7 +208,7 @@ void* RU::loopSend(void *in_context)
     int* tx_socket_ = obj_ptr->tx_socket_;
     char *cur_ptr_buffer;
 #else 
-    RadioConfig *radio = obj_ptr->radioconfig_;
+    ClientRadioConfig *radio = obj_ptr->radioconfig_;
 #endif
     int packet_length = cfg->packet_length;
 #ifndef SIM
@@ -227,16 +227,8 @@ void* RU::loopSend(void *in_context)
 
     int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
-    if (cfg->isUE)
-    {
-        txSymsPerFrame = cfg->ulSymsPerFrame;
-        txSymbols = cfg->ULSymbols[0];
-    }
-    else
-    {
-        txSymsPerFrame = cfg->dlSymsPerFrame;
-        txSymbols = cfg->DLSymbols[0];
-    }
+    txSymsPerFrame = cfg->ulSymsPerFrame;
+    txSymbols = cfg->ULSymbols[0];
 
     // use token to speed up
     moodycamel::ProducerToken local_ptok(*message_queue_);
@@ -260,26 +252,23 @@ void* RU::loopSend(void *in_context)
         //frame_id = task_event.more_data; 
 
 #ifdef SIM
-        if(cfg->isUE)
+        // first sending pilots in sim mode
+        //for (int p_id = 0; p_id < cfg->pilotSymsPerFrame; p_id++)
         {
-            // first sending pilots in sim mode
-            //for (int p_id = 0; p_id < cfg->pilotSymsPerFrame; p_id++)
-            {
-                int* tx_buffer_hdr = (int*)obj_ptr->pilot_buffer_; //.data();
-                tx_buffer_hdr[0] = frame_id;    
-                tx_buffer_hdr[1] = cfg->pilotSymbols[0][ant_id];  
-                tx_buffer_hdr[2] = 0; //cell_id
-                tx_buffer_hdr[3] = ant_id; // rsvd  
-                //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
-                if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
-                    perror("loopSend: socket sendto failed");
-                    exit(0);
-                }
+            int* tx_buffer_hdr = (int*)obj_ptr->pilot_buffer_; //.data();
+            tx_buffer_hdr[0] = frame_id;    
+            tx_buffer_hdr[1] = cfg->pilotSymbols[0][ant_id];  
+            tx_buffer_hdr[2] = 0; //cell_id
+            tx_buffer_hdr[3] = ant_id; // rsvd  
+            //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
+            if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+                perror("loopSend: socket sendto failed");
+                exit(0);
             }
-#if DEBUG_SEND
-            printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, cfg->pilotSymbols[0][ant_id], ant_id);
-#endif
         }
+#if DEBUG_SEND
+        printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, cfg->pilotSymbols[0][ant_id], ant_id);
+#endif
         for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         {
             //for (ant_id = 0; ant_id < cfg->getNumAntennas(); ant_id++) 
@@ -420,16 +409,8 @@ void* RU::loopProc(void *in_context)
 
     int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
-    if (cfg->isUE)
-    {
-        txSymsPerFrame = cfg->ulSymsPerFrame;
-        txSymbols = cfg->ULSymbols[0];
-    }
-    else
-    {
-        txSymsPerFrame = cfg->dlSymsPerFrame;
-        txSymbols = cfg->DLSymbols[0];
-    }
+    txSymsPerFrame = cfg->ulSymsPerFrame;
+    txSymbols = cfg->ULSymbols[0];
     int n_ant = cfg->getNumAntennas();
 
     char* cur_ptr_buffer = buffer;
@@ -438,7 +419,7 @@ void* RU::loopProc(void *in_context)
     int nradio_per_thread = cfg->nRadios/obj_ptr->thread_num_;
     int rem_thread_nradio = cfg->nRadios%obj_ptr->thread_num_;//obj_ptr->thread_num_*(cfg->nRadios/obj_ptr->thread_num_);
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    RadioConfig *radio = obj_ptr->radioconfig_;
+    ClientRadioConfig *radio = obj_ptr->radioconfig_;
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2 
@@ -512,13 +493,13 @@ void* RU::loopProc(void *in_context)
             exit(0);
         }
 
-        if (txSymsPerFrame > 0 and ((cfg->isUE and cfg->getDlSFIndex(frame_id, symbol_id) == 0) || (!cfg->isUE and cfg->getPilotSFIndex(frame_id, symbol_id) == 0)))
+        if (txSymsPerFrame > 0 && cfg->getDlSFIndex(frame_id, symbol_id) == 0)
         {
             // notify TXthread to start transmitting frame_id+offset
             Event_data do_tx_task;
             do_tx_task.event_type = TASK_SEND;
             do_tx_task.data = ant_id;
-            do_tx_task.more_data = cfg->isUE ? frame_id + TX_FRAME_DELTA : frame_id;
+            do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
             if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
                 printf("task enqueue failed\n");
                 exit(0);
@@ -598,7 +579,7 @@ void* RU::loopProc(void *in_context)
             }
 
             // notify TXthread to start transmitting frame_id+offset
-            if (txSymsPerFrame > 0 && ((cfg->isUE && cfg->getDlSFIndex(frame_id, symbol_id) == 0) || (!cfg->isUE && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)))
+            if (txSymsPerFrame > 0 && cfg->getDlSFIndex(frame_id, symbol_id) == 0)
             {
 //#ifdef SEPARATE_TX_THREAD
 //                Event_data do_tx_task;
