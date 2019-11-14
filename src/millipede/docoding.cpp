@@ -9,7 +9,7 @@ using namespace arma;
 DoCoding::DoCoding(Config *cfg, int in_tid, 
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
     int8_t **in_raw_data_buffer, int8_t **in_encoded_buffer, int8_t **in_demod_buffer, uint8_t **in_decoded_buffer, 
-    double **in_Encode_task_duration, int *in_Encode_task_count, double **in_Decode_task_duration, int *in_Decode_task_count) 
+    Stats *in_stats_manager) 
 {
     config_ = cfg;
     LDPC_config = cfg->LDPC_config;
@@ -27,10 +27,10 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
     raw_data_buffer = in_raw_data_buffer;
     llr_buffer = in_demod_buffer;
 
-    Encode_task_duration = in_Encode_task_duration;
-    Encode_task_count = in_Encode_task_count;
-    Decode_task_duration = in_Decode_task_duration;
-    Decode_task_count = in_Decode_task_count;
+    Encode_task_duration = in_stats_manager->encode_stats_worker.task_duration;
+    Encode_task_count = in_stats_manager->encode_stats_worker.task_count;
+    Decode_task_duration = in_stats_manager->decode_stats_worker.task_duration;
+    Decode_task_count = in_stats_manager->decode_stats_worker.task_count;
 
     int16_t numChannelLlrs = LDPC_config.cbCodewLen;
     

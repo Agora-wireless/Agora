@@ -43,7 +43,7 @@ Millipede::Millipede(Config *cfg)
         printf("initialize downlink buffers\n");
         initialize_downlink_buffers();
     }
-
+    stats_manager_ = new Stats(cfg_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM);
     
     /* initialize TXRX threads*/
     printf("new TXRX\n");
@@ -58,13 +58,8 @@ Millipede::Millipede(Config *cfg)
 #else
     create_threads(Worker, 0, TASK_THREAD_NUM);
 #endif
-    stats_manager_.reset(new Stats(cfg_, CSI_task_duration, CSI_task_count, FFT_task_duration, FFT_task_count, 
-          ZF_task_duration, ZF_task_count, Demul_task_duration, Demul_task_count,
-          IFFT_task_duration, IFFT_task_count, Precode_task_duration, Precode_task_count,
-          Decode_task_duration, Decode_task_count, Encode_task_duration, Encode_task_count,
-          frame_start, 
-          TASK_THREAD_NUM * 8, 4, TASK_THREAD_NUM * 16,
-          TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM));
+    // stats_manager_.reset(new Stats(cfg_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM));
+    
 }
 
 Millipede::~Millipede()
@@ -87,7 +82,7 @@ void Millipede::start()
 {
     /* start uplink receiver */
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_, 
-        socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, frame_start);
+        socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, stats_manager_->frame_start);
 #ifdef USE_ARGOS
     if (rx_threads.size() == 0) {
 	this->stop();
@@ -120,12 +115,9 @@ void Millipede::start()
     moodycamel::ProducerToken ptok_zf(zf_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     moodycamel::ProducerToken ptok_decode(decode_queue_);
-    moodycamel::ProducerToken ptok_encode(encode_queue_);
-
     /* downlink */
+    moodycamel::ProducerToken ptok_encode(encode_queue_);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
-    // moodycamel::ProducerToken ptok_modul(modulate_queue_);
-    // moodycamel::ProducerToken ptok_encode(precode_queue_);
     moodycamel::ProducerToken ptok_precode(precode_queue_);
     moodycamel::ProducerToken ptok_tx(tx_queue_);
     /* tokens used for dequeue */
@@ -134,29 +126,20 @@ void Millipede::start()
 
 
     buffer_frame_num = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * UE_NUM) : (BS_ANT_NUM * (ul_data_subframe_num_perframe + UE_NUM));
+    
 
     #ifdef USE_LDPC
-    prev_frame_counter = downlink_mode ? ifft_counter_ants_ : decode_counter_subframes_;
+    prev_frame_counter = downlink_mode ? ifft_stats_.symbol_count : decode_stats_.symbol_count;
     #else
-    prev_frame_counter = downlink_mode ? ifft_counter_ants_ : demul_counter_subframes_;
+    prev_frame_counter = downlink_mode ? ifft_stats_.symbol_count : demul_stats_.symbol_count;
     #endif
-    prev_frame_counter_max = downlink_mode ?  (BS_ANT_NUM * dl_data_subframe_num_perframe) : ul_data_subframe_num_perframe;
+    prev_frame_counter_max = downlink_mode ?  ifft_stats_.max_symbol_count : demul_stats_.max_symbol_count;
 
     /* counters for printing summary */
     int demul_count = 0;
     int tx_count = 0;
     double demul_begin = get_time();
     double tx_begin = get_time();
-    
-    int frame_count_pilot_fft = 0;
-    int frame_count_zf = 0;
-    int frame_count_demul = 0;
-    int frame_count_decode = 0;
-    int frame_count_encode = 0;
-    int frame_count_precode = 0;
-    int frame_count_ifft = 0;
-    int frame_count_tx = 0;
     
     bool prev_demul_scheduled = false;
 
@@ -202,9 +185,11 @@ void Millipede::start()
                     int socket_thread_id, offset_in_current_buffer;
                     interpreteOffset2d_setbits(offset, &socket_thread_id, &offset_in_current_buffer, 28);                
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * packet_length;
-                    int frame_id = *((int *)socket_buffer_ptr) % 10000;
-                    int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
-                    int ant_id = *((int *)socket_buffer_ptr + 3);
+                    struct Packet *pkt = (struct Packet *)socket_buffer_ptr;
+                    
+                    int frame_id = pkt->frame_id % 10000;
+                    int subframe_id = pkt->symbol_id;                                    
+                    int ant_id = pkt->ant_id;
                     int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
                     int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
                     
@@ -215,11 +200,7 @@ void Millipede::start()
                     #else
                     bool previous_frame_done = prev_frame_counter[prev_frame_id] == prev_frame_counter_max;
                     /* if this is the first frame or the previous frame is all processed, schedule FFT for this packet */
-                    // if (downlink_mode)
-                    //     previous_frame_done = ifft_counter_ants_[prev_frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe;
-                    // else
-                    //     previous_frame_done = demul_counter_subframes_[prev_frame_id] == ul_data_subframe_num_perframe;
-                    if ((frame_id == 0 && frame_count_pilot_fft < 100) || (frame_count_pilot_fft > 0 && previous_frame_done)) {
+                    if ((frame_id == 0 && fft_stats_.frame_count < 100) || (fft_stats_.frame_count > 0 && previous_frame_done)) {
                         schedule_fft_task(offset, frame_id, frame_id_in_buffer, subframe_id, ant_id, prev_frame_id, ptok);
                     }
                     else {
@@ -234,41 +215,41 @@ void Millipede::start()
                     int offset_fft = event.data;
                     int frame_id, subframe_id;
                     interpreteOffset2d(offset_fft, &frame_id, &subframe_id);
-                    fft_counter_ants_[frame_id][subframe_id] ++;
-                    if (fft_counter_ants_[frame_id][subframe_id] == BS_ANT_NUM) {
-                        fft_counter_ants_[frame_id][subframe_id] = 0;
-                        if (cfg_->isPilot(frame_id, subframe_id)) {   
-                            csi_counter_users_[frame_id] ++;
-                            print_per_subframe_done(PRINT_FFT_PILOTS, frame_count_pilot_fft, frame_id, subframe_id);
+                    fft_stats_.task_count[frame_id][subframe_id]++;
+                    if (fft_stats_.task_count[frame_id][subframe_id] == fft_stats_.max_task_count) {
+                        fft_stats_.task_count[frame_id][subframe_id] = 0;
+                        if (cfg_->isPilot(frame_id, subframe_id)) { 
+                            fft_stats_.symbol_pilot_count[frame_id]++;  
+                            print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id, subframe_id);
                             /* if csi of all UEs is ready, schedule ZF or prediction */
-                            if (csi_counter_users_[frame_id] == UE_NUM) {
-                                csi_counter_users_[frame_id] = 0; 
-                                stats_manager_->update_fft_processed(frame_count_pilot_fft);     
-                                print_per_frame_done(PRINT_FFT_PILOTS, frame_count_pilot_fft, frame_id);    
-                                update_frame_count(&frame_count_pilot_fft);                          
+                            if (fft_stats_.symbol_pilot_count[frame_id] == fft_stats_.max_symbol_pilot_count) {
+                                fft_stats_.symbol_pilot_count[frame_id] = 0;
+                                stats_manager_->update_fft_processed(fft_stats_.frame_count); 
+                                print_per_frame_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id); 
+                                update_frame_count(&(fft_stats_.frame_count));  
                                 schedule_zf_task(frame_id, ptok_zf);
                             }
                         }
-                        else if (cfg_->isUplink(frame_id, subframe_id)) {                     
-                            data_exist_in_subframe_[frame_id][subframe_id-UE_NUM] = true;  
-                            data_counter_subframes_[frame_id]++; 
-                            print_per_subframe_done(PRINT_FFT_DATA, frame_count_pilot_fft - 1, frame_id, subframe_id);                 
-                            if (data_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) {      
-                                print_per_frame_done(PRINT_FFT_DATA, frame_count_pilot_fft - 1, frame_id);                                
+                        else if (cfg_->isUplink(frame_id, subframe_id)) {   
+                            fft_stats_.data_exist_in_symbol[frame_id][subframe_id - UE_NUM] = true;
+                            fft_stats_.symbol_data_count[frame_id]++;
+                            print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id, subframe_id); 
+                            if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count) {      
+                                print_per_frame_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id);                                
                                 prev_demul_scheduled = false;
-                            }                     
+                            }  
                             /* if precoder exist, schedule demodulation */
-                            if (precoder_exist_in_frame_[frame_id]) {
+                            if (zf_stats_.precoder_exist_in_frame[frame_id]) {
                                 int start_sche_id = subframe_id;
                                 if (!prev_demul_scheduled) {
                                     start_sche_id = UE_NUM;
                                     prev_demul_scheduled = true;
                                 }
-                                int end_sche_id = UE_NUM + data_counter_subframes_[frame_id];
+                                int end_sche_id = UE_NUM + fft_stats_.symbol_data_count[frame_id];
                                 if (end_sche_id < subframe_id)
                                     end_sche_id = subframe_id + 1;
                                 schedule_demul_task(frame_id, start_sche_id, end_sche_id, ptok_demul);
-                            }                                      
+                            }                                       
                         }
                     }
                 }
@@ -277,16 +258,16 @@ void Millipede::start()
                     int offset_zf = event.data;
                     int frame_id, sc_id;
                     interpreteOffset2d(offset_zf, &frame_id, &sc_id);
-                    precoder_counter_scs_[frame_id] ++;
+                    zf_stats_.task_count[frame_id]++;
                     // print_per_task_done(PRINT_ZF, frame_id, 0, sc_id);
-                    if (precoder_counter_scs_[frame_id] == zf_block_num) { 
-                        stats_manager_->update_zf_processed(frame_count_zf);
-                        precoder_counter_scs_[frame_id] = 0;
-                        precoder_exist_in_frame_[frame_id] = true;
-                        print_per_frame_done(PRINT_ZF, frame_count_zf, frame_id); 
-                        update_frame_count(&frame_count_zf);
+                    if (zf_stats_.task_count[frame_id] == zf_stats_.max_task_count) { 
+                        stats_manager_->update_zf_processed(zf_stats_.frame_count);
+                        zf_stats_.task_count[frame_id] = 0;
+                        zf_stats_.precoder_exist_in_frame[frame_id] = true;
+                        print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id); 
+                        update_frame_count(&(zf_stats_.frame_count));
                         /* if all the data in a frame has arrived when ZF is done */
-                        if (data_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) 
+                        if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count) 
                             schedule_demul_task(frame_id, UE_NUM, subframe_num_perframe, ptok_demul);   
                         if (downlink_mode) {
                             /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
@@ -304,43 +285,43 @@ void Millipede::start()
                     int offset_demul = event.data;                   
                     int frame_id, data_subframe_id, sc_id;
                     interpreteOffset3d(offset_demul, &frame_id, &data_subframe_id, &sc_id);
-                    demul_counter_scs_[frame_id][data_subframe_id]++;
+                    demul_stats_.task_count[frame_id][data_subframe_id]++;
                     print_per_task_done(PRINT_DEMUL, frame_id, data_subframe_id, sc_id);
                     /* if this subframe is ready */
-                    if (demul_counter_scs_[frame_id][data_subframe_id] == demul_block_num) {
+                    if (demul_stats_.task_count[frame_id][data_subframe_id] == demul_stats_.max_task_count) {
                         max_equaled_frame = frame_id;
-                        demul_counter_scs_[frame_id][data_subframe_id] = 0;
-                        demul_counter_subframes_[frame_id]++;
+                        demul_stats_.task_count[frame_id][data_subframe_id] = 0;
+                        demul_stats_.symbol_count[frame_id]++;
                         #ifdef USE_LDPC
                         schedule_decode_task(frame_id, data_subframe_id, ptok_decode);
                         #endif
-                        print_per_subframe_done(PRINT_DEMUL, frame_count_demul, frame_id, data_subframe_id);
-                        if (demul_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) {
+                        print_per_subframe_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id, data_subframe_id);
+                        if (demul_stats_.symbol_count[frame_id] == demul_stats_.max_symbol_count) {
                             /* schedule fft for the next frame if there are delayed fft tasks */
                         #ifndef USE_LDPC
-                            schedule_delayed_fft_tasks(frame_count_demul, frame_id, data_subframe_id, ptok);
+                            schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, data_subframe_id, ptok);
                             #if BIGSTATION
-                            demul_counter_subframes_[frame_id] = 0;
+                            demul_stats_.symbol_count[frame_id] = 0;
                             #endif  
-                            stats_manager_->update_stats_in_functions_uplink(frame_count_demul);
+                            stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
                         #else
-                            demul_counter_subframes_[frame_id] = 0;
+                            demul_stats_.symbol_count[frame_id] = 0;
                         #endif
-                            stats_manager_->update_demul_processed(frame_count_demul);
-                            precoder_exist_in_frame_[frame_id] = false;
-                            data_counter_subframes_[frame_id] = 0;
-                            print_per_frame_done(PRINT_DEMUL, frame_count_demul, frame_id);
+                            stats_manager_->update_demul_processed(demul_stats_.frame_count);
+                            zf_stats_.precoder_exist_in_frame[frame_id] = false;
+                            fft_stats_.symbol_data_count[frame_id] = 0;
+                            print_per_frame_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id);
                             
-                            update_frame_count(&frame_count_demul);                    
+                            update_frame_count(&demul_stats_.frame_count);                    
                         }
                         // save_demul_data_to_file(frame_id, data_subframe_id);
                         demul_count++;
-                        if (demul_count == ul_data_subframe_num_perframe * 9000) {
+                        if (demul_count == demul_stats_.max_symbol_count * 9000) {
                             demul_count = 0;
                             double diff = get_time() - demul_begin;
-                            int samples_num_per_UE = OFDM_DATA_NUM * ul_data_subframe_num_perframe * 1000;
+                            int samples_num_per_UE = OFDM_DATA_NUM * demul_stats_.max_symbol_count * 1000;
                             printf("Frame %d: Receive %d samples (per-client) from %d clients in %f secs, throughtput %f bps per-client (16QAM), current task queue length %zu\n", 
-                                frame_count_demul, samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, fft_queue_.size_approx());
+                                demul_stats_.frame_count, samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, fft_queue_.size_approx());
                             demul_begin = get_time();
                         }                       
                     }
@@ -351,24 +332,22 @@ void Millipede::start()
                     int offset_demul = event.data;                   
                     int frame_id, data_subframe_id, cb_id;
                     interpreteOffset3d(offset_demul, &frame_id, &data_subframe_id, &cb_id);
-                    decode_counter_blocks_[frame_id][data_subframe_id]++;
-                    if(decode_counter_blocks_[frame_id][data_subframe_id] == LDPC_config.nblocksInSymbol * UE_NUM) {
-                        decode_counter_blocks_[frame_id][data_subframe_id] = 0;
-                        decode_counter_subframes_[frame_id]++;
-                        print_per_subframe_done(PRINT_DECODE, frame_count_decode, frame_id, data_subframe_id);
-                        if (decode_counter_subframes_[frame_id] == ul_data_subframe_num_perframe) {
-                            schedule_delayed_fft_tasks(frame_count_demul, frame_id, data_subframe_id, ptok);
+                    decode_stats_.task_count[frame_id][data_subframe_id]++;
+                    if (decode_stats_.task_count[frame_id][data_subframe_id] == decode_stats_.max_task_count) {
+                        decode_stats_.task_count[frame_id][data_subframe_id] = 0;
+                        decode_stats_.symbol_count[frame_id]++;
+                        print_per_subframe_done(PRINT_DECODE, decode_stats_.frame_count, frame_id, data_subframe_id);
+                        if (decode_stats_.symbol_count[frame_id] == decode_stats_.max_symbol_count) {
+                            schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, data_subframe_id, ptok);
                             #if BIGSTATION
                             prev_frame_counter[frame_id] = 0;
                             #endif  
-                            stats_manager_->update_decode_processed(frame_count_decode);
-                            print_per_frame_done(PRINT_DECODE, frame_count_decode, frame_id);
-                            stats_manager_->update_stats_in_functions_uplink(frame_count_decode);
-                            update_frame_count(&frame_count_decode);  
+                            stats_manager_->update_decode_processed(decode_stats_.frame_count);
+                            print_per_frame_done(PRINT_DECODE, decode_stats_.frame_count, frame_id);
+                            stats_manager_->update_stats_in_functions_uplink(decode_stats_.frame_count);
+                            update_frame_count(&decode_stats_.frame_count);  
                         }
-                         
                     }
-
                 }
                 break;
 
@@ -376,16 +355,16 @@ void Millipede::start()
                     int offset_demul = event.data;                   
                     int frame_id, data_subframe_id, cb_id;
                     interpreteOffset3d(offset_demul, &frame_id, &data_subframe_id, &cb_id);
-                    encode_counter_blocks_[frame_id][data_subframe_id]++;
-                    if(encode_counter_blocks_[frame_id][data_subframe_id] == LDPC_config.nblocksInSymbol * UE_NUM) {
+                    encode_stats_.task_count[frame_id][data_subframe_id]++;
+                    if (encode_stats_.task_count[frame_id][data_subframe_id] == encode_stats_.max_task_count) {
                         schedule_precode_task(frame_id, data_subframe_id, ptok_precode); 
-                        encode_counter_blocks_[frame_id][data_subframe_id] = 0;
-                        encode_counter_subframes_[frame_id]++;
-                        print_per_subframe_done(PRINT_ENCODE, frame_count_encode, frame_id, data_subframe_id);
-                        if (encode_counter_subframes_[frame_id] == dl_data_subframe_num_perframe) {          
-                            stats_manager_->update_encode_processed(frame_count_encode);
-                            print_per_frame_done(PRINT_ENCODE, frame_count_encode, frame_id);
-                            update_frame_count(&frame_count_encode);  
+                        encode_stats_.task_count[frame_id][data_subframe_id] = 0;
+                        encode_stats_.symbol_count[frame_id]++;
+                        print_per_subframe_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id, data_subframe_id);
+                        if (encode_stats_.symbol_count[frame_id] == encode_stats_.max_symbol_count) {          
+                            stats_manager_->update_encode_processed(encode_stats_.frame_count);
+                            print_per_frame_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id);
+                            update_frame_count(&encode_stats_.frame_count);  
                         }         
                     }
                 }
@@ -394,29 +373,29 @@ void Millipede::start()
                 case EVENT_PRECODE: {
                     /* Precoding is done, schedule ifft */
                     int offset_precode = event.data;
-                    int frame_id, current_data_subframe_id, sc_id;
-                    interpreteOffset3d(offset_precode, &frame_id, &current_data_subframe_id, &sc_id);
-                    dl_data_counter_scs_[frame_id][current_data_subframe_id]++;
-                    print_per_task_done(PRINT_PRECODE, frame_id, current_data_subframe_id, sc_id);          
-                    if (dl_data_counter_scs_[frame_id][current_data_subframe_id] == demul_block_num) {
-                        schedule_ifft_task(frame_count_precode, current_data_subframe_id, ptok_ifft);
-                        // schedule_ifft_task(frame_id, current_data_subframe_id, ptok_ifft);
-                        if (current_data_subframe_id < dl_data_subframe_end - 1) {
+                    int frame_id, data_subframe_id, sc_id;
+                    interpreteOffset3d(offset_precode, &frame_id, &data_subframe_id, &sc_id);
+
+                    precode_stats_.task_count[frame_id][data_subframe_id]++;
+                    print_per_task_done(PRINT_PRECODE, frame_id, data_subframe_id, sc_id);          
+                    if (precode_stats_.task_count[frame_id][data_subframe_id] == precode_stats_.max_task_count) {
+                        schedule_ifft_task(precode_stats_.frame_count, data_subframe_id, ptok_ifft);
+                        if (data_subframe_id < dl_data_subframe_end - 1) {
                             #ifdef USE_LDPC
-                            schedule_encode_task(frame_id, current_data_subframe_id + 1, ptok_encode);
+                            schedule_encode_task(frame_id, data_subframe_id + 1, ptok_encode);
                             #else
-                            schedule_precode_task(frame_id, current_data_subframe_id + 1, ptok_precode); 
+                            schedule_precode_task(frame_id, data_subframe_id + 1, ptok_precode); 
                             #endif
                         }
 
-                        dl_data_counter_scs_[frame_id][current_data_subframe_id] = 0;    
-                        print_per_subframe_done(PRINT_PRECODE, frame_count_precode, frame_id, current_data_subframe_id);                   
-                        dl_data_counter_subframes_[frame_id]++;
-                        if (dl_data_counter_subframes_[frame_id] == dl_data_subframe_num_perframe) {
-                            dl_data_counter_subframes_[frame_id] = 0;
-                            stats_manager_->update_precode_processed(frame_count_precode);    
-                            print_per_frame_done(PRINT_PRECODE, frame_count_precode, frame_id);       
-                            update_frame_count(&frame_count_precode);                       
+                        precode_stats_.task_count[frame_id][data_subframe_id] = 0;    
+                        print_per_subframe_done(PRINT_PRECODE, precode_stats_.frame_count, frame_id, data_subframe_id);                   
+                        precode_stats_.symbol_count[frame_id]++;
+                        if (precode_stats_.symbol_count[frame_id] == precode_stats_.max_symbol_count) {
+                            precode_stats_.symbol_count[frame_id] = 0;
+                            stats_manager_->update_precode_processed(precode_stats_.frame_count);    
+                            print_per_frame_done(PRINT_PRECODE, precode_stats_.frame_count, frame_id);       
+                            update_frame_count(&precode_stats_.frame_count);                       
                         }
                     }
                 }
@@ -424,8 +403,8 @@ void Millipede::start()
                 case EVENT_IFFT: {
                     /* IFFT is done, schedule data transmission */
                     int offset_ifft = event.data;
-                    int frame_id, current_data_subframe_id, ant_id;
-                    interpreteOffset3d(offset_ifft, &current_data_subframe_id, &ant_id, &frame_id);
+                    int frame_id, data_subframe_id, ant_id;
+                    interpreteOffset3d(offset_ifft, &data_subframe_id, &ant_id, &frame_id);
  
                     Event_data do_tx_task;
                     do_tx_task.event_type = TASK_SEND;
@@ -434,53 +413,57 @@ void Millipede::start()
                     schedule_task(do_tx_task, &tx_queue_, *tx_ptoks_ptr[ptok_id]);
 
                     frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-                    ifft_counter_ants_[frame_id] += 1;
-                    print_per_task_done(PRINT_IFFT, frame_id, current_data_subframe_id, ant_id);
-                    if (ifft_counter_ants_[frame_id] == BS_ANT_NUM * dl_data_subframe_num_perframe) {
-                        /* schedule fft for next frame */
-                        schedule_delayed_fft_tasks(frame_count_ifft, frame_id, current_data_subframe_id, ptok);
-                        stats_manager_->update_ifft_processed(frame_count_ifft);
-                        print_per_frame_done(PRINT_IFFT, frame_count_ifft, frame_id);      
-                        update_frame_count(&frame_count_ifft);            
+                    print_per_task_done(PRINT_IFFT, frame_id, data_subframe_id, ant_id);
+                    ifft_stats_.task_count[frame_id][data_subframe_id]++;
+                    if (ifft_stats_.task_count[frame_id][data_subframe_id] == ifft_stats_.max_task_count) {
+                        ifft_stats_.task_count[frame_id][data_subframe_id] = 0;
+                        ifft_stats_.symbol_count[frame_id]++;
+                        if (ifft_stats_.symbol_count[frame_id] == ifft_stats_.max_symbol_count) {
+                            /* schedule fft for next frame */
+                            schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, ptok);
+                            stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
+                            print_per_frame_done(PRINT_IFFT, ifft_stats_.frame_count, frame_id);      
+                            update_frame_count(&ifft_stats_.frame_count);
+                        }
                     }
                 }
                 break;
                 case EVENT_PACKET_SENT: {
                     /* Data is sent */
                     int offset_tx = event.data;
-                    int frame_id, current_data_subframe_id, ant_id;
-                    interpreteOffset3d(offset_tx, &current_data_subframe_id, &ant_id, &frame_id);
-                    // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, current_data_subframe_id, ant_id);
+                    int frame_id, data_subframe_id, ant_id;
+                    interpreteOffset3d(offset_tx, &data_subframe_id, &ant_id, &frame_id);
+                    // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, data_subframe_id, ant_id);
                     frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
-                    tx_counter_ants_[frame_id][current_data_subframe_id] += 1;
-                    print_per_task_done(PRINT_TX, frame_id, current_data_subframe_id, ant_id);
-                    if (tx_counter_ants_[frame_id][current_data_subframe_id] == BS_ANT_NUM) {
-                        tx_counter_ants_[frame_id][current_data_subframe_id] = 0;
-                        print_per_subframe_done(PRINT_TX, frame_count_tx, frame_id, current_data_subframe_id);
+
+                    print_per_task_done(PRINT_TX, frame_id, data_subframe_id, ant_id);
+                    tx_stats_.task_count[frame_id][data_subframe_id]++;
+                    if (tx_stats_.task_count[frame_id][data_subframe_id] == tx_stats_.max_task_count) {
+                        tx_stats_.task_count[frame_id][data_subframe_id] = 0;
+                        print_per_subframe_done(PRINT_TX, tx_stats_.frame_count, frame_id, data_subframe_id);
                         /* if tx of the first symbol is done */
-                        if (current_data_subframe_id == dl_data_subframe_start) {
-                            stats_manager_->update_tx_processed_first(frame_count_tx);
-                            print_per_frame_done(PRINT_TX_FIRST, frame_count_tx, frame_id);
+                        if (data_subframe_id == dl_data_subframe_start) {
+                            stats_manager_->update_tx_processed_first(tx_stats_.frame_count);
+                            print_per_frame_done(PRINT_TX_FIRST, tx_stats_.frame_count, frame_id);
                         }
-                        tx_counter_subframes_[frame_id]++;       
-                        if (tx_counter_subframes_[frame_id] == dl_data_subframe_num_perframe) {
-                            tx_counter_subframes_[frame_id] = 0; 
-                            stats_manager_->update_tx_processed(frame_count_tx);    
-                            print_per_frame_done(PRINT_TX, frame_count_tx, frame_id);                       
-                            stats_manager_->update_stats_in_functions_downlink(frame_count_tx);
-                            update_frame_count(&frame_count_tx); 
+                        tx_stats_.symbol_count[frame_id]++;       
+                        if (tx_stats_.symbol_count[frame_id] == tx_stats_.max_symbol_count) {
+                            tx_stats_.symbol_count[frame_id] = 0; 
+                            stats_manager_->update_tx_processed(tx_stats_.frame_count);    
+                            print_per_frame_done(PRINT_TX, tx_stats_.frame_count, frame_id);                       
+                            stats_manager_->update_stats_in_functions_downlink(tx_stats_.frame_count);
+                            update_frame_count(&tx_stats_.frame_count); 
                         }
                         tx_count++;
-                        if (tx_count == dl_data_subframe_num_perframe * 9000)
-                        {
+                        if (tx_count == tx_stats_.max_symbol_count * 9000) {
                             tx_count = 0;
                             double diff = get_time() - tx_begin;
-                            int samples_num_per_UE = OFDM_DATA_NUM * dl_data_subframe_num_perframe * 1000;
+                            int samples_num_per_UE = OFDM_DATA_NUM * tx_stats_.max_symbol_count * 1000;
                             printf("Transmit %d samples (per-client) to %d clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %zu\n", 
                                 samples_num_per_UE, UE_NUM, diff, samples_num_per_UE * log2(16.0f) / diff, tx_queue_.size_approx());
                             tx_begin = get_time();
                         }
-                    }                    
+                    }         
                 }
                 break;
                 default:
@@ -491,7 +474,7 @@ void Millipede::start()
     } /* end of while */
     this->stop();
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
-    int last_frame_id = downlink_mode ? frame_count_tx : frame_count_demul;
+    int last_frame_id = downlink_mode ? tx_stats_.frame_count : demul_stats_.frame_count;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
     //exit(0);
@@ -509,24 +492,22 @@ void *Millipede::worker(int tid)
     /* initialize operators */
     DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
-        dl_ifft_buffer_, dl_socket_buffer_, 
-        FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
-        IFFT_task_duration, IFFT_task_count);
+        dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
+        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
-        Precode_task_duration, Precode_task_count);
+        stats_manager_);
 
     #ifdef USE_LDPC
     DoCoding *computeCoding = new DoCoding(cfg_, tid, &(complete_task_queue_), task_ptok_ptr,
         dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
-        Encode_task_duration, Encode_task_count, Decode_task_duration, Decode_task_count);
+        stats_manager_);
     #endif
 
     Event_data event;
@@ -541,20 +522,20 @@ void *Millipede::worker(int tid)
 
 #ifdef USE_LDPC
     if (downlink_mode) {
-        queue_num = 5;
+        queue_num = sizeof(dequeue_order_DL_LDPC) / sizeof(dequeue_order_DL_LDPC[0]);
         dequeue_order = dequeue_order_DL_LDPC;
     }
     else {
-        queue_num = 4;
+        queue_num = sizeof(dequeue_order_UL_LDPC) / sizeof(dequeue_order_UL_LDPC[0]);;
         dequeue_order = dequeue_order_UL_LDPC;
     }
 #else
     if (downlink_mode) {
-        queue_num = 4;
+        queue_num = sizeof(dequeue_order_DL) / sizeof(dequeue_order_DL[0]);;
         dequeue_order = dequeue_order_DL;
     }
     else {
-        queue_num = 3;
+        queue_num = sizeof(dequeue_order_UL) / sizeof(dequeue_order_UL[0]);
         dequeue_order = dequeue_order_UL;
     }
 #endif
@@ -618,9 +599,7 @@ void* Millipede::worker_fft(int tid)
     /* initialize FFT operator */
     DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
-        dl_ifft_buffer_, dl_socket_buffer_, 
-        FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
-        IFFT_task_duration, IFFT_task_count);
+        dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
 
     Event_data event;
@@ -658,7 +637,7 @@ void* Millipede::worker_zf(int tid)
 
     /* initialize ZF operator */
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
 
     Event_data event;
@@ -683,13 +662,13 @@ void* Millipede::worker_demul(int tid)
 
     /* initialize Demul operator */
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
+        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
 
     /* initialize Precode operator */
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
-        Precode_task_duration, Precode_task_count);
+        stats_manager_);
 
 
 
@@ -785,21 +764,21 @@ void Millipede::schedule_fft_task(int offset, int frame_id, int frame_id_in_buff
 #if DEBUG_PRINT_PER_TASK_ENTER_QUEUE
     printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", 
             frame_id, frame_id_in_buffer, subframe_id, ant_id);
-#endif             
-    fft_created_counter_packets_[frame_id_in_buffer]++;
-    if (fft_created_counter_packets_[frame_id_in_buffer] == 1) {
+#endif     
+    rx_stats_.fft_created_count[frame_id_in_buffer]++;
+    if (rx_stats_.fft_created_count[frame_id_in_buffer] == 1) {
         stats_manager_->update_processing_started(frame_id);
     }
-    else if (fft_created_counter_packets_[frame_id_in_buffer] == max_packet_num_per_frame) {
-        fft_created_counter_packets_[frame_id_in_buffer] = 0;
+    else if (rx_stats_.fft_created_count[frame_id_in_buffer] == rx_stats_.max_task_count) {
+        rx_stats_.fft_created_count[frame_id_in_buffer] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE                            
         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n", 
                 frame_id, frame_id_in_buffer, get_time()-stats_manager_->get_pilot_received(frame_id));
 #endif  
 #if !BIGSTATION
-    prev_frame_counter[prev_frame_id] = 0;
+        prev_frame_counter[prev_frame_id] = 0;
 #endif
-    }
+    }        
 }
 
 void Millipede::schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer, int data_subframe_id, moodycamel::ProducerToken const& ptok)
@@ -840,7 +819,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_sche_id, int end_sch
 {
     for (int sche_subframe_id = start_sche_id; sche_subframe_id < end_sche_id; sche_subframe_id++) {
         int data_subframe_id = (sche_subframe_id- UE_NUM);
-        if (data_exist_in_subframe_[frame_id][data_subframe_id]) {
+        if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
             Event_data do_demul_task;
             do_demul_task.event_type = TASK_DEMUL;
             /* schedule demodulation task for subcarrier blocks */
@@ -853,7 +832,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_sche_id, int end_sch
                     frame_id, start_sche_id, data_subframe_id);
 #endif                                         
             /* clear data status after scheduling */
-            data_exist_in_subframe_[frame_id][data_subframe_id] = false;
+            fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = false;
         }
     }
 }
@@ -908,26 +887,26 @@ void Millipede::update_rx_counters(int frame_id, int frame_id_in_buffer, int sub
 {
     int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
     if (cfg_->isPilot(frame_id, subframe_id)) { 
-        rx_counter_packets_pilots_[frame_id_in_buffer]++;
-        if(rx_counter_packets_pilots_[frame_id_in_buffer] == BS_ANT_NUM * UE_NUM) {
-            rx_counter_packets_pilots_[frame_id_in_buffer] = 0;
+        rx_stats_.task_pilot_count[frame_id_in_buffer]++;
+        if(rx_stats_.task_pilot_count[frame_id_in_buffer] == rx_stats_.max_task_pilot_count) {
+            rx_stats_.task_pilot_count[frame_id_in_buffer] = 0;
             stats_manager_->update_pilot_all_received(frame_id);
             print_per_frame_done(PRINT_RX_PILOTS, frame_id, frame_id_in_buffer);    
         }
     }
-    rx_counter_packets_[frame_id_in_buffer]++;
-    if (rx_counter_packets_[frame_id_in_buffer] == 1) {   
+    rx_stats_.task_count[frame_id_in_buffer]++;
+    if (rx_stats_.task_count[frame_id_in_buffer] == 1) {   
         stats_manager_->update_pilot_received(frame_id);
 #if DEBUG_PRINT_PER_FRAME_START 
         printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us, rx in prev frame: %d\n", \
                 frame_id, subframe_id, ant_id, stats_manager_->get_pilot_received(frame_id) - stats_manager_->get_pilot_received(frame_id-1),
-                rx_counter_packets_[prev_frame_id]);
+                rx_stats_.task_count[prev_frame_id]);
 #endif
     }
-    else if (rx_counter_packets_[frame_id_in_buffer] == max_packet_num_per_frame) {  
+    else if (rx_stats_.task_count[frame_id_in_buffer] == rx_stats_.max_task_count) {  
         stats_manager_->update_rx_processed(frame_id);
         print_per_frame_done(PRINT_RX, frame_id, frame_id_in_buffer);                        
-        rx_counter_packets_[frame_id_in_buffer] = 0;                                  
+        rx_stats_.task_count[frame_id_in_buffer] = 0;                                  
     } 
 }
 
@@ -940,9 +919,9 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
             int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
             printf("Main thread: received all packets in frame: %d, frame buffer: %d in %.2f us, demul: %d done, FFT: %d,%d, rx in prev frame: %d\n", 
                 frame_id, frame_id_in_buffer, stats_manager_->get_rx_processed(frame_id) - stats_manager_->get_pilot_received(frame_id),
-                demul_counter_subframes_[frame_id_in_buffer], data_counter_subframes_[frame_id_in_buffer], 
-                fft_counter_ants_[frame_id_in_buffer][data_counter_subframes_[frame_id_in_buffer] + UE_NUM], 
-                rx_counter_packets_[prev_frame_id]);
+                demul_stats_.symbol_count[frame_id_in_buffer], fft_stats_.symbol_data_count[frame_id_in_buffer], 
+                fft_stats_.task_count[frame_id_in_buffer][fft_stats_.symbol_data_count[frame_id_in_buffer] + UE_NUM], 
+                rx_stats_.task_count[prev_frame_id]);
             }
             break;
         case(PRINT_RX_PILOTS):
@@ -1020,7 +999,7 @@ void Millipede::print_per_subframe_done(int task_type, int frame_id, int frame_i
     switch(task_type) {
         case(PRINT_FFT_PILOTS):
             printf("Main thread: pilot FFT done frame: %d, %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, csi_counter_users_[frame_id_in_buffer]);
+                frame_id, frame_id_in_buffer, subframe_id, fft_stats_.symbol_pilot_count[frame_id_in_buffer]);
             break;
         case(PRINT_FFT_DATA):
             printf("Main thread: data FFT done frame %d, %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d, in %.2f\n", 
@@ -1030,15 +1009,15 @@ void Millipede::print_per_subframe_done(int task_type, int frame_id, int frame_i
             break;
         case(PRINT_DEMUL):
             printf("Main thread: Demodulation done frame %d %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, demul_counter_subframes_[frame_id_in_buffer]);
+                frame_id, frame_id_in_buffer, subframe_id, demul_stats_.symbol_count[frame_id_in_buffer]);
             break;
         case(PRINT_DECODE):
             printf("Main thread: Decoding done frame %d %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, decode_counter_subframes_[frame_id_in_buffer]);
+                frame_id, frame_id_in_buffer, subframe_id, decode_stats_.symbol_count[frame_id_in_buffer]);
             break;
         case(PRINT_ENCODE):
             printf("Main thread: Encoding done frame %d %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, encode_counter_subframes_[frame_id_in_buffer]);
+                frame_id, frame_id_in_buffer, subframe_id, encode_stats_.symbol_count[frame_id_in_buffer]);
             break;
         case(PRINT_PRECODE):
             printf("Main thread: Precoding done frame: %d %d, subframe: %d in %.2f us\n", 
@@ -1065,23 +1044,23 @@ void Millipede::print_per_task_done(int task_type, int frame_id, int subframe_id
             break;
         case(PRINT_DEMUL):
             printf("Main thread: Demodulation done frame: %d, subframe: %d, sc: %d, num blocks done: %d\n", 
-                frame_id, subframe_id, ant_or_sc_id, demul_counter_scs_[frame_id][subframe_id]);
+                frame_id, subframe_id, ant_or_sc_id, demul_stats_.task_count[frame_id][subframe_id]);
             break;
         case(PRINT_DEMUL):
             printf("Main thread: Decoding done frame: %d, subframe: %d, sc: %d, num blocks done: %d\n", 
-                frame_id, subframe_id, ant_or_sc_id, decode_counter_blocks_[frame_id][subframe_id]);
+                frame_id, subframe_id, ant_or_sc_id, decode_stats.task_count[frame_id][subframe_id]);
             break;
         case(PRINT_PRECODE):
             printf("Main thread: Precoding done frame: %d, subframe: %d, subcarrier: %d, total SCs: %d\n", 
-                frame_id, subframe_id, ant_or_sc_id, dl_data_counter_scs_[frame_id][subframe_id]);
+                frame_id, subframe_id, ant_or_sc_id, precode_stats_.task_count[frame_id][subframe_id]);
             break;
         case(PRINT_IFFT):
             printf("Main thread: IFFT done frame: %d, subframe: %d, antenna: %d, total ants: %d\n", 
-                frame_id, subframe_id, ant_or_sc_id, ifft_counter_ants_[frame_id]);
+                frame_id, subframe_id, ant_or_sc_id, ifft_stats_.task_count[frame_id]);
             break;
         case(PRINT_TX):
             printf("Main thread: TX done frame: %d, subframe: %d, antenna: %d, total packets: %d\n", 
-                frame_id, subframe_id, ant_or_sc_id, tx_counter_ants_[frame_id][subframe_id]);
+                frame_id, subframe_id, ant_or_sc_id, tx_stats_.task_count[frame_id][subframe_id]);
             break;
         default:
             printf("Wrong task type in frame done print!");
@@ -1105,6 +1084,7 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
 
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
+    PILOT_NUM = cfg->pilot_symbol_num_perframe;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     subframe_num_perframe = cfg->symbol_num_perframe;
@@ -1185,41 +1165,38 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64, 0);
     alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
     
+    int max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * PILOT_NUM) : (BS_ANT_NUM * (ul_data_subframe_num_perframe + PILOT_NUM));
+    rx_stats_.max_task_count = max_packet_num_per_frame;
+    rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM; 
+    alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&(rx_stats_.fft_created_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    /* initilize all uplink status checkers */
-    alloc_buffer_1d(&rx_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&rx_counter_packets_pilots_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&csi_counter_users_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&data_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&precoder_counter_scs_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&demul_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&fft_created_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&precoder_exist_in_frame_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&decode_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    fft_stats_.max_task_count = BS_ANT_NUM;
+    fft_stats_.max_symbol_pilot_count = PILOT_NUM;
+    fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
+    alloc_buffer_2d(&(fft_stats_.task_count), TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64, 1);
+    alloc_buffer_2d(&(fft_stats_.data_exist_in_symbol), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(fft_stats_.symbol_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    alloc_buffer_2d(&fft_counter_ants_, TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64, 1);
+    zf_stats_.max_task_count = zf_block_num;
+    alloc_buffer_1d(&(zf_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&(zf_stats_.precoder_exist_in_frame), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    alloc_buffer_2d(&data_exist_in_subframe_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_2d(&demul_counter_scs_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_2d(&decode_counter_blocks_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    demul_stats_.max_task_count = demul_block_num;
+    demul_stats_.max_symbol_count = ul_data_subframe_num_perframe;
+    alloc_buffer_2d(&(demul_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(demul_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+
+    decode_stats_.max_task_count = LDPC_config.nblocksInSymbol * UE_NUM;
+    decode_stats_.max_symbol_count = ul_data_subframe_num_perframe;
+    alloc_buffer_2d(&(decode_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(decode_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    
 
     alloc_buffer_2d(&delay_fft_queue, TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32, 1);
     alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
-
-    /* initilize all timestamps and counters for worker threads */
-    alloc_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-
-    alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Decode_task_count, TASK_THREAD_NUM * 16, 64, 1);
-
-    alloc_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM, 10240, 64, 1);
 }
 
 
@@ -1238,26 +1215,25 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_2d(&dl_encoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
     alloc_buffer_2d(&recip_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM, 64, 0);
 
+    encode_stats_.max_task_count = LDPC_config.nblocksInSymbol * UE_NUM;
+    encode_stats_.max_symbol_count = dl_data_subframe_num_perframe;
+    alloc_buffer_2d(&(encode_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(encode_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    /* initilize all downlink status checkers */
-    alloc_buffer_1d(&dl_data_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&ifft_counter_ants_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&tx_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&encode_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    precode_stats_.max_task_count = demul_block_num;
+    precode_stats_.max_symbol_count = dl_data_subframe_num_perframe;
+    alloc_buffer_2d(&(precode_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(precode_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    alloc_buffer_2d(&dl_data_counter_scs_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_2d(&modulate_checker_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_2d(&tx_counter_ants_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_2d(&encode_counter_blocks_, TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    ifft_stats_.max_task_count = BS_ANT_NUM;
+    ifft_stats_.max_symbol_count = dl_data_subframe_num_perframe;
+    alloc_buffer_2d(&(ifft_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(ifft_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    /* initilize all timestamps and counters for worker threads */
-    alloc_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-
-    alloc_buffer_1d(&IFFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Precode_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Encode_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    tx_stats_.max_task_count = BS_ANT_NUM;
+    tx_stats_.max_symbol_count = dl_data_subframe_num_perframe;
+    alloc_buffer_2d(&(tx_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&(tx_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 }
 
 
@@ -1275,37 +1251,22 @@ void Millipede::free_uplink_buffers()
     free_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
     free_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
 
-    free_buffer_1d(&rx_counter_packets_);
-    free_buffer_1d(&rx_counter_packets_pilots_);
-    free_buffer_1d(&csi_counter_users_);
-    free_buffer_1d(&data_counter_subframes_);
-    free_buffer_1d(&precoder_counter_scs_);
-    free_buffer_1d(&demul_counter_subframes_);
-    free_buffer_1d(&fft_created_counter_packets_);
-    free_buffer_1d(&precoder_exist_in_frame_);
-    free_buffer_1d(&decode_counter_subframes_);
-
-    free_buffer_2d(&fft_counter_ants_, TASK_BUFFER_FRAME_NUM);
-
-    free_buffer_2d(&data_exist_in_subframe_, TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&demul_counter_scs_, TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&decode_counter_blocks_, TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(rx_stats_.task_count));
+    free_buffer_1d(&(rx_stats_.task_pilot_count));
+    free_buffer_1d(&(rx_stats_.fft_created_count));
+    free_buffer_2d(&(fft_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_2d(&(fft_stats_.data_exist_in_symbol), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(fft_stats_.symbol_pilot_count));
+    free_buffer_1d(&(fft_stats_.symbol_data_count));
+    free_buffer_1d(&(zf_stats_.task_count));
+    free_buffer_1d(&(zf_stats_.precoder_exist_in_frame));
+    free_buffer_2d(&(demul_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(demul_stats_.symbol_count));
+    free_buffer_2d(&(decode_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(decode_stats_.symbol_count));
 
     free_buffer_2d(&delay_fft_queue, TASK_BUFFER_FRAME_NUM);
     free_buffer_1d(&delay_fft_queue_cnt);
-
-
-    free_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8);
-
-    free_buffer_1d(&CSI_task_count);
-    free_buffer_1d(&FFT_task_count);
-    free_buffer_1d(&ZF_task_count);
-    free_buffer_1d(&Demul_task_count);
-    free_buffer_1d(&Decode_task_count);
 }
 
 void Millipede::free_downlink_buffers()
@@ -1318,23 +1279,14 @@ void Millipede::free_downlink_buffers()
     free_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
 
 
-    free_buffer_1d(&dl_data_counter_subframes_);
-    free_buffer_1d(&ifft_counter_ants_);
-    free_buffer_1d(&tx_counter_subframes_);
-    free_buffer_1d(&encode_counter_subframes_);
-
-    free_buffer_2d(&dl_data_counter_scs_, TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&modulate_checker_, TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&tx_counter_ants_, TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&encode_counter_blocks_, TASK_BUFFER_FRAME_NUM);
-
-    free_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8);
-
-    free_buffer_1d(&IFFT_task_count);
-    free_buffer_1d(&Precode_task_count);
-    free_buffer_1d(&Encode_task_count);
+    free_buffer_2d(&(encode_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(encode_stats_.symbol_count));
+    free_buffer_2d(&(precode_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(precode_stats_.symbol_count));
+    free_buffer_2d(&(ifft_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(ifft_stats_.symbol_count));
+    free_buffer_2d(&(tx_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    free_buffer_1d(&(tx_stats_.symbol_count));
 }
 
 
