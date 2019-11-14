@@ -8,7 +8,7 @@ int main(int argc, char const *argv[])
     else
     {
         std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-        filename = cur_directory + "/data/userconfig.json";
+        filename = cur_directory + "/data/userconfig_512.json";
     }
     Config *config = new Config(filename.c_str());
     int ret;

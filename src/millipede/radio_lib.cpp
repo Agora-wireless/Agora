@@ -175,6 +175,11 @@ void* RadioConfig::configureBSRadio(void* in_context)
         channels = { 0, 1 };
     }
 
+    // resets the DATA_clk domain logic.
+    rc->baStn[i]->writeRegister("IRIS30", 48, (1 << 29) | 0x1);
+    rc->baStn[i]->writeRegister("IRIS30", 48, (1 << 29));
+    rc->baStn[i]->writeRegister("IRIS30", 48, 0);
+
     //use the TRX antenna port for both tx and rx
     for (auto ch : channels)
         rc->baStn[i]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
@@ -194,7 +199,7 @@ void* RadioConfig::configureBSRadio(void* in_context)
 
         if (info["frontend"].find("CBRS") != std::string::npos) {
             if (cfg->freq > 3e9)
-                rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", 0); //[-18,0]
+                rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -6); //[-18,0]
             else if (cfg->freq > 2e9 && cfg->freq < 3e9)
                 rc->baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18); //[-18,0]
             else

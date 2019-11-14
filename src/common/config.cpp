@@ -192,6 +192,12 @@ Config::Config(std::string jsonfile)
         pilot_ci16.push_back(std::complex<int16_t>((int16_t)(pilot_cf32[i].real()*32768), (int16_t)(pilot_cf32[i].imag()*32768)));
     pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
     pilot_ci16.insert(pilot_ci16.end(), post_ci16.begin(), post_ci16.end());
+    size_t seq_len = pilot_cf32.size(); 
+    for (size_t i = 0; i < seq_len; i++) {
+        std::complex<float> cf = pilot_cf32[i];
+        //pilot_cs16.push_back(std::complex<int16_t>((int16_t)(cf.real() * 32768), (int16_t)(cf.imag() * 32768)));
+        pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
+    }
 
     if (exec_mode == "hw") {
         pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");

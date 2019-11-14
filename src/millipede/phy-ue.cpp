@@ -280,6 +280,17 @@ void Phy_UE::start()
                 char *rx_buffer_ptr = rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length;
                 symbol_id = *((int *)rx_buffer_ptr + 1);
                 frame_id = *((int *)rx_buffer_ptr);
+            #if WRITE_RECV
+                if (frame_id < 10 && cfg->getDlSFIndex(frame_id, symbol_id) == 0) {
+                    ant_id = *((int *)rx_buffer_ptr + 3);
+                    int len = cfg->sampsPerSymbol;
+                    void *cur_buf = (rx_buffer_ptr + package_header_offset);
+                    std::string filename = "sig_ant"+std::to_string(ant_id)+"_f"+std::to_string(frame_id)+".bin";
+                    fp = fopen(filename.c_str(),"wb");
+                    fwrite(cur_buf, sizeof(std::complex<short>), cfg->sampsPerSymbol, fp);
+                    fclose(fp);
+                }
+            #endif      
 
                 if (ul_data_symbol_perframe > 0 && prev_frame_id == cfg->maxFrame)
 		    printf("received start indication frame with frame_id %zu\n", frame_id);
@@ -558,6 +569,40 @@ void Phy_UE::doFFT(int tid, int offset)
     // remove CP, do FFT
     int dl_symbol_id = cfg->getDlSFIndex(frame_id, symbol_id);
     int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM, rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id); 
+    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + cfg->package_header_offset);
+
+    size_t sym_offset = 0;
+    if(cfg->isPilot(frame_id, symbol_id)) {
+       if (frame_id == 3*TX_FRAME_DELTA) {
+           std::string fname = "rxpilot"+std::to_string(symbol_id)+".bin";
+           FILE *f = fopen(fname.c_str(), "wb");
+           fwrite(cur_ptr_buffer_ushort, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
+           fclose(f);
+       }
+    
+    #if DEBUG_DL_PILOT    
+        std::vector<std::complex<double>> vec;
+        for(size_t i = 0; i < cfg->sampsPerSymbol; i++)
+            vec.push_back(std::complex<double>(cur_ptr_buffer_ushort[2*i]/32768.0, cur_ptr_buffer_ushort[2*i+1]/32768.0));
+        sym_offset = CommsLib::find_pilot_seq(vec, cfg->pilot_cd64, cfg->pilot_cd64.size());
+        sym_offset = sym_offset < cfg->pilot_cd64.size() ? 0 : sym_offset - cfg->pilot_cd64.size();
+        double noise_power = 0;
+        for (size_t i = 0; i < sym_offset; i++)
+            noise_power += std::pow(std::abs(vec[i]), 2);
+        double signal_power = 0;
+        for (size_t i = sym_offset; i < 2 * sym_offset; i++)
+            signal_power += std::pow(std::abs(vec[i]), 2);
+        double SNR = 10*std::log10(signal_power/noise_power);
+        printf("frame %d symbol %d ant %d: corr offset %zu, SNR %2.1f \n", frame_id, symbol_id, ant_id, sym_offset, SNR);
+    #endif
+    } else {
+       if (frame_id == 3*TX_FRAME_DELTA) {
+           std::string fname = "rxdata"+std::to_string(symbol_id)+".bin";
+           FILE *f = fopen(fname.c_str(), "wb");
+           fwrite(cur_ptr_buffer_ushort, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
+           fclose(f);
+       }
+    }
 
     // transfer ushort to float
     size_t delay_offset = (dl_prefix_len + CP_LEN) * 2; //GetFrameStart(cur_ptr_buffer_ushort, prefix_len, postfix_len);
@@ -567,7 +612,6 @@ void Phy_UE::doFFT(int tid, int offset)
 
     for(size_t i = 0; i < (FFT_LEN) * 2; i++)
         cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[delay_offset + i]/32768.2f;
-        //cur_fft_buffer_float[i] = cur_radio_buffer[delay_offset + i];
     //memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float)); 
 
     // perform fft
@@ -808,7 +852,7 @@ void Phy_UE::initialize_vars_from_cfg(Config *cfg)
 
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
-    for (int i = 0; i < OFDM_CA_NUM; i++) 
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) 
         cout<<pilots_[i]<<",";
     cout<<endl;
 #endif

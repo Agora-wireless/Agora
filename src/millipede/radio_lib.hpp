@@ -1,3 +1,6 @@
+#ifndef RADIO_LIB
+#define RADIO_LIB
+
 #include <iostream>
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Formats.hpp>
@@ -65,3 +68,4 @@ private:
     std::atomic<size_t> remainingJobs;
     RadioConfigContext *context;
 };
+#endif
