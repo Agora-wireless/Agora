@@ -564,7 +564,7 @@ void* RU::loopProc(void *in_context)
 //                                                           *((RadioBufElemeType *)cur_ptr_buffer+14),
 //                                                           *((RadioBufElemeType *)cur_ptr_buffer+15),
 //                                                           *((RadioBufElemeType *)cur_ptr_buffer+16)); 
-#endif             
+#endif
             // get the position in buffer
             offset = cur_ptr_buffer_status - buffer_status;
             // move ptr & set status to full

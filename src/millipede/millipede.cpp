@@ -1097,6 +1097,7 @@ void Millipede::initialize_vars_from_cfg(Config *cfg)
     dl_IQ_data = cfg->dl_IQ_data;
 
 #if DEBUG_PRINT_PILOT
+    using namespace std;
     cout<<"Pilot data"<<endl;
     for (int i = 0; i < OFDM_CA_NUM; i++) 
         cout<<pilots_[i]<<",";
