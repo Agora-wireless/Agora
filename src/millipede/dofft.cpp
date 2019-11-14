@@ -9,8 +9,7 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
     char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
     complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
-    double **in_FFT_task_duration, double **in_CSI_task_duration, int *in_FFT_task_count, int *in_CSI_task_count,
-    double **in_IFFT_task_duration, int *in_IFFT_task_count) 
+    Stats *in_stats_manager) 
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -38,13 +37,12 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     dl_socket_buffer_ = in_dl_socket_buffer;
     dl_ifft_buffer_ = in_dl_ifft_buffer;
 
-
-    FFT_task_duration = in_FFT_task_duration;
-    CSI_task_duration = in_CSI_task_duration;
-    FFT_task_count = in_FFT_task_count;
-    CSI_task_count = in_CSI_task_count;
-    IFFT_task_duration = in_IFFT_task_duration;
-    IFFT_task_count = in_IFFT_task_count;
+    FFT_task_duration = in_stats_manager->fft_stats_worker.task_duration;
+    CSI_task_duration = in_stats_manager->csi_stats_worker.task_duration;
+    FFT_task_count = in_stats_manager->fft_stats_worker.task_count;
+    CSI_task_count = in_stats_manager->csi_stats_worker.task_count;
+    IFFT_task_duration = in_stats_manager->ifft_stats_worker.task_duration;
+    IFFT_task_count = in_stats_manager->ifft_stats_worker.task_count;
 
 
     int FFT_buffer_block_num = 1;

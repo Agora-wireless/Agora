@@ -43,13 +43,13 @@ Millipede::Millipede(Config *cfg)
         printf("initialize downlink buffers\n");
         initialize_downlink_buffers();
     }
-
+    stats_manager_ = new Stats(cfg_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM);
     
     /* initialize TXRX threads*/
     printf("new TXRX\n");
     receiver_.reset(new PacketTXRX(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, 
                     &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
-
+    
     /* create worker threads */
 #if BIGSTATION
     create_threads(Worker_FFT, 0, FFT_THREAD_NUM);
@@ -58,13 +58,8 @@ Millipede::Millipede(Config *cfg)
 #else
     create_threads(Worker, 0, TASK_THREAD_NUM);
 #endif
-    stats_manager_.reset(new Stats(cfg_, CSI_task_duration, CSI_task_count, FFT_task_duration, FFT_task_count, 
-          ZF_task_duration, ZF_task_count, Demul_task_duration, Demul_task_count,
-          IFFT_task_duration, IFFT_task_count, Precode_task_duration, Precode_task_count,
-          Decode_task_duration, Decode_task_count, Encode_task_duration, Encode_task_count,
-          frame_start, 
-          TASK_THREAD_NUM * 8, 4, TASK_THREAD_NUM * 16,
-          TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM));
+    // stats_manager_.reset(new Stats(cfg_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM));
+    
 }
 
 Millipede::~Millipede()
@@ -87,7 +82,7 @@ void Millipede::start()
 {
     /* start uplink receiver */
     std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_, 
-        socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, frame_start);
+        socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_, stats_manager_->frame_start);
 #ifdef USE_ARGOS
     if (rx_threads.size() == 0) {
 	this->stop();
@@ -497,24 +492,22 @@ void *Millipede::worker(int tid)
     /* initialize operators */
     DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
-        dl_ifft_buffer_, dl_socket_buffer_, 
-        FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
-        IFFT_task_duration, IFFT_task_count);
+        dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
+        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
-        Precode_task_duration, Precode_task_count);
+        stats_manager_);
 
     #ifdef USE_LDPC
     DoCoding *computeCoding = new DoCoding(cfg_, tid, &(complete_task_queue_), task_ptok_ptr,
         dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
-        Encode_task_duration, Encode_task_count, Decode_task_duration, Decode_task_count);
+        stats_manager_);
     #endif
 
     Event_data event;
@@ -606,9 +599,7 @@ void* Millipede::worker_fft(int tid)
     /* initialize FFT operator */
     DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
-        dl_ifft_buffer_, dl_socket_buffer_, 
-        FFT_task_duration, CSI_task_duration, FFT_task_count, CSI_task_count,
-        IFFT_task_duration, IFFT_task_count);
+        dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
 
     Event_data event;
@@ -646,7 +637,7 @@ void* Millipede::worker_zf(int tid)
 
     /* initialize ZF operator */
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, ZF_task_duration, ZF_task_count);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
 
     Event_data event;
@@ -671,13 +662,13 @@ void* Millipede::worker_demul(int tid)
 
     /* initialize Demul operator */
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, Demul_task_duration, Demul_task_count);
+        data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
 
     /* initialize Precode operator */
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
         dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
-        Precode_task_duration, Precode_task_count);
+        stats_manager_);
 
 
 
@@ -1208,19 +1199,19 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
 
     /* initilize all timestamps and counters for worker threads */
-    alloc_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
-    alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Decode_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&Decode_task_count, TASK_THREAD_NUM * 16, 64, 1);
 
-    alloc_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM, 10240, 64, 1);
+    // alloc_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM, 10240, 64, 1);
 }
 
 
@@ -1260,13 +1251,13 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_1d(&(tx_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
     /* initilize all timestamps and counters for worker threads */
-    alloc_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    alloc_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
+    // alloc_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
 
-    alloc_buffer_1d(&IFFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Precode_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    alloc_buffer_1d(&Encode_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&IFFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&Precode_task_count, TASK_THREAD_NUM * 16, 64, 1);
+    // alloc_buffer_1d(&Encode_task_count, TASK_THREAD_NUM * 16, 64, 1);
 }
 
 
@@ -1302,17 +1293,17 @@ void Millipede::free_uplink_buffers()
     free_buffer_1d(&delay_fft_queue_cnt);
 
 
-    free_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8);
 
-    free_buffer_1d(&CSI_task_count);
-    free_buffer_1d(&FFT_task_count);
-    free_buffer_1d(&ZF_task_count);
-    free_buffer_1d(&Demul_task_count);
-    free_buffer_1d(&Decode_task_count);
+    // free_buffer_1d(&CSI_task_count);
+    // free_buffer_1d(&FFT_task_count);
+    // free_buffer_1d(&ZF_task_count);
+    // free_buffer_1d(&Demul_task_count);
+    // free_buffer_1d(&Decode_task_count);
 }
 
 void Millipede::free_downlink_buffers()
@@ -1335,13 +1326,13 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&(tx_stats_.symbol_count));
 
 
-    free_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8);
-    free_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8);
+    // free_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8);
 
-    free_buffer_1d(&IFFT_task_count);
-    free_buffer_1d(&Precode_task_count);
-    free_buffer_1d(&Encode_task_count);
+    // free_buffer_1d(&IFFT_task_count);
+    // free_buffer_1d(&Precode_task_count);
+    // free_buffer_1d(&Encode_task_count);
 }
 
 

@@ -18,6 +18,7 @@
 #include "offset.h"
 #include "modulation.hpp"
 #include "config.hpp"
+#include "stats.hpp"
 // #include "mkl_dfti.h"
 
 
@@ -27,7 +28,7 @@ public:
     DoDemul(Config *cfg, int in_tid, int in_demod_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demul_hard_buffer,
-        int8_t **in_demod_soft_buffer, double **in_Demul_task_duration, int *in_Demul_task_count);
+        int8_t **in_demod_soft_buffer, Stats *in_stats_manager);
     ~DoDemul();
 
     /**

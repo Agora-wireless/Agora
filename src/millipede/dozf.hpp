@@ -17,6 +17,7 @@
 #include "gettime.h"
 #include "offset.h"
 #include "config.hpp"
+#include "stats.hpp"
 // #include "mkl_dfti.h"
 
 
@@ -26,7 +27,7 @@ public:
     DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_csi_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoder_buffer, complex_float **in_recip_buffer, complex_float **in_pred_csi_buffer, 
-        double **in_ZF_task_duration, int *in_ZF_task_count);
+        Stats *in_stats_manager);
     ~DoZF();
 
     /**

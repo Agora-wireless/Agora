@@ -9,7 +9,7 @@ using namespace arma;
 DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demod_hard_buffer,
-        int8_t **in_demod_soft_buffer, double **in_Demul_task_duration, int *in_Demul_task_count)
+        int8_t **in_demod_soft_buffer, Stats *in_stats_manager)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -30,8 +30,10 @@ DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transp
     demod_hard_buffer_ = in_demod_hard_buffer;
     demod_soft_buffer_ = in_demod_soft_buffer;
 
-    Demul_task_duration = in_Demul_task_duration;
-    Demul_task_count = in_Demul_task_count;
+    Demul_task_duration = in_stats_manager->demul_stats_worker.task_duration;
+    Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
+    // Demul_task_duration = in_Demul_task_duration;
+    // Demul_task_count = in_Demul_task_count;
 
     spm_buffer = (complex_float *)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
     equaled_buffer_temp = (complex_float *)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));

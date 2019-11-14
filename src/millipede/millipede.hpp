@@ -138,7 +138,8 @@ private:
     int buffer_frame_num;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    std::unique_ptr<Stats> stats_manager_;
+    Stats *stats_manager_;
+    // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t *task_threads;
@@ -320,27 +321,27 @@ private:
     /*****************************************************
      * Timestamps and counters used in worker threads 
      *****************************************************/ 
-    int *CSI_task_count;
-    int *FFT_task_count;
-    int *ZF_task_count;
-    int *Demul_task_count;
-    int *Decode_task_count;
+    // int *CSI_task_count;
+    // int *FFT_task_count;
+    // int *ZF_task_count;
+    // int *Demul_task_count;
+    // int *Decode_task_count;
 
-    double **CSI_task_duration;
-    double **FFT_task_duration;
-    double **ZF_task_duration;
-    double **Demul_task_duration;
-    double **Decode_task_duration;
+    // double **CSI_task_duration;
+    // double **FFT_task_duration;
+    // double **ZF_task_duration;
+    // double **Demul_task_duration;
+    // double **Decode_task_duration;
 
-    int *IFFT_task_count;
-    int *Precode_task_count;
-    int *Encode_task_count;
+    // int *IFFT_task_count;
+    // int *Precode_task_count;
+    // int *Encode_task_count;
 
-    double **IFFT_task_duration;
-    double **Precode_task_duration;
-    double **Encode_task_duration;
+    // double **IFFT_task_duration;
+    // double **Precode_task_duration;
+    // double **Encode_task_duration;
 
-    double **frame_start;
+    // double **frame_start;
 
 };
 

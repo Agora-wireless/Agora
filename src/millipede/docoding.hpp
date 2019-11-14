@@ -19,10 +19,12 @@
 #include "config.hpp"
 #include "memory_manage.h"
 #include "modulation.hpp"
+#include "stats.hpp"
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+
 
 
 // #include "mkl_dfti.h"
@@ -34,7 +36,7 @@ public:
     DoCoding(Config *cfg, int in_tid, 
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         int8_t **in_raw_data_buffer, int8_t **in_encoded_buffer, int8_t **in_demod_buffer, uint8_t **in_decoded_buffer, 
-        double **in_Encode_task_duration, int *in_Encode_task_count, double **in_Decode_task_duration, int *in_Decode_task_count);
+        Stats *in_stats_manager);
     ~DoCoding();
 
     /**

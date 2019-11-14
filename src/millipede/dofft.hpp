@@ -18,6 +18,7 @@
 #include "mkl_dfti.h"
 #include "mufft/fft.h"
 #include "config.hpp"
+#include "stats.hpp"
 
 
 class DoFFT
@@ -27,8 +28,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
         complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
-        double **in_FFT_task_duration, double **in_CSI_task_duration, int *in_FFT_task_count, int *in_CSI_task_count,
-        double **in_IFFT_task_duration, int *in_IFFT_task_count);
+        Stats *in_stats_manager);
     ~DoFFT();
 
     /**
