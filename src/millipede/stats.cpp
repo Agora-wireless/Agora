@@ -69,6 +69,36 @@ Stats::Stats(Config *cfg, int in_break_down_num,
 
 }
 
+Stats::~Stats()
+{
+    free_stats_worker(&csi_stats_worker, task_thread_num);
+    free_stats_worker(&fft_stats_worker, task_thread_num);
+    free_stats_worker(&zf_stats_worker, task_thread_num);
+    free_stats_worker(&demul_stats_worker, task_thread_num);
+    free_stats_worker(&decode_stats_worker, task_thread_num);
+    free_stats_worker(&encode_stats_worker, task_thread_num);
+    free_stats_worker(&ifft_stats_worker, task_thread_num);
+    free_stats_worker(&precode_stats_worker, task_thread_num);
+
+    free_stats_worker(&csi_stats_worker_old, task_thread_num);
+    free_stats_worker(&fft_stats_worker_old, task_thread_num);
+    free_stats_worker(&zf_stats_worker_old, task_thread_num);
+    free_stats_worker(&demul_stats_worker_old, task_thread_num);
+    free_stats_worker(&decode_stats_worker_old, task_thread_num);
+    free_stats_worker(&encode_stats_worker_old, task_thread_num);
+    free_stats_worker(&ifft_stats_worker_old, task_thread_num);
+    free_stats_worker(&precode_stats_worker_old, task_thread_num);
+
+    free_stats_worker_per_frame(&csi_stats_per_frame);
+    free_stats_worker_per_frame(&fft_stats_per_frame);
+    free_stats_worker_per_frame(&zf_stats_per_frame);
+    free_stats_worker_per_frame(&demul_stats_per_frame);
+    free_stats_worker_per_frame(&decode_stats_per_frame);
+    free_stats_worker_per_frame(&encode_stats_per_frame);
+    free_stats_worker_per_frame(&ifft_stats_per_frame);
+    free_stats_worker_per_frame(&precode_stats_per_frame);
+}
+
 void Stats::init_stats_worker(Stats_worker *stats_in_worker, int thread_num, int break_down_num)
 {
     alloc_buffer_2d(&(stats_in_worker->task_duration), thread_num * 8, break_down_num, 32, 1);
@@ -80,6 +110,19 @@ void Stats::init_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker,
     alloc_buffer_1d(&(stats_in_worker->duration_this_thread), break_down_num, 32, 1);
     alloc_buffer_1d(&(stats_in_worker->duration_this_thread_per_task), break_down_num, 32, 1);
     alloc_buffer_1d(&(stats_in_worker->duration_avg_threads), break_down_num, 32, 1);
+}
+
+void Stats::free_stats_worker(Stats_worker *stats_in_worker, int thread_num)
+{
+    free_buffer_2d(&(stats_in_worker->task_duration), thread_num * 8);
+    free_buffer_1d(&(stats_in_worker->task_count));
+}
+
+void Stats::free_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker)
+{
+    free_buffer_1d(&(stats_in_worker->duration_this_thread));
+    free_buffer_1d(&(stats_in_worker->duration_this_thread_per_task));
+    free_buffer_1d(&(stats_in_worker->duration_avg_threads));
 }
 
 void Stats::reset_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker, int break_down_num)

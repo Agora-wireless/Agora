@@ -49,7 +49,7 @@ Millipede::Millipede(Config *cfg)
     printf("new TXRX\n");
     receiver_.reset(new PacketTXRX(cfg_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, 
                     &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
-    
+
     /* create worker threads */
 #if BIGSTATION
     create_threads(Worker_FFT, 0, FFT_THREAD_NUM);
@@ -1197,21 +1197,6 @@ void Millipede::initialize_uplink_buffers()
 
     alloc_buffer_2d(&delay_fft_queue, TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32, 1);
     alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
-
-    /* initilize all timestamps and counters for worker threads */
-    // alloc_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    // alloc_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    // alloc_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    // alloc_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    // alloc_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-
-    // alloc_buffer_1d(&CSI_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    // alloc_buffer_1d(&FFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    // alloc_buffer_1d(&ZF_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    // alloc_buffer_1d(&Demul_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    // alloc_buffer_1d(&Decode_task_count, TASK_THREAD_NUM * 16, 64, 1);
-
-    // alloc_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM, 10240, 64, 1);
 }
 
 
@@ -1249,15 +1234,6 @@ void Millipede::initialize_downlink_buffers()
     tx_stats_.max_symbol_count = dl_data_subframe_num_perframe;
     alloc_buffer_2d(&(tx_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
     alloc_buffer_1d(&(tx_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
-
-    /* initilize all timestamps and counters for worker threads */
-    // alloc_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    // alloc_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-    // alloc_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8, 4, 64, 1);
-
-    // alloc_buffer_1d(&IFFT_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    // alloc_buffer_1d(&Precode_task_count, TASK_THREAD_NUM * 16, 64, 1);
-    // alloc_buffer_1d(&Encode_task_count, TASK_THREAD_NUM * 16, 64, 1);
 }
 
 
@@ -1291,19 +1267,6 @@ void Millipede::free_uplink_buffers()
 
     free_buffer_2d(&delay_fft_queue, TASK_BUFFER_FRAME_NUM);
     free_buffer_1d(&delay_fft_queue_cnt);
-
-
-    // free_buffer_2d(&CSI_task_duration, TASK_THREAD_NUM * 8);
-    // free_buffer_2d(&FFT_task_duration, TASK_THREAD_NUM * 8);
-    // free_buffer_2d(&ZF_task_duration, TASK_THREAD_NUM * 8);
-    // free_buffer_2d(&Demul_task_duration, TASK_THREAD_NUM * 8);
-    // free_buffer_2d(&Decode_task_duration, TASK_THREAD_NUM * 8);
-
-    // free_buffer_1d(&CSI_task_count);
-    // free_buffer_1d(&FFT_task_count);
-    // free_buffer_1d(&ZF_task_count);
-    // free_buffer_1d(&Demul_task_count);
-    // free_buffer_1d(&Decode_task_count);
 }
 
 void Millipede::free_downlink_buffers()
@@ -1324,15 +1287,6 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&(ifft_stats_.symbol_count));
     free_buffer_2d(&(tx_stats_.task_count), TASK_BUFFER_FRAME_NUM);
     free_buffer_1d(&(tx_stats_.symbol_count));
-
-
-    // free_buffer_2d(&IFFT_task_duration, TASK_THREAD_NUM * 8);
-    // free_buffer_2d(&Precode_task_duration, TASK_THREAD_NUM * 8);
-    // free_buffer_2d(&Encode_task_duration, TASK_THREAD_NUM * 8);
-
-    // free_buffer_1d(&IFFT_task_count);
-    // free_buffer_1d(&Precode_task_count);
-    // free_buffer_1d(&Encode_task_count);
 }
 
 
