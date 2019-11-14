@@ -17,8 +17,8 @@ message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 if (${CMAKE_C_COMPILER} STREQUAL "/usr/bin/gcc")
-  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -O3 -mavx2 -march=broadwell")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -O3 -mavx2 -mavx -march=broadwell  -m64")
+  set(CMAKE_C_FLAGS "-std=c99 -w -g -O3 -mavx2 -march=broadwell")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -w -g -O3 -mavx2 -mavx -march=broadwell  -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set (MKL_LIBS -lmkl_rt -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lm -ldl)
 else ()
@@ -78,8 +78,9 @@ if (${USE_ARGOS})
   set (TXRX_SOURCES src/millipede/txrx/txrx_argos.cpp)
   set (CLIENT_SOURCES
          src/common/modulation.cpp
-         src/millipede/ru.cpp
-         src/millipede/phy-ue.cpp)
+         src/client/client_radio.cpp
+         src/client/ru.cpp
+         src/client/phy-ue.cpp)
   set (PYTHON_LIB ${PYTHON_LIBRARIES}) 
   add_definitions(-DTHREADED_INIT)
 endif ()
@@ -99,6 +100,7 @@ include_directories(
 	src/common/
   src/millipede/
   src/millipede/txrx/
+  src/client/
 	)
 
 
@@ -183,7 +185,7 @@ target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo 
 
 if (${USE_ARGOS})
   add_executable(user 
-       src/millipede/user-main.cpp
+       src/client/user-main.cpp
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})

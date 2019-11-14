@@ -21,7 +21,7 @@
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "radio_lib.hpp"
+#include "client_radio.hpp"
 #include <fstream>      // std::ifstream
 
 class RU
@@ -83,7 +83,7 @@ private:
     int* rx_socket_;
     int* tx_socket_;
 
-    RadioConfig *radioconfig_;
+    ClientRadioConfig *radioconfig_;
 
     void** buffer_;
     int** buffer_status_;
