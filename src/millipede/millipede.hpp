@@ -317,32 +317,6 @@ private:
     moodycamel::ProducerToken **rx_ptoks_ptr;
     moodycamel::ProducerToken **tx_ptoks_ptr;
 
-
-    /*****************************************************
-     * Timestamps and counters used in worker threads 
-     *****************************************************/ 
-    // int *CSI_task_count;
-    // int *FFT_task_count;
-    // int *ZF_task_count;
-    // int *Demul_task_count;
-    // int *Decode_task_count;
-
-    // double **CSI_task_duration;
-    // double **FFT_task_duration;
-    // double **ZF_task_duration;
-    // double **Demul_task_duration;
-    // double **Decode_task_duration;
-
-    // int *IFFT_task_count;
-    // int *Precode_task_count;
-    // int *Encode_task_count;
-
-    // double **IFFT_task_duration;
-    // double **Precode_task_duration;
-    // double **Encode_task_duration;
-
-    // double **frame_start;
-
 };
 
 #endif

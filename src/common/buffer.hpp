@@ -81,15 +81,9 @@ struct Data_stats {
     int max_symbol_count;
 };
 
-// struct Decode_stats {
-//     int **block_count;
-//     int *count_symbols;
-//     int frame_count = 0;
-//     int count_block_max;
-//     int max_symbol_count;
-// };
 
 
+/* TODO: clean up the legency code below */
 struct FFTBuffer
 {
     // Data before IFFT

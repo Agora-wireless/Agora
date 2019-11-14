@@ -37,11 +37,13 @@ class Stats
 public:
     Stats(Config *cfg, int in_break_down_num, 
           int in_task_thread_num, int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num);
-    ~Stats(){};
+    ~Stats();
 
 
     void init_stats_worker(Stats_worker *stats_in_worker, int thread_num, int break_down_num);
     void init_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker, int break_down_num);
+    void free_stats_worker(Stats_worker *stats_in_worker, int thread_num);
+    void free_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker);
     void reset_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker, int break_down_num);
     void update_stats_for_breakdowns(Stats_worker_per_frame *stats_per_frame, Stats_worker stats_in_worker, 
         Stats_worker *stats_in_worker_old, int thread_id, int break_down_num);
