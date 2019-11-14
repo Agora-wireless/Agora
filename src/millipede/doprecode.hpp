@@ -19,6 +19,7 @@
 #include "modulation.hpp"
 #include "config.hpp"
 #include "memory_manage.h"
+#include "stats.hpp"
 // #include "mkl_dfti.h"
 
 
@@ -29,7 +30,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
         complex_float **in_dl_ifft_buffer, int8_t **in_dl_IQ_data, int8_t **in_dl_encoded_data,
-        double **in_Precode_task_duration, int *in_Precode_task_count);
+        Stats *in_stats_manager);
     ~DoPrecode();
 
     /**

@@ -11,7 +11,7 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
         complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
         complex_float **in_dl_ifft_buffer, int8_t **in_dl_IQ_data, int8_t **in_dl_encoded_data,
-        double **in_Precode_task_duration, int *in_Precode_task_count)
+        Stats *in_stats_manager)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -38,8 +38,10 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     size_t mod_type = config_->mod_type;
     qam_table = init_modulation_table(mod_type);
 
-    Precode_task_duration = in_Precode_task_duration;
-    Precode_task_count = in_Precode_task_count;
+    Precode_task_duration = in_stats_manager->precode_stats_worker.task_duration;
+    Precode_task_count = in_stats_manager->precode_stats_worker.task_count;
+    // Precode_task_duration = in_Precode_task_duration;
+    // Precode_task_count = in_Precode_task_count;
 
     modulated_buffer_temp = (complex_float *)aligned_alloc(64, UE_NUM * sizeof(complex_float));
     precoded_buffer_temp =  (complex_float *)aligned_alloc(64, demul_block_size * BS_ANT_NUM * sizeof(complex_float));

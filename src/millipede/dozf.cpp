@@ -9,7 +9,7 @@ using namespace arma;
 DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
     complex_float **in_csi_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoder_buffer, complex_float **in_recip_buffer, complex_float **in_pred_csi_buffer, 
-    double **in_ZF_task_duration, int *in_ZF_task_count) 
+    Stats *in_stats_manager) 
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -30,8 +30,10 @@ DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block
     pred_csi_buffer_ = in_pred_csi_buffer;
 
 
-    ZF_task_duration = in_ZF_task_duration;
-    ZF_task_count = in_ZF_task_count;
+    ZF_task_duration = in_stats_manager->zf_stats_worker.task_duration;
+    ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
+    // ZF_task_duration = in_ZF_task_duration;
+    // ZF_task_count = in_ZF_task_count;
 
     csi_gather_buffer = (complex_float *)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), BS_ANT_NUM * UE_NUM * sizeof(complex_float));
 

@@ -107,17 +107,10 @@ public:
 
     void save_demul_data_to_file(int frame_id, int data_subframe_id);
     void getDemulData(int **ptr, int *size);
-    void getEqualData(float **ptr, int *size);
-
-    // inline bool isPilot(int subframe_id) {return (subframe_id >=0) && (subframe_id < UE_NUM); }
-    // inline bool isData(int subframe_id) {return (subframe_id < subframe_num_perframe) && (subframe_id >= UE_NUM); }
-    // inline int getUEId(int subframe_id) {return subframe_id; }
-    // inline int getULSFIndex(int subframe_id) {return subframe_id - UE_NUM; }
-
-    
+    void getEqualData(float **ptr, int *size);    
 
 private:
-    int BS_ANT_NUM, UE_NUM;
+    int BS_ANT_NUM, UE_NUM, PILOT_NUM;
     int OFDM_CA_NUM;
     int OFDM_DATA_NUM;
     int subframe_num_perframe, data_subframe_num_perframe;
@@ -143,9 +136,10 @@ private:
     int max_equaled_frame = 0;
     float csi_format_offset;
     int buffer_frame_num;
-    int max_packet_num_per_frame;
+    // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    std::unique_ptr<Stats> stats_manager_;
+    Stats *stats_manager_;
+    // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t *task_threads;
@@ -216,42 +210,18 @@ private:
 
     uint8_t **decoded_buffer_;
 
-
-
-    
-
-    /* Uplink status checkers used by master thread */ 
-    /* used to check if RX for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
-    int *rx_counter_packets_;   
-    /* used to check if RX for all antennas and all pilots in a frame is done (max: BS_ANT_NUM * UE_NUM) */
-    int *rx_counter_packets_pilots_;   
-    /* used to check if FFT for all users/pilots in a frame is done (max: UE_NUM) */
-    int *csi_counter_users_;
-    /* used to check if FFT for all data subframes in a frame is done (max: data_subframe_num_perframe) */
-    int *data_counter_subframes_;
-    /* used to check if ZF for all subcarriers in a frame is done (max: OFDM_DATA_NUM) */
-    int *precoder_counter_scs_;
-    /* used to check if demodulation for all data subframes in a frame is done (max: data_subframe_num_perframe) */
-    int *demul_counter_subframes_;
-    /* used to check if creating FFT for all antennas and all subframes in a frame is done (max: BS_ANT_NUM * subframe_num_perframe) */
-    int *fft_created_counter_packets_;
-    /* used to check the existance of precoder in a frame */
-    bool *precoder_exist_in_frame_;
-    int *decode_counter_subframes_;
-
-    /* used to check if FFT for all antennas in a subframe is done (max: BS_ANT_NUM) */
-    int **fft_counter_ants_;
-
-    /* used to check if demodulation for all subcarriers in a data subframe is done (max: OFDM_DATA_NUM) */
-    int **demul_counter_scs_;
-    /* used to check the existance of data after FFT of a subframe in a frame */
-    bool **data_exist_in_subframe_;
-    int **decode_counter_blocks_;
-
+    RX_stats rx_stats_;
+    FFT_stats fft_stats_;
+    ZF_stats zf_stats_;
+    Data_stats demul_stats_;
+    Data_stats decode_stats_;
+    Data_stats encode_stats_;
+    Data_stats precode_stats_;
+    Data_stats ifft_stats_;
+    Data_stats tx_stats_;
 
     int **delay_fft_queue;
     int *delay_fft_queue_cnt;
-
 
     /* Downlink */   
     /** 
@@ -319,18 +289,6 @@ private:
     int dl_socket_buffer_status_size_;
 
 
-    /* Downlink status checkers used by master thread */ 
-    int **dl_data_counter_scs_;
-    int *dl_data_counter_subframes_;
-    int **modulate_checker_;
-    int *ifft_counter_ants_;
-    int **tx_counter_ants_;
-    int *tx_counter_subframes_;
-
-    int **encode_counter_blocks_;
-    int *encode_counter_subframes_;
-    // int precoding_checker_[TASK_BUFFER_FRAME_NUM];
-
     int *prev_frame_counter;
     int prev_frame_counter_max;
     /*****************************************************
@@ -358,32 +316,6 @@ private:
     moodycamel::ProducerToken **task_ptoks_ptr;
     moodycamel::ProducerToken **rx_ptoks_ptr;
     moodycamel::ProducerToken **tx_ptoks_ptr;
-
-
-    /*****************************************************
-     * Timestamps and counters used in worker threads 
-     *****************************************************/ 
-    int *CSI_task_count;
-    int *FFT_task_count;
-    int *ZF_task_count;
-    int *Demul_task_count;
-    int *Decode_task_count;
-
-    double **CSI_task_duration;
-    double **FFT_task_duration;
-    double **ZF_task_duration;
-    double **Demul_task_duration;
-    double **Decode_task_duration;
-
-    int *IFFT_task_count;
-    int *Precode_task_count;
-    int *Encode_task_count;
-
-    double **IFFT_task_duration;
-    double **Precode_task_duration;
-    double **Encode_task_duration;
-
-    double **frame_start;
 
 };
 
