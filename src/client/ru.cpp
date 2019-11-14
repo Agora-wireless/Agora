@@ -536,7 +536,7 @@ void* RU::loopProc(void *in_context)
                 *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
             }
 #if DEBUG_RECV
-            printf("receive thread %d: frame_id %d, symbol_id %d, cell_id %d, ant_id %d frametime %llx\n", tid, frame_id, symbol_id, cell_id, ant_id, frameTime);
+            printf("receive thread %d: frame_id %d, symbol_id %d, cell_id %d, ant_id %d frametime %llx\n", tid, frame_id, symbol_id, 0, ant_id, frameTime);
 //            printf("receive samples: %d %d %d %d %d %d %d %d ...\n",*((RadioBufElemeType *)cur_ptr_buffer+9), 
 //                               *((RadioBufElemeType *)cur_ptr_buffer+10),
 //                                                           *((RadioBufElemeType *)cur_ptr_buffer+11),
