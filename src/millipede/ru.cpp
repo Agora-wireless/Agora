@@ -248,8 +248,6 @@ void* RU::loopSend(void *in_context)
         if(!ret)
             continue;
 
-
-
         // printf("tx queue length: %d\n", task_queue_->size_approx());
         if (task_event.event_type!=TASK_SEND) {
             printf("Wrong event type!");
@@ -287,10 +285,8 @@ void* RU::loopSend(void *in_context)
                 offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
                 cur_ptr_buffer = buffer + offset * packet_length;  
                 // send data (one OFDM symbol)
-                *((int *)cur_ptr_buffer) = frame_id;
-                *((int *)cur_ptr_buffer + 1) = txSymbols[symbol_id]; //symbol_id;
-                *((int *)cur_ptr_buffer + 2) = cell_id;
-                *((int *)cur_ptr_buffer + 3) = ant_id;
+		struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
+		new (cur_ptr_buffer) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
 
                 if (sendto(tx_socket_[tid], (char *)cur_ptr_buffer, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
                     perror("loopSend: socket sendto failed");
@@ -471,7 +467,6 @@ void* RU::loopProc(void *in_context)
             cfg->running = false;
             break;
         }
-        int ant_id, frame_id, symbol_id;
         // receive data
 #ifdef SIM
         int recvlen = -1;
@@ -480,10 +475,12 @@ void* RU::loopProc(void *in_context)
             exit(0);
         }
         // read information from received packet
-        frame_id = *((int *)cur_ptr_buffer);
-        symbol_id = *((int *)cur_ptr_buffer + 1);
-        //cell_id = *((int *)cur_ptr_buffer + 2);
-        ant_id = *((int *)cur_ptr_buffer + 3);
+    struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
+
+    int frame_id = pkt->frame_id;
+    int symbol_id = pkt->symbol_id;
+    //int cell_id = pkt->cell_id;
+    int ant_id = pkt->ant_id;
 
 #if DEBUG_RECV
         printf("RU: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d\n", frame_id, symbol_id, cell_id, ant_id);
@@ -543,16 +540,12 @@ void* RU::loopProc(void *in_context)
             frame_id = (int)(frameTime>>32);
             symbol_id = (int)((frameTime>>16)&0xFFFF);
             ant_id = rid * cfg->nChannels;
-            *((int *)cur_ptr_buffer) = frame_id;
-            *((int *)cur_ptr_buffer + 1) = symbol_id;
-            *((int *)cur_ptr_buffer + 2) = 0; //cell_id 
-            *((int *)cur_ptr_buffer + 3) = ant_id;
+	    struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
+	    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
             if (cfg->nChannels == 2)
             {
-                *((int *)cur_ptr_buffer2) = frame_id;
-                *((int *)cur_ptr_buffer2 + 1) = symbol_id;
-                *((int *)cur_ptr_buffer2 + 2) = 0; //cell_id 
-                *((int *)cur_ptr_buffer2 + 3) = ant_id + 1;
+	        struct Packet *pkt2 = (struct Packet *)cur_ptr_buffer2;
+	        new (pkt2) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + 1);
             }
 #if DEBUG_RECV
             printf("receive thread %d: frame_id %d, symbol_id %d, cell_id %d, ant_id %d frametime %llx\n", tid, frame_id, symbol_id, cell_id, ant_id, frameTime);

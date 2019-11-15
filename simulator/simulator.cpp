@@ -7,7 +7,7 @@
 
 
 Simulator::Simulator(Config *cfg, int in_task_thread_num, int in_socket_tx_num, int in_core_offset, int sender_delay):
-TASK_THREAD_NUM(in_task_thread_num), SOCKET_TX_THREAD_NUM(in_socket_tx_num), SOCKET_RX_THREAD_NUM(in_socket_tx_num), 
+TASK_THREAD_NUM(in_task_thread_num), SOCKET_RX_THREAD_NUM(in_socket_tx_num), SOCKET_TX_THREAD_NUM(in_socket_tx_num), 
 CORE_OFFSET(in_core_offset)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
@@ -16,7 +16,8 @@ CORE_OFFSET(in_core_offset)
     // std::string env_parameter = "MKL_THREADING_LAYER=sequential";
     // char *env_parameter_char = (char *)env_parameter.c_str();
     // putenv(env_parameter_char);
-    putenv("MKL_THREADING_LAYER=sequential");
+    char thread_cmd[] = "MKL_THREADING_LAYER=sequential";
+    putenv(thread_cmd);
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     printf("enter constructor\n");
 
@@ -70,11 +71,8 @@ void Simulator::start()
     max_packet_num_per_frame = BS_ANT_NUM * dl_data_subframe_num_perframe;
 
     /* counters for printing summary */
-    int tx_count = 0;
     int frame_count_rx = 0;
-    bool prev_demul_scheduled = false;
 
-    int last_dequeue = 0;
     int ret = 0;
     Event_data events_list[dequeue_bulk_size];
     int miss_count = 0;
@@ -115,9 +113,10 @@ void Simulator::start()
                     int socket_thread_id, offset_in_current_buffer;
                     interpreteOffset2d_setbits(offset, &socket_thread_id, &offset_in_current_buffer, 28);                
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * packet_length;
-                    int frame_id = *((int *)socket_buffer_ptr) % 10000;
-                    int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
-                    int ant_id = *((int *)socket_buffer_ptr + 3);
+		    struct Packet *pkt = (struct Packet *)socket_buffer_ptr;
+                    int frame_id = pkt->frame_id % 10000;
+                    int subframe_id = pkt->symbol_id;
+                    int ant_id = pkt->ant_id;
                     int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
                     // int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
 
@@ -163,7 +162,6 @@ inline void Simulator::update_frame_count(int *frame_count)
 
 void Simulator::update_rx_counters(int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id)
 {
-    int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
     rx_counter_packets_[frame_id_in_buffer]++;
     if (rx_counter_packets_[frame_id_in_buffer] == 1) {   
         frame_start_receive[frame_id] = get_time();
@@ -186,9 +184,8 @@ void Simulator::print_per_frame_done(int task_type, int frame_id, int frame_id_i
 #if DEBUG_PRINT_PER_FRAME_DONE
     switch(task_type) {
         case(PRINT_RX): {
-            int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
             printf("Main thread: received all packets in frame: %d, in %.2f us since tx, in %.2f us since rx, tx duration: %.2f us\n", 
-                frame_id, frame_id_in_buffer, frame_end_receive[frame_id] - frame_start_tx[frame_id],
+                frame_id, frame_end_receive[frame_id] - frame_start_tx[frame_id],
                 frame_end_receive[frame_id] - frame_start_receive[frame_id], frame_end_tx[frame_id] - frame_start_tx[frame_id]);
             }
             break;

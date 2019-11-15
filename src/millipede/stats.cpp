@@ -563,8 +563,10 @@ void Stats::print_summary(int last_frame_id)
     int FFT_total_count = compute_total_count(fft_stats_worker, task_thread_num);
     int ZF_total_count = compute_total_count(zf_stats_worker, task_thread_num);
     int Demul_total_count = compute_total_count(demul_stats_worker, task_thread_num);
+#if USE_LDPC
     int Decode_total_count = compute_total_count(decode_stats_worker, task_thread_num);
     int Encode_total_count = compute_total_count(encode_stats_worker, task_thread_num);
+#endif
     int IFFT_total_count = compute_total_count(ifft_stats_worker, task_thread_num);
     int Precode_total_count = compute_total_count(precode_stats_worker, task_thread_num);
     if (downlink_mode) {
@@ -572,12 +574,11 @@ void Stats::print_summary(int last_frame_id)
         double precode_frames = (double) Precode_total_count / OFDM_DATA_NUM / dl_data_subframe_num_perframe;
         double ifft_frames = (double) IFFT_total_count / BS_ANT_NUM / dl_data_subframe_num_perframe;
         double zf_frames = (double) ZF_total_count / OFDM_DATA_NUM;
-        double encode_frames = (double) Encode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / dl_data_subframe_num_perframe;
         printf("Downlink: total performed ");
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);
         printf("ZF: %d (%.2f frames), ", ZF_total_count, zf_frames);
         #if USE_LDPC
-        printf("Encode: %d (%.2f frames), ", Encode_total_count, encode_frames);
+        double encode_frames = (double) Encode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / dl_data_subframe_num_perfram        printf("Encode: %d (%.2f frames), ", Encode_total_count, encode_frames);
         #endif
         printf("Precode: %d (%.2f frames), ", Precode_total_count, precode_frames);
         printf("IFFT: %d (%.2f frames)", IFFT_total_count, ifft_frames);
@@ -587,11 +588,11 @@ void Stats::print_summary(int last_frame_id)
             double percent_ZF = compute_count_percentage(zf_stats_worker, ZF_total_count, i);
             double percent_Precode = compute_count_percentage(precode_stats_worker, Precode_total_count, i);
             double percent_IFFT = compute_count_percentage(ifft_stats_worker, IFFT_total_count, i);
-            double percent_Encode = compute_count_percentage(encode_stats_worker, Encode_total_count, i);
             printf("thread %d performed ", i);
             printf("CSI: %d (%.2f%%), ", csi_stats_worker.task_count[i * 16], percent_CSI);
             printf("ZF: %d (%.2f%%), ", zf_stats_worker.task_count[i * 16], percent_ZF);
             #if USE_LDPC
+            double percent_Encode = compute_count_percentage(encode_stats_worker, Encode_total_count, i);
             printf("Encode: %d (%.2f%%), ", encode_stats_worker.task_count[i * 16], percent_Encode);
             #endif
             printf("Precode: %d (%.2f%%), ", precode_stats_worker.task_count[i * 16], percent_Precode);
@@ -604,14 +605,13 @@ void Stats::print_summary(int last_frame_id)
         double fft_frames = (double) FFT_total_count / BS_ANT_NUM / ul_data_subframe_num_perframe;
         double demul_frames = (double) Demul_total_count / OFDM_DATA_NUM / ul_data_subframe_num_perframe;
         double zf_frames = (double) ZF_total_count / OFDM_DATA_NUM;
-        double decode_frames = (double) Decode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / ul_data_subframe_num_perframe;
         printf("Uplink: total performed ");
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);  
         printf("ZF: %d (%.2f frames), ", ZF_total_count, zf_frames);
         printf("FFT: %d (%.2f frames), ", FFT_total_count, fft_frames);
         printf("Demul: %d (%.2f frames) ", Demul_total_count, demul_frames);
         #if USE_LDPC
-        printf("Decode: %d (%.2f frames)", Decode_total_count, decode_frames);
+        double decode_frames = (double) Decode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / ul_data_subframe_num_perfram        printf("Decode: %d (%.2f frames)", Decode_total_count, decode_frames);
         #endif
         printf("\n");
         for (int i = 0; i < task_thread_num; i++) {
@@ -619,13 +619,13 @@ void Stats::print_summary(int last_frame_id)
             double percent_FFT = compute_count_percentage(fft_stats_worker, FFT_total_count, i);;
             double percent_ZF = compute_count_percentage(zf_stats_worker, ZF_total_count, i);
             double percent_Demul = compute_count_percentage(demul_stats_worker, Demul_total_count, i);
-            double percent_Decode = compute_count_percentage(decode_stats_worker, Decode_total_count, i);
             printf("thread %d performed ", i);
             printf("CSI: %d (%.2f%%), ", csi_stats_worker.task_count[i * 16], percent_CSI);
             printf("ZF: %d (%.2f%%), ", zf_stats_worker.task_count[i * 16], percent_ZF);
             printf("FFT: %d (%.2f%%), ", fft_stats_worker.task_count[i * 16], percent_FFT);
             printf("Demul: %d (%.2f%%) ", demul_stats_worker.task_count[i * 16], percent_Demul);
             #if USE_LDPC
+            double percent_Decode = compute_count_percentage(decode_stats_worker, Decode_total_count, i);
             printf("Decode: %d (%.2f%%) ", decode_stats_worker.task_count[i * 16], percent_Decode);
             #endif
             printf("\n"); 

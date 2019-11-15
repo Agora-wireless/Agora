@@ -169,11 +169,12 @@ void *PacketTXRX::loopRecv(int tid)
     double *frame_start = frame_start_[tid];
 
     // walk through all the pages
+#if 0
     double temp;
     for (int i = 0; i < 20; i++) {
         temp = frame_start[i * 512];
     }
-
+#endif
 
     char* cur_buffer_ptr = buffer_ptr;
     int* cur_buffer_status_ptr = buffer_status_ptr;
@@ -212,11 +213,11 @@ void *PacketTXRX::loopRecv(int tid)
 
     #if MEASURE_TIME
         // read information from received packet
-        int frame_id; //, subframe_id, ant_id, cell_id;
-        frame_id = *((int *)cur_buffer_ptr);
-        // subframe_id = *((int *)cur_buffer_ptr + 1);
-        // cell_id = *((int *)cur_buffer_ptr + 2);
-        // ant_id = *((int *)cur_buffer_ptr + 3);
+	struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+        int frame_id = pkt->frame_id;
+        // int subframe_id = pkt->symbol_id;
+        // int cell_id = pkt->cell_id;
+        // int ant_id = pkt->ant_id;
         // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
         if (frame_id > prev_frame_id) {
             *(frame_start + frame_id) = get_time();
@@ -274,8 +275,9 @@ void *PacketTXRX::loopSend(int tid)
     int offset;
     char *cur_buffer_ptr;
     // int *cur_ptr_buffer_status;
-    int ant_id, frame_id, symbol_id, total_data_subframe_id, current_data_subframe_id;
-    int cell_id = 0;
+    int ant_id, frame_id, symbol_id, current_data_subframe_id;
+    // int total_data_sumframe_id;
+    // int cell_id = 0;
     // int maxMesgQLen = 0;
     // int maxTaskQLen = 0;
 
@@ -385,14 +387,16 @@ void *PacketTXRX::loopTXRX(int tid)
     char* rx_cur_buffer_ptr = rx_buffer_ptr;
     int* rx_cur_buffer_status_ptr = rx_buffer_status_ptr;
     int rx_offset = 0;
-    int ant_id, frame_id, symbol_id;
+    int frame_id;
 
 
+#if 0
     // walk through all the pages
     double temp;
     for (int i = 0; i < 20; i++) {
         temp = rx_frame_start[i * 512];
     }
+#endif
 
 
     // TX pointers
@@ -447,8 +451,8 @@ void *PacketTXRX::loopTXRX(int tid)
             // read information from received packet 
             struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
             frame_id = pkt->frame_id;
-            symbol_id = pkt->symbol_id;
-            ant_id = pkt->ant_id;
+            // int symbol_id = pkt->symbol_id;
+            // int ant_id = pkt->ant_id;
             // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, symbol_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
@@ -506,10 +510,10 @@ void *PacketTXRX::loopTXRX(int tid)
                 
                 struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
                 frame_id = pkt->frame_id;
-                symbol_id = pkt->symbol_id;
-                ant_id = pkt->ant_id;
 
             #if MEASURE_TIME
+                // int symbol_id = pkt->symbol_id;
+                // int ant_id = pkt->ant_id;
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, symbol_id, ant_id, rx_offset);
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d, buffer status %d %d ptr_offset %d\n", 
                     // tid, frame_id, symbol_id, ant_id, rx_offset, *(rx_buffer_status_ptr+1424), *(rx_cur_buffer_status_ptr+1), rx_cur_buffer_status_ptr - rx_buffer_status_ptr);
