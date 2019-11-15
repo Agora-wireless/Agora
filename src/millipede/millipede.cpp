@@ -22,7 +22,8 @@ Millipede::Millipede(Config *cfg)
     // std::string env_parameter = "MKL_THREADING_LAYER=sequential";
     // char *env_parameter_char = (char *)env_parameter.c_str();
     // putenv(env_parameter_char);
-    putenv("MKL_THREADING_LAYER=sequential");
+    char thread_cmd[] = "MKL_THREADING_LAYER=sequential";
+    putenv(thread_cmd);
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     // openblas_set_num_threads(1);
     printf("enter constructor\n");
@@ -515,10 +516,13 @@ void *Millipede::worker(int tid)
 
     int queue_num;
     int *dequeue_order;
+#ifdef USE_LDPC
     int dequeue_order_DL_LDPC[] = {TASK_IFFT, TASK_PRECODE, TASK_ENCODE, TASK_ZF, TASK_FFT};
     int dequeue_order_UL_LDPC[] = {TASK_ZF, TASK_FFT, TASK_DEMUL, TASK_DECODE};
+#else
     int dequeue_order_DL[] = {TASK_IFFT, TASK_PRECODE, TASK_ZF, TASK_FFT};
     int dequeue_order_UL[] = {TASK_ZF, TASK_FFT, TASK_DEMUL};
+#endif
 
 #ifdef USE_LDPC
     if (downlink_mode) {
@@ -545,34 +549,40 @@ void *Millipede::worker(int tid)
     while(true) {
         switch(dequeue_order[dequeue_idx]) {
             case TASK_IFFT: 
-                if (ret = ifft_queue_.try_dequeue(event)) 
+	      ret = ifft_queue_.try_dequeue(event);
+                if (ret) 
                     computeFFT->IFFT(event.data);
             break;
             case TASK_PRECODE: 
-                if (ret = precode_queue_.try_dequeue(event)) 
+	      ret = precode_queue_.try_dequeue(event);
+                if (ret) 
                     computePrecode->Precode(event.data);
             break;
             #ifdef USE_LDPC
             case TASK_ENCODE: 
-                if (ret = encode_queue_.try_dequeue(event)) {
+	      ret = encode_queue_.try_dequeue(event);
+                if (ret)
                     computeCoding->Encode(event.data);
-                }
             break;
             case TASK_DECODE: 
-                if (ret = decode_queue_.try_dequeue(event)) 
+	      ret = decode_queue_.try_dequeue(event);
+                if (ret) 
                     computeCoding->Decode(event.data);
             break;
             #endif
             case TASK_ZF: 
-                if (ret = zf_queue_.try_dequeue(event)) 
+	      ret = zf_queue_.try_dequeue(event);
+                if (ret) 
                     computeZF->ZF(event.data);
             break;
             case TASK_FFT: 
-                if (ret = fft_queue_.try_dequeue(event)) 
+	      ret = fft_queue_.try_dequeue(event);
+                if (ret) 
                     computeFFT->FFT(event.data);
             break;
             case TASK_DEMUL: 
-                if (ret = demul_queue_.try_dequeue(event)) 
+	      ret = demul_queue_.try_dequeue(event);
+                if (ret) 
                     computeDemul->Demul(event.data);
             break;
             default: 
@@ -603,24 +613,12 @@ void* Millipede::worker_fft(int tid)
 
 
     Event_data event;
-    bool ret = false;
 
     while(true) {
-        ret = fft_queue_.try_dequeue(event);
-        if (!ret) {
-            if (downlink_mode)
-            {
-                ret = ifft_queue_.try_dequeue(event);
-                if (!ret)
-                    continue;
-                else
-                    computeFFT->IFFT(event.data);
-            }
-            else
-                continue;
-        }
-        else
+        if (fft_queue_.try_dequeue(event))
             computeFFT->FFT(event.data);
+        else if (downlink_mode && ifft_queue_.try_dequeue(event))
+	    computeFFT->IFFT(event.data);
     }
 
 }
@@ -641,13 +639,9 @@ void* Millipede::worker_zf(int tid)
 
 
     Event_data event;
-    bool ret_zf = false;
 
     while(true) {
-        ret_zf = zf_queue_.try_dequeue(event);
-        if (!ret_zf) 
-            continue;
-        else
+        if (zf_queue_.try_dequeue(event)) 
             computeZF->ZF(event.data);
     }
 
@@ -673,33 +667,21 @@ void* Millipede::worker_demul(int tid)
 
 
     Event_data event;
-    bool ret_demul = false;
-    bool ret_precode = false;
     // int cur_frame_id = 0;
 
     while(true) {         
         if (downlink_mode)
         {
-            ret_precode = precode_queue_.try_dequeue(event);
-            if (!ret_precode)
-                continue;
-            else
+            if (precode_queue_.try_dequeue(event))
                 computePrecode->Precode(event.data);
         }
-        else
-        {
-            ret_demul = demul_queue_.try_dequeue(event);
-            if (!ret_demul) {
-                continue;
-            }
-            else {
-                // int frame_id = event.data / (OFDM_CA_NUM * ul_data_subframe_num_perframe);
-                // // check precoder status for the current frame
-                // if (frame_id > cur_frame_id || frame_id == 0) {
-                //     while (!precoder_status_[frame_id]);
-                // }
-                computeDemul->Demul(event.data);
-            }
+        else if (demul_queue_.try_dequeue(event)) {
+            // int frame_id = event.data / (OFDM_CA_NUM * ul_data_subframe_num_perframe);
+            // // check precoder status for the current frame
+            // if (frame_id > cur_frame_id || frame_id == 0) {
+            //     while (!precoder_status_[frame_id]);
+            // }
+            computeDemul->Demul(event.data);
         }
     }
 

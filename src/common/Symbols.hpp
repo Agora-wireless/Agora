@@ -129,22 +129,6 @@ typedef enum {
 	Master_TX,
 } thread_type;
 
-static const char *THREAD_TYPE_STRING[] = {
-	"Master",
-	"Worker",
-	"Worker (FFT)",
-	"Worker (ZF)",
-	"Worker (Demul)",
-	"RX",
-	"TX",
-	"TXRX",
-	"Master (RX)",
-	"Master (TX)"
-};
-
-
-
-
 struct LDPCconfig {
     uint16_t Bg;
     bool earlyTermination;

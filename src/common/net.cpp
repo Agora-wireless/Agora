@@ -14,7 +14,7 @@ void set_socket_buf_size(int socket_local, int sock_buf_size)
         printf("Error setting buffer size to %d\n", sock_buf_size);
     }
     else {     
-        int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
+        getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
         printf("Set socket buffer size to %d\n", sock_buf_size);
     }
 }

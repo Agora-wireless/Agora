@@ -163,7 +163,7 @@ void *Receiver::loopRecv(int tid)
         printf("Error setting buffer size to %d\n", sock_buf_size);
     }
     else {     
-        int res = getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
+        getsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
         printf("Set socket %d buffer size to %d\n", tid, sock_buf_size);
     }
 
@@ -186,24 +186,21 @@ void *Receiver::loopRecv(int tid)
     int buffer_frame_num = buffer_frame_num_;
     double *frame_start = frame_start_[tid];
 
+#if 0
     // walk through all the pages
     double temp;
     for (int i = 0; i < 20; i++) {
         temp = frame_start[i * 512];
     }
-
+#endif
 
     char* cur_buffer_ptr = buffer_ptr;
     int* cur_buffer_status_ptr = buffer_status_ptr;
     // loop recv
     socklen_t addrlen = sizeof(servaddr_local);
     int offset = 0;
-    int packet_num = 0;
-    int ret = 0;
-    int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     int prev_frame_id = -1;
-    int packet_num_per_frame = 0;
-    double start_time= get_time();
+    // double start_time= get_time();
 
 
     // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
@@ -224,11 +221,11 @@ void *Receiver::loopRecv(int tid)
 
     #if MEASURE_TIME
         // read information from received packet
-        int ant_id, frame_id, subframe_id, cell_id;
-        frame_id = *((int *)cur_buffer_ptr);
-        subframe_id = *((int *)cur_buffer_ptr + 1);
-        // cell_id = *((int *)cur_buffer_ptr + 2);
-        ant_id = *((int *)cur_buffer_ptr + 3);
+        struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+        int frame_id = pkt->frame_id;
+        // int subframe_id = pkt->symbol_id;
+        // int cell_id = pkt->cell_id;
+        // int ant_id = pkt->ant_id;
         // printf("RX thread %d received frame %d subframe %d, ant %d, msg queue length %d\n", tid, frame_id, subframe_id, ant_id, message_queue_->size_approx());
         if (frame_id > prev_frame_id) {
             *(frame_start + frame_id) = get_time();

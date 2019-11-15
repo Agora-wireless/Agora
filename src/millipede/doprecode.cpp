@@ -96,7 +96,7 @@ void DoPrecode::Precode(int offset)
             }
 
             complex_float *data_ptr;
-            if (current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
+            if ((unsigned)current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
                 data_ptr = modulated_buffer_temp;
                 for (int user_id = 0; user_id < UE_NUM; user_id ++)
                     *(data_ptr + user_id) = {config_->pilots_[cur_sc_id], 0};

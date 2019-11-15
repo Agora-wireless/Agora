@@ -513,21 +513,12 @@ void* Phy_UE::taskThread(void* context)
     bool ret_ifft = false;
 
     while(cfg->running) {
-        ret_demul = demul_queue_->try_dequeue(event);
-        if (!ret_demul) { 
-            ret_ifft = ifft_queue_->try_dequeue(event);
-            if (!ret_ifft) { 
-                ret = task_queue_->try_dequeue(event);
-                if (!ret)
-                    continue;
-                else 
-                    obj_ptr->doFFT(tid, event.data);
-            }
-            else 
-                obj_ptr->doTransmit(tid, event.data, 0); //, event.more_data);
-        }
-        else 
+        if (demul_queue_->try_dequeue(event))
             obj_ptr->doDemul(tid, event.data);
+	else if (ifft_queue_->try_dequeue(event))
+	    obj_ptr->doFFT(tid, event.data);
+	else if (task_queue_->try_dequeue(event))
+	  obj_ptr->doTransmit(tid, event.data, 0); //, event.more_data);
     }
     return 0;
 }
@@ -545,12 +536,11 @@ void Phy_UE::doFFT(int tid, int offset)
     
     // read info of one frame
     char *cur_ptr_buffer = rx_buffer_[rx_thread_id] + offset * packet_length;
-
-    int ant_id, frame_id, symbol_id;
-    frame_id = *((int *)cur_ptr_buffer);
-    symbol_id = *((int *)cur_ptr_buffer + 1);
-    //cell_id = *((int *)cur_ptr_buffer + 2);
-    ant_id = *((int *)cur_ptr_buffer + 3);
+    struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+    int frame_id = pkt->frame_id;
+    int symbol_id = pkt->symbol_id;
+    //int cell_id = pkt->cell_id;
+    int ant_id = pkt->ant_id;
 
     if (!cfg->isPilot(frame_id, symbol_id) && !(cfg->isDownlink(frame_id, symbol_id)))
         return;
