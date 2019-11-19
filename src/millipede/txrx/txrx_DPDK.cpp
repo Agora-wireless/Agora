@@ -535,11 +535,11 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
 
         #if MEASURE_TIME
             // read information from received packet
-            int ant_id, frame_id, subframe_id, cell_id;
-            frame_id = *((int *)cur_ptr_buffer);
-            subframe_id = *((int *)cur_ptr_buffer + 1);
-            // cell_id = *((int *)cur_ptr_buffer + 2);
-            ant_id = *((int *)cur_ptr_buffer + 3);
+	    struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+	    int frame_id = pkt->frame_id;
+	    int subframe_id = pkt->symbol_id;
+	    // int cell_id = pkt->cell_id;
+	    int ant_id = pkt->ant_id;
             // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(frame_start + frame_id) = get_time();

@@ -41,6 +41,7 @@ void delay_pause(unsigned int us)
 
 
 
+#if 0
 static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
     // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src, %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31), (intptr_t(pvSrc) & 31) );
     // assert(nBytes % 32 == 0);
@@ -55,10 +56,11 @@ static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
     }
     _mm_sfence();
 }
+#endif
 
 Sender::Sender(Config *cfg, int in_thread_num, int in_core_offset, int in_delay):
-ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
-socket_num(in_thread_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_delay)
+cur_ptr_(0), ant_id(0), frame_id(0), subframe_id(0), thread_num(in_thread_num), 
+socket_num(in_thread_num), core_offset(in_core_offset), delay(in_delay)
 {
     printf("TX constructer: on core %d\n", sched_getcpu());
 
@@ -142,11 +144,14 @@ socket_num(in_thread_num), cur_ptr_(0), core_offset(in_core_offset), delay(in_de
     std::string filename = cur_directory + "/data/rx_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(),"rb");
     if (fp==NULL) {
-        printf("open file faild: %s\n", filename.c_str());
+        printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
-        fread(IQ_data[i], sizeof(float), OFDM_FRAME_LEN * 2, fp);
+        if (OFDM_FRAME_LEN * 2u != fread(IQ_data[i], sizeof(float), OFDM_FRAME_LEN * 2, fp)) {
+	    printf("read file failed: %s\n", filename.c_str());
+	    std::cerr << "Error: " << strerror(errno) << std::endl;
+	}
         for(int j = 0; j < OFDM_FRAME_LEN * 2; j++) {
             IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 32768);
             // printf("i:%d, j:%d, Coded: %d, orignal: %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
@@ -234,14 +239,13 @@ void Sender::startTX()
     }
 
     
-    double start_time = get_time();
+    //double start_time = get_time();
     int tx_frame_count = 0;
     uint64_t ticks_100 = (uint64_t) 150000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
-    uint64_t ticks_per_symbol = (uint64_t) 71.3 * CPU_FREQ / 1e6;
     uint64_t ticks_5 = (uint64_t) 5000000 * CPU_FREQ / 1e6 / 70;
 
     // ticks_100 = (uint64_t) 100000 * CPU_FREQ / 1e6 / 70;
@@ -288,23 +292,23 @@ void Sender::startTX()
             // printf("Finished transmit all antennas in frame: %d, subframe: %d, at %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id, cur_time,cur_time-start_time);
             if (tx_frame_count == 5) {
                 while ((RDTSC() - tick_start) < ticks_5) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else if (tx_frame_count < 100) {
                 while ((RDTSC() - tick_start) < ticks_100) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else if (tx_frame_count < 200) {
                 while ((RDTSC() - tick_start) < ticks_200) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else if (tx_frame_count < 500) {
                 while ((RDTSC() - tick_start) < ticks_500) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else {
                 while ((RDTSC() - tick_start) < ticks_all) 
-                    _mm_pause; 
+                    _mm_pause();
             }
 
             tick_start = RDTSC();
@@ -317,12 +321,12 @@ void Sender::startTX()
                 if (downlink_mode) {
                     if (frame_id < 500) {
                         while ((RDTSC() - tick_start) < 2 * data_subframe_num_perframe * ticks_all) 
-                            _mm_pause; 
+                            _mm_pause();
                         // delay_busy_cpu(data_subframe_num_perframe*120*2.3e3/6);
                     }
                     else {
                         while ((RDTSC() - tick_start) < data_subframe_num_perframe * ticks_all) 
-                            _mm_pause; 
+                            _mm_pause();
                         // delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
                     }
                 }
@@ -458,14 +462,13 @@ void *Sender::loopSend_main(int tid)
     }
 
     
-    double start_time = get_time();
+    //double start_time = get_time();
     int tx_frame_count = 0;
     uint64_t ticks_100 = (uint64_t) 150000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
     uint64_t ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
-    uint64_t ticks_per_symbol = (uint64_t) 71.3 * CPU_FREQ / 1e6;
     uint64_t ticks_5 = (uint64_t) 5000000 * CPU_FREQ / 1e6 / 70;
 
     // ticks_100 = (uint64_t) 100000 * CPU_FREQ / 1e6 / 70;
@@ -514,23 +517,23 @@ void *Sender::loopSend_main(int tid)
             // printf("Finished transmit all antennas in frame: %d, subframe: %d, at %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id, cur_time,cur_time-start_time);
             if (tx_frame_count == 5) {
                 while ((RDTSC() - tick_start) < ticks_5) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else if (tx_frame_count < 100) {
                 while ((RDTSC() - tick_start) < ticks_100) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else if (tx_frame_count < 200) {
                 while ((RDTSC() - tick_start) < ticks_200) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else if (tx_frame_count < 500) {
                 while ((RDTSC() - tick_start) < ticks_500) 
-                    _mm_pause; 
+                    _mm_pause();
             }
             else {
                 while ((RDTSC() - tick_start) < ticks_all) 
-                    _mm_pause; 
+                    _mm_pause();
             }
 
             tick_start = RDTSC();
@@ -542,12 +545,12 @@ void *Sender::loopSend_main(int tid)
                 if (downlink_mode) {
                     if (frame_id < 500) {
                         while ((RDTSC() - tick_start) < 2 * data_subframe_num_perframe * ticks_all) 
-                            _mm_pause; 
+                            _mm_pause();
                         // delay_busy_cpu(data_subframe_num_perframe*120*2.3e3/6);
                     }
                     else {
                         while ((RDTSC() - tick_start) < data_subframe_num_perframe * ticks_all) 
-                            _mm_pause; 
+                            _mm_pause();
                         // delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
                     }
                 }
@@ -626,18 +629,17 @@ void *Sender::loopSend(int tid)
 
     int used_socker_id = 0;
     int ret;
-    int socket_per_thread = socket_num / thread_num;
     int total_tx_packets = 0;
     // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
     int ant_num_this_thread = BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1: 0);
-    double start_time_send = get_time();
-    double start_time_msg = get_time();
-    double end_time_send = get_time();
-    double end_time_msg = get_time();
-    double end_time_prev = get_time();
-
-    char invalid_packet[buffer_length]; 
+#ifdef DEBUG_SENDER
+    //double start_time_send = get_time();
+    //double start_time_msg = get_time();
+    //double end_time_send = get_time();
+    //double end_time_msg = get_time();
+    //double end_time_prev = get_time();
+#endif
 
     printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, thread_num);
     while(true) {

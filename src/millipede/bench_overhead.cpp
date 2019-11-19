@@ -662,9 +662,10 @@ void CoMP::start()
 
                     // char *socket_buffer_ptr = socket_buffer_ptrs[socket_thread_id] + offset_in_current_buffer * PackageReceiver::package_length;
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id].buffer + offset_in_current_buffer * PackageReceiver::package_length;
-                    int subframe_id = *((int *)socket_buffer_ptr + 1);                                    
-                    int frame_id = *((int *)socket_buffer_ptr) % 10000;
-                    int ant_id = *((int *)socket_buffer_ptr + 3);
+                    struct Packet *pkt = (struct Packet *)socket_buffer_ptr;
+                    int frame_id = pkt->frame_id % 10000;
+                    int subframe_id = pkt->symbol_id;
+                    int ant_id = pkt->ant_id;
                     int rx_frame_id = (frame_id % TASK_BUFFER_FRAME_NUM);
 
                     rx_counter_packets_[rx_frame_id]++;
@@ -1654,78 +1655,40 @@ void* CoMP::taskThread(void* context)
     int total_count = 0;
     int miss_count = 0;
     Event_data event;
-    bool ret = false;
-    bool ret_zf = false;
-    bool ret_demul = false;
-    bool ret_decode = false;
-    bool ret_modul = false;
-    bool ret_ifft = false;
-    bool ret_precode = false;
 
     while(true) {
         if (ENABLE_DOWNLINK) {
             // do not process uplink data if downlink is enabled
-            ret_ifft = ifft_queue_->try_dequeue(event);
-            if (!ret_ifft) {
-                ret_precode = precode_queue_->try_dequeue(event);
-                if (!ret_precode) {
-                    ret_modul = modulate_queue_->try_dequeue(event);
-                    if (!ret_modul) {
-                        ret_zf = zf_queue_->try_dequeue(event);
-                        if (!ret_zf) {
-                            ret = fft_queue_->try_dequeue(event);
-                            if (!ret) 
-                                continue;
-                            else
-                                obj_ptr->doFFT(tid, event.data);
-                        }
-                        else if (event.event_type == TASK_ZF) {
-                            obj_ptr->doZF(tid, event.data);
-                        }
-                        else if (event.event_type == TASK_PRED) {
-                            obj_ptr->doPred(tid, event.data);
-                        }
-                    }
-                    else {
-                        obj_ptr->do_modulate(tid, event.data);
-                    }
-                }
-                else {
-                    obj_ptr->do_precode(tid, event.data);
-                }
-            }
-            else {
+	    if (ifft_queue_->try_dequeue(event))
                 obj_ptr->do_ifft(tid, event.data);
-            }
+            else if (precode_queue_->try_dequeue(event))
+	        obj_ptr->do_precode(tid, event.data);
+	    else if (modulate_queue_->try_dequeue(event))
+	        obj_ptr->do_modulate(tid, event.data);
+	    else if (zf_queue_->try_dequeue(event)) {
+                if (event.event_type == TASK_ZF)
+                    obj_ptr->doZF(tid, event.data);
+                else if (event.event_type == TASK_PRED)
+                    obj_ptr->doPred(tid, event.data);
+	    }
+            else if (fft_queue_->try_dequeue(event))
+	        obj_ptr->doFFT(tid, event.data);
         }
         else {
-            ret_zf = zf_queue_->try_dequeue(event);
-            if (!ret_zf) {
-                // ret_decode = decode_queue_->try_dequeue(event);
-                // if(!ret_decode) {
-                    ret_demul = demul_queue_->try_dequeue(event);
-                    if (!ret_demul) {   
-                        ret = fft_queue_->try_dequeue(event);
-                        if (!ret)
-                            continue;
-                        else 
-                            obj_ptr->doFFT(tid, event.data);
-                    }
-                    else {
-                        // TODO: add precoder status check
-                        obj_ptr->doDemul(tid, event.data);
-                    }
-                // }
-                // else {
-                //     obj_ptr->doDecode(tid, event.data);
-                // }
-            }
-            else if (event.event_type == TASK_ZF) {
-                obj_ptr->doZF(tid, event.data);
-            }
-            else if (event.event_type == TASK_PRED) {
-                obj_ptr->doPred(tid, event.data);
-            }
+            if (zf_queue_->try_dequeue(event)) {
+	        if (event.event_type == TASK_ZF)
+		    obj_ptr->doZF(tid, event.data);
+		else if (event.event_type == TASK_PRED)
+		    obj_ptr->doPred(tid, event.data);
+	    }
+	    else if (decode_queue_->try_dequeue(event))
+	        obj_ptr->doDecode(tid, event.data);
+	    else if (demul_queue_->try_dequeue(event)) {
+	        // TODO: add precoder status check
+	        obj_ptr->doDemul(tid, event.data);
+	    }
+	    else if (fft_queue_->try_dequeue(event))
+	        obj_ptr->doFFT(tid, event.data);
         } 
     }
 }
@@ -1758,13 +1721,9 @@ void* CoMP::fftThread(void* context)
     int total_count = 0;
     int miss_count = 0;
     Event_data event;
-    bool ret = false;
 
     while(true) {
-        ret = fft_queue_->try_dequeue(event);
-        if (!ret) 
-            continue;
-        else
+        if (fft_queue_->try_dequeue(event))
             obj_ptr->doFFT(tid, event.data);
     }
 
@@ -1798,13 +1757,9 @@ void* CoMP::zfThread(void* context)
     int total_count = 0;
     int miss_count = 0;
     Event_data event;
-    bool ret_zf = false;
 
     while(true) {
-        ret_zf = zf_queue_->try_dequeue(event);
-        if (!ret_zf) 
-            continue;
-        else
+        if (zf_queue_->try_dequeue(event))
             obj_ptr->doZF(tid, event.data);
     }
 
@@ -1835,15 +1790,10 @@ void* CoMP::demulThread(void* context)
     int total_count = 0;
     int miss_count = 0;
     Event_data event;
-    bool ret_demul = false;
     int cur_frame_id = 0;
 
     while(true) {         
-        ret_demul = demul_queue_->try_dequeue(event);
-        if (!ret_demul) {
-            continue;
-        }
-        else {
+        if (demul_queue_->try_dequeue(event) {
             // int frame_id = event.data / (OFDM_CA_NUM * data_subframe_num_perframe);
             // // check precoder status for the current frame
             // if (frame_id > cur_frame_id || frame_id == 0) {
@@ -1851,7 +1801,6 @@ void* CoMP::demulThread(void* context)
             // }
             obj_ptr->doDemul(tid, event.data);
         }
-        
     }
 
 }
