@@ -95,12 +95,11 @@ void DoFFT::FFT(int offset)
     // printf("In doFFT: socket_thread: %d offset %d\n", socket_thread_id, offset);
     // read info of one frame
     char *cur_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset * packet_length;
-
-    int ant_id, frame_id, subframe_id; //, cell_id;
-    frame_id = *((int *)cur_buffer_ptr);
-    subframe_id = *((int *)cur_buffer_ptr + 1);
-    // cell_id = *((int *)cur_buffer_ptr + 2);
-    ant_id = *((int *)cur_buffer_ptr + 3);
+    struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+    int frame_id = pkt->frame_id % 10000;
+    int subframe_id = pkt->symbol_id;
+    // int cell_id = pkt->cell_id;
+    int ant_id = pkt->ant_id;
     // printf("thread %d process frame_id %d, subframe_id %d, cell_id %d, ant_id %d\n", tid, frame_id, subframe_id, cell_id, ant_id);
     // remove CP, do FFT
     // int delay_offset = 0;

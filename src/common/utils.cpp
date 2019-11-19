@@ -25,6 +25,18 @@ int pin_to_core(int core_id) {
 
 void pin_to_core_with_offset(thread_type thread, int core_offset, int thread_id) {
 #ifdef ENABLE_CPU_ATTACH
+    const char *THREAD_TYPE_STRING[] = {
+	"Master",
+	"Worker",
+	"Worker (FFT)",
+	"Worker (ZF)",
+	"Worker (Demul)",
+	"RX",
+	"TX",
+	"TXRX",
+	"Master (RX)",
+	"Master (TX)"
+    };
     int actual_core_id = core_offset + thread_id;
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
     /* reserve core 0 for kernel threads */
