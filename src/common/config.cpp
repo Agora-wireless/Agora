@@ -124,6 +124,8 @@ Config::Config(std::string jsonfile)
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
 
     /* frame configurations */
+    if(freq_orthogonal_pilot) 
+        zf_block_size = UE_NUM;
     symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
     size_t pilot_num_default = freq_orthogonal_pilot? 1 : UE_NUM;
     pilot_symbol_num_perframe = tddConf.value("pilot_num", pilot_num_default);
@@ -421,7 +423,7 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
         return (ind < DL_PILOT_SYMS);
         //return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
     } else
-        return (symbol_id < UE_NUM);
+        return (symbol_id < pilot_symbol_num_perframe);
 #endif
 }
 
@@ -442,7 +444,7 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
     if (isUE)
         return frames[fid].at(symbol_id) == 'U';
     else
-        return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM);
+        return (symbol_id < symbol_num_perframe) && (symbol_id >= pilot_symbol_num_perframe);
 #endif
 }
 

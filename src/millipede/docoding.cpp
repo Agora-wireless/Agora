@@ -206,7 +206,6 @@ void DoCoding::Decode(int offset)
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer[symbol_offset] + decoded_buffer_offset;
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n", 
     //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, decoded_buffer_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
-    // t_dec_start = clock();
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
     // inform main thread
 
