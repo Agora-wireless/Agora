@@ -578,7 +578,8 @@ void Stats::print_summary(int last_frame_id)
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);
         printf("ZF: %d (%.2f frames), ", ZF_total_count, zf_frames);
         #if USE_LDPC
-        double encode_frames = (double) Encode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / dl_data_subframe_num_perfram        printf("Encode: %d (%.2f frames), ", Encode_total_count, encode_frames);
+        double encode_frames = (double) Encode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / dl_data_subframe_num_perframe;        
+        printf("Encode: %d (%.2f frames), ", Encode_total_count, encode_frames);
         #endif
         printf("Precode: %d (%.2f frames), ", Precode_total_count, precode_frames);
         printf("IFFT: %d (%.2f frames)", IFFT_total_count, ifft_frames);
@@ -611,7 +612,8 @@ void Stats::print_summary(int last_frame_id)
         printf("FFT: %d (%.2f frames), ", FFT_total_count, fft_frames);
         printf("Demul: %d (%.2f frames) ", Demul_total_count, demul_frames);
         #if USE_LDPC
-        double decode_frames = (double) Decode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / ul_data_subframe_num_perfram        printf("Decode: %d (%.2f frames)", Decode_total_count, decode_frames);
+        double decode_frames = (double) Decode_total_count / LDPC_config.nblocksInSymbol / UE_NUM / ul_data_subframe_num_perframe;       
+        printf("Decode: %d (%.2f frames)", Decode_total_count, decode_frames);
         #endif
         printf("\n");
         for (int i = 0; i < task_thread_num; i++) {
