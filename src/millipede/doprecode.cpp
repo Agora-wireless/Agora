@@ -89,7 +89,8 @@ void DoPrecode::Precode(int offset)
 #endif
             int cur_sc_id = sc_id + i + j;
             int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
-
+            if (config_->freq_orthogonal_pilot) 
+                precoder_offset = precoder_offset - cur_sc_id % UE_NUM;
 
             for (int line_idx = 0; line_idx < precoder_cache_line_num; line_idx ++) {
                 _mm_prefetch((char *)(precoder_buffer_[precoder_offset] + line_idx * 8), _MM_HINT_T0);

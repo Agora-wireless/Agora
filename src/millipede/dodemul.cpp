@@ -129,6 +129,8 @@ void DoDemul::Demul(int offset)
             /* create input precoder matrix */
             int cur_sc_id = i * 8 + j + sc_id;
             int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
+            if (config_->freq_orthogonal_pilot) 
+                precoder_offset = precoder_offset - cur_sc_id % UE_NUM;
             cx_float* precoder_ptr = (cx_float *)precoder_buffer_[precoder_offset];
             cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
             // cout<<"Precoder: "<< mat_precoder<<endl;
