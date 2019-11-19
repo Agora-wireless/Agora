@@ -15,7 +15,7 @@ CORE_OFFSET(in_core_offset)
     printf("Main thread: on core %d\n", sched_getcpu());
     // char thread_cmd[] = "MKL_THREADING_LAYER=sequential";
     // putenv(thread_cmd);
-    // putenv("MKL_THREADING_LAYER=sequential");
+    putenv("MKL_THREADING_LAYER=sequential");
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     printf("enter constructor\n");
 
