@@ -13,7 +13,7 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
+    PILOT_NUM = cfg->pilot_symbol_num_perframe;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     OFDM_DATA_START = cfg->OFDM_DATA_START;
@@ -239,10 +239,10 @@ void DoFFT::FFT(int offset)
 #endif
     // if it is pilot part, do CE
     if(pilot_symbol == 1) {
-        int UE_id = subframe_id;
+        int pilot_id = subframe_id;
         // int ca_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM;
         // int csi_offset = ant_id + UE_id * BS_ANT_NUM;
-        int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * UE_NUM + UE_id;
+        int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * PILOT_NUM + pilot_id;
         // int csi_offset = UE_id + ant_id * UE_NUM;
 
         // float* cur_fft_buffer_float_output = (float*)(fft_buffer_.FFT_outputs[tid] + ant_id * OFDM_CA_NUM);
@@ -309,7 +309,7 @@ void DoFFT::FFT(int offset)
     }
     else if (pilot_symbol == 0) {
         
-        int data_subframe_id = subframe_id - UE_NUM;
+        int data_subframe_id = subframe_id - PILOT_NUM;
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + data_subframe_id;
         
         // cx_fmat mat_fft_cx_output((cx_float *)fft_buffer_.FFT_outputs[FFT_buffer_target_id], OFDM_CA_NUM, 1, false);

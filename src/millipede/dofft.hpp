@@ -93,7 +93,7 @@ public:
     
 private:
     Config *config_;
-    int BS_ANT_NUM, UE_NUM;
+    int BS_ANT_NUM, PILOT_NUM;
     int OFDM_CA_NUM;
     int OFDM_DATA_NUM;
     int OFDM_DATA_START;
