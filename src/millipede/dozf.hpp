@@ -47,6 +47,10 @@ public:
      */
     void ZF(int offset);
 
+    void ZF_time_orthogonal(int offset);
+
+    void ZF_freq_orthogonal(int offset);
+
     /**
      * Do prediction task for one subcarrier 
      * @param tid: task thread index, used for selecting task ptok
