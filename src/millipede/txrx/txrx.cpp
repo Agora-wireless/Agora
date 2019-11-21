@@ -55,15 +55,16 @@ PacketTXRX::~PacketTXRX()
 }
 
 
-std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start)
+std::vector<pthread_t> PacketTXRX::startRecv(Table<char> &in_buffer, Table<int> &in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, Table<double> &in_frame_start)
 {
+    buffer_ = &in_buffer;
+    buffer_status_ = &in_buffer_status;
+    frame_start_ = &in_frame_start;
+
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-    buffer_ = in_buffer;  // for save data
-    buffer_status_ = in_buffer_status; // for save status
-    frame_start_ = in_frame_start;
 
 
     printf("create RX threads\n");
@@ -162,11 +163,11 @@ void *PacketTXRX::loopRecv(int tid)
     // moodycamel::ProducerToken *local_ptok = new moodycamel::ProducerToken(*message_queue_);
     moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
 
-    char *buffer_ptr = buffer_[tid];
-    int *buffer_status_ptr = buffer_status_[tid];
+    char *buffer_ptr = (*buffer_)[tid];
+    int *buffer_status_ptr = (*buffer_status_)[tid];
     long long buffer_length = buffer_length_;
     int buffer_frame_num = buffer_frame_num_;
-    double *frame_start = frame_start_[tid];
+    double *frame_start = (*frame_start_)[tid];
 
     // walk through all the pages
 #if 0
@@ -379,11 +380,11 @@ void *PacketTXRX::loopTXRX(int tid)
 
 
     // RX  pointers
-    char* rx_buffer_ptr = buffer_[tid];
-    int* rx_buffer_status_ptr = buffer_status_[tid];
+    char* rx_buffer_ptr = (*buffer_)[tid];
+    int* rx_buffer_status_ptr = (*buffer_status_)[tid];
     long long rx_buffer_length = buffer_length_;
     int rx_buffer_frame_num = buffer_frame_num_;
-    double *rx_frame_start = frame_start_[tid];
+    double *rx_frame_start = (*frame_start_)[tid];
     char* rx_cur_buffer_ptr = rx_buffer_ptr;
     int* rx_cur_buffer_status_ptr = rx_buffer_status_ptr;
     int rx_offset = 0;

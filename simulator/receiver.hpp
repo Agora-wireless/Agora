@@ -105,7 +105,7 @@ public:
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + RX_THREAD_NUM - 1}
     */ 
-    std::vector<pthread_t> startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start);
+    std::vector<pthread_t> startRecv(Table<char> &in_buffer, Table<int> &in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, Table<double> &in_frame_start);
     
     /**
      * receive thread
@@ -134,8 +134,8 @@ private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
-    char** buffer_;
-    int** buffer_status_;
+    Table<char> *buffer_;
+    Table <int> *buffer_status_;
     long long buffer_length_;
     int buffer_frame_num_;
 
@@ -148,7 +148,7 @@ private:
     int rx_thread_num_;
     int tx_thread_num_;
 
-    double **frame_start_;
+    Table<double> *frame_start_;
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data> *message_queue_;
     moodycamel::ConcurrentQueue<Event_data> *task_queue_;

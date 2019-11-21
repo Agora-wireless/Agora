@@ -18,7 +18,7 @@
 
 struct Stats_worker {
     /* accumulated task duration for all frames in each worker thread*/
-    double **task_duration;
+    Table<double> task_duration;
     /* accumulated task count for all frames in each worker thread*/
     int *task_count;
 };
@@ -132,7 +132,7 @@ public:
     Stats_worker encode_stats_worker;
     Stats_worker ifft_stats_worker;
     Stats_worker precode_stats_worker;
-    double **frame_start;
+    Table<double> frame_start;
  
 private:
     Config *config_;
@@ -175,10 +175,10 @@ private:
     double encode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    double **csi_time_in_function_details;
-    double **fft_time_in_function_details;
-    double **zf_time_in_function_details;
-    double **demul_time_in_function_details;
+    Table<double> csi_time_in_function_details;
+    Table<double> fft_time_in_function_details;
+    Table<double> zf_time_in_function_details;
+    Table<double> demul_time_in_function_details;
 #endif
 
     Stats_worker csi_stats_worker_old;

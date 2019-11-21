@@ -236,13 +236,13 @@ void Simulator::initialize_uplink_buffers()
 
     socket_buffer_size_ = (long long) packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
-    alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);
+    socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
+    socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
     
     /* initilize all uplink status checkers */
     alloc_buffer_1d(&rx_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    alloc_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM, 10240, 4096, 1);
+    frame_start.calloc(SOCKET_RX_THREAD_NUM, 10240, 4096);
     alloc_buffer_1d(&frame_start_receive, 10240, 4096, 1);
     alloc_buffer_1d(&frame_end_receive, 10240, 4096, 1);
     alloc_buffer_1d(&frame_start_tx, 10240, 4096, 1);
@@ -256,12 +256,12 @@ void Simulator::free_uplink_buffers()
 {
     // free_buffer_1d(&pilots_);
 
-    free_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM);
-    free_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM);
+    socket_buffer_.free();
+    socket_buffer_status_.free();
 
     free_buffer_1d(&rx_counter_packets_);
 
-    free_buffer_2d(&frame_start, SOCKET_RX_THREAD_NUM);
+    frame_start.free();
     free_buffer_1d(&frame_start_receive);
     free_buffer_1d(&frame_end_receive);
     free_buffer_1d(&frame_start_tx);

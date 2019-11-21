@@ -26,8 +26,8 @@ class DoFFT
 public:
     DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
-        complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
+	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status, Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
+        Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
         Stats *in_stats_manager);
     ~DoFFT();
 
@@ -108,22 +108,22 @@ private:
     moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
     moodycamel::ProducerToken *task_ptok;
 
-    char **socket_buffer_;
-    int **socket_buffer_status_;
-    complex_float **data_buffer_;
-    complex_float **csi_buffer_;
+    Table<char> &socket_buffer_;
+    Table<int> &socket_buffer_status_;
+    Table<complex_float> &data_buffer_;
+    Table<complex_float> &csi_buffer_;
     float *pilots_;
 
     char *dl_socket_buffer_;;
-    complex_float **dl_ifft_buffer_;
+    Table<complex_float> &dl_ifft_buffer_;
 
 
     // int packet_length;
-    double **FFT_task_duration;
-    double **CSI_task_duration;
+    Table<double> *FFT_task_duration;
+    Table<double> *CSI_task_duration;
     int *FFT_task_count;
     int *CSI_task_count;
-    double **IFFT_task_duration;
+    Table<double> *IFFT_task_duration;
     int *IFFT_task_count;
 
     FFTBuffer fft_buffer_;
