@@ -8,6 +8,8 @@
 #ifndef BUFFER_HEAD
 #define BUFFER_HEAD
 
+#include "memory_manage.h"
+
 // boost is required for aligned memory allocation (for SIMD instructions)
 #include <boost/align/aligned_allocator.hpp>
 
@@ -56,10 +58,10 @@ struct RX_stats {
 };
 
 struct FFT_stats {
-    int **task_count;
+    Table<int> task_count;
     int *symbol_pilot_count;
     int *symbol_data_count;
-    bool **data_exist_in_symbol;
+    Table<bool> data_exist_in_symbol;
     int frame_count = 0;
     int max_task_count;
     int max_symbol_pilot_count;
@@ -74,7 +76,7 @@ struct ZF_stats {
 };
 
 struct Data_stats {
-    int **task_count;
+    Table<int> task_count;
     int *symbol_count;
     int frame_count = 0;
     int max_task_count;
@@ -88,16 +90,16 @@ struct FFTBuffer
 {
     // Data before IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
-    complex_float **FFT_inputs;
-    complex_float **FFT_outputs;
+    Table<complex_float> FFT_inputs;
+    Table<complex_float> FFT_outputs;
 };
 
 struct IFFTBuffer
 {
     // Data before IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
-    complex_float **IFFT_inputs;
-    complex_float **IFFT_outputs;
+    Table<complex_float> IFFT_inputs;
+    Table<complex_float> IFFT_outputs;
 };
 
 

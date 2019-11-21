@@ -95,7 +95,7 @@ private:
     int demul_block_size, demul_block_num;
 
     /* lookup table for 16 QAM, real and imag */
-    float **qam16_table_;
+    Table<float> qam16_table_;
     // float *pilots_;
     Config *cfg_;
     int max_equaled_frame = 0;
@@ -121,8 +121,8 @@ private:
     // int *socket_buffer_status_[SOCKET_RX_THREAD_NUM];
     // SocketBuffer socket_buffer_[SOCKET_RX_THREAD_NUM];
 
-    char **socket_buffer_;
-    int **socket_buffer_status_;
+    Table<char> socket_buffer_;
+    Table<int> socket_buffer_status_;
     long long socket_buffer_size_;
     int socket_buffer_status_size_;
     
@@ -149,7 +149,7 @@ private:
     /*****************************************************
      * Timestamps and counters used in worker threads 
      *****************************************************/ 
-    double **frame_start;
+    Table<double> frame_start;
     double *frame_start_receive;
     double *frame_end_receive;
     double *frame_start_tx;

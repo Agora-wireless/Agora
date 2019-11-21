@@ -9,9 +9,19 @@ using namespace arma;
 
 DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
-        complex_float **in_dl_ifft_buffer, int8_t **in_dl_IQ_data, int8_t **in_dl_encoded_data,
+        Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoded_data_buffer, 
+        Table<complex_float> &in_dl_ifft_buffer, Table<int8_t> &in_dl_IQ_data, Table<int8_t> &in_dl_encoded_data,
         Stats *in_stats_manager)
+  : dl_modulated_buffer_(in_dl_modulated_buffer)
+  , precoder_buffer_(in_precoder_buffer)
+  , dl_precoded_data_buffer_(in_dl_precoded_data_buffer)
+  , dl_ifft_buffer_(in_dl_ifft_buffer)
+#ifdef USE_LDPC
+  , dl_IQ_data(in_dl_encoded_data)
+#else
+  , dl_IQ_data(in_dl_IQ_data)
+#endif
+  , Precode_task_duration(in_stats_manager->precode_stats_worker.task_duration)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -26,19 +36,9 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     complete_task_queue_ = in_complete_task_queue;
     task_ptok = in_task_ptok;
 
-    dl_modulated_buffer_ = in_dl_modulated_buffer;
-    precoder_buffer_ = in_precoder_buffer;
-    dl_precoded_data_buffer_ = in_dl_precoded_data_buffer;
-    dl_ifft_buffer_ = in_dl_ifft_buffer;
-#ifdef USE_LDPC
-    dl_IQ_data = in_dl_encoded_data;
-#else
-    dl_IQ_data = in_dl_IQ_data;
-#endif
     size_t mod_type = config_->mod_type;
-    qam_table = init_modulation_table(mod_type);
+    init_modulation_table(qam_table, mod_type);
 
-    Precode_task_duration = in_stats_manager->precode_stats_worker.task_duration;
     Precode_task_count = in_stats_manager->precode_stats_worker.task_count;
     // Precode_task_duration = in_Precode_task_duration;
     // Precode_task_count = in_Precode_task_count;

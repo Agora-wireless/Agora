@@ -155,8 +155,8 @@ private:
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
-    char **socket_buffer_;
-    int **socket_buffer_status_;
+    Table<char> socket_buffer_;
+    Table<int> socket_buffer_status_;
     long long socket_buffer_size_;
     int socket_buffer_status_size_;
 
@@ -167,7 +167,7 @@ private:
      * First dimension: UE_NUM * TASK_BUFFER_FRAME_NUM
      * Second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
-    complex_float **csi_buffer_;
+    Table<complex_float> csi_buffer_;
 
     /** 
      * Data symbols after IFFT
@@ -175,40 +175,40 @@ private:
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      * second dimension data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
      */
-    complex_float **data_buffer_;
+    Table<complex_float> data_buffer_;
 
     /**
      * Calculated precoder
      * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
      * Second dimension: UE_NUM * BS_ANT_NUM
      */
-    complex_float **precoder_buffer_;
+    Table<complex_float> precoder_buffer_;
 
     /**
      * Data after equalization
      * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    complex_float **equal_buffer_;
+    Table<complex_float> equal_buffer_;
 
     /**
      * Data after demodulation
      * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    uint8_t **demod_hard_buffer_;
+    Table<uint8_t> demod_hard_buffer_;
 
-    int8_t **demod_soft_buffer_;
+    Table<int8_t> demod_soft_buffer_;
 
     /** 
      * Predicted CSI data 
      * First dimension: OFDM_CA_NUM 
      * Second dimension: BS_ANT_NUM * UE_NUM
      */
-    complex_float **pred_csi_buffer_;
+    Table<complex_float> pred_csi_buffer_;
 
 
-    uint8_t **decoded_buffer_;
+    Table<uint8_t> decoded_buffer_;
 
     RX_stats rx_stats_;
     FFT_stats fft_stats_;
@@ -220,7 +220,7 @@ private:
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
-    int **delay_fft_queue;
+    Table<int> delay_fft_queue;
     int *delay_fft_queue_cnt;
 
     /* Downlink */   
@@ -229,8 +229,8 @@ private:
      * First dimension: data_subframe_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
-    int8_t **dl_IQ_data;
-    long long **dl_IQ_data_long;
+    Table<int8_t> *dl_IQ_data;
+    Table<long long> dl_IQ_data_long;
 
     /** 
      * Modulated data
@@ -245,14 +245,14 @@ private:
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
      * second dimension: UE_NUM * OFDM_CA_NUM
      */
-    complex_float **dl_modulated_buffer_;
+    Table<complex_float> dl_modulated_buffer_;
 
     /**
      * Data for IFFT
      * First dimension: FFT_buffer_block_num = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
      * Second dimension: OFDM_CA_NUM
      */
-    complex_float **dl_ifft_buffer_;
+    Table<complex_float> dl_ifft_buffer_;
 
     /**
      * Data after IFFT
@@ -262,18 +262,18 @@ private:
      */
     // DataBuffer dl_iffted_data_buffer_;
 
-    complex_float **dl_precoder_buffer_;
-    complex_float **recip_buffer_;
+    Table<complex_float> dl_precoder_buffer_;
+    Table<complex_float> recip_buffer_;
 
     /**
      * Precoded data
      * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
-    complex_float **dl_precoded_data_buffer_;
+    Table<complex_float> dl_precoded_data_buffer_;
 
 
-    int8_t **dl_encoded_buffer_;
+    Table<int8_t> dl_encoded_buffer_;
 
 
     /**

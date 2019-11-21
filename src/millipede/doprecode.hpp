@@ -28,8 +28,8 @@ class DoPrecode
 public:
     DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        complex_float **in_dl_modulated_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoded_data_buffer, 
-        complex_float **in_dl_ifft_buffer, int8_t **in_dl_IQ_data, int8_t **in_dl_encoded_data,
+	Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoded_data_buffer, 
+        Table<complex_float> &in_dl_ifft_buffer, Table<int8_t> &in_dl_IQ_data, Table<int8_t> &in_dl_encoded_data,
         Stats *in_stats_manager);
     ~DoPrecode();
 
@@ -76,14 +76,14 @@ private:
     moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
     moodycamel::ProducerToken *task_ptok;
     
-    complex_float **dl_modulated_buffer_;
-    complex_float **precoder_buffer_;
-    complex_float **dl_precoded_data_buffer_;
-    complex_float **dl_ifft_buffer_;
-    int8_t **dl_IQ_data;
-    float **qam_table;
+    Table<complex_float> &dl_modulated_buffer_;
+    Table<complex_float> &precoder_buffer_;
+    Table<complex_float> &dl_precoded_data_buffer_;
+    Table<complex_float> &dl_ifft_buffer_;
+    Table<int8_t> &dl_IQ_data;
+    Table<float> qam_table;
 
-    double **Precode_task_duration;
+    Table<double> &Precode_task_duration;
     int *Precode_task_count;
 
     complex_float *modulated_buffer_temp;
