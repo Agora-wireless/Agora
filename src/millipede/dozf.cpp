@@ -241,7 +241,6 @@ void DoZF::ZF_freq_orthogonal(int offset)
 #endif 
     for (int i = 0; i < UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
-        int cur_offset = offset_in_buffer;
         // directly gather data from FFT buffer
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, 
                                             transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);

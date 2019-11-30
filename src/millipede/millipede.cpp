@@ -186,26 +186,26 @@ void Millipede::start()
                     char *socket_buffer_ptr = socket_buffer_[socket_thread_id] + (long long) offset_in_current_buffer * packet_length;
                     struct Packet *pkt = (struct Packet *)socket_buffer_ptr;
                     
-                    int frame_id = pkt->frame_id % 10000;
+                    int frame_count = pkt->frame_id % 10000;
+                    int frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
                     int subframe_id = pkt->symbol_id;                                    
                     int ant_id = pkt->ant_id;
-                    int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
-                    int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-                    
-                    update_rx_counters(frame_id, frame_id_in_buffer, subframe_id, ant_id); 
+			
+                    update_rx_counters(frame_count, frame_id, pkt->symbol_id); 
                     #if BIGSTATION 
                     /* in BigStation, schedule FFT whenever a packet is received */
-                    schedule_fft_task(offset, frame_id, frame_id_in_buffer, subframe_id, ant_id, prev_frame_id, ptok);
+                    schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, ptok);
                     #else
-                    bool previous_frame_done = prev_frame_counter[prev_frame_id] == prev_frame_counter_max;
+                    bool previous_frame_done = prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] ==
+		        prev_frame_counter_max;
                     /* if this is the first frame or the previous frame is all processed, schedule FFT for this packet */
-                    if ((frame_id == 0 && fft_stats_.frame_count < 100) || (fft_stats_.frame_count > 0 && previous_frame_done)) {
-                        schedule_fft_task(offset, frame_id, frame_id_in_buffer, subframe_id, ant_id, prev_frame_id, ptok);
+                    if ((frame_count == 0 && fft_stats_.frame_count < 100) || (fft_stats_.frame_count > 0 && previous_frame_done)) {
+                        schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, ptok);
                     }
                     else {
                         /* if the previous frame is not finished, store offset in queue */
-                        delay_fft_queue[frame_id_in_buffer][delay_fft_queue_cnt[frame_id_in_buffer]] = offset;
-                        delay_fft_queue_cnt[frame_id_in_buffer]++;
+                        delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]] = offset;
+                        delay_fft_queue_cnt[frame_id]++;
                     }
                     #endif                                            
                 }                
@@ -734,7 +734,7 @@ void Millipede::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Ev
     }
 }
 
-void Millipede::schedule_fft_task(int offset, int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id, int prev_frame_id,
+void Millipede::schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
     moodycamel::ProducerToken const& ptok) 
 {
     Event_data do_fft_task;
@@ -743,38 +743,38 @@ void Millipede::schedule_fft_task(int offset, int frame_id, int frame_id_in_buff
     schedule_task(do_fft_task, &fft_queue_, ptok);
 #if DEBUG_PRINT_PER_TASK_ENTER_QUEUE
     printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", 
-            frame_id, frame_id_in_buffer, subframe_id, ant_id);
+            frame_count, frame_id, subframe_id, ant_id);
 #endif     
-    rx_stats_.fft_created_count[frame_id_in_buffer]++;
-    if (rx_stats_.fft_created_count[frame_id_in_buffer] == 1) {
-        stats_manager_->update_processing_started(frame_id);
+    rx_stats_.fft_created_count[frame_id]++;
+    if (rx_stats_.fft_created_count[frame_id] == 1) {
+        stats_manager_->update_processing_started(frame_count);
     }
-    else if (rx_stats_.fft_created_count[frame_id_in_buffer] == rx_stats_.max_task_count) {
-        rx_stats_.fft_created_count[frame_id_in_buffer] = 0;
+    else if (rx_stats_.fft_created_count[frame_id] == rx_stats_.max_task_count) {
+        rx_stats_.fft_created_count[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE                            
         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n", 
-                frame_id, frame_id_in_buffer, get_time()-stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, get_time()-stats_manager_->get_pilot_received(frame_count));
 #endif  
 #if !BIGSTATION
-        prev_frame_counter[prev_frame_id] = 0;
+        prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] = 0;
 #endif
     }        
 }
 
-void Millipede::schedule_delayed_fft_tasks(int frame_id, int frame_id_in_buffer, int data_subframe_id, moodycamel::ProducerToken const& ptok)
+void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok)
 {
-    int frame_id_next = (frame_id_in_buffer + 1) % TASK_BUFFER_FRAME_NUM;
-    if (delay_fft_queue_cnt[frame_id_next] > 0) {
-        for (int i = 0; i < delay_fft_queue_cnt[frame_id_next]; i++) {
-            int offset_rx = delay_fft_queue[frame_id_next][i];
-            schedule_fft_task(offset_rx, frame_id + 1, frame_id_next, data_subframe_id + UE_NUM, 0, frame_id_in_buffer, ptok);
+    frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+    if (delay_fft_queue_cnt[frame_id] > 0) {
+        for (int i = 0; i < delay_fft_queue_cnt[frame_id]; i++) {
+            int offset_rx = delay_fft_queue[frame_id][i];
+            schedule_fft_task(offset_rx, frame_count + 1, frame_id, data_subframe_id + UE_NUM, 0, ptok);
         }
-        delay_fft_queue_cnt[frame_id_next] = 0;
+        delay_fft_queue_cnt[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE 
     if (downlink_mode)
-        printf("Main thread in IFFT: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id_next], frame_id_next);
+        printf("Main thread in IFFT: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
     else
-        printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id_next], frame_id_next);
+        printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
 #endif                                
     } 
 }
@@ -863,109 +863,108 @@ void Millipede::schedule_ifft_task(int frame_id, int data_subframe_id, moodycame
     }
 }
 
-void Millipede::update_rx_counters(int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id)
+void Millipede::update_rx_counters(int frame_count, int frame_id, int subframe_id)
 {
-    int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-    if (cfg_->isPilot(frame_id, subframe_id)) { 
-        rx_stats_.task_pilot_count[frame_id_in_buffer]++;
-        if(rx_stats_.task_pilot_count[frame_id_in_buffer] == rx_stats_.max_task_pilot_count) {
-            rx_stats_.task_pilot_count[frame_id_in_buffer] = 0;
-            stats_manager_->update_pilot_all_received(frame_id);
-            print_per_frame_done(PRINT_RX_PILOTS, frame_id, frame_id_in_buffer);    
+    if (cfg_->isPilot(frame_count, subframe_id)) { 
+        if(++rx_stats_.task_pilot_count[frame_id] == rx_stats_.max_task_pilot_count) {
+            rx_stats_.task_pilot_count[frame_id] = 0;
+            stats_manager_->update_pilot_all_received(frame_count);
+            print_per_frame_done(PRINT_RX_PILOTS, frame_count, frame_id);    
         }
     }
-    rx_stats_.task_count[frame_id_in_buffer]++;
-    if (rx_stats_.task_count[frame_id_in_buffer] == 1) {   
-        stats_manager_->update_pilot_received(frame_id);
+    if (rx_stats_.task_count[frame_id]++ == 0) {   
+        stats_manager_->update_pilot_received(frame_count);
 #if DEBUG_PRINT_PER_FRAME_START 
-        printf("Main thread: data received from frame %d, subframe %d, ant %d, in %.5f us, rx in prev frame: %d\n", \
-                frame_id, subframe_id, ant_id, stats_manager_->get_pilot_received(frame_id) - stats_manager_->get_pilot_received(frame_id-1),
+	int prev_frame_id = (frame_count + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM;
+        printf("Main thread: data received from frame %d, subframe %d, in %.5f us, rx in prev frame: %d\n", \
+                frame_count, subframe_id,
+	       stats_manager_->get_pilot_received(frame_count) - stats_manager_->get_pilot_received(frame_count-1),
                 rx_stats_.task_count[prev_frame_id]);
 #endif
     }
-    else if (rx_stats_.task_count[frame_id_in_buffer] == rx_stats_.max_task_count) {  
-        stats_manager_->update_rx_processed(frame_id);
-        print_per_frame_done(PRINT_RX, frame_id, frame_id_in_buffer);                        
-        rx_stats_.task_count[frame_id_in_buffer] = 0;                                  
+    else if (rx_stats_.task_count[frame_id] == rx_stats_.max_task_count) {  
+        stats_manager_->update_rx_processed(frame_count);
+        print_per_frame_done(PRINT_RX, frame_count, frame_id);                        
+        rx_stats_.task_count[frame_id] = 0;                                  
     } 
 }
 
 
-void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_in_buffer)
+void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_id)
 {
 #if DEBUG_PRINT_PER_FRAME_DONE
     switch(task_type) {
         case(PRINT_RX): {
-            int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
+            int prev_frame_count = (frame_count - 1) % TASK_BUFFER_FRAME_NUM;
             printf("Main thread: received all packets in frame: %d, frame buffer: %d in %.2f us, demul: %d done, FFT: %d,%d, rx in prev frame: %d\n", 
-                frame_id, frame_id_in_buffer, stats_manager_->get_rx_processed(frame_id) - stats_manager_->get_pilot_received(frame_id),
-                demul_stats_.symbol_count[frame_id_in_buffer], fft_stats_.symbol_data_count[frame_id_in_buffer], 
-                fft_stats_.task_count[frame_id_in_buffer][fft_stats_.symbol_data_count[frame_id_in_buffer] + UE_NUM], 
-                rx_stats_.task_count[prev_frame_id]);
+                frame_count, frame_id, stats_manager_->get_rx_processed(frame_count) - stats_manager_->get_pilot_received(frame_count),
+                demul_stats_.symbol_count[frame_id], fft_stats_.symbol_data_count[frame_id], 
+                fft_stats_.task_count[frame_id][fft_stats_.symbol_data_count[frame_id] + UE_NUM], 
+                rx_stats_.task_count[prev_frame_count]);
             }
             break;
         case(PRINT_RX_PILOTS):
-            printf("Main thread: received all pilots in frame: %d, frame buffer: %d in %.2f us\n", frame_id, frame_id_in_buffer, 
-                stats_manager_->get_pilot_all_received(frame_id) - stats_manager_->get_pilot_received(frame_id));
+            printf("Main thread: received all pilots in frame: %d, frame buffer: %d in %.2f us\n", frame_count, frame_id, 
+                stats_manager_->get_pilot_all_received(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_FFT_PILOTS):
             printf("Main thread: pilot frame: %d, %d, finished FFT for all pilot subframes in %.2f us, pilot all received: %.2f\n", 
-                frame_id, frame_id_in_buffer,
-                stats_manager_->get_fft_processed(frame_id) - stats_manager_->get_pilot_received(frame_id),
-                stats_manager_->get_pilot_all_received(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id,
+                stats_manager_->get_fft_processed(frame_count) - stats_manager_->get_pilot_received(frame_count),
+                stats_manager_->get_pilot_all_received(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_FFT_DATA):
             printf("Main thread: data frame: %d, %d, finished FFT for all data subframes in %.2f us\n", 
-                frame_id, frame_id_in_buffer, 
-                get_time()-stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, 
+                get_time()-stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_ZF):
             printf("Main thread: ZF done frame: %d, %d in %.2f us since pilot FFT done, total: %.2f us\n", 
-                frame_id, frame_id_in_buffer, 
-                stats_manager_->get_zf_processed(frame_id) - stats_manager_->get_fft_processed(frame_id),
-                stats_manager_->get_zf_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, 
+                stats_manager_->get_zf_processed(frame_count) - stats_manager_->get_fft_processed(frame_count),
+                stats_manager_->get_zf_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_DEMUL):
             printf("Main thread: Demodulation done frame: %d, %d (%d UL subframes) in %.2f us since ZF done, total %.2f us\n",
-                frame_id, frame_id_in_buffer, ul_data_subframe_num_perframe,
-                stats_manager_->get_demul_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
-                stats_manager_->get_demul_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, ul_data_subframe_num_perframe,
+                stats_manager_->get_demul_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
+                stats_manager_->get_demul_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_DECODE):
             printf("Main thread: Decoding done frame: %d, %d (%d UL subframes) in %.2f us since ZF done, total %.2f us\n",
-                frame_id, frame_id_in_buffer, ul_data_subframe_num_perframe,
-                stats_manager_->get_decode_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
-                stats_manager_->get_decode_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, ul_data_subframe_num_perframe,
+                stats_manager_->get_decode_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
+                stats_manager_->get_decode_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_ENCODE):
             printf("Main thread: Encoding done frame: %d, %d in %.2f us since ZF done, total %.2f us\n",
-                frame_id, frame_id_in_buffer, 
-                stats_manager_->get_encode_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
-                stats_manager_->get_encode_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, 
+                stats_manager_->get_encode_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
+                stats_manager_->get_encode_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_PRECODE):
             printf("Main thread: Precoding done frame: %d, %d in %.2f us since ZF done, total: %.2f us\n", 
-                frame_id, frame_id_in_buffer, 
-                stats_manager_->get_precode_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
-                stats_manager_->get_precode_processed(frame_id) - stats_manager_->get_pilot_received(frame_id)); 
+                frame_count, frame_id, 
+                stats_manager_->get_precode_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
+                stats_manager_->get_precode_processed(frame_count) - stats_manager_->get_pilot_received(frame_count)); 
             break;
         case(PRINT_IFFT):
             printf("Main thread: IFFT done frame: %d, %d in %.2f us since precode done, total: %.2f us\n", 
-                frame_id, frame_id_in_buffer,
-                stats_manager_->get_ifft_processed(frame_id) - stats_manager_->get_precode_processed(frame_id),
-                stats_manager_->get_ifft_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id,
+                stats_manager_->get_ifft_processed(frame_count) - stats_manager_->get_precode_processed(frame_count),
+                stats_manager_->get_ifft_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_TX_FIRST):
             printf("Main thread: TX of first subframe done frame: %d, %d in %.2f us since ZF done, total: %.2f us\n", 
-                frame_id, frame_id_in_buffer, 
-                stats_manager_->get_tx_processed_first(frame_id) - stats_manager_->get_zf_processed(frame_id),
-                stats_manager_->get_tx_processed_first(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, 
+                stats_manager_->get_tx_processed_first(frame_count) - stats_manager_->get_zf_processed(frame_count),
+                stats_manager_->get_tx_processed_first(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_TX):
             printf("Main thread: TX done frame: %d %d (%d DL subframes) in %.2f us since ZF done, total: %.2f us\n", 
-                frame_id, frame_id_in_buffer, dl_data_subframe_num_perframe,
-                stats_manager_->get_tx_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
-                stats_manager_->get_tx_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, dl_data_subframe_num_perframe,
+                stats_manager_->get_tx_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
+                stats_manager_->get_tx_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
             break;
         default:
             printf("Wrong task type in frame done print!");
@@ -973,41 +972,41 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
 #endif
 }
 
-void Millipede::print_per_subframe_done(int task_type, int frame_id, int frame_id_in_buffer, int subframe_id)
+void Millipede::print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id)
 {
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
     switch(task_type) {
         case(PRINT_FFT_PILOTS):
             printf("Main thread: pilot FFT done frame: %d, %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, fft_stats_.symbol_pilot_count[frame_id_in_buffer]);
+                frame_count, frame_id, subframe_id, fft_stats_.symbol_pilot_count[frame_id]);
             break;
         case(PRINT_FFT_DATA):
             printf("Main thread: data FFT done frame %d, %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d, in %.2f\n", 
-                frame_id, frame_id_in_buffer, subframe_id, zf_stats_.precoder_exist_in_frame[frame_id_in_buffer], 
+                frame_count, frame_id, subframe_id, zf_stats_.precoder_exist_in_frame[frame_id], 
                 fft_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx(),
-                get_time()-stats_manager_->get_pilot_received(frame_id));
+                get_time()-stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_DEMUL):
             printf("Main thread: Demodulation done frame %d %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, demul_stats_.symbol_count[frame_id_in_buffer]);
+                frame_count, frame_id, subframe_id, demul_stats_.symbol_count[frame_id]);
             break;
         case(PRINT_DECODE):
             printf("Main thread: Decoding done frame %d %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, decode_stats_.symbol_count[frame_id_in_buffer]);
+                frame_count, frame_id, subframe_id, decode_stats_.symbol_count[frame_id]);
             break;
         case(PRINT_ENCODE):
             printf("Main thread: Encoding done frame %d %d, subframe: %d, num sumbframes done: %d\n", 
-                frame_id, frame_id_in_buffer, subframe_id, encode_stats_.symbol_count[frame_id_in_buffer]);
+                frame_count, frame_id, subframe_id, encode_stats_.symbol_count[frame_id]);
             break;
         case(PRINT_PRECODE):
             printf("Main thread: Precoding done frame: %d %d, subframe: %d in %.2f us\n", 
-                frame_id, frame_id_in_buffer, subframe_id,
-                get_time()-stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, subframe_id,
+                get_time()-stats_manager_->get_pilot_received(frame_count));
             break;
         case(PRINT_TX):
             printf("Main thread: TX done frame: %d %d, subframe: %d in %.2f us\n", 
-                frame_id, frame_id_in_buffer, subframe_id,
-                get_time()-stats_manager_->get_pilot_received(frame_id));
+                frame_count, frame_id, subframe_id,
+                get_time()-stats_manager_->get_pilot_received(frame_count));
             break;
         default:
             printf("Wrong task type in frame done print!");
