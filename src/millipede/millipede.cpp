@@ -188,17 +188,19 @@ void Millipede::start()
                     
                     int frame_count = pkt->frame_id % 10000;
                     int frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
-                    
+                    int subframe_id = pkt->symbol_id;                                    
+                    int ant_id = pkt->ant_id;
+			
                     update_rx_counters(frame_count, frame_id, pkt->symbol_id); 
                     #if BIGSTATION 
                     /* in BigStation, schedule FFT whenever a packet is received */
-                    schedule_fft_task(offset, frame_count, frame_id, ptok);
+                    schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, ptok);
                     #else
                     bool previous_frame_done = prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] ==
 		        prev_frame_counter_max;
                     /* if this is the first frame or the previous frame is all processed, schedule FFT for this packet */
                     if ((frame_count == 0 && fft_stats_.frame_count < 100) || (fft_stats_.frame_count > 0 && previous_frame_done)) {
-                        schedule_fft_task(offset, frame_count, frame_id, ptok);
+                        schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, ptok);
                     }
                     else {
                         /* if the previous frame is not finished, store offset in queue */
@@ -296,7 +298,7 @@ void Millipede::start()
                         if (demul_stats_.symbol_count[frame_id] == demul_stats_.max_symbol_count) {
                             /* schedule fft for the next frame if there are delayed fft tasks */
                         #ifndef USE_LDPC
-                            schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, ptok);
+                            schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, data_subframe_id, ptok);
                             #if BIGSTATION
                             demul_stats_.symbol_count[frame_id] = 0;
                             #endif  
@@ -335,7 +337,7 @@ void Millipede::start()
                         decode_stats_.symbol_count[frame_id]++;
                         print_per_subframe_done(PRINT_DECODE, decode_stats_.frame_count, frame_id, data_subframe_id);
                         if (decode_stats_.symbol_count[frame_id] == decode_stats_.max_symbol_count) {
-                            schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, ptok);
+                            schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, data_subframe_id, ptok);
                             #if BIGSTATION
                             prev_frame_counter[frame_id] = 0;
                             #endif  
@@ -417,7 +419,7 @@ void Millipede::start()
                         ifft_stats_.symbol_count[frame_id]++;
                         if (ifft_stats_.symbol_count[frame_id] == ifft_stats_.max_symbol_count) {
                             /* schedule fft for next frame */
-                            schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, ptok);
+                            schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, ptok);
                             stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
                             print_per_frame_done(PRINT_IFFT, ifft_stats_.frame_count, frame_id);      
                             update_frame_count(&ifft_stats_.frame_count);
@@ -732,7 +734,7 @@ void Millipede::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Ev
     }
 }
 
-void Millipede::schedule_fft_task(int offset, int frame_count, int frame_id,
+void Millipede::schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
     moodycamel::ProducerToken const& ptok) 
 {
     Event_data do_fft_task;
@@ -740,8 +742,8 @@ void Millipede::schedule_fft_task(int offset, int frame_count, int frame_id,
     do_fft_task.data = offset;
     schedule_task(do_fft_task, &fft_queue_, ptok);
 #if DEBUG_PRINT_PER_TASK_ENTER_QUEUE
-    printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d\n", 
-            frame_count, frame_id);
+    printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d, subframe: %d, ant: %d\n", 
+            frame_count, frame_id, subframe_id, ant_id);
 #endif     
     rx_stats_.fft_created_count[frame_id]++;
     if (rx_stats_.fft_created_count[frame_id] == 1) {
@@ -759,13 +761,13 @@ void Millipede::schedule_fft_task(int offset, int frame_count, int frame_id,
     }        
 }
 
-void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, moodycamel::ProducerToken const& ptok)
+void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok)
 {
     frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
     if (delay_fft_queue_cnt[frame_id] > 0) {
         for (int i = 0; i < delay_fft_queue_cnt[frame_id]; i++) {
             int offset_rx = delay_fft_queue[frame_id][i];
-            schedule_fft_task(offset_rx, frame_count + 1, frame_id, ptok);
+            schedule_fft_task(offset_rx, frame_count + 1, frame_id, data_subframe_id + UE_NUM, 0, ptok);
         }
         delay_fft_queue_cnt[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE 
