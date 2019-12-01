@@ -36,7 +36,7 @@ find_package(Armadillo)
 
 set(USE_DPDK False)
 set(USE_ARGOS False)
-set(USE_LDPC True)
+set(USE_LDPC False)
 
 set (TXRX_SOURCE src/millipede/txrx/txrx.cpp)
 
