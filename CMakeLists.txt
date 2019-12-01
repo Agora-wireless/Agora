@@ -34,9 +34,13 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Armadillo)
 
-set(USE_DPDK False)
-set(USE_ARGOS False)
-set(USE_LDPC False)
+SET(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
+SET(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
+SET(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+
+message(STATUS "USE_DPDK: ${USE_DPDK}")
+message(STATUS "USE_ARGOS: ${USE_ARGOS}")
+message(STATUS "USE_LDPC: ${USE_LDPC}")
 
 set (TXRX_SOURCE src/millipede/txrx/txrx.cpp)
 
@@ -109,13 +113,17 @@ set(COMMON_SOURCES src/common/config.cpp
                    src/common/signalHandler.cpp
                    src/common/modulation.cpp
                    src/common/net.cpp)
-add_library(comp MODULE 
+
+set(MILLIPEDE_SOURCES 
        src/millipede/millipede.cpp
        src/millipede/stats.cpp 
        src/millipede/dofft.cpp
        src/millipede/dozf.cpp
        src/millipede/dodemul.cpp
-       src/millipede/doprecode.cpp
+       src/millipede/doprecode.cpp)
+
+add_library(comp MODULE 
+       ${MILLIPEDE_SOURCES}
        ${TXRX_SOURCE}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
@@ -163,12 +171,7 @@ foreach(dir ${dirs})
 endforeach()
 
 set(SOURCES src/millipede/main.cpp 
-            src/millipede/millipede.cpp   
-            src/millipede/stats.cpp 
-            src/millipede/dofft.cpp 
-            src/millipede/dozf.cpp 
-            src/millipede/dodemul.cpp 
-            src/millipede/doprecode.cpp
+            ${MILLIPEDE_SOURCES}
             ${TXRX_SOURCE}
             ${COMMON_SOURCES}
             ${ARGOS_SOURCES}
