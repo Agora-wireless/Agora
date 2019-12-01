@@ -35,7 +35,7 @@ class DoCoding
 public:
     DoCoding(Config *cfg, int in_tid, 
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        int8_t **in_raw_data_buffer, int8_t **in_encoded_buffer, int8_t **in_demod_buffer, uint8_t **in_decoded_buffer, 
+        Table<int8_t> &in_raw_data_buffer, Table<int8_t> &in_encoded_buffer, Table<int8_t> &in_demod_buffer, Table<uint8_t> &in_decoded_buffer, 
         Stats *in_stats_manager);
     ~DoCoding();
 
@@ -59,16 +59,16 @@ private:
     moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
     moodycamel::ProducerToken *task_ptok;
 
-    int8_t **raw_data_buffer;
+    Table<int8_t> &raw_data_buffer_;
     int8_t *encoded_buffer_temp;
-    int8_t **encoded_buffer;
-    int8_t **llr_buffer;
-    uint8_t **decoded_buffer;
+    Table<int8_t> &encoded_buffer_;
+    Table<int8_t> &llr_buffer_;
+    Table<uint8_t> &decoded_buffer_;
 
-    double **Encode_task_duration;
+    Table<double> &Encode_task_duration;
     int *Encode_task_count;
 
-    double **Decode_task_duration;
+    Table<double> &Decode_task_duration;
     int *Decode_task_count;
 
     LDPCconfig LDPC_config;
