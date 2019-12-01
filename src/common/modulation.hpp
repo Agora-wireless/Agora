@@ -26,15 +26,15 @@
 
 // using namespace arma;
 // using namespace std;
-float **init_modulation_table(size_t mod_order);
-float **init_qpsk_table();
-// void init_qam16_table(float **qam16_table);
-float **init_qam16_table();
-float **init_qam64_table();
+void init_modulation_table(Table<float> &table, size_t mod_order);
+void init_qpsk_table(Table<float> &table);
+// void init_qam16_table(Table<float> &table);
+void init_qam16_table(Table<float> &table);
+void init_qam64_table(Table<float> &table);
 
 
 complex_float mod_single(int x, float **mod_table);
-complex_float mod_single_uint8(uint8_t x, float **mod_table);
+complex_float mod_single_uint8(uint8_t x, Table<float> &mod_table);
 
 void demod_16qam_hard_loop(float *vec_in, uint8_t *vec_out, int num);
 void demod_16qam_hard_sse(float *vec_in, uint8_t *vec_out, int num);

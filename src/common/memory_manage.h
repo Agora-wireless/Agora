@@ -9,16 +9,33 @@
 #include <stdlib.h>
 #include <cstring>
 
-template <typename T, typename U>
-static void alloc_buffer_2d(T ***buffer, int dim1, U dim2, int aligned_bytes, int init_zero) 
+template <typename T>
+class Table
 {
+ private:
+  size_t dimension;
+  void *data;
+ public:
+ Table(void): dimension(0), data(NULL) {}
+  void malloc(size_t dim1, size_t dim2, size_t aligned_bytes)
+  {
     aligned_bytes = (aligned_bytes) / 32 * 32;
-    *buffer = (T **)malloc(dim1 * sizeof(T *));
-    for (int i = 0; i < dim1; i++) {
-        (*buffer)[i] = (T *)aligned_alloc(aligned_bytes, dim2 * sizeof(T));
-        if (init_zero)
-            memset((*buffer)[i], 0, dim2 * sizeof(T));
-    }
+    dimension = (dim2 * sizeof(T) + aligned_bytes - 1) & -aligned_bytes;
+    data = aligned_alloc(aligned_bytes, dim1 * dimension);
+  }
+  void calloc(size_t dim1, size_t dim2, size_t aligned_bytes)
+  {
+    malloc(dim1, dim2, aligned_bytes);
+    memset(data, 0, dim1 * dimension);
+  }
+  void free(void)
+  {
+    std::free(data);
+    dimension = 0;
+    data = NULL;
+  }
+  
+  T* operator[] (int dim1) { return (T*)((char*)data + dim1 * dimension); }
 };
 
 template <typename T, typename U>
@@ -28,15 +45,6 @@ static void alloc_buffer_1d(T **buffer, U dim, int aligned_bytes, int init_zero)
     *buffer = (T *)aligned_alloc(aligned_bytes, dim * sizeof(T));
     if (init_zero)
         memset(*buffer, 0, dim * sizeof(T));
-};
-
-template <typename T>
-static void free_buffer_2d(T ***buffer, int dim1) 
-{
-    for (int i = 0; i < dim1; i++) {
-        free((*buffer)[i]);
-    }
-    free((*buffer));
 };
 
 template <typename T>

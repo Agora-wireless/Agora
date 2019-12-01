@@ -74,8 +74,8 @@ Phy_UE::Phy_UE(Config *cfg)
     ////////////////////////////////////////
 
     // initialize rx buffer
-    alloc_buffer_2d(&rx_buffer_, rx_thread_num, rx_buffer_size, 64, 0);
-    alloc_buffer_2d(&rx_buffer_status_, rx_thread_num, rx_buffer_status_size, 64, 0);
+    rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
+    rx_buffer_status_.malloc_buffer_2d(rx_thread_num, rx_buffer_status_size, 64);
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num = numAntennas * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;

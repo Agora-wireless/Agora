@@ -230,11 +230,11 @@ Config::Config(std::string jsonfile)
 
 #endif
 
-    alloc_buffer_2d(&dl_IQ_data, data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&dl_IQ_modul, data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64, 0); // used for debug
-    alloc_buffer_2d(&dl_IQ_symbol, data_symbol_num_perframe, sampsPerSymbol, 64, 0); // used for debug
-    alloc_buffer_2d(&ul_IQ_data, ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64, 0);
-    alloc_buffer_2d(&ul_IQ_modul, ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64, 0);
+    dl_IQ_data.malloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64);
+    dl_IQ_modul.malloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64); // used for debug
+    dl_IQ_symbol.malloc(data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
+    ul_IQ_data.malloc(ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64);
+    ul_IQ_modul.malloc(ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64);
 
 
 
@@ -329,11 +329,11 @@ Config::Config(std::string jsonfile)
 Config::~Config()
 {
     free_buffer_1d(&pilots_);
-    free_buffer_2d(&dl_IQ_data, data_symbol_num_perframe);
-    free_buffer_2d(&dl_IQ_modul, data_symbol_num_perframe);
-    free_buffer_2d(&dl_IQ_symbol, data_symbol_num_perframe);
-    free_buffer_2d(&ul_IQ_data, data_symbol_num_perframe * UE_NUM);
-    free_buffer_2d(&ul_IQ_modul, data_symbol_num_perframe * UE_NUM);
+    dl_IQ_data.free();
+    dl_IQ_modul.free();
+    dl_IQ_symbol.free();
+    ul_IQ_data.free();
+    ul_IQ_modul.free();
 }
 
 int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
