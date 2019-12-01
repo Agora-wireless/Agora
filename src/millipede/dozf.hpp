@@ -26,7 +26,7 @@ class DoZF
 public:
     DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        complex_float **in_csi_buffer, complex_float **in_precoder_buffer, complex_float **in_dl_precoder_buffer, complex_float **in_recip_buffer, complex_float **in_pred_csi_buffer, 
+        Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Table<complex_float> &in_pred_csi_buffer, 
         Stats *in_stats_manager);
     ~DoZF();
 
@@ -86,13 +86,13 @@ private:
     moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
     moodycamel::ProducerToken *task_ptok;
 
-    complex_float **csi_buffer_;
-    complex_float **precoder_buffer_;
-    complex_float **dl_precoder_buffer_;
-    complex_float **recip_buffer_;
-    complex_float **pred_csi_buffer_;
+    Table<complex_float> csi_buffer_;
+    Table<complex_float> precoder_buffer_;
+    Table<complex_float> dl_precoder_buffer_;
+    Table<complex_float> recip_buffer_;
+    Table<complex_float> pred_csi_buffer_;
 
-    double **ZF_task_duration;
+  Table<double> *ZF_task_duration;
     int *ZF_task_count;
 
     /** 

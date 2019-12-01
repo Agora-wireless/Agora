@@ -95,7 +95,7 @@ private:
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
     // std::vector<std::vector<char,boost::alignment::aligned_allocator<char, 64>>> trans_buffer_;
-    char **trans_buffer_;
+    Table<char> trans_buffer_;
     int cur_ptr_;
     int buffer_len_;
     pthread_mutex_t lock_;
@@ -114,8 +114,8 @@ private:
 
     // First dimension: subframe_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
-    float **IQ_data;
-    ushort **IQ_data_coded;
+    Table<float> IQ_data;
+    Table<ushort> IQ_data_coded;
 
     int thread_num;
     int socket_num;
@@ -124,7 +124,7 @@ private:
     int delay;
     EventHandlerContext<Sender> *context;
 
-    int **packet_count_per_subframe;
+    Table<int> packet_count_per_subframe;
     int *packet_count_per_frame;
 
     double *frame_start;

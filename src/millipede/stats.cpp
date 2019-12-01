@@ -59,13 +59,13 @@ Stats::Stats(Config *cfg, int in_break_down_num,
     init_stats_worker_per_frame(&precode_stats_per_frame, break_down_num);
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    alloc_buffer_2d(&csi_time_in_function_details, break_down_num-1, 10000, 4096, 1);
-    alloc_buffer_2d(&fft_time_in_function_details, break_down_num-1, 10000, 4096, 1);
-    alloc_buffer_2d(&zf_time_in_function_details, break_down_num-1, 10000, 4096, 1);
-    alloc_buffer_2d(&demul_time_in_function_details, break_down_num-1, 10000, 4096, 1);
+    csi_time_in_function_details.calloc(break_down_num-1, 10000, 4096);
+    fft_time_in_function_details.calloc(break_down_num-1, 10000, 4096);
+    zf_time_in_function_details.calloc(break_down_num-1, 10000, 4096);
+    demul_time_in_function_details.calloc(break_down_num-1, 10000, 4096);
 #endif
 
-    alloc_buffer_2d(&frame_start, cfg->socket_thread_num, 10240, 64, 1);
+    frame_start.calloc(cfg->socket_thread_num, 10240, 64);
 
 }
 
@@ -101,8 +101,8 @@ Stats::~Stats()
 
 void Stats::init_stats_worker(Stats_worker *stats_in_worker, int thread_num, int break_down_num)
 {
-    alloc_buffer_2d(&(stats_in_worker->task_duration), thread_num * 8, break_down_num, 32, 1);
-    alloc_buffer_1d(&(stats_in_worker->task_count), thread_num * 16, 32, 1);
+    stats_in_worker->task_duration.calloc(thread_num * 8, break_down_num, 32);
+    alloc_buffer_1d(&stats_in_worker->task_count, thread_num * 16, 32, 1);
 }
 
 void Stats::init_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker, int break_down_num)
@@ -114,8 +114,8 @@ void Stats::init_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker,
 
 void Stats::free_stats_worker(Stats_worker *stats_in_worker, int thread_num)
 {
-    free_buffer_2d(&(stats_in_worker->task_duration), thread_num * 8);
-    free_buffer_1d(&(stats_in_worker->task_count));
+    stats_in_worker->task_duration.free();
+    free_buffer_1d(&stats_in_worker->task_count);
 }
 
 void Stats::free_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker)

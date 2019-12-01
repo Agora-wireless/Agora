@@ -27,8 +27,8 @@ class DoDemul
 public:
     DoDemul(Config *cfg, int in_tid, int in_demod_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demul_hard_buffer,
-        int8_t **in_demod_soft_buffer, Stats *in_stats_manager);
+	    Table<complex_float> &in_data_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_equal_buffer,
+	    Table<uint8_t> &in_demul_hard_buffer, Table<int8_t> &in_demod_soft_buffer, Stats *in_stats_manager);
     ~DoDemul();
 
     /**
@@ -77,13 +77,13 @@ private:
     
 
 
-    complex_float **data_buffer_;
-    complex_float **precoder_buffer_;
-    complex_float **equal_buffer_;
-    uint8_t **demod_hard_buffer_;
-    int8_t **demod_soft_buffer_;
+    Table<complex_float> &data_buffer_;
+    Table<complex_float> &precoder_buffer_;
+    Table<complex_float> &equal_buffer_;
+    Table<uint8_t> &demod_hard_buffer_;
+    Table<int8_t> &demod_soft_buffer_;
 
-    double **Demul_task_duration;
+    Table<double> &Demul_task_duration;
     int *Demul_task_count;
 
     /** 

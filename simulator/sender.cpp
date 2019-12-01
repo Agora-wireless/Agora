@@ -77,7 +77,7 @@ socket_num(in_thread_num), core_offset(in_core_offset), delay(in_delay)
     max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
 
-    alloc_buffer_2d(&packet_count_per_subframe, BUFFER_FRAME_NUM, max_subframe_id, 64, 1);
+    packet_count_per_subframe.calloc(BUFFER_FRAME_NUM, max_subframe_id, 64);
     alloc_buffer_1d(&packet_count_per_frame, BUFFER_FRAME_NUM, 64, 1);
 
     socket_ = new int[socket_num];
@@ -135,9 +135,9 @@ socket_num(in_thread_num), core_offset(in_core_offset), delay(in_delay)
     }
 
     int IQ_data_size = subframe_num_perframe * BS_ANT_NUM;
-    alloc_buffer_2d(&IQ_data, IQ_data_size, OFDM_FRAME_LEN * 2, 64, 1);
-    alloc_buffer_2d(&IQ_data_coded, IQ_data_size, OFDM_FRAME_LEN * 2, 64, 1);
-    alloc_buffer_2d(&trans_buffer_, max_length_, buffer_length, 64, 1);
+    IQ_data.calloc(IQ_data_size, OFDM_FRAME_LEN * 2, 64);
+    IQ_data_coded.calloc(IQ_data_size, OFDM_FRAME_LEN * 2, 64);
+    trans_buffer_.calloc(max_length_, buffer_length, 64);
     
     /* read from file */
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -167,12 +167,8 @@ socket_num(in_thread_num), core_offset(in_core_offset), delay(in_delay)
 
 Sender::~Sender()
 {
-    for(int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
-        delete[] IQ_data_coded[i];
-        delete[] IQ_data[i];
-    }
-    delete[] IQ_data;
-    delete[] IQ_data_coded;
+    IQ_data_coded.free();
+    IQ_data.free();
 
     delete[] socket_;
     delete[] context;

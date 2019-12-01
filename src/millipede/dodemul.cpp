@@ -7,9 +7,16 @@
 
 using namespace arma;
 DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        complex_float **in_data_buffer, complex_float **in_precoder_buffer, complex_float **in_equal_buffer, uint8_t **in_demod_hard_buffer,
-        int8_t **in_demod_soft_buffer, Stats *in_stats_manager)
+		 moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+		 Table<complex_float> &in_data_buffer, Table<complex_float> &in_precoder_buffer,
+		 Table<complex_float> &in_equal_buffer, Table<uint8_t> &in_demod_hard_buffer,
+		 Table<int8_t> &in_demod_soft_buffer, Stats *in_stats_manager)
+  : data_buffer_(in_data_buffer)
+  , precoder_buffer_(in_precoder_buffer)
+  , equal_buffer_(in_equal_buffer)
+  , demod_hard_buffer_(in_demod_hard_buffer)
+  , demod_soft_buffer_(in_demod_soft_buffer)
+  , Demul_task_duration(in_stats_manager->demul_stats_worker.task_duration)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -24,13 +31,6 @@ DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transp
     complete_task_queue_ = in_complete_task_queue;
     task_ptok = in_task_ptok;
 
-    data_buffer_ = in_data_buffer;
-    precoder_buffer_ = in_precoder_buffer;
-    equal_buffer_ = in_equal_buffer;
-    demod_hard_buffer_ = in_demod_hard_buffer;
-    demod_soft_buffer_ = in_demod_soft_buffer;
-
-    Demul_task_duration = in_stats_manager->demul_stats_worker.task_duration;
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;
     // Demul_task_count = in_Demul_task_count;

@@ -7,9 +7,15 @@
 
 DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-    char **in_socket_buffer, int **in_socket_buffer_status, complex_float **in_data_buffer_, complex_float **in_csi_buffer, float *in_pilots,
-    complex_float **in_dl_ifft_buffer, char *in_dl_socket_buffer, 
+    Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
+    Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
+    Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
     Stats *in_stats_manager) 
+  : socket_buffer_(in_socket_buffer)
+  , socket_buffer_status_(in_socket_buffer_status)
+  , data_buffer_(in_data_buffer)
+  , csi_buffer_(in_csi_buffer)
+  , dl_ifft_buffer_(in_dl_ifft_buffer)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -28,34 +34,22 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     complete_task_queue_ = in_complete_task_queue;
     task_ptok = in_task_ptok;
 
-    socket_buffer_ = in_socket_buffer;
-    socket_buffer_status_ = in_socket_buffer_status;
-    data_buffer_ = in_data_buffer_;
-    csi_buffer_ = in_csi_buffer;
     pilots_ = in_pilots;
 
     dl_socket_buffer_ = in_dl_socket_buffer;
-    dl_ifft_buffer_ = in_dl_ifft_buffer;
 
-    FFT_task_duration = in_stats_manager->fft_stats_worker.task_duration;
-    CSI_task_duration = in_stats_manager->csi_stats_worker.task_duration;
+    FFT_task_duration = &in_stats_manager->fft_stats_worker.task_duration;
+    CSI_task_duration = &in_stats_manager->csi_stats_worker.task_duration;
     FFT_task_count = in_stats_manager->fft_stats_worker.task_count;
     CSI_task_count = in_stats_manager->csi_stats_worker.task_count;
-    IFFT_task_duration = in_stats_manager->ifft_stats_worker.task_duration;
+    IFFT_task_duration = &in_stats_manager->ifft_stats_worker.task_duration;
     IFFT_task_count = in_stats_manager->ifft_stats_worker.task_count;
 
 
     int FFT_buffer_block_num = 1;
-    fft_buffer_.FFT_inputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *)); 
-    for (int i = 0; i < FFT_buffer_block_num; i++) {
-        fft_buffer_.FFT_inputs[i] = (complex_float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(complex_float));
-        memset(fft_buffer_.FFT_inputs[i], 0, sizeof(OFDM_CA_NUM * sizeof(complex_float)));
-    }
+    fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num, OFDM_CA_NUM, 64);
+    fft_buffer_.FFT_outputs.calloc(FFT_buffer_block_num, OFDM_CA_NUM, 64);
 
-    fft_buffer_.FFT_outputs = (complex_float **)malloc(FFT_buffer_block_num * sizeof(complex_float *));
-    for (int i = 0; i < FFT_buffer_block_num; i++) {
-        fft_buffer_.FFT_outputs[i] = (complex_float *)aligned_alloc(64, OFDM_CA_NUM * sizeof(complex_float));
-    }
 
     mkl_status = DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, OFDM_CA_NUM);
     // mkl_status = DftiSetValue(mkl_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
@@ -71,11 +65,8 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
 
 DoFFT::~DoFFT()
 {
-    int FFT_buffer_block_num = 1;
-    for (int i = 0; i < FFT_buffer_block_num; i++) {
-        free(fft_buffer_.FFT_inputs[i]);
-        free(fft_buffer_.FFT_outputs[i]);
-    }
+    fft_buffer_.FFT_inputs.free();
+    fft_buffer_.FFT_outputs.free();
     DftiFreeDescriptor(&mkl_handle);
     DftiFreeDescriptor(&mkl_handle_dl);
 }
@@ -185,9 +176,9 @@ void DoFFT::FFT(int offset)
     double start_time1 = get_time();
     double duration1 = start_time1 - start_time;
     if (pilot_symbol == 0)
-        FFT_task_duration[tid * 8][1] += duration1;
+        (*FFT_task_duration)[tid * 8][1] += duration1;
     else 
-        CSI_task_duration[tid * 8][1] += duration1;
+        (*CSI_task_duration)[tid * 8][1] += duration1;
 #endif
     // for(int i = 0; i < (OFDM_CA_NUM - delay_offset) * 2; i++)
     //     cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[OFDM_PREFIX_LEN + delay_offset + i] * csi_format_offset;
@@ -208,9 +199,9 @@ void DoFFT::FFT(int offset)
     double start_time2 = get_time();
     double duration2 = start_time2 - start_time1;
     if (pilot_symbol == 0)
-        FFT_task_duration[tid * 8][2] += duration2;
+       (*FFT_task_duration)[tid * 8][2] += duration2;
     else
-        CSI_task_duration[tid * 8][2] += duration2;
+       (*CSI_task_duration)[tid * 8][2] += duration2;
 #endif
     // mufft_execute_plan_1d(muplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM, 
     //     fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
@@ -373,9 +364,9 @@ void DoFFT::FFT(int offset)
     double end_time = get_time();
     double duration3 = end_time - start_time_part3;
     if (pilot_symbol == 0)
-        FFT_task_duration[tid * 8][3] += duration3;
+        (*FFT_task_duration)[tid * 8][3] += duration3;
     else
-        CSI_task_duration[tid * 8][3] += duration2;
+        (*CSI_task_duration)[tid * 8][3] += duration2;
 #endif    
 
     // after finish
@@ -386,14 +377,14 @@ void DoFFT::FFT(int offset)
     double duration = get_time() - start_time;
     if (pilot_symbol == 0) {
         FFT_task_count[tid * 16] = FFT_task_count[tid * 16]+1;
-        FFT_task_duration[tid * 8][0] += duration;
+        (*FFT_task_duration)[tid * 8][0] += duration;
         // if (duration > 500) {
         //     printf("Thread %d FFT takes %.2f\n", tid, duration);
         // }
     }
     else {
         CSI_task_count[tid * 16] = CSI_task_count[tid * 16]+1;
-        CSI_task_duration[tid * 8][0] += duration;
+        (*CSI_task_duration)[tid * 8][0] += duration;
         // if (duration > 500) {
         //     printf("Thread %d pilot FFT takes %.2f\n", tid, duration);
         // }
@@ -487,7 +478,7 @@ void DoFFT::IFFT(int offset)
 
 #if DEBUG_UPDATE_STATS   
     IFFT_task_count[tid*16] = IFFT_task_count[tid*16]+1;
-    IFFT_task_duration[tid*8][0] += get_time() - start_time;
+    (*IFFT_task_duration)[tid*8][0] += get_time() - start_time;
 #endif
 
     // inform main thread

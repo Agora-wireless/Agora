@@ -62,11 +62,11 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float *pilots_;
-    int8_t **dl_IQ_data;
-    int8_t **ul_IQ_data;
-    complex_float **ul_IQ_modul;
-    complex_float **dl_IQ_modul;
-    std::complex<int16_t> **dl_IQ_symbol;
+    Table<int8_t> dl_IQ_data;
+    Table<int8_t> ul_IQ_data;
+    Table<complex_float> ul_IQ_modul;
+    Table<complex_float> dl_IQ_modul;
+    Table<std::complex<int16_t>> dl_IQ_symbol;
     
     double freq;
     double bbf_ratio;

@@ -496,16 +496,16 @@ void *Millipede::worker(int tid)
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
-    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, *dl_IQ_data, dl_encoded_buffer_,
         stats_manager_);
 
     #ifdef USE_LDPC
-    DoCoding *computeCoding = new DoCoding(cfg_, tid, &(complete_task_queue_), task_ptok_ptr,
-        dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
+    DoCoding *computeCoding = new DoCoding(cfg_, tid, &complete_task_queue_, task_ptok_ptr,
+        *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
         stats_manager_);
     #endif
 
@@ -605,7 +605,7 @@ void* Millipede::worker_fft(int tid)
     moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize FFT operator */
-    DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+    DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
@@ -632,7 +632,7 @@ void* Millipede::worker_zf(int tid)
     moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize ZF operator */
-    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
 
@@ -653,13 +653,13 @@ void* Millipede::worker_demul(int tid)
     moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
 
     /* initialize Demul operator */
-    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
 
     /* initialize Precode operator */
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &(complete_task_queue_), task_ptok_ptr,
-        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, dl_IQ_data, dl_encoded_buffer_,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, *dl_IQ_data, dl_encoded_buffer_,
         stats_manager_);
 
 
@@ -1052,7 +1052,7 @@ void Millipede::print_per_task_done(int task_type, int frame_id, int subframe_id
 void Millipede::initialize_vars_from_cfg(Config *cfg)
 {
     pilots_ = cfg->pilots_;
-    dl_IQ_data = cfg->dl_IQ_data;
+    dl_IQ_data = &cfg->dl_IQ_data;
 
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
@@ -1133,16 +1133,16 @@ void Millipede::initialize_uplink_buffers()
     socket_buffer_size_ = (long long) packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM; 
     socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     printf("socket_buffer_size %lld, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
-    alloc_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64, 0);
-    alloc_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64, 1);
-    alloc_buffer_2d(&csi_buffer_ , PILOT_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
-    alloc_buffer_2d(&data_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
-    alloc_buffer_2d(&pred_csi_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
-    alloc_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&demod_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
+    socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
+    socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
+    csi_buffer_.malloc(PILOT_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
+    data_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
+    pred_csi_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64);
+    precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
+    equal_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+    demod_hard_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+    demod_soft_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
+    decoded_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     
     int max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * PILOT_NUM) : (BS_ANT_NUM * (ul_data_subframe_num_perframe + PILOT_NUM));
     rx_stats_.max_task_count = max_packet_num_per_frame;
@@ -1154,8 +1154,8 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_task_count = BS_ANT_NUM;
     fft_stats_.max_symbol_pilot_count = PILOT_NUM;
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
-    alloc_buffer_2d(&(fft_stats_.task_count), TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64, 1);
-    alloc_buffer_2d(&(fft_stats_.data_exist_in_symbol), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    fft_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
+    fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
     alloc_buffer_1d(&(fft_stats_.symbol_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
@@ -1165,16 +1165,16 @@ void Millipede::initialize_uplink_buffers()
 
     demul_stats_.max_task_count = demul_block_num;
     demul_stats_.max_symbol_count = ul_data_subframe_num_perframe;
-    alloc_buffer_2d(&(demul_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_1d(&(demul_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    demul_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
+    alloc_buffer_1d(&demul_stats_.symbol_count, TASK_BUFFER_FRAME_NUM, 64, 1);
 
     decode_stats_.max_task_count = LDPC_config.nblocksInSymbol * UE_NUM;
     decode_stats_.max_symbol_count = ul_data_subframe_num_perframe;
-    alloc_buffer_2d(&(decode_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
-    alloc_buffer_1d(&(decode_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    decode_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
+    alloc_buffer_1d(&decode_stats_.symbol_count, TASK_BUFFER_FRAME_NUM, 64, 1);
     
 
-    alloc_buffer_2d(&delay_fft_queue, TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32, 1);
+    delay_fft_queue.calloc(TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32);
     alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
 }
 
@@ -1187,31 +1187,31 @@ void Millipede::initialize_downlink_buffers()
     dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
-    alloc_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64, 1);
-    alloc_buffer_2d(&dl_precoded_data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64, 0);
-    alloc_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64, 0);
-    alloc_buffer_2d(&dl_precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64, 0);
-    alloc_buffer_2d(&dl_encoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64, 0);
-    alloc_buffer_2d(&recip_buffer_ , OFDM_DATA_NUM, BS_ANT_NUM, 64, 0);
+    dl_ifft_buffer_.calloc(BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64);
+    dl_precoded_data_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
+    dl_modulated_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64);
+    dl_precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
+    dl_encoded_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+    recip_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM, 64);
 
     encode_stats_.max_task_count = LDPC_config.nblocksInSymbol * UE_NUM;
     encode_stats_.max_symbol_count = dl_data_subframe_num_perframe;
-    alloc_buffer_2d(&(encode_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    encode_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
     alloc_buffer_1d(&(encode_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
     precode_stats_.max_task_count = demul_block_num;
     precode_stats_.max_symbol_count = dl_data_subframe_num_perframe;
-    alloc_buffer_2d(&(precode_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    precode_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
     alloc_buffer_1d(&(precode_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
     ifft_stats_.max_task_count = BS_ANT_NUM;
     ifft_stats_.max_symbol_count = dl_data_subframe_num_perframe;
-    alloc_buffer_2d(&(ifft_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    ifft_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
     alloc_buffer_1d(&(ifft_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
     tx_stats_.max_task_count = BS_ANT_NUM;
     tx_stats_.max_symbol_count = dl_data_subframe_num_perframe;
-    alloc_buffer_2d(&(tx_stats_.task_count), TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64, 1);
+    tx_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
     alloc_buffer_1d(&(tx_stats_.symbol_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 }
 
@@ -1219,32 +1219,32 @@ void Millipede::initialize_downlink_buffers()
 void Millipede::free_uplink_buffers()
 {
     //free_buffer_1d(&pilots_);
-    free_buffer_2d(&socket_buffer_, SOCKET_RX_THREAD_NUM);
-    free_buffer_2d(&socket_buffer_status_, SOCKET_RX_THREAD_NUM);
-    free_buffer_2d(&csi_buffer_, UE_NUM * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&pred_csi_buffer_ , OFDM_DATA_NUM);
-    free_buffer_2d(&precoder_buffer_ , OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&equal_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&demod_hard_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&demod_soft_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&decoded_buffer_ , data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    socket_buffer_.free();
+    socket_buffer_status_.free();
+    csi_buffer_.free();
+    data_buffer_.free();
+    pred_csi_buffer_.free();
+    precoder_buffer_.free();
+    equal_buffer_.free();
+    demod_hard_buffer_.free();
+    demod_soft_buffer_.free();
+    decoded_buffer_.free();
 
     free_buffer_1d(&(rx_stats_.task_count));
     free_buffer_1d(&(rx_stats_.task_pilot_count));
     free_buffer_1d(&(rx_stats_.fft_created_count));
-    free_buffer_2d(&(fft_stats_.task_count), TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&(fft_stats_.data_exist_in_symbol), TASK_BUFFER_FRAME_NUM);
+    fft_stats_.task_count.free();
+    fft_stats_.data_exist_in_symbol.free();
     free_buffer_1d(&(fft_stats_.symbol_pilot_count));
     free_buffer_1d(&(fft_stats_.symbol_data_count));
     free_buffer_1d(&(zf_stats_.task_count));
     free_buffer_1d(&(zf_stats_.precoder_exist_in_frame));
-    free_buffer_2d(&(demul_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    demul_stats_.task_count.free();
     free_buffer_1d(&(demul_stats_.symbol_count));
-    free_buffer_2d(&(decode_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    decode_stats_.task_count.free();
     free_buffer_1d(&(decode_stats_.symbol_count));
 
-    free_buffer_2d(&delay_fft_queue, TASK_BUFFER_FRAME_NUM);
+    delay_fft_queue.free();
     free_buffer_1d(&delay_fft_queue_cnt);
 }
 
@@ -1253,18 +1253,18 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_);
     free_buffer_1d(&dl_socket_buffer_status_);
 
-    free_buffer_2d(&dl_ifft_buffer_, BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&dl_precoded_data_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
-    free_buffer_2d(&dl_modulated_buffer_, data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM);
+    dl_ifft_buffer_.free();
+    dl_precoded_data_buffer_.free();
+    dl_modulated_buffer_.free();
 
 
-    free_buffer_2d(&(encode_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    encode_stats_.task_count.free();
     free_buffer_1d(&(encode_stats_.symbol_count));
-    free_buffer_2d(&(precode_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    precode_stats_.task_count.free();
     free_buffer_1d(&(precode_stats_.symbol_count));
-    free_buffer_2d(&(ifft_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    ifft_stats_.task_count.free();
     free_buffer_1d(&(ifft_stats_.symbol_count));
-    free_buffer_2d(&(tx_stats_.task_count), TASK_BUFFER_FRAME_NUM);
+    tx_stats_.task_count.free();
     free_buffer_1d(&(tx_stats_.symbol_count));
 }
 

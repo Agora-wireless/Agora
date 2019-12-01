@@ -52,25 +52,23 @@ void print128_epi8(__m128i var)
   */
 
 
-float **init_modulation_table(size_t mod_order)
+void init_modulation_table(Table<float> &mod_table, size_t mod_order)
 {
-    float **mod_table;
     switch(mod_order) {
         case 2:
-            mod_table = init_qpsk_table();
+            init_qpsk_table(mod_table);
             break;
         case 4:
-            mod_table = init_qam16_table();
+            init_qam16_table(mod_table);
             break;
         case 6:
-            mod_table = init_qam64_table();
+            init_qam64_table(mod_table);
             break;
         default: {
             printf("Modulation order not supported, use default value 4\n");
-            mod_table = init_qam16_table();
+            init_qam16_table(mod_table);
         }
     }
-    return mod_table;
 }
 
 
@@ -81,17 +79,15 @@ float **init_modulation_table(size_t mod_order)
   *---------------> I
   *  00  |  10
   */
-float **init_qpsk_table()
+void init_qpsk_table(Table<float>& qpsk_table)
 {
-    float **qpsk_table;
-    alloc_buffer_2d(&qpsk_table, 4, 2, 32, 1);
+    qpsk_table.malloc(4, 2, 32);
     float scale = 1/sqrt(2);
     float mod_qpsk[2] = {-scale, scale};
     for (int i = 0; i < 4; i++) {
         qpsk_table[i][1] = mod_qpsk[i / 2];
         qpsk_table[i][0] = mod_qpsk[i % 2];
     }
-    return qpsk_table;
 }
 
 
@@ -106,7 +102,7 @@ float **init_qpsk_table()
 //   */
 // void init_qam16_table(float **qam16_table)
 // {
-//     alloc_buffer_2d(&qam16_table, 16, 2, 32, 1);
+//     qam16_table.malloc(16, 2, 32);
 //     float scale = 1/sqrt(10);
 //     float mod_16qam[4] = {-3*scale, -1*scale, 3*scale, scale};
 //     for (int i = 0; i < 16; i++) {
@@ -125,10 +121,9 @@ float **init_qpsk_table()
   *  1110  1100  |  0100  0110
   *  1111  1101  |  0101  0111
   */
-float **init_qam16_table()
+void init_qam16_table(Table<float> &qam16_table)
 {
-    float **qam16_table;
-    alloc_buffer_2d(&qam16_table, 16, 2, 32, 1);
+    qam16_table.malloc(16, 2, 32);
     float scale = 1/sqrt(10);
     float mod_16qam[4] = {1 * scale, 3 * scale, (-1) * scale, (-3) * scale};
     for (int i = 0; i < 16; i++) {
@@ -140,7 +135,6 @@ float **init_qam16_table()
       qam16_table[i][1] = mod_16qam[imag_i];
       // printf("%d: (%.3f, %.3f)\n", i, qam16_table[i][0], qam16_table[i][1]);
     }
-    return qam16_table;
 }
 
 
@@ -159,10 +153,9 @@ float **init_qam16_table()
   *  111111  111101  110101  110111  |  010111  010101  011101  011111
   */
 
-float **init_qam64_table()
+void init_qam64_table(Table<float> &qam64_table)
 {
-    float **qam64_table;
-    alloc_buffer_2d(&qam64_table, 64, 2, 32, 1);
+    qam64_table.malloc(64, 2, 32);
     float scale = 1/sqrt(42);
     float mod_64qam[8] = {3 * scale, 1 * scale, 5 * scale, 7 * scale, (-3) * scale, (-1) * scale, (-5) * scale, (-7) * scale};
     for (int i = 0; i < 64; i++) {
@@ -173,7 +166,6 @@ float **init_qam64_table()
       qam64_table[i][0] = mod_64qam[real_i];
       qam64_table[i][1] = mod_64qam[imag_i];
     }
-    return qam64_table;
 }
 
 
@@ -193,7 +185,7 @@ complex_float mod_single(int x, float **mod_table)
     return re;
 }
 
-complex_float mod_single_uint8(uint8_t x, float **mod_table) 
+complex_float mod_single_uint8(uint8_t x, Table<float> &mod_table) 
 {
     complex_float re;
     re.re = mod_table[x][0];
