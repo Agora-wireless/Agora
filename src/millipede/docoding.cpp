@@ -8,8 +8,14 @@
 using namespace arma;
 DoCoding::DoCoding(Config *cfg, int in_tid, 
     moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-    int8_t **in_raw_data_buffer, int8_t **in_encoded_buffer, int8_t **in_demod_buffer, uint8_t **in_decoded_buffer, 
+    Table<int8_t> &in_raw_data_buffer, Table<int8_t> &in_encoded_buffer, Table<int8_t> &in_demod_buffer, Table<uint8_t> &in_decoded_buffer, 
     Stats *in_stats_manager) 
+  : raw_data_buffer_(in_raw_data_buffer)
+  , encoded_buffer_(in_encoded_buffer)
+  , llr_buffer_(in_demod_buffer)
+  , decoded_buffer_(in_decoded_buffer)
+  , Encode_task_duration(in_stats_manager->encode_stats_worker.task_duration)
+  , Decode_task_duration(in_stats_manager->decode_stats_worker.task_duration)
 {
     config_ = cfg;
     LDPC_config = cfg->LDPC_config;
@@ -22,14 +28,7 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
     complete_task_queue_ = in_complete_task_queue;
     task_ptok = in_task_ptok;
 
-    encoded_buffer = in_encoded_buffer;
-    decoded_buffer = in_decoded_buffer;
-    raw_data_buffer = in_raw_data_buffer;
-    llr_buffer = in_demod_buffer;
-
-    Encode_task_duration = in_stats_manager->encode_stats_worker.task_duration;
     Encode_task_count = in_stats_manager->encode_stats_worker.task_count;
-    Decode_task_duration = in_stats_manager->decode_stats_worker.task_duration;
     Decode_task_count = in_stats_manager->decode_stats_worker.task_count;
 
     int16_t numChannelLlrs = LDPC_config.cbCodewLen;
@@ -146,7 +145,7 @@ void DoCoding::Encode(int offset)
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
     int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
-    int8_t *input_ptr = raw_data_buffer[symbol_id] + input_offset;
+    int8_t *input_ptr = (int8_t *)raw_data_buffer_[symbol_id] + input_offset;
     int8_t *output_ptr = encoded_buffer_temp;
     // int8_t *output_ptr = encoded_buffer[symbol_offset] + output_offset;
     ldpc_adapter_func(input_ptr, internalBuffer0, LDPC_config.Zc, LDPC_config.cbLen, 1);
@@ -158,7 +157,7 @@ void DoCoding::Encode(int offset)
     memcpy(internalBuffer2+(LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES, internalBuffer1, LDPC_config.cbEncLen / LDPC_config.Zc * PROC_BYTES);
 
     ldpc_adapter_func(output_ptr, internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
-    int8_t *final_output_ptr = encoded_buffer[symbol_offset] + output_offset;
+    int8_t *final_output_ptr = (int8_t *)encoded_buffer_[symbol_offset] + output_offset;
     adapt_bits_for_mod(output_ptr, final_output_ptr, LDPC_config.cbCodewLen / 8, config_->mod_type);
 
     #if DEBUG_UPDATE_STATS   
@@ -202,8 +201,8 @@ void DoCoding::Decode(int offset)
     int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * config_->mod_type;
     int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
-    ldpc_decoder_5gnr_request.varNodes = llr_buffer[symbol_offset] + llr_buffer_offset;
-    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer[symbol_offset] + decoded_buffer_offset;
+    ldpc_decoder_5gnr_request.varNodes = (int8_t *)llr_buffer_[symbol_offset] + llr_buffer_offset;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = (uint8_t *)decoded_buffer_[symbol_offset] + decoded_buffer_offset;
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n", 
     //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, decoded_buffer_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
