@@ -537,9 +537,9 @@ void* RU::loopProc(void *in_context)
             char* samp2 = (cur_ptr_buffer2 + packet_header_offset*sizeof(int));
             void *samp[2] = {(void*)samp1, (void*)samp2};
             while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
-            frame_id = (int)(frameTime>>32);
-            symbol_id = (int)((frameTime>>16)&0xFFFF);
-            ant_id = rid * cfg->nChannels;
+            int frame_id = (int)(frameTime>>32);
+            int symbol_id = (int)((frameTime>>16)&0xFFFF);
+            int ant_id = rid * cfg->nChannels;
 	    struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
 	    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
             if (cfg->nChannels == 2)
