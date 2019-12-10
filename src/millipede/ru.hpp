@@ -63,7 +63,7 @@ public:
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + N_THREAD - 1}
     */ 
-    std::vector<pthread_t> startProc(void** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
+  std::vector<pthread_t> startProc(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     std::vector<pthread_t> startTX(char* in_buffer, char *in_pilot_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     /**
      * receive thread
@@ -85,8 +85,8 @@ private:
 
     RadioConfig *radioconfig_;
 
-    void** buffer_;
-    int** buffer_status_;
+    Table<char>* buffer_;
+    Table<int>* buffer_status_;
     int buffer_length_;
     int buffer_frame_num_;
 
