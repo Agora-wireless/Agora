@@ -98,14 +98,14 @@ void RU::startRadios()
 #endif
 }
 
-std::vector<pthread_t> RU::startProc(void** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id)
+std::vector<pthread_t> RU::startProc(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
     assert(in_buffer_length == config_->packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-    buffer_ = in_buffer;  // for save data
-    buffer_status_ = in_buffer_status; // for save status
+    buffer_ = &in_buffer;  // for save data
+    buffer_status_ = &in_buffer_status; // for save status
 
     core_id_ = in_core_id;
 
@@ -407,8 +407,8 @@ void* RU::loopProc(void *in_context)
     int packet_length = cfg->packet_length;
     int packet_header_offset = cfg->packet_header_offset;
     int tx_packet_length = packet_length - packet_header_offset;
-    char* buffer = (char*)obj_ptr->buffer_[tid];
-    int* buffer_status = obj_ptr->buffer_status_[tid];
+    char* buffer = (*obj_ptr->buffer_)[tid];
+    int* buffer_status = (*obj_ptr->buffer_status_)[tid];
     int buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
 
@@ -440,8 +440,8 @@ void* RU::loopProc(void *in_context)
     // this is assuming buffer_frame_num is at least 2 
     char* cur_ptr_buffer2;
     int* cur_ptr_buffer_status2;
-    char* buffer2 = (char*)obj_ptr->buffer_[tid] + packet_length;
-    int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
+    char* buffer2 = (*obj_ptr->buffer_)[tid] + packet_length;
+    int* buffer_status2 = (*obj_ptr->buffer_status_)[tid] + 1;
     cur_ptr_buffer_status2 = buffer_status2;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;

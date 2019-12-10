@@ -196,8 +196,8 @@ private:
     float *pilots_;
     complex_float *ul_pilot;
     char* ul_pilot_aligned;
-    int8_t **ul_IQ_data;
-    complex_float **ul_IQ_modul;
+    Table<int8_t>& ul_IQ_data;
+    Table<complex_float>& ul_IQ_modul;
 
 
     int pilot_sc_len;
@@ -264,8 +264,8 @@ private:
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM
      */
-    char **rx_buffer_;
-    int **rx_buffer_status_;
+    Table<char> rx_buffer_;
+    Table<int> rx_buffer_status_;
     int rx_buffer_size;
     int rx_buffer_status_size;
 
