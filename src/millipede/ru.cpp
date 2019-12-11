@@ -118,13 +118,14 @@ std::vector<pthread_t> RU::startProc(Table<char>& in_buffer, Table<int>& in_buff
     for(int i = 0; i < thread_num_; i++) {
         pthread_t proc_thread_;
         // record the thread id 
-        context[i].ptr = this;
-        context[i].tid = i;
+	RUContext *context = new RUContext;
+        context->ptr = this;
+        context->tid = i;
 #ifndef SIM
-        context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
+        context->radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
 #endif
         // start socket thread
-        if(pthread_create( &proc_thread_, NULL, RU::loopProc, (void *)(&context[i])) != 0) {
+        if(pthread_create( &proc_thread_, NULL, taskThread_launch, context) != 0) {
             perror("socket thread create failed");
             exit(0);
         }
@@ -363,87 +364,96 @@ void* RU::loopSend(void *in_context)
 
 /*****  Receive threads   *****/
 
-void* RU::loopProc(void *in_context)
+void* RU::taskThread_launch(void *in_context)
 {
-    // get the pointer of class & tid
-    RU* obj_ptr = ((RUContext *)in_context)->ptr;
-    int tid = ((RUContext *)in_context)->tid;
-    Config *cfg = obj_ptr->config_;
-    // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-#ifdef SIM
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
+    RUContext *context = (RUContext *)in_context;
+    RU *me = context->ptr;
+    int tid = context->tid;
+#ifndef SIM
+    int radios = context->radios;
+#define RADIO_ARG , radios
+#define RADIO_PARAM , int nradio_cur_thread
 #else
-    int nradio_cur_thread = ((RUContext *)in_context)->radios;
+#define RADIO_ARG
+#define RADIO_PARAM
+#endif
+    delete context;
+    me->taskThread(tid RADIO_ARG);
+#undef RADIO_ARG
+    return 0;
+}
+
+void RU::taskThread(int tid RADIO_PARAM)
+{
+#ifndef SIM
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
 #endif
-    int core_id = obj_ptr->core_id_;
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
-    // printf("Recv thread: pinning thread %d to core %d\n", tid, core_id + tid);
-    if(pin_to_core(core_id + tid) != 0)
+    // printf("Recv thread: pinning thread %d to core %d\n", tid, core_id_ + tid);
+    if(pin_to_core(core_id_ + tid) != 0)
     {
-        printf("Recv thread: pinning thread %d to core %d failed\n", tid, core_id + tid);
+        printf("Recv thread: pinning thread %d to core %d failed\n", tid, core_id_ + tid);
         exit(0);
     }
     else {
-        printf("Recv thread: pinning thread %d to core %d succeed\n", tid, core_id + tid);
+        printf("Recv thread: pinning thread %d to core %d succeed\n", tid, core_id_ + tid);
     }
 #endif
 
     // Use mutex to sychronize data receiving across threads
-    pthread_mutex_lock(&obj_ptr->mutex);
+    pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
 
-    pthread_cond_wait(&obj_ptr->cond, &obj_ptr->mutex);
-    pthread_mutex_unlock(&obj_ptr->mutex); // unlocking for all other threads
+    pthread_cond_wait(&cond, &mutex);
+    pthread_mutex_unlock(&mutex); // unlocking for all other threads
 
     // usleep(10000-tid*2000);
     // use token to speed up
     moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ProducerToken local_ctok(*task_queue_);
-    //moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
+    //moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
-    int packet_length = cfg->packet_length;
-    int packet_header_offset = cfg->packet_header_offset;
+    int packet_length = config_->packet_length;
+    int packet_header_offset = config_->packet_header_offset;
     int tx_packet_length = packet_length - packet_header_offset;
-    char* buffer = (*obj_ptr->buffer_)[tid];
-    int* buffer_status = (*obj_ptr->buffer_status_)[tid];
-    int buffer_length = obj_ptr->buffer_length_;
-    int buffer_frame_num = obj_ptr->buffer_frame_num_;
+    char* buffer = (*buffer_)[tid];
+    int* buffer_status = (*buffer_status_)[tid];
+    int buffer_length = buffer_length_;
+    int buffer_frame_num = buffer_frame_num_;
 
-    char *tx_buffer = obj_ptr->tx_buffer_;
+    char *tx_buffer = tx_buffer_;
 
     int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
-    if (cfg->isUE)
+    if (config_->isUE)
     {
-        txSymsPerFrame = cfg->ulSymsPerFrame;
-        txSymbols = cfg->ULSymbols[0];
+        txSymsPerFrame = config_->ulSymsPerFrame;
+        txSymbols = config_->ULSymbols[0];
     }
     else
     {
-        txSymsPerFrame = cfg->dlSymsPerFrame;
-        txSymbols = cfg->DLSymbols[0];
+        txSymsPerFrame = config_->dlSymsPerFrame;
+        txSymbols = config_->DLSymbols[0];
     }
-    int n_ant = cfg->getNumAntennas();
+    int n_ant = config_->getNumAntennas();
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
 #ifndef SIM
-    int nradio_per_thread = cfg->nRadios/obj_ptr->thread_num_;
-    int rem_thread_nradio = cfg->nRadios%obj_ptr->thread_num_;//obj_ptr->thread_num_*(cfg->nRadios/obj_ptr->thread_num_);
+    int nradio_per_thread = config_->nRadios/thread_num_;
+    int rem_thread_nradio = config_->nRadios%thread_num_;//thread_num_*(config_->nRadios/thread_num_);
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    RadioConfig *radio = obj_ptr->radioconfig_;
+    RadioConfig *radio = radioconfig_;
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2 
     char* cur_ptr_buffer2;
     int* cur_ptr_buffer_status2;
-    char* buffer2 = (*obj_ptr->buffer_)[tid] + packet_length;
-    int* buffer_status2 = (*obj_ptr->buffer_status_)[tid] + 1;
+    char* buffer2 = (*buffer_)[tid] + packet_length;
+    int* buffer_status2 = (*buffer_status_)[tid] + 1;
     cur_ptr_buffer_status2 = buffer_status2;
-    if (cfg->nChannels == 2) {
+    if (config_->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
     }
     else {
@@ -451,26 +461,26 @@ void* RU::loopProc(void *in_context)
     }
 #else
     // loop recv
-    socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
+    socklen_t addrlen = sizeof(servaddr_[tid]);
 #endif
     int offset = 0;
     int packet_num = 0;
     long long frameTime;
 
     int maxQueueLength = 0;
-    while(cfg->running)
+    while(config_->running)
     {
         // if buffer is full, exit
         if(cur_ptr_buffer_status[0] == 1) {
             printf("RX thread %d buffer full\n", tid);
             //exit(0);
-            cfg->running = false;
+            config_->running = false;
             break;
         }
         // receive data
 #ifdef SIM
         int recvlen = -1;
-        if ((recvlen = recvfrom(obj_ptr->rx_socket_[tid], cur_ptr_buffer, (size_t) packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0) {
+        if ((recvlen = recvfrom(rx_socket_[tid], cur_ptr_buffer, (size_t) packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
         }
@@ -509,14 +519,14 @@ void* RU::loopProc(void *in_context)
             exit(0);
         }
 
-        if (txSymsPerFrame > 0 and ((cfg->isUE and cfg->getDlSFIndex(frame_id, symbol_id) == 0) || (!cfg->isUE and cfg->getPilotSFIndex(frame_id, symbol_id) == 0)))
+        if (txSymsPerFrame > 0 and ((config_->isUE and config_->getDlSFIndex(frame_id, symbol_id) == 0) || (!config_->isUE and config_->getPilotSFIndex(frame_id, symbol_id) == 0)))
         {
             // notify TXthread to start transmitting frame_id+offset
             Event_data do_tx_task;
             do_tx_task.event_type = TASK_SEND;
             do_tx_task.data = ant_id;
-            do_tx_task.more_data = cfg->isUE ? frame_id + TX_FRAME_DELTA : frame_id;
-            if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
+            do_tx_task.more_data = config_->isUE ? frame_id + TX_FRAME_DELTA : frame_id;
+            if ( !task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
                 printf("task enqueue failed\n");
                 exit(0);
             }
@@ -530,19 +540,19 @@ void* RU::loopProc(void *in_context)
 #else
         for (int it = 0 ; it < nradio_cur_thread; it++) // FIXME: this must be threaded
         {
-            //int rid = tid * obj_ptr->radios_per_thread + it;
+            //int rid = tid * radios_per_thread + it;
             int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
             char* samp1 = (cur_ptr_buffer +  packet_header_offset*sizeof(int));
             char* samp2 = (cur_ptr_buffer2 + packet_header_offset*sizeof(int));
             void *samp[2] = {(void*)samp1, (void*)samp2};
-            while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0);
+            while (config_->running && radio->radioRx(rid, samp, frameTime) <= 0);
             int frame_id = (int)(frameTime>>32);
             int symbol_id = (int)((frameTime>>16)&0xFFFF);
-            int ant_id = rid * cfg->nChannels;
+            int ant_id = rid * config_->nChannels;
 	    struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
 	    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-            if (cfg->nChannels == 2)
+            if (config_->nChannels == 2)
             {
 	        struct Packet *pkt2 = (struct Packet *)cur_ptr_buffer2;
 	        new (pkt2) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + 1);
@@ -562,8 +572,8 @@ void* RU::loopProc(void *in_context)
             offset = cur_ptr_buffer_status - buffer_status;
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
-            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + config_->nChannels) % buffer_frame_num;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * config_->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
             Event_data packet_message;
             packet_message.event_type = EVENT_PACKET_RECEIVED;
@@ -573,12 +583,12 @@ void* RU::loopProc(void *in_context)
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
-            if (cfg->nChannels == 2)
+            if (config_->nChannels == 2)
             {
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
-                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + config_->nChannels) % buffer_frame_num;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * config_->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
                 Event_data packet_message2;
                 packet_message2.event_type = EVENT_PACKET_RECEIVED;
@@ -591,14 +601,14 @@ void* RU::loopProc(void *in_context)
             }
 
             // notify TXthread to start transmitting frame_id+offset
-            if (txSymsPerFrame > 0 && ((cfg->isUE && cfg->getDlSFIndex(frame_id, symbol_id) == 0) || (!cfg->isUE && cfg->getPilotSFIndex(frame_id, symbol_id) == 0)))
+            if (txSymsPerFrame > 0 && ((config_->isUE && config_->getDlSFIndex(frame_id, symbol_id) == 0) || (!config_->isUE && config_->getPilotSFIndex(frame_id, symbol_id) == 0)))
             {
 //#ifdef SEPARATE_TX_THREAD
 //                Event_data do_tx_task;
 //                do_tx_task.event_type = TASK_packet_SENT;
-//                do_tx_task.data = ant_id; //tx_symbol_id * cfg->getNumAntennas() + ant_id;
+//                do_tx_task.data = ant_id; //tx_symbol_id * config_->getNumAntennas() + ant_id;
 //                do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
-//                if ( !task_queue_->enqueue(*obj_ptr->task_ptok[tid], do_tx_task)) {
+//                if ( !task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
 //                    printf("task enqueue failed\n");
 //                    exit(0);
 //                }
@@ -608,7 +618,7 @@ void* RU::loopProc(void *in_context)
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM; 
                     size_t tx_symbol = txSymbols[tx_symbol_id];
-                    //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, cfg->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+                    //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, config_->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
                     int frame_samp_size = (tx_packet_length * n_ant * txSymsPerFrame);
                     int tx_offset = tx_frame_offset * frame_samp_size + tx_packet_length * (n_ant * tx_symbol_id + ant_id);
                     void* txbuf[2];
@@ -616,12 +626,12 @@ void* RU::loopProc(void *in_context)
                     int flags = 1; // HAS_TIME
                     if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST
                     txbuf[0] = (void*)(tx_buffer + tx_offset); 
-                    if (cfg->nChannels == 2)
+                    if (config_->nChannels == 2)
                     {
                         txbuf[1] = (void*)(tx_buffer + tx_offset + tx_packet_length);
                     }
 #if DEBUG_SEND
-                    int start_ind = 2 * cfg->prefix;
+                    int start_ind = 2 * config_->prefix;
                     printf("transmit samples: %d %d %d %d %d %d %d %d ...\n\n",
                                               *((short *)txbuf[0]+start_ind+0),
                                               *((short *)txbuf[0]+start_ind+1),
@@ -646,6 +656,5 @@ void* RU::loopProc(void *in_context)
         }
 #endif
     }
-    return 0;
 }
 
