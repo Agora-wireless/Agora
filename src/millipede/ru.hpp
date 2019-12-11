@@ -104,7 +104,5 @@ private:
     //std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
     int core_id_;
     int tx_core_id_;
-
-    RUContext* context;
 };
 #endif

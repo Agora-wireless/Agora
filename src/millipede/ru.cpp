@@ -63,8 +63,6 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config *cfg)
     tx_thread_num_ = n_tx_thread;
     /* initialize random seed: */
     srand (time(NULL));
-    context = new RUContext[thread_num_];
-
 }
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config *config, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ConcurrentQueue<Event_data> * in_queue_task):
@@ -80,7 +78,6 @@ RU(n_rx_thread,n_tx_thread, config)
 
 RU::~RU()
 {
-    delete[] context;
 #ifdef SIM
     delete[] rx_socket_;
     delete[] tx_socket_;
