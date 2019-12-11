@@ -109,11 +109,6 @@ std::vector<pthread_t> RU::startProc(Table<char>& in_buffer, Table<int>& in_buff
 
     core_id_ = in_core_id;
 
-#ifndef SIM
-    int nradio_per_thread = config_->nRadios/thread_num_;
-    int rem_thread_nradio = config_->nRadios%thread_num_;
-#endif
-     
     std::vector<pthread_t> created_threads;
     for(int i = 0; i < thread_num_; i++) {
         pthread_t proc_thread_;
@@ -121,9 +116,6 @@ std::vector<pthread_t> RU::startProc(Table<char>& in_buffer, Table<int>& in_buff
 	RUContext *context = new RUContext;
         context->ptr = this;
         context->tid = i;
-#ifndef SIM
-        context->radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
-#endif
         // start socket thread
         if(pthread_create( &proc_thread_, NULL, taskThread_launch, context) != 0) {
             perror("socket thread create failed");
@@ -369,24 +361,17 @@ void* RU::taskThread_launch(void *in_context)
     RUContext *context = (RUContext *)in_context;
     RU *me = context->ptr;
     int tid = context->tid;
-#ifndef SIM
-    int radios = context->radios;
-#define RADIO_ARG , radios
-#define RADIO_PARAM , int nradio_cur_thread
-#else
-#define RADIO_ARG
-#define RADIO_PARAM
-#endif
     delete context;
-    me->taskThread(tid RADIO_ARG);
-#undef RADIO_ARG
+    me->taskThread(tid);
     return 0;
 }
 
-void RU::taskThread(int tid RADIO_PARAM)
+void RU::taskThread(int tid)
 {
 #ifndef SIM
-    printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
+    int start_radio = tid * config_->nRadios / thread_num_;
+    int end_radio =  (tid + 1) * config_->nRadios / thread_num_;
+    printf("receiver thread %d has %d radios\n", tid, end_radio - start_radio);
 #endif
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
@@ -441,9 +426,7 @@ void RU::taskThread(int tid RADIO_PARAM)
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
 #ifndef SIM
-    int nradio_per_thread = config_->nRadios/thread_num_;
-    int rem_thread_nradio = config_->nRadios%thread_num_;//thread_num_*(config_->nRadios/thread_num_);
-    printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
+    printf("receiver thread %d has %d radios\n", tid, end_radio - start_radio);
     RadioConfig *radio = radioconfig_;
 
     // to handle second channel at each radio
@@ -538,18 +521,16 @@ void RU::taskThread(int tid RADIO_PARAM)
 
         packet_num++;
 #else
-        for (int it = 0 ; it < nradio_cur_thread; it++) // FIXME: this must be threaded
+        for (int it = start_radio ; it < end_radio; it++) // FIXME: this must be threaded
         {
-            //int rid = tid * radios_per_thread + it;
-            int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it ;
             // this is probably a really bad implementation, and needs to be revamped
             char* samp1 = (cur_ptr_buffer +  packet_header_offset*sizeof(int));
             char* samp2 = (cur_ptr_buffer2 + packet_header_offset*sizeof(int));
             void *samp[2] = {(void*)samp1, (void*)samp2};
-            while (config_->running && radio->radioRx(rid, samp, frameTime) <= 0);
+            while (config_->running && radio->radioRx(it, samp, frameTime) <= 0);
             int frame_id = (int)(frameTime>>32);
             int symbol_id = (int)((frameTime>>16)&0xFFFF);
-            int ant_id = rid * config_->nChannels;
+            int ant_id = it * config_->nChannels;
 	    struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
 	    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
             if (config_->nChannels == 2)
@@ -642,7 +623,7 @@ void RU::taskThread(int tid RADIO_PARAM)
                                               *((short *)txbuf[0]+start_ind+6), 
                                               *((short *)txbuf[0]+start_ind+7)); 
 #endif
-                    radio->radioTx(rid, txbuf, flags, frameTime);
+                    radio->radioTx(it, txbuf, flags, frameTime);
                 }
 //#endif
             }

@@ -38,9 +38,6 @@ public:
     {
         RU *ptr;
         int tid;
-#ifndef SIM
-        int radios;
-#endif
     };
 
 public:
@@ -71,13 +68,7 @@ public:
     */
     static void* loopSend(void *context);
     static void* taskThread_launch(void *context);
-#ifndef SIM
-#define RADIO_PARAM , int nradio_cur_thread
-#else
-#define RADIO_PARAM
-#endif
-    void taskThread(int tid RADIO_PARAM);
-#undef RADIO_PARAM
+    void taskThread(int tid);
     void send(void *out_buffer, int length, int frame_id, int symbol_id, int ant_id);
  
 private:
