@@ -11,6 +11,7 @@
 #ifndef UTILS_HEADER
 #define UTILS_HEADER
 
+#define UNUSED __attribute__((unused))
 #include <iostream>
 #include <fstream>      // std::ifstream
 #include <sstream>

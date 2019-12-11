@@ -428,10 +428,12 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         //{
             size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
-	    void* txbuf[2];
+	    UNUSED void* txbuf[2];
             //long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+#if SEPARATE_TX_RX
             int flags = 1; // HAS_TIME
             if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+#endif
             if (cfg->nChannels == 1 || tx_ant_id % 2 == 0)
             {
             #if DEBUG_DOWNLINK

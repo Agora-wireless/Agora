@@ -112,7 +112,7 @@ void Stats::init_stats_worker_per_frame(Stats_worker_per_frame *stats_in_worker,
     alloc_buffer_1d(&(stats_in_worker->duration_avg_threads), break_down_num, 32, 1);
 }
 
-void Stats::free_stats_worker(Stats_worker *stats_in_worker, int thread_num)
+void Stats::free_stats_worker(Stats_worker *stats_in_worker, UNUSED int thread_num)
 {
     stats_in_worker->task_duration.free();
     free_buffer_1d(&stats_in_worker->task_count);
@@ -259,7 +259,7 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
 
 
 
-void Stats::update_stats_in_dofft(int frame_id, int thread_num, int thread_num_offset)
+void Stats::update_stats_in_dofft(UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
 	reset_stats_worker_per_frame(&fft_stats_per_frame, break_down_num);
     reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
@@ -285,7 +285,7 @@ void Stats::update_stats_in_dofft(int frame_id, int thread_num, int thread_num_o
 }
 
 
-void Stats::update_stats_in_dozf(int frame_id, int thread_num, int thread_num_offset)
+void Stats::update_stats_in_dozf(UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
 	reset_stats_worker_per_frame(&zf_stats_per_frame, break_down_num);
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
@@ -304,7 +304,7 @@ void Stats::update_stats_in_dozf(int frame_id, int thread_num, int thread_num_of
 }
 
 
-void Stats::update_stats_in_dodemul(int frame_id, int thread_num, int thread_num_offset)
+void Stats::update_stats_in_dodemul(UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
 	reset_stats_worker_per_frame(&demul_stats_per_frame, break_down_num);
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
@@ -323,7 +323,7 @@ void Stats::update_stats_in_dodemul(int frame_id, int thread_num, int thread_num
 }
 
 
-void Stats::update_stats_in_doifft(int frame_id, int thread_num, int thread_num_offset)
+void Stats::update_stats_in_doifft(UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
 	reset_stats_worker_per_frame(&ifft_stats_per_frame, break_down_num);
     reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
@@ -349,7 +349,7 @@ void Stats::update_stats_in_doifft(int frame_id, int thread_num, int thread_num_
 }
 
 
-void Stats::update_stats_in_doprecode(int frame_id, int thread_num, int thread_num_offset)
+void Stats::update_stats_in_doprecode(UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
 	reset_stats_worker_per_frame(&precode_stats_per_frame, break_down_num);
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
@@ -383,7 +383,7 @@ void Stats::update_stats_in_functions_downlink_bigstation(int frame_id)
     update_stats_in_doprecode(frame_id, demul_thread_num, fft_thread_num + zf_thread_num);
 }
 
-void Stats::update_stats_in_functions_uplink_millipede(int frame_id) 
+void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id) 
 {
     reset_stats_worker_per_frame(&fft_stats_per_frame, break_down_num);
     reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
@@ -434,7 +434,7 @@ void Stats::update_stats_in_functions_uplink_millipede(int frame_id)
 
 
 
-void Stats::update_stats_in_functions_downlink_millipede(int frame_id)
+void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
 {
     reset_stats_worker_per_frame(&ifft_stats_per_frame, break_down_num);
     reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
@@ -557,7 +557,7 @@ double Stats::compute_count_percentage(Stats_worker stats_in_worker, int total_c
     return percentage;
 }
 
-void Stats::print_summary(int last_frame_id)
+void Stats::print_summary(UNUSED int last_frame_id)
 {
     int CSI_total_count = compute_total_count(csi_stats_worker, task_thread_num);
     int FFT_total_count = compute_total_count(fft_stats_worker, task_thread_num);
