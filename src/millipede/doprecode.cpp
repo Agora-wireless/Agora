@@ -9,10 +9,13 @@ using namespace arma;
 
 DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
         moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoded_data_buffer, 
-        Table<complex_float> &in_dl_ifft_buffer,
-	Table<int8_t> &in_dl_IQ_data,
+        Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer,
+	Table<complex_float> &in_dl_precoded_data_buffer, Table<complex_float> &in_dl_ifft_buffer,
+#ifdef USE_LDPC
 	Table<int8_t> &in_dl_encoded_data,
+#else
+	Table<int8_t> &in_dl_IQ_data,
+#endif
         Stats *in_stats_manager)
   : dl_modulated_buffer_(in_dl_modulated_buffer)
   , precoder_buffer_(in_precoder_buffer)

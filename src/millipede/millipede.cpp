@@ -499,8 +499,13 @@ void *Millipede::worker(int tid)
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
-        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, *dl_IQ_data, dl_encoded_buffer_,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_,
+	task_ptok_ptr, dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
+#ifdef USE_LDPC
+	dl_encoded_buffer_,
+#else
+	*dl_IQ_data,
+#endif
         stats_manager_);
 
     #ifdef USE_LDPC
@@ -658,8 +663,13 @@ void* Millipede::worker_demul(int tid)
 
 
     /* initialize Precode operator */
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
-        dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_, *dl_IQ_data, dl_encoded_buffer_,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_,
+	task_ptok_ptr, dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
+#ifdef USE_LDPC
+	dl_encoded_buffer_,
+#else
+	*dl_IQ_data,
+#endif
         stats_manager_);
 
 
