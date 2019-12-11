@@ -734,7 +734,8 @@ void Millipede::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Ev
     }
 }
 
-void Millipede::schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
+void Millipede::schedule_fft_task(UNUSED int offset, UNUSED int frame_count,
+    UNUSED int frame_id, UNUSED int subframe_id, UNUSED int ant_id,
     moodycamel::ProducerToken const& ptok) 
 {
     Event_data do_fft_task;
@@ -972,7 +973,7 @@ void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_i
 #endif
 }
 
-void Millipede::print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id)
+void Millipede::print_per_subframe_done(UNUSED int task_type, UNUSED int frame_count, UNUSED int frame_id, UNUSED int subframe_id)
 {
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
     switch(task_type) {
@@ -1014,7 +1015,7 @@ void Millipede::print_per_subframe_done(int task_type, int frame_count, int fram
 #endif
 }
 
-void Millipede::print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id) 
+void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, UNUSED int subframe_id, UNUSED int ant_or_sc_id) 
 {
 #if DEBUG_PRINT_PER_TASK_DONE
     switch(task_type) {
@@ -1270,7 +1271,7 @@ void Millipede::free_downlink_buffers()
 
 
 
-void Millipede::save_demul_data_to_file(int frame_id, int data_subframe_id)
+void Millipede::save_demul_data_to_file(UNUSED int frame_id, UNUSED int data_subframe_id)
 {
 #if WRITE_DEMUL
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
