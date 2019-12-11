@@ -396,30 +396,13 @@ void RU::taskThread(int tid)
     //moodycamel::ProducerToken local_ctok(*task_queue_);
     //moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
-    int packet_length = config_->packet_length;
-    int packet_header_offset = config_->packet_header_offset;
-    int tx_packet_length = packet_length - packet_header_offset;
-    char* buffer = (*buffer_)[tid];
-    int* buffer_status = (*buffer_status_)[tid];
-    int buffer_length = buffer_length_;
-    int buffer_frame_num = buffer_frame_num_;
 
-    char *tx_buffer = tx_buffer_;
-
-    int txSymsPerFrame = 0;
-    std::vector<size_t> txSymbols;
-    if (config_->isUE)
-    {
-        txSymsPerFrame = config_->ulSymsPerFrame;
-        txSymbols = config_->ULSymbols[0];
-    }
-    else
-    {
-        txSymsPerFrame = config_->dlSymsPerFrame;
-        txSymbols = config_->DLSymbols[0];
-    }
+    int txSymsPerFrame = config_->isUE ? config_->ulSymsPerFrame : config_->dlSymsPerFrame;
+    const std::vector<size_t> &txSymbols = config_->isUE ? config_->ULSymbols[0] : config_->DLSymbols[0];
     int n_ant = config_->getNumAntennas();
 
+    char* buffer = (*buffer_)[tid];
+    int* buffer_status = (*buffer_status_)[tid];
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
 #ifndef SIM
@@ -427,17 +410,17 @@ void RU::taskThread(int tid)
     RadioConfig *radio = radioconfig_;
 
     // to handle second channel at each radio
-    // this is assuming buffer_frame_num is at least 2 
+    // this is assuming buffer_frame_num_ is at least 2 
     char* cur_ptr_buffer2;
     int* cur_ptr_buffer_status2;
-    char* buffer2 = (*buffer_)[tid] + packet_length;
+    char* buffer2 = (*buffer_)[tid] + config_->packet_length;
     int* buffer_status2 = (*buffer_status_)[tid] + 1;
     cur_ptr_buffer_status2 = buffer_status2;
     if (config_->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
     }
     else {
-        cur_ptr_buffer2 = (char*)calloc(packet_length, sizeof(char)); 
+        cur_ptr_buffer2 = (char*)calloc(config_->packet_length, sizeof(char)); 
     }
 #else
     // loop recv
@@ -460,7 +443,7 @@ void RU::taskThread(int tid)
         // receive data
 #ifdef SIM
         int recvlen = -1;
-        if ((recvlen = recvfrom(rx_socket_[tid], cur_ptr_buffer, (size_t) packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0) {
+        if ((recvlen = recvfrom(rx_socket_[tid], cur_ptr_buffer, (size_t) config_->packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0) {
             perror("recv failed");
             exit(0);
         }
@@ -487,13 +470,13 @@ void RU::taskThread(int tid)
         offset = cur_ptr_buffer_status - buffer_status;
         // move ptr & set status to full
         cur_ptr_buffer_status[0] = 1; // has data, after doing fft, it is set to 0
-        cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num;
-        cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length) % buffer_length;
+        cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + 1) % buffer_frame_num_;
+        cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + config_->packet_length) % buffer_length_;
         // push EVENT_RX_ENB event into the queue
         Event_data packet_message;
         packet_message.event_type = EVENT_RX_SYMBOL;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-        packet_message.data = offset + tid * buffer_frame_num;
+        packet_message.data = offset + tid * buffer_frame_num_;
         if ( !message_queue_->enqueue(local_ptok, packet_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
@@ -521,8 +504,8 @@ void RU::taskThread(int tid)
         for (int it = start_radio ; it < end_radio; it++) // FIXME: this must be threaded
         {
             // this is probably a really bad implementation, and needs to be revamped
-            char* samp1 = (cur_ptr_buffer +  packet_header_offset*sizeof(int));
-            char* samp2 = (cur_ptr_buffer2 + packet_header_offset*sizeof(int));
+            char* samp1 = (cur_ptr_buffer +  config_->packet_header_offset*sizeof(int));
+            char* samp2 = (cur_ptr_buffer2 + config_->packet_header_offset*sizeof(int));
             void *samp[2] = {(void*)samp1, (void*)samp2};
             while (config_->running && radio->radioRx(it, samp, frameTime) <= 0);
             int frame_id = (int)(frameTime>>32);
@@ -550,13 +533,13 @@ void RU::taskThread(int tid)
             offset = cur_ptr_buffer_status - buffer_status;
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
-            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + config_->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * config_->nChannels) % buffer_length;
+            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + config_->nChannels) % buffer_frame_num_;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + config_->packet_length * config_->nChannels) % buffer_length_;
             // push EVENT_RX_ENB event into the queue
             Event_data packet_message;
             packet_message.event_type = EVENT_PACKET_RECEIVED;
             // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-            packet_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num 
+            packet_message.data = offset + tid * buffer_frame_num_; // Note: offset < buffer_frame_num_ 
             if (!message_queue_->enqueue(local_ptok, packet_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
@@ -565,13 +548,13 @@ void RU::taskThread(int tid)
             {
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute 
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
-                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + config_->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * config_->nChannels) % buffer_length;
+                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + config_->nChannels) % buffer_frame_num_;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + config_->packet_length * config_->nChannels) % buffer_length_;
                 // push EVENT_RX_ENB event into the queue
                 Event_data packet_message2;
                 packet_message2.event_type = EVENT_PACKET_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
-                packet_message2.data = offset + tid * buffer_frame_num;
+                packet_message2.data = offset + tid * buffer_frame_num_;
                 if (!message_queue_->enqueue(local_ptok, packet_message2 ) ) {
                     printf("socket message enqueue failed\n");
                     exit(0);
@@ -597,16 +580,17 @@ void RU::taskThread(int tid)
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM; 
                     size_t tx_symbol = txSymbols[tx_symbol_id];
                     //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymsPerFrame, config_->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
+		    int tx_packet_length = config_->packet_length - config_->packet_header_offset;
                     int frame_samp_size = (tx_packet_length * n_ant * txSymsPerFrame);
                     int tx_offset = tx_frame_offset * frame_samp_size + tx_packet_length * (n_ant * tx_symbol_id + ant_id);
                     void* txbuf[2];
                     long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
                     int flags = 1; // HAS_TIME
                     if (tx_symbol == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST
-                    txbuf[0] = (void*)(tx_buffer + tx_offset); 
+                    txbuf[0] = (void*)(tx_buffer_ + tx_offset); 
                     if (config_->nChannels == 2)
                     {
-                        txbuf[1] = (void*)(tx_buffer + tx_offset + tx_packet_length);
+                        txbuf[1] = (void*)(tx_buffer_ + tx_offset + tx_packet_length);
                     }
 #if DEBUG_SEND
                     int start_ind = 2 * config_->prefix;
