@@ -562,7 +562,8 @@ void RU::taskThread(int tid)
             }
 
             // notify TXthread to start transmitting frame_id+offset
-            if (txSymsPerFrame > 0 && ((config_->isUE && config_->getDlSFIndex(frame_id, symbol_id) == 0) || (!config_->isUE && config_->getPilotSFIndex(frame_id, symbol_id) == 0)))
+            if (txSymsPerFrame > 0 &&
+		(config_->isUE ? config_->getDlSFIndex(frame_id, symbol_id) : config_->getPilotSFIndex(frame_id, symbol_id)) == 0)
             {
 //#ifdef SEPARATE_TX_THREAD
 //                Event_data do_tx_task;
