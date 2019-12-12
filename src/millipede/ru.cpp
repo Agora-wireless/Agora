@@ -148,11 +148,10 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
     printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
-        
-        context[i].ptr = this;
-        context[i].tid = i;
-
-        if (pthread_create( &send_thread_, NULL, RU::loopSend, (void *)(&context[i])) != 0) {
+	RUContext *context = new RUContext;
+        context->ptr = this;
+        context->tid = i;
+        if (pthread_create( &send_thread_, NULL, sendThread_launch, context) != 0) {
             perror("socket Transmit thread create failed");
             exit(0);
         }
@@ -166,43 +165,35 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer, int* 
 
 /*****  transmit threads   *****/
 
-void* RU::loopSend(void *in_context)
+void* RU::sendThread_launch(void *in_context)
 {
-    RU* obj_ptr = ((RUContext *)in_context)->ptr;
-    int tid = ((RUContext *)in_context)->tid;
+    RUContext *context = (RUContext *)in_context;
+    RU* me = context->ptr;
+    int tid = context->tid;
+    delete context;
+    me->sendThread(tid);
+    return 0;
+}
+
+void RU::sendThread(int tid)
+{
     printf("packet sender thread %d start\n", tid);
 
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_ = obj_ptr->task_queue_;
-    // get pointer to message queue
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
-    int core_id = obj_ptr->tx_core_id_;
 
 #ifdef ENABLE_CPU_ATTACH
-    if(pin_to_core(core_id + tid) != 0) {
-        printf("TX thread: stitch thread %d to core %d failed\n", tid, core_id+ tid);
+    if(pin_to_core(core_id_ + tid) != 0) {
+        printf("TX thread: stitch thread %d to core %d failed\n", tid, core_id_ + tid);
         exit(0);
     }
     else {
-        printf("TX thread: stitch thread %d to core %d succeeded\n", tid, core_id + tid);
+        printf("TX thread: stitch thread %d to core %d succeeded\n", tid, core_id_ + tid);
     }
 #endif
 
-    // downlink socket buffer
-    char *buffer = obj_ptr->tx_buffer_;
-    //int buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
-    //int buffer_length = obj_ptr->tx_buffer_length_;
-    int* buffer_status = obj_ptr->tx_buffer_status_;
-
-    Config *cfg = obj_ptr->config_;
-#ifdef SIM
-    int* tx_socket_ = obj_ptr->tx_socket_;
-    char *cur_ptr_buffer;
-#else 
-    RadioConfig *radio = obj_ptr->radioconfig_;
-#endif
-    int packet_length = cfg->packet_length;
+    int packet_length = config_->packet_length;
 #ifndef SIM
-    packet_length -= cfg->packet_header_offset;
+    RadioConfig *radio = radioconfig_;
+    packet_length -= config_->packet_header_offset;
 #endif
 
     int ret;
@@ -215,14 +206,14 @@ void* RU::loopSend(void *in_context)
     int time_count = 0;
 #endif
 
-    std::vector<size_t> &txSymbols = (cfg->isUE) ? cfg->ULSymbols[0] : cfg->DLSymbols[0];
+    std::vector<size_t> &txSymbols = (config_->isUE) ? config_->ULSymbols[0] : config_->DLSymbols[0];
     // use token to speed up
     moodycamel::ProducerToken local_ptok(*message_queue_);
-    while(cfg->running) {
+    while(config_->running) {
     
         Event_data task_event;
         //ret = task_queue_->try_dequeue(task_event); 
-        ret = task_queue_->try_dequeue_from_producer(*obj_ptr->task_ptok[tid], task_event); 
+        ret = task_queue_->try_dequeue_from_producer(*task_ptok[tid], task_event); 
         if(!ret)
             continue;
 
@@ -232,41 +223,37 @@ void* RU::loopSend(void *in_context)
             exit(0);
         }
 
-        ant_id = task_event.data; //% cfg->getNumAntennas();
+        ant_id = task_event.data; //% config_->getNumAntennas();
         //frame_id = task_event.more_data; 
 
 #ifdef SIM
-        if(cfg->isUE)
+        if(config_->isUE)
         {
             // first sending pilots in sim mode
-            //for (int p_id = 0; p_id < cfg->pilotSymsPerFrame; p_id++)
+            //for (int p_id = 0; p_id < config_->pilotSymsPerFrame; p_id++)
             {
-                int* tx_buffer_hdr = (int*)obj_ptr->pilot_buffer_; //.data();
-                tx_buffer_hdr[0] = frame_id;    
-                tx_buffer_hdr[1] = cfg->pilotSymbols[0][ant_id];  
-                tx_buffer_hdr[2] = 0; //cell_id
-                tx_buffer_hdr[3] = ant_id; // rsvd  
-                //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
-                if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+  	        struct Packet *pkt = (struct Packet *)pilot_buffer_;
+		new (pkt) Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
+                //ru_->send((void *)ul_pilot_aligned, config_->getTxPackageLength(), frame_id, config_->pilotSymbols[0][p_id], p_id);
+                if (sendto(tx_socket_[tid], (char *)pilot_buffer_, packet_length, 0, (struct sockaddr *)&cliaddr_[tid], sizeof(cliaddr_[tid])) < 0) {
                     perror("loopSend: socket sendto failed");
                     exit(0);
                 }
             }
 #if DEBUG_SEND
-            printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, cfg->pilotSymbols[0][ant_id], ant_id);
+            printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, config_->pilotSymbols[0][ant_id], ant_id);
 #endif
         }
         for (symbol_id = 0; symbol_id < txSymbols.size(); symbol_id++)
         {
-            //for (ant_id = 0; ant_id < cfg->getNumAntennas(); ant_id++) 
+            //for (ant_id = 0; ant_id < config_->getNumAntennas(); ant_id++) 
             {
-                offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
-                cur_ptr_buffer = buffer + offset * packet_length;  
+                offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), config_->getNumAntennas(), frame_id, symbol_id, ant_id);
                 // send data (one OFDM symbol)
-		struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
-		new (cur_ptr_buffer) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
+		struct Packet *pkt = (struct Packet *)(tx_buffer_ + offset * packet_length);
+		new (pkt) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
 
-                if (sendto(tx_socket_[tid], (char *)cur_ptr_buffer, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+                if (sendto(tx_socket_[tid], (char *)pkt, packet_length, 0, (struct sockaddr *)&cliaddr_[tid], sizeof(cliaddr_[tid])) < 0) {
                     perror("loopSend: socket sendto failed");
                     exit(0);
                 }
@@ -276,39 +263,39 @@ void* RU::loopSend(void *in_context)
 #endif
         }
 #else
-        //symbol_id = task_event.data / cfg->getNumAntennas();
+        //symbol_id = task_event.data / config_->getNumAntennas();
         for (symbol_id = 0; symbol_id < txSymbols.size(); symbol_id++)
         {
             int tx_frame_id = frame_id;
             size_t tx_symbol_id = txSymbols[symbol_id];
-            offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), cfg->getNumAntennas(), frame_id, symbol_id, ant_id);
+            offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), config_->getNumAntennas(), frame_id, symbol_id, ant_id);
             void* txbuf[2];
             long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
             int flags = 1; // HAS_TIME
             if (tx_symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-	    for (size_t ch = 0; ch < cfg->nChannels; ++ch) {
-	      txbuf[ch] = buffer + (offset + ch) * packet_length; //   obj_ptr->pilot_buffer_; //
-	      buffer_status[offset + ch] = 0;
+	    for (size_t ch = 0; ch < config_->nChannels; ++ch) {
+	      txbuf[ch] = tx_buffer_ + (offset + ch) * packet_length; //   pilot_buffer_; //
+	      tx_buffer_status_[offset + ch] = 0;
 	    }
 #if DEBUG_SEND
         printf("RU: transmit tx_frame_id %d, tx_symbol_id %d, cell_id %d, ant_id %d\n", frame_id, symbol_id, cell_id, ant_id);
-        printf("transmit samples: %f %f %f %f %f %f %f %f ...\n",*((RadioBufRealType *)txbuf[0]+2*cfg->prefix+9), 
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+10),
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+11),
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+12),
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+13),
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+14),
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+15),
-                           *((RadioBufRealType *)txbuf[0]+2*cfg->prefix+16));
+        printf("transmit samples: %f %f %f %f %f %f %f %f ...\n",*((RadioBufRealType *)txbuf[0]+2*config_->prefix+9), 
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+10),
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+11),
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+12),
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+13),
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+14),
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+15),
+                           *((RadioBufRealType *)txbuf[0]+2*config_->prefix+16));
 #endif 
             clock_gettime(CLOCK_MONOTONIC, &tv);
-            radio->radioTx(ant_id/cfg->nChannels, txbuf, flags, frameTime);
+            radio->radioTx(ant_id/config_->nChannels, txbuf, flags, frameTime);
             clock_gettime(CLOCK_MONOTONIC, &tv2);
 #if TX_TIME_MEASURE
             double diff = (tv2.tv_sec * 1e9 + tv2.tv_nsec - tv.tv_sec * 1e9 - tv.tv_nsec);
             time_avg += diff;
             time_count++;
-            if (time_count == cfg->getNumAntennas()*cfg->dlSymsPerFrame)
+            if (time_count == config_->getNumAntennas()*config_->dlSymsPerFrame)
             {
                 printf("In TX thread %d: Transmitted 100 frames with average tx time %f\n", tid, time_avg/time_count/1e3);
                 time_count = 0;
@@ -326,12 +313,11 @@ void* RU::loopSend(void *in_context)
         packet_message.event_type = EVENT_PACKET_SENT;
         packet_message.data = offset;
         //packet_message.more_data = frame_id;
-        if ( cfg->running && !message_queue_->enqueue(local_ptok, packet_message ) ) {
+        if ( config_->running && !message_queue_->enqueue(local_ptok, packet_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
     }
-    return 0; 
 }
 
 

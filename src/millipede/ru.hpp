@@ -66,7 +66,8 @@ public:
      * receive thread
      * context: PackageReceiverContext type
     */
-    static void* loopSend(void *context);
+    static void* sendThread_launch(void *context);
+    void sendThread(int tid);
     static void* taskThread_launch(void *context);
     void taskThread(int tid);
     void send(void *out_buffer, int length, int frame_id, int symbol_id, int ant_id);
