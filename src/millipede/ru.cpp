@@ -1,5 +1,7 @@
 
+#include "config.hpp"
 #include "ru.hpp"
+#include "radio_lib.hpp"
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config *cfg)
 {

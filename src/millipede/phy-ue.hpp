@@ -1,5 +1,6 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
+#include "config.hpp"
 #include "ru.hpp"
 //#include "l2.hpp"
 #include <unistd.h>

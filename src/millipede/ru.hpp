@@ -2,27 +2,19 @@
 #ifndef RU_HEADER
 #define RU_HEADER
 
-#include <iostream>
+#ifdef SIM
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <stdlib.h>
-#include <vector>
-#include <ctime>
-#include <algorithm>
-#include <numeric>
+#else
+class RadioConfig;
+#endif
+#include <complex>
 #include <pthread.h>
-#include <cassert>
-#include <unistd.h>
-#include <chrono>
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include <vector>
+
 #include "concurrentqueue.h"
-#include "radio_lib.hpp"
-#include <fstream>      // std::ifstream
 
 class RU
 {
@@ -74,13 +66,16 @@ private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     Config *config_;
+#ifdef SIM
     struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in servaddr_tx_[10]; /* server address for tx*/
     struct sockaddr_in cliaddr_[10];    /* client address */
     int* rx_socket_;
     int* tx_socket_;
+#else
 
     RadioConfig *radioconfig_;
+#endif
 
     Table<char>* buffer_;
     Table<int>* buffer_status_;
