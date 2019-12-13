@@ -70,7 +70,6 @@ public:
     void sendThread(int tid);
     static void* taskThread_launch(void *context);
     void taskThread(int tid);
-    void send(void *out_buffer, int length, int frame_id, int symbol_id, int ant_id);
  
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
