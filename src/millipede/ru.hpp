@@ -96,7 +96,6 @@ private:
 
     int thread_num_;
     int tx_thread_num_;
-    int radios_per_thread;
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data> *message_queue_;
     moodycamel::ConcurrentQueue<Event_data> *task_queue_;
