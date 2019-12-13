@@ -159,7 +159,8 @@ public:
 
 
     // while loop of task thread
-    static void* taskThread(void* context);
+    static void* taskThread_launch(void* context);
+    void taskThread(int tid);
 
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
@@ -325,8 +326,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
-
-    EventHandlerContext context[TASK_THREAD_NUM];
 
     // all checkers
     // int cropper_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
