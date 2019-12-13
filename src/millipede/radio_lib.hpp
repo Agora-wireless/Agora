@@ -21,7 +21,8 @@ class RadioConfig
 {
 public:
     RadioConfig(Config *cfg);
-    static void *initBSRadio(void * context);
+    static void *initBSRadio_launch(void * context);
+    void initBSRadio(int tid);
     bool radioStart();
     void radioStop();
     void readSensors();
@@ -58,5 +59,4 @@ private:
     bool calib;
     RadioType _radioType; 
     std::atomic<size_t> remainingJobs;
-    RadioConfigContext *context;
 };
