@@ -32,7 +32,6 @@ public:
     // header 4 int for: frame_id, subframe_id, cell_id, ant_id
     // ushort for: I/Q samples
     // static const int package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-    static const int data_offset = sizeof(int) * 4;
     // use for create pthread 
     struct RUContext
     {
