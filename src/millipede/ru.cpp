@@ -234,7 +234,6 @@ void RU::sendThread(int tid)
             {
   	        struct Packet *pkt = (struct Packet *)pilot_buffer_;
 		new (pkt) Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
-                //ru_->send((void *)ul_pilot_aligned, config_->getTxPackageLength(), frame_id, config_->pilotSymbols[0][p_id], p_id);
                 if (sendto(tx_socket_[tid], (char *)pilot_buffer_, packet_length, 0, (struct sockaddr *)&cliaddr_[tid], sizeof(cliaddr_[tid])) < 0) {
                     perror("loopSend: socket sendto failed");
                     exit(0);
