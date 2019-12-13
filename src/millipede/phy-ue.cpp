@@ -107,7 +107,7 @@ Phy_UE::Phy_UE(Config *cfg)
     }
 
     printf("new RU\n");
-    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, &message_queue_, &tx_queue_));
+    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, message_queue_, tx_queue_));
 
     // initilize all kinds of checkers
     cropper_checker_ = new size_t[dl_symbol_perframe * TASK_BUFFER_FRAME_NUM];
