@@ -91,8 +91,8 @@ private:
     int thread_num_;
     int tx_thread_num_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_;
+    moodycamel::ConcurrentQueue<Event_data> &message_queue_;
+    moodycamel::ConcurrentQueue<Event_data> &task_queue_;
     std::vector<std::unique_ptr<moodycamel::ProducerToken>> task_ptok;
     //std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
     int core_id_;

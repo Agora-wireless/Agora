@@ -69,11 +69,14 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config *cfg)
     srand (time(NULL));
 }
 
-RU::RU(int n_rx_thread, int n_tx_thread, Config *config, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ConcurrentQueue<Event_data> * in_queue_task):
-RU(n_rx_thread,n_tx_thread, config)
+RU::RU(int n_rx_thread, int n_tx_thread, Config *config,
+       moodycamel::ConcurrentQueue<Event_data>& in_message_queue,
+       moodycamel::ConcurrentQueue<Event_data>& in_task_queue)
+: RU(n_rx_thread,n_tx_thread, config)
+, message_queue_(in_message_queue)
+, task_queue_(in_task_queue)
+  
 {
-    message_queue_ = in_queue;
-    task_queue_ = in_queue_task;
     task_ptok.resize(thread_num_);
     for (int i = 0; i < thread_num_; i++)
         task_ptok[i].reset(new moodycamel::ProducerToken(*task_queue_));
@@ -216,12 +219,12 @@ void RU::sendThread(int tid)
     while(config_->running) {
     
         Event_data task_event;
-        //ret = task_queue_->try_dequeue(task_event); 
-        ret = task_queue_->try_dequeue_from_producer(*task_ptok[tid], task_event); 
+        //ret = task_queue_.try_dequeue(task_event); 
+        ret = task_queue_.try_dequeue_from_producer(*task_ptok[tid], task_event); 
         if(!ret)
             continue;
 
-        // printf("tx queue length: %d\n", task_queue_->size_approx());
+        // printf("tx queue length: %d\n", task_queue_.size_approx());
         if (task_event.event_type!=TASK_SEND) {
             printf("Wrong event type!");
             exit(0);
@@ -316,7 +319,7 @@ void RU::sendThread(int tid)
         packet_message.event_type = EVENT_PACKET_SENT;
         packet_message.data = offset;
         //packet_message.more_data = frame_id;
-        if ( config_->running && !message_queue_->enqueue(local_ptok, packet_message ) ) {
+        if ( config_->running && !message_queue_.enqueue(local_ptok, packet_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -436,7 +439,7 @@ void RU::taskThread(int tid)
         packet_message.event_type = EVENT_RX_SYMBOL;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
         packet_message.data = cursor + tid * buffer_frame_num_;
-        if ( !message_queue_->enqueue(local_ptok, packet_message ) ) {
+        if ( !message_queue_.enqueue(local_ptok, packet_message ) ) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -450,14 +453,14 @@ void RU::taskThread(int tid)
             do_tx_task.event_type = TASK_SEND;
             do_tx_task.data = ant_id;
             do_tx_task.more_data = config_->isUE ? frame_id + TX_FRAME_DELTA : frame_id;
-            if ( !task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
+            if ( !task_queue_.enqueue(*task_ptok[tid], do_tx_task)) {
                 printf("task enqueue failed\n");
                 exit(0);
             }
         }
 
         //printf("enqueue offset %d\n", offset);
-        int cur_queue_len = message_queue_->size_approx();
+        int cur_queue_len = message_queue_.size_approx();
         maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
 
         packet_num++;
@@ -496,7 +499,7 @@ void RU::taskThread(int tid)
 	      packet_message.event_type = EVENT_PACKET_RECEIVED;
 	      // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
 	      packet_message.data = cursor + tid * buffer_frame_num_;
-	      if (!message_queue_->enqueue(local_ptok, packet_message ) ) {
+	      if (!message_queue_.enqueue(local_ptok, packet_message ) ) {
                 printf("socket message enqueue failed\n");
                 exit(0);
 	      }
@@ -513,7 +516,7 @@ void RU::taskThread(int tid)
 //                do_tx_task.event_type = TASK_packet_SENT;
 //                do_tx_task.data = ant_id; //tx_symbol_id * config_->getNumAntennas() + ant_id;
 //                do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
-//                if ( !task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
+//                if ( !task_queue_.enqueue(*task_ptok[tid], do_tx_task)) {
 //                    printf("task enqueue failed\n");
 //                    exit(0);
 //                }
@@ -552,7 +555,7 @@ void RU::taskThread(int tid)
             //stats
 
             //printf("enqueue offset %d\n", offset);
-            int cur_queue_len = message_queue_->size_approx();
+            int cur_queue_len = message_queue_.size_approx();
             maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
 
             packet_num++;
