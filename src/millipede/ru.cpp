@@ -1,7 +1,9 @@
 
 #include "config.hpp"
 #include "ru.hpp"
+#ifndef SIM
 #include "radio_lib.hpp"
+#endif
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config *cfg)
 {
