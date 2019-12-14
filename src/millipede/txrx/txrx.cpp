@@ -57,8 +57,8 @@ PacketTXRX::~PacketTXRX()
 
 std::vector<pthread_t> PacketTXRX::startRecv(Table<char> &in_buffer, Table<int> &in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, Table<double> &in_frame_start)
 {
-    buffer_ = &in_buffer;
-    buffer_status_ = &in_buffer_status;
+    buffer_ = &in_buffer;  // for save data
+    buffer_status_ = &in_buffer_status; // for save status
     frame_start_ = &in_frame_start;
 
     // check length
@@ -610,6 +610,3 @@ void *PacketTXRX::loopTXRX(int tid)
         }
     }
 }
-
-
-
