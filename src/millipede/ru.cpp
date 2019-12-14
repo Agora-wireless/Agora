@@ -79,7 +79,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config *config,
 {
     task_ptok.resize(thread_num_);
     for (int i = 0; i < thread_num_; i++)
-        task_ptok[i].reset(new moodycamel::ProducerToken(*task_queue_));
+        task_ptok[i].reset(new moodycamel::ProducerToken(task_queue_));
 
 }
 
@@ -215,7 +215,7 @@ void RU::sendThread(int tid)
 
     std::vector<size_t> &txSymbols = (config_->isUE) ? config_->ULSymbols[0] : config_->DLSymbols[0];
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(*message_queue_);
+    moodycamel::ProducerToken local_ptok(message_queue_);
     while(config_->running) {
     
         Event_data task_event;
@@ -364,8 +364,8 @@ void RU::taskThread(int tid)
 
     // usleep(10000-tid*2000);
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(*message_queue_);
-    //moodycamel::ProducerToken local_ctok(*task_queue_);
+    moodycamel::ProducerToken local_ptok(message_queue_);
+    //moodycamel::ProducerToken local_ctok(task_queue_);
     //moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
 
