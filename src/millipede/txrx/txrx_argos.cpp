@@ -6,7 +6,6 @@
 
 #include "txrx.hpp"
 
-
 PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
     socket_ = new int[RX_THREAD_NUM];
@@ -62,15 +61,16 @@ PacketTXRX::~PacketTXRX()
 }
 
 
-std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, Table<double> &in_frame_start)
+std::vector<pthread_t> PacketTXRX::startRecv(Table<char> &in_buffer, Table<int> &in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, Table<double> &in_frame_start)
 {
+    buffer_ = &in_buffer;  // for save data
+    buffer_status_ = &in_buffer_status; // for save status
+    frame_start_ = &in_frame_start;
+
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-    buffer_ = &in_buffer;  // for save data
-    buffer_status_ = &in_buffer_status; // for save status
-    frame_start_ = &in_frame_start;
 
 
     printf("create RX threads\n");
@@ -476,4 +476,3 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
     }
     return 0; 
 }
-
