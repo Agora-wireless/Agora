@@ -23,6 +23,7 @@ public:
           double **in_ZF_task_duration, int *in_ZF_task_count, double **in_Demul_task_duration, int *in_Demul_task_count,
           double **in_IFFT_task_duration, int *in_IFFT_task_count, double **in_Precode_task_duration, int *in_Precode_task_count,
           double **in_Decode_task_duration, int *in_Decode_task_count, double **in_Encode_task_duration, int *in_Encode_task_count,
+          double **in_rc_task_duration, int *in_rc_task_count,
           double **in_frame_start, 
           int in_task_duration_dim1, int in_task_duration_dim2, int in_task_count_dim,
           int in_task_thread_num, int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num);
@@ -61,6 +62,9 @@ public:
     void update_zf_processed(int frame_id) {zf_processed[frame_id % 10000] = get_time();};
     double get_zf_processed(int frame_id) {return zf_processed[frame_id % 10000];};
 
+    void update_rc_processed(int frame_id) {rc_processed[frame_id % 10000] = get_time();};
+    double get_rc_processed(int frame_id) {return rc_processed[frame_id % 10000];};
+
     void update_decode_processed(int frame_id) {decode_processed[frame_id % 10000] = get_time();};
     double get_decode_processed(int frame_id) {return decode_processed[frame_id % 10000];};
 
@@ -98,6 +102,9 @@ public:
     void update_stats_in_doprecode(int frame_id, int thread_num, int thread_num_offset);
     double get_time_in_doprecode(int frame_id) {return precode_time_in_function[frame_id % 10000];};
  
+    void update_stats_in_rc(int frame_id, int thread_num, int thread_num_offset);
+    double get_time_in_rc(int frame_id) {return zf_time_in_function[frame_id % 10000];};
+
 private:
     Config *config_;
     int BS_ANT_NUM, UE_NUM;
@@ -129,6 +136,7 @@ private:
     double ifft_processed[10000] __attribute__( ( aligned (4096) ) ) ;
     double tx_processed_first[10000] __attribute__( ( aligned (4096) ) ) ;
     double tx_processed[10000] __attribute__( ( aligned (4096) ) ) ;
+    double rc_processed[10000] __attribute__( ( aligned (4096) ) ) ;
 
     double csi_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
     double fft_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
@@ -138,6 +146,7 @@ private:
     double precode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
     double decode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
     double encode_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
+    double rc_time_in_function[10000] __attribute__( ( aligned (4096) ) ) ;
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double **csi_time_in_function_details;
@@ -155,6 +164,7 @@ private:
     double **Encode_task_duration; 
     double **IFFT_task_duration; 
     double **Precode_task_duration; 
+    double **RC_task_duration; 
 
     /* accumulated task count for all frames in each worker thread*/
     int *CSI_task_count;
@@ -165,6 +175,7 @@ private:
     int *Encode_task_count;
     int *IFFT_task_count; 
     int *Precode_task_count;
+    int *RC_task_count; 
 
     double **frame_start;
 
@@ -186,6 +197,7 @@ private:
     int encode_count_this_frame = 0;
     int ifft_count_this_frame = 0;
     int precode_count_this_frame = 0;
+    int rc_count_this_frame = 0;
 
     double *csi_time_this_frame_this_thread;
     double *fft_time_this_frame_this_thread;
@@ -195,6 +207,7 @@ private:
     double *encode_time_this_frame_this_thread;
     double *ifft_time_this_frame_this_thread;
     double *precode_time_this_frame_this_thread;
+    double *rc_time_this_frame_this_thread;
 
     double *csi_time_this_frame_this_thread_per_task;
     double *fft_time_this_frame_this_thread_per_task;
@@ -204,6 +217,7 @@ private:
     double *encode_time_this_frame_this_thread_per_task;
     double *ifft_time_this_frame_this_thread_per_task;
     double *precode_time_this_frame_this_thread_per_task;
+    double *rc_time_this_frame_this_thread_per_task;
 
     double *csi_time_this_frame;
     double *fft_time_this_frame;
@@ -213,6 +227,7 @@ private:
     double *encode_time_this_frame;
     double *ifft_time_this_frame;
     double *precode_time_this_frame;
+    double *rc_time_this_frame;
 
     int *CSI_task_count_prev_frame_each_thread;
     int *FFT_task_count_prev_frame_each_thread;
@@ -222,6 +237,7 @@ private:
     int *Encode_task_count_prev_frame_each_thread;
     int *IFFT_task_count_prev_frame_each_thread;
     int *Precode_task_count_prev_frame_each_thread;
+    int *RC_task_count_prev_frame_each_thread;
 
     double **CSI_task_duration_prev_frame_each_thread;
     double **FFT_task_duration_prev_frame_each_thread;
@@ -231,6 +247,7 @@ private:
     double **Encode_task_duration_prev_frame_each_thread;
     double **IFFT_task_duration_prev_frame_each_thread;
     double **Precode_task_duration_prev_frame_each_thread;
+    double **RC_task_duration_prev_frame_each_thread;
 
 };
 

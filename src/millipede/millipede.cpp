@@ -62,7 +62,7 @@ Millipede::Millipede(Config *cfg)
           ZF_task_duration, ZF_task_count, Demul_task_duration, Demul_task_count,
           IFFT_task_duration, IFFT_task_count, Precode_task_duration, Precode_task_count,
           Decode_task_duration, Decode_task_count, Encode_task_duration, Encode_task_count,
-          frame_start, 
+          RC_task_duration, RC_task_count, frame_start, 
           TASK_THREAD_NUM * 8, 4, TASK_THREAD_NUM * 16,
           TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM));
 }
@@ -146,6 +146,7 @@ void Millipede::start()
     int frame_count_precode = 0;
     int frame_count_ifft = 0;
     int frame_count_tx = 0;
+    int frame_count_rc = 0;
     
     bool prev_demul_scheduled = false;
 
@@ -272,7 +273,10 @@ void Millipede::start()
                 }
                 break;          
                 case EVENT_RC: {
-
+                    int frame_id = event.data;
+                    stats_manager_->update_rc_processed(frame_count_rc);
+                    print_per_frame_done(PRINT_RC, frame_count_rc, frame_id); 
+                    update_frame_count(&frame_count_rc);
                 }
                 break;          
                 case EVENT_ZF: {
@@ -1011,6 +1015,12 @@ void Millipede::print_per_frame_done(int task_type, int frame_id, int frame_id_i
                 stats_manager_->get_precode_processed(frame_id) - stats_manager_->get_zf_processed(frame_id),
                 stats_manager_->get_precode_processed(frame_id) - stats_manager_->get_pilot_received(frame_id)); 
             break;
+        case(PRINT_RC):
+            printf("Main thread: RC done frame: %d, %d in %.2f us since pilot FFT done, total: %.2f us\n", 
+                frame_id, frame_id_in_buffer, 
+                stats_manager_->get_rc_processed(frame_id) - stats_manager_->get_fft_processed(frame_id),
+                stats_manager_->get_rc_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+            break;
         case(PRINT_IFFT):
             printf("Main thread: IFFT done frame: %d, %d in %.2f us since precode done, total: %.2f us\n", 
                 frame_id, frame_id_in_buffer,
@@ -1219,6 +1229,7 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_1d(&fft_created_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(&precoder_exist_in_frame_, TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(&decode_counter_subframes_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&recip_cal_counters_, TASK_BUFFER_FRAME_NUM, 64, 1);
 
     alloc_buffer_2d(&fft_counter_ants_, TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64, 1);
 
