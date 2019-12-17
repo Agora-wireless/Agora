@@ -176,9 +176,7 @@ void* RadioConfig::configureBSRadio(void* in_context)
     }
 
     // resets the DATA_clk domain logic.
-    rc->baStn[i]->writeRegister("IRIS30", 48, (1 << 29) | 0x1);
-    rc->baStn[i]->writeRegister("IRIS30", 48, (1 << 29));
-    rc->baStn[i]->writeRegister("IRIS30", 48, 0);
+    rc->baStn[i]->writeSetting("RESET_DATA_LOGIC", "");
 
     //use the TRX antenna port for both tx and rx
     for (auto ch : channels)
@@ -220,90 +218,15 @@ void* RadioConfig::configureBSRadio(void* in_context)
     }
 
     for (auto ch : channels) {
-        //baStn[i]->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
-        //baStn[i]->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
         rc->baStn[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
     }
 
     // we disable channel 1 because of the internal LDO issue.
     // This will be fixed in the next revision (E) of Iris.
     if (cfg->nChannels == 1) {
-        if (cfg->freq > 3e9 and cfg->radio_ids[i].find("RF3E") == std::string::npos) {
-            std::cout << "setting up SPI_TDD" << std::endl;
-            std::vector<unsigned> txActive, rxActive;
-            unsigned ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
-            rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
-            //unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
-            //unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
-            unsigned regRbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
-            //unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
-            unsigned regTbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
-
-            // disable TX
-            txActive = {
-                //0xa10C0000 | 0xfe, //RFE in power down
-                //0xa10D0000 | 0x0, //RFE SISO and disables
-                0xa1150000 | 0xe, //RBB in power down
-                //0xa1000000 | regTrfA //TRF stays the same
-                0xa1050000 | regTbbA //TBB stays the same
-            };
-            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 16, txActive); //trig1 offset
-            // disable RX
-            rxActive = {
-                //0xa10C0000 | regRfeA, //RFE stays the same
-                //0xa10D0000 | regRfeALo, //RFE stays the same
-                0xa1150000 | regRbbA, //RBB stays the same
-                //0xa1000000 | 0xe //TRF in power down + SISO
-                0xa1050000 | 0x1e //TBB in power down
-            };
-            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
-        }
         rc->baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         rc->baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
-    } else if (cfg->nChannels == 2) {
-        if (cfg->freq > 3e9 and cfg->radio_ids[i].find("RF3E") == std::string::npos) {
-            std::vector<unsigned> txActive, rxActive;
-            unsigned ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
-            rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 1);
-            //unsigned regRfeA = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
-            //unsigned regRfeALo = rc->baStn[i]->readRegister("LMS7IC", 0x010D);
-            unsigned regRbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
-            //unsigned regTrfA = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
-            unsigned regTbbA = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
-
-            ch = rc->baStn[i]->readRegister("LMS7IC", 0x0020);
-            rc->baStn[i]->writeRegister("LMS7IC", 0x0020, (ch & 0xFFFC) | 2);
-            //unsigned regRfeB = rc->baStn[i]->readRegister("LMS7IC", 0x010C);
-            //unsigned regRbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0115);
-            //unsigned regTrfB = rc->baStn[i]->readRegister("LMS7IC", 0x0100);
-            //unsigned regTbbB = rc->baStn[i]->readRegister("LMS7IC", 0x0105);
-
-            txActive = {
-                //0xe10C0000 | 0xfe, //RFE in power down
-                //0xe10D0000 | 0x0, //RFE SISO and disables
-                0xe1150000 | 0xe, //RBB in power down
-                //0xe1000000 | regTrfA, //TRF stays the same
-                0xe1050000 | regTbbA
-            }; //TBB stays the same
-
-            rxActive = {
-                //0xe10C0000 | regRfeA, //RFE stays the same
-                //0xe10D0000 | regRfeALo, //RFE stays the same
-                0xe1150000 | regRbbA, //RBB stays the same
-                //0xe1000000 | 0xe, //TRF in power down + SISO
-                0xe1050000 | 0x1e
-            }; //TBB in power down
-
-            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 16, txActive); //trig1 offset
-            rc->baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
-            //baStn[i]->writeSetting("SPI_TDD_MODE", "MIMO");
-        }
     }
-    // resets the DATA_clk domain logic.
-    rc->baStn[i]->writeRegister("IRIS30", 48, (1 << 29) | 0x1);
-    rc->baStn[i]->writeRegister("IRIS30", 48, (1 << 29));
-    rc->baStn[i]->writeRegister("IRIS30", 48, 0);
-
     rc->remainingJobs--;
     return 0;
 }
@@ -422,11 +345,11 @@ bool RadioConfig::radioStart()
                     else if (c == 'L')
                         sched.replace(s, 1, isRefAnt ? "P" : "R");
                     else if (c == 'P')
-                        sched.replace(s, 1, isRefAnt ? "R" : "R");
+                        sched.replace(s, 1, "R");
                     else if (c == 'U')
-                        sched.replace(s, 1, isRefAnt ? "R" : "R");
+                        sched.replace(s, 1, "R");
                     else if (c == 'D')
-                        sched.replace(s, 1, isRefAnt ? "T" : "T");
+                        sched.replace(s, 1, "T");
                     else if (c != 'B')
                         sched.replace(s, 1, "G");
                 }
