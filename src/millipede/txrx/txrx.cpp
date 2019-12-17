@@ -262,10 +262,6 @@ void *PacketTXRX::loopSend(int tid)
     setup_sockaddr_remote_ipv6(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #endif
 
-    // downlink socket buffer
-    char *dl_buffer = tx_buffer_;
-    
-
     // auto begin = std::chrono::system_clock::now();
     // int packet_count = 0;
     int ret;
@@ -303,7 +299,7 @@ void *PacketTXRX::loopSend(int tid)
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-        cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;  
+        cur_buffer_ptr = tx_buffer_ + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;  
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
         struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
         new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
@@ -397,7 +393,6 @@ void *PacketTXRX::loopTXRX(int tid)
 
 
     // TX pointers
-    char *tx_buffer_ptr = tx_buffer_;
     // float *tx_data_buffer = obj_ptr->tx_data_buffer_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     int ret;
@@ -568,7 +563,7 @@ void *PacketTXRX::loopTXRX(int tid)
                 int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
                 int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
-                tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;  
+                tx_cur_buffer_ptr = tx_buffer_ + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length;
                 // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
                 struct Packet *pkt = (struct Packet *)tx_cur_buffer_ptr;
                 new (pkt) Packet(tx_frame_id, tx_symbol_id, 0 /* cell_id */, tx_ant_id);
