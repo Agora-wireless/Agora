@@ -122,7 +122,7 @@ void DoFFT::FFT(int offset)
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
     float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[0]);
 
-    int cur_symbol_type = -1;
+    int cur_symbol_type = UNKNOWN;
     if (config_->isUplink(frame_id, subframe_id))
         cur_symbol_type = UL;
     else if (config_->isPilot(frame_id, subframe_id))
