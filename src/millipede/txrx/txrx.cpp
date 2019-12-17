@@ -374,11 +374,8 @@ void *PacketTXRX::loopTXRX(int tid)
     // RX  pointers
     char* rx_buffer_ptr = (*buffer_)[tid];
     int* rx_buffer_status_ptr = (*buffer_status_)[tid];
-    long long rx_buffer_length = buffer_length_;
     int rx_buffer_frame_num = buffer_frame_num_;
     double *rx_frame_start = (*frame_start_)[tid];
-    char* rx_cur_buffer_ptr = rx_buffer_ptr;
-    int* rx_cur_buffer_status_ptr = rx_buffer_status_ptr;
     int rx_offset = 0;
     int frame_id;
 
@@ -422,12 +419,12 @@ void *PacketTXRX::loopTXRX(int tid)
     if (!downlink_mode) {
         while(true) {
             // if buffer is full, exit
-            if (rx_cur_buffer_status_ptr[0] == 1) {
+            if (rx_buffer_status_ptr[rx_offset] == 1) {
                 printf("Receive thread %d buffer full, offset: %d\n", tid, rx_offset);
                 exit(0);
             }
+            struct Packet *pkt = (struct Packet *)&rx_buffer_ptr[rx_offset * packet_length];
 
-            struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
             int recvlen = -1;
 
             // start_time= get_time();
@@ -456,11 +453,8 @@ void *PacketTXRX::loopTXRX(int tid)
             }
         #endif
             // get the position in buffer
-            rx_offset = rx_cur_buffer_status_ptr - rx_buffer_status_ptr;
             // move ptr & set status to full
-            rx_cur_buffer_status_ptr[0] = 1; // has data, after doing fft, it is set to 0
-            rx_cur_buffer_status_ptr = rx_buffer_status_ptr + (rx_offset + 1) % rx_buffer_frame_num;
-            rx_cur_buffer_ptr = rx_buffer_ptr + (rx_cur_buffer_ptr - rx_buffer_ptr + packet_length) % rx_buffer_length;
+            rx_buffer_status_ptr[rx_offset] = 1; // has data, after doing fft, it is set to 0
 
             // push EVENT_PACKET_RECEIVED event into the queue
             Event_data rx_message;
@@ -472,6 +466,9 @@ void *PacketTXRX::loopTXRX(int tid)
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
+	    rx_offset++;
+	    if (rx_offset == rx_buffer_frame_num)
+	      rx_offset = 0;
 
         }
     }
@@ -479,16 +476,16 @@ void *PacketTXRX::loopTXRX(int tid)
         while(true) {
             if (do_tx == 0) {
                 // if buffer is full, exit
-                if (rx_cur_buffer_status_ptr[0] > 0) {
-                    printf("Receive thread %d buffer full, offset: %d, buffer value: %d, total length: %d\n", tid, rx_offset, rx_cur_buffer_status_ptr[0], rx_buffer_frame_num);
+                if (rx_buffer_status_ptr[rx_offset] > 0) {
+                    printf("Receive thread %d buffer full, offset: %d, buffer value: %d, total length: %d\n", tid, rx_offset, rx_buffer_status_ptr[rx_offset], rx_buffer_frame_num);
                     printf("Buffer status:\n");
                     for(int i = 0; i < rx_buffer_frame_num; i++) 
                         printf("%d ", *(rx_buffer_status_ptr+i));
                     printf("\n");
                     exit(0);
                 }
+                struct Packet *pkt = (struct Packet *)&rx_buffer_ptr[rx_offset * packet_length];
 
-                struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
                 int recvlen = -1;
 
                 // start_time= get_time();
@@ -507,8 +504,6 @@ void *PacketTXRX::loopTXRX(int tid)
                 // int symbol_id = pkt->symbol_id;
                 // int ant_id = pkt->ant_id;
                 // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, symbol_id, ant_id, rx_offset);
-                // printf("RX thread %d received frame %d subframe %d, ant %d offset %d, buffer status %d %d ptr_offset %d\n", 
-                    // tid, frame_id, symbol_id, ant_id, rx_offset, *(rx_buffer_status_ptr+1424), *(rx_cur_buffer_status_ptr+1), rx_cur_buffer_status_ptr - rx_buffer_status_ptr);
                 if (frame_id > prev_frame_id) {
                     *(rx_frame_start + frame_id) = get_time();
                     prev_frame_id = frame_id;
@@ -519,11 +514,8 @@ void *PacketTXRX::loopTXRX(int tid)
             #endif
                 
                 // get the position in buffer
-                rx_offset = rx_cur_buffer_status_ptr - rx_buffer_status_ptr;
                 // move ptr & set status to full
-                rx_cur_buffer_status_ptr[0] = 1; // has data, after doing fft, it is set to 0
-                rx_cur_buffer_status_ptr = rx_buffer_status_ptr + (rx_offset + 1) % rx_buffer_frame_num;
-                rx_cur_buffer_ptr = rx_buffer_ptr + (rx_cur_buffer_ptr - rx_buffer_ptr + packet_length) % rx_buffer_length;
+                rx_buffer_status_ptr[rx_offset] = 1; // has data, after doing fft, it is set to 0
 
                 // push EVENT_PACKET_RECEIVED event into the queue
                 Event_data rx_message;
@@ -598,6 +590,9 @@ void *PacketTXRX::loopTXRX(int tid)
                     // last_finished_tx_frame_id = (last_finished_tx_frame_id + 1) % TASK_BUFFER_FRAME_NUM;                
                 }
             }  
+	    rx_offset++;
+	    if (rx_offset == rx_buffer_frame_num)
+	      rx_offset = 0;
         }
     }
 }
