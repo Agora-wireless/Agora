@@ -393,7 +393,7 @@ void *PacketTXRX::loopTXRX(int tid)
 
 
     // TX pointers
-    // float *tx_data_buffer = obj_ptr->tx_data_buffer_;
+    // float *tx_data_buffer = tx_data_buffer_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     int ret;
     int tx_offset;
@@ -427,12 +427,13 @@ void *PacketTXRX::loopTXRX(int tid)
                 exit(0);
             }
 
+            struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
             int recvlen = -1;
 
             // start_time= get_time();
-            // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
-            if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0))<0) {
-            // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &local_addr, &addrlen)) < 0) {
+            // if ((recvlen = recvfrom(socket_[tid], (char*)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
+            if ((recvlen = recv(socket_local, (char*)pkt, packet_length, 0))<0) {
+            // if ((recvlen = recvfrom(socket_local, (char*)pkt, packet_length, 0, (struct sockaddr *) &local_addr, &addrlen)) < 0) {
                 perror("recv failed");
                 exit(0);
             } 
@@ -441,7 +442,6 @@ void *PacketTXRX::loopTXRX(int tid)
 
         #if MEASURE_TIME
             // read information from received packet 
-            struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
             frame_id = pkt->frame_id;
             // int symbol_id = pkt->symbol_id;
             // int ant_id = pkt->ant_id;
@@ -488,19 +488,19 @@ void *PacketTXRX::loopTXRX(int tid)
                     exit(0);
                 }
 
+                struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
                 int recvlen = -1;
 
                 // start_time= get_time();
-                // if ((recvlen = recvfrom(obj_ptr->socket_[tid], (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &obj_ptr->servaddr_[tid], &addrlen)) < 0)
-                if ((recvlen = recv(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0))<0) {
-                // if ((recvlen = recvfrom(socket_local, (char*)rx_cur_buffer_ptr, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
+                // if ((recvlen = recvfrom(socket_[tid], (char*)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
+                if ((recvlen = recv(socket_local, (char*)pkt, packet_length, 0))<0) {
+                // if ((recvlen = recvfrom(socket_local, (char*)pkt, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
                     perror("recv failed");
                     exit(0);
                 } 
 
                 rx_packet_num_per_frame++;
                 
-                struct Packet *pkt = (struct Packet *)rx_cur_buffer_ptr;
                 frame_id = pkt->frame_id;
 
             #if MEASURE_TIME
