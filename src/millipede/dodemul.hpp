@@ -20,13 +20,14 @@
 #include "config.hpp"
 #include "stats.hpp"
 // #include "mkl_dfti.h"
+class Consumer;
 
 
 class DoDemul
 {
 public:
     DoDemul(Config *cfg, int in_tid, int in_demod_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+	    Consumer &in_consumer,
 	    Table<complex_float> &in_data_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_equal_buffer,
 	    Table<uint8_t> &in_demul_hard_buffer, Table<int8_t> &in_demod_soft_buffer, Stats *in_stats_manager);
     ~DoDemul();
@@ -72,10 +73,7 @@ private:
     int tid;
     int transpose_block_size;
     int demul_block_size;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
-    
-
+    Consumer &consumer_;
 
     Table<complex_float> &data_buffer_;
     Table<complex_float> &precoder_buffer_;

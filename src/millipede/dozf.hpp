@@ -19,13 +19,14 @@
 #include "config.hpp"
 #include "stats.hpp"
 // #include "mkl_dfti.h"
+class Consumer;
 
 
 class DoZF
 {
 public:
     DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+	Consumer &in_consumer,
         Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Table<complex_float> &in_pred_csi_buffer, 
         Stats *in_stats_manager);
     ~DoZF();
@@ -83,8 +84,7 @@ private:
     int tid;
     int transpose_block_size;
     int zf_block_size;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
+    Consumer &consumer_;
 
     Table<complex_float> csi_buffer_;
     Table<complex_float> precoder_buffer_;

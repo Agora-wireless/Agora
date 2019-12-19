@@ -24,7 +24,7 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-
+class Consumer;
 
 
 // #include "mkl_dfti.h"
@@ -33,8 +33,7 @@
 class DoCoding
 {
 public:
-    DoCoding(Config *cfg, int in_tid, 
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+  DoCoding(Config *cfg, int in_tid, Consumer &in_consumer,
         Table<int8_t> &in_raw_data_buffer, Table<int8_t> &in_encoded_buffer, Table<int8_t> &in_demod_buffer, Table<uint8_t> &in_decoded_buffer, 
         Stats *in_stats_manager);
     ~DoCoding();
@@ -56,8 +55,7 @@ private:
     int OFDM_CA_NUM, OFDM_DATA_NUM;
 
     int tid;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
+    Consumer &consumer_;
 
     Table<int8_t> &raw_data_buffer_;
     int8_t *encoded_buffer_temp;
