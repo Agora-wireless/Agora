@@ -4,13 +4,14 @@
  * 
  */
 #include "docoding.hpp"
+#include "Consumer.hpp"
 
 using namespace arma;
-DoCoding::DoCoding(Config *cfg, int in_tid, 
-    moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+DoCoding::DoCoding(Config *cfg, int in_tid, Consumer &in_consumer,
     Table<int8_t> &in_raw_data_buffer, Table<int8_t> &in_encoded_buffer, Table<int8_t> &in_demod_buffer, Table<uint8_t> &in_decoded_buffer, 
     Stats *in_stats_manager) 
-  : raw_data_buffer_(in_raw_data_buffer)
+  : consumer_(in_consumer)
+  , raw_data_buffer_(in_raw_data_buffer)
   , encoded_buffer_(in_encoded_buffer)
   , llr_buffer_(in_demod_buffer)
   , decoded_buffer_(in_decoded_buffer)
@@ -25,8 +26,6 @@ DoCoding::DoCoding(Config *cfg, int in_tid,
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
 
     tid = in_tid;
-    complete_task_queue_ = in_complete_task_queue;
-    task_ptok = in_task_ptok;
 
     Encode_task_count = in_stats_manager->encode_stats_worker.task_count;
     Decode_task_count = in_stats_manager->decode_stats_worker.task_count;
@@ -174,13 +173,7 @@ void DoCoding::Encode(int offset)
     Encode_finish_event.event_type = EVENT_ENCODE;
     Encode_finish_event.data = offset;
     
-
-    if ( !complete_task_queue_->enqueue(*task_ptok, Encode_finish_event ) ) {
-        printf("Encode message enqueue failed\n");
-        exit(0);
-    }
-
-
+    consumer_.handle(Encode_finish_event);
 }
 
 
@@ -221,9 +214,5 @@ void DoCoding::Decode(int offset)
     Event_data Decode_finish_event;
     Decode_finish_event.event_type = EVENT_DECODE;
     Decode_finish_event.data = offset;
-
-    if ( !complete_task_queue_->enqueue(*task_ptok, Decode_finish_event ) ) {
-        printf("Decode message enqueue failed\n");
-        exit(0);
-    }
+    consume_.handle(Decode_finish_event);
 }

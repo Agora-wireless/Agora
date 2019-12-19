@@ -4,6 +4,7 @@
  * 
  */
 #include "millipede.hpp"
+#include "Consumer.hpp"
 
 // typedef cx_float COMPLEX;
 bool keep_running = true;
@@ -486,21 +487,21 @@ void *Millipede::worker(int tid)
 {
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
     pin_to_core_with_offset(Worker, core_offset, tid);
-    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
+    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize operators */
-    DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+    DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
-    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_,
-	task_ptok_ptr, dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, consumer,
+	dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
 	dl_encoded_buffer_,
 #else
@@ -509,7 +510,7 @@ void *Millipede::worker(int tid)
         stats_manager_);
 
     #ifdef USE_LDPC
-    DoCoding *computeCoding = new DoCoding(cfg_, tid, &complete_task_queue_, task_ptok_ptr,
+    DoCoding *computeCoding = new DoCoding(cfg_, tid, consumer,
         *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
         stats_manager_);
     #endif
@@ -607,10 +608,10 @@ void* Millipede::worker_fft(int tid)
 {
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
     pin_to_core_with_offset(Worker_FFT, core_offset, tid);
-    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
+    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize FFT operator */
-    DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+    DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
@@ -634,10 +635,10 @@ void* Millipede::worker_zf(int tid)
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
     pin_to_core_with_offset(Worker_ZF, core_offset, tid);
 
-    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
+    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize ZF operator */
-    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
 
 
@@ -655,16 +656,16 @@ void* Millipede::worker_demul(int tid)
     
     int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
     pin_to_core_with_offset(Worker_Demul, core_offset, tid);
-    moodycamel::ProducerToken *task_ptok_ptr = task_ptoks_ptr[tid];
+    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize Demul operator */
-    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_, task_ptok_ptr,
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
 
     /* initialize Precode operator */
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, &complete_task_queue_,
-	task_ptok_ptr, dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, consumer,
+	dl_modulated_buffer_, dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
 	dl_encoded_buffer_,
 #else

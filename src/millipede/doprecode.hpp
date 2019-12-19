@@ -21,13 +21,13 @@
 #include "memory_manage.h"
 #include "stats.hpp"
 // #include "mkl_dfti.h"
-
+class Consumer;
 
 class DoPrecode
 {
 public:
     DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+	      Consumer &in_consumer,
 	Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer,
 	Table<complex_float> &in_dl_precoded_data_buffer, Table<complex_float> &in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -78,8 +78,7 @@ private:
     int tid;
     int transpose_block_size;
     int demul_block_size;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
+    Consumer &consumer_;
     
     Table<complex_float> &dl_modulated_buffer_;
     Table<complex_float> &precoder_buffer_;

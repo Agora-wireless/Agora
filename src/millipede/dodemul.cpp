@@ -4,14 +4,16 @@
  * 
  */
 #include "dodemul.hpp"
+#include "Consumer.hpp"
 
 using namespace arma;
 DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
-		 moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+		 Consumer &in_consumer,
 		 Table<complex_float> &in_data_buffer, Table<complex_float> &in_precoder_buffer,
 		 Table<complex_float> &in_equal_buffer, Table<uint8_t> &in_demod_hard_buffer,
 		 Table<int8_t> &in_demod_soft_buffer, Stats *in_stats_manager)
-  : data_buffer_(in_data_buffer)
+  : consumer_(in_consumer)
+  , data_buffer_(in_data_buffer)
   , precoder_buffer_(in_precoder_buffer)
   , equal_buffer_(in_equal_buffer)
   , demod_hard_buffer_(in_demod_hard_buffer)
@@ -28,8 +30,6 @@ DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transp
     tid = in_tid;
     demul_block_size = in_demul_block_size;
     transpose_block_size = in_transpose_block_size;
-    complete_task_queue_ = in_complete_task_queue;
-    task_ptok = in_task_ptok;
 
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;
@@ -251,11 +251,7 @@ void DoDemul::Demul(int offset)
     Event_data demul_finish_event;
     demul_finish_event.event_type = EVENT_DEMUL;
     demul_finish_event.data = offset;
-    if ( !complete_task_queue_->enqueue(*task_ptok, demul_finish_event ) ) {
-        printf("Demuliplexing message enqueue failed\n");
-        exit(0);
-    }  
-      
+    consumer_.handle(demul_finish_event);
 }
 
 void DoDemul::DemulSingleSC(int offset)
@@ -333,11 +329,7 @@ void DoDemul::DemulSingleSC(int offset)
     demul_finish_event.event_type = EVENT_DEMUL;
     demul_finish_event.data = offset;
     Demul_task_count[tid] = Demul_task_count[tid]+1;
-
-    if ( !complete_task_queue_->enqueue(*task_ptok, demul_finish_event ) ) {
-        printf("Demuliplexing message enqueue failed\n");
-        exit(0);
-    }  
+    consumer_.handle(demul_finish_event);
     double duration = get_time() - start_time;
     Demul_task_duration[tid][0] += duration;
       
