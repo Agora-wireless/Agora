@@ -81,16 +81,15 @@ public:
 
     inline void update_frame_count(int *frame_count);
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
-    moodycamel::ProducerToken const& ptok);
-    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok);
-    void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
-    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
-    void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
-    void schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode);
-    void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
-    void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
+    Consumer const& consumer);
+    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_zf_task(int frame_id, Consumer const &consumer);
+    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
+    void schedule_decode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_encode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_ifft_task(int frame_id, int data_subframe_id, Consumer const& consumer);  
+    void schedule_precode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
