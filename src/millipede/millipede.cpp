@@ -503,7 +503,7 @@ void *Millipede::worker(int tid)
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, consumer,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  stats_manager_);
 
     DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -647,7 +647,7 @@ void* Millipede::worker_zf(int tid)
 
     /* initialize ZF operator */
     DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, consumer,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  pred_csi_buffer_, stats_manager_);
+        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  stats_manager_);
 
 
     Event_data event;
@@ -1147,7 +1147,6 @@ void Millipede::initialize_uplink_buffers()
     socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
     csi_buffer_.malloc(PILOT_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
     data_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
-    pred_csi_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64);
     precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
     equal_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     demod_hard_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
@@ -1233,7 +1232,6 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
     csi_buffer_.free();
     data_buffer_.free();
-    pred_csi_buffer_.free();
     precoder_buffer_.free();
     equal_buffer_.free();
     demod_hard_buffer_.free();
