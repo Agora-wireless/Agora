@@ -231,13 +231,6 @@ private:
     // RawDataBuffer dl_rawdata_buffer_;
 
 
-    /** 
-     * Modulated data
-     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
-     */
-    Table<complex_float> dl_modulated_buffer_;
-
     /**
      * Data for IFFT
      * First dimension: FFT_buffer_block_num = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
