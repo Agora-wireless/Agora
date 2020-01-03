@@ -29,7 +29,7 @@ public:
     DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
 	      Consumer &in_consumer,
 	Table<complex_float> &in_precoder_buffer,
-	Table<complex_float> &in_dl_precoded_data_buffer, Table<complex_float> &in_dl_ifft_buffer,
+	Table<complex_float> &in_dl_ifft_buffer,
 #ifdef USE_LDPC
 	Table<int8_t> &in_dl_encoded_data,
 #else
@@ -88,7 +88,15 @@ private:
 
     //Table<complex_float> dl_modulated_buffer_;
     Table<complex_float> &precoder_buffer_;
-    Table<complex_float> &dl_precoded_data_buffer_;
+
+
+    /**
+     * Precoded data
+     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
+     */
+
+    //Table<complex_float> dl_precoded_data_buffer_;
     Table<complex_float> &dl_ifft_buffer_;
     Table<int8_t> &dl_IQ_data;
     Table<float> qam_table;

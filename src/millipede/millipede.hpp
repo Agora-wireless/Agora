@@ -248,15 +248,6 @@ private:
 
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
-
-    /**
-     * Precoded data
-     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
-     */
-    Table<complex_float> dl_precoded_data_buffer_;
-
-
     Table<int8_t> dl_encoded_buffer_;
 
 
