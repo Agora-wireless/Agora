@@ -25,7 +25,7 @@ class DoFFT
 {
 public:
     DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, Consumer &in_consumer,
-	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status, Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
+	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status, Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
         Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
         Stats *in_stats_manager);
     ~DoFFT();
@@ -110,7 +110,6 @@ private:
     Table<int> &socket_buffer_status_;
     Table<complex_float> &data_buffer_;
     Table<complex_float> &csi_buffer_;
-    float *pilots_;
 
     char *dl_socket_buffer_;;
     Table<complex_float> &dl_ifft_buffer_;
