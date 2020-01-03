@@ -11,7 +11,7 @@ using namespace arma;
 DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
 		     Consumer &in_consumer,
         Table<complex_float> &in_precoder_buffer,
-	Table<complex_float> &in_dl_precoded_data_buffer, Table<complex_float> &in_dl_ifft_buffer,
+	Table<complex_float> &in_dl_ifft_buffer,
 #ifdef USE_LDPC
 	Table<int8_t> &in_dl_encoded_data,
 #else
@@ -20,7 +20,6 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
         Stats *in_stats_manager)
   : consumer_(in_consumer)
   , precoder_buffer_(in_precoder_buffer)
-  , dl_precoded_data_buffer_(in_dl_precoded_data_buffer)
   , dl_ifft_buffer_(in_dl_ifft_buffer)
 #ifdef USE_LDPC
   , dl_IQ_data(in_dl_encoded_data)
@@ -36,6 +35,7 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     OFDM_DATA_START = cfg->OFDM_DATA_START;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     //dl_modulated_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64);
+    //dl_precoded_data_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
 
     tid = in_tid;
     demul_block_size = in_demul_block_size;

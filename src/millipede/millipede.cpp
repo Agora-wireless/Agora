@@ -509,7 +509,7 @@ void *Millipede::worker(int tid)
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, consumer,
-	dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
+	dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
 	dl_encoded_buffer_,
 #else
@@ -673,7 +673,7 @@ void* Millipede::worker_demul(int tid)
 
     /* initialize Precode operator */
     DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, consumer,
-	dl_precoder_buffer_, dl_precoded_data_buffer_, dl_ifft_buffer_,
+	dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
 	dl_encoded_buffer_,
 #else
@@ -1197,7 +1197,6 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
     dl_ifft_buffer_.calloc(BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_CA_NUM, 64);
-    dl_precoded_data_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
     dl_precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
     dl_encoded_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     recip_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM, 64);
@@ -1261,7 +1260,6 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
-    dl_precoded_data_buffer_.free();
 
 
     encode_stats_.task_count.free();
