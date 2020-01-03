@@ -27,8 +27,7 @@ class DoZF
 public:
     DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
 	Consumer &in_consumer,
-        Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Table<complex_float> &in_pred_csi_buffer, 
-        Stats *in_stats_manager);
+        Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Stats *in_stats_manager);
     ~DoZF();
 
     /**
@@ -90,6 +89,11 @@ private:
     Table<complex_float> precoder_buffer_;
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
+    /**
+     * Predicted CSI data
+     * First dimension: OFDM_CA_NUM
+     * Second dimension: BS_ANT_NUM * UE_NUM
+     */
     Table<complex_float> pred_csi_buffer_;
 
   Table<double> *ZF_task_duration;

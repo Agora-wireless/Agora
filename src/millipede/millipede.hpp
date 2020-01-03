@@ -199,14 +199,6 @@ private:
 
     Table<int8_t> demod_soft_buffer_;
 
-    /** 
-     * Predicted CSI data 
-     * First dimension: OFDM_CA_NUM 
-     * Second dimension: BS_ANT_NUM * UE_NUM
-     */
-    Table<complex_float> pred_csi_buffer_;
-
-
     Table<uint8_t> decoded_buffer_;
 
     RX_stats rx_stats_;
