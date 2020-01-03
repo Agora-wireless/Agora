@@ -130,7 +130,6 @@ private:
     /* lookup table for 16 QAM, real and imag */
     size_t mod_type;
     float **qam16_table_;
-    float *pilots_;
     Config *cfg_;
     int max_equaled_frame = 0;
     float csi_format_offset;

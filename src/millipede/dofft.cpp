@@ -9,7 +9,7 @@
 DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     Consumer &in_consumer,
     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
-    Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
+    Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
     Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
     Stats *in_stats_manager) 
   : consumer_(in_consumer)
@@ -33,7 +33,6 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
 
     tid = in_tid;
     transpose_block_size = in_transpose_block_size;
-    pilots_ = in_pilots;
 
     dl_socket_buffer_ = in_dl_socket_buffer;
 
@@ -246,6 +245,7 @@ void DoFFT::FFT(int offset)
         // int iteration_per_page = 64 / cache_line_num;
         // int offset_in_page = OFDM_DATA_START / 8;
         int block_num = OFDM_DATA_NUM / transpose_block_size;
+        float *pilots_ = config_->pilots_;
         _mm_prefetch((char*)pilots_, _MM_HINT_T0);
         for (int block_idx = 0; block_idx < block_num; block_idx ++) {
             // if (block_idx % iteration_per_page == 0 && block_idx < block_num - iteration_per_page)
