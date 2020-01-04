@@ -43,7 +43,7 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
 * @param[in] _ignored Not used but required by function prototype
 *                     to match required handler.
 */
-void SignalHandler::exitSignalHandler(int _ignored)
+void SignalHandler::exitSignalHandler(int)
 {
     mbGotExitSignal = true;
 }

@@ -4,29 +4,27 @@
  * 
  */
 #include "dozf.hpp"
+#include "Consumer.hpp"
 
 using namespace arma;
 DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
-    moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-    Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Table<complex_float> &in_pred_csi_buffer, 
-    Stats *in_stats_manager) 
-  : csi_buffer_(in_csi_buffer)
+    Consumer &in_consumer,
+    Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Stats *in_stats_manager)
+  : consumer_(in_consumer)
+  , csi_buffer_(in_csi_buffer)
   , precoder_buffer_(in_precoder_buffer)
   , dl_precoder_buffer_(in_dl_precoder_buffer)
   , recip_buffer_(in_recip_buffer)
-  , pred_csi_buffer_(in_pred_csi_buffer)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-
+    pred_csi_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64);
     tid = in_tid;
     zf_block_size = in_zf_block_size;
     transpose_block_size = in_transpose_block_size;
-    complete_task_queue_ = in_complete_task_queue;
-    task_ptok = in_task_ptok;
 
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
@@ -41,6 +39,7 @@ DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block
 DoZF::~DoZF()
 {
     free(csi_gather_buffer);   
+    pred_csi_buffer_.free();
 }
 
 
@@ -212,14 +211,7 @@ void DoZF::ZF_time_orthogonal(int offset)
     Event_data ZF_finish_event;
     ZF_finish_event.event_type = EVENT_ZF;
     ZF_finish_event.data = offset;
-    
-
-    if ( !complete_task_queue_->enqueue(*task_ptok, ZF_finish_event ) ) {
-        printf("ZF message enqueue failed\n");
-        exit(0);
-    }
-
-
+    consumer_.handle(ZF_finish_event);
 }
 
 
@@ -313,13 +305,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     Event_data ZF_finish_event;
     ZF_finish_event.event_type = EVENT_ZF;
     ZF_finish_event.data = offset;
-    
-    if ( !complete_task_queue_->enqueue(*task_ptok, ZF_finish_event ) ) {
-        printf("ZF message enqueue failed\n");
-        exit(0);
-    }
-
-
+    consumer_.handle(ZF_finish_event);
 }
 
 
@@ -342,9 +328,5 @@ void DoZF::Predict(int offset)
     Event_data pred_finish_event;
     pred_finish_event.event_type = EVENT_ZF;
     pred_finish_event.data = offset_next_frame;
-
-    if ( !complete_task_queue_->enqueue(*task_ptok, pred_finish_event ) ) {
-        printf("Prediction message enqueue failed\n");
-        exit(0);
-    }
+    consumer_.handle(pred_finish_event);
 }

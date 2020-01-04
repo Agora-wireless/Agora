@@ -1,5 +1,6 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
+#include "config.hpp"
 #include "ru.hpp"
 //#include "l2.hpp"
 #include <unistd.h>
@@ -158,7 +159,8 @@ public:
 
 
     // while loop of task thread
-    static void* taskThread(void* context);
+    static void* taskThread_launch(void* context);
+    void taskThread(int tid);
 
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
@@ -196,8 +198,8 @@ private:
     float *pilots_;
     complex_float *ul_pilot;
     char* ul_pilot_aligned;
-    int8_t **ul_IQ_data;
-    complex_float **ul_IQ_modul;
+    Table<int8_t>& ul_IQ_data;
+    Table<complex_float>& ul_IQ_modul;
 
 
     int pilot_sc_len;
@@ -264,8 +266,8 @@ private:
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM
      */
-    char **rx_buffer_;
-    int **rx_buffer_status_;
+    Table<char> rx_buffer_;
+    Table<int> rx_buffer_status_;
     int rx_buffer_size;
     int rx_buffer_status_size;
 
@@ -324,8 +326,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
-
-    EventHandlerContext context[TASK_THREAD_NUM];
 
     // all checkers
     // int cropper_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];

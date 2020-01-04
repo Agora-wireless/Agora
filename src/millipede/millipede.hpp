@@ -81,16 +81,15 @@ public:
 
     inline void update_frame_count(int *frame_count);
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
-    moodycamel::ProducerToken const& ptok);
-    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok);
-    void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
-    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
-    void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
-    void schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode);
-    void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
-    void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
+    Consumer const& consumer);
+    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_zf_task(int frame_id, Consumer const &consumer);
+    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
+    void schedule_decode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_encode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_ifft_task(int frame_id, int data_subframe_id, Consumer const& consumer);  
+    void schedule_precode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
@@ -200,14 +199,6 @@ private:
 
     Table<int8_t> demod_soft_buffer_;
 
-    /** 
-     * Predicted CSI data 
-     * First dimension: OFDM_CA_NUM 
-     * Second dimension: BS_ANT_NUM * UE_NUM
-     */
-    Table<complex_float> pred_csi_buffer_;
-
-
     Table<uint8_t> decoded_buffer_;
 
     RX_stats rx_stats_;
@@ -240,13 +231,6 @@ private:
     // RawDataBuffer dl_rawdata_buffer_;
 
 
-    /** 
-     * Modulated data
-     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
-     */
-    Table<complex_float> dl_modulated_buffer_;
-
     /**
      * Data for IFFT
      * First dimension: FFT_buffer_block_num = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
@@ -264,15 +248,6 @@ private:
 
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
-
-    /**
-     * Precoded data
-     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
-     */
-    Table<complex_float> dl_precoded_data_buffer_;
-
-
     Table<int8_t> dl_encoded_buffer_;
 
 

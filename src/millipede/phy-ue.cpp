@@ -4,6 +4,8 @@ using namespace arma;
 typedef cx_float COMPLEX;
 
 Phy_UE::Phy_UE(Config *cfg)
+  : ul_IQ_data(cfg->ul_IQ_data)
+  , ul_IQ_modul(cfg->ul_IQ_modul)
 {
     srand(time(NULL));
 
@@ -47,13 +49,8 @@ Phy_UE::Phy_UE(Config *cfg)
 
     // initialize IFFT buffer
     size_t IFFT_buffer_block_num = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    ifft_buffer_.IFFT_inputs = new complex_float * [IFFT_buffer_block_num];
-    ifft_buffer_.IFFT_outputs = new complex_float * [IFFT_buffer_block_num];
-    for (size_t i = 0; i < IFFT_buffer_block_num; i++)
-    {
-        ifft_buffer_.IFFT_inputs[i] = (complex_float *)mufft_alloc(FFT_LEN * sizeof(complex_float));
-        ifft_buffer_.IFFT_outputs[i] = (complex_float *)mufft_alloc(FFT_LEN * sizeof(complex_float));
-    }
+    ifft_buffer_.IFFT_inputs.malloc(IFFT_buffer_block_num, FFT_LEN, 0);
+    ifft_buffer_.IFFT_outputs.malloc(IFFT_buffer_block_num, FFT_LEN, 0);
 
     // initialize muplans for ifft
     for (size_t i = 0; i < TASK_THREAD_NUM; i++) 
@@ -75,16 +72,12 @@ Phy_UE::Phy_UE(Config *cfg)
 
     // initialize rx buffer
     rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
-    rx_buffer_status_.malloc_buffer_2d(rx_thread_num, rx_buffer_status_size, 64);
+    rx_buffer_status_.malloc(rx_thread_num, rx_buffer_status_size, 64);
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num = numAntennas * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    fft_buffer_.FFT_inputs = new complex_float * [FFT_buffer_block_num];
-    fft_buffer_.FFT_outputs = new complex_float * [FFT_buffer_block_num];
-    for (size_t i = 0; i < FFT_buffer_block_num; i++) {
-        fft_buffer_.FFT_inputs[i] = (complex_float *)mufft_alloc(FFT_LEN * sizeof(complex_float));
-        fft_buffer_.FFT_outputs[i] = (complex_float *)mufft_alloc(FFT_LEN * sizeof(complex_float));
-    }
+    fft_buffer_.FFT_inputs.malloc(FFT_buffer_block_num, FFT_LEN, 0);
+    fft_buffer_.FFT_outputs.malloc(FFT_buffer_block_num, FFT_LEN, 0);
 
     // initialize muplans for fft
     for (size_t i = 0; i < TASK_THREAD_NUM; i++) 
@@ -114,7 +107,7 @@ Phy_UE::Phy_UE(Config *cfg)
     }
 
     printf("new RU\n");
-    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, &message_queue_, &tx_queue_));
+    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, message_queue_, tx_queue_));
 
     // initilize all kinds of checkers
     cropper_checker_ = new size_t[dl_symbol_perframe * TASK_BUFFER_FRAME_NUM];
@@ -133,10 +126,11 @@ Phy_UE::Phy_UE(Config *cfg)
     }
     // create task thread 
     for(size_t i = 0; i < TASK_THREAD_NUM; i++) {
-        context[i].obj_ptr = this;
-        context[i].id = i;
+      EventHandlerContext *context = new EventHandlerContext;
+        context->obj_ptr = this;
+        context->id = i;
         //printf("create thread %d\n", i);
-        if(pthread_create( &task_threads[i], NULL, Phy_UE::taskThread, &context[i]) != 0) {
+        if(pthread_create( &task_threads[i], NULL, taskThread_launch, context) != 0) {
             perror("task thread create failed");
             exit(0);
         }
@@ -152,18 +146,10 @@ Phy_UE::~Phy_UE()
         mufft_free_plan_1d(mufftplans_[i]);
     }
     // release FFT_buffer
-    size_t FFT_buffer_block_num = numAntennas * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    for(size_t i = 0; i < FFT_buffer_block_num; i++)
-    {
-        mufft_free(fft_buffer_.FFT_inputs[i]);
-        mufft_free(fft_buffer_.FFT_outputs[i]);
-    }
-    size_t IFFT_buffer_block_num = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    for(size_t i = 0; i < IFFT_buffer_block_num; i++)
-    {
-        mufft_free(ifft_buffer_.IFFT_inputs[i]);
-        mufft_free(ifft_buffer_.IFFT_outputs[i]);
-    }
+    fft_buffer_.FFT_inputs.free();
+    fft_buffer_.FFT_outputs.free();
+    ifft_buffer_.IFFT_inputs.free();
+    ifft_buffer_.IFFT_outputs.free();
     //delete ul_pilot_aligned;
     //delete ul_pilot;
 }
@@ -208,13 +194,7 @@ void Phy_UE::start()
     // start radios
     ru_->startRadios();
 
-    // create socket buffer and socket threads
-    void *rx_buffer_ptrs[rx_thread_num];
-    for(size_t i = 0; i < rx_thread_num; i++) {
-        rx_buffer_ptrs[i] = (void *)rx_buffer_[i];
-    }
-
-    std::vector<pthread_t> rx_threads = ru_->startProc(rx_buffer_ptrs, 
+    std::vector<pthread_t> rx_threads = ru_->startProc(rx_buffer_,
         rx_buffer_status_, rx_buffer_status_size, rx_buffer_size, core_offset + 1);
 
     std::vector<pthread_t> tx_threads = ru_->startTX(tx_buffer_, ul_pilot_aligned, 
@@ -478,24 +458,27 @@ void Phy_UE::start()
     this->stop();
 }
 
-void* Phy_UE::taskThread(void* context)
+void* Phy_UE::taskThread_launch(void* in_context)
 {
-    
-    Phy_UE* obj_ptr = ((EventHandlerContext *)context)->obj_ptr;
-    Config *cfg = obj_ptr->cfg;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_ = &(obj_ptr->task_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* demul_queue_ = &(obj_ptr->demul_queue_);
-    moodycamel::ConcurrentQueue<Event_data>* ifft_queue_ = &(obj_ptr->ifft_queue_);
-    int tid = ((EventHandlerContext *)context)->id;
+    EventHandlerContext *context = (EventHandlerContext *)in_context;
+    Phy_UE* me = context->obj_ptr;
+    int tid = context->id;
+    delete context;
+    me->taskThread(tid);
+    return 0;
+}
+
+void Phy_UE::taskThread(int tid)
+{
     //printf("task thread %d starts\n", tid);
     
     // attach task threads to specific cores
     // Note: cores 0-17, 36-53 are on the same socket
 #ifdef ENABLE_CPU_ATTACH
-    size_t offset_id = obj_ptr->core_offset + obj_ptr->rx_thread_num * 2 + 1;
+    size_t offset_id = core_offset + rx_thread_num * 2 + 1;
     size_t tar_core_id = tid + offset_id;
-    if(tar_core_id >= obj_ptr->nCPUs) // FIXME: read the number of cores
-        tar_core_id = (tar_core_id - obj_ptr->nCPUs) + 2*obj_ptr->nCPUs;
+    if(tar_core_id >= nCPUs) // FIXME: read the number of cores
+        tar_core_id = (tar_core_id - nCPUs) + 2*nCPUs;
     if(pin_to_core(tar_core_id) != 0) {
         printf("Task thread: pinning thread %d to core %zu failed\n", tid, tar_core_id);
         exit(0);
@@ -505,22 +488,17 @@ void* Phy_UE::taskThread(void* context)
     }
 #endif
 
-    obj_ptr->task_ptok[tid].reset(new moodycamel::ProducerToken(obj_ptr->message_queue_));
+    task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 
     Event_data event;
-    bool ret = false;
-    bool ret_demul = false;
-    bool ret_ifft = false;
-
     while(cfg->running) {
-        if (demul_queue_->try_dequeue(event))
-            obj_ptr->doDemul(tid, event.data);
-	else if (ifft_queue_->try_dequeue(event))
-	    obj_ptr->doFFT(tid, event.data);
-	else if (task_queue_->try_dequeue(event))
-	  obj_ptr->doTransmit(tid, event.data, 0); //, event.more_data);
+        if (demul_queue_.try_dequeue(event))
+            doDemul(tid, event.data);
+	else if (ifft_queue_.try_dequeue(event))
+	    doFFT(tid, event.data);
+	else if (task_queue_.try_dequeue(event))
+	  doTransmit(tid, event.data, 0); //, event.more_data);
     }
-    return 0;
 }
 
 
@@ -536,7 +514,7 @@ void Phy_UE::doFFT(int tid, int offset)
     
     // read info of one frame
     char *cur_ptr_buffer = rx_buffer_[rx_thread_id] + offset * packet_length;
-    struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
+    struct Packet *pkt = (struct Packet *)cur_ptr_buffer;
     int frame_id = pkt->frame_id;
     int symbol_id = pkt->symbol_id;
     //int cell_id = pkt->cell_id;
@@ -793,8 +771,6 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 void Phy_UE::initialize_vars_from_cfg(Config *cfg)
 {
     pilots_ = cfg->pilots_;
-    ul_IQ_data = cfg->ul_IQ_data;
-    ul_IQ_modul = cfg->ul_IQ_modul;
 
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;

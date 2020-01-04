@@ -19,13 +19,12 @@
 #include "mufft/fft.h"
 #include "config.hpp"
 #include "stats.hpp"
-
+class Consumer;
 
 class DoFFT
 {
 public:
-    DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+    DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, Consumer &in_consumer,
 	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status, Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
         Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
         Stats *in_stats_manager);
@@ -105,8 +104,7 @@ private:
     int tid;
     int transpose_block_size;
 
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
+    Consumer &consumer_;
 
     Table<char> &socket_buffer_;
     Table<int> &socket_buffer_status_;

@@ -6,7 +6,6 @@
 
 #include "txrx.hpp"
 
-
 PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
     socket_ = new int[RX_THREAD_NUM];
@@ -62,15 +61,16 @@ PacketTXRX::~PacketTXRX()
 }
 
 
-std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start)
+std::vector<pthread_t> PacketTXRX::startRecv(Table<char> &in_buffer, Table<int> &in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, Table<double> &in_frame_start)
 {
+    buffer_ = &in_buffer;  // for save data
+    buffer_status_ = &in_buffer_status; // for save status
+    frame_start_ = &in_frame_start;
+
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-    buffer_ = in_buffer;  // for save data
-    buffer_status_ = in_buffer_status; // for save status
-    frame_start_ = in_frame_start;
 
 
     printf("create RX threads\n");
@@ -196,11 +196,11 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
     //moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
 
-    char* buffer = (char*)obj_ptr->buffer_[tid];
-    int* buffer_status = obj_ptr->buffer_status_[tid];
+    char* buffer = (*obj_ptr->buffer_)[tid];
+    int* buffer_status = (*obj_ptr->buffer_status_)[tid];
     int buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
-    double *frame_start = obj_ptr->frame_start_[tid];
+    double *frame_start = (*obj_ptr->frame_start_)[tid];
 
     // downlink socket buffer
     // char *tx_buffer_ptr = obj_ptr->tx_buffer_;
@@ -208,12 +208,6 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
     size_t txSymsPerFrame = cfg->dlSymsPerFrame;
     std::vector<size_t> txSymbols = cfg->DLSymbols[0];
     std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
-
-    // walk through all the pages
-    double temp;
-    for (int i = 0; i < 20; i++) {
-        temp = frame_start[i * 512];
-    }
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -225,8 +219,8 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2 
     char* cur_ptr_buffer2;
-    char* buffer2 = (char*)obj_ptr->buffer_[tid] + packet_length; 
-    int* buffer_status2 = obj_ptr->buffer_status_[tid] + 1;
+    char* buffer2 = (*obj_ptr->buffer_)[tid] + packet_length; 
+    int* buffer_status2 = (*obj_ptr->buffer_status_)[tid] + 1;
     int *cur_ptr_buffer_status2 = buffer_status2;
     if (cfg->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
@@ -326,15 +320,15 @@ void* PacketTXRX::loopRecv_Argos(void *in_context)
         #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
 	    if (rx_symbol_id > 0) 
                 continue;
-            for (int sym_id = 0; sym_id < txSymsPerFrame; sym_id++)
+            for (size_t sym_id = 0; sym_id < txSymsPerFrame; sym_id++)
             {
                 symbol_id = txSymbols[sym_id];
 		int tx_frame_id = frame_id + TX_FRAME_DELTA;
                 void* txbuf[2];
                 long long frameTime = ((long long)tx_frame_id << 32) | (symbol_id << 16);
                 int flags = 1; // HAS_TIME
-                if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
-	    	if (ant_id != cfg->ref_ant)
+                if (symbol_id == (int)txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+	    	if (ant_id != (int)cfg->ref_ant)
 	    	    txbuf[0] = zeros.data(); 
 	    	else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
                         txbuf[0] = cfg->pilot_ci16.data();
@@ -378,7 +372,7 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
     //int* buffer_status = obj_ptr->tx_buffer_status_;
 
     Config *cfg = obj_ptr->config_;
-    RadioConfig *radio = obj_ptr->radioconfig_;
+    //RadioConfig *radio = obj_ptr->radioconfig_;
 
     int ret;
     int tx_offset;
@@ -434,14 +428,16 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         //{
             size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
-            void* txbuf[2];
-            long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+	    UNUSED void* txbuf[2];
+            //long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+#if SEPARATE_TX_RX
             int flags = 1; // HAS_TIME
             if (symbol_id == txSymbols.back()) flags = 2; // HAS_TIME & END_BURST, fixme
+#endif
             if (cfg->nChannels == 1 || tx_ant_id % 2 == 0)
             {
             #if DEBUG_DOWNLINK
-		if (tx_ant_id != cfg->ref_ant)
+	        if (tx_ant_id != (int)cfg->ref_ant)
 		    txbuf[0] = zeros.data(); 
 		else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
                     txbuf[0] = cfg->pilot_ci16.data();
@@ -480,4 +476,3 @@ void* PacketTXRX::loopSend_Argos(void *in_context)
     }
     return 0; 
 }
-
