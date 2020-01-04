@@ -88,12 +88,13 @@ void adapt_bits_for_mod(int8_t *vec_in, int8_t *vec_out, int len, int mod_order)
             int nremaining_bits = 8 - start_bit;
             int nbits_in_next = mod_order - (nremaining_bits);
             int nremaining_bits_next = 8 - nbits_in_next;
-            vec_out[out_idx] = (cvt_to_int8(vec_in[i], start_bit, 8) << nremaining_bits ) + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
+            vec_out[out_idx] = (cvt_to_int8(vec_in[i], start_bit, 8) << nbits_in_next) + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
             out_idx++;
             start_bit = nbits_in_next;
         }
 
     }
+    // printf("mod_order: %d\n", mod_order);
     // printf("original\n");
     // for (int i = 0; i < len; i++) {
     //     std::cout << " " << std::bitset<8>(vec_in[i]);
@@ -121,14 +122,17 @@ int main(){
     int8_t *encoded[numberCodeblocks];
     uint8_t *decoded[numberCodeblocks];
 
-    int8_t **mod_input;
-    complex_float **mod_output;
+    Table<int8_t> mod_input;
+    Table<complex_float> mod_output;
+    // int8_t **mod_input;
+    // complex_float **mod_output;
 
 
 
     // uint16_t Zc_array[12] = {2,8,10,12,14,16,20,32,64,96,144,192};
-    int mod_order = 4;
-    float **mod_table = init_modulation_table(mod_order);
+    int mod_order = 6;
+    Table<float> mod_table;
+    init_modulation_table(mod_table, mod_order);
     uint16_t Zc_array[1] = {32};
     for (int zc_itr = 0; zc_itr < 1; zc_itr++) {
         uint16_t Zc = Zc_array[zc_itr];
@@ -143,8 +147,10 @@ int main(){
             decoded[i] = (uint8_t*)malloc(((cbLen+7)>>3) * sizeof(uint8_t));
         }
 
-        alloc_buffer_2d(&mod_input, numberCodeblocks, cbCodewLen / mod_order, 32, 1);
-        alloc_buffer_2d(&mod_output, numberCodeblocks, cbCodewLen / mod_order, 32, 1);
+        mod_input.calloc(numberCodeblocks, cbCodewLen / mod_order, 32);
+        mod_output.calloc(numberCodeblocks, cbCodewLen / mod_order, 32);
+        // alloc_buffer_2d(&mod_input, numberCodeblocks, cbCodewLen / mod_order, 32, 1);
+        // alloc_buffer_2d(&mod_output, numberCodeblocks, cbCodewLen / mod_order, 32, 1);
 
 
         printf("Zc: %d, code block len: %d, encoded block len: %d, encoder buf: %d Bytes, decoder buf: %d Bytes, decoder iterations: %d\n", 
