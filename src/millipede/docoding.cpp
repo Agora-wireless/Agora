@@ -119,7 +119,7 @@ void adapt_bits_for_mod(int8_t *vec_in, int8_t *vec_out, int len, int mod_order)
             int nremaining_bits = 8 - start_bit;
             int nbits_in_next = mod_order - (nremaining_bits);
             int nremaining_bits_next = 8 - nbits_in_next;
-            vec_out[out_idx] = (cvt_to_int8(vec_in[i], start_bit, 8) << nremaining_bits ) + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
+            vec_out[out_idx] = (cvt_to_int8(vec_in[i], start_bit, 8) << nbits_in_next) + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
             out_idx++;
             start_bit = nbits_in_next;
         }
