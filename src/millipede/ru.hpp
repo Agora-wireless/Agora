@@ -2,27 +2,19 @@
 #ifndef RU_HEADER
 #define RU_HEADER
 
-#include <iostream>
+#ifdef SIM
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <stdlib.h>
-#include <vector>
-#include <ctime>
-#include <algorithm>
-#include <numeric>
+#else
+class RadioConfig;
+#endif
+#include <complex>
 #include <pthread.h>
-#include <cassert>
-#include <unistd.h>
-#include <chrono>
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include <vector>
+
 #include "concurrentqueue.h"
-#include "radio_lib.hpp"
-#include <fstream>      // std::ifstream
 
 class RU
 {
@@ -32,15 +24,11 @@ public:
     // header 4 int for: frame_id, subframe_id, cell_id, ant_id
     // ushort for: I/Q samples
     // static const int package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-    static const int data_offset = sizeof(int) * 4;
     // use for create pthread 
     struct RUContext
     {
         RU *ptr;
         int tid;
-#ifndef SIM
-        int radios;
-#endif
     };
 
 public:
@@ -63,30 +51,34 @@ public:
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + N_THREAD - 1}
     */ 
-    std::vector<pthread_t> startProc(void** in_buffer, int** in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
+  std::vector<pthread_t> startProc(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     std::vector<pthread_t> startTX(char* in_buffer, char *in_pilot_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id=0);
     /**
      * receive thread
      * context: PackageReceiverContext type
     */
-    static void* loopSend(void *context);
-    static void* loopProc(void *context);
-    void send(void *out_buffer, int length, int frame_id, int symbol_id, int ant_id);
+    static void* sendThread_launch(void *context);
+    void sendThread(int tid);
+    static void* taskThread_launch(void *context);
+    void taskThread(int tid);
  
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     Config *config_;
+#ifdef SIM
     struct sockaddr_in servaddr_[10];    /* server address */
     struct sockaddr_in servaddr_tx_[10]; /* server address for tx*/
     struct sockaddr_in cliaddr_[10];    /* client address */
     int* rx_socket_;
     int* tx_socket_;
+#else
 
     RadioConfig *radioconfig_;
+#endif
 
-    void** buffer_;
-    int** buffer_status_;
+    Table<char>* buffer_;
+    Table<int>* buffer_status_;
     int buffer_length_;
     int buffer_frame_num_;
 
@@ -98,15 +90,12 @@ private:
 
     int thread_num_;
     int tx_thread_num_;
-    int radios_per_thread;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_;
+    moodycamel::ConcurrentQueue<Event_data> &message_queue_;
+    moodycamel::ConcurrentQueue<Event_data> &task_queue_;
     std::vector<std::unique_ptr<moodycamel::ProducerToken>> task_ptok;
     //std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
     int core_id_;
     int tx_core_id_;
-
-    RUContext* context;
 };
 #endif

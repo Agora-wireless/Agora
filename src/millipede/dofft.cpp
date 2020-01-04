@@ -4,14 +4,16 @@
  * 
  */
 #include "dofft.hpp"
+#include "Consumer.hpp"
 
-DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
-    moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
+DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
+    Consumer &in_consumer,
     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
     Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
     Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
     Stats *in_stats_manager) 
-  : socket_buffer_(in_socket_buffer)
+  : consumer_(in_consumer)
+  , socket_buffer_(in_socket_buffer)
   , socket_buffer_status_(in_socket_buffer_status)
   , data_buffer_(in_data_buffer)
   , csi_buffer_(in_csi_buffer)
@@ -31,9 +33,6 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
 
     tid = in_tid;
     transpose_block_size = in_transpose_block_size;
-    complete_task_queue_ = in_complete_task_queue;
-    task_ptok = in_task_ptok;
-
     pilots_ = in_pilots;
 
     dl_socket_buffer_ = in_dl_socket_buffer;
@@ -398,12 +397,7 @@ void DoFFT::FFT(int offset)
     
     
 
-    // if ( !complete_task_queue_.enqueue(*task_ptok[tid], fft_finish_event ) ) {
-    if ( !complete_task_queue_->enqueue(*task_ptok, fft_finish_event ) ) {
-        printf("fft message enqueue failed\n");
-        exit(0);
-    }
-
+    consumer_.handle(fft_finish_event);
 }
 
 
@@ -485,11 +479,6 @@ void DoFFT::IFFT(int offset)
     Event_data ifft_finish_event;
     ifft_finish_event.event_type = EVENT_IFFT;
     ifft_finish_event.data = offset;
-
-    if ( !complete_task_queue_->enqueue(*task_ptok, ifft_finish_event ) ) {
-        printf("IFFT message enqueue failed\n");
-        exit(0);
-    }
-
+    consumer_.handle(ifft_finish_event);
 }
 

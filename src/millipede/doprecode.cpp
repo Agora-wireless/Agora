@@ -4,17 +4,22 @@
  * 
  */
 #include "doprecode.hpp"
+#include "Consumer.hpp"
 
 using namespace arma;
 
 DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-        Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoded_data_buffer, 
-        Table<complex_float> &in_dl_ifft_buffer, Table<int8_t> &in_dl_IQ_data, Table<int8_t> &in_dl_encoded_data,
+		     Consumer &in_consumer,
+        Table<complex_float> &in_precoder_buffer,
+	Table<complex_float> &in_dl_ifft_buffer,
+#ifdef USE_LDPC
+	Table<int8_t> &in_dl_encoded_data,
+#else
+	Table<int8_t> &in_dl_IQ_data,
+#endif
         Stats *in_stats_manager)
-  : dl_modulated_buffer_(in_dl_modulated_buffer)
+  : consumer_(in_consumer)
   , precoder_buffer_(in_precoder_buffer)
-  , dl_precoded_data_buffer_(in_dl_precoded_data_buffer)
   , dl_ifft_buffer_(in_dl_ifft_buffer)
 #ifdef USE_LDPC
   , dl_IQ_data(in_dl_encoded_data)
@@ -29,12 +34,12 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     OFDM_DATA_START = cfg->OFDM_DATA_START;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    //dl_modulated_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, UE_NUM * OFDM_DATA_NUM, 64);
+    //dl_precoded_data_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
 
     tid = in_tid;
     demul_block_size = in_demul_block_size;
     transpose_block_size = in_transpose_block_size;
-    complete_task_queue_ = in_complete_task_queue;
-    task_ptok = in_task_ptok;
 
     size_t mod_type = config_->mod_type;
     init_modulation_table(qam_table, mod_type);
@@ -54,7 +59,7 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
 
 DoPrecode::~DoPrecode() 
 {
-
+  //dl_modulated_buffer_.free();
 }
 
 
@@ -203,11 +208,7 @@ void DoPrecode::Precode(int offset)
     Event_data precode_finish_event;
     precode_finish_event.event_type = EVENT_PRECODE;
     precode_finish_event.data = offset;
-    
-    if ( !complete_task_queue_->enqueue(*task_ptok, precode_finish_event ) ) {
-        printf("Precoding message enqueue failed\n");
-        exit(0);
-    }
+    consumer_.handle(precode_finish_event);
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, subcarrier: %d , offset: %d\n", tid, 
         frame_id, current_data_subframe_id, sc_id, offset);

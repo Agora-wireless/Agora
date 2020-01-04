@@ -21,15 +21,20 @@
 #include "memory_manage.h"
 #include "stats.hpp"
 // #include "mkl_dfti.h"
-
+class Consumer;
 
 class DoPrecode
 {
 public:
     DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-	Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoded_data_buffer, 
-        Table<complex_float> &in_dl_ifft_buffer, Table<int8_t> &in_dl_IQ_data, Table<int8_t> &in_dl_encoded_data,
+	      Consumer &in_consumer,
+	Table<complex_float> &in_precoder_buffer,
+	Table<complex_float> &in_dl_ifft_buffer,
+#ifdef USE_LDPC
+	Table<int8_t> &in_dl_encoded_data,
+#else
+	Table<int8_t> &in_dl_IQ_data,
+#endif
         Stats *in_stats_manager);
     ~DoPrecode();
 
@@ -73,12 +78,25 @@ private:
     int tid;
     int transpose_block_size;
     int demul_block_size;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
+    Consumer &consumer_;
     
-    Table<complex_float> &dl_modulated_buffer_;
+    /**
+     * Modulated data
+     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * second dimension: UE_NUM * OFDM_CA_NUM
+     */
+
+    //Table<complex_float> dl_modulated_buffer_;
     Table<complex_float> &precoder_buffer_;
-    Table<complex_float> &dl_precoded_data_buffer_;
+
+
+    /**
+     * Precoded data
+     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
+     */
+
+    //Table<complex_float> dl_precoded_data_buffer_;
     Table<complex_float> &dl_ifft_buffer_;
     Table<int8_t> &dl_IQ_data;
     Table<float> qam_table;
