@@ -6,7 +6,7 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
-DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
+DoFFT::DoFFT(Config *cfg, int in_tid,
     Consumer &in_consumer,
     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
     Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
@@ -32,7 +32,6 @@ DoFFT::DoFFT(Config *cfg, int in_tid, int in_transpose_block_size,
     buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
 
     tid = in_tid;
-    transpose_block_size = in_transpose_block_size;
 
     dl_socket_buffer_ = in_dl_socket_buffer;
 
@@ -241,6 +240,7 @@ void DoFFT::FFT(int offset)
         int sc_idx = OFDM_DATA_START;
         //int dst_idx = 0;
 
+	int transpose_block_size = config_->transpose_block_size;
         // int cache_line_num = transpose_block_size / 8;
         // int iteration_per_page = 64 / cache_line_num;
         // int offset_in_page = OFDM_DATA_START / 8;
@@ -329,6 +329,7 @@ void DoFFT::FFT(int offset)
 
         // tar_ptr: point to the start of subframe with size BS_ANT_NUM * OFDM_CA_NUM
         // 96*1024*2 float values
+	int transpose_block_size = config_->transpose_block_size;
         float *tar_ptr = (float *)&data_buffer_[frame_offset][0];
         // copy data from fft_outputs to data_buffer
         // 1024*2/8 = 256 iterations, copy 8 bytes every time

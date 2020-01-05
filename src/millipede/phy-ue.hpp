@@ -58,7 +58,6 @@ public:
     //static const int TASK_BUFFER_FRAME_NUM = 60;
     // optimization parameters for block transpose (see the slides for more
     // details)
-    static const int transpose_block_size = 64;
     // do demul_block_size sub-carriers in each task
     //static const int demul_block_size = OFDM_CA_NUM*2/transpose_block_size;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
