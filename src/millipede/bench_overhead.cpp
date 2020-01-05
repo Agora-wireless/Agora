@@ -2077,7 +2077,7 @@ void CoMP::doDemul(int tid, int offset)
     
 
     // int gather_step_size = 8 * OFDM_CA_NUM;
-    int gather_step_size = 8 * transpose_block_size;
+    int gather_step_size = 8 * cfg_->transpose_block_size;
 
 #if DEBUG_PRINT_IN_TASK
         printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
@@ -2107,6 +2107,7 @@ void CoMP::doDemulSingleSC(int tid, int offset)
     interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
     
+    int transpose_block_size = cfg_->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
 
 #if DEBUG_PRINT_IN_TASK

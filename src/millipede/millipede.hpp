@@ -55,7 +55,6 @@ class Millipede
 {
 public:
     /* optimization parameters for block transpose (see the slides for more details) */
-    static const int transpose_block_size = 8;
     static const int transpose_block_num = 256;
     /* dequeue bulk size, used to reduce the overhead of dequeue in main thread */
     static const int dequeue_bulk_size = 32;

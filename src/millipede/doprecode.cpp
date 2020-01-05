@@ -8,7 +8,7 @@
 
 using namespace arma;
 
-DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
+DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size,
 		     Consumer &in_consumer,
         Table<complex_float> &in_precoder_buffer,
 	Table<complex_float> &in_dl_ifft_buffer,
@@ -39,7 +39,6 @@ DoPrecode::DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_tr
 
     tid = in_tid;
     demul_block_size = in_demul_block_size;
-    transpose_block_size = in_transpose_block_size;
 
     size_t mod_type = config_->mod_type;
     init_modulation_table(qam_table, mod_type);
