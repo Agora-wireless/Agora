@@ -20,9 +20,10 @@ Install Armadillo:
 
 Install muFFT:
 
+	sudo apt-get install libfftw3-dev
 	git clone https://github.com/Themaister/muFFT.git
 	cd muFFT
-	make
+	cmake
 	sudo make install
 
 	
