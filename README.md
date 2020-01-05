@@ -6,7 +6,7 @@
 
 Required packages LAPACK, BLAS, Boost, Doxygen
 
-	sudo apt-get install liblapack-dev, libblas-dev, libboost-all-dev
+	sudo apt-get install liblapack-dev libblas-dev libboost-all-dev
 	sudo apt-get install doxygen
 
 Install Armadillo:
