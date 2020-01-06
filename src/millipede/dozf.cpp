@@ -7,7 +7,7 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block_size,
+DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size,
     Consumer &in_consumer,
     Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Stats *in_stats_manager)
   : consumer_(in_consumer)
@@ -24,7 +24,6 @@ DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size, int in_transpose_block
     pred_csi_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64);
     tid = in_tid;
     zf_block_size = in_zf_block_size;
-    transpose_block_size = in_transpose_block_size;
 
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
@@ -74,6 +73,7 @@ void DoZF::ZF_time_orthogonal(int offset)
 #endif 
         int cur_sc_id = sc_id + i;
         int cur_offset = offset_in_buffer + i;
+	int transpose_block_size = config_->transpose_block_size;
         // directly gather data from FFT buffer
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, 
                                             transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
@@ -229,6 +229,8 @@ void DoZF::ZF_freq_orthogonal(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time1 = get_time();
 #endif 
+    int transpose_block_size = config_->transpose_block_size;
+
     for (int i = 0; i < UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
         // directly gather data from FFT buffer

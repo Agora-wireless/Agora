@@ -91,39 +91,42 @@ DoCoding::~DoCoding()
 
 }
 
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
 
-int8_t cvt_to_int8(int8_t x, int start, int end) 
+static inline uint8_t
+bitreverse8(uint8_t x)
 {
-    int8_t re = 0;
-    int index = end - start -1;
-    for (int i = start; i < end; i++) {
-        re |= ((x >> i) & 0x1) << index;
-        index--;
-    }
-    return re;
+#if __has_builtin(__builtin_bireverse8)
+  return (__builtin_bitreverse8(x));
+# else
+  x = (x << 4) | (x >> 4);
+  x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
+  x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
+  return (x);
+#endif
 }
 
-void adapt_bits_for_mod(int8_t *vec_in, int8_t *vec_out, int len, int mod_order)
+/*
+ * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
+ * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
+ * at least 8*len/m bytes.
+ */
+static void
+adapt_bits_for_mod(int8_t *vec_in, int8_t *vec_out, int len, int mod_order)
 {
-    int start_bit = 0, end_bit = 0;
-    int out_idx = 0;
-    for (int i = 0; i < len; i++) {
-        end_bit = start_bit + mod_order;
-        while (end_bit <= 8) {
-            vec_out[out_idx] = cvt_to_int8(vec_in[i], start_bit, end_bit);
-            out_idx++;
-            start_bit = end_bit;
-            end_bit = start_bit + mod_order;
-        } 
-        if (i + 1 < len) {
-            int nremaining_bits = 8 - start_bit;
-            int nbits_in_next = mod_order - (nremaining_bits);
-            int nremaining_bits_next = 8 - nbits_in_next;
-            vec_out[out_idx] = (cvt_to_int8(vec_in[i], start_bit, 8) << nbits_in_next) + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
-            out_idx++;
-            start_bit = nbits_in_next;
-        }
+  int bits_avail = 0;
+  uint16_t bits = 0;
+  for (int i = 0; i < len; i++) {
+    bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
+    bits_avail += 8;
+    while (bits_avail >= mod_order) {
+      *vec_out++ = bits >> (16 - mod_order);
+      bits <<= mod_order;
+      bits_avail -= mod_order;
     }
+  }
 }
 
 void DoCoding::Encode(int offset)

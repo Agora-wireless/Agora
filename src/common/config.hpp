@@ -30,6 +30,7 @@ typedef unsigned short ushort;
 class Config
 {
 public:
+    int transpose_block_size;
     size_t sampsPerSymbol;
     size_t symbolsPerFrame;
     size_t pilotSymsPerFrame;

@@ -55,7 +55,6 @@ class Millipede
 {
 public:
     /* optimization parameters for block transpose (see the slides for more details) */
-    static const int transpose_block_size = 8;
     static const int transpose_block_num = 256;
     /* dequeue bulk size, used to reduce the overhead of dequeue in main thread */
     static const int dequeue_bulk_size = 32;
@@ -130,7 +129,6 @@ private:
     /* lookup table for 16 QAM, real and imag */
     size_t mod_type;
     float **qam16_table_;
-    float *pilots_;
     Config *cfg_;
     int max_equaled_frame = 0;
     float csi_format_offset;

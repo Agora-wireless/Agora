@@ -7,7 +7,7 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
+DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size,
 		 Consumer &in_consumer,
 		 Table<complex_float> &in_data_buffer, Table<complex_float> &in_precoder_buffer,
 		 Table<complex_float> &in_equal_buffer, Table<uint8_t> &in_demod_hard_buffer,
@@ -29,7 +29,6 @@ DoDemul::DoDemul(Config *cfg, int in_tid, int in_demul_block_size, int in_transp
 
     tid = in_tid;
     demul_block_size = in_demul_block_size;
-    transpose_block_size = in_transpose_block_size;
 
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;
@@ -66,6 +65,7 @@ void DoDemul::Demul(int offset)
     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id,sc_id);
     #endif
 
+    int transpose_block_size = config_->transpose_block_size;
     __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, 
                                         transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
     int gather_step_size = 8 * transpose_block_size;
@@ -263,6 +263,7 @@ void DoDemul::DemulSingleSC(int offset)
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
     
+    int transpose_block_size = config_->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
 
 #if DEBUG_PRINT_IN_TASK

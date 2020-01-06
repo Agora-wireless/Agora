@@ -498,17 +498,17 @@ void *Millipede::worker(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize operators */
-    DoFFT *computeFFT = new DoFFT(cfg_, tid, transpose_block_size, consumer,
-        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
+    DoFFT *computeFFT = new DoFFT(cfg_, tid, consumer,
+        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, consumer,
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  stats_manager_);
 
-    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, consumer,
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, consumer,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, consumer,
 	dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
 	dl_encoded_buffer_,
@@ -619,8 +619,8 @@ void* Millipede::worker_fft(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize FFT operator */
-    DoFFT* computeFFT = new DoFFT(cfg_, tid, transpose_block_size, consumer,
-        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_, pilots_,
+    DoFFT* computeFFT = new DoFFT(cfg_, tid, consumer,
+        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
 
@@ -646,7 +646,7 @@ void* Millipede::worker_zf(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize ZF operator */
-    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, transpose_block_size, consumer,
+    DoZF *computeZF = new DoZF(cfg_, tid, zf_block_size, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, recip_buffer_,  stats_manager_);
 
 
@@ -667,12 +667,12 @@ void* Millipede::worker_demul(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize Demul operator */
-    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, transpose_block_size, consumer,
+    DoDemul *computeDemul = new DoDemul(cfg_, tid, demul_block_size, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
 
     /* initialize Precode operator */
-    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, transpose_block_size, consumer,
+    DoPrecode *computePrecode = new DoPrecode(cfg_, tid, demul_block_size, consumer,
 	dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
 	dl_encoded_buffer_,
@@ -1061,13 +1061,12 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, U
 
 void Millipede::initialize_vars_from_cfg(Config *cfg)
 {
-    pilots_ = cfg->pilots_;
     dl_IQ_data = &cfg->dl_IQ_data;
 
 #if DEBUG_PRINT_PILOT
     cout<<"Pilot data"<<endl;
     for (int i = 0; i < OFDM_CA_NUM; i++) 
-        cout<<pilots_[i]<<",";
+        cout<<cfg->pilots_[i]<<",";
     cout<<endl;
 #endif
 
@@ -1225,7 +1224,6 @@ void Millipede::initialize_downlink_buffers()
 
 void Millipede::free_uplink_buffers()
 {
-    //free_buffer_1d(&pilots_);
     socket_buffer_.free();
     socket_buffer_status_.free();
     csi_buffer_.free();

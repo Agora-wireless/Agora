@@ -24,6 +24,7 @@ Config::Config(std::string jsonfile)
     calTxGainA = tddConf.value("calTxGainA", 10);
     calTxGainB = tddConf.value("calTxGainB", 10);
     rate = tddConf.value("rate", 5e6);
+    transpose_block_size = tddConf.value("transpose_block_size", 16);
     sampsPerSymbol = tddConf.value("symbol_size", 0);
     prefix = tddConf.value("prefix", 0);
     dl_prefix = tddConf.value("dl_prefix", 0);

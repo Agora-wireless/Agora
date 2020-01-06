@@ -26,7 +26,7 @@ class Consumer;
 class DoPrecode
 {
 public:
-    DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
+    DoPrecode(Config *cfg, int in_tid, int in_demul_block_size,
 	      Consumer &in_consumer,
 	Table<complex_float> &in_precoder_buffer,
 	Table<complex_float> &in_dl_ifft_buffer,
@@ -76,7 +76,6 @@ private:
     int data_subframe_num_perframe;
 
     int tid;
-    int transpose_block_size;
     int demul_block_size;
     Consumer &consumer_;
     
