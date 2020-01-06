@@ -66,8 +66,7 @@ public:
     /**
      * Do modulation and ifft tasks for one OFDM symbol
      * @param tid: task thread index, used for selecting task ptok
-     * @param offset: offset of the OFDM symbol in dl_modulated_buffer_
-     * Buffers: dl_IQ_data_long, dl_modulated_buffer_
+     * Buffers: dl_IQ_data_long
      *     Input buffer: dl_IQ_data_long
      *     Output buffer: dl_iffted_data_buffer_
      *     Intermediate buffer: dl_ifft_buffer_
