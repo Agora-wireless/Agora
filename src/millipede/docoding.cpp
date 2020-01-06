@@ -89,6 +89,8 @@ DoCoding::DoCoding(Config *cfg, int in_tid, Consumer &in_consumer,
 DoCoding::~DoCoding()
 {
     decoded_buffer_.free();
+    free_buffer_1d(&ldpc_decoder_5gnr_response.varNodes);
+    free_buffer_1d(&encoded_buffer_temp);
 }
 
 #ifndef __has_builtin
