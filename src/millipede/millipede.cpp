@@ -519,7 +519,7 @@ void *Millipede::worker(int tid)
 
     #ifdef USE_LDPC
     DoCoding *computeCoding = new DoCoding(cfg_, tid, consumer,
-        *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_, 
+        *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_,
         stats_manager_);
     #endif
 
@@ -1154,7 +1154,6 @@ void Millipede::initialize_uplink_buffers()
     equal_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     demod_hard_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     demod_soft_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
-    decoded_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     
     int max_packet_num_per_frame = downlink_mode ? (BS_ANT_NUM * PILOT_NUM) : (BS_ANT_NUM * (ul_data_subframe_num_perframe + PILOT_NUM));
     rx_stats_.max_task_count = max_packet_num_per_frame;
@@ -1237,7 +1236,6 @@ void Millipede::free_uplink_buffers()
     equal_buffer_.free();
     demod_hard_buffer_.free();
     demod_soft_buffer_.free();
-    decoded_buffer_.free();
 
     free_buffer_1d(&(rx_stats_.task_count));
     free_buffer_1d(&(rx_stats_.task_pilot_count));
