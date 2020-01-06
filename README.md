@@ -9,6 +9,14 @@ Required packages LAPACK, BLAS, Boost, Doxygen
 	sudo apt-get install liblapack-dev libblas-dev libboost-all-dev
 	sudo apt-get install doxygen
 
+Install Intel® Libraries and compiler
+
+Download Intel® Parallel Studio XE from 
+Intel's [website](https://software.intel.com/en-us/parallel-studio-xe/choose-download).
+Unpack the installer, navigate to it and install it with:
+    
+    sudo ./install_GUI.sh
+
 Install Armadillo:
 
 	wget http://sourceforge.net/projects/arma/files/armadillo-9.300.2.tar.xz .
@@ -23,7 +31,7 @@ Install muFFT:
 	sudo apt-get install libfftw3-dev
 	git clone https://github.com/Themaister/muFFT.git
 	cd muFFT
-	cmake
+	cmake .
 	sudo make install
 
 	
