@@ -197,7 +197,8 @@ void DoCoding::Decode(int offset)
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * config_->mod_type;
     int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
-    int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int symbol_offset = data_subframe_num_perframe * frame_id + symbol_id;
     ldpc_decoder_5gnr_request.varNodes = (int8_t *)llr_buffer_[symbol_offset] + llr_buffer_offset;
     ldpc_decoder_5gnr_response.compactedMessageBytes = (uint8_t *)decoded_buffer_[symbol_offset] + decoded_buffer_offset;
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n", 

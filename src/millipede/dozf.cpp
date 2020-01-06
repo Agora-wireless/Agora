@@ -21,7 +21,7 @@ DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size,
     UE_NUM = cfg->UE_NUM;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    pred_csi_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM * UE_NUM, 64);
+    alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
     tid = in_tid;
     zf_block_size = in_zf_block_size;
 
@@ -38,7 +38,7 @@ DoZF::DoZF(Config *cfg, int in_tid, int in_zf_block_size,
 DoZF::~DoZF()
 {
     free(csi_gather_buffer);   
-    pred_csi_buffer_.free();
+    free_buffer_1d(&pred_csi_buffer_);
 }
 
 
@@ -319,7 +319,7 @@ void DoZF::Predict(int offset)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
-    cx_float *ptr_in = (cx_float *)pred_csi_buffer_[sc_id];
+    cx_float *ptr_in = (cx_float *)pred_csi_buffer_;
     memcpy(ptr_in, (cx_float *)csi_buffer_[offset_in_buffer], sizeof(cx_float)*BS_ANT_NUM*UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     cx_float *ptr_out = (cx_float *)precoder_buffer_[offset_next_frame];
