@@ -38,7 +38,7 @@ Install muFFT:
 
 Compile Millipede:
 
-	cd millipede
+	cd Millipede
 	mkdir build
 	cd build
 	cmake ..
