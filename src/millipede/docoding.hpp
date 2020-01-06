@@ -61,7 +61,7 @@ private:
     int8_t *encoded_buffer_temp;
     Table<int8_t> &encoded_buffer_;
     Table<int8_t> &llr_buffer_;
-    Table<uint8_t> &decoded_buffer_;
+    Table<uint8_t> decoded_buffer_;
 
     Table<double> &Encode_task_duration;
     int *Encode_task_count;

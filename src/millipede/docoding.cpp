@@ -8,13 +8,12 @@
 
 using namespace arma;
 DoCoding::DoCoding(Config *cfg, int in_tid, Consumer &in_consumer,
-    Table<int8_t> &in_raw_data_buffer, Table<int8_t> &in_encoded_buffer, Table<int8_t> &in_demod_buffer, Table<uint8_t> &in_decoded_buffer, 
+    Table<int8_t> &in_raw_data_buffer, Table<int8_t> &in_encoded_buffer, Table<int8_t> &in_demod_buffer,
     Stats *in_stats_manager) 
   : consumer_(in_consumer)
   , raw_data_buffer_(in_raw_data_buffer)
   , encoded_buffer_(in_encoded_buffer)
   , llr_buffer_(in_demod_buffer)
-  , decoded_buffer_(in_decoded_buffer)
   , Encode_task_duration(in_stats_manager->encode_stats_worker.task_duration)
   , Decode_task_duration(in_stats_manager->decode_stats_worker.task_duration)
 {
@@ -27,6 +26,7 @@ DoCoding::DoCoding(Config *cfg, int in_tid, Consumer &in_consumer,
 
     tid = in_tid;
 
+    decoded_buffer_.malloc(TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     Encode_task_count = in_stats_manager->encode_stats_worker.task_count;
     Decode_task_count = in_stats_manager->decode_stats_worker.task_count;
 
@@ -88,7 +88,9 @@ DoCoding::DoCoding(Config *cfg, int in_tid, Consumer &in_consumer,
 
 DoCoding::~DoCoding()
 {
-
+    decoded_buffer_.free();
+    free_buffer_1d(&ldpc_decoder_5gnr_response.varNodes);
+    free_buffer_1d(&encoded_buffer_temp);
 }
 
 #ifndef __has_builtin
@@ -196,9 +198,10 @@ void DoCoding::Decode(int offset)
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * config_->mod_type;
     int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
-    int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int symbol_offset = data_subframe_num_perframe * frame_id + symbol_id;
     ldpc_decoder_5gnr_request.varNodes = (int8_t *)llr_buffer_[symbol_offset] + llr_buffer_offset;
-    ldpc_decoder_5gnr_response.compactedMessageBytes = (uint8_t *)decoded_buffer_[symbol_offset] + decoded_buffer_offset;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = (uint8_t *)decoded_buffer_[symbol_id] + decoded_buffer_offset;
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n", 
     //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, decoded_buffer_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);

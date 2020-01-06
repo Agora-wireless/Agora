@@ -6,7 +6,7 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
-DoFFT::DoFFT(Config *cfg, int in_tid,
+FFTBase::FFTBase(Config *cfg, int in_tid,
     Consumer &in_consumer,
     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
     Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
@@ -60,7 +60,7 @@ DoFFT::DoFFT(Config *cfg, int in_tid,
 }
 
 
-DoFFT::~DoFFT()
+FFTBase::~FFTBase()
 {
     fft_buffer_.FFT_inputs.free();
     fft_buffer_.FFT_outputs.free();
@@ -403,7 +403,7 @@ void DoFFT::FFT(int offset)
 
 
 
-void DoFFT::IFFT(int offset)
+void DoIFFT::IFFT(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
