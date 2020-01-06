@@ -31,10 +31,12 @@ Install muFFT:
 	sudo apt-get install libfftw3-dev
 	git clone https://github.com/Themaister/muFFT.git
 	cd muFFT
-	cmake .
+	git checkout 6d716abf9d813627338b9580589fc442975559d1
 	sudo make install
 
-	
+Install nlohmann-json:
+
+    sudo apt-get install nlohmann-json-dev
 
 Compile Millipede:
 
