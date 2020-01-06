@@ -111,7 +111,8 @@ private:
     int BS_ANT_NUM, UE_NUM, PILOT_NUM;
     int OFDM_CA_NUM;
     int OFDM_DATA_NUM;
-    int subframe_num_perframe;
+    int subframe_num_perframe, data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     int dl_data_subframe_start, dl_data_subframe_end;
     bool downlink_mode;
     int packet_length;
