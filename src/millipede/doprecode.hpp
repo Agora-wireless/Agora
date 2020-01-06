@@ -79,23 +79,8 @@ private:
     int demul_block_size;
     Consumer &consumer_;
     
-    /**
-     * Modulated data
-     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
-     */
-
-    //Table<complex_float> dl_modulated_buffer_;
     Table<complex_float> &precoder_buffer_;
 
-
-    /**
-     * Precoded data
-     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
-     */
-
-    //Table<complex_float> dl_precoded_data_buffer_;
     Table<complex_float> &dl_ifft_buffer_;
     Table<int8_t> &dl_IQ_data;
     Table<float> qam_table;
