@@ -4,10 +4,11 @@
 
 1. Installation
 
-Required packages LAPACK, BLAS, Boost, Doxygen
+Required packages LAPACK, BLAS, Boost, Doxygen, nlohmann-json
 
 	sudo apt-get install liblapack-dev libblas-dev libboost-all-dev
 	sudo apt-get install doxygen
+	sudo apt-get install nlohmann-json-dev
 
 Install Intel® Libraries and compiler
 
@@ -33,10 +34,6 @@ Install muFFT:
 	cd muFFT
 	git checkout 6d716abf9d813627338b9580589fc442975559d1
 	sudo make install
-
-Install nlohmann-json:
-
-    sudo apt-get install nlohmann-json-dev
 
 Compile Millipede:
 
