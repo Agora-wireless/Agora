@@ -6,28 +6,27 @@
 #ifndef DOFFT
 #define DOFFT
 
-#include <iostream>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
+#include "config.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "mkl_dfti.h"
 #include "mufft/fft.h"
-#include "config.hpp"
+#include "offset.h"
 #include "stats.hpp"
+#include <iostream>
+#include <stdio.h> /* for fprintf */
+#include <string.h> /* for memcpy */
+#include <vector>
 class Consumer;
 
-class DoFFT
-{
+class DoFFT {
 public:
-    DoFFT(Config *cfg, int in_tid, Consumer &in_consumer,
-	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
-	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
-        Stats *in_stats_manager);
+    DoFFT(Config* cfg, int in_tid, Consumer& in_consumer,
+        Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
+        Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
+        Stats* in_stats_manager);
     ~DoFFT();
 
     /**
@@ -61,28 +60,28 @@ public:
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
     void FFT(int offset);
+
 private:
-    Config *config_;
+    Config* config_;
     int tid;
-    Consumer &consumer_;
-    Table<char> &socket_buffer_;
-    Table<int> &socket_buffer_status_;
-    Table<complex_float> &data_buffer_;
-    Table<complex_float> &csi_buffer_;
-    Table<double> *FFT_task_duration;
-    int *FFT_task_count;
-    Table<double> *CSI_task_duration;
-    int *CSI_task_count;
+    Consumer& consumer_;
+    Table<char>& socket_buffer_;
+    Table<int>& socket_buffer_status_;
+    Table<complex_float>& data_buffer_;
+    Table<complex_float>& csi_buffer_;
+    Table<double>* FFT_task_duration;
+    int* FFT_task_count;
+    Table<double>* CSI_task_duration;
+    int* CSI_task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     FFTBuffer fft_buffer_;
 };
 
-class DoIFFT
-{
+class DoIFFT {
 public:
-    DoIFFT(Config *cfg, int in_tid, Consumer &in_consumer,
-        Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
-	Stats *in_stats_manager);
+    DoIFFT(Config* cfg, int in_tid, Consumer& in_consumer,
+        Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
+        Stats* in_stats_manager);
     ~DoIFFT();
 
     /**
@@ -109,16 +108,17 @@ public:
      *     2. add an event to the message queue to infrom main thread the completion of this task
      */
     void IFFT(int offset);
+
 private:
-    Config *config_;
+    Config* config_;
     int tid;
-    Consumer &consumer_;
-    Table<complex_float> &dl_ifft_buffer_;
-    char *dl_socket_buffer_;;
-    Table<double> *task_duration;
-    int *task_count;
+    Consumer& consumer_;
+    Table<complex_float>& dl_ifft_buffer_;
+    char* dl_socket_buffer_;
+    ;
+    Table<double>* task_duration;
+    int* task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 };
-
 
 #endif

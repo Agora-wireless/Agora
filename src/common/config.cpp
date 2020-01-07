@@ -62,10 +62,10 @@ Config::Config(std::string jsonfile)
     nRadios = radio_ids.size();
     nAntennas = nChannels * nRadios;
     if (ref_ant >= nAntennas)
-	ref_ant = 0;
+        ref_ant = 0;
     if (beacon_mode == "beamsweep" && nAntennas > 1) {
         int hadamardSize = int(pow(2, ceil(log2(nAntennas))));
-        std::vector<std::vector<double> > hadamard_weights = CommsLib::getSequence(hadamardSize, CommsLib::HADAMARD);
+        std::vector<std::vector<double>> hadamard_weights = CommsLib::getSequence(hadamardSize, CommsLib::HADAMARD);
         beacon_weights.resize(nAntennas);
         for (size_t i = 0; i < nAntennas; i++)
             for (size_t j = 0; j < nAntennas; j++)
@@ -125,10 +125,10 @@ Config::Config(std::string jsonfile)
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
 
     /* frame configurations */
-    if(freq_orthogonal_pilot) 
+    if (freq_orthogonal_pilot)
         zf_block_size = UE_NUM;
     symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
-    size_t pilot_num_default = freq_orthogonal_pilot? 1 : UE_NUM;
+    size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_NUM;
     pilot_symbol_num_perframe = tddConf.value("pilot_num", pilot_num_default);
     data_symbol_num_perframe = tddConf.value("data_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
     ul_data_symbol_num_perframe = tddConf.value("ul_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
@@ -147,14 +147,14 @@ Config::Config(std::string jsonfile)
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
     LDPC_config.Zc = tddConf.value("Zc", 32);
-    LDPC_config.nRows = (LDPC_config.Bg==1) ? 46 : 42;
+    LDPC_config.nRows = (LDPC_config.Bg == 1) ? 46 : 42;
     LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
-    LDPC_config.cbLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
-    LDPC_config.cbCodewLen = (LDPC_config.Bg==1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
-    LDPC_config.nblocksInSymbol = 1;//OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+    LDPC_config.cbLen = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
+    LDPC_config.cbCodewLen = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
+    LDPC_config.nblocksInSymbol = 1; //OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
-    printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, encoded block len: %d, decoder iterations: %d\n", 
-            LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen, LDPC_config.cbCodewLen, LDPC_config.decoderIter);
+    printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, encoded block len: %d, decoder iterations: %d\n",
+        LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen, LDPC_config.cbCodewLen, LDPC_config.decoderIter);
 
     std::cout << "Config file loaded!" << std::endl;
     std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
@@ -164,8 +164,8 @@ Config::Config(std::string jsonfile)
     std::cout << "DL sym num " << dlSymsPerFrame << std::endl;
 
 #ifdef USE_ARGOS
-    std::vector<std::vector<double> > gold_ifft = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
-    std::vector<std::complex<int16_t> > coeffs_ci16 = Utils::double_to_int16(gold_ifft);
+    std::vector<std::vector<double>> gold_ifft = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
+    std::vector<std::complex<int16_t>> coeffs_ci16 = Utils::double_to_int16(gold_ifft);
     coeffs = Utils::cint16_to_uint32(coeffs_ci16, true, "QI");
     beacon_ci16.resize(256);
     for (size_t i = 0; i < 128; i++) {
@@ -173,13 +173,12 @@ Config::Config(std::string jsonfile)
         beacon_ci16[i + 128] = beacon_ci16[i];
     }
 
-    std::vector<std::complex<int16_t> > pre0(prefix, 0);
-    std::vector<std::complex<int16_t> > post0(sampsPerSymbol - 256 - prefix, 0);
+    std::vector<std::complex<int16_t>> pre0(prefix, 0);
+    std::vector<std::complex<int16_t>> post0(sampsPerSymbol - 256 - prefix, 0);
     beacon_ci16.insert(beacon_ci16.begin(), pre0.begin(), pre0.end());
     beacon_ci16.insert(beacon_ci16.end(), post0.begin(), post0.end());
     beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
 #endif
-
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
     size_t r = 0;
@@ -200,12 +199,12 @@ Config::Config(std::string jsonfile)
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
-    if (r < OFDM_CA_NUM) printf("bad read from file %s \n", filename.c_str());
+    if (r < OFDM_CA_NUM)
+        printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
 #endif
 
-
-    std::vector<std::complex<float> > pilotsF(OFDM_CA_NUM);
+    std::vector<std::complex<float>> pilotsF(OFDM_CA_NUM);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilotsF[i] = pilots_[i];
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
@@ -214,7 +213,7 @@ Config::Config(std::string jsonfile)
     std::vector<std::complex<int16_t>> pre_ci16(prefix, 0);
     std::vector<std::complex<int16_t>> post_ci16(postfix, 0);
     for (size_t i = 0; i < OFDM_CA_NUM + CP_LEN; i++)
-        pilot_ci16.push_back(std::complex<int16_t>((int16_t)(pilot_cf32[i].real()*32768), (int16_t)(pilot_cf32[i].imag()*32768)));
+        pilot_ci16.push_back(std::complex<int16_t>((int16_t)(pilot_cf32[i].real() * 32768), (int16_t)(pilot_cf32[i].imag() * 32768)));
     pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
     pilot_ci16.insert(pilot_ci16.end(), post_ci16.begin(), post_ci16.end());
 
@@ -237,43 +236,41 @@ Config::Config(std::string jsonfile)
     ul_IQ_data.malloc(ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64);
     ul_IQ_modul.malloc(ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64);
 
-
-
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
 
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int8_t>(dl_IQ_data[i], (dl_IQ_data[i] + OFDM_CA_NUM * UE_NUM)), mod_type);
+        std::vector<std::complex<float>> modul_data = CommsLib::modulate(std::vector<int8_t>(dl_IQ_data[i], (dl_IQ_data[i] + OFDM_CA_NUM * UE_NUM)), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM * UE_NUM; j++) {
             if ((j % OFDM_CA_NUM) < OFDM_DATA_START || (j % OFDM_CA_NUM) >= OFDM_DATA_START + OFDM_DATA_NUM) {
                 dl_IQ_modul[i][j].re = 0;
                 dl_IQ_modul[i][j].im = 0;
-	        } else {
+            } else {
                 dl_IQ_modul[i][j].re = modul_data[j].real();
                 dl_IQ_modul[i][j].im = modul_data[j].imag();
-	        }
+            }
         }
 
         // if (i % UE_NUM == 0) {
-	        // int c = i / UE_NUM;
-            int c = i;
-            std::vector<std::complex<float> > ifft_dl_data = CommsLib::IFFT(modul_data, OFDM_CA_NUM);
-	        ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
-            for (size_t j = 0; j < sampsPerSymbol; j++) {
-                if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                    dl_IQ_symbol[c][j] = 0;
-                } else {
-                    dl_IQ_symbol[c][j] = {(int16_t)(ifft_dl_data[j-prefix].real()*32768), (int16_t)(ifft_dl_data[j-prefix].imag()*32768)};
-                }
+        // int c = i / UE_NUM;
+        int c = i;
+        std::vector<std::complex<float>> ifft_dl_data = CommsLib::IFFT(modul_data, OFDM_CA_NUM);
+        ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
+        for (size_t j = 0; j < sampsPerSymbol; j++) {
+            if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                dl_IQ_symbol[c][j] = 0;
+            } else {
+                dl_IQ_symbol[c][j] = { (int16_t)(ifft_dl_data[j - prefix].real() * 32768), (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
             }
+        }
         // }
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
         for (size_t j = 0; j < OFDM_DATA_NUM; j++)
             ul_IQ_data[i][j] = rand() % mod_order;
-        std::vector<std::complex<float> > modul_data = CommsLib::modulate(std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM * UE_NUM), mod_type);
+        std::vector<std::complex<float>> modul_data = CommsLib::modulate(std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM * UE_NUM), mod_type);
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
             if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM)
                 continue;
@@ -293,7 +290,7 @@ Config::Config(std::string jsonfile)
     for (size_t i = 0; i < data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_NUM; j++) {
             r = fread(dl_IQ_data[i] + j * OFDM_CA_NUM, sizeof(int8_t), OFDM_CA_NUM, fd);
-            if (r < OFDM_CA_NUM) 
+            if (r < OFDM_CA_NUM)
                 printf("bad read from file %s (batch %zu) \n", filename1.c_str(), i);
             // for (size_t k = 0; k < OFDM_CA_NUM; k++) {
             //     dl_IQ_data[i][j * OFDM_CA_NUM + k] = dl_IQ_data[i][j * OFDM_CA_NUM + k] % (uint8_t) mod_order;
@@ -312,7 +309,7 @@ Config::Config(std::string jsonfile)
     size_t total_sc = OFDM_DATA_NUM * UE_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
     L2_data = new mac_dtype[total_sc];
     r = fread(L2_data, sizeof(mac_dtype), total_sc, fp);
-    if (r < total_sc) 
+    if (r < total_sc)
         printf("bad read from file %s \n", filename2.c_str());
     fclose(fp);
     for (size_t i = 0; i < total_sc; i++) {
