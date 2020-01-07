@@ -24,7 +24,6 @@ class Consumer;
 class FFTBase{
 public:
     FFTBase(Config *cfg, int in_tid, Consumer &in_consumer,
-	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
         Stats *in_stats_manager);
     ~FFTBase();
@@ -44,8 +43,6 @@ protected:
 
     Consumer &consumer_;
 
-    Table<char> &socket_buffer_;
-    Table<int> &socket_buffer_status_;
     Table<complex_float> &data_buffer_;
     Table<complex_float> &csi_buffer_;
 
@@ -108,12 +105,14 @@ public:
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
     void FFT(int offset);
+private:
+    Table<char> &socket_buffer_;
+    Table<int> &socket_buffer_status_;
 };
 
 class DoIFFT: public FFTBase {
 public:
     DoIFFT(Config *cfg, int in_tid, Consumer &in_consumer,
-	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
         Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
 	Stats *in_stats_manager);
