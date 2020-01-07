@@ -26,7 +26,7 @@ public:
     FFTBase(Config *cfg, int in_tid, Consumer &in_consumer,
 	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
-        char *in_dl_socket_buffer, Stats *in_stats_manager);
+        Stats *in_stats_manager);
     ~FFTBase();
 
 protected:
@@ -48,9 +48,6 @@ protected:
     Table<int> &socket_buffer_status_;
     Table<complex_float> &data_buffer_;
     Table<complex_float> &csi_buffer_;
-
-    char *dl_socket_buffer_;;
-
 
     // int packet_length;
     Table<double> *FFT_task_duration;
@@ -77,7 +74,7 @@ public:
     DoFFT(Config *cfg, int in_tid, Consumer &in_consumer,
 	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
-        char *in_dl_socket_buffer,  Stats *in_stats_manager);
+        Stats *in_stats_manager);
     ~DoFFT() {}
 
     /**
@@ -148,6 +145,7 @@ public:
     void IFFT(int offset);
 private:
     Table<complex_float> &dl_ifft_buffer_;
+    char *dl_socket_buffer_;;
 };
 
 
