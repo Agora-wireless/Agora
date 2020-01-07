@@ -21,54 +21,14 @@
 #include "stats.hpp"
 class Consumer;
 
-class FFTBase{
-public:
-    FFTBase(Config *cfg, int in_tid, Consumer &in_consumer,
-        Stats *in_stats_manager);
-    ~FFTBase();
-
-protected:
-    Config *config_;
-    int BS_ANT_NUM, PILOT_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int OFDM_PREFIX_LEN;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int packet_length;
-    int buffer_subframe_num_;
-
-    int tid;
-
-    Consumer &consumer_;
-
-    // int packet_length;
-    Table<double> *FFT_task_duration;
-    Table<double> *CSI_task_duration;
-    int *FFT_task_count;
-    int *CSI_task_count;
-    Table<double> *IFFT_task_duration;
-    int *IFFT_task_count;
-
-    FFTBuffer fft_buffer_;
-
-    DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    MKL_LONG mkl_status;
-
-    DFTI_DESCRIPTOR_HANDLE mkl_handle_dl;
-    MKL_LONG mkl_status_dl;
-    
-    // mufft_plan_1d *muplans_;
-};
-
-class DoFFT: public FFTBase
+class DoFFT
 {
 public:
     DoFFT(Config *cfg, int in_tid, Consumer &in_consumer,
 	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
         Stats *in_stats_manager);
-    ~DoFFT() {}
+    ~DoFFT();
 
     /**
      * Do FFT task for one OFDM symbol 
@@ -102,18 +62,28 @@ public:
      */
     void FFT(int offset);
 private:
+    Config *config_;
+    int tid;
+    Consumer &consumer_;
     Table<char> &socket_buffer_;
     Table<int> &socket_buffer_status_;
     Table<complex_float> &data_buffer_;
     Table<complex_float> &csi_buffer_;
+    Table<double> *FFT_task_duration;
+    int *FFT_task_count;
+    Table<double> *CSI_task_duration;
+    int *CSI_task_count;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    FFTBuffer fft_buffer_;
 };
 
-class DoIFFT: public FFTBase {
+class DoIFFT
+{
 public:
     DoIFFT(Config *cfg, int in_tid, Consumer &in_consumer,
         Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
 	Stats *in_stats_manager);
-    ~DoIFFT() {}
+    ~DoIFFT();
 
     /**
      * Do modulation and ifft tasks for one OFDM symbol
@@ -140,8 +110,14 @@ public:
      */
     void IFFT(int offset);
 private:
+    Config *config_;
+    int tid;
+    Consumer &consumer_;
     Table<complex_float> &dl_ifft_buffer_;
     char *dl_socket_buffer_;;
+    Table<double> *task_duration;
+    int *task_count;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
 };
 
 
