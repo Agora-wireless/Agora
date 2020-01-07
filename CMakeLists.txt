@@ -188,20 +188,20 @@ if (${USE_ARGOS})
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
-  target_link_libraries(user -lpthread -lmufft -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
+  target_link_libraries(user -lpthread /usr/local/lib/libmufft.a -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
 
   add_library(ue_phy MODULE 
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
-  target_link_libraries(ue_phy -lpthread -lmufft -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
+  target_link_libraries(ue_phy -lpthread /usr/local/lib/libmufft.a -larmadillo ${SOAPY_LIB} ${PYTHON_LIB})
 else()
   set(SENDER_SOURCES simulator/sender_cli.cpp
                      simulator/sender.cpp 
                      ${COMMON_SOURCES})
 
   add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender -lpthread -lmufft)
+  target_link_libraries(sender -lpthread /usr/local/lib/libmufft.a)
 
 
   set(SIMULATOR_SOURCES simulator/main.cpp
@@ -211,7 +211,7 @@ else()
                         ${COMMON_SOURCES})
 
   add_executable(sim ${SIMULATOR_SOURCES})
-  target_link_libraries(sim -lpthread -lmufft)
+  target_link_libraries(sim -lpthread /usr/local/lib/libmufft.a)
 endif()
 
 
