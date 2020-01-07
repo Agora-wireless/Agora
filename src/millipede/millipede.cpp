@@ -500,7 +500,7 @@ void *Millipede::worker(int tid)
     /* initialize operators */
     auto computeFFT = new DoFFT(cfg_, tid, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
-        dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
+        dl_socket_buffer_, stats_manager_);
 
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
@@ -625,7 +625,7 @@ void* Millipede::worker_fft(int tid)
     /* initialize IFFT operator */
     auto computeFFT = new DoFFT(cfg_, tid, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
-        dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
+        dl_socket_buffer_, stats_manager_);
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
