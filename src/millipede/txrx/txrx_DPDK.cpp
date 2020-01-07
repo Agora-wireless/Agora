@@ -6,7 +6,7 @@
 
 #include "txrx.hpp"
 
-inline const struct rte_eth_conf port_conf_default() 
+inline const struct rte_eth_conf port_conf_default()
 {
     struct rte_eth_conf rte = rte_eth_conf();
     // rte.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
@@ -14,16 +14,15 @@ inline const struct rte_eth_conf port_conf_default()
     return rte;
 }
 
-static struct rte_flow *
+static struct rte_flow*
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
-                uint32_t src_ip, uint32_t src_mask,
-                uint32_t dest_ip, uint32_t dest_mask,
-                uint16_t src_port, uint16_t src_port_mask,
-                uint16_t dst_port, uint16_t dst_port_mask,
-                struct rte_flow_error *error);
+    uint32_t src_ip, uint32_t src_mask,
+    uint32_t dest_ip, uint32_t dest_mask,
+    uint16_t src_port, uint16_t src_port_mask,
+    uint16_t dst_port, uint16_t dst_port_mask,
+    struct rte_flow_error* error);
 
-
-PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
 {
     socket_ = new int[RX_THREAD_NUM];
     config_ = cfg;
@@ -47,13 +46,13 @@ PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
 
     //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
-    srand (time(NULL));
+    srand(time(NULL));
     rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
     tx_context = new EventHandlerContext<PacketTXRX>[tx_thread_num_];
 
-    std::string core_list = std::to_string(core_id_)+"-"+std::to_string(core_id_+rx_thread_num_+tx_thread_num_);
+    std::string core_list = std::to_string(core_id_) + "-" + std::to_string(core_id_ + rx_thread_num_ + tx_thread_num_);
     int argc = 5;
-    char *argv[] = {
+    char* argv[] = {
         (char*)"txrx",
         (char*)"-l",
         &core_list[0u],
@@ -62,26 +61,26 @@ PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
         NULL
     };
     // Initialize DPDK environment
-    for (int i = 0; i< argc; i++) {
-        printf("%s\n",argv[i]);
+    for (int i = 0; i < argc; i++) {
+        printf("%s\n", argv[i]);
     }
     int ret = rte_eal_init(argc, argv);
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
 
-    struct rte_mempool *mbuf_pool;
+    struct rte_mempool* mbuf_pool;
     unsigned int nb_ports = rte_eth_dev_count_avail();
-    printf("Number of ports: %d, socket: %d\n",nb_ports, rte_socket_id());
+    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
     // Initialize memory pool
     // mbuf_pool = rte_mempool_create("MBUF pool",
-    //                 NUM_MBUFS * nb_ports, 
+    //                 NUM_MBUFS * nb_ports,
     //                 MBUF_SIZE + 128*4, MBUF_CACHE_SIZE, 64, NULL, NULL, NULL, NULL,rte_socket_id(), 0);
 
     // rte_pktmbuf_pool_init(mp, &mbp_priv);
-  
+
     // rte_mempool_populate_default(mp);
-    mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports, 
+    mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
         MBUF_CACHE_SIZE, 0, MBUF_SIZE, rte_socket_id());
 
     if (mbuf_pool == NULL)
@@ -89,49 +88,47 @@ PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
 
     uint16_t portid;
     RTE_ETH_FOREACH_DEV(portid)
-            if (nic_dpdk_init(portid, mbuf_pool) != 0)
-                    rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu16 "\n", portid);
+    if (nic_dpdk_init(portid, mbuf_pool) != 0)
+        rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n", portid);
 
     unsigned int nb_lcores = rte_lcore_count();
     uint16_t mtu_size = 0;
     rte_eth_dev_get_mtu(0, &mtu_size);
     printf("Number of DPDK cores: %d, MTU: %d\n", nb_lcores, mtu_size);
 
-
-    src_addr = rte_cpu_to_be_32(IPv4(10,0,0,2));
-    dst_addr = rte_cpu_to_be_32(IPv4(10,0,0,1));
+    src_addr = rte_cpu_to_be_32(IPv4(10, 0, 0, 2));
+    dst_addr = rte_cpu_to_be_32(IPv4(10, 0, 0, 1));
 
     struct rte_flow_error error;
-    struct rte_flow *flow;
+    struct rte_flow* flow;
     /* create flow for send packet with */
     for (int i = 0; i < rx_thread_num_; i++) {
         uint16_t src_port = rte_cpu_to_be_16(src_port_start + i);
         uint16_t dst_port = rte_cpu_to_be_16(dst_port_start + i);
         flow = generate_ipv4_flow(0, i,
-                                src_addr, FULL_MASK,
-                                dst_addr, FULL_MASK, 
-                                src_port, 0xffff, 
-                                dst_port, 0xffff, &error);
+            src_addr, FULL_MASK,
+            dst_addr, FULL_MASK,
+            src_port, 0xffff,
+            dst_port, 0xffff, &error);
         // printf("Add rule for src port: %d, dst port: %d, queue: %d\n", src_port, dst_port, i);
         if (!flow) {
-                printf("Flow can't be created %d message: %s\n",
-                        error.type,
-                        error.message ? error.message : "(no stated reason)");
-                rte_exit(EXIT_FAILURE, "error in creating flow");
+            printf("Flow can't be created %d message: %s\n",
+                error.type,
+                error.message ? error.message : "(no stated reason)");
+            rte_exit(EXIT_FAILURE, "error in creating flow");
         }
     }
 }
 
-PacketTXRX::PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset, 
-        moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
-        moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks):
-PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset,
+    moodycamel::ConcurrentQueue<Event_data>* in_queue_message, moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+    moodycamel::ProducerToken** in_rx_ptoks, moodycamel::ProducerToken** in_tx_ptoks)
+    : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
     rx_ptoks_ = in_rx_ptoks;
     tx_ptoks_ = in_tx_ptoks;
-
 }
 
 PacketTXRX::~PacketTXRX()
@@ -142,9 +139,10 @@ PacketTXRX::~PacketTXRX()
     delete config_;
 }
 
-int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
+int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
+{
     struct rte_eth_conf port_conf = port_conf_default();
-    const uint16_t rxRings = rx_thread_num_, txRings = tx_thread_num_+rx_thread_num_;
+    const uint16_t rxRings = rx_thread_num_, txRings = tx_thread_num_ + rx_thread_num_;
     int retval;
     uint16_t q;
     uint16_t nb_rxd = RX_RING_SIZE;
@@ -165,7 +163,6 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     rte_eth_dev_get_mtu(port, &mtu_size);
     printf("MTU: %d\n", mtu_size);
 
-
     int promiscuous_en = rte_eth_promiscuous_get(port);
     printf("Promiscuous mode: %d\n", promiscuous_en);
     rte_eth_promiscuous_enable(port);
@@ -182,7 +179,7 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
     if (retval != 0)
         return retval;
-    printf("Max packet length: %d, dev max: %d\n", port_conf.rxmode.max_rx_pkt_len,dev_info.max_rx_pktlen);
+    printf("Max packet length: %d, dev max: %d\n", port_conf.rxmode.max_rx_pkt_len, dev_info.max_rx_pktlen);
     retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
     if (retval != 0)
         return retval;
@@ -200,7 +197,7 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
 
     for (q = 0; q < txRings; q++) {
         retval = rte_eth_tx_queue_setup(port, q, nb_txd,
-                                        rte_eth_dev_socket_id(port), &txconf);
+            rte_eth_dev_socket_id(port), &txconf);
         if (retval < 0)
             return retval;
     }
@@ -212,12 +209,10 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     struct ether_addr addr;
     rte_eth_macaddr_get(port, &addr);
     printf("NIC %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-        " %02" PRIx8 " %02" PRIx8 " \n",
+           " %02" PRIx8 " %02" PRIx8 " \n",
         port, addr.addr_bytes[0], addr.addr_bytes[1], addr.addr_bytes[2],
         addr.addr_bytes[3], addr.addr_bytes[4], addr.addr_bytes[5]);
     server_eth_addr = addr;
-
-
 
     struct rte_eth_link link;
     rte_eth_link_get_nowait(port, &link);
@@ -234,17 +229,15 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool) {
     return 0;
 }
 
-
-std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double **in_frame_start)
+std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length, double** in_frame_start)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-    buffer_ = in_buffer;  // for save data
+    buffer_ = in_buffer; // for save data
     buffer_status_ = in_buffer_status; // for save status
     frame_start_ = in_frame_start;
-
 
     printf("create RX threads\n");
     // new thread
@@ -258,24 +251,21 @@ std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer, int** in_buffer_s
         unsigned int lcore_id;
         int worker_id = 0;
         // Launch specific task to cores
-        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-        // launch communication and task thread onto specific core
+        RTE_LCORE_FOREACH_SLAVE(lcore_id)
+        {
+            // launch communication and task thread onto specific core
             if (worker_id < rx_thread_num_) {
                 rx_context[worker_id].obj_ptr = this;
                 rx_context[worker_id].id = worker_id;
-                rte_eal_remote_launch((lcore_function_t *)loopRecv_DPDK,
-                                    &rx_context[worker_id], lcore_id);
+                rte_eal_remote_launch((lcore_function_t*)loopRecv_DPDK,
+                    &rx_context[worker_id], lcore_id);
                 printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
-            } 
+            }
             worker_id++;
         }
-    } 
+    }
     return created_threads;
 }
-
-
-
-
 
 std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length)
 {
@@ -283,9 +273,9 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     tx_buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     tx_buffer_length_ = in_buffer_length;
-    tx_buffer_ = in_buffer;  // for save data
+    tx_buffer_ = in_buffer; // for save data
     tx_buffer_status_ = in_buffer_status; // for save status
-    
+
     printf("create TX or TXRX threads\n");
     // create new threads
     std::vector<pthread_t> created_threads;
@@ -293,14 +283,15 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     unsigned int lcore_id;
     int worker_id = 0;
     int thread_id;
-    RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-    // launch communication and task thread onto specific core
+    RTE_LCORE_FOREACH_SLAVE(lcore_id)
+    {
+        // launch communication and task thread onto specific core
         if (worker_id >= rx_thread_num_) {
             thread_id = worker_id - rx_thread_num_;
             tx_context[thread_id].obj_ptr = this;
             tx_context[thread_id].id = thread_id;
-            rte_eal_remote_launch((lcore_function_t *)loopSend,
-                                &tx_context[thread_id], lcore_id);
+            rte_eal_remote_launch((lcore_function_t*)loopSend,
+                &tx_context[thread_id], lcore_id);
             printf("TX: launched thread %d on core %d\n", thread_id, lcore_id);
         }
         worker_id++;
@@ -308,27 +299,27 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     return created_threads;
 }
 
-static void fastMemcpy(void *pvDest, void *pvSrc, size_t nBytes) {
+static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
+{
     // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src, %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31), (intptr_t(pvSrc) & 31) );
     // assert(nBytes % 32 == 0);
     // assert((intptr_t(pvDest) & 31) == 0);
     // assert((intptr_t(pvSrc) & 31) == 0);
-    const __m256i *pSrc = reinterpret_cast<const __m256i*>(pvSrc);
-    __m256i *pDest = reinterpret_cast<__m256i*>(pvDest);
+    const __m256i* pSrc = reinterpret_cast<const __m256i*>(pvSrc);
+    __m256i* pDest = reinterpret_cast<__m256i*>(pvDest);
     int64_t nVects = nBytes / sizeof(*pSrc);
     for (; nVects > 0; nVects--, pSrc++, pDest++) {
-    const __m256i loaded = _mm256_stream_load_si256(pSrc);
-    _mm256_stream_si256(pDest, loaded);
+        const __m256i loaded = _mm256_stream_load_si256(pSrc);
+        _mm256_stream_si256(pDest, loaded);
     }
     _mm_sfence();
 }
 
-
 static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_port, int len, int tid)
 {
-    uint8_t     b[12];
-    uint16_t    sp,
-                dp;
+    uint8_t b[12];
+    uint16_t sp,
+        dp;
 
     b[0] = src_ip & 0xFF;
     b[1] = (src_ip >> 8) & 0xFF;
@@ -345,54 +336,52 @@ static void print_pkt(int src_ip, int dst_ip, uint16_t src_port, uint16_t dst_po
     b[11] = (dst_port >> 8) & 0xFF;
     dp = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
     printf("In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n", tid,
-            b[0], b[1], b[2], b[3], sp,
-            b[6], b[7], b[8], b[9], dp,
-            len);
+        b[0], b[1], b[2], b[3], sp,
+        b[6], b[7], b[8], b[9], dp,
+        len);
 }
 
-
-int PacketTXRX::process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth, int len, int tid) {
-  printf("Processing ARP request\n");
-  struct arp_hdr *ah = (struct arp_hdr *)((unsigned char *)eth + ETHER_HDR_LEN);
-  // recv_arp_pkts++;
-  if (len < (int)(sizeof(struct ether_hdr) + sizeof(struct arp_hdr))) {
-    printf("len=%d is too small for arp packet\n", len);
-    return 0;
-  }
-  if (rte_cpu_to_be_16(ah->arp_op) != ARP_OP_REQUEST) {
-    printf("Not ARP Request\n");
-    return 0;
-  }
-
-  if (dst_addr == ah->arp_data.arp_tip) {
-    memcpy((unsigned char *)&eth->d_addr, (unsigned char *)&eth->s_addr, 6);
-    memcpy((unsigned char *)&eth->s_addr, (unsigned char *)&server_eth_addr, 6);
-
-    ah->arp_op = rte_cpu_to_be_16(ARP_OP_REPLY);
-    ah->arp_data.arp_tha = ah->arp_data.arp_sha;
-    memcpy((unsigned char *)&ah->arp_data.arp_sha,
-           (unsigned char *)&server_eth_addr, 6);
-    ah->arp_data.arp_tip = ah->arp_data.arp_sip;
-    ah->arp_data.arp_sip = dst_addr;
-    if (likely(1 == rte_eth_tx_burst(0, tid, &mbuf, 1))) {
-      return 1;
+int PacketTXRX::process_arp(struct rte_mbuf* mbuf, struct ether_hdr* eth, int len, int tid)
+{
+    printf("Processing ARP request\n");
+    struct arp_hdr* ah = (struct arp_hdr*)((unsigned char*)eth + ETHER_HDR_LEN);
+    // recv_arp_pkts++;
+    if (len < (int)(sizeof(struct ether_hdr) + sizeof(struct arp_hdr))) {
+        printf("len=%d is too small for arp packet\n", len);
+        return 0;
     }
-    printf("Reply ARP\n");
-  }
-  return 0;
+    if (rte_cpu_to_be_16(ah->arp_op) != ARP_OP_REQUEST) {
+        printf("Not ARP Request\n");
+        return 0;
+    }
+
+    if (dst_addr == ah->arp_data.arp_tip) {
+        memcpy((unsigned char*)&eth->d_addr, (unsigned char*)&eth->s_addr, 6);
+        memcpy((unsigned char*)&eth->s_addr, (unsigned char*)&server_eth_addr, 6);
+
+        ah->arp_op = rte_cpu_to_be_16(ARP_OP_REPLY);
+        ah->arp_data.arp_tha = ah->arp_data.arp_sha;
+        memcpy((unsigned char*)&ah->arp_data.arp_sha,
+            (unsigned char*)&server_eth_addr, 6);
+        ah->arp_data.arp_tip = ah->arp_data.arp_sip;
+        ah->arp_data.arp_sip = dst_addr;
+        if (likely(1 == rte_eth_tx_burst(0, tid, &mbuf, 1))) {
+            return 1;
+        }
+        printf("Reply ARP\n");
+    }
+    return 0;
 }
 
-
-void* PacketTXRX::loopRecv_DPDK(void *in_context)
+void* PacketTXRX::loopRecv_DPDK(void* in_context)
 {
     // get the pointer of class & tid
-    PacketTXRX* obj_ptr = ((PacketTXRXContext *)in_context)->ptr;
-    int tid = ((PacketTXRXContext *)in_context)->tid;
+    PacketTXRX* obj_ptr = ((PacketTXRXContext*)in_context)->ptr;
+    int tid = ((PacketTXRXContext*)in_context)->tid;
     printf("packet receiver thread %d start\n", tid);
     // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_ = obj_ptr->message_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
     int core_id = obj_ptr->core_id_;
-
 
     int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
     int UE_NUM = obj_ptr->UE_NUM;
@@ -405,11 +394,10 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
     bool downlink_mode = obj_ptr->downlink_mode;
     int packet_length = obj_ptr->packet_length;
 
-
     uint16_t nic;
-    struct rte_mbuf *bufs[BURST_SIZE * 2] __attribute__( ( aligned (64) ) );
-    struct udp_hdr    *udp_h;
-    struct ipv4_hdr   *ip_h;
+    struct rte_mbuf* bufs[BURST_SIZE * 2] __attribute__((aligned(64)));
+    struct udp_hdr* udp_h;
+    struct ipv4_hdr* ip_h;
     uint16_t dst_port = rte_cpu_to_be_16((obj_ptr->dst_port_start + tid));
     uint16_t src_port = rte_cpu_to_be_16((obj_ptr->src_port_start + tid));
 
@@ -417,25 +405,21 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
     rte_eth_dev_get_mtu(0, &mtu_size);
     printf("MTU: %d\n", mtu_size);
 
-
-
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
-    moodycamel::ProducerToken *local_ptok = obj_ptr->rx_ptoks_[tid];
-
+    moodycamel::ProducerToken* local_ptok = obj_ptr->rx_ptoks_[tid];
 
     char* buffer = obj_ptr->buffer_[tid];
     int* buffer_status = obj_ptr->buffer_status_[tid];
     long long buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
-    double *frame_start = obj_ptr->frame_start_[tid];
+    double* frame_start = obj_ptr->frame_start_[tid];
 
     // walk through all the pages
     double temp;
     for (int i = 0; i < 20; i++) {
         temp = frame_start[i * 512];
     }
-
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -449,13 +433,11 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
     int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     int prev_frame_id = -1;
     int packet_num_per_frame = 0;
-    double start_time= get_time();
-
+    double start_time = get_time();
 
     // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
 
-
-    while(true) {
+    while (true) {
 
         uint16_t nb_rx = rte_eth_rx_burst(0, tid, bufs, BURST_SIZE);
         // printf("Thread %d receives %d packets\n", tid, nb_rx);
@@ -472,24 +454,24 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
             }
             // struct rte_eth_stats eth_stats;
             // rte_eth_stats_get(0, &eth_stats);
-            // printf("RX thread %d: total number of packets received %llu, dropped rx full %llu and rest= %llu, %llu, %llu\n", 
+            // printf("RX thread %d: total number of packets received %llu, dropped rx full %llu and rest= %llu, %llu, %llu\n",
             //     tid, eth_stats.ipackets, eth_stats.imissed,
             //     eth_stats.ierrors, eth_stats.rx_nombuf, eth_stats.q_ipackets[tid]);
 
             int len = rte_pktmbuf_data_len(bufs[i]);
-            struct rte_mbuf *pkt = bufs[i];
+            struct rte_mbuf* pkt = bufs[i];
             // rte_prefetch0(rte_pktmbuf_mtod(pkt, void *));
             /* parse the header */
-            struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct ether_hdr *);
+            struct ether_hdr* eth_hdr = rte_pktmbuf_mtod(pkt, struct ether_hdr*);
             uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
             int l2_len = sizeof(*eth_hdr);
 
-            ip_h = (struct ipv4_hdr *) ((char *) eth_hdr + l2_len);
-            udp_h = (struct udp_hdr *) ((char *) ip_h + sizeof(*ip_h));
+            ip_h = (struct ipv4_hdr*)((char*)eth_hdr + l2_len);
+            udp_h = (struct udp_hdr*)((char*)ip_h + sizeof(*ip_h));
             // print_pkt(ip_h->src_addr, ip_h->dst_addr, udp_h->src_port, udp_h->dst_port, pkt->data_len, tid);
             // printf("Header type: %d, IPV4: %d\n", eth_type, ETHER_TYPE_IPv4);
             // printf("UDP: %d, %d\n", ip_h->next_proto_id, IPPROTO_UDP);
-            
+
             if (eth_type == ETHER_TYPE_ARP) {
                 obj_ptr->process_arp(bufs[i], eth_hdr, len, tid);
                 rte_pktmbuf_free(bufs[i]);
@@ -507,7 +489,7 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
             }
             // udp_h = (struct udp_hdr *) ((char *) ip_h + sizeof(*ip_h));
             // print_pkt(ip_h->src_addr, ip_h->dst_addr, udp_h->src_port, udp_h->dst_port, pkt->data_len);
-            
+
             if (ip_h->src_addr != obj_ptr->src_addr) {
                 printf("Source addr does not match\n");
                 rte_pktmbuf_free(bufs[i]);
@@ -527,29 +509,29 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
             //     printf("Destination port does not match\n");
             //     continue;
             // }
-            char *payload = (char *)eth_hdr + ETH_HDRLEN + IP4_HDRLEN + UDP_HDRLEN + 22;
+            char* payload = (char*)eth_hdr + ETH_HDRLEN + IP4_HDRLEN + UDP_HDRLEN + 22;
             // printf("eth_hdr: 0x%lx, offset: %d\n", eth_hdr, ETH_HDRLEN + IP4_HDRLEN + UDP_HDRLEN);
             // rte_memcpy(cur_ptr_buffer, payload, packet_length);
             fastMemcpy(cur_ptr_buffer, payload, packet_length);
             rte_pktmbuf_free(bufs[i]);
 
-        #if MEASURE_TIME
+#if MEASURE_TIME
             // read information from received packet
-	    struct Packet *pkt = (struct Packet *)cur_buffer_ptr;
-	    int frame_id = pkt->frame_id;
-	    int subframe_id = pkt->symbol_id;
-	    // int cell_id = pkt->cell_id;
-	    int ant_id = pkt->ant_id;
+            struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+            int frame_id = pkt->frame_id;
+            int subframe_id = pkt->symbol_id;
+            // int cell_id = pkt->cell_id;
+            int ant_id = pkt->ant_id;
             // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
                 if (frame_id % 512 == 200) {
-                    _mm_prefetch((char*)(frame_start+frame_id+512), _MM_HINT_T0);
+                    _mm_prefetch((char*)(frame_start + frame_id + 512), _MM_HINT_T0);
                     // double temp = frame_start[frame_id+3];
                 }
             }
-        #endif
+#endif
 
             // get the position in buffer
             offset = cur_ptr_buffer_status - buffer_status;
@@ -561,31 +543,30 @@ void* PacketTXRX::loopRecv_DPDK(void *in_context)
             Event_data packet_message;
             packet_message.event_type = EVENT_PACKET_RECEIVED;
             packet_message.data = offset + tid * buffer_frame_num;
-            if ( !message_queue_->enqueue(*local_ptok, packet_message) ) {
+            if (!message_queue_->enqueue(*local_ptok, packet_message)) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
             packet_num++;
             // print some information
-            if(packet_num == BS_ANT_NUM * max_subframe_id * 1000) {
+            if (packet_num == BS_ANT_NUM * max_subframe_id * 1000) {
                 auto end = std::chrono::system_clock::now();
                 double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 * BS_ANT_NUM * max_subframe_id * 1000;
                 std::chrono::duration<double> diff = end - begin;
                 // print network throughput & maximum message queue length during this period
-                printf("RX thread %d receive 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(), 
+                printf("RX thread %d receive 1000 frames in %f secs, throughput %f MB/s\n", tid, diff.count(),
                     byte_len / diff.count() / 1024 / 1024);
                 begin = std::chrono::system_clock::now();
                 packet_num = 0;
-            }    
+            }
         }
     }
 }
 
-
-void *PacketTXRX::loopSend(int tid)
+void* PacketTXRX::loopSend(int tid)
 {
     pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
-    int sock_buf_size = 1024*1024*64*8-1;
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = 0;
     int remote_port_id = 7000 + tid;
 #if USE_IPV4
@@ -599,14 +580,13 @@ void *PacketTXRX::loopSend(int tid)
 #endif
 
     // downlink socket buffer
-    char *dl_buffer = tx_buffer_;
-    
+    char* dl_buffer = tx_buffer_;
 
     // auto begin = std::chrono::system_clock::now();
     // int packet_count = 0;
     int ret;
     int offset;
-    char *cur_buffer_ptr;
+    char* cur_buffer_ptr;
     // int *cur_ptr_buffer_status;
     int ant_id, frame_id, subframe_id, total_data_subframe_id, current_data_subframe_id;
     int cell_id = 0;
@@ -614,18 +594,18 @@ void *PacketTXRX::loopSend(int tid)
     // int maxTaskQLen = 0;
 
     // use token to speed up
-    moodycamel::ProducerToken *local_ptok = rx_ptoks_[tid];
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ConsumerToken local_ctok(*task_queue_);
-    while(true) {
-    
+    while (true) {
+
         Event_data task_event;
-        // ret = task_queue_->try_dequeue(task_event); 
-        ret = task_queue_->try_dequeue_from_producer(*(tx_ptoks_[tid]),task_event); 
-        if(!ret)
+        // ret = task_queue_->try_dequeue(task_event);
+        ret = task_queue_->try_dequeue_from_producer(*(tx_ptoks_[tid]), task_event);
+        if (!ret)
             continue;
         // printf("tx queue length: %d\n", task_queue_->size_approx());
-        if (task_event.event_type!=TASK_SEND) {
+        if (task_event.event_type != TASK_SEND) {
             printf("Wrong event type!");
             exit(0);
         }
@@ -634,22 +614,22 @@ void *PacketTXRX::loopSend(int tid)
 
         offset = task_event.data;
         ant_id = offset % BS_ANT_NUM;
-        total_data_subframe_id = offset / BS_ANT_NUM; 
+        total_data_subframe_id = offset / BS_ANT_NUM;
         current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
         subframe_id = current_data_subframe_id + UE_NUM;
         frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-        cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;  
-        // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);   
-        *((int *)cur_buffer_ptr) = frame_id;
-        *((int *)cur_buffer_ptr + 1) = subframe_id;
-        *((int *)cur_buffer_ptr + 2) = cell_id;
-        *((int *)cur_buffer_ptr + 3) = ant_id;
+        cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;
+        // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
+        *((int*)cur_buffer_ptr) = frame_id;
+        *((int*)cur_buffer_ptr + 1) = subframe_id;
+        *((int*)cur_buffer_ptr + 2) = cell_id;
+        *((int*)cur_buffer_ptr + 3) = ant_id;
 
         // send data (one OFDM symbol)
-        if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
+        if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr*)&remote_addr, sizeof(remote_addr)) < 0) {
             perror("socket sendto failed");
             exit(0);
         }
@@ -658,12 +638,12 @@ void *PacketTXRX::loopSend(int tid)
         printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, subframe_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
-        
+
         Event_data packet_message;
         packet_message.event_type = EVENT_PACKET_SENT;
-        // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit) 
+        // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
         packet_message.data = offset;
-        if ( !message_queue_->enqueue(*local_ptok, packet_message) ) {
+        if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -684,98 +664,90 @@ void *PacketTXRX::loopSend(int tid)
         //     packet_count = 0;
         // }
     }
-    
 }
 
-
-
-
-
-
-static struct rte_flow *
+static struct rte_flow*
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
-                uint32_t src_ip, uint32_t src_mask,
-                uint32_t dest_ip, uint32_t dest_mask,
-                uint16_t src_port, uint16_t src_port_mask,
-                uint16_t dst_port, uint16_t dst_port_mask,
-                struct rte_flow_error *error)
+    uint32_t src_ip, uint32_t src_mask,
+    uint32_t dest_ip, uint32_t dest_mask,
+    uint16_t src_port, uint16_t src_port_mask,
+    uint16_t dst_port, uint16_t dst_port_mask,
+    struct rte_flow_error* error)
 {
-        struct rte_flow_attr attr;
-        struct rte_flow_item pattern[4];
-        struct rte_flow_action action[2];
-        struct rte_flow *flow = NULL;
-        struct rte_flow_action_queue queue = { .index = rx_q };
-        struct rte_flow_item_ipv4 ip_spec;
-        struct rte_flow_item_ipv4 ip_mask;
-        struct rte_flow_item_udp udp_spec;
-        struct rte_flow_item_udp udp_mask;
-        struct rte_flow_item udp_item;
-        int res;
-        memset(pattern, 0, sizeof(pattern));
-        memset(action, 0, sizeof(action));
-        /*
+    struct rte_flow_attr attr;
+    struct rte_flow_item pattern[4];
+    struct rte_flow_action action[2];
+    struct rte_flow* flow = NULL;
+    struct rte_flow_action_queue queue = { .index = rx_q };
+    struct rte_flow_item_ipv4 ip_spec;
+    struct rte_flow_item_ipv4 ip_mask;
+    struct rte_flow_item_udp udp_spec;
+    struct rte_flow_item_udp udp_mask;
+    struct rte_flow_item udp_item;
+    int res;
+    memset(pattern, 0, sizeof(pattern));
+    memset(action, 0, sizeof(action));
+    /*
          * set the rule attribute.
          * in this case only ingress packets will be checked.
          */
-        memset(&attr, 0, sizeof(struct rte_flow_attr));
-        attr.ingress = 1;
-        attr.priority = 0;
-        /*
+    memset(&attr, 0, sizeof(struct rte_flow_attr));
+    attr.ingress = 1;
+    attr.priority = 0;
+    /*
          * create the action sequence.
          * one action only,  move packet to queue
          */
-        action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
-        action[0].conf = &queue;
-        action[1].type = RTE_FLOW_ACTION_TYPE_END;
-        /*
+    action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+    action[0].conf = &queue;
+    action[1].type = RTE_FLOW_ACTION_TYPE_END;
+    /*
          * set the first level of the pattern (ETH).
          * since in this example we just want to get the
          * ipv4 we set this level to allow all.
          */
-        pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+    pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 
-        /* the final level must be always type end */
-        pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
-        /*
+    /* the final level must be always type end */
+    pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
+    /*
          * setting the second level of the pattern (IP).
          * in this example this is the level we care about
          * so we set it according to the parameters.
          */
-        memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
-        memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
-        ip_spec.hdr.next_proto_id = IPPROTO_UDP;
-        ip_mask.hdr.next_proto_id = 0xf; // protocol mask
+    memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
+    memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
+    ip_spec.hdr.next_proto_id = IPPROTO_UDP;
+    ip_mask.hdr.next_proto_id = 0xf; // protocol mask
 
-        ip_spec.hdr.dst_addr = dest_ip;//htonl(dest_ip);
-        ip_mask.hdr.dst_addr = dest_mask;
-        ip_spec.hdr.src_addr = src_ip;//htonl(src_ip);
-        ip_mask.hdr.src_addr = src_mask;
+    ip_spec.hdr.dst_addr = dest_ip; //htonl(dest_ip);
+    ip_mask.hdr.dst_addr = dest_mask;
+    ip_spec.hdr.src_addr = src_ip; //htonl(src_ip);
+    ip_mask.hdr.src_addr = src_mask;
 
-        pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
-        pattern[1].spec = &ip_spec;
-        pattern[1].mask = &ip_mask;
-        
+    pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
+    pattern[1].spec = &ip_spec;
+    pattern[1].mask = &ip_mask;
 
-        udp_spec.hdr.src_port = src_port;
-        udp_spec.hdr.dst_port = dst_port;
-        udp_spec.hdr.dgram_len = 0;
-        udp_spec.hdr.dgram_cksum = 0;
+    udp_spec.hdr.src_port = src_port;
+    udp_spec.hdr.dst_port = dst_port;
+    udp_spec.hdr.dgram_len = 0;
+    udp_spec.hdr.dgram_cksum = 0;
 
-        udp_mask.hdr.src_port = src_port_mask;
-        udp_mask.hdr.dst_port = dst_port_mask;
-        udp_mask.hdr.dgram_len = 0;
-        udp_mask.hdr.dgram_cksum = 0;
+    udp_mask.hdr.src_port = src_port_mask;
+    udp_mask.hdr.dst_port = dst_port_mask;
+    udp_mask.hdr.dgram_len = 0;
+    udp_mask.hdr.dgram_cksum = 0;
 
-        udp_item.type = RTE_FLOW_ITEM_TYPE_UDP;
-        udp_item.spec = &udp_spec;
-        udp_item.mask = &udp_mask;
-        udp_item.last = NULL;
+    udp_item.type = RTE_FLOW_ITEM_TYPE_UDP;
+    udp_item.spec = &udp_spec;
+    udp_item.mask = &udp_mask;
+    udp_item.last = NULL;
 
-        pattern[2] = udp_item;
+    pattern[2] = udp_item;
 
-        res = rte_flow_validate(port_id, &attr, pattern, action, error);
-        if (!res)
-                flow = rte_flow_create(port_id, &attr, pattern, action, error);
-        return flow;
+    res = rte_flow_validate(port_id, &attr, pattern, action, error);
+    if (!res)
+        flow = rte_flow_create(port_id, &attr, pattern, action, error);
+    return flow;
 }
-

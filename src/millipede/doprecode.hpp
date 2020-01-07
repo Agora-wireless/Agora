@@ -6,36 +6,35 @@
 #ifndef DOPRECODE
 #define DOPRECODE
 
-#include <iostream>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-#include <armadillo>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
-#include "gettime.h"
-#include "offset.h"
-#include "modulation.hpp"
 #include "config.hpp"
+#include "gettime.h"
 #include "memory_manage.h"
+#include "modulation.hpp"
+#include "offset.h"
 #include "stats.hpp"
+#include <armadillo>
+#include <iostream>
+#include <stdio.h> /* for fprintf */
+#include <string.h> /* for memcpy */
+#include <vector>
 // #include "mkl_dfti.h"
 class Consumer;
 
-class DoPrecode
-{
+class DoPrecode {
 public:
-    DoPrecode(Config *cfg, int in_tid, int in_demul_block_size,
-	      Consumer &in_consumer,
-	Table<complex_float> &in_precoder_buffer,
-	Table<complex_float> &in_dl_ifft_buffer,
+    DoPrecode(Config* cfg, int in_tid, int in_demul_block_size,
+        Consumer& in_consumer,
+        Table<complex_float>& in_precoder_buffer,
+        Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
-	Table<int8_t> &in_dl_encoded_data,
+        Table<int8_t>& in_dl_encoded_data,
 #else
-	Table<int8_t> &in_dl_IQ_data,
+        Table<int8_t>& in_dl_IQ_data,
 #endif
-        Stats *in_stats_manager);
+        Stats* in_stats_manager);
     ~DoPrecode();
 
     /**
@@ -66,10 +65,9 @@ public:
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
     void Precode(int offset);
-    
- 
+
 private:
-    Config *config_;
+    Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_DATA_NUM;
     int OFDM_DATA_START;
@@ -77,16 +75,15 @@ private:
 
     int tid;
     int demul_block_size;
-    Consumer &consumer_;
-    
+    Consumer& consumer_;
+
     /**
      * Modulated data
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
      * second dimension: UE_NUM * OFDM_CA_NUM
      */
 
-    Table<complex_float> &precoder_buffer_;
-
+    Table<complex_float>& precoder_buffer_;
 
     /**
      * Precoded data
@@ -94,18 +91,15 @@ private:
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
 
-    Table<complex_float> &dl_ifft_buffer_;
-    Table<int8_t> &dl_IQ_data;
+    Table<complex_float>& dl_ifft_buffer_;
+    Table<int8_t>& dl_IQ_data;
     Table<float> qam_table;
 
-    Table<double> &Precode_task_duration;
-    int *Precode_task_count;
+    Table<double>& Precode_task_duration;
+    int* Precode_task_count;
 
-    complex_float *modulated_buffer_temp;
-    complex_float *precoded_buffer_temp;
-
-
+    complex_float* modulated_buffer_temp;
+    complex_float* precoded_buffer_temp;
 };
-
 
 #endif

@@ -6,28 +6,26 @@
 #ifndef DOZF
 #define DOZF
 
-#include <iostream>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-#include <armadillo>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
+#include "config.hpp"
 #include "gettime.h"
 #include "offset.h"
-#include "config.hpp"
 #include "stats.hpp"
+#include <armadillo>
+#include <iostream>
+#include <stdio.h> /* for fprintf */
+#include <string.h> /* for memcpy */
+#include <vector>
 // #include "mkl_dfti.h"
 class Consumer;
 
-
-class DoZF
-{
+class DoZF {
 public:
-    DoZF(Config *cfg, int in_tid, int in_zf_block_size,
-	Consumer &in_consumer,
-        Table<complex_float> &in_csi_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoder_buffer, Table<complex_float> &in_recip_buffer, Stats *in_stats_manager);
+    DoZF(Config* cfg, int in_tid, int in_zf_block_size,
+        Consumer& in_consumer,
+        Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer, Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~DoZF();
 
     /**
@@ -73,34 +71,30 @@ public:
      *     3. add an event to the message queue to infrom main thread the completion of this task
      */
     void Predict(int offset);
-    
- 
+
 private:
-    Config *config_;
+    Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_CA_NUM, OFDM_DATA_NUM;
 
     int tid;
     int zf_block_size;
-    Consumer &consumer_;
+    Consumer& consumer_;
 
     Table<complex_float> csi_buffer_;
     Table<complex_float> precoder_buffer_;
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
-    complex_float *pred_csi_buffer_;
+    complex_float* pred_csi_buffer_;
 
-    Table<double> *ZF_task_duration;
-    int *ZF_task_count;
+    Table<double>* ZF_task_duration;
+    int* ZF_task_count;
 
     /** 
      * Intermediate buffer to gather CSI
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM */
-    complex_float *csi_gather_buffer;
-
-
+    complex_float* csi_gather_buffer;
 };
-
 
 #endif

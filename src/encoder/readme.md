@@ -1,4 +1,4 @@
-# ldpc encoder
+#ldpc encoder
 an AVX256 implementation based on Intel's AVX512 library </br>
 
 algorithm based on *Efficient QC-LDPC Encoder for 5G New Radio* by Tram Thi Bao Nguyen, Tuy Nguyen Tan, Hanho Lee </br>
