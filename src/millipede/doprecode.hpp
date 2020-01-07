@@ -85,7 +85,6 @@ private:
      * second dimension: UE_NUM * OFDM_CA_NUM
      */
 
-    //Table<complex_float> dl_modulated_buffer_;
     Table<complex_float> &precoder_buffer_;
 
 
@@ -95,7 +94,6 @@ private:
      * second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
 
-    //Table<complex_float> dl_precoded_data_buffer_;
     Table<complex_float> &dl_ifft_buffer_;
     Table<int8_t> &dl_IQ_data;
     Table<float> qam_table;
