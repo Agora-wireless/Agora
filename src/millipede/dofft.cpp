@@ -8,11 +8,8 @@
 
 FFTBase::FFTBase(Config *cfg, int in_tid,
     Consumer &in_consumer,
-    Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
     Stats *in_stats_manager) 
   : consumer_(in_consumer)
-  , data_buffer_(in_data_buffer)
-  , csi_buffer_(in_csi_buffer)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -65,10 +62,11 @@ DoFFT::DoFFT(Config *cfg, int in_tid, Consumer &in_consumer,
 	     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	     Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
 	     Stats *in_stats_manager)
-  :FFTBase(cfg, in_tid, in_consumer,
-	   in_data_buffer, in_csi_buffer, in_stats_manager)
+  :FFTBase(cfg, in_tid, in_consumer, in_stats_manager)
   , socket_buffer_(in_socket_buffer)
   , socket_buffer_status_(in_socket_buffer_status)
+  , data_buffer_(in_data_buffer)
+  , csi_buffer_(in_csi_buffer)
 {}
 
 void DoFFT::FFT(int offset)
@@ -407,11 +405,9 @@ void DoFFT::FFT(int offset)
 
 
 DoIFFT::DoIFFT(Config *cfg, int in_tid, Consumer &in_consumer,
-	       Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
 	       Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
 	       Stats *in_stats_manager)
-  :FFTBase(cfg, in_tid, in_consumer,
-	   in_data_buffer, in_csi_buffer, in_stats_manager)
+  :FFTBase(cfg, in_tid, in_consumer, in_stats_manager)
   , dl_ifft_buffer_(in_dl_ifft_buffer)
   , dl_socket_buffer_(in_dl_socket_buffer)
 {}

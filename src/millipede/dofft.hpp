@@ -24,7 +24,6 @@ class Consumer;
 class FFTBase{
 public:
     FFTBase(Config *cfg, int in_tid, Consumer &in_consumer,
-	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
         Stats *in_stats_manager);
     ~FFTBase();
 
@@ -42,9 +41,6 @@ protected:
     int tid;
 
     Consumer &consumer_;
-
-    Table<complex_float> &data_buffer_;
-    Table<complex_float> &csi_buffer_;
 
     // int packet_length;
     Table<double> *FFT_task_duration;
@@ -108,12 +104,13 @@ public:
 private:
     Table<char> &socket_buffer_;
     Table<int> &socket_buffer_status_;
+    Table<complex_float> &data_buffer_;
+    Table<complex_float> &csi_buffer_;
 };
 
 class DoIFFT: public FFTBase {
 public:
     DoIFFT(Config *cfg, int in_tid, Consumer &in_consumer,
-	Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
         Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
 	Stats *in_stats_manager);
     ~DoIFFT() {}
