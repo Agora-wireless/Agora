@@ -74,9 +74,39 @@ struct ZF_stats {
 struct Data_stats {
     Table<int> task_count;
     int* symbol_count;
-    int frame_count = 0;
+    int frame_count;
     int max_task_count;
     int max_symbol_count;
+
+    void init(int max_tasks, int max_symbols, int max_frame, int max_data_subframe, int align)
+    {
+        task_count.calloc(max_frame, max_data_subframe, align);
+        alloc_buffer_1d(&symbol_count, max_frame, align, 1);
+        frame_count = 0;
+        max_task_count = max_tasks;
+        max_symbol_count = max_symbols;
+    }
+    void fini()
+    {
+        task_count.free();
+        free_buffer_1d(&symbol_count);
+    }
+    bool last_task(int frame_id, int data_subframe_id)
+    {
+        if (++task_count[frame_id][data_subframe_id] == max_task_count) {
+            task_count[frame_id][data_subframe_id] = 0;
+            return (true);
+        }
+        return (false);
+    }
+    bool last_symbol(int frame_id)
+    {
+        if (++symbol_count[frame_id] == max_symbol_count) {
+            symbol_count[frame_id] = 0;
+            return (true);
+        }
+        return (false);
+    }
 };
 
 /* TODO: clean up the legency code below */
