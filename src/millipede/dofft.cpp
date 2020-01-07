@@ -10,7 +10,7 @@ FFTBase::FFTBase(Config *cfg, int in_tid,
     Consumer &in_consumer,
     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
     Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
-    char *in_dl_socket_buffer, Stats *in_stats_manager) 
+    Stats *in_stats_manager) 
   : consumer_(in_consumer)
   , socket_buffer_(in_socket_buffer)
   , socket_buffer_status_(in_socket_buffer_status)
@@ -30,8 +30,6 @@ FFTBase::FFTBase(Config *cfg, int in_tid,
     buffer_subframe_num_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
 
     tid = in_tid;
-
-    dl_socket_buffer_ = in_dl_socket_buffer;
 
     FFT_task_duration = &in_stats_manager->fft_stats_worker.task_duration;
     CSI_task_duration = &in_stats_manager->csi_stats_worker.task_duration;
@@ -69,11 +67,9 @@ FFTBase::~FFTBase()
 DoFFT::DoFFT(Config *cfg, int in_tid, Consumer &in_consumer,
 	     Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status,
 	     Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer,
-	     char *in_dl_socket_buffer, 
 	     Stats *in_stats_manager)
   :FFTBase(cfg, in_tid, in_consumer, in_socket_buffer, in_socket_buffer_status,
-	   in_data_buffer, in_csi_buffer, in_dl_socket_buffer,
-	   in_stats_manager)
+	   in_data_buffer, in_csi_buffer, in_stats_manager)
 {}
 
 void DoFFT::FFT(int offset)
@@ -417,9 +413,9 @@ DoIFFT::DoIFFT(Config *cfg, int in_tid, Consumer &in_consumer,
 	       Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
 	       Stats *in_stats_manager)
   :FFTBase(cfg, in_tid, in_consumer, in_socket_buffer, in_socket_buffer_status,
-	   in_data_buffer, in_csi_buffer, in_dl_socket_buffer,
-	   in_stats_manager)
+	   in_data_buffer, in_csi_buffer, in_stats_manager)
   , dl_ifft_buffer_(in_dl_ifft_buffer)
+  , dl_socket_buffer_(in_dl_socket_buffer)
 {}
 
 void DoIFFT::IFFT(int offset)
