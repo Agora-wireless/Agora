@@ -3,51 +3,50 @@
 #include "config.hpp"
 #include "ru.hpp"
 //#include "l2.hpp"
-#include <unistd.h>
-#include <memory>
-#include <iostream>
-#include <sys/epoll.h>
+#include "buffer.hpp"
+#include "comms-lib.h"
+#include "concurrentqueue.h"
+#include "config.hpp"
+#include "modulation.hpp"
+#include "offset.h"
+#include "signalHandler.hpp"
+#include <algorithm>
+#include <armadillo>
+#include <ctime>
 #include <fcntl.h>
-#include <system_error>
+#include <immintrin.h>
+#include <iostream>
+#include <memory>
 #include <pthread.h>
 #include <queue>
+#include <sys/epoll.h>
+#include <system_error>
 #include <tuple>
-#include <immintrin.h>
-#include <ctime>
-#include <algorithm>
-#include "buffer.hpp"
-#include "concurrentqueue.h"
-#include "modulation.hpp"
-#include "signalHandler.hpp"
-#include "comms-lib.h"
-#include <armadillo>
-#include "config.hpp"
-#include "offset.h"
+#include <unistd.h>
 //#include "mufft/fft.h"
 
 //typedef std::vector<complex_float> myVec;
 typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
 
-class Phy_UE
-{
+class Phy_UE {
 public:
-    /* TASK & SOCKET thread number */
-    #ifdef SIM
-        static const int RX_THREAD_NUM = 1;
-        static const int TASK_THREAD_NUM = 8;
-    #else
-        static const int RX_THREAD_NUM = 2; // Set this RADIO_NUM
-        static const int TASK_THREAD_NUM = 12;
-    #endif 
+/* TASK & SOCKET thread number */
+#ifdef SIM
+    static const int RX_THREAD_NUM = 1;
+    static const int TASK_THREAD_NUM = 8;
+#else
+    static const int RX_THREAD_NUM = 2; // Set this RADIO_NUM
+    static const int TASK_THREAD_NUM = 12;
+#endif
     static const int TX_THREAD_NUM = 1;
     static const int L2_THREAD_NUM = 1;
-    // defined by protocol usually
-    // buffer length of downlink which is synced to uplink 
-    #ifdef SIM
+// defined by protocol usually
+// buffer length of downlink which is synced to uplink
+#ifdef SIM
     static const int TX_RX_FRAME_OFFSET = 2;
-    #else
+#else
     static const int TX_RX_FRAME_OFFSET = 12;
-    #endif 
+#endif
     // static const int TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     // buffer length of each socket thread
     // the actual length will be RX_BUFFER_FRAME_NUM
@@ -64,7 +63,7 @@ public:
     // thread
     static const int dequeue_bulk_size = 5;
 
-    Phy_UE(Config *cfg);
+    Phy_UE(Config* cfg);
     ~Phy_UE();
 
     void start();
@@ -72,8 +71,8 @@ public:
 
     /*****************************************************
      * Downlink 
-     *****************************************************/ 
-    
+     *****************************************************/
+
     /**
      * modulate data from nUEs and does spatial multiplexing by applying beamweights
      */
@@ -81,8 +80,8 @@ public:
 
     /*****************************************************
      * Uplink 
-     *****************************************************/ 
-   
+     *****************************************************/
+
     /**
      * Do FFT task for one OFDM symbol 
      * @param tid: task thread index, used for selecting muplans and task ptok
@@ -115,7 +114,6 @@ public:
      */
     void doFFT(int tid, int offset);
 
-
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
      * @param tid: task thread index, used for selecting spm_buffer and task ptok
@@ -145,28 +143,26 @@ public:
      */
     void doDemul(int tid, int offset);
 
+    void getDemulData(long long** ptr, int* size);
+    void getEqualPCData(float** ptr, int* size, int);
+    void getEqualData(float** ptr, int* size, int);
 
-    void getDemulData(long long **ptr, int *size);
-    void getEqualPCData(float **ptr, int *size, int);
-    void getEqualData(float **ptr, int *size, int);
-
-    struct EventHandlerContext
-    {
-        Phy_UE *obj_ptr;
+    struct EventHandlerContext {
+        Phy_UE* obj_ptr;
         int id;
     };
-
 
     // while loop of task thread
     static void* taskThread_launch(void* context);
     void taskThread(int tid);
 
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
+    void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data>* in_queue, moodycamel::ProducerToken const& ptok);
 
-    void initialize_vars_from_cfg(Config *cfg);
+    void initialize_vars_from_cfg(Config* cfg);
+
 private:
-    Config *cfg;
+    Config* cfg;
     size_t symbol_perframe;
     size_t ul_pilot_symbol_perframe;
     size_t dl_pilot_symbol_perframe;
@@ -194,12 +190,11 @@ private:
     size_t packet_header_offset;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
-    float *pilots_;
-    complex_float *ul_pilot;
+    float* pilots_;
+    complex_float* ul_pilot;
     char* ul_pilot_aligned;
     Table<int8_t>& ul_IQ_data;
     Table<complex_float>& ul_IQ_modul;
-
 
     int pilot_sc_len;
     int data_sc_len;
@@ -211,10 +206,10 @@ private:
 
     /*****************************************************
      * Uplink 
-     *****************************************************/ 
-    
+     *****************************************************/
+
     //std::unique_ptr<L2> l2_;
-    
+
     /** 
      * transmit data 
      * Frist dimension: TX_THREAD_NUM
@@ -222,8 +217,8 @@ private:
      * packet_length = sizeof(int) * 4 + sizeof(uchar) * OFDM_FRAME_LEN;
      * Second dimension of buffer_status: DL_SYM_PER_FRAME * UE_NUM * TX_BUFFER_FRAME_NUM
      */
-    char *tx_buffer_;
-    int *tx_buffer_status_;
+    char* tx_buffer_;
+    int* tx_buffer_status_;
     int tx_buffer_size;
     int tx_buffer_status_size;
 
@@ -249,15 +244,14 @@ private:
      */
     std::vector<myVec> modul_buffer_;
 
-    mufft_plan_1d *muifftplans_[TASK_THREAD_NUM];
-
+    mufft_plan_1d* muifftplans_[TASK_THREAD_NUM];
 
     /*****************************************************
      * Downlink 
-     *****************************************************/ 
-    
+     *****************************************************/
+
     std::unique_ptr<RU> ru_;
-    
+
     /** 
      * received data 
      * Frist dimension: RX_THREAD_NUM
@@ -306,21 +300,20 @@ private:
      */
     std::vector<myVec> equal_pc_buffer_;
 
-
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<int> data_sc_ind_;
     std::vector<int> pilot_sc_ind_;
     std::vector<int> non_null_sc_ind_;
 
-    mufft_plan_1d *mufftplans_[TASK_THREAD_NUM];
+    mufft_plan_1d* mufftplans_[TASK_THREAD_NUM];
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
-    moodycamel::ConcurrentQueue<Event_data> task_queue_;// = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> task_queue_; // = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for uplink demodulation */
-    moodycamel::ConcurrentQueue<Event_data> demul_queue_;// = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> demul_queue_; // = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* main thread message queue */
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;// = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> message_queue_; // = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
@@ -359,8 +352,8 @@ private:
     // for python
     /**
      * dimension: OFDM*UE_NUM
-     */ 
-    int max_equaled_frame=0;
+     */
+    int max_equaled_frame = 0;
     // long long* demul_output;
     // float* equal_output;
 };

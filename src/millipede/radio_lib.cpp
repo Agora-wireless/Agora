@@ -42,7 +42,7 @@ RadioConfig::RadioConfig(Config* cfg)
         //args["serial"] = _cfg->radio_ids.at(i);
         //baStn.push_back(SoapySDR::Device::make(args));
 #ifdef THREADED_INIT
-        RadioConfigContext *context = new RadioConfigContext;
+        RadioConfigContext* context = new RadioConfigContext;
         context->ptr = this;
         context->tid = i;
         pthread_t init_thread_;
@@ -107,7 +107,7 @@ RadioConfig::RadioConfig(Config* cfg)
 
 void* RadioConfig::initBSRadio_launch(void* in_context)
 {
-    RadioConfigContext *context = (RadioConfigContext *)in_context;
+    RadioConfigContext* context = (RadioConfigContext*)in_context;
     RadioConfig* me = context->ptr;
     int tid = context->tid;
     delete context;
@@ -213,7 +213,6 @@ void RadioConfig::initBSRadio(int i)
                 0xa1050000 | 0x1e //TBB in power down
             };
             baStn[i]->writeRegisters("LMS7_PROG_SPI", 32, rxActive); //trig2 offset
-
         }
         baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
@@ -272,20 +271,20 @@ bool RadioConfig::radioStart()
     if (!isUE && _cfg->downlink_mode) {
         std::cout << "start reciprocity CSI collection" << std::endl;
         int iter = 0;
-	int max_iter = 3;
+        int max_iter = 3;
         size_t ref_ant = _cfg->ref_ant;
         while (!good_calib) {
             good_calib = calib_proc(ref_ant, _cfg->sampleCalEn);
             iter++;
             if (iter == max_iter && !good_calib) {
-                std::cout << "attempted "<< max_iter <<" unsucessful calibration procs, stopping ..." << std::endl;
+                std::cout << "attempted " << max_iter << " unsucessful calibration procs, stopping ..." << std::endl;
                 break;
             }
         }
-	if (!good_calib)
-	    return good_calib;
-	else
-	    std::cout << "calibration procedure successful!" << std::endl;	
+        if (!good_calib)
+            return good_calib;
+        else
+            std::cout << "calibration procedure successful!" << std::endl;
     }
 
     // send through the first radio for now
@@ -489,8 +488,8 @@ int RadioConfig::radioRx(size_t r /*radio id*/, void** buffs, long long& frameTi
 
 void RadioConfig::drain_buffers()
 {
-    std::vector<std::complex<int16_t> > dummyBuff0(_cfg->sampsPerSymbol);
-    std::vector<std::complex<int16_t> > dummyBuff1(_cfg->sampsPerSymbol);
+    std::vector<std::complex<int16_t>> dummyBuff0(_cfg->sampsPerSymbol);
+    std::vector<std::complex<int16_t>> dummyBuff1(_cfg->sampsPerSymbol);
     std::vector<void*> dummybuffs(2);
     dummybuffs[0] = dummyBuff0.data();
     dummybuffs[1] = dummyBuff1.data();
@@ -535,8 +534,8 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
     size_t seq_len = _cfg->pilot_cf32.size();
     size_t fft_len = _cfg->OFDM_CA_NUM;
     std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len << std::endl;
-    std::vector<std::complex<double> > pilot_cd64;
-    std::vector<std::complex<int16_t> > pilot_cs16;
+    std::vector<std::complex<double>> pilot_cd64;
+    std::vector<std::complex<int16_t>> pilot_cs16;
 
     for (size_t i = 0; i < seq_len; i++) {
         std::complex<float> cf = _cfg->pilot_cf32[i];
@@ -544,20 +543,20 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
-    std::vector<std::complex<int16_t> > pre(_cfg->prefix, 0);
-    std::vector<std::complex<int16_t> > post(_cfg->postfix, 0);
+    std::vector<std::complex<int16_t>> pre(_cfg->prefix, 0);
+    std::vector<std::complex<int16_t>> post(_cfg->postfix, 0);
     pilot_cs16.insert(pilot_cs16.begin(), pre.begin(), pre.end());
     pilot_cs16.insert(pilot_cs16.end(), post.begin(), post.end());
     size_t read_len = pilot_cs16.size();
 
     // Transmitting from only one chain, create a null vector for chainB
-    std::vector<std::complex<int16_t> > dummy_cs16(read_len, 0);
+    std::vector<std::complex<int16_t>> dummy_cs16(read_len, 0);
 
     std::vector<void*> txbuff0(2);
     txbuff0[0] = pilot_cs16.data();
     txbuff0[1] = dummy_cs16.data();
 
-    std::vector<std::vector<std::complex<int16_t> > > buff;
+    std::vector<std::vector<std::complex<int16_t>>> buff;
     //int ant = _cfg->nChannels;
     size_t M = _cfg->nAntennas;
     size_t R = _cfg->nRadios;
@@ -572,7 +571,7 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
         }
     }
 
-    std::vector<std::complex<int16_t> > dummybuff(read_len);
+    std::vector<std::complex<int16_t>> dummybuff(read_len);
     drain_buffers();
 
     for (size_t i = 0; i < R; i++) {
@@ -625,8 +624,8 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
     std::vector<size_t> start_dn(R);
 
     for (size_t i = 0; i < R; i++) {
-        std::vector<std::complex<double> > up(read_len);
-        std::vector<std::complex<double> > dn(read_len);
+        std::vector<std::complex<double>> up(read_len);
+        std::vector<std::complex<double>> dn(read_len);
         std::transform(buff[ref_ant * R + i].begin(), buff[ref_ant * R + i].end(), up.begin(),
             [](std::complex<int16_t> ci) { return std::complex<double>(ci.real() / 32768.0, ci.imag() / 32768.0); });
         std::transform(buff[i * R + ref_ant].begin(), buff[i * R + ref_ant].end(), dn.begin(),
@@ -648,28 +647,26 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
 
 #if DEBUG_PLOT
         std::vector<double> up_I(read_len);
-        std::transform( up.begin(), up.end(), up_I.begin(), []( std::complex<double> cd ) {
-        return cd.real(); });
+        std::transform(up.begin(), up.end(), up_I.begin(), [](std::complex<double> cd) { return cd.real(); });
 
         std::vector<double> dn_I(read_len);
-        std::transform( dn.begin(), dn.end(), dn_I.begin(), []( std::complex<double> cd ) {
-        return cd.real(); });
+        std::transform(dn.begin(), dn.end(), dn_I.begin(), [](std::complex<double> cd) { return cd.real(); });
 
         plt::figure_size(1200, 780);
         plt::plot(up_I);
         plt::xlim(0, read_len);
         plt::ylim(-1, 1);
-        plt::title("ant "+std::to_string(ref_ant)+" (ref) to ant " + std::to_string(i));
+        plt::title("ant " + std::to_string(ref_ant) + " (ref) to ant " + std::to_string(i));
         plt::legend();
-        plt::save("up_"+std::to_string(i)+".png");
+        plt::save("up_" + std::to_string(i) + ".png");
 
         plt::figure_size(1200, 780);
         plt::plot(dn_I);
         plt::xlim(0, read_len);
         plt::ylim(-1, 1);
-        plt::title("ant "+std::to_string(i)+" to ant (ref)" + std::to_string(ref_ant));
+        plt::title("ant " + std::to_string(i) + " to ant (ref)" + std::to_string(ref_ant));
         plt::legend();
-        plt::save("dn_"+std::to_string(i)+".png");
+        plt::save("dn_" + std::to_string(i) + ".png");
 #endif
     }
 
@@ -679,18 +676,18 @@ bool RadioConfig::calib_proc(size_t ref_ant, bool sample_adjust)
             adjustDelays(offset, ref_offset);
         calib_mat.resize(R);
         for (size_t i = 0; i < R; i++) {
-            std::vector<std::complex<float> > dn_t(fft_len);
-            std::vector<std::complex<float> > up_t(fft_len);
+            std::vector<std::complex<float>> dn_t(fft_len);
+            std::vector<std::complex<float>> up_t(fft_len);
             std::transform(buff[i * R + ref_ant].begin() + start_dn[i], buff[i * R + ref_ant].begin() + start_dn[i] + fft_len, dn_t.begin(),
                 [](std::complex<int16_t> cf) { return std::complex<float>(cf.real() / 32768.0, cf.imag() / 32768.0); });
             std::transform(buff[ref_ant * R + i].begin() + start_up[i], buff[ref_ant * R + i].begin() + start_up[i] + fft_len, up_t.begin(),
                 [](std::complex<int16_t> cf) { return std::complex<float>(cf.real() / 32768.0, cf.imag() / 32768.0); });
-            std::vector<std::complex<float> > dn_f = CommsLib::FFT(dn_t, fft_len);
-            std::vector<std::complex<float> > up_f = CommsLib::FFT(up_t, fft_len);
+            std::vector<std::complex<float>> dn_f = CommsLib::FFT(dn_t, fft_len);
+            std::vector<std::complex<float>> up_f = CommsLib::FFT(up_t, fft_len);
             for (size_t f = 0; f < fft_len; f++) {
                 if (f < _cfg->OFDM_DATA_START || f >= _cfg->OFDM_DATA_START + _cfg->OFDM_DATA_NUM) {
-		    continue;
-		}
+                    continue;
+                }
                 float dre = dn_f[f].real();
                 float dim = dn_f[f].imag();
                 float ure = up_f[f].real();
