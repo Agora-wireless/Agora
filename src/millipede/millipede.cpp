@@ -342,7 +342,7 @@ void Millipede::start()
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
                     schedule_precode_task(frame_id, data_subframe_id, consumer_precode);
                     print_per_subframe_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id, data_subframe_id);
-                    if (++encode_stats_.symbol_count[frame_id] == encode_stats_.max_symbol_count) {
+                    if (encode_stats_.last_symbol(frame_id)) {
                         stats_manager_->update_encode_processed(encode_stats_.frame_count);
                         print_per_frame_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id);
                         update_frame_count(&encode_stats_.frame_count);
