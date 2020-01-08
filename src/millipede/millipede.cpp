@@ -213,15 +213,11 @@ void Millipede::start()
                 int offset_fft = event.data;
                 int frame_id, subframe_id;
                 interpreteOffset2d(offset_fft, &frame_id, &subframe_id);
-                fft_stats_.task_count[frame_id][subframe_id]++;
-                if (fft_stats_.task_count[frame_id][subframe_id] == fft_stats_.max_task_count) {
-                    fft_stats_.task_count[frame_id][subframe_id] = 0;
+                if (fft_stats_.last_task(frame_id, subframe_id)) {
                     if (cfg_->isPilot(frame_id, subframe_id)) {
-                        fft_stats_.symbol_pilot_count[frame_id]++;
                         print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id, subframe_id);
                         /* if csi of all UEs is ready, schedule ZF or prediction */
-                        if (fft_stats_.symbol_pilot_count[frame_id] == fft_stats_.max_symbol_pilot_count) {
-                            fft_stats_.symbol_pilot_count[frame_id] = 0;
+                        if (fft_stats_.last_symbol(frame_id)) {
                             stats_manager_->update_fft_processed(fft_stats_.frame_count);
                             print_per_frame_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                             update_frame_count(&(fft_stats_.frame_count));
@@ -851,10 +847,11 @@ void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_i
     switch (task_type) {
     case (PRINT_RX): {
         int prev_frame_count = (frame_count - 1) % TASK_BUFFER_FRAME_NUM;
+        int fft_sym = fft_stats_.symbol_data_count[frame_id];
         printf("Main thread: received all packets in frame: %d, frame buffer: %d in %.2f us, demul: %d done, FFT: %d,%d, rx in prev frame: %d\n",
             frame_count, frame_id, stats_manager_->get_rx_processed(frame_count) - stats_manager_->get_pilot_received(frame_count),
-            demul_stats_.symbol_count[frame_id], fft_stats_.symbol_data_count[frame_id],
-            fft_stats_.task_count[frame_id][fft_stats_.symbol_data_count[frame_id] + UE_NUM],
+            demul_stats_.symbol_count[frame_id],
+            fft_sym, fft_stats_.task_count[frame_id][fft_sym + UE_NUM],
             rx_stats_.task_count[prev_frame_count]);
     } break;
     case (PRINT_RX_PILOTS):
@@ -932,7 +929,7 @@ void Millipede::print_per_subframe_done(UNUSED int task_type, UNUSED int frame_c
     switch (task_type) {
     case (PRINT_FFT_PILOTS):
         printf("Main thread: pilot FFT done frame: %d, %d, subframe: %d, num sumbframes done: %d\n",
-            frame_count, frame_id, subframe_id, fft_stats_.symbol_pilot_count[frame_id]);
+            frame_count, frame_id, subframe_id, fft_stats_.symbol_count[frame_id]);
         break;
     case (PRINT_FFT_DATA):
         printf("Main thread: data FFT done frame %d, %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d, in %.2f\n",
@@ -1101,13 +1098,11 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_1d(&(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(&(rx_stats_.fft_created_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    fft_stats_.max_task_count = BS_ANT_NUM;
-    fft_stats_.max_symbol_pilot_count = PILOT_NUM;
-    fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
-    fft_stats_.task_count.calloc(TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
-    fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
-    alloc_buffer_1d(&(fft_stats_.symbol_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    fft_stats_.init(BS_ANT_NUM, PILOT_NUM,
+        TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
     alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
+    fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     zf_stats_.max_task_count = zf_block_num;
     alloc_buffer_1d(&(zf_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
@@ -1165,9 +1160,8 @@ void Millipede::free_uplink_buffers()
     free_buffer_1d(&(rx_stats_.task_count));
     free_buffer_1d(&(rx_stats_.task_pilot_count));
     free_buffer_1d(&(rx_stats_.fft_created_count));
-    fft_stats_.task_count.free();
+    fft_stats_.fini();
     fft_stats_.data_exist_in_symbol.free();
-    free_buffer_1d(&(fft_stats_.symbol_pilot_count));
     free_buffer_1d(&(fft_stats_.symbol_data_count));
     free_buffer_1d(&(zf_stats_.task_count));
     free_buffer_1d(&(zf_stats_.precoder_exist_in_frame));

@@ -53,29 +53,11 @@ struct RX_stats {
     int max_task_pilot_count;
 };
 
-struct FFT_stats {
-    Table<int> task_count;
-    int* symbol_pilot_count;
-    int* symbol_data_count;
-    Table<bool> data_exist_in_symbol;
-    int frame_count = 0;
-    int max_task_count;
-    int max_symbol_pilot_count;
-    int max_symbol_data_count;
-};
-
-struct ZF_stats {
-    int* task_count;
-    int frame_count = 0;
-    int max_task_count;
-    bool* precoder_exist_in_frame;
-};
-
 struct Data_stats {
-    Table<int> task_count;
-    int* symbol_count;
     int frame_count;
+    Table<int> task_count;
     int max_task_count;
+    int* symbol_count;
     int max_symbol_count;
 
     void init(int max_tasks, int max_symbols, int max_frame, int max_data_subframe, int align)
@@ -107,6 +89,19 @@ struct Data_stats {
         }
         return (false);
     }
+};
+
+struct FFT_stats : public Data_stats {
+    int* symbol_data_count;
+    int max_symbol_data_count;
+    Table<bool> data_exist_in_symbol;
+};
+
+struct ZF_stats {
+    int* task_count;
+    int frame_count = 0;
+    int max_task_count;
+    bool* precoder_exist_in_frame;
 };
 
 /* TODO: clean up the legency code below */
