@@ -4,7 +4,6 @@
  * 
  */
 
-
 #ifndef BUFFER_HEAD
 #define BUFFER_HEAD
 
@@ -23,15 +22,12 @@ struct complex_float {
 };
 #endif
 
-
-
 // structure for event
 struct Event_data {
     int event_type;
     int data;
     // int more_data;
 };
-
 
 struct Packet {
     uint32_t frame_id;
@@ -49,9 +45,9 @@ struct Packet {
 };
 
 struct RX_stats {
-    int *task_count;
-    int *task_pilot_count;
-    int *fft_created_count;
+    int* task_count;
+    int* task_pilot_count;
+    int* fft_created_count;
     // int frame_count = 0;
     int max_task_count;
     int max_task_pilot_count;
@@ -59,8 +55,8 @@ struct RX_stats {
 
 struct FFT_stats {
     Table<int> task_count;
-    int *symbol_pilot_count;
-    int *symbol_data_count;
+    int* symbol_pilot_count;
+    int* symbol_data_count;
     Table<bool> data_exist_in_symbol;
     int frame_count = 0;
     int max_task_count;
@@ -69,41 +65,36 @@ struct FFT_stats {
 };
 
 struct ZF_stats {
-    int *task_count;
+    int* task_count;
     int frame_count = 0;
     int max_task_count;
-    bool *precoder_exist_in_frame;
+    bool* precoder_exist_in_frame;
 };
 
 struct Data_stats {
     Table<int> task_count;
-    int *symbol_count;
+    int* symbol_count;
     int frame_count = 0;
     int max_task_count;
     int max_symbol_count;
 };
 
-
-
 /* TODO: clean up the legency code below */
-struct FFTBuffer
-{
+struct FFTBuffer {
     // Data before IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
     Table<complex_float> FFT_inputs;
     Table<complex_float> FFT_outputs;
 };
 
-struct IFFTBuffer
-{
+struct IFFTBuffer {
     // Data before IFFT
     // record TASK_BUFFER_FRAME_NUM entire frames
     Table<complex_float> IFFT_inputs;
     Table<complex_float> IFFT_outputs;
 };
 
-
-inline size_t generateOffset2d(size_t max_dim1, size_t max_dim2, size_t dim1_id, size_t dim2_id) 
+inline size_t generateOffset2d(size_t max_dim1, size_t max_dim2, size_t dim1_id, size_t dim2_id)
 {
     dim1_id = dim1_id % max_dim1;
     return dim1_id * max_dim2 + dim2_id;
@@ -116,19 +107,18 @@ inline size_t generateOffset3d(size_t max_dim1, size_t max_dim2, size_t max_dim3
     return dim2d_id * max_dim3 + dim3_id;
 }
 
-inline void interpretOffset2d(size_t max_dim2, size_t offset, size_t *dim1_id, size_t *dim2_id)
+inline void interpretOffset2d(size_t max_dim2, size_t offset, size_t* dim1_id, size_t* dim2_id)
 {
     *dim2_id = offset % max_dim2;
     *dim1_id = offset / max_dim2;
 }
 
-inline void interpretOffset3d(size_t max_dim2, size_t max_dim3, size_t offset, size_t *dim1_id, size_t *dim2d_id, size_t *dim2_id, size_t *dim3_id)
+inline void interpretOffset3d(size_t max_dim2, size_t max_dim3, size_t offset, size_t* dim1_id, size_t* dim2d_id, size_t* dim2_id, size_t* dim3_id)
 {
     *dim3_id = offset % max_dim3;
     *dim2d_id = offset / max_dim3;
     *dim2_id = (*dim2d_id) % max_dim2;
     *dim1_id = (*dim2d_id) / max_dim2;
 }
-
 
 #endif
