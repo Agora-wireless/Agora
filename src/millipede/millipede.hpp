@@ -127,7 +127,6 @@ private:
     float** qam16_table_;
     Config* cfg_;
     int max_equaled_frame = 0;
-    float csi_format_offset;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
     Stats* stats_manager_;
