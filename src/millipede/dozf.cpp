@@ -7,14 +7,13 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config* cfg, int in_tid, int in_zf_block_size,
-    Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer, Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
+DoZF::DoZF(Config* cfg, int in_tid, int in_zf_block_size, Consumer& in_consumer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
+    Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
     : consumer_(in_consumer)
     , csi_buffer_(in_csi_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
-    , recip_buffer_(in_recip_buffer)
 {
     config_ = cfg;
     BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -161,18 +160,6 @@ void DoZF::ZF_time_orthogonal(int offset)
         (*ZF_task_duration)[tid * 8][3] += duration3;
 #endif
 
-        if (config_->downlink_mode) {
-            cx_float* ptr_out2 = (cx_float*)dl_precoder_buffer_[cur_offset];
-            cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
-
-            cx_float* calib_ptr = (cx_float*)recip_buffer_[cur_sc_id];
-            cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
-            cx_fvec vec_calib = mat_calib.col(0);
-            cx_fmat mat_calib_diag = diagmat(vec_calib);
-
-            mat_output2 = mat_output * mat_calib_diag;
-        }
-
         // float *tar_ptr = (float *)precoder_buffer_.precoder[cur_offset];
         // // float temp = *tar_ptr;
         // float *src_ptr = (float *)ptr_out;
@@ -269,18 +256,6 @@ void DoZF::ZF_freq_orthogonal(int offset)
     double duration3 = get_time() - start_time2;
     (*ZF_task_duration)[tid * 8][3] += duration3;
 #endif
-
-    if (config_->downlink_mode) {
-        cx_float* ptr_out2 = (cx_float*)dl_precoder_buffer_[offset_in_buffer];
-        cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
-
-        cx_float* calib_ptr = (cx_float*)recip_buffer_[sc_id];
-        cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
-        cx_fvec vec_calib = mat_calib.col(0);
-        cx_fmat mat_calib_diag = diagmat(vec_calib);
-
-        mat_output2 = mat_output * mat_calib_diag;
-    }
 
 #if DEBUG_UPDATE_STATS
     ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;

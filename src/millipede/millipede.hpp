@@ -238,7 +238,6 @@ private:
     // DataBuffer dl_iffted_data_buffer_;
 
     Table<complex_float> dl_precoder_buffer_;
-    Table<complex_float> recip_buffer_;
     Table<int8_t> dl_encoded_buffer_;
 
     /**
