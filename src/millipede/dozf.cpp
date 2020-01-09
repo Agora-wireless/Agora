@@ -276,7 +276,6 @@ void DoZF::Predict(int offset)
 {
     int frame_id, sc_id;
     interpreteOffset2d(offset, &frame_id, &sc_id);
-    int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM + sc_id;
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
@@ -290,6 +289,6 @@ void DoZF::Predict(int offset)
     // inform main thread
     Event_data pred_finish_event;
     pred_finish_event.event_type = EVENT_ZF;
-    pred_finish_event.data = offset_next_frame;
+    pred_finish_event.data = generateOffset2d((frame_id + 1) % TASK_BUFFER_FRAME_NUM, sc_id);
     consumer_.handle(pred_finish_event);
 }
