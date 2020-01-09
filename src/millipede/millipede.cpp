@@ -250,11 +250,9 @@ void Millipede::start()
                 int offset_zf = event.data;
                 int frame_id, sc_id;
                 interpreteOffset2d(offset_zf, &frame_id, &sc_id);
-                zf_stats_.task_count[frame_id]++;
                 // print_per_task_done(PRINT_ZF, frame_id, 0, sc_id);
-                if (zf_stats_.task_count[frame_id] == zf_stats_.max_task_count) {
+                if (zf_stats_.last_task(frame_id)) {
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
-                    zf_stats_.task_count[frame_id] = 0;
                     zf_stats_.precoder_exist_in_frame[frame_id] = true;
                     print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id);
                     update_frame_count(&(zf_stats_.frame_count));
@@ -1104,9 +1102,7 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    zf_stats_.max_task_count = zf_block_num;
-    alloc_buffer_1d(&(zf_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
-    alloc_buffer_1d(&(zf_stats_.precoder_exist_in_frame), TASK_BUFFER_FRAME_NUM, 64, 1);
+    zf_stats_.init(zf_block_num, TASK_BUFFER_FRAME_NUM, 64, 1);
 
     demul_stats_.init(demul_block_num, ul_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
@@ -1163,8 +1159,7 @@ void Millipede::free_uplink_buffers()
     fft_stats_.fini();
     fft_stats_.data_exist_in_symbol.free();
     free_buffer_1d(&(fft_stats_.symbol_data_count));
-    free_buffer_1d(&(zf_stats_.task_count));
-    free_buffer_1d(&(zf_stats_.precoder_exist_in_frame));
+    zf_stats_.fini();
     demul_stats_.fini();
     decode_stats_.fini();
 
