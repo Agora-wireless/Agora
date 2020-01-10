@@ -282,7 +282,7 @@ void DoZF::Predict(int offset)
     cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_next_frame];
+    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset];
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     pinv(mat_output, mat_input, 1e-1, "dc");
 
