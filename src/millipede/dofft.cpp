@@ -392,7 +392,7 @@ void DoIFFT::IFFT(int offset)
     double start_time = get_time();
 #endif
     int frame_id, current_data_subframe_id, ant_id; //, total_data_subframe_id;
-    interpreteOffset3d(offset, &current_data_subframe_id, &ant_id, &frame_id);
+    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &ant_id);
     int frame_id_in_task_buffer = frame_id % TASK_BUFFER_FRAME_NUM;
     int frame_id_in_socket_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;

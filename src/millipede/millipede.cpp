@@ -75,7 +75,6 @@ void Millipede::stop()
     receiver_.reset();
 }
 
-#ifdef USE_LDPC
 static void
 schedule_task_table(int task_type, int num_tasks, int frame_id, int data_subframe_id, Consumer const& consumer)
 {
@@ -86,7 +85,6 @@ schedule_task_table(int task_type, int num_tasks, int frame_id, int data_subfram
         consumer.try_handle(do_task);
     }
 }
-#endif
 
 static void
 schedule_task_row(int task_type, int num_rows, int row_size, int frame_id, int data_subframe_id, Consumer const& consumer)
@@ -368,7 +366,7 @@ void Millipede::start()
 
                 print_per_task_done(PRINT_PRECODE, frame_id, data_subframe_id, sc_id);
                 if (precode_stats_.last_task(frame_id, data_subframe_id)) {
-                    schedule_ifft_task(precode_stats_.frame_count, data_subframe_id, consumer_ifft);
+                    schedule_task_table(TASK_IFFT, BS_ANT_NUM, frame_id, data_subframe_id, consumer_ifft);
                     if (data_subframe_id < dl_data_subframe_end - 1) {
 #ifdef USE_LDPC
                         int num_tasks = UE_NUM * LDPC_config.nblocksInSymbol;
@@ -773,16 +771,6 @@ void Millipede::schedule_demul_task(int frame_id, int start_sche_id, int end_sch
             /* clear data status after scheduling */
             fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = false;
         }
-    }
-}
-
-void Millipede::schedule_ifft_task(int frame_id, int data_subframe_id, Consumer const& consumer)
-{
-    Event_data do_ifft_task;
-    do_ifft_task.event_type = TASK_IFFT;
-    for (int i = 0; i < BS_ANT_NUM; i++) {
-        do_ifft_task.data = generateOffset3d(data_subframe_id, i, frame_id);
-        consumer.try_handle(do_ifft_task);
     }
 }
 
