@@ -76,23 +76,12 @@ void Millipede::stop()
 }
 
 static void
-schedule_task_table(int task_type, int num_tasks, int frame_id, int data_subframe_id, Consumer const& consumer)
+schedule_task_set(int task_type, int num_tasks, int frame_id, int data_subframe_id, Consumer const& consumer)
 {
     Event_data do_task;
     do_task.event_type = task_type;
     for (int i = 0; i < num_tasks; i++) {
         do_task.data = generateOffset3d(frame_id, data_subframe_id, i);
-        consumer.try_handle(do_task);
-    }
-}
-
-static void
-schedule_task_row(int task_type, int num_rows, int row_size, int frame_id, int data_subframe_id, Consumer const& consumer)
-{
-    Event_data do_task;
-    do_task.event_type = task_type;
-    for (int i = 0; i < num_rows; i++) {
-        do_task.data = generateOffset3d(frame_id, data_subframe_id, i * row_size);
         consumer.try_handle(do_task);
     }
 }
@@ -272,9 +261,9 @@ void Millipede::start()
 /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
 #ifdef USE_LDPC
                         int num_tasks = UE_NUM * LDPC_config.nblocksInSymbol;
-                        schedule_task_table(TASK_ENCODE, num_tasks, frame_id, data_subframe_id, consumer_encode);
+                        schedule_task_set(TASK_ENCODE, num_tasks, frame_id, data_subframe_id, consumer_encode);
 #else
-                        schedule_task_row(TASK_PRECODE, demul_block_num, demul_block_size, frame_id, dl_data_subframe_start, consumer_precode);
+                        schedule_task_set(TASK_PRECODE, demul_block_num, frame_id, dl_data_subframe_start, consumer_precode);
 #endif
                     }
                 }
@@ -290,7 +279,7 @@ void Millipede::start()
                     max_equaled_frame = frame_id;
 #ifdef USE_LDPC
                     int num_tasks = UE_NUM * LDPC_config.nblocksInSymbol;
-                    schedule_task_table(TASK_DECODE, num_tasks, frame_id, data_subframe_id, consumer_decode);
+                    schedule_task_set(TASK_DECODE, num_tasks, frame_id, data_subframe_id, consumer_decode);
 #endif
                     print_per_subframe_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id, data_subframe_id);
                     if (++demul_stats_.symbol_count[frame_id] == demul_stats_.max_symbol_count) {
@@ -349,7 +338,7 @@ void Millipede::start()
                 interpreteOffset3d(offset_demul, &frame_id, &data_subframe_id, &cb_id);
 
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
-                    schedule_task_row(TASK_PRECODE, demul_block_num, demul_block_size, frame_id, data_subframe_id, consumer_precode);
+                    schedule_task_set(TASK_PRECODE, demul_block_num, frame_id, data_subframe_id, consumer_precode);
                     print_per_subframe_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id, data_subframe_id);
                     if (encode_stats_.last_symbol(frame_id)) {
                         stats_manager_->update_encode_processed(encode_stats_.frame_count);
@@ -367,13 +356,13 @@ void Millipede::start()
 
                 print_per_task_done(PRINT_PRECODE, frame_id, data_subframe_id, sc_id);
                 if (precode_stats_.last_task(frame_id, data_subframe_id)) {
-                    schedule_task_table(TASK_IFFT, BS_ANT_NUM, frame_id, data_subframe_id, consumer_ifft);
+                    schedule_task_set(TASK_IFFT, BS_ANT_NUM, frame_id, data_subframe_id, consumer_ifft);
                     if (data_subframe_id < dl_data_subframe_end - 1) {
 #ifdef USE_LDPC
                         int num_tasks = UE_NUM * LDPC_config.nblocksInSymbol;
-                        schedule_task_table(TASK_ENCODE, num_tasks, frame_id, data_subframe_id, consumer_encode);
+                        schedule_task_set(TASK_ENCODE, num_tasks, frame_id, data_subframe_id, consumer_encode);
 #else
-                        schedule_task_row(TASK_PRECODE, demul_block_num, demul_block_size, frame_id, data_subframe_id + 1, consumer_precode);
+                        schedule_task_set(TASK_PRECODE, demul_block_num, frame_id, data_subframe_id + 1, consumer_precode);
 #endif
                     }
 
@@ -475,11 +464,10 @@ void* Millipede::worker(int tid)
     auto computeZF = new DoZF(cfg_, tid, zf_block_size, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
-    auto computeDemul = new DoDemul(cfg_, tid, demul_block_size, consumer,
+    auto computeDemul = new DoDemul(cfg_, tid, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
-    auto computePrecode = new DoPrecode(cfg_, tid, demul_block_size, consumer,
-        dl_precoder_buffer_, dl_ifft_buffer_,
+    auto computePrecode = new DoPrecode(cfg_, tid, consumer, dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
         dl_encoded_buffer_,
 #else
@@ -629,11 +617,11 @@ void* Millipede::worker_demul(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize Demul operator */
-    auto computeDemul = new DoDemul(cfg_, tid, demul_block_size, consumer,
+    auto computeDemul = new DoDemul(cfg_, tid, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
     /* initialize Precode operator */
-    auto computePrecode = new DoPrecode(cfg_, tid, demul_block_size, consumer,
+    auto computePrecode = new DoPrecode(cfg_, tid, consumer,
         dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
         dl_encoded_buffer_,
@@ -763,7 +751,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
     for (int data_subframe_id = start_subframe_id; data_subframe_id < end_subframe_id; data_subframe_id++) {
         if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
             /* schedule demodulation task for subcarrier blocks */
-            schedule_task_row(TASK_DEMUL, demul_block_num, demul_block_size, frame_id, data_subframe_id, consumer);
+            schedule_task_set(TASK_DEMUL, demul_block_num, frame_id, data_subframe_id, consumer);
 #if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
             printf("Main thread: created Demodulation task for frame: %d,, start subframe: %d, current subframe: %d\n",
                 frame_id, start_subframe_id, data_subframe_id);
@@ -988,8 +976,8 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
     DEMUL_THREAD_NUM = cfg->demul_thread_num;
     ZF_THREAD_NUM = cfg->zf_thread_num;
     CORE_OFFSET = cfg->core_offset;
-    demul_block_size = cfg->demul_block_size;
     zf_block_size = cfg->zf_block_size;
+    int demul_block_size = cfg->demul_block_size;
     demul_block_num = OFDM_DATA_NUM / demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
     zf_block_num = OFDM_DATA_NUM / zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
 

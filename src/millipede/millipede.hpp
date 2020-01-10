@@ -113,7 +113,7 @@ private:
     int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
     int FFT_THREAD_NUM, DEMUL_THREAD_NUM, ZF_THREAD_NUM;
     int CORE_OFFSET;
-    int demul_block_size, demul_block_num;
+    int demul_block_num;
     int zf_block_size, zf_block_num;
 
     LDPCconfig LDPC_config;

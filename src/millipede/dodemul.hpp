@@ -24,8 +24,7 @@ class Consumer;
 
 class DoDemul {
 public:
-    DoDemul(Config* cfg, int in_tid, int in_demod_block_size,
-        Consumer& in_consumer,
+    DoDemul(Config* cfg, int in_tid, Consumer& in_consumer,
         Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_equal_buffer,
         Table<uint8_t>& in_demul_hard_buffer, Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
     ~DoDemul();
@@ -68,7 +67,6 @@ private:
     int subframe_num_perframe, data_subframe_num_perframe;
 
     int tid;
-    int demul_block_size;
     Consumer& consumer_;
 
     Table<complex_float>& data_buffer_;

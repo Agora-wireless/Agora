@@ -7,7 +7,7 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(Config* cfg, int in_tid, int in_demul_block_size,
+DoDemul::DoDemul(Config* cfg, int in_tid,
     Consumer& in_consumer,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
@@ -28,12 +28,12 @@ DoDemul::DoDemul(Config* cfg, int in_tid, int in_demul_block_size,
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
 
     tid = in_tid;
-    demul_block_size = in_demul_block_size;
 
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;
     // Demul_task_count = in_Demul_task_count;
 
+    int demul_block_size = config_->demul_block_size;
     spm_buffer = (complex_float*)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
     equaled_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
     equaled_buffer_temp_transposed = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
@@ -70,6 +70,7 @@ void DoDemul::Demul(int offset)
     // int mat_elem = UE_NUM * BS_ANT_NUM;
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
+    int demul_block_size = config_->demul_block_size;
     int max_sc_ite;
     if (sc_id + demul_block_size <= OFDM_DATA_NUM)
         max_sc_ite = demul_block_size;
@@ -251,6 +252,8 @@ void DoDemul::DemulSingleSC(int offset)
     double start_time = get_time();
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
+    int demul_block_size = config_->demul_block_size;
+    sc_id *= demul_block_size;
     total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
