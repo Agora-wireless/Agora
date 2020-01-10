@@ -25,8 +25,7 @@ class Consumer;
 
 class DoPrecode {
 public:
-    DoPrecode(Config* cfg, int in_tid, int in_demul_block_size,
-        Consumer& in_consumer,
+    DoPrecode(Config* cfg, int in_tid, Consumer& in_consumer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -74,7 +73,6 @@ private:
     int data_subframe_num_perframe;
 
     int tid;
-    int demul_block_size;
     Consumer& consumer_;
 
     /**

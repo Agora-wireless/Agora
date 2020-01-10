@@ -8,8 +8,7 @@
 
 using namespace arma;
 
-DoPrecode::DoPrecode(Config* cfg, int in_tid, int in_demul_block_size,
-    Consumer& in_consumer,
+DoPrecode::DoPrecode(Config* cfg, int in_tid, Consumer& in_consumer,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -36,7 +35,6 @@ DoPrecode::DoPrecode(Config* cfg, int in_tid, int in_demul_block_size,
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
 
     tid = in_tid;
-    demul_block_size = in_demul_block_size;
 
     size_t mod_type = config_->mod_type;
     init_modulation_table(qam_table, mod_type);
@@ -46,6 +44,7 @@ DoPrecode::DoPrecode(Config* cfg, int in_tid, int in_demul_block_size,
     // Precode_task_count = in_Precode_task_count;
 
     modulated_buffer_temp = (complex_float*)aligned_alloc(64, UE_NUM * sizeof(complex_float));
+    int demul_block_size = config_->demul_block_size;
     precoded_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * BS_ANT_NUM * sizeof(complex_float));
     // precoded_buffer_temp = (complex_float **)aligned_alloc(64, demul_block_size * sizeof(complex_float *));
     // for (int i = 0; i < demul_block_size; i++) {
@@ -65,6 +64,8 @@ void DoPrecode::Precode(int offset)
     int frame_id, current_data_subframe_id, sc_id; //, total_data_subframe_id;
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    int demul_block_size = config_->demul_block_size;
+    sc_id *= demul_block_size;
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
 
     int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
