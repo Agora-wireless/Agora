@@ -241,15 +241,16 @@ void Millipede::start()
                         }
                         /* if precoder exist, schedule demodulation */
                         if (zf_stats_.precoder_exist_in_frame[frame_id]) {
-                            int start_sche_id = subframe_id;
+                            int start_subframe_id, end_subframe_id;
+                            start_subframe_id = subframe_id - PILOT_NUM;
+                            end_subframe_id = fft_stats_.symbol_data_count[frame_id];
+                            if (end_subframe_id < start_subframe_id)
+                                end_subframe_id = start_subframe_id + 1;
                             if (!prev_demul_scheduled) {
-                                start_sche_id = PILOT_NUM;
+                                start_subframe_id = 0;
                                 prev_demul_scheduled = true;
                             }
-                            int end_sche_id = PILOT_NUM + fft_stats_.symbol_data_count[frame_id];
-                            if (end_sche_id < subframe_id)
-                                end_sche_id = subframe_id + 1;
-                            schedule_demul_task(frame_id, start_sche_id, end_sche_id, consumer_demul);
+                            schedule_demul_task(frame_id, start_subframe_id, end_subframe_id, consumer_demul);
                         }
                     }
                 }
@@ -266,7 +267,7 @@ void Millipede::start()
                     update_frame_count(&(zf_stats_.frame_count));
                     /* if all the data in a frame has arrived when ZF is done */
                     if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
-                        schedule_demul_task(frame_id, PILOT_NUM, subframe_num_perframe, consumer_demul);
+                        schedule_demul_task(frame_id, 0, subframe_num_perframe - PILOT_NUM, consumer_demul);
                     if (downlink_mode) {
 /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
 #ifdef USE_LDPC
@@ -757,16 +758,15 @@ void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
 #endif
 }
 
-void Millipede::schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer)
+void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end_subframe_id, Consumer const& consumer)
 {
-    for (int sche_subframe_id = start_sche_id; sche_subframe_id < end_sche_id; sche_subframe_id++) {
-        int data_subframe_id = (sche_subframe_id - PILOT_NUM);
+    for (int data_subframe_id = start_subframe_id; data_subframe_id < end_subframe_id; data_subframe_id++) {
         if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
             /* schedule demodulation task for subcarrier blocks */
             schedule_task_row(TASK_DEMUL, demul_block_num, demul_block_size, frame_id, data_subframe_id, consumer);
 #if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
             printf("Main thread: created Demodulation task for frame: %d,, start subframe: %d, current subframe: %d\n",
-                frame_id, start_sche_id, data_subframe_id);
+                frame_id, start_subframe_id, data_subframe_id);
 #endif
             /* clear data status after scheduling */
             fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = false;
