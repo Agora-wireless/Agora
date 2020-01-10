@@ -71,11 +71,7 @@ void DoPrecode::Precode(int offset)
     int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
 
     // double start_time = get_time();
-    int max_sc_ite;
-    if (sc_id + demul_block_size <= OFDM_DATA_NUM)
-        max_sc_ite = demul_block_size;
-    else
-        max_sc_ite = OFDM_DATA_NUM - sc_id;
+    int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
     // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d, max_sc_ite: %d\n", tid, frame_id, current_data_subframe_id, sc_id, max_sc_ite);
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
