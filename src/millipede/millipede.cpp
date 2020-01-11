@@ -256,7 +256,7 @@ void Millipede::start()
                     update_frame_count(&(zf_stats_.frame_count));
                     /* if all the data in a frame has arrived when ZF is done */
                     if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
-                        schedule_demul_task(frame_id, 0, subframe_num_perframe - PILOT_NUM, consumer_demul);
+                        schedule_demul_task(frame_id, 0, cfg_->symbol_num_perframe - PILOT_NUM, consumer_demul);
                     if (downlink_mode) {
 /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
 #ifdef USE_LDPC
@@ -963,7 +963,6 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
     PILOT_NUM = cfg->pilot_symbol_num_perframe;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
     downlink_mode = cfg_->downlink_mode;
     dl_data_subframe_start = cfg->dl_data_symbol_start;
     dl_data_subframe_end = cfg->dl_data_symbol_end;
@@ -1026,8 +1025,8 @@ void Millipede::initialize_uplink_buffers()
     // task_threads = (pthread_t *)malloc(TASK_THREAD_NUM * sizeof(pthread_t));
     // context = (EventHandlerContext *)malloc(TASK_THREAD_NUM * sizeof(EventHandlerContext));
 
-    socket_buffer_size_ = (long long)packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    socket_buffer_size_ = (long long)packet_length * cfg_->symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    socket_buffer_status_size_ = cfg_->symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     printf("socket_buffer_size %lld, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
     socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
@@ -1049,7 +1048,7 @@ void Millipede::initialize_uplink_buffers()
     alloc_buffer_1d(&(rx_stats_.fft_created_count), TASK_BUFFER_FRAME_NUM, 64, 1);
 
     fft_stats_.init(BS_ANT_NUM, PILOT_NUM,
-        TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
+        TASK_BUFFER_FRAME_NUM, cfg_->symbol_num_perframe, 64);
     alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
@@ -1062,7 +1061,7 @@ void Millipede::initialize_uplink_buffers()
     decode_stats_.init(LDPC_config.nblocksInSymbol * UE_NUM, ul_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    delay_fft_queue.calloc(TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32);
+    delay_fft_queue.calloc(TASK_BUFFER_FRAME_NUM, cfg_->symbol_num_perframe * BS_ANT_NUM, 32);
     alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
 }
 
