@@ -64,7 +64,6 @@ private:
     Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
 
     int tid;
     Consumer& consumer_;

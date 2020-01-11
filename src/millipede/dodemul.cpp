@@ -24,8 +24,6 @@ DoDemul::DoDemul(Config* cfg, int in_tid,
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
-    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
 
     tid = in_tid;
 
@@ -52,7 +50,7 @@ void DoDemul::Demul(int offset)
 
     int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
-    total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
+    total_data_subframe_id = current_data_subframe_id + frame_id * config_->data_symbol_num_perframe;
 
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -254,7 +252,7 @@ void DoDemul::DemulSingleSC(int offset)
     interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
     int demul_block_size = config_->demul_block_size;
     sc_id *= demul_block_size;
-    total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
+    total_data_subframe_id = current_data_subframe_id + frame_id * config_->data_symbol_num_perframe;
     // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
