@@ -55,11 +55,7 @@ void DoZF::ZF_time_orthogonal(int offset)
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
-    int max_sc_ite;
-    if (sc_id + zf_block_size <= OFDM_DATA_NUM)
-        max_sc_ite = zf_block_size;
-    else
-        max_sc_ite = OFDM_DATA_NUM - sc_id;
+    int max_sc_ite = std::min(zf_block_size, OFDM_DATA_NUM - sc_id);
     for (int i = 0; i < max_sc_ite; i++) {
 
 #if DEBUG_UPDATE_STATS
