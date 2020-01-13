@@ -69,11 +69,8 @@ void DoDemul::Demul(int offset)
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
     int demul_block_size = config_->demul_block_size;
-    int max_sc_ite;
-    if (sc_id + demul_block_size <= OFDM_DATA_NUM)
-        max_sc_ite = demul_block_size;
-    else
-        max_sc_ite = OFDM_DATA_NUM - sc_id;
+    int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
+
     /* i = 0, 1, ..., 32/8
      * iterate through cache lines (each cache line has 8 subcarriers) */
     for (int i = 0; i < max_sc_ite / 8; i++) {
