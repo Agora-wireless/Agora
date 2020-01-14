@@ -23,8 +23,7 @@ class Consumer;
 
 class DoZF {
 public:
-    DoZF(Config* cfg, int in_tid, int in_zf_block_size,
-        Consumer& in_consumer,
+    DoZF(Config* cfg, int in_tid, Consumer& in_consumer,
         Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager);
     ~DoZF();
@@ -79,7 +78,6 @@ private:
     int OFDM_CA_NUM, OFDM_DATA_NUM;
 
     int tid;
-    int zf_block_size;
     Consumer& consumer_;
 
     Table<complex_float> csi_buffer_;

@@ -484,7 +484,7 @@ void* Millipede::worker(int tid)
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    auto computeZF = new DoZF(cfg_, tid, zf_block_size, consumer,
+    auto computeZF = new DoZF(cfg_, tid, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(cfg_, tid, consumer,
@@ -621,7 +621,7 @@ void* Millipede::worker_zf(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize ZF operator */
-    auto computeZF = new DoZF(cfg_, tid, zf_block_size, consumer,
+    auto computeZF = new DoZF(cfg_, tid, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
     Event_data event;
@@ -761,7 +761,7 @@ void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
     Event_data do_zf_task;
     do_zf_task.event_type = TASK_ZF;
     for (int i = 0; i < zf_block_num; i++) {
-        do_zf_task.data = generateOffset2d(frame_id, i * zf_block_size);
+        do_zf_task.data = generateOffset2d(frame_id, i);
         consumer.try_handle(do_zf_task);
     }
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
@@ -1001,7 +1001,7 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
     DEMUL_THREAD_NUM = cfg->demul_thread_num;
     ZF_THREAD_NUM = cfg->zf_thread_num;
     CORE_OFFSET = cfg->core_offset;
-    zf_block_size = cfg->zf_block_size;
+    int zf_block_size = cfg->zf_block_size;
     int demul_block_size = cfg->demul_block_size;
     demul_block_num = OFDM_DATA_NUM / demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
     zf_block_num = OFDM_DATA_NUM / zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
