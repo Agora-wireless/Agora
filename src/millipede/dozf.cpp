@@ -7,7 +7,7 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config* cfg, int in_tid, int in_zf_block_size, Consumer& in_consumer,
+DoZF::DoZF(Config* cfg, int in_tid, Consumer& in_consumer,
     Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
     : consumer_(in_consumer)
@@ -22,7 +22,6 @@ DoZF::DoZF(Config* cfg, int in_tid, int in_zf_block_size, Consumer& in_consumer,
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
     tid = in_tid;
-    zf_block_size = in_zf_block_size;
 
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
@@ -54,6 +53,8 @@ void DoZF::ZF_time_orthogonal(int offset)
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
+    int zf_block_size = config_->zf_block_size;
+    sc_id *= zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     int max_sc_ite = std::min(zf_block_size, OFDM_DATA_NUM - sc_id);
     for (int i = 0; i < max_sc_ite; i++) {
@@ -197,6 +198,8 @@ void DoZF::ZF_freq_orthogonal(int offset)
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d, blcok: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
+    int zf_block_size = config_->zf_block_size;
+    sc_id *= zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
 
 #if DEBUG_UPDATE_STATS
@@ -274,6 +277,8 @@ void DoZF::Predict(int offset)
     interpreteOffset2d(offset, &frame_id, &sc_id);
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
+    int zf_block_size = config_->zf_block_size;
+    sc_id *= zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
