@@ -269,6 +269,7 @@ void Millipede::start()
                             frame_id * data_subframe_num_perframe + data_subframe_id,
                             TASK_BUFFER_SUBFRAME_NUM, consumer_encode);
 #else
+                        int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->demul_block_size;
                         schedule_task_set(TASK_PRECODE, demul_block_num,
                             frame_id * data_subframe_num_perframe + dl_data_subframe_start,
                             TASK_BUFFER_SUBFRAME_NUM, consumer_precode);
@@ -349,6 +350,7 @@ void Millipede::start()
                 int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+                int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->demul_block_size;
 
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
                     schedule_task_set(TASK_PRECODE, demul_block_num,
@@ -380,6 +382,7 @@ void Millipede::start()
                         schedule_task_set(TASK_ENCODE, num_tasks,
                             total_data_subframe_id, TASK_BUFFER_SUBFRAME_NUM, consumer_encode);
 #else
+                        int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->demul_block_size;
                         schedule_task_set(TASK_PRECODE, demul_block_num,
                             total_data_subframe_id + 1, TASK_BUFFER_SUBFRAME_NUM, consumer_precode);
 #endif
@@ -760,6 +763,7 @@ void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
     /* schedule normal ZF for all data subcarriers */
     Event_data do_zf_task;
     do_zf_task.event_type = TASK_ZF;
+    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->zf_block_size;
     for (int i = 0; i < zf_block_num; i++) {
         do_zf_task.data = generateOffset2d(frame_id, i);
         consumer.try_handle(do_zf_task);
@@ -773,6 +777,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
 {
     int data_subframe_num_perframe = cfg_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->demul_block_size;
     for (int data_subframe_id = start_subframe_id; data_subframe_id < end_subframe_id; data_subframe_id++) {
         if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
             /* schedule demodulation task for subcarrier blocks */
@@ -1001,10 +1006,6 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
     DEMUL_THREAD_NUM = cfg->demul_thread_num;
     ZF_THREAD_NUM = cfg->zf_thread_num;
     CORE_OFFSET = cfg->core_offset;
-    int zf_block_size = cfg->zf_block_size;
-    int demul_block_size = cfg->demul_block_size;
-    demul_block_num = OFDM_DATA_NUM / demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
-    zf_block_num = OFDM_DATA_NUM / zf_block_size + (OFDM_DATA_NUM % zf_block_size == 0 ? 0 : 1);
 
     LDPC_config = cfg->LDPC_config;
     mod_type = cfg->mod_type;
@@ -1080,8 +1081,10 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
+    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->zf_block_size;
     zf_stats_.init(zf_block_num, TASK_BUFFER_FRAME_NUM, 64, 1);
 
+    int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->demul_block_size;
     demul_stats_.init(demul_block_num, ul_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
@@ -1109,6 +1112,7 @@ void Millipede::initialize_downlink_buffers()
     encode_stats_.init(LDPC_config.nblocksInSymbol * UE_NUM, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
+    int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / cfg_->demul_block_size;
     precode_stats_.init(demul_block_num, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
