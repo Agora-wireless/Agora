@@ -129,10 +129,14 @@ adapt_bits_for_mod(int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
 
 void DoCoding::Encode(int offset)
 {
-    int frame_id, symbol_id, cb_id;
-    interpreteOffset3d(offset, &frame_id, &symbol_id, &cb_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int cb_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_offset = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_id = symbol_offset % data_subframe_num_perframe;
 
 #if DEBUG_PRINT_IN_TASK
+    int frame_id = symbol_offset / data_subframe_num_perframe;
     printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
 #endif
 
@@ -142,8 +146,6 @@ void DoCoding::Encode(int offset)
 
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int symbol_offset = data_subframe_num_perframe * frame_id + symbol_id;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
     int8_t* input_ptr = (int8_t*)raw_data_buffer_[symbol_id] + input_offset;
@@ -180,10 +182,14 @@ void DoCoding::Encode(int offset)
 
 void DoCoding::Decode(int offset)
 {
-    int frame_id, symbol_id, cb_id;
-    interpreteOffset3d(offset, &frame_id, &symbol_id, &cb_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int cb_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_offset = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_id = symbol_offset % data_subframe_num_perframe;
 
 #if DEBUG_PRINT_IN_TASK
+    int frame_id = symbol_offset / data_subframe_num_perframe;
     printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
 #endif
 
@@ -193,8 +199,6 @@ void DoCoding::Decode(int offset)
 
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int symbol_offset = data_subframe_num_perframe * frame_id + symbol_id;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
     int llr_buffer_offset = output_offset * config_->mod_type;

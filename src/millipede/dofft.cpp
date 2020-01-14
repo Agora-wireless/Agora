@@ -391,14 +391,17 @@ void DoIFFT::IFFT(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int frame_id, current_data_subframe_id, ant_id; //, total_data_subframe_id;
-    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &ant_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
     int frame_id_in_task_buffer = frame_id % TASK_BUFFER_FRAME_NUM;
     int frame_id_in_socket_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int offset_in_buffer = ant_id + BS_ANT_NUM * (current_data_subframe_id + frame_id_in_task_buffer * data_subframe_num_perframe);
-    // interpreteOffset3d(BS_ANT_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &ant_id);
 #if DEBUG_PRINT_IN_TASK
     printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, current_data_subframe_id, ant_id);
 #endif

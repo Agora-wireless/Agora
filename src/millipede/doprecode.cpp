@@ -61,11 +61,14 @@ void DoPrecode::Precode(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int frame_id, current_data_subframe_id, sc_id; //, total_data_subframe_id;
-    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
-    // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     int demul_block_size = config_->demul_block_size;
-    sc_id *= demul_block_size;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
 
     int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
@@ -173,7 +176,6 @@ void DoPrecode::Precode(int offset)
     float* precoded_ptr = (float*)precoded_buffer_temp;
     for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
         int ifft_buffer_offset = ant_id + BS_ANT_NUM * (current_data_subframe_id + frame_id * data_subframe_num_perframe);
-        // int ifft_buffer_offset = generateOffset3d(BS_ANT_NUM, frame_id, current_data_subframe_id, ant_id);
         float* ifft_ptr = (float*)&dl_ifft_buffer_[ifft_buffer_offset][sc_id + OFDM_DATA_START];
         for (int i = 0; i < demul_block_size / 4; i++) {
             float* input_shifted_ptr = precoded_ptr + 4 * i * 2 * BS_ANT_NUM + ant_id * 2;
