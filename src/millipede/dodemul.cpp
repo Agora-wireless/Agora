@@ -47,10 +47,15 @@ DoDemul::~DoDemul()
 
 void DoDemul::Demul(int offset)
 {
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
-    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
-    total_data_subframe_id = current_data_subframe_id + frame_id * config_->data_symbol_num_perframe;
+#if DEBUG_PRINT_IN_TASK
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+#endif
 
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -245,20 +250,20 @@ void DoDemul::Demul(int offset)
 void DoDemul::DemulSingleSC(int offset)
 {
     double start_time = get_time();
-    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int demul_block_size = config_->demul_block_size;
-    sc_id *= demul_block_size;
-    total_data_subframe_id = current_data_subframe_id + frame_id * config_->data_symbol_num_perframe;
-    // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+#if DEBUG_PRINT_IN_TASK
+    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
+#endif
     // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
     int transpose_block_size = config_->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
-
-#if DEBUG_PRINT_IN_TASK
-    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
-#endif
 
     __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
 
