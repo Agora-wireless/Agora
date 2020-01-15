@@ -65,7 +65,8 @@ void DoFFT::FFT(int offset)
     // remove CP, do FFT
     // int delay_offset = 0;
     // int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
-    // int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int FFT_buffer_target_id = frame_id % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + subframe_id;
 
     // transfer ushort to float
     int OFDM_PREFIX_LEN = config_->OFDM_PREFIX_LEN;
@@ -358,8 +359,7 @@ void DoFFT::FFT(int offset)
 #endif
     Event_data fft_finish_event;
     fft_finish_event.event_type = EVENT_FFT;
-    fft_finish_event.data = generateOffset2d((frame_id % TASK_BUFFER_FRAME_NUM), subframe_id);
-    // fft_finish_event.data = generateOffset2d(subframe_num_perframe, frame_id, subframe_id);
+    fft_finish_event.data = FFT_buffer_target_id;
     // getSubframeBufferIndex(frame_id, subframe_id);
 
     consumer_.handle(fft_finish_event);

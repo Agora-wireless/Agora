@@ -211,9 +211,9 @@ void Millipede::start()
 #endif
             } break;
             case EVENT_FFT: {
-                int offset_fft = event.data;
-                int frame_id, subframe_id;
-                interpreteOffset2d(offset_fft, &frame_id, &subframe_id);
+                int offset = event.data;
+                int frame_id = offset / data_subframe_num_perframe;
+                int subframe_id = offset % data_subframe_num_perframe;
                 if (fft_stats_.last_task(frame_id, subframe_id)) {
                     if (config_->isPilot(frame_id, subframe_id)) {
                         print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id, subframe_id);
