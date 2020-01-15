@@ -196,7 +196,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     interpreteOffset2d(offset, &frame_id, &sc_id);
 
 #if DEBUG_PRINT_IN_TASK
-    printf("In doZF thread %d: frame: %d, subcarrier: %d, blcok: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
+    printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
     int zf_block_size = config_->zf_block_size;
     sc_id *= zf_block_size;
