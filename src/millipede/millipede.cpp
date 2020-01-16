@@ -249,9 +249,8 @@ void Millipede::start()
                 }
             } break;
             case EVENT_ZF: {
-                int offset_zf = event.data;
-                int frame_id, sc_id;
-                interpreteOffset2d(offset_zf, &frame_id, &sc_id);
+                int offset = event.data;
+                int frame_id = offset / data_subframe_num_perframe;
                 // print_per_task_done(PRINT_ZF, frame_id, 0, sc_id);
                 if (zf_stats_.last_task(frame_id)) {
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
@@ -761,12 +760,14 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
 void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
 {
     /* schedule normal ZF for all data subcarriers */
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     Event_data do_zf_task;
     do_zf_task.event_type = TASK_ZF;
+    do_zf_task.data = frame_id * data_subframe_num_perframe;
     int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
     for (int i = 0; i < zf_block_num; i++) {
-        do_zf_task.data = generateOffset2d(frame_id, i);
         consumer.try_handle(do_zf_task);
+        do_zf_task.data++;
     }
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
     printf("Main thread: created ZF tasks for frame: %d\n", frame_id);
