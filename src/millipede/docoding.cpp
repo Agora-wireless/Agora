@@ -7,28 +7,25 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoCoding::DoCoding(Config* cfg, int in_tid, Consumer& in_consumer,
-    Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer, Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+DoCoding::DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
+    Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+    Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
     Stats* in_stats_manager)
-    : consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_consumer)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
     , llr_buffer_(in_demod_buffer)
     , decoded_buffer_(in_decoded_buffer)
     , Encode_task_duration(in_stats_manager->encode_stats_worker.task_duration)
     , Decode_task_duration(in_stats_manager->decode_stats_worker.task_duration)
+    , Encode_task_count(in_stats_manager->encode_stats_worker.task_count)
+    , Decode_task_count(in_stats_manager->decode_stats_worker.task_count)
 {
-    config_ = cfg;
-    LDPC_config = cfg->LDPC_config;
-    // BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    // OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-
-    tid = in_tid;
-
-    Encode_task_count = in_stats_manager->encode_stats_worker.task_count;
-    Decode_task_count = in_stats_manager->decode_stats_worker.task_count;
+    LDPC_config = config_->LDPC_config;
+    // BS_ANT_NUM = config_->BS_ANT_NUM;
+    UE_NUM = config_->UE_NUM;
+    // OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
 
     int16_t numChannelLlrs = LDPC_config.cbCodewLen;
 

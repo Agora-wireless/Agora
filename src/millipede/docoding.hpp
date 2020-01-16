@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
@@ -24,14 +25,14 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-class Consumer;
 
 // #include "mkl_dfti.h"
 
-class DoCoding {
+class DoCoding : public Doer {
 public:
-    DoCoding(Config* cfg, int in_tid, Consumer& in_consumer,
-        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer, Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+    DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager);
     ~DoCoding();
 
@@ -46,12 +47,8 @@ public:
     void Decode(int offset);
 
 private:
-    Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_CA_NUM, OFDM_DATA_NUM;
-
-    int tid;
-    Consumer& consumer_;
 
     Table<int8_t>& raw_data_buffer_;
     int8_t* encoded_buffer_temp;

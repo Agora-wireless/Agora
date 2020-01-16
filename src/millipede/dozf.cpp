@@ -5,23 +5,22 @@
  */
 #include "dozf.hpp"
 #include "Consumer.hpp"
+#include "doer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config* cfg, int in_tid, Consumer& in_consumer,
+DoZF::DoZF(Config* in_config, int in_tid, Consumer& in_consumer,
     Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
-    : consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_consumer)
     , csi_buffer_(in_csi_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
-    config_ = cfg;
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    BS_ANT_NUM = config_->BS_ANT_NUM;
+    UE_NUM = config_->UE_NUM;
+    OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
-    tid = in_tid;
 
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;

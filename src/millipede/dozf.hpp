@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "offset.h"
 #include "stats.hpp"
@@ -19,11 +20,10 @@
 #include <string.h> /* for memcpy */
 #include <vector>
 // #include "mkl_dfti.h"
-class Consumer;
 
-class DoZF {
+class DoZF : public Doer {
 public:
-    DoZF(Config* cfg, int in_tid, Consumer& in_consumer,
+    DoZF(Config* in_config, int in_tid, Consumer& in_consumer,
         Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager);
     ~DoZF();
@@ -73,12 +73,8 @@ public:
     void Predict(int offset);
 
 private:
-    Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_CA_NUM, OFDM_DATA_NUM;
-
-    int tid;
-    Consumer& consumer_;
 
     Table<complex_float> csi_buffer_;
     Table<complex_float> precoder_buffer_;

@@ -7,12 +7,11 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(Config* cfg, int in_tid,
-    Consumer& in_consumer,
+DoDemul::DoDemul(Config* in_config, int in_tid, Consumer& in_consumer,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
-    : consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_consumer)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , equal_buffer_(in_equal_buffer)
@@ -20,12 +19,9 @@ DoDemul::DoDemul(Config* cfg, int in_tid,
     , demod_soft_buffer_(in_demod_soft_buffer)
     , Demul_task_duration(in_stats_manager->demul_stats_worker.task_duration)
 {
-    config_ = cfg;
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-
-    tid = in_tid;
+    BS_ANT_NUM = config_->BS_ANT_NUM;
+    UE_NUM = config_->UE_NUM;
+    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
 
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;

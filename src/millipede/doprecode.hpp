@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
@@ -21,11 +22,10 @@
 #include <string.h> /* for memcpy */
 #include <vector>
 // #include "mkl_dfti.h"
-class Consumer;
 
-class DoPrecode {
+class DoPrecode : public Doer {
 public:
-    DoPrecode(Config* cfg, int in_tid, Consumer& in_consumer,
+    DoPrecode(Config* in_config, int in_tid, Consumer& in_consumer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -66,14 +66,10 @@ public:
     void Precode(int offset);
 
 private:
-    Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_DATA_NUM;
     int OFDM_DATA_START;
     int data_subframe_num_perframe;
-
-    int tid;
-    Consumer& consumer_;
 
     /**
      * Modulated data
