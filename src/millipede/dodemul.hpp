@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
 #include "offset.h"
@@ -20,13 +21,14 @@
 #include <string.h> /* for memcpy */
 #include <vector>
 // #include "mkl_dfti.h"
-class Consumer;
 
-class DoDemul {
+class DoDemul : public Doer {
 public:
-    DoDemul(Config* cfg, int in_tid, Consumer& in_consumer,
-        Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_equal_buffer,
-        Table<uint8_t>& in_demul_hard_buffer, Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
+    DoDemul(Config* in_config, int in_tid, Consumer& in_consumer,
+        Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer,
+        Table<complex_float>& in_equal_buffer,
+        Table<uint8_t>& in_demul_hard_buffer, Table<int8_t>& in_demod_soft_buffer,
+        Stats* in_stats_manager);
     ~DoDemul();
 
     /**
@@ -61,12 +63,8 @@ public:
     void DemulSingleSC(int offset);
 
 private:
-    Config* config_;
     int BS_ANT_NUM, UE_NUM;
     int OFDM_DATA_NUM;
-
-    int tid;
-    Consumer& consumer_;
 
     Table<complex_float>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
