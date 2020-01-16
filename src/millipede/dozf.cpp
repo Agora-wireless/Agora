@@ -47,14 +47,13 @@ void DoZF::ZF(int offset)
 
 void DoZF::ZF_time_orthogonal(int offset)
 {
-    int frame_id, sc_id;
-    interpreteOffset2d(offset, &frame_id, &sc_id);
-
+    int zf_block_size = config_->zf_block_size;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = offset / subframe_num_perframe;
+    int sc_id = offset % subframe_num_perframe * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
-    int zf_block_size = config_->zf_block_size;
-    sc_id *= zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     int max_sc_ite = std::min(zf_block_size, OFDM_DATA_NUM - sc_id);
     for (int i = 0; i < max_sc_ite; i++) {
@@ -192,14 +191,13 @@ void DoZF::ZF_time_orthogonal(int offset)
 
 void DoZF::ZF_freq_orthogonal(int offset)
 {
-    int frame_id, sc_id;
-    interpreteOffset2d(offset, &frame_id, &sc_id);
-
+    int zf_block_size = config_->zf_block_size;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = offset / subframe_num_perframe;
+    int sc_id = offset % subframe_num_perframe * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
-    int zf_block_size = config_->zf_block_size;
-    sc_id *= zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
 
 #if DEBUG_UPDATE_STATS
@@ -273,12 +271,12 @@ void DoZF::ZF_freq_orthogonal(int offset)
 
 void DoZF::Predict(int offset)
 {
-    int frame_id, sc_id;
-    interpreteOffset2d(offset, &frame_id, &sc_id);
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int zf_block_size = config_->zf_block_size;
-    sc_id *= zf_block_size;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = offset / subframe_num_perframe;
+    int sc_id = offset % subframe_num_perframe * zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
@@ -290,6 +288,6 @@ void DoZF::Predict(int offset)
     // inform main thread
     Event_data pred_finish_event;
     pred_finish_event.event_type = EVENT_ZF;
-    pred_finish_event.data = generateOffset2d((frame_id + 1) % TASK_BUFFER_FRAME_NUM, sc_id);
+    pred_finish_event.data = (frame_id + 1) % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + sc_id;
     consumer_.handle(pred_finish_event);
 }
