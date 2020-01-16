@@ -501,7 +501,10 @@ void* Millipede::worker(int tid)
         stats_manager_);
 
 #ifdef USE_LDPC
-    auto* computeCoding = new DoCoding(config_, tid, consumer,
+    auto* computeEncoding = new DoEncode(config_, tid, consumer,
+        *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
+        stats_manager_);
+    auto* computeDecoding = new DoDecode(config_, tid, consumer,
         *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
         stats_manager_);
 #endif
@@ -557,12 +560,12 @@ void* Millipede::worker(int tid)
         case TASK_ENCODE:
             ret = encode_queue_.try_dequeue(event);
             if (ret)
-                computeCoding->Encode(event.data);
+                computeEncoding->Encode(event.data);
             break;
         case TASK_DECODE:
             ret = decode_queue_.try_dequeue(event);
             if (ret)
-                computeCoding->Decode(event.data);
+                computeDecoding->Decode(event.data);
             break;
 #endif
         case TASK_ZF:

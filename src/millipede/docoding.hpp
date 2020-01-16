@@ -29,26 +29,12 @@
 // #include "mkl_dfti.h"
 
 class DoCoding : public Doer {
-public:
+protected:
     DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager);
     ~DoCoding();
-
-    /**
-     * Do Encode task for one code block 
-     */
-    void Encode(int offset);
-
-    /**
-     * Do Decode task for one code block 
-     */
-    void Decode(int offset);
-
-private:
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_CA_NUM, OFDM_DATA_NUM;
 
     Table<int8_t>& raw_data_buffer_;
     int8_t* encoded_buffer_temp;
@@ -80,5 +66,41 @@ private:
     __attribute__((aligned(64))) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
     __attribute__((aligned(64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
 };
+
+class DoEncode : public DoCoding {
+public:
+    DoEncode(Config* in_config, int in_tid, Consumer& in_consumer,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Stats* in_stats_manager)
+        : DoCoding(in_config, in_tid, in_consumer, in_raw_data_buffer, in_encoded_buffer,
+              in_demod_buffer, in_decoded_buffer, in_stats_manager)
+    {
+    }
+    ~DoEncode() {}
+
+    /**
+     * Do Encode task for one code block 
+     */
+    void Encode(int offset);
+}
+
+class DoDecode : public DoCoding {
+public:
+    DoDecode(Config* in_config, int in_tid, Consumer& in_consumer,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Stats* in_stats_manager)
+        : DoCoding(in_config, in_tid, in_consumer, in_raw_data_buffer, in_encoded_buffer,
+              in_demod_buffer, in_decoded_buffer, in_stats_manager)
+    {
+    }
+    ~DoEncode() {}
+
+    /**
+     * Do Decode task for one code block 
+     */
+    void Decode(int offset);
+}
 
 #endif

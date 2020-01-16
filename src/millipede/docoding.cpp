@@ -22,10 +22,6 @@ DoCoding::DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
     , Decode_task_count(in_stats_manager->decode_stats_worker.task_count)
 {
     LDPC_config = config_->LDPC_config;
-    // BS_ANT_NUM = config_->BS_ANT_NUM;
-    UE_NUM = config_->UE_NUM;
-    // OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
 
     int16_t numChannelLlrs = LDPC_config.cbCodewLen;
 
@@ -73,6 +69,7 @@ DoCoding::DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
 
     int numMsgBits = LDPC_config.cbLen - numFillerBits;
     int numMsgBytes = (numMsgBits + 7) / 8;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     alloc_buffer_1d(&(ldpc_decoder_5gnr_response.varNodes), buffer_len, 32, 1);
     alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
@@ -124,7 +121,7 @@ adapt_bits_for_mod(int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
     }
 }
 
-void DoCoding::Encode(int offset)
+void DoEncode::Encode(int offset)
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
@@ -141,6 +138,7 @@ void DoCoding::Encode(int offset)
     double start_time = get_time();
 #endif
 
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
@@ -177,7 +175,7 @@ void DoCoding::Encode(int offset)
     consumer_.handle(Encode_finish_event);
 }
 
-void DoCoding::Decode(int offset)
+void DoDecode::Decode(int offset)
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
@@ -194,6 +192,7 @@ void DoCoding::Decode(int offset)
     double start_time = get_time();
 #endif
 
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
