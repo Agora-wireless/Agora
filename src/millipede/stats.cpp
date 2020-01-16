@@ -39,6 +39,7 @@ Stats::Stats(Config* cfg, int in_break_down_num,
     init_stats_worker(&encode_stats_worker, task_thread_num, break_down_num);
     init_stats_worker(&ifft_stats_worker, task_thread_num, break_down_num);
     init_stats_worker(&precode_stats_worker, task_thread_num, break_down_num);
+    init_stats_worker(&rc_stats_worker, task_thread_num, break_down_num);
 
     init_stats_worker(&csi_stats_worker_old, task_thread_num, break_down_num);
     init_stats_worker(&fft_stats_worker_old, task_thread_num, break_down_num);
@@ -48,6 +49,7 @@ Stats::Stats(Config* cfg, int in_break_down_num,
     init_stats_worker(&encode_stats_worker_old, task_thread_num, break_down_num);
     init_stats_worker(&ifft_stats_worker_old, task_thread_num, break_down_num);
     init_stats_worker(&precode_stats_worker_old, task_thread_num, break_down_num);
+    init_stats_worker(&rc_stats_worker_old, task_thread_num, break_down_num);
 
     init_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
     init_stats_worker_per_frame(&fft_stats_per_frame, break_down_num);
@@ -57,6 +59,7 @@ Stats::Stats(Config* cfg, int in_break_down_num,
     init_stats_worker_per_frame(&encode_stats_per_frame, break_down_num);
     init_stats_worker_per_frame(&ifft_stats_per_frame, break_down_num);
     init_stats_worker_per_frame(&precode_stats_per_frame, break_down_num);
+    init_stats_worker_per_frame(&rc_stats_per_frame, break_down_num);
 
 #if DEBUG_UPDATE_STATS_DETAILED
     csi_time_in_function_details.calloc(break_down_num - 1, 10000, 4096);
@@ -78,6 +81,7 @@ Stats::~Stats()
     free_stats_worker(&encode_stats_worker, task_thread_num);
     free_stats_worker(&ifft_stats_worker, task_thread_num);
     free_stats_worker(&precode_stats_worker, task_thread_num);
+    free_stats_worker(&rc_stats_worker, task_thread_num);
 
     free_stats_worker(&csi_stats_worker_old, task_thread_num);
     free_stats_worker(&fft_stats_worker_old, task_thread_num);
@@ -87,6 +91,7 @@ Stats::~Stats()
     free_stats_worker(&encode_stats_worker_old, task_thread_num);
     free_stats_worker(&ifft_stats_worker_old, task_thread_num);
     free_stats_worker(&precode_stats_worker_old, task_thread_num);
+    free_stats_worker(&rc_stats_worker_old, task_thread_num);
 
     free_stats_worker_per_frame(&csi_stats_per_frame);
     free_stats_worker_per_frame(&fft_stats_per_frame);
@@ -96,6 +101,7 @@ Stats::~Stats()
     free_stats_worker_per_frame(&encode_stats_per_frame);
     free_stats_worker_per_frame(&ifft_stats_per_frame);
     free_stats_worker_per_frame(&precode_stats_per_frame);
+    free_stats_worker_per_frame(&rc_stats_per_frame);
 }
 
 void Stats::init_stats_worker(Stats_worker* stats_in_worker, int thread_num, int break_down_num)

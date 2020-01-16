@@ -5,7 +5,7 @@
  */
 #include "millipede.hpp"
 #include "Consumer.hpp"
-
+using namespace std;
 // typedef cx_float COMPLEX;
 bool keep_running = true;
 
@@ -56,7 +56,6 @@ Millipede::Millipede(Config* cfg)
 #else
     create_threads(Worker, 0, TASK_THREAD_NUM);
 #endif
-    // stats_manager_.reset(new Stats(cfg_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM));
 }
 
 Millipede::~Millipede()
@@ -92,18 +91,6 @@ void Millipede::start()
     if (downlink_mode) {
         std::vector<pthread_t> tx_threads = receiver_->startTX(dl_socket_buffer_,
             dl_socket_buffer_status_, dl_socket_buffer_status_size_, dl_socket_buffer_size_);
-
-#ifdef USE_ARGOS
-        std::vector<std::vector<std::complex<float>>> calib_mat = receiver_->get_calib_mat();
-        for (int i = 0; i < BS_ANT_NUM; i++) {
-            for (int j = 0; j < OFDM_DATA_NUM; j++) {
-                float re = calib_mat[i][j].real();
-                float im = calib_mat[i][j].imag();
-                recip_buffer_[j][i].re = re; //re/(re*re + im*im);
-                recip_buffer_[j][i].im = im; //-im/(re*re + im*im);
-            }
-        }
-#endif
     }
 
     /* tokens used for enqueue */
@@ -121,6 +108,8 @@ void Millipede::start()
     Consumer consumer_encode(encode_queue_, ptok_encode);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
     Consumer consumer_ifft(ifft_queue_, ptok_ifft);
+    moodycamel::ProducerToken ptok_rc(rc_queue_);
+    Consumer consumer_rc(rc_queue_, ptok_rc);
     moodycamel::ProducerToken ptok_precode(precode_queue_);
     Consumer consumer_precode(precode_queue_, ptok_precode);
 
@@ -246,6 +235,13 @@ void Millipede::start()
                     }
                 }
             } break;
+            case EVENT_RC: {
+                int frame_id = event.data;
+                stats_manager_->update_rc_processed(rc_stats_.frame_count);
+                print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id); 
+                update_frame_count(&(rc_stats_.frame_count));
+            }
+            break;          
             case EVENT_ZF: {
                 int offset_zf = event.data;
                 int frame_id, sc_id;
@@ -456,7 +452,8 @@ void* Millipede::worker(int tid)
 
     /* initialize operators */
     auto computeFFT = new DoFFT(cfg_, tid, consumer,
-        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
+        socket_buffer_, socket_buffer_status_, 
+	data_buffer_, csi_buffer_, calib_buffer_,
         stats_manager_);
 
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
@@ -482,6 +479,9 @@ void* Millipede::worker(int tid)
         *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
         stats_manager_);
 #endif
+    auto *rc = new Reciprocity(cfg_, tid, consumer,
+        calib_buffer_, recip_buffer_, stats_manager_);
+
 
     Event_data event;
     bool ret = false;
@@ -547,6 +547,11 @@ void* Millipede::worker(int tid)
             if (ret)
                 computeZF->ZF(event.data);
             break;
+        case TASK_RC: 
+            ret = rc_queue_.try_dequeue(event);
+            if (ret) 
+                rc->computeReciprocityCalib(event.data);
+            break;
         case TASK_FFT:
             ret = fft_queue_.try_dequeue(event);
             if (ret)
@@ -576,7 +581,8 @@ void* Millipede::worker_fft(int tid)
 
     /* initialize IFFT operator */
     auto computeFFT = new DoFFT(cfg_, tid, consumer,
-        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
+        socket_buffer_, socket_buffer_status_, 
+	data_buffer_, csi_buffer_, calib_buffer_,
         stats_manager_);
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
@@ -732,6 +738,19 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
             printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
 #endif
     }
+}
+
+
+void Millipede::schedule_rc_task(int frame_id, Consumer const& consumer) 
+{
+    /* schedule normal ZF for all data subcarriers */                                                                                      
+    Event_data do_rc_task;
+    do_rc_task.event_type = TASK_RC;
+    do_rc_task.data = frame_id;
+    consumer.try_handle(do_rc_task);
+#if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
+    printf("Main thread: created Reciprocity Cal tasks for frame: %d\n", frame_id);
+#endif
 }
 
 void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
@@ -899,6 +918,12 @@ void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_i
             stats_manager_->get_precode_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
             stats_manager_->get_precode_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
         break;
+    case(PRINT_RC):
+        printf("Main thread: RC done frame: %d, %d in %.2f us since pilot FFT done, total: %.2f us\n", 
+            frame_id, frame_id, 
+            stats_manager_->get_rc_processed(frame_id) - stats_manager_->get_fft_processed(frame_id),
+            stats_manager_->get_rc_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
+        break;
     case (PRINT_IFFT):
         printf("Main thread: IFFT done frame: %d, %d in %.2f us since precode done, total: %.2f us\n",
             frame_count, frame_id,
@@ -1046,6 +1071,7 @@ void Millipede::initialize_queues()
     fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     ;
+    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);;
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
 
@@ -1131,6 +1157,7 @@ void Millipede::initialize_downlink_buffers()
     dl_precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
     dl_encoded_buffer_.malloc(data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     recip_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM, 64);
+    calib_buffer_.malloc(TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * BS_ANT_NUM, 64);
 
     encode_stats_.init(LDPC_config.nblocksInSymbol * UE_NUM, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);

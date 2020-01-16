@@ -78,7 +78,6 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     bool ret = radioconfig_->radioStart();
     if (!ret)
         return created_threads;
-    calib_mat = radioconfig_->get_calib_mat();
     int nradio_per_thread = config_->nRadios / rx_thread_num_;
     int rem_thread_nradio = config_->nRadios % rx_thread_num_;
 
@@ -243,15 +242,12 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
             frame_id = (int)(frameTime >> 32);
             symbol_id = (int)((frameTime >> 16) & 0xFFFF);
             ant_id = rid * cfg->nChannels;
-            int rx_symbol_id = cfg->getPilotSFIndex(frame_id, symbol_id);
-            if (rx_symbol_id < 0)
-                rx_symbol_id = cfg->getUlSFIndex(frame_id, symbol_id) + cfg->pilotSymsPerFrame;
             struct Packet* pkt = (struct Packet*)cur_ptr_buffer;
-            new (pkt) Packet(frame_id, rx_symbol_id, 0 /* cell_id */, ant_id);
+            new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
             if (cfg->nChannels == 2) {
                 struct Packet* pkt2 = (struct Packet*)cur_ptr_buffer2;
-                new (pkt2) Packet(frame_id, rx_symbol_id, 0 /* cell_id */, ant_id + 1);
+                new (pkt2) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + 1);
             }
 
 #if MEASURE_TIME
@@ -309,7 +305,7 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
                 symbol_id = txSymbols[sym_id];
                 int tx_frame_id = frame_id + TX_FRAME_DELTA;
                 void* txbuf[2];
-                long long frameTime = ((long long)tx_frame_id << 32) | (symbol_id << 16);
+                long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
                 int flags = 1; // HAS_TIME
                 if (symbol_id == (int)txSymbols.back())
                     flags = 2; // HAS_TIME & END_BURST, fixme
@@ -398,7 +394,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
 
         tx_offset = task_event.data;
         interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
-        tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
+        tx_subframe_id = cfg->DLSymbols[0][tx_current_data_subframe_id]; //tx_current_data_subframe_id + UE_NUM;
         int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
         int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
         tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length + packet_header_offset;

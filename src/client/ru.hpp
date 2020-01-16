@@ -15,6 +15,8 @@ class RadioConfig;
 #include <vector>
 
 #include "concurrentqueue.h"
+#include "client_radio.hpp"
+#include <fstream>      // std::ifstream
 
 class RU {
 public:
@@ -71,7 +73,7 @@ private:
     int* tx_socket_;
 #else
 
-    RadioConfig* radioconfig_;
+    ClientRadioConfig *radioconfig_;
 #endif
 
     Table<char>* buffer_;
