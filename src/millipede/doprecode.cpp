@@ -8,7 +8,8 @@
 
 using namespace arma;
 
-DoPrecode::DoPrecode(Config* in_config, int in_tid, Consumer& in_consumer,
+DoPrecode::DoPrecode(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -17,7 +18,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, Consumer& in_consumer,
     Table<int8_t>& in_dl_IQ_data,
 #endif
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
 #ifdef USE_LDPC
@@ -27,11 +28,8 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, Consumer& in_consumer,
 #endif
     , Precode_task_duration(in_stats_manager->precode_stats_worker.task_duration)
 {
-    BS_ANT_NUM = config_->BS_ANT_NUM;
-    UE_NUM = config_->UE_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    OFDM_DATA_START = config_->OFDM_DATA_START;
-    data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
 
     size_t mod_type = config_->mod_type;
     init_modulation_table(qam_table, mod_type);
@@ -55,11 +53,15 @@ DoPrecode::~DoPrecode()
 
 void DoPrecode::launch(int offset)
 {
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int OFDM_DATA_START = config_->OFDM_DATA_START;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
     int demul_block_size = config_->demul_block_size;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
     int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;

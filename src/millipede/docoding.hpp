@@ -68,11 +68,12 @@ protected:
 
 class DoEncode : publiic Doer, private DoCoding {
 public:
-    DoEncode(Config* in_config, int in_tid, Consumer& in_consumer,
+    DoEncode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager)
-        : Doer(in_config, in_tid, in_consumer)
+        : Doer(in_config, in_tid, in_task_queue, in_consumer)
         , DoCoding(in_raw_data_buffer, in_encoded_buffer,
               in_demod_buffer, in_decoded_buffer, in_stats_manager)
     {
@@ -88,11 +89,12 @@ public:
 class DoDecode : public Doer,
                  private DoCoding {
 public:
-    DoDecode(Config* in_config, int in_tid, Consumer& in_consumer,
+    DoDecode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager)
-        : Doer(in_config, in_tid, in_consumer)
+        : Doer(in_config, in_tid, in_task_queue, in_consumer)
         , DoCoding(in_raw_data_buffer, in_encoded_buffer,
               in_demod_buffer, in_decoded_buffer, in_stats_manager)
     {
