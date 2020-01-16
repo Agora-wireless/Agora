@@ -121,7 +121,7 @@ adapt_bits_for_mod(int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
     }
 }
 
-void DoEncode::Encode(int offset)
+void DoEncode::launch(int offset)
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
@@ -175,7 +175,7 @@ void DoEncode::Encode(int offset)
     consumer_.handle(Encode_finish_event);
 }
 
-void DoDecode::Decode(int offset)
+void DoDecode::launch(int offset)
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;

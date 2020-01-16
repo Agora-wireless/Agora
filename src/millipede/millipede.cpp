@@ -549,39 +549,39 @@ void* Millipede::worker(int tid)
         case TASK_IFFT:
             ret = ifft_queue_.try_dequeue(event);
             if (ret)
-                computeIFFT->IFFT(event.data);
+                computeIFFT->launch(event.data);
             break;
         case TASK_PRECODE:
             ret = precode_queue_.try_dequeue(event);
             if (ret)
-                computePrecode->Precode(event.data);
+                computePrecode->launch(event.data);
             break;
 #ifdef USE_LDPC
         case TASK_ENCODE:
             ret = encode_queue_.try_dequeue(event);
             if (ret)
-                computeEncoding->Encode(event.data);
+                computeEncoding->launch(event.data);
             break;
         case TASK_DECODE:
             ret = decode_queue_.try_dequeue(event);
             if (ret)
-                computeDecoding->Decode(event.data);
+                computeDecoding->launch(event.data);
             break;
 #endif
         case TASK_ZF:
             ret = zf_queue_.try_dequeue(event);
             if (ret)
-                computeZF->ZF(event.data);
+                computeZF->launch(event.data);
             break;
         case TASK_FFT:
             ret = fft_queue_.try_dequeue(event);
             if (ret)
-                computeFFT->FFT(event.data);
+                computeFFT->launch(event.data);
             break;
         case TASK_DEMUL:
             ret = demul_queue_.try_dequeue(event);
             if (ret)
-                computeDemul->Demul(event.data);
+                computeDemul->launch(event.data);
             break;
         default:
             printf("ERROR: unsupported task type in dequeue\n");
@@ -611,9 +611,9 @@ void* Millipede::worker_fft(int tid)
 
     while (true) {
         if (fft_queue_.try_dequeue(event))
-            computeFFT->FFT(event.data);
+            computeFFT->launch(event.data);
         else if (downlink_mode && ifft_queue_.try_dequeue(event))
-            computeIFFT->IFFT(event.data);
+            computeIFFT->launch(event.data);
     }
 }
 
@@ -633,7 +633,7 @@ void* Millipede::worker_zf(int tid)
 
     while (true) {
         if (zf_queue_.try_dequeue(event))
-            computeZF->ZF(event.data);
+            computeZF->launch(event.data);
     }
 }
 
@@ -664,7 +664,7 @@ void* Millipede::worker_demul(int tid)
     while (true) {
         if (downlink_mode) {
             if (precode_queue_.try_dequeue(event))
-                computePrecode->Precode(event.data);
+                computePrecode->launch(event.data);
         } else if (demul_queue_.try_dequeue(event)) {
             // int ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
             // int frame_id = event.data / (OFDM_CA_NUM * ul_data_subframe_num_perframe);
@@ -672,7 +672,7 @@ void* Millipede::worker_demul(int tid)
             // if (frame_id > cur_frame_id || frame_id == 0) {
             //     while (!precoder_status_[frame_id]);
             // }
-            computeDemul->Demul(event.data);
+            computeDemul->launch(event.data);
         }
     }
 }

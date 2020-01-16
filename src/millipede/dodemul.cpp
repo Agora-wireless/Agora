@@ -19,16 +19,14 @@ DoDemul::DoDemul(Config* in_config, int in_tid, Consumer& in_consumer,
     , demod_soft_buffer_(in_demod_soft_buffer)
     , Demul_task_duration(in_stats_manager->demul_stats_worker.task_duration)
 {
-    BS_ANT_NUM = config_->BS_ANT_NUM;
-    UE_NUM = config_->UE_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;
     // Demul_task_count = in_Demul_task_count;
 
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
     int demul_block_size = config_->demul_block_size;
     spm_buffer = (complex_float*)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
+    int UE_NUM = config_->UE_NUM;
     equaled_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
     equaled_buffer_temp_transposed = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
 
@@ -41,7 +39,7 @@ DoDemul::~DoDemul()
     free(equaled_buffer_temp);
 }
 
-void DoDemul::Demul(int offset)
+void DoDemul::launch(int offset)
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
@@ -70,6 +68,7 @@ void DoDemul::Demul(int offset)
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
     int demul_block_size = config_->demul_block_size;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
 
     /* i = 0, 1, ..., 32/8
@@ -90,6 +89,9 @@ void DoDemul::Demul(int offset)
         //     }
         // }
 
+        int BS_ANT_NUM = config_->BS_ANT_NUM;
+        int UE_NUM = config_->UE_NUM;
+        int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
         int cur_block_id = (sc_id + i * 8) / transpose_block_size;
         int sc_inblock_idx = (i * 8) % transpose_block_size;
         int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
@@ -203,6 +205,8 @@ void DoDemul::Demul(int offset)
 #ifdef USE_LDPC
     // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
     // cout<< "Demuled data: \n";
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     __m256i index2 = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4,
         UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
@@ -263,6 +267,9 @@ void DoDemul::DemulSingleSC(int offset)
 
     __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
 
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int cur_block_id = sc_id / transpose_block_size;
     int sc_inblock_idx = sc_id % transpose_block_size;
     int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;

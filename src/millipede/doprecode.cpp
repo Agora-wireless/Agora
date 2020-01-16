@@ -53,7 +53,7 @@ DoPrecode::~DoPrecode()
 {
 }
 
-void DoPrecode::Precode(int offset)
+void DoPrecode::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();

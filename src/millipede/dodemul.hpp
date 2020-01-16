@@ -58,14 +58,11 @@ public:
      *     3. perform demodulation on equalized data matrix   
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void Demul(int offset);
+    void launch(int offset);
 
     void DemulSingleSC(int offset);
 
 private:
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-
     Table<complex_float>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
     Table<complex_float>& equal_buffer_;
