@@ -59,7 +59,7 @@ public:
      *        if subframe is data, copy data from fft_buffer_.FFT_outputs to data_buffer_ and do block transpose     
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void FFT(int offset);
+    void launch(int offset);
 
 private:
     Table<char>& socket_buffer_;
@@ -104,7 +104,7 @@ public:
      *     2. perform block-wise transpose on IFFT outputs and store results in dl_iffted_data_buffer_
      *     2. add an event to the message queue to infrom main thread the completion of this task
      */
-    void IFFT(int offset);
+    void launch(int offset);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;

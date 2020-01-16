@@ -43,7 +43,7 @@ public:
      *     1. perform pseudo-inverse (pinv) on csi_buffer_ and store results in precoder_buffer_  
      *     2. add an event to the message queue to infrom main thread the completion of this task
      */
-    void ZF(int offset);
+    void launch(int offset);
 
     void ZF_time_orthogonal(int offset);
 

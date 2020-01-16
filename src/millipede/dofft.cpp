@@ -38,7 +38,7 @@ DoFFT::~DoFFT()
     fft_buffer_.FFT_outputs.free();
 }
 
-void DoFFT::FFT(int offset)
+void DoFFT::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -382,7 +382,7 @@ DoIFFT::~DoIFFT()
     DftiFreeDescriptor(&mkl_handle);
 }
 
-void DoIFFT::IFFT(int offset)
+void DoIFFT::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();

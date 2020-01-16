@@ -28,10 +28,9 @@
 
 // #include "mkl_dfti.h"
 
-class DoCoding : public Doer {
+class DoCoding {
 protected:
-    DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
-        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+    DoCoding(Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager);
     ~DoCoding();
@@ -67,13 +66,14 @@ protected:
     __attribute__((aligned(64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
 };
 
-class DoEncode : public DoCoding {
+class DoEncode : publiic Doer, private DoCoding {
 public:
     DoEncode(Config* in_config, int in_tid, Consumer& in_consumer,
         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager)
-        : DoCoding(in_config, in_tid, in_consumer, in_raw_data_buffer, in_encoded_buffer,
+        : Doer(in_config, in_tid, in_consumer)
+        , DoCoding(in_raw_data_buffer, in_encoded_buffer,
               in_demod_buffer, in_decoded_buffer, in_stats_manager)
     {
     }
@@ -82,16 +82,18 @@ public:
     /**
      * Do Encode task for one code block 
      */
-    void Encode(int offset);
+    void launch(int offset);
 }
 
-class DoDecode : public DoCoding {
+class DoDecode : public Doer,
+                 private DoCoding {
 public:
     DoDecode(Config* in_config, int in_tid, Consumer& in_consumer,
         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager)
-        : DoCoding(in_config, in_tid, in_consumer, in_raw_data_buffer, in_encoded_buffer,
+        : Doer(in_config, in_tid, in_consumer)
+        , DoCoding(in_raw_data_buffer, in_encoded_buffer,
               in_demod_buffer, in_decoded_buffer, in_stats_manager)
     {
     }
@@ -100,7 +102,7 @@ public:
     /**
      * Do Decode task for one code block 
      */
-    void Decode(int offset);
+    void launch(int offset);
 }
 
 #endif

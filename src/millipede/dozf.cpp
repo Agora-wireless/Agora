@@ -36,7 +36,7 @@ DoZF::~DoZF()
     free_buffer_1d(&pred_csi_buffer_);
 }
 
-void DoZF::ZF(int offset)
+void DoZF::launch(int offset)
 {
     if (config_->freq_orthogonal_pilot)
         ZF_freq_orthogonal(offset);
