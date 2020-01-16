@@ -6,11 +6,12 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
-DoFFT::DoFFT(Config* in_config, int in_tid, Consumer& in_consumer,
+DoFFT::DoFFT(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , socket_buffer_(in_socket_buffer)
     , socket_buffer_status_(in_socket_buffer_status)
     , data_buffer_(in_data_buffer)
@@ -363,10 +364,11 @@ void DoFFT::launch(int offset)
     consumer_.handle(fft_finish_event);
 }
 
-DoIFFT::DoIFFT(Config* in_config, int in_tid, Consumer& in_consumer,
+DoIFFT::DoIFFT(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
     , task_duration(&in_stats_manager->ifft_stats_worker.task_duration)

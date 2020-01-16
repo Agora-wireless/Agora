@@ -8,18 +8,17 @@
 #include "doer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config* in_config, int in_tid, Consumer& in_consumer,
+DoZF::DoZF(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , csi_buffer_(in_csi_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
-    BS_ANT_NUM = config_->BS_ANT_NUM;
-    UE_NUM = config_->UE_NUM;
-    OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
     alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
 
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
@@ -46,6 +45,9 @@ void DoZF::launch(int offset)
 
 void DoZF::ZF_time_orthogonal(int offset)
 {
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
     int subframe_num_perframe = config_->data_symbol_num_perframe;
     int frame_id = offset / subframe_num_perframe;
@@ -190,6 +192,9 @@ void DoZF::ZF_time_orthogonal(int offset)
 
 void DoZF::ZF_freq_orthogonal(int offset)
 {
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
     int subframe_num_perframe = config_->data_symbol_num_perframe;
     int frame_id = offset / subframe_num_perframe;
@@ -270,6 +275,9 @@ void DoZF::ZF_freq_orthogonal(int offset)
 
 void DoZF::Predict(int offset)
 {
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int zf_block_size = config_->zf_block_size;

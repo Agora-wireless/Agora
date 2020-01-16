@@ -479,20 +479,20 @@ void* Millipede::worker(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize operators */
-    auto computeFFT = new DoFFT(config_, tid, consumer,
+    auto computeFFT = new DoFFT(config_, tid, fft_queue_, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
         stats_manager_);
 
-    auto computeIFFT = new DoIFFT(config_, tid, consumer,
+    auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    auto computeZF = new DoZF(config_, tid, consumer,
+    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
-    auto computeDemul = new DoDemul(config_, tid, consumer,
+    auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
-    auto computePrecode = new DoPrecode(config_, tid, consumer, dl_precoder_buffer_, dl_ifft_buffer_,
+    auto computePrecode = new DoPrecode(config_, tid, precode_queue_, consumer, dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
         dl_encoded_buffer_,
 #else
@@ -501,15 +501,14 @@ void* Millipede::worker(int tid)
         stats_manager_);
 
 #ifdef USE_LDPC
-    auto* computeEncoding = new DoEncode(config_, tid, consumer,
+    auto* computeEncoding = new DoEncode(config_, tid, encode_queue_, consumer,
         *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
         stats_manager_);
-    auto* computeDecoding = new DoDecode(config_, tid, consumer,
+    auto* computeDecoding = new DoDecode(config_, tid, decode_queue_, consumer,
         *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
         stats_manager_);
 #endif
 
-    Event_data event;
     bool ret = false;
 
     int queue_num;
@@ -547,41 +546,27 @@ void* Millipede::worker(int tid)
     while (true) {
         switch (dequeue_order[dequeue_idx]) {
         case TASK_IFFT:
-            ret = ifft_queue_.try_dequeue(event);
-            if (ret)
-                computeIFFT->launch(event.data);
+            ret = computeIFFT->try_launch();
             break;
         case TASK_PRECODE:
-            ret = precode_queue_.try_dequeue(event);
-            if (ret)
-                computePrecode->launch(event.data);
+            ret = computePrecode->try_launch();
             break;
 #ifdef USE_LDPC
         case TASK_ENCODE:
-            ret = encode_queue_.try_dequeue(event);
-            if (ret)
-                computeEncoding->launch(event.data);
+            ret = computeEncoding->try_launch();
             break;
         case TASK_DECODE:
-            ret = decode_queue_.try_dequeue(event);
-            if (ret)
-                computeDecoding->launch(event.data);
+            ret = computeDecoding->try_launch();
             break;
 #endif
         case TASK_ZF:
-            ret = zf_queue_.try_dequeue(event);
-            if (ret)
-                computeZF->launch(event.data);
+            ret = computeZF->try_launch();
             break;
         case TASK_FFT:
-            ret = fft_queue_.try_dequeue(event);
-            if (ret)
-                computeFFT->launch(event.data);
+            ret = computeFFT->try_launch();
             break;
         case TASK_DEMUL:
-            ret = demul_queue_.try_dequeue(event);
-            if (ret)
-                computeDemul->launch(event.data);
+            ret = computeDemul->try_launch();
             break;
         default:
             printf("ERROR: unsupported task type in dequeue\n");
@@ -601,19 +586,16 @@ void* Millipede::worker_fft(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize IFFT operator */
-    auto computeFFT = new DoFFT(config_, tid, consumer,
+    auto computeFFT = new DoFFT(config_, tid, fft_queue_, consumer,
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
         stats_manager_);
-    auto computeIFFT = new DoIFFT(config_, tid, consumer,
+    auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    Event_data event;
-
     while (true) {
-        if (fft_queue_.try_dequeue(event))
-            computeFFT->launch(event.data);
-        else if (downlink_mode && ifft_queue_.try_dequeue(event))
-            computeIFFT->launch(event.data);
+        if (computeFFT->try_launch()) {
+        } else if (downlink_mode && computeIFFT->try_launch()) {
+        }
     }
 }
 
@@ -626,14 +608,11 @@ void* Millipede::worker_zf(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize ZF operator */
-    auto computeZF = new DoZF(config_, tid, consumer,
+    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
         csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
-    Event_data event;
-
     while (true) {
-        if (zf_queue_.try_dequeue(event))
-            computeZF->launch(event.data);
+        computeZF->try_launch();
     }
 }
 
@@ -645,11 +624,11 @@ void* Millipede::worker_demul(int tid)
     Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
 
     /* initialize Demul operator */
-    auto computeDemul = new DoDemul(config_, tid, consumer,
+    auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
 
     /* initialize Precode operator */
-    auto computePrecode = new DoPrecode(config_, tid, consumer,
+    auto computePrecode = new DoPrecode(config_, tid, precode_queue_, consumer,
         dl_precoder_buffer_, dl_ifft_buffer_,
 #ifdef USE_LDPC
         dl_encoded_buffer_,
@@ -658,21 +637,19 @@ void* Millipede::worker_demul(int tid)
 #endif
         stats_manager_);
 
-    Event_data event;
     // int cur_frame_id = 0;
 
     while (true) {
         if (downlink_mode) {
-            if (precode_queue_.try_dequeue(event))
-                computePrecode->launch(event.data);
-        } else if (demul_queue_.try_dequeue(event)) {
+            computePrecode->try_launch();
+        } else {
             // int ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
             // int frame_id = event.data / (OFDM_CA_NUM * ul_data_subframe_num_perframe);
             // // check precoder status for the current frame
             // if (frame_id > cur_frame_id || frame_id == 0) {
             //     while (!precoder_status_[frame_id]);
             // }
-            computeDemul->launch(event.data);
+            computeDemul->try_launch();
         }
     }
 }

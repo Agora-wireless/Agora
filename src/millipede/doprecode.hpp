@@ -25,7 +25,8 @@
 
 class DoPrecode : public Doer {
 public:
-    DoPrecode(Config* in_config, int in_tid, Consumer& in_consumer,
+    DoPrecode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -66,11 +67,6 @@ public:
     void launch(int offset);
 
 private:
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int data_subframe_num_perframe;
-
     /**
      * Modulated data
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
