@@ -40,6 +40,7 @@
 #include "gettime.h"
 #include "offset.h"
 #include "txrx.hpp"
+#include "reciprocity.hpp"
 
 #ifdef USE_LDPC
 #include "docoding.hpp"
@@ -83,6 +84,7 @@ public:
         Consumer const& consumer);
     void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
     void schedule_zf_task(int frame_id, Consumer const& consumer);
+    void schedule_rc_task(int frame_id, Consumer const& consumer);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
     void schedule_decode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
     void schedule_encode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
@@ -198,6 +200,7 @@ private:
     RX_stats rx_stats_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
+    RC_stats rc_stats_;
     Data_stats demul_stats_;
     Data_stats decode_stats_;
     Data_stats encode_stats_;
@@ -208,7 +211,6 @@ private:
     Table<int> delay_fft_queue;
     int* delay_fft_queue_cnt;
 
-    /* Downlink */
     /** 
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM
@@ -241,6 +243,7 @@ private:
 
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
+    Table<complex_float> calib_buffer_;
     Table<int8_t> dl_encoded_buffer_;
 
     /**
@@ -272,6 +275,7 @@ private:
 
     /* Downlink*/
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
+    moodycamel::ConcurrentQueue<Event_data> rc_queue_;
     // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;

@@ -20,6 +20,7 @@
 #include "memory_manage.h"
 #include "utils.h"
 #include <nlohmann/json.hpp>
+#include "comms-lib.h"
 //#include <itpp/itbase.h>
 //using namespace itpp;
 using json = nlohmann::json;
@@ -59,6 +60,7 @@ public:
     std::vector<uint32_t> coeffs;
     std::vector<std::complex<int16_t>> pilot_ci16;
     std::vector<std::complex<float>> pilot_cf32;
+    std::vector<std::complex<double> > pilot_cd64;
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float* pilots_;
@@ -67,9 +69,9 @@ public:
     Table<complex_float> ul_IQ_modul;
     Table<complex_float> dl_IQ_modul;
     Table<std::complex<int16_t>> dl_IQ_symbol;
+    std::vector<std::complex<float> > pilotsF;
 
     double freq;
-    double bbf_ratio;
     double txgainA;
     double rxgainA;
     double txgainB;
@@ -77,6 +79,9 @@ public:
     double calTxGainA;
     double calTxGainB;
     double rate;
+    double nco;
+    double radioRfFreq;
+    double bwFilter;
     size_t framePeriod;
     size_t nCells;
     size_t nRadios;
@@ -86,8 +91,10 @@ public:
     size_t ref_ant;
     size_t beacon_ant;
     size_t beacon_len;
-    std::string beacon_mode;
+    bool beamsweep;
     bool sampleCalEn;
+    bool imbalanceCalEn;
+    std::string channel;
 
     size_t core_offset;
     size_t worker_thread_num;
@@ -108,11 +115,13 @@ public:
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
+    size_t OFDM_SYM_LEN;
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
+    std::string exec_mode;
 
     size_t packet_header_offset;
     size_t packet_length;
@@ -137,6 +146,8 @@ public:
     int getDownlinkPilotId(size_t, size_t);
     int getPilotSFIndex(size_t, size_t);
     bool isPilot(size_t, size_t);
+    bool isCalDlPilot(size_t, size_t);
+    bool isCalUlPilot(size_t, size_t);
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
     Config(std::string);

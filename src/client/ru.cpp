@@ -55,7 +55,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
         }
     }
 #else
-    radioconfig_ = new RadioConfig(config_);
+    radioconfig_ = new ClientRadioConfig(config_);
 
 #endif
 
@@ -189,7 +189,7 @@ void RU::sendThread(int tid)
 
     int packet_length = config_->packet_length;
 #ifndef SIM
-    RadioConfig* radio = radioconfig_;
+    ClientRadioConfig* radio = radioconfig_;
     packet_length -= config_->packet_header_offset;
 #endif
 
@@ -203,7 +203,7 @@ void RU::sendThread(int tid)
     int time_count = 0;
 #endif
 
-    std::vector<size_t>& txSymbols = (config_->isUE) ? config_->ULSymbols[0] : config_->DLSymbols[0];
+    std::vector<size_t>& txSymbols = config_->ULSymbols[0];
     // use token to speed up
     moodycamel::ProducerToken local_ptok(message_queue_);
     while (config_->running) {
@@ -224,17 +224,17 @@ void RU::sendThread(int tid)
         //frame_id = task_event.more_data;
 
 #ifdef SIM
-        if (config_->isUE) {
-            // first sending pilots in sim mode
-            //for (int p_id = 0; p_id < config_->pilotSymsPerFrame; p_id++)
-            {
-                struct Packet* pkt = (struct Packet*)pilot_buffer_;
-                new (pkt) Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
-                if (sendto(tx_socket_[tid], (char*)pilot_buffer_, packet_length, 0, (struct sockaddr*)&cliaddr_[tid], sizeof(cliaddr_[tid])) < 0) {
-                    perror("loopSend: socket sendto failed");
-                    exit(0);
-                }
+        // first sending pilots in sim mode
+        //for (int p_id = 0; p_id < cfg->pilotSymsPerFrame; p_id++)
+        {
+            struct Packet* pkt = (struct Packet*)pilot_buffer_;
+            new (pkt) Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
+            //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
+            if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+                perror("loopSend: socket sendto failed");
+                exit(0);
             }
+        }
 #if DEBUG_SEND
             printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, config_->pilotSymbols[0][ant_id], ant_id);
 #endif
@@ -351,7 +351,7 @@ void RU::taskThread(int tid)
     //moodycamel::ProducerToken local_ctok(task_queue_);
     //moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
-    const std::vector<size_t>& txSymbols = config_->isUE ? config_->ULSymbols[0] : config_->DLSymbols[0];
+    const std::vector<size_t>& txSymbols = config_->ULSymbols[0];
     int n_ant = config_->getNumAntennas();
 
     char* buffer = (*buffer_)[tid];
@@ -362,7 +362,7 @@ void RU::taskThread(int tid)
     int radio_start = tid * num_radios / thread_num_;
     int radio_end = (tid + 1) * num_radios / thread_num_;
     printf("receiver thread %d has %d radios\n", tid, radio_end - radio_start);
-    RadioConfig* radio = radioconfig_;
+    ClientRadioConfig* radio = radioconfig_;
 #else
     // loop recv
     socklen_t addrlen = sizeof(servaddr_[tid]);
@@ -423,12 +423,12 @@ void RU::taskThread(int tid)
             exit(0);
         }
 
-        if (txSymbols.size() > 0 && (config_->isUE ? config_->getDlSFIndex(frame_id, symbol_id) : config_->getPilotSFIndex(frame_id, symbol_id)) == 0) {
+        if (txSymbols.size() > 0 && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
             // notify TXthread to start transmitting frame_id+offset
             Event_data do_tx_task;
             do_tx_task.event_type = TASK_SEND;
             do_tx_task.data = ant_id;
-            do_tx_task.more_data = config_->isUE ? frame_id + TX_FRAME_DELTA : frame_id;
+            do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
             if (!task_queue_.enqueue(*task_ptok[tid], do_tx_task)) {
                 printf("task enqueue failed\n");
                 exit(0);
@@ -485,7 +485,7 @@ void RU::taskThread(int tid)
             }
 
             // notify TXthread to start transmitting frame_id+offset
-            if (txSymbols.size() > 0 && (config_->isUE ? config_->getDlSFIndex(frame_id, symbol_id) : config_->getPilotSFIndex(frame_id, symbol_id)) == 0) {
+            if (txSymbols.size() > 0 && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
                 //#ifdef SEPARATE_TX_THREAD
                 //                Event_data do_tx_task;
                 //                do_tx_task.event_type = TASK_packet_SENT;

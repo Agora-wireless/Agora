@@ -104,6 +104,12 @@ struct ZF_stats {
     bool* precoder_exist_in_frame;
 };
 
+struct RC_stats {
+    int* task_count;
+    int frame_count = 0;
+    int max_task_count;
+};
+
 /* TODO: clean up the legency code below */
 struct FFTBuffer {
     // Data before IFFT

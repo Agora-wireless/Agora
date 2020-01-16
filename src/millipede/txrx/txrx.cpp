@@ -283,7 +283,7 @@ void* PacketTXRX::loopSend(int tid)
 
         offset = task_event.data;
         interpreteOffset3d(offset, &current_data_subframe_id, &ant_id, &frame_id);
-        symbol_id = current_data_subframe_id + UE_NUM;
+        symbol_id = config_->DLSymbols[0][current_data_subframe_id]; // current_data_subframe_id + UE_NUM;
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
@@ -526,7 +526,8 @@ void* PacketTXRX::loopTXRX(int tid)
 
                 tx_offset = task_event.data;
                 interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
-                tx_symbol_id = tx_current_data_subframe_id + UE_NUM;
+                //tx_symbol_id = tx_current_data_subframe_id + UE_NUM;
+                tx_symbol_id = config_->DLSymbols[0][tx_current_data_subframe_id];
                 int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
                 int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
                 // int data_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
