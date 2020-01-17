@@ -232,16 +232,22 @@ void Millipede::start()
                                 end_sche_id = subframe_id + 1;
                             schedule_demul_task(frame_id, start_sche_id, end_sche_id, consumer_demul);
                         }
+                    } else if (cfg_->isCalDlPilot(frame_id, subframe_id) || cfg_->isCalUlPilot(frame_id, subframe_id)) {
+                        fft_stats_.symbol_cal_count[frame_id]++;
+                        print_per_subframe_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id, subframe_id);
+                        if (fft_stats_.symbol_cal_count[frame_id] == fft_stats_.max_symbol_cal_count) {
+                            print_per_frame_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id);
+                            schedule_rc_task(frame_id, consumer_rc);
+                        }
                     }
                 }
             } break;
             case EVENT_RC: {
                 int frame_id = event.data;
                 stats_manager_->update_rc_processed(rc_stats_.frame_count);
-                print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id); 
+                print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
                 update_frame_count(&(rc_stats_.frame_count));
-            }
-            break;          
+            } break;
             case EVENT_ZF: {
                 int offset_zf = event.data;
                 int frame_id, sc_id;
@@ -452,8 +458,8 @@ void* Millipede::worker(int tid)
 
     /* initialize operators */
     auto computeFFT = new DoFFT(cfg_, tid, consumer,
-        socket_buffer_, socket_buffer_status_, 
-	data_buffer_, csi_buffer_, calib_buffer_,
+        socket_buffer_, socket_buffer_status_,
+        data_buffer_, csi_buffer_, calib_buffer_,
         stats_manager_);
 
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
@@ -479,9 +485,8 @@ void* Millipede::worker(int tid)
         *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
         stats_manager_);
 #endif
-    auto *rc = new Reciprocity(cfg_, tid, consumer,
+    auto* rc = new Reciprocity(cfg_, tid, consumer,
         calib_buffer_, recip_buffer_, stats_manager_);
-
 
     Event_data event;
     bool ret = false;
@@ -547,9 +552,9 @@ void* Millipede::worker(int tid)
             if (ret)
                 computeZF->ZF(event.data);
             break;
-        case TASK_RC: 
+        case TASK_RC:
             ret = rc_queue_.try_dequeue(event);
-            if (ret) 
+            if (ret)
                 rc->computeReciprocityCalib(event.data);
             break;
         case TASK_FFT:
@@ -581,8 +586,8 @@ void* Millipede::worker_fft(int tid)
 
     /* initialize IFFT operator */
     auto computeFFT = new DoFFT(cfg_, tid, consumer,
-        socket_buffer_, socket_buffer_status_, 
-	data_buffer_, csi_buffer_, calib_buffer_,
+        socket_buffer_, socket_buffer_status_,
+        data_buffer_, csi_buffer_, calib_buffer_,
         stats_manager_);
     auto computeIFFT = new DoIFFT(cfg_, tid, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
@@ -740,10 +745,9 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
     }
 }
 
-
-void Millipede::schedule_rc_task(int frame_id, Consumer const& consumer) 
+void Millipede::schedule_rc_task(int frame_id, Consumer const& consumer)
 {
-    /* schedule normal ZF for all data subcarriers */                                                                                      
+    /* schedule normal ZF for all data subcarriers */
     Event_data do_rc_task;
     do_rc_task.event_type = TASK_RC;
     do_rc_task.data = frame_id;
@@ -888,6 +892,11 @@ void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_i
             frame_count, frame_id,
             get_time() - stats_manager_->get_pilot_received(frame_count));
         break;
+    case (PRINT_FFT_CAL):
+        printf("Main thread: cal frame: %d, %d, finished FFT for all cal subframes in %.2f us\n",
+            frame_count, frame_id,
+            get_time() - stats_manager_->get_pilot_received(frame_count));
+        break;
     case (PRINT_ZF):
         printf("Main thread: ZF done frame: %d, %d in %.2f us since pilot FFT done, total: %.2f us\n",
             frame_count, frame_id,
@@ -918,9 +927,9 @@ void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_i
             stats_manager_->get_precode_processed(frame_count) - stats_manager_->get_zf_processed(frame_count),
             stats_manager_->get_precode_processed(frame_count) - stats_manager_->get_pilot_received(frame_count));
         break;
-    case(PRINT_RC):
-        printf("Main thread: RC done frame: %d, %d in %.2f us since pilot FFT done, total: %.2f us\n", 
-            frame_id, frame_id, 
+    case (PRINT_RC):
+        printf("Main thread: Reciprocity Calculation done frame: %d, %d in %.2f us since pilot FFT done, total: %.2f us\n",
+            frame_count, frame_id,
             stats_manager_->get_rc_processed(frame_id) - stats_manager_->get_fft_processed(frame_id),
             stats_manager_->get_rc_processed(frame_id) - stats_manager_->get_pilot_received(frame_id));
         break;
@@ -962,6 +971,10 @@ void Millipede::print_per_subframe_done(UNUSED int task_type, UNUSED int frame_c
             fft_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx(),
             get_time() - stats_manager_->get_pilot_received(frame_count));
         break;
+    case (PRINT_FFT_RC):
+        printf("Main thread: cal symbol FFT done frame: %d, %d, subframe: %d, num sumbframes done: %d\n",
+            frame_count, frame_id, subframe_id, fft_stats_.symbol_cal_count[frame_id]);
+        break;
     case (PRINT_DEMUL):
         printf("Main thread: Demodulation done frame %d %d, subframe: %d, num sumbframes done: %d\n",
             frame_count, frame_id, subframe_id, demul_stats_.symbol_count[frame_id]);
@@ -997,6 +1010,9 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, U
     case (PRINT_ZF):
         printf("Main thread: ZF done frame: %d, subcarrier %d\n", frame_id, ant_or_sc_id);
         break;
+    case (PRINT_RC):
+        printf("Main thread: RC done frame: %d, subcarrier %d\n", frame_id, ant_or_sc_id);
+        break;
     case (PRINT_DEMUL):
         printf("Main thread: Demodulation done frame: %d, subframe: %d, sc: %d, num blocks done: %d\n",
             frame_id, subframe_id, ant_or_sc_id, demul_stats_.task_count[frame_id][subframe_id]);
@@ -1028,13 +1044,6 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
 {
     dl_IQ_data = &cfg->dl_IQ_data;
 
-#if DEBUG_PRINT_PILOT
-    cout << "Pilot data" << endl;
-    for (int i = 0; i < OFDM_CA_NUM; i++)
-        cout << cfg->pilots_[i] << ",";
-    cout << endl;
-#endif
-
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     PILOT_NUM = cfg->pilot_symbol_num_perframe;
@@ -1060,6 +1069,13 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
 
     LDPC_config = cfg->LDPC_config;
     mod_type = cfg->mod_type;
+
+#if DEBUG_PRINT_PILOT
+    cout << "Pilot data" << endl;
+    for (int i = 0; i < OFDM_CA_NUM; i++)
+        cout << cfg->pilots_[i] << ",";
+    cout << endl;
+#endif
 }
 
 void Millipede::initialize_queues()
@@ -1071,7 +1087,8 @@ void Millipede::initialize_queues()
     fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     ;
-    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);;
+    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);
+    ;
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
     decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * data_subframe_num_perframe * 4);
 
@@ -1128,6 +1145,8 @@ void Millipede::initialize_uplink_buffers()
         TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
     alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
+    alloc_buffer_1d(&(fft_stats_.symbol_cal_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    fft_stats_.max_symbol_cal_count = 2;
     fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     zf_stats_.max_task_count = zf_block_num;

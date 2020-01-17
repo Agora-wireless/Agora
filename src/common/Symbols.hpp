@@ -6,7 +6,7 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-//#define GENERATE_PILOT
+#define GENERATE_PILOT
 #ifdef USE_ARGOS
 #define GENERATE_DATA
 #endif
@@ -69,6 +69,7 @@
 #define PRINT_DECODE 10
 #define PRINT_ENCODE 11
 #define PRINT_RC 12
+#define PRINT_FFT_CAL 13
 
 #define BIGSTATION 0
 // #define ENABLE_DOWNLINK 0
