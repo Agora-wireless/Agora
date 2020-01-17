@@ -6,13 +6,12 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
-DoFFT::DoFFT(Config* cfg, int in_tid, Consumer& in_consumer,
+DoFFT::DoFFT(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
     Stats* in_stats_manager)
-    : config_(cfg)
-    , tid(in_tid)
-    , consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , socket_buffer_(in_socket_buffer)
     , socket_buffer_status_(in_socket_buffer_status)
     , data_buffer_(in_data_buffer)
@@ -40,7 +39,7 @@ DoFFT::~DoFFT()
     fft_buffer_.FFT_outputs.free();
 }
 
-void DoFFT::FFT(int offset)
+void DoFFT::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -65,7 +64,8 @@ void DoFFT::FFT(int offset)
     // remove CP, do FFT
     // int delay_offset = 0;
     // int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
-    // int FFT_buffer_target_id = (frame_id % TASK_BUFFER_FRAME_NUM) * (subframe_num_perframe) + subframe_id;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int FFT_buffer_target_id = frame_id % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + subframe_id;
 
     // transfer ushort to float
     int OFDM_PREFIX_LEN = config_->OFDM_PREFIX_LEN;
@@ -358,19 +358,17 @@ void DoFFT::FFT(int offset)
 #endif
     Event_data fft_finish_event;
     fft_finish_event.event_type = EVENT_FFT;
-    fft_finish_event.data = generateOffset2d((frame_id % TASK_BUFFER_FRAME_NUM), subframe_id);
-    // fft_finish_event.data = generateOffset2d(subframe_num_perframe, frame_id, subframe_id);
+    fft_finish_event.data = FFT_buffer_target_id;
     // getSubframeBufferIndex(frame_id, subframe_id);
 
     consumer_.handle(fft_finish_event);
 }
 
-DoIFFT::DoIFFT(Config* cfg, int in_tid, Consumer& in_consumer,
+DoIFFT::DoIFFT(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
     Stats* in_stats_manager)
-    : config_(cfg)
-    , tid(in_tid)
-    , consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
     , task_duration(&in_stats_manager->ifft_stats_worker.task_duration)
@@ -386,19 +384,22 @@ DoIFFT::~DoIFFT()
     DftiFreeDescriptor(&mkl_handle);
 }
 
-void DoIFFT::IFFT(int offset)
+void DoIFFT::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int frame_id, current_data_subframe_id, ant_id; //, total_data_subframe_id;
-    interpreteOffset3d(offset, &current_data_subframe_id, &ant_id, &frame_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
     int frame_id_in_task_buffer = frame_id % TASK_BUFFER_FRAME_NUM;
     int frame_id_in_socket_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int offset_in_buffer = ant_id + BS_ANT_NUM * (current_data_subframe_id + frame_id_in_task_buffer * data_subframe_num_perframe);
-    // interpreteOffset3d(BS_ANT_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &ant_id);
 #if DEBUG_PRINT_IN_TASK
     printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, current_data_subframe_id, ant_id);
 #endif
