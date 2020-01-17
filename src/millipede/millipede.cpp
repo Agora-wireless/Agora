@@ -502,11 +502,9 @@ void* Millipede::worker(int tid)
 
 #ifdef USE_LDPC
     auto* computeEncoding = new DoEncode(config_, tid, encode_queue_, consumer,
-        *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
-        stats_manager_);
+        *dl_IQ_data, dl_encoded_buffer_, stats_manager_);
     auto* computeDecoding = new DoDecode(config_, tid, decode_queue_, consumer,
-        *dl_IQ_data, dl_encoded_buffer_, demod_soft_buffer_, decoded_buffer_,
-        stats_manager_);
+        demod_soft_buffer_, decoded_buffer_, stats_manager_);
 #endif
 
     int queue_num;
