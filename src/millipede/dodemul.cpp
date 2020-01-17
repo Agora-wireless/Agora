@@ -7,12 +7,12 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(Config* cfg, int in_tid, int in_demul_block_size,
-    Consumer& in_consumer,
+DoDemul::DoDemul(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
-    : consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , equal_buffer_(in_equal_buffer)
@@ -20,21 +20,14 @@ DoDemul::DoDemul(Config* cfg, int in_tid, int in_demul_block_size,
     , demod_soft_buffer_(in_demod_soft_buffer)
     , Demul_task_duration(in_stats_manager->demul_stats_worker.task_duration)
 {
-    config_ = cfg;
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
-    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-
-    tid = in_tid;
-    demul_block_size = in_demul_block_size;
-
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
     // Demul_task_duration = in_Demul_task_duration;
     // Demul_task_count = in_Demul_task_count;
 
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int demul_block_size = config_->demul_block_size;
     spm_buffer = (complex_float*)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
+    int UE_NUM = config_->UE_NUM;
     equaled_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
     equaled_buffer_temp_transposed = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
 
@@ -47,12 +40,17 @@ DoDemul::~DoDemul()
     free(equaled_buffer_temp);
 }
 
-void DoDemul::Demul(int offset)
+void DoDemul::launch(int offset)
 {
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
-    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
-    total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
+#if DEBUG_PRINT_IN_TASK
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+#endif
 
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -70,11 +68,10 @@ void DoDemul::Demul(int offset)
     // int mat_elem = UE_NUM * BS_ANT_NUM;
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
-    int max_sc_ite;
-    if (sc_id + demul_block_size <= OFDM_DATA_NUM)
-        max_sc_ite = demul_block_size;
-    else
-        max_sc_ite = OFDM_DATA_NUM - sc_id;
+    int demul_block_size = config_->demul_block_size;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
+
     /* i = 0, 1, ..., 32/8
      * iterate through cache lines (each cache line has 8 subcarriers) */
     for (int i = 0; i < max_sc_ite / 8; i++) {
@@ -93,6 +90,9 @@ void DoDemul::Demul(int offset)
         //     }
         // }
 
+        int BS_ANT_NUM = config_->BS_ANT_NUM;
+        int UE_NUM = config_->UE_NUM;
+        int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
         int cur_block_id = (sc_id + i * 8) / transpose_block_size;
         int sc_inblock_idx = (i * 8) % transpose_block_size;
         int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
@@ -206,6 +206,8 @@ void DoDemul::Demul(int offset)
 #ifdef USE_LDPC
     // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
     // cout<< "Demuled data: \n";
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     __m256i index2 = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4,
         UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
@@ -249,21 +251,26 @@ void DoDemul::Demul(int offset)
 void DoDemul::DemulSingleSC(int offset)
 {
     double start_time = get_time();
-    int frame_id, total_data_subframe_id, current_data_subframe_id, sc_id;
-    interpreteOffset3d(offset, &frame_id, &current_data_subframe_id, &sc_id);
-    total_data_subframe_id = current_data_subframe_id + frame_id * data_subframe_num_perframe;
-    // interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int demul_block_size = config_->demul_block_size;
+    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
+    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+#if DEBUG_PRINT_IN_TASK
+    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
+#endif
     // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
     int transpose_block_size = config_->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
 
-#if DEBUG_PRINT_IN_TASK
-    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
-#endif
-
     __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4, transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
 
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int cur_block_id = sc_id / transpose_block_size;
     int sc_inblock_idx = sc_id % transpose_block_size;
     int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;

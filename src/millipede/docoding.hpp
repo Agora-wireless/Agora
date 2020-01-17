@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
@@ -24,34 +25,15 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-class Consumer;
 
 // #include "mkl_dfti.h"
 
 class DoCoding {
-public:
-    DoCoding(Config* cfg, int in_tid, Consumer& in_consumer,
-        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer, Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+protected:
+    DoCoding(Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         Stats* in_stats_manager);
     ~DoCoding();
-
-    /**
-     * Do Encode task for one code block 
-     */
-    void Encode(int offset);
-
-    /**
-     * Do Decode task for one code block 
-     */
-    void Decode(int offset);
-
-private:
-    Config* config_;
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_CA_NUM, OFDM_DATA_NUM;
-
-    int tid;
-    Consumer& consumer_;
 
     Table<int8_t>& raw_data_buffer_;
     int8_t* encoded_buffer_temp;
@@ -83,5 +65,46 @@ private:
     __attribute__((aligned(64))) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
     __attribute__((aligned(64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
 };
+
+class DoEncode : publiic Doer, private DoCoding {
+public:
+    DoEncode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Stats* in_stats_manager)
+        : Doer(in_config, in_tid, in_task_queue, in_consumer)
+        , DoCoding(in_raw_data_buffer, in_encoded_buffer,
+              in_demod_buffer, in_decoded_buffer, in_stats_manager)
+    {
+    }
+    ~DoEncode() {}
+
+    /**
+     * Do Encode task for one code block 
+     */
+    void launch(int offset);
+}
+
+class DoDecode : public Doer,
+                 private DoCoding {
+public:
+    DoDecode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Stats* in_stats_manager)
+        : Doer(in_config, in_tid, in_task_queue, in_consumer)
+        , DoCoding(in_raw_data_buffer, in_encoded_buffer,
+              in_demod_buffer, in_decoded_buffer, in_stats_manager)
+    {
+    }
+    ~DoEncode() {}
+
+    /**
+     * Do Decode task for one code block 
+     */
+    void launch(int offset);
+}
 
 #endif

@@ -7,28 +7,21 @@
 #include "Consumer.hpp"
 
 using namespace arma;
-DoCoding::DoCoding(Config* cfg, int in_tid, Consumer& in_consumer,
-    Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer, Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+DoCoding::DoCoding(Config* in_config, int in_tid, Consumer& in_consumer,
+    Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+    Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
     Stats* in_stats_manager)
-    : consumer_(in_consumer)
+    : Doer(in_config, in_tid, in_consumer)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
     , llr_buffer_(in_demod_buffer)
     , decoded_buffer_(in_decoded_buffer)
     , Encode_task_duration(in_stats_manager->encode_stats_worker.task_duration)
     , Decode_task_duration(in_stats_manager->decode_stats_worker.task_duration)
+    , Encode_task_count(in_stats_manager->encode_stats_worker.task_count)
+    , Decode_task_count(in_stats_manager->decode_stats_worker.task_count)
 {
-    config_ = cfg;
-    LDPC_config = cfg->LDPC_config;
-    // BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    // OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-
-    tid = in_tid;
-
-    Encode_task_count = in_stats_manager->encode_stats_worker.task_count;
-    Decode_task_count = in_stats_manager->decode_stats_worker.task_count;
+    LDPC_config = config_->LDPC_config;
 
     int16_t numChannelLlrs = LDPC_config.cbCodewLen;
 
@@ -76,6 +69,7 @@ DoCoding::DoCoding(Config* cfg, int in_tid, Consumer& in_consumer,
 
     int numMsgBits = LDPC_config.cbLen - numFillerBits;
     int numMsgBytes = (numMsgBits + 7) / 8;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     alloc_buffer_1d(&(ldpc_decoder_5gnr_response.varNodes), buffer_len, 32, 1);
     alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
@@ -127,12 +121,16 @@ adapt_bits_for_mod(int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
     }
 }
 
-void DoCoding::Encode(int offset)
+void DoEncode::launch(int offset)
 {
-    int frame_id, symbol_id, cb_id;
-    interpreteOffset3d(offset, &frame_id, &symbol_id, &cb_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int cb_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_offset = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_id = symbol_offset % data_subframe_num_perframe;
 
 #if DEBUG_PRINT_IN_TASK
+    int frame_id = symbol_offset / data_subframe_num_perframe;
     printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
 #endif
 
@@ -140,11 +138,11 @@ void DoCoding::Encode(int offset)
     double start_time = get_time();
 #endif
 
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
-    int symbol_offset = config_->data_symbol_num_perframe * frame_id + symbol_id;
     int8_t* input_ptr = (int8_t*)raw_data_buffer_[symbol_id] + input_offset;
     int8_t* output_ptr = encoded_buffer_temp;
     // int8_t *output_ptr = encoded_buffer[symbol_offset] + output_offset;
@@ -177,11 +175,16 @@ void DoCoding::Encode(int offset)
     consumer_.handle(Encode_finish_event);
 }
 
-void DoCoding::Decode(int offset)
+void DoDecode::launch(int offset)
 {
-    int frame_id, symbol_id, cb_id;
-    interpreteOffset3d(offset, &frame_id, &symbol_id, &cb_id);
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int cb_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_offset = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int symbol_id = symbol_offset % data_subframe_num_perframe;
+
 #if DEBUG_PRINT_IN_TASK
+    int frame_id = symbol_offset / data_subframe_num_perframe;
     printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
 #endif
 
@@ -189,16 +192,16 @@ void DoCoding::Decode(int offset)
     double start_time = get_time();
 #endif
 
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int ue_id = cb_id / LDPC_config.nblocksInSymbol;
     int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
-    int llr_buffer_offset = (OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id) * config_->mod_type;
-    int decoded_buffer_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int symbol_offset = data_subframe_num_perframe * frame_id + symbol_id;
+    int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
+    int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+    int llr_buffer_offset = output_offset * config_->mod_type;
     ldpc_decoder_5gnr_request.varNodes = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
-    ldpc_decoder_5gnr_response.compactedMessageBytes = (uint8_t*)decoded_buffer_[symbol_offset] + decoded_buffer_offset;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = (uint8_t*)decoded_buffer_[symbol_offset] + input_offset;
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n",
-    //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, decoded_buffer_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
+    //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, input_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
     // inform main thread
 

@@ -5,25 +5,21 @@
  */
 #include "dozf.hpp"
 #include "Consumer.hpp"
+#include "doer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config* cfg, int in_tid, int in_zf_block_size,
-    Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer, Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
-    : consumer_(in_consumer)
+DoZF::DoZF(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
+    Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
+    : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , csi_buffer_(in_csi_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
-    , recip_buffer_(in_recip_buffer)
 {
-    config_ = cfg;
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
     alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
-    tid = in_tid;
-    zf_block_size = in_zf_block_size;
 
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
@@ -39,7 +35,7 @@ DoZF::~DoZF()
     free_buffer_1d(&pred_csi_buffer_);
 }
 
-void DoZF::ZF(int offset)
+void DoZF::launch(int offset)
 {
     if (config_->freq_orthogonal_pilot)
         ZF_freq_orthogonal(offset);
@@ -49,18 +45,18 @@ void DoZF::ZF(int offset)
 
 void DoZF::ZF_time_orthogonal(int offset)
 {
-    int frame_id, sc_id;
-    interpreteOffset2d(offset, &frame_id, &sc_id);
-
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int zf_block_size = config_->zf_block_size;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = offset / subframe_num_perframe;
+    int sc_id = offset % subframe_num_perframe * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
-    int max_sc_ite;
-    if (sc_id + zf_block_size <= OFDM_DATA_NUM)
-        max_sc_ite = zf_block_size;
-    else
-        max_sc_ite = OFDM_DATA_NUM - sc_id;
+    int max_sc_ite = std::min(zf_block_size, OFDM_DATA_NUM - sc_id);
     for (int i = 0; i < max_sc_ite; i++) {
 
 #if DEBUG_UPDATE_STATS
@@ -161,18 +157,6 @@ void DoZF::ZF_time_orthogonal(int offset)
         (*ZF_task_duration)[tid * 8][3] += duration3;
 #endif
 
-        if (config_->downlink_mode) {
-            cx_float* ptr_out2 = (cx_float*)dl_precoder_buffer_[cur_offset];
-            cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
-
-            cx_float* calib_ptr = (cx_float*)recip_buffer_[cur_sc_id];
-            cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
-            cx_fvec vec_calib = mat_calib.col(0);
-            cx_fmat mat_calib_diag = diagmat(vec_calib);
-
-            mat_output2 = mat_output * mat_calib_diag;
-        }
-
         // float *tar_ptr = (float *)precoder_buffer_.precoder[cur_offset];
         // // float temp = *tar_ptr;
         // float *src_ptr = (float *)ptr_out;
@@ -208,11 +192,15 @@ void DoZF::ZF_time_orthogonal(int offset)
 
 void DoZF::ZF_freq_orthogonal(int offset)
 {
-    int frame_id, sc_id;
-    interpreteOffset2d(offset, &frame_id, &sc_id);
-
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int zf_block_size = config_->zf_block_size;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = offset / subframe_num_perframe;
+    int sc_id = offset % subframe_num_perframe * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
-    printf("In doZF thread %d: frame: %d, subcarrier: %d, blcok: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
+    printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
 
@@ -270,18 +258,6 @@ void DoZF::ZF_freq_orthogonal(int offset)
     (*ZF_task_duration)[tid * 8][3] += duration3;
 #endif
 
-    if (config_->downlink_mode) {
-        cx_float* ptr_out2 = (cx_float*)dl_precoder_buffer_[offset_in_buffer];
-        cx_fmat mat_output2(ptr_out2, UE_NUM, BS_ANT_NUM, false);
-
-        cx_float* calib_ptr = (cx_float*)recip_buffer_[sc_id];
-        cx_fmat mat_calib(calib_ptr, BS_ANT_NUM, 1, false);
-        cx_fvec vec_calib = mat_calib.col(0);
-        cx_fmat mat_calib_diag = diagmat(vec_calib);
-
-        mat_output2 = mat_output * mat_calib_diag;
-    }
-
 #if DEBUG_UPDATE_STATS
     ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
     double duration = get_time() - start_time1;
@@ -299,22 +275,26 @@ void DoZF::ZF_freq_orthogonal(int offset)
 
 void DoZF::Predict(int offset)
 {
-    int frame_id, sc_id;
-    interpreteOffset2d(offset, &frame_id, &sc_id);
-    int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_CA_NUM + sc_id;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
+    int zf_block_size = config_->zf_block_size;
+    int subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = offset / subframe_num_perframe;
+    int sc_id = offset % subframe_num_perframe * zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_next_frame];
+    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset];
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     pinv(mat_output, mat_input, 1e-1, "dc");
 
     // inform main thread
     Event_data pred_finish_event;
     pred_finish_event.event_type = EVENT_ZF;
-    pred_finish_event.data = offset_next_frame;
+    pred_finish_event.data = (frame_id + 1) % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + sc_id;
     consumer_.handle(pred_finish_event);
 }

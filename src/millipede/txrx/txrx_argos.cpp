@@ -362,7 +362,6 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     int ret;
     int tx_offset;
     //int ant_id, symbol_id, frame_id;
-    int frame_id, tx_ant_id, tx_frame_id, tx_subframe_id, tx_current_data_subframe_id;
     //struct timespec tv, tv2;
 
     //int txSymsPerFrame = 0;
@@ -396,13 +395,17 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
 
         //ant_id = task_event.data; //% cfg->getNumAntennas();
 
-        tx_offset = task_event.data;
-        interpreteOffset3d(tx_offset, &tx_current_data_subframe_id, &tx_ant_id, &tx_frame_id);
-        tx_subframe_id = tx_current_data_subframe_id + UE_NUM;
-        int tx_frame_id_in_buffer = tx_frame_id % SOCKET_BUFFER_FRAME_NUM;
-        int socket_subframe_offset = tx_frame_id_in_buffer * data_subframe_num_perframe + tx_current_data_subframe_id;
-        tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + tx_ant_id) * packet_length + packet_header_offset;
-        frame_id = tx_frame_id + TX_FRAME_DELTA;
+        offset = task_event.data;
+        int ant_id = offset / (TASK_BUFFER_FRAME_NUM * data_subframe_num_perframe);
+        int total_data_subframe_id = offset % (TASK_BUFFER_FRAME_NUM * data_subframe_num_perframe);
+        int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+        int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
+        int tx_subframe_id = current_data_subframe_id + UE_NUM;
+        int frame_id_in_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
+        int socket_subframe_offset = frame_id_in_buffer * data_subframe_num_perframe + current_data_subframe_id;
+        tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length + packet_header_offset;
+        frame_id += TX_FRAME_DELTA;
 
         //symbol_id = task_event.data / cfg->getNumAntennas();
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
@@ -415,29 +418,29 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         if (symbol_id == txSymbols.back())
             flags = 2; // HAS_TIME & END_BURST, fixme
 #endif
-        if (cfg->nChannels == 1 || tx_ant_id % 2 == 0) {
+        if (cfg->nChannels == 1 || ant_id % 2 == 0) {
 #if DEBUG_DOWNLINK
-            if (tx_ant_id != (int)cfg->ref_ant)
+            if (ant_id != (int)cfg->ref_ant)
                 txbuf[0] = zeros.data();
             else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
                 txbuf[0] = cfg->pilot_ci16.data();
             else
-                txbuf[0] = (void*)cfg->dl_IQ_symbol[tx_current_data_subframe_id];
+                txbuf[0] = (void*)cfg->dl_IQ_symbol[current_data_subframe_id];
 #else
             txbuf[0] = tx_cur_buffer_ptr;
 #endif
             //buffer_status[offset] = 0;
-        } else if (cfg->nChannels == 2 && tx_ant_id % 2 == 1) {
+        } else if (cfg->nChannels == 2 && ant_id % 2 == 1) {
             txbuf[1] = tx_cur_buffer_ptr + packet_length; //FIXME
             //buffer_status[offset+1] = 0;
         }
 #if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n", tid, frame_id, symbol_id, tx_ant_id, tx_offset,
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n", tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv);
 #if SEPARATE_TX_RX
-        radio->radioTx(tx_ant_id / cfg->nChannels, txbuf, flags, frameTime);
+        radio->radioTx(ant_id / cfg->nChannels, txbuf, flags, frameTime);
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
@@ -445,7 +448,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
 
         Event_data tx_message;
         tx_message.event_type = EVENT_PACKET_SENT;
-        tx_message.data = tx_offset;
+        tx_message.data = offset;
         if (!message_queue_->enqueue(*local_ptok, tx_message)) {
             printf("socket message enqueue failed\n");
             exit(0);

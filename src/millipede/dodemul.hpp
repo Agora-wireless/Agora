@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
 #include "offset.h"
@@ -20,14 +21,15 @@
 #include <string.h> /* for memcpy */
 #include <vector>
 // #include "mkl_dfti.h"
-class Consumer;
 
-class DoDemul {
+class DoDemul : public Doer {
 public:
-    DoDemul(Config* cfg, int in_tid, int in_demod_block_size,
-        Consumer& in_consumer,
-        Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_equal_buffer,
-        Table<uint8_t>& in_demul_hard_buffer, Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
+    DoDemul(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer,
+        Table<complex_float>& in_equal_buffer,
+        Table<uint8_t>& in_demul_hard_buffer, Table<int8_t>& in_demod_soft_buffer,
+        Stats* in_stats_manager);
     ~DoDemul();
 
     /**
@@ -57,20 +59,11 @@ public:
      *     3. perform demodulation on equalized data matrix   
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void Demul(int offset);
+    void launch(int offset);
 
     void DemulSingleSC(int offset);
 
 private:
-    Config* config_;
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
-
-    int tid;
-    int demul_block_size;
-    Consumer& consumer_;
-
     Table<complex_float>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
     Table<complex_float>& equal_buffer_;
