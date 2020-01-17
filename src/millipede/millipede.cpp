@@ -509,73 +509,40 @@ void* Millipede::worker(int tid)
         stats_manager_);
 #endif
 
-    bool ret = false;
-
     int queue_num;
-    int* dequeue_order;
+    Doer** computers;
 #ifdef USE_LDPC
-    int dequeue_order_DL_LDPC[] = { TASK_IFFT, TASK_PRECODE, TASK_ENCODE, TASK_ZF, TASK_FFT };
-    int dequeue_order_UL_LDPC[] = { TASK_ZF, TASK_FFT, TASK_DEMUL, TASK_DECODE };
+    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeZF, computeFFT };
+    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecode };
 #else
-    int dequeue_order_DL[] = { TASK_IFFT, TASK_PRECODE, TASK_ZF, TASK_FFT };
-    int dequeue_order_UL[] = { TASK_ZF, TASK_FFT, TASK_DEMUL };
+    Doer* compute_DL[] = { computeIFFT, computePrecode, computeZF, computeFFT };
+    Doer* compute_UL[] = { computeZF, computeFFT, computeDemul };
 #endif
 
+#define NITEMS(a) (sizeof(a) / sizeof(*a))
 #ifdef USE_LDPC
     if (downlink_mode) {
-        queue_num = sizeof(dequeue_order_DL_LDPC) / sizeof(dequeue_order_DL_LDPC[0]);
-        dequeue_order = dequeue_order_DL_LDPC;
+        queue_num = NITEMS(compute_DL_LDPC);
+        computers = compute_DL_LDPC;
     } else {
-        queue_num = sizeof(dequeue_order_UL_LDPC) / sizeof(dequeue_order_UL_LDPC[0]);
-        ;
-        dequeue_order = dequeue_order_UL_LDPC;
+        queue_num = NITEMS(compute_UL_LDPC);
+        computers = compute_UL_LDPC;
     }
 #else
     if (downlink_mode) {
-        queue_num = sizeof(dequeue_order_DL) / sizeof(dequeue_order_DL[0]);
-        ;
-        dequeue_order = dequeue_order_DL;
+        queue_num = NITEMS(compute_DL);
+        computers = compute_DL;
     } else {
-        queue_num = sizeof(dequeue_order_UL) / sizeof(dequeue_order_UL[0]);
-        dequeue_order = dequeue_order_UL;
+        queue_num = NITEMS(compute_UL);
+        computers = compute_UL;
     }
 #endif
-
-    int dequeue_idx = 0;
 
     while (true) {
-        switch (dequeue_order[dequeue_idx]) {
-        case TASK_IFFT:
-            ret = computeIFFT->try_launch();
-            break;
-        case TASK_PRECODE:
-            ret = computePrecode->try_launch();
-            break;
-#ifdef USE_LDPC
-        case TASK_ENCODE:
-            ret = computeEncoding->try_launch();
-            break;
-        case TASK_DECODE:
-            ret = computeDecoding->try_launch();
-            break;
-#endif
-        case TASK_ZF:
-            ret = computeZF->try_launch();
-            break;
-        case TASK_FFT:
-            ret = computeFFT->try_launch();
-            break;
-        case TASK_DEMUL:
-            ret = computeDemul->try_launch();
-            break;
-        default:
-            printf("ERROR: unsupported task type in dequeue\n");
-            exit(0);
+        for (int i = 0; i < queue_num; i++) {
+            if (computers[i]->try_launch())
+                break;
         }
-        if (ret)
-            dequeue_idx = 0;
-        else
-            dequeue_idx = (dequeue_idx + 1) % queue_num;
     }
 }
 
