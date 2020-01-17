@@ -121,7 +121,6 @@ public:
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
-    std::string exec_mode;
 
     size_t packet_header_offset;
     size_t packet_length;
