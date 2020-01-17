@@ -38,7 +38,6 @@ Config::Config(std::string jsonfile)
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "16QAM");
     printf("modulation: %s\n", modulation.c_str());
-    exec_mode = tddConf.value("exec_mode", "hw");
     TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 0);
     CP_LEN = tddConf.value("cp_len", 0);
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0 + CP_LEN);
@@ -200,18 +199,15 @@ Config::Config(std::string jsonfile)
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
-    if (exec_mode == "hw") {
-        pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
-        std::vector<uint32_t> pre(prefix, 0);
-        std::vector<uint32_t> post(postfix, 0);
-        pilot.insert(pilot.begin(), pre.begin(), pre.end());
-        pilot.insert(pilot.end(), post.begin(), post.end());
-        if (pilot.size() != sampsPerSymbol) {
-            std::cout << "generated pilot symbol size does not match configured symbol size!" << std::endl;
-            exit(1);
-        }
+    pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
+    std::vector<uint32_t> pre(prefix, 0);
+    std::vector<uint32_t> post(postfix, 0);
+    pilot.insert(pilot.begin(), pre.begin(), pre.end());
+    pilot.insert(pilot.end(), post.begin(), post.end());
+    if (pilot.size() != sampsPerSymbol) {
+        std::cout << "generated pilot symbol size does not match configured symbol size!" << std::endl;
+        exit(1);
     }
-
 
     dl_IQ_data.malloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64);
     dl_IQ_modul.malloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64); // used for debug
