@@ -28,31 +28,27 @@
 
 // #include "mkl_dfti.h"
 
-class DoCoding {
-protected:
-    DoCoding(Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+class DoEncode : publiic Doer {
+public:
+    DoEncode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Stats* in_stats_manager);
-    ~DoCoding();
+    ~DoEncode();
 
+    /**
+     * Do Encode task for one code block 
+     */
+    void launch(int offset);
+
+private:
     Table<int8_t>& raw_data_buffer_;
     int8_t* encoded_buffer_temp;
     Table<int8_t>& encoded_buffer_;
-    Table<int8_t>& llr_buffer_;
-    Table<uint8_t>& decoded_buffer_;
-
-    Table<double>& Encode_task_duration;
-    int* Encode_task_count;
-
-    Table<double>& Decode_task_duration;
-    int* Decode_task_count;
-
-    LDPCconfig LDPC_config;
-
-    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
-    };
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
     };
+    Table<double>& Encode_task_duration;
+    int* Encode_task_count;
     const int16_t* pShiftMatrix;
     const int16_t* pMatrixNumPerCol;
     const int16_t* pAddr;
@@ -64,47 +60,28 @@ protected:
     __attribute__((aligned(64))) int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
     __attribute__((aligned(64))) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
     __attribute__((aligned(64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
-};
-
-class DoEncode : publiic Doer, private DoCoding {
-public:
-    DoEncode(Config* in_config, int in_tid,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
-        Stats* in_stats_manager)
-        : Doer(in_config, in_tid, in_task_queue, in_consumer)
-        , DoCoding(in_raw_data_buffer, in_encoded_buffer,
-              in_demod_buffer, in_decoded_buffer, in_stats_manager)
-    {
-    }
-    ~DoEncode() {}
-
-    /**
-     * Do Encode task for one code block 
-     */
-    void launch(int offset);
 }
 
-class DoDecode : public Doer,
-                 private DoCoding {
+class DoDecode : public Doer {
 public:
     DoDecode(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
-        Stats* in_stats_manager)
-        : Doer(in_config, in_tid, in_task_queue, in_consumer)
-        , DoCoding(in_raw_data_buffer, in_encoded_buffer,
-              in_demod_buffer, in_decoded_buffer, in_stats_manager)
-    {
-    }
-    ~DoEncode() {}
+        Stats* in_stats_manager);
+    ~DoDecode();
 
     /**
      * Do Decode task for one code block 
      */
     void launch(int offset);
+
+private:
+    Table<int8_t>& llr_buffer_;
+    Table<uint8_t>& decoded_buffer_;
+    Table<double>& Decode_task_duration;
+    int* Decode_task_count;
+    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
+    };
 }
 
 #endif
