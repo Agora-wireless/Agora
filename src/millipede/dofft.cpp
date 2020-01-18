@@ -392,15 +392,15 @@ void DoIFFT::launch(int offset)
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int offset_in_buffer = ant_id + BS_ANT_NUM * total_data_subframe_id;
+    int offset_in_buffer = ant_id + BS_ANT_NUM * subframe_id;
 #if DEBUG_PRINT_IN_TASK
-    printf("In doIFFT thread %d: tot_subframe: %d, antenna: %d\n", tid, total_data_subframe_id, ant_id);
+    printf("In doIFFT thread %d: tot_subframe: %d, antenna: %d\n", tid, subframe_id, ant_id);
 #endif
 
-    // cout << "In ifft: tot_subframe: "<< total_data_subframe_id<<", ant: " << ant_id << ", input data: ";
+    // cout << "In ifft: tot_subframe: "<< subframe_id<<", ant: " << ant_id << ", input data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
     //     cout << dl_ifft_buffer_.IFFT_inputs[offset][j].real << "+" << dl_ifft_buffer_.IFFT_inputs[offset][j].imag << "j,   ";
     // }
@@ -410,7 +410,7 @@ void DoIFFT::launch(int offset)
 
     DftiComputeBackward(mkl_handle, dl_ifft_buffer_[offset_in_buffer]);
 
-    // cout << "In ifft: tot_subframe: "<< total_data_subframe_id<<", ant: " << ant_id <<", offset: "<<offset <<", output data: ";
+    // cout << "In ifft: tot_subframe: "<< subframe_id<<", ant: " << ant_id <<", offset: "<<offset <<", output data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
     //     cout << dl_ifft_buffer_.IFFT_outputs[offset][j].real << "+" << dl_ifft_buffer_.IFFT_outputs[offset][j].imag << "j,   ";
     // }
@@ -418,7 +418,7 @@ void DoIFFT::launch(int offset)
 
     // calculate data for downlink socket buffer
     float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[offset_in_buffer][0]);
-    int socket_subframe_offset = total_data_subframe_id % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe);
+    int socket_subframe_offset = subframe_id % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe);
     int packet_length = config_->packet_length;
     char* socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * packet_length];
     int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
@@ -445,7 +445,7 @@ void DoIFFT::launch(int offset)
         _mm256_stream_si256((__m256i*)(socket_ptr + sc_id * 4), integer1);
     }
 
-    // cout << "In ifft: tot_subframe: "<< total_data_subframe_id<<", ant: " << ant_id << ", data: ";
+    // cout << "In ifft: tot_subframe: "<< subframe_id<<", ant: " << ant_id << ", data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
     //     int socket_offset = sizeof(int) * 16 + ant_id * packetReceiver::packet_length;
     //     cout <<*((short *)(socket_ptr + socket_offset) + 2 * j)  << "+j"<<*((short *)(socket_ptr + socket_offset) + 2 * j + 1 )<<",   ";
