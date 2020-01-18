@@ -58,15 +58,12 @@ void DoFFT::launch(int offset)
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     int frame_id = pkt->frame_id % 10000;
     int subframe_id = pkt->symbol_id;
-    // int cell_id = pkt->cell_id;
     int ant_id = pkt->ant_id;
-    // printf("thread %d process frame_id %d, subframe_id %d, cell_id %d, ant_id %d\n", tid, frame_id, subframe_id, cell_id, ant_id);
+    // printf("thread %d process frame_id %d, subframe_id %d, ant_id %d\n", tid, frame_id, subframe_id, ant_id);
     // remove CP, do FFT
     // int delay_offset = 0;
     // int FFT_buffer_target_id = getFFTBufferIndex(frame_id, subframe_id, ant_id);
-    int subframe_num_perframe = config_->data_symbol_num_perframe;
-    int FFT_buffer_target_id = frame_id % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + subframe_id;
-
+    
     // transfer ushort to float
     int OFDM_PREFIX_LEN = config_->OFDM_PREFIX_LEN;
     int OFDM_CA_NUM = config_->OFDM_CA_NUM;
@@ -345,21 +342,15 @@ void DoFFT::launch(int offset)
     if (pilot_symbol == 0) {
         FFT_task_count[tid * 16] = FFT_task_count[tid * 16] + 1;
         (*FFT_task_duration)[tid * 8][0] += duration;
-        // if (duration > 500) {
-        //     printf("Thread %d FFT takes %.2f\n", tid, duration);
-        // }
     } else {
         CSI_task_count[tid * 16] = CSI_task_count[tid * 16] + 1;
         (*CSI_task_duration)[tid * 8][0] += duration;
-        // if (duration > 500) {
-        //     printf("Thread %d pilot FFT takes %.2f\n", tid, duration);
-        // }
     }
 #endif
     Event_data fft_finish_event;
     fft_finish_event.event_type = EVENT_FFT;
-    fft_finish_event.data = FFT_buffer_target_id;
-    // getSubframeBufferIndex(frame_id, subframe_id);
+    int subframe_num_perframe = config_->symbol_num_perframe;
+    fft_finish_event.data = frame_id % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + subframe_id;
 
     consumer_.handle(fft_finish_event);
 }
