@@ -86,10 +86,6 @@ public:
     void schedule_zf_task(int frame_id, Consumer const& consumer);
     void schedule_rc_task(int frame_id, Consumer const& consumer);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
-    void schedule_decode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
-    void schedule_encode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
-    void schedule_ifft_task(int frame_id, int data_subframe_id, Consumer const& consumer);
-    void schedule_precode_task(int frame_id, int data_subframe_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
@@ -111,7 +107,6 @@ private:
     int BS_ANT_NUM, UE_NUM, PILOT_NUM;
     int OFDM_CA_NUM;
     int OFDM_DATA_NUM;
-    int subframe_num_perframe;
     int dl_data_subframe_start, dl_data_subframe_end;
     bool downlink_mode;
     int packet_length;
@@ -119,18 +114,15 @@ private:
     int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
     int FFT_THREAD_NUM, DEMUL_THREAD_NUM, ZF_THREAD_NUM;
     int CORE_OFFSET;
-    int demul_block_size, demul_block_num;
-    int zf_block_size, zf_block_num;
+    int demul_block_num;
 
     LDPCconfig LDPC_config;
 
     /* lookup table for 16 QAM, real and imag */
     size_t mod_type;
     float** qam16_table_;
-    Config* cfg_;
+    Config* config_;
     int max_equaled_frame = 0;
-    float csi_format_offset;
-    int buffer_frame_num;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
     Stats* stats_manager_;

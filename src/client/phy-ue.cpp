@@ -795,7 +795,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     //demul_block_size = cfg->demul_block_size; //OFDM_CA_NUM*2/transpose_block_size;
     //demul_block_num = OFDM_DATA_NUM / demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
 
-    //downlink_mode = cfg_->downlink_mode;
+    //downlink_mode = config_->downlink_mode;
     //dl_data_subframe_start = cfg->dl_data_symbol_start;
     //dl_data_subframe_end = cfg->dl_data_symbol_end;
     packet_length = cfg->packet_length;

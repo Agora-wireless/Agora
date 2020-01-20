@@ -6,7 +6,7 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-#define GENERATE_PILOT
+//#define GENERATE_PILOT
 #ifdef USE_ARGOS
 #define GENERATE_DATA
 #endif

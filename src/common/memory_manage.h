@@ -7,7 +7,7 @@
 #define MEMORY_MANAGE
 #include <cstring>
 #include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
 
 template <typename T>
 class Table {

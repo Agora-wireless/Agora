@@ -150,7 +150,6 @@ Config::Config(std::string jsonfile)
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    float *pilots_2048 = (float*)aligned_alloc(64, 2048 * sizeof(float));
     size_t r = 0;
 #ifdef GENERATE_PILOT
     for (size_t i = 0; i < OFDM_CA_NUM; i++) {
@@ -168,7 +167,8 @@ Config::Config(std::string jsonfile)
         printf("open file %s faild.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    float *pilots_2048 = (float*)aligned_alloc(64, 2048 * sizeof(float));
+    r = fread(pilots_2048, sizeof(float), OFDM_CA_NUM, fp);
     if (r < OFDM_CA_NUM)
         printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
@@ -322,7 +322,7 @@ int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
         int id = it - DLSymbols[fid].begin();
         if (id < DL_PILOT_SYMS) {
 #ifdef DEBUG3
-            printf("getDownlinkPilotId(%d, %d) = %d\n", frame_id, symbol_id, id);
+            printf("getDownlinkPilotId(%zu, %zu) = %zu\n", frame_id, symbol_id, id);
 #endif
             return id;
         }
@@ -348,7 +348,7 @@ int Config::getPilotSFIndex(size_t frame_id, size_t symbol_id)
     it = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
     if (it != pilotSymbols[fid].end()) {
 #ifdef DEBUG3
-        printf("getPilotSFIndex(%d, %d) = %d\n", frame_id, symbol_id, it - pilotSymbols[fid].begin());
+        printf("getPilotSFIndex(%zu, %zu) = %zu\n", frame_id, symbol_id, it - pilotSymbols[fid].begin());
 #endif
         return it - pilotSymbols[fid].begin();
     } else
@@ -362,7 +362,7 @@ int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
     it = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
     if (it != ULSymbols[fid].end()) {
 #ifdef DEBUG3
-        printf("getUlSFIndexId(%d, %d) = %d\n", frame_id, symbol_id, it - ULSymbols[fid].begin());
+        printf("getUlSFIndexId(%zu, %zu) = %zu\n", frame_id, symbol_id, it - ULSymbols[fid].begin());
 #endif
         return it - ULSymbols[fid].begin();
     } else
@@ -374,11 +374,11 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
     if (symbol_id > symbolsPerFrame) {
-        printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n", symbol_id, frame_id);
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
         return false;
     }
 #ifdef DEBUG3
-    printf("isPilot(%d, %d) = %c\n", frame_id, symbol_id, s);
+    printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     if (isUE) {
         std::vector<size_t>::iterator it;
@@ -418,11 +418,11 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
     if (symbol_id > symbolsPerFrame) {
-        printf("\x1B[31mERROR: Received out of range symbol %d at frame %d\x1B[0m\n", symbol_id, frame_id);
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
         return false;
     }
 #ifdef DEBUG3
-    printf("isUplink(%d, %d) = %c\n", frame_id, symbol_id, s);
+    printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     return s == 'U';
     //return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM);
@@ -433,7 +433,7 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
-    printf("isDownlink(%d, %d) = %c\n", frame_id, symbol_id, s);
+    printf("isDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     if (isUE)
         return s == 'D' && !this->isPilot(frame_id, symbol_id);
