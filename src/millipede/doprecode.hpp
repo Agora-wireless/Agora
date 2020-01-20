@@ -10,6 +10,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
@@ -21,12 +22,11 @@
 #include <string.h> /* for memcpy */
 #include <vector>
 // #include "mkl_dfti.h"
-class Consumer;
 
-class DoPrecode {
+class DoPrecode : public Doer {
 public:
-    DoPrecode(Config* cfg, int in_tid, int in_demul_block_size,
-        Consumer& in_consumer,
+    DoPrecode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -64,19 +64,9 @@ public:
      *     3. perform demodulation on equalized data matrix   
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void Precode(int offset);
+    void launch(int offset);
 
 private:
-    Config* config_;
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int data_subframe_num_perframe;
-
-    int tid;
-    int demul_block_size;
-    Consumer& consumer_;
-
     /**
      * Modulated data
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM

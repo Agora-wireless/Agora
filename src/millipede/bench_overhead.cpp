@@ -19,7 +19,7 @@ CoMP::CoMP(Config* cfg)
     printf("enter constructor\n");
     // initialize socket buffer
 
-    this->cfg_ = cfg;
+    this->config_ = cfg;
     float* pilots_ = cfg->pilots_;
 
 #if DEBUG_PRINT_PILOT
@@ -425,7 +425,7 @@ static double get_time(void)
 void CoMP::stop()
 {
     std::cout << "stopping threads " << std::endl;
-    cfg_->running = false;
+    config_->running = false;
     usleep(1000);
     receiver_.reset();
 }
@@ -588,7 +588,7 @@ void CoMP::start()
     int precode_count_per_thread[TASK_THREAD_NUM];
 
 #ifdef USE_ARGOS
-    while (cfg_->running && !SignalHandler::gotExitSignal()) {
+    while (config_->running && !SignalHandler::gotExitSignal()) {
 #else
     signal(SIGINT, intHandler);
     while (keep_running) {
@@ -1975,7 +1975,7 @@ void CoMP::doDemul(int tid, int offset)
     // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
     // int gather_step_size = 8 * OFDM_CA_NUM;
-    int gather_step_size = 8 * cfg_->transpose_block_size;
+    int gather_step_size = 8 * config_->transpose_block_size;
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
@@ -2003,7 +2003,7 @@ void CoMP::doDemulSingleSC(int tid, int offset)
     interpreteOffset3d(OFDM_DATA_NUM, offset, &frame_id, &total_data_subframe_id, &current_data_subframe_id, &sc_id);
     int subframe_offset = subframe_num_perframe * frame_id + UE_NUM + current_data_subframe_id;
 
-    int transpose_block_size = cfg_->transpose_block_size;
+    int transpose_block_size = config_->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
 
 #if DEBUG_PRINT_IN_TASK
