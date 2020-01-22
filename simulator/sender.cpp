@@ -650,12 +650,12 @@ void *Sender::loopSend(int tid)
     // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
     int ant_num_this_thread = BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1: 0);
-#ifdef DEBUG_SENDER
-    //double start_time_send = get_time();
-    //double start_time_msg = get_time();
-    //double end_time_send = get_time();
-    //double end_time_msg = get_time();
-    //double end_time_prev = get_time();
+#if DEBUG_SENDER
+    double start_time_send = get_time();
+    double start_time_msg = get_time();
+    double end_time_send = get_time();
+    double end_time_msg = get_time();
+    double end_time_prev = get_time();
 #endif
 
     printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, thread_num);

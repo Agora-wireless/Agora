@@ -201,10 +201,12 @@ void* PacketTXRX::loopRecv(int tid)
 #if MEASURE_TIME
         // read information from received packet
         int frame_id = pkt->frame_id;
-        // int subframe_id = pkt->symbol_id;
+#if DEBUG_RECV
+        int subframe_id = pkt->symbol_id;
         // int cell_id = pkt->cell_id;
-        // int ant_id = pkt->ant_id;
-        // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+        int ant_id = pkt->ant_id;
+        printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+#endif
         if (frame_id > prev_frame_id) {
             *(frame_start + frame_id) = get_time();
             prev_frame_id = frame_id;
@@ -414,9 +416,11 @@ void* PacketTXRX::loopTXRX(int tid)
 #if MEASURE_TIME
             // read information from received packet
             frame_id = pkt->frame_id;
-            // int symbol_id = pkt->symbol_id;
-            // int ant_id = pkt->ant_id;
-            // printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, symbol_id, ant_id);
+#if DEBUG_RECV
+            int symbol_id = pkt->symbol_id;
+            int ant_id = pkt->ant_id;
+            printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, symbol_id, ant_id);
+#endif
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
@@ -473,9 +477,11 @@ void* PacketTXRX::loopTXRX(int tid)
                 frame_id = pkt->frame_id;
 
 #if MEASURE_TIME
-                // int symbol_id = pkt->symbol_id;
-                // int ant_id = pkt->ant_id;
-                // printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, symbol_id, ant_id, rx_offset);
+#if DEBUG_RECV
+                int symbol_id = pkt->symbol_id;
+                int ant_id = pkt->ant_id;
+                printf("RX thread %d received frame %d subframe %d, ant %d offset %d\n", tid, frame_id, symbol_id, ant_id, rx_offset);
+#endif
                 if (frame_id > prev_frame_id) {
                     *(rx_frame_start + frame_id) = get_time();
                     prev_frame_id = frame_id;

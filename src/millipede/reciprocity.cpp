@@ -33,7 +33,7 @@ void Reciprocity::launch(int offset)
     int ref_ant = config_->ref_ant;
 
 #if DEBUG_PRINT_IN_TASK
-    printf("In doRecip thread %d: frame: %d, subcarrier: %d\n", tid, offset, sc_id);
+    printf("In doRecip thread %d: frame: %d, \n", tid, offset);
 #endif
 
 #if DEBUG_UPDATE_STATS
