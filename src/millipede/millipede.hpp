@@ -82,7 +82,6 @@ public:
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
         Consumer const& consumer);
     void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
-    void schedule_zf_task(int frame_id, Consumer const& consumer);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);

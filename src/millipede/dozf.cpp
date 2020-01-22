@@ -45,17 +45,18 @@ void DoZF::launch(int offset)
 
 void DoZF::ZF_time_orthogonal(int offset)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int frame_id = offset / OFDM_DATA_NUM;
-    int sc_id = offset % OFDM_DATA_NUM * zf_block_size;
+    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+    int frame_id = offset / zf_block_num;
+    int sc_id = offset % zf_block_num * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     int max_sc_ite = std::min(zf_block_size, OFDM_DATA_NUM - sc_id);
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
     for (int i = 0; i < max_sc_ite; i++) {
 
 #if DEBUG_UPDATE_STATS
@@ -191,12 +192,11 @@ void DoZF::ZF_time_orthogonal(int offset)
 
 void DoZF::ZF_freq_orthogonal(int offset)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int frame_id = offset / OFDM_DATA_NUM;
-    int sc_id = offset % OFDM_DATA_NUM * zf_block_size;
+    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+    int frame_id = offset / zf_block_num;
+    int sc_id = offset % zf_block_num * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
@@ -206,7 +206,8 @@ void DoZF::ZF_freq_orthogonal(int offset)
     double start_time1 = get_time();
 #endif
     int transpose_block_size = config_->transpose_block_size;
-
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
     for (int i = 0; i < UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
         // directly gather data from FFT buffer
@@ -273,16 +274,18 @@ void DoZF::ZF_freq_orthogonal(int offset)
 
 void DoZF::Predict(int offset)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int zf_block_size = config_->zf_block_size;
+    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+    int frame_id = offset / zf_block_num;
+    int sc_id = offset % zf_block_num * zf_block_size;
+
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
-    int zf_block_size = config_->zf_block_size;
-    int frame_id = offset / OFDM_DATA_NUM;
-    int sc_id = offset % OFDM_DATA_NUM * zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_DATA_NUM + sc_id;
