@@ -44,7 +44,8 @@ void DoDemul::launch(int offset)
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM;
+    int demul_block_size = config_->demul_block_size;
+    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
     int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
@@ -68,7 +69,6 @@ void DoDemul::launch(int offset)
     // int mat_elem = UE_NUM * BS_ANT_NUM;
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
-    int demul_block_size = config_->demul_block_size;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
 
