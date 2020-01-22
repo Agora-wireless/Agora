@@ -1,4 +1,4 @@
-/**
+	/**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
  * 
@@ -269,7 +269,6 @@ void Millipede::start()
                 int frame_id = offset / OFDM_DATA_NUM;
                 print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.task_count[frame_id]);
                 if (zf_stats_.last_task(frame_id)) {
-                    printf("here\n");
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
                     zf_stats_.precoder_exist_in_frame[frame_id] = true;
                     print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id);
@@ -959,7 +958,7 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, U
         break;
     case (PRINT_IFFT):
         printf("Main thread: IFFT done frame: %d, subframe: %d, antenna: %d, total ants: %d\n",
-            frame_id, subframe_id, ant_or_sc_id, ifft_stats_.task_count[frame_id]);
+            frame_id, subframe_id, ant_or_sc_id, ifft_stats_.task_count[frame_id][subframe_id]);
         break;
     case (PRINT_TX):
         printf("Main thread: TX done frame: %d, subframe: %d, antenna: %d, total packets: %d\n",
