@@ -283,10 +283,10 @@ void Millipede::start()
                     if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
                         schedule_demul_task(frame_id, 0, subframe_num_perframe - PILOT_NUM, consumer_demul);
                     if (config_->downlink_mode) {
-/* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
+                        /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
 #ifdef USE_LDPC
                         int num_code_blocks = UE_NUM * LDPC_config.nblocksInSymbol;
-                        int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
+                        int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
                         schedule_task_set(TASK_ENCODE, num_code_blocks,
                             total_data_subframe_id, consumer_encode);
 #else
