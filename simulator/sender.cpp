@@ -68,7 +68,7 @@ socket_num(in_thread_num), core_offset(in_core_offset), delay(in_delay)
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     OFDM_FRAME_LEN = cfg->OFDM_FRAME_LEN;
-    data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
+    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     subframe_num_perframe = UE_NUM + data_subframe_num_perframe; //cfg->symbol_num_perframe;
     downlink_mode = cfg->downlink_mode;
     packet_length = cfg->packet_length;

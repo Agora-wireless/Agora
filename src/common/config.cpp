@@ -121,7 +121,7 @@ Config::Config(std::string jsonfile)
     dl_data_symbol_num_perframe = dlSymsPerFrame;
     downlink_mode = dl_data_symbol_num_perframe > 0;
     dl_data_symbol_start = downlink_mode ? DLSymbols[0][0] - pilot_symbol_num_perframe : 0;
-    dl_data_symbol_end = downlink_mode ? DLSymbols[0].back() : 0;
+    dl_data_symbol_end = downlink_mode ? DLSymbols[0].back() - pilot_symbol_num_perframe + 1: 0;
     packet_length = packet_header_offset + sizeof(short) * sampsPerSymbol * 2;
     //packet_length = packet_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
     data_symbol_num_perframe = symbol_num_perframe - pilotSymsPerFrame; 
@@ -131,6 +131,7 @@ Config::Config(std::string jsonfile)
     std::cout << "pilot sym num " << pilotSymsPerFrame << std::endl;
     std::cout << "UL sym num " << ulSymsPerFrame << std::endl;
     std::cout << "DL sym num " << dlSymsPerFrame << std::endl;
+    std::cout << "DL sym end " << dl_data_symbol_end << std::endl;
 
 #ifdef USE_ARGOS
     std::vector<std::vector<double>> gold_ifft = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
