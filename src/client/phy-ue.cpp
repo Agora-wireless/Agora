@@ -429,7 +429,7 @@ void Phy_UE::start()
             case EVENT_PACKET_SENT: {
                 int offset = event.data;
                 size_t frame_id, total_symbol_id, symbol_id, ant_id;
-                interpretOffset3d(cfg->ulSymsPerFrame, cfg->getNumAntennas(), offset, &frame_id, &total_symbol_id, &symbol_id, &ant_id);
+                interpretOffset3d(cfg->ul_data_symbol_num_perframe, cfg->getNumAntennas(), offset, &frame_id, &total_symbol_id, &symbol_id, &ant_id);
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
                 printf("Main thread: finished TX for frame %d, symbol %d, ant %d\n", frame_id, symbol_id, ant_id);
 #endif
@@ -806,7 +806,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     tx_packet_length = packet_length - packet_header_offset;
 #endif
 
-    symbol_perframe = cfg->symbolsPerFrame;
+    symbol_perframe = cfg->symbol_num_perframe;
     dl_pilot_symbol_perframe = DL_PILOT_SYMS;
     ul_pilot_symbol_perframe = cfg->pilot_symbol_num_perframe;
     ul_data_symbol_perframe = cfg->ul_data_symbol_num_perframe;
