@@ -269,7 +269,8 @@ void Millipede::start()
             } break;
             case EVENT_ZF: {
                 int offset = event.data;
-                int frame_id = offset / OFDM_DATA_NUM;
+                int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
+                int frame_id = offset / zf_block_num;
                 print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.task_count[frame_id]);
                 if (zf_stats_.last_task(frame_id)) {
                     printf("here\n");
