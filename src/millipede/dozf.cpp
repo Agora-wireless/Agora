@@ -49,9 +49,8 @@ void DoZF::ZF_time_orthogonal(int offset)
     int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int subframe_num_perframe = config_->data_symbol_num_perframe;
-    int frame_id = offset / subframe_num_perframe;
-    int sc_id = offset % subframe_num_perframe * zf_block_size;
+    int frame_id = offset / OFDM_DATA_NUM;
+    int sc_id = offset % OFDM_DATA_NUM * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
@@ -196,9 +195,8 @@ void DoZF::ZF_freq_orthogonal(int offset)
     int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int subframe_num_perframe = config_->data_symbol_num_perframe;
-    int frame_id = offset / subframe_num_perframe;
-    int sc_id = offset % subframe_num_perframe * zf_block_size;
+    int frame_id = offset / OFDM_DATA_NUM;
+    int sc_id = offset % OFDM_DATA_NUM * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
@@ -281,20 +279,20 @@ void DoZF::Predict(int offset)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int zf_block_size = config_->zf_block_size;
-    int subframe_num_perframe = config_->data_symbol_num_perframe;
-    int frame_id = offset / subframe_num_perframe;
-    int sc_id = offset % subframe_num_perframe * zf_block_size;
+    int frame_id = offset / OFDM_DATA_NUM;
+    int sc_id = offset % OFDM_DATA_NUM * zf_block_size;
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
     cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset];
+    int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_DATA_NUM + sc_id;
+    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_next_frame];
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     pinv(mat_output, mat_input, 1e-1, "dc");
 
     // inform main thread
     Event_data pred_finish_event;
     pred_finish_event.event_type = EVENT_ZF;
-    pred_finish_event.data = (frame_id + 1) % TASK_BUFFER_FRAME_NUM * subframe_num_perframe + sc_id;
+    pred_finish_event.data = offset_next_frame;
     consumer_.handle(pred_finish_event);
 }

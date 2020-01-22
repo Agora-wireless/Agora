@@ -153,6 +153,7 @@ void Millipede::start()
 
     bool prev_demul_scheduled = false;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int subframe_num_perframe = config_->symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
@@ -229,8 +230,8 @@ void Millipede::start()
             } break;
             case EVENT_FFT: {
                 int offset = event.data;
-                int frame_id = offset / data_subframe_num_perframe;
-                int subframe_id = offset % data_subframe_num_perframe;
+                int frame_id = offset / subframe_num_perframe;
+                int subframe_id = offset % subframe_num_perframe;
                 if (fft_stats_.last_task(frame_id, subframe_id)) {
                     if (config_->isPilot(frame_id, subframe_id)) {
                         print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id, subframe_id);
@@ -267,9 +268,10 @@ void Millipede::start()
             } break;
             case EVENT_ZF: {
                 int offset = event.data;
-                int frame_id = offset / data_subframe_num_perframe;
-                // print_per_task_done(PRINT_ZF, frame_id, 0, sc_id);
+                int frame_id = offset / OFDM_DATA_NUM;
+                print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.task_count[frame_id]);
                 if (zf_stats_.last_task(frame_id)) {
+                    printf("here\n");
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
                     zf_stats_.precoder_exist_in_frame[frame_id] = true;
                     print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id);
@@ -729,8 +731,8 @@ void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     Event_data do_zf_task;
     do_zf_task.event_type = TASK_ZF;
-    do_zf_task.data = frame_id * data_subframe_num_perframe;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    do_zf_task.data = frame_id * OFDM_DATA_NUM;
     int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
     for (int i = 0; i < zf_block_num; i++) {
         consumer.try_handle(do_zf_task);
@@ -925,9 +927,9 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, U
         printf("Main thread: Demodulation done frame: %d, subframe: %d, sc: %d, num blocks done: %d\n",
             frame_id, subframe_id, ant_or_sc_id, demul_stats_.task_count[frame_id][subframe_id]);
         break;
-    case (PRINT_DEMUL):
+    case (PRINT_DECODE):
         printf("Main thread: Decoding done frame: %d, subframe: %d, sc: %d, num blocks done: %d\n",
-            frame_id, subframe_id, ant_or_sc_id, decode_stats.task_count[frame_id][subframe_id]);
+            frame_id, subframe_id, ant_or_sc_id, decode_stats_.task_count[frame_id][subframe_id]);
         break;
     case (PRINT_PRECODE):
         printf("Main thread: Precoding done frame: %d, subframe: %d, subcarrier: %d, total SCs: %d\n",
