@@ -728,7 +728,6 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
 void Millipede::schedule_zf_task(int frame_id, Consumer const& consumer)
 {
     /* schedule normal ZF for all data subcarriers */
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     Event_data do_zf_task;
     do_zf_task.event_type = TASK_ZF;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
