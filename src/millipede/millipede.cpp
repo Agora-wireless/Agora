@@ -301,8 +301,10 @@ void Millipede::start()
 
             case EVENT_DEMUL: {
                 int offset = event.data;
-                int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
+                int sc_id = offset % demul_block_num * config_->demul_block_size;
+                int total_data_subframe_id = offset / demul_block_num;
+                int data_subframe_num_perframe = config_->data_symbol_num_perframe;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 print_per_task_done(PRINT_DEMUL, frame_id, data_subframe_id, sc_id);
@@ -348,7 +350,8 @@ void Millipede::start()
 
             case EVENT_DECODE: {
                 int offset = event.data;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int num_code_blocks = UE_NUM * LDPC_config.nblocksInSymbol;
+                int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
@@ -388,8 +391,10 @@ void Millipede::start()
             case EVENT_PRECODE: {
                 /* Precoding is done, schedule ifft */
                 int offset = event.data;
-                int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int demul_block_size = config_->demul_block_size;
+                int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+                int sc_id = offset % demul_block_num * demul_block_size;
+                int total_data_subframe_id = offset / demul_block_num;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
@@ -420,8 +425,8 @@ void Millipede::start()
             case EVENT_IFFT: {
                 /* IFFT is done, schedule data transmission */
                 int offset = event.data;
-                int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int ant_id = offset % BS_ANT_NUM;
+                int total_data_subframe_id = offset / BS_ANT_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
