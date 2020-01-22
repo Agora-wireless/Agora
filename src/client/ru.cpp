@@ -289,7 +289,7 @@ void RU::sendThread(int tid)
             double diff = (tv2.tv_sec * 1e9 + tv2.tv_nsec - tv.tv_sec * 1e9 - tv.tv_nsec);
             time_avg += diff;
             time_count++;
-            if (time_count == config_->getNumAntennas() * config_->dlSymsPerFrame) {
+            if (time_count == config_->getNumAntennas() * config_->dl_data_symbol_num_perframe) {
                 printf("In TX thread %d: Transmitted 100 frames with average tx time %f\n", tid, time_avg / time_count / 1e3);
                 time_count = 0;
                 time_avg = 0;

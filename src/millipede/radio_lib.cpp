@@ -303,7 +303,7 @@ bool RadioConfig::radioStart()
             json conf;
             conf["tdd_enabled"] = true;
             conf["frame_mode"] = "continuous_resync";
-            int max_frame_ = (int)(2.0 / ((_cfg->sampsPerSymbol * _cfg->symbolsPerFrame) / _cfg->rate));
+            int max_frame_ = (int)(2.0 / ((_cfg->sampsPerSymbol * _cfg->symbol_num_perframe) / _cfg->rate));
             conf["max_frame"] = max_frame_;
             conf["dual_pilot"] = (_cfg->nChannels == 2);
             std::vector<std::string> jframes;

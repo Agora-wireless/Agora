@@ -32,10 +32,6 @@ class Config {
 public:
     int transpose_block_size;
     size_t sampsPerSymbol;
-    size_t symbolsPerFrame;
-    size_t pilotSymsPerFrame;
-    size_t ulSymsPerFrame;
-    size_t dlSymsPerFrame;
     size_t dl_prefix;
     size_t prefix;
     size_t postfix;
@@ -86,7 +82,6 @@ public:
     size_t nCells;
     size_t nRadios;
     size_t nAntennas;
-    size_t nUEs;
     size_t nChannels;
     size_t ref_ant;
     size_t beacon_ant;

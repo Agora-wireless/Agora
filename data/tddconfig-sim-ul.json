@@ -1,5 +1,4 @@
 {
- "cells" : 1,
  "symbol_size" : 1,
  "prefix" : 160,
  "postfix" : 160,
@@ -8,8 +7,6 @@
  "cp_len" : 0,
  "tx_prefix_len" : 0,
  "ofdm_prefix_len" : 0,
- "ref_ant" : 2,
- "frames" : ["PPPPPPPPUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU"],
  "worker_thread_num" : 15,
  "demul_block_size" : 12,
  "antennta_num": 8
