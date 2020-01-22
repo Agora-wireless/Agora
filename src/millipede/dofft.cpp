@@ -383,14 +383,13 @@ void DoIFFT::launch(int offset)
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
-    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+    int subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    // int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    // int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    // int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
-    int frame_id_in_task_buffer = frame_id % TASK_BUFFER_FRAME_NUM;
-    int frame_id_in_socket_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int offset_in_buffer = ant_id + BS_ANT_NUM * (current_data_subframe_id + frame_id_in_task_buffer * data_subframe_num_perframe);
+    int offset_in_buffer = ant_id + BS_ANT_NUM * subframe_id;
 #if DEBUG_PRINT_IN_TASK
     printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, current_data_subframe_id, ant_id);
 #endif
@@ -413,7 +412,7 @@ void DoIFFT::launch(int offset)
 
     // calculate data for downlink socket buffer
     float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[offset_in_buffer][0]);
-    int socket_subframe_offset = frame_id_in_socket_buffer * data_subframe_num_perframe + current_data_subframe_id;
+    int socket_subframe_offset = subframe_id % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe);
     int packet_length = config_->packet_length;
     char* socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * packet_length];
     int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
