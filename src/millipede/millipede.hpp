@@ -104,18 +104,6 @@ public:
     void getEqualData(float** ptr, int* size);
 
 private:
-    int BS_ANT_NUM, UE_NUM, PILOT_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int dl_data_subframe_start, dl_data_subframe_end;
-    bool downlink_mode;
-    int packet_length;
-
-    int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
-    int FFT_THREAD_NUM, DEMUL_THREAD_NUM, ZF_THREAD_NUM;
-    int CORE_OFFSET;
-    int demul_block_num;
-
     LDPCconfig LDPC_config;
 
     /* lookup table for 16 QAM, real and imag */
