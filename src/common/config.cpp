@@ -110,6 +110,9 @@ Config::Config(std::string jsonfile)
     pilotSymbols = Utils::loadSymbols(frames, 'P');
     ULSymbols = Utils::loadSymbols(frames, 'U');
     DLSymbols = Utils::loadSymbols(frames, 'D');
+    ULCalSymbols = Utils::loadSymbols(frames, 'L');
+    DLCalSymbols = Utils::loadSymbols(frames, 'C');
+    recipCalEn = (ULCalSymbols[0].size() == 1 and DLCalSymbols[0].size() == 1);
 
     symbol_num_perframe = frames.at(0).size();
     pilot_symbol_num_perframe = pilotSymbols[0].size();

@@ -25,8 +25,9 @@ class DoZF : public Doer {
 public:
     DoZF(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-        Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
-        Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager);
+        Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
+	Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer,
+	Stats* in_stats_manager);
     ~DoZF();
 
     /**
@@ -75,6 +76,7 @@ public:
 
 private:
     Table<complex_float> csi_buffer_;
+    Table<complex_float> recip_buffer_;
     Table<complex_float> precoder_buffer_;
     Table<complex_float> dl_precoder_buffer_;
     complex_float* pred_csi_buffer_;

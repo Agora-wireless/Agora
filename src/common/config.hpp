@@ -51,6 +51,8 @@ public:
     std::vector<std::vector<size_t>> pilotSymbols;
     std::vector<std::vector<size_t>> ULSymbols;
     std::vector<std::vector<size_t>> DLSymbols;
+    std::vector<std::vector<size_t>> ULCalSymbols;
+    std::vector<std::vector<size_t>> DLCalSymbols;
     std::vector<std::complex<int16_t>> beacon_ci16;
     std::vector<std::vector<uint32_t>> beacon_weights;
     std::vector<uint32_t> coeffs;
@@ -89,6 +91,7 @@ public:
     bool beamsweep;
     bool sampleCalEn;
     bool imbalanceCalEn;
+    bool recipCalEn;
     std::string channel;
 
     size_t core_offset;
