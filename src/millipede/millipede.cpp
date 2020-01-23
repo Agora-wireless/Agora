@@ -421,14 +421,9 @@ void Millipede::start()
                 int total_data_subframe_id = offset / BS_ANT_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
-
-                Event_data do_tx_task;
-                do_tx_task.event_type = TASK_SEND;
-                do_tx_task.data = offset;
                 int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;
                 Consumer consumer_tx(tx_queue_, *tx_ptoks_ptr[ptok_id]);
-                consumer_tx.try_handle(do_tx_task);
-
+                schedule_task_set(TASK_SEND, 1, offset, consumer_tx);
                 frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
                 print_per_task_done(PRINT_IFFT, frame_id, data_subframe_id, ant_id);
 
