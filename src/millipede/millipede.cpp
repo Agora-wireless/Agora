@@ -82,19 +82,6 @@ void Millipede::stop()
     receiver_.reset();
 }
 
-static void
-schedule_task_set(int task_type, int task_setsize, int task_setid,
-    Consumer const& consumer)
-{
-    Event_data do_task;
-    do_task.event_type = task_type;
-    do_task.data = task_setid * task_setsize;
-    for (int i = 0; i < task_setsize; i++) {
-        consumer.try_handle(do_task);
-        do_task.data++;
-    }
-}
-
 void Millipede::start()
 {
     /* start uplink receiver */
@@ -110,20 +97,20 @@ void Millipede::start()
     /* tokens used for enqueue */
     /* uplink */
     moodycamel::ProducerToken ptok_fft(fft_queue_);
-    Consumer consumer_fft(fft_queue_, ptok_fft);
+    Consumer consumer_fft(fft_queue_, ptok_fft, fft_stats_.max_task_count, TASK_FFT);
     moodycamel::ProducerToken ptok_zf(zf_queue_);
-    Consumer consumer_zf(zf_queue_, ptok_zf);
+    Consumer consumer_zf(zf_queue_, ptok_zf, zf_stats_.max_symbol_count, TASK_ZF);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
-    Consumer consumer_demul(demul_queue_, ptok_demul);
+    Consumer consumer_demul(demul_queue_, ptok_demul, demul_stats_.max_task_count, TASK_DEMUL);
     moodycamel::ProducerToken ptok_decode(decode_queue_);
-    Consumer consumer_decode(decode_queue_, ptok_decode);
+    Consumer consumer_decode(decode_queue_, ptok_decode, decode_stats_.max_task_count, TASK_DECODE);
     /* downlink */
     moodycamel::ProducerToken ptok_encode(encode_queue_);
-    Consumer consumer_encode(encode_queue_, ptok_encode);
+    Consumer consumer_encode(encode_queue_, ptok_encode, encode_stats_.max_task_count, TASK_ENCODE);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
-    Consumer consumer_ifft(ifft_queue_, ptok_ifft);
+    Consumer consumer_ifft(ifft_queue_, ptok_ifft, ifft_stats_.max_task_count, TASK_IFFT);
     moodycamel::ProducerToken ptok_precode(precode_queue_);
-    Consumer consumer_precode(precode_queue_, ptok_precode);
+    Consumer consumer_precode(precode_queue_, ptok_precode, precode_stats_.max_task_count, TASK_PRECODE);
 
     /* tokens used for dequeue */
     moodycamel::ConsumerToken ctok(message_queue_);
@@ -240,7 +227,7 @@ void Millipede::start()
                             stats_manager_->update_fft_processed(fft_stats_.frame_count);
                             print_per_frame_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                             fft_stats_.update_frame_count();
-                            schedule_task_set(TASK_ZF, zf_stats_.max_symbol_count, frame_id, consumer_zf);
+                            consumer_zf.schedule_task_set(frame_id);
                         }
                     } else if (config_->isUplink(frame_id, subframe_id)) {
                         fft_stats_.data_exist_in_symbol[frame_id][subframe_id - PILOT_NUM] = true;
@@ -285,11 +272,9 @@ void Millipede::start()
                         /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
                         int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
 #ifdef USE_LDPC
-                        schedule_task_set(TASK_ENCODE, encode_stats_.max_task_count,
-                            total_data_subframe_id, consumer_encode);
+                        consumer_encode.schedule_task_set(total_data_subframe_id);
 #else
-                        schedule_task_set(TASK_PRECODE, precode_stats_.max_task_count,
-                            total_data_subframe_id, consumer_precode);
+                        consumer_precode.schedule_task_set(total_data_subframe_id);
 #endif
                     }
                 }
@@ -371,8 +356,7 @@ void Millipede::start()
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
-                    schedule_task_set(TASK_PRECODE, precode_stats_.max_task_count,
-                        total_data_subframe_id, consumer_precode);
+                    consumer_precode.schedule_task_set(total_data_subframe_id);
                     print_per_subframe_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id, data_subframe_id);
                     if (encode_stats_.last_symbol(frame_id)) {
                         stats_manager_->update_encode_processed(encode_stats_.frame_count);
@@ -394,15 +378,12 @@ void Millipede::start()
 
                 print_per_task_done(PRINT_PRECODE, frame_id, data_subframe_id, sc_id);
                 if (precode_stats_.last_task(frame_id, data_subframe_id)) {
-                    schedule_task_set(TASK_IFFT, BS_ANT_NUM,
-                        total_data_subframe_id, consumer_ifft);
+                    consumer_ifft.schedule_task_set(total_data_subframe_id);
                     if (data_subframe_id < dl_data_subframe_end - 1) {
 #ifdef USE_LDPC
-                        schedule_task_set(TASK_ENCODE, encode_stats_.max_task_count,
-                            total_data_subframe_id, consumer_encode);
+                        consumer_encode.schedule_task_set(total_data_subframe_id);
 #else
-                        schedule_task_set(TASK_PRECODE, precode_stats_.max_task_count,
-                            total_data_subframe_id + 1, consumer_precode);
+                        consumer_precode.schedule_task_set(total_data_subframe_id + 1);
 #endif
                     }
 
@@ -422,8 +403,8 @@ void Millipede::start()
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;
-                Consumer consumer_tx(tx_queue_, *tx_ptoks_ptr[ptok_id]);
-                schedule_task_set(TASK_SEND, 1, offset, consumer_tx);
+                Consumer consumer_tx(tx_queue_, *tx_ptoks_ptr[ptok_id], 1, TASK_SEND);
+                consumer_tx.schedule_task_set(offset);
                 frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
                 print_per_task_done(PRINT_IFFT, frame_id, data_subframe_id, ant_id);
 
@@ -719,8 +700,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
         if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
             /* schedule demodulation task for subcarrier blocks */
             int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
-            schedule_task_set(TASK_DEMUL, demul_stats_.max_task_count,
-                total_data_subframe_id, consumer);
+            consumer.schedule_task_set(total_data_subframe_id);
 #if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
             printf("Main thread: created Demodulation task for frame: %d,, start subframe: %d, current subframe: %d\n",
                 frame_id, start_subframe_id, data_subframe_id);
