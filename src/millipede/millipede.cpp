@@ -529,7 +529,7 @@ void* Millipede::worker(int tid)
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
     auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
+        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -614,7 +614,7 @@ void* Millipede::worker_zf(int tid)
 
     /* initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
+        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
     while (true) {
         computeZF->try_launch();
@@ -1128,7 +1128,7 @@ void Millipede::initialize_downlink_buffers()
     dl_ifft_buffer_.calloc(BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, OFDM_CA_NUM, 64);
     dl_precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
     dl_encoded_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
-    recip_buffer_.malloc(OFDM_DATA_NUM, BS_ANT_NUM, 64);
+    recip_buffer_.malloc(TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * BS_ANT_NUM, 64);
     calib_buffer_.malloc(TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * BS_ANT_NUM, 64);
 
     encode_stats_.init(LDPC_config.nblocksInSymbol * UE_NUM, dl_data_subframe_num_perframe,

@@ -45,15 +45,17 @@ void Reciprocity::launch(int offset)
     cx_fvec vec_calib_ref = mat_input.col(ref_ant);
     cx_float* ptr_out = (cx_float*)calib_gather_buffer;
     cx_fmat mat_output(ptr_out, BS_ANT_NUM, OFDM_DATA_NUM, false);
+    complex_float *recip_buff = recip_buffer_[offset];
 
     for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
         cx_fvec vec_calib = mat_input.col(ant_id);
         cx_fvec recipFactor = vec_calib_ref / vec_calib;
         mat_output.row(ant_id) = recipFactor;
         for (int sc_id = ant_id; sc_id < OFDM_DATA_NUM; sc_id += BS_ANT_NUM) {
+	    // TODO: interpolate here
             for (int i = 0; i < BS_ANT_NUM; i++) {
-                recip_buffer_[sc_id + i][ant_id].re = mat_output.at(ant_id, sc_id).real();
-                recip_buffer_[sc_id + i][ant_id].im = mat_output.at(ant_id, sc_id).imag();
+                recip_buff[(sc_id + i)*BS_ANT_NUM + ant_id].re = mat_output.at(ant_id, sc_id).real();
+                recip_buff[(sc_id + i)*BS_ANT_NUM + ant_id].im = mat_output.at(ant_id, sc_id).imag();
             }
         }
     }
