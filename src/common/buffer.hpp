@@ -73,6 +73,11 @@ struct Data_stats {
         task_count.free();
         free_buffer_1d(&symbol_count);
     }
+    void update_frame_count(void)
+    {
+        if (++frame_count == 1e9)
+            frame_count = 0;
+    }
     bool last_task(int frame_id, int data_subframe_id)
     {
         if (++task_count[frame_id][data_subframe_id] == max_task_count) {
@@ -121,6 +126,11 @@ struct ZF_stats {
     {
         free_buffer_1d(&task_count);
         free_buffer_1d(&precoder_exist_in_frame);
+    }
+    void update_frame_count(void)
+    {
+        if (++frame_count == 1e9)
+            frame_count = 0;
     }
 };
 

@@ -77,7 +77,6 @@ public:
     //     int id;
     // };
 
-    inline void update_frame_count(int* frame_count);
     /* Add tasks into task queue based on event type */
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
         Consumer const& consumer);
