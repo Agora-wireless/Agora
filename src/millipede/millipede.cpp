@@ -240,7 +240,7 @@ void Millipede::start()
                             stats_manager_->update_fft_processed(fft_stats_.frame_count);
                             print_per_frame_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                             fft_stats_.update_frame_count();
-                            schedule_task_set(TASK_ZF, zf_stats_.max_task_count, frame_id, consumer_zf);
+                            schedule_task_set(TASK_ZF, zf_stats_.max_symbol_count, frame_id, consumer_zf);
                         }
                     } else if (config_->isUplink(frame_id, subframe_id)) {
                         fft_stats_.data_exist_in_symbol[frame_id][subframe_id - PILOT_NUM] = true;
@@ -270,8 +270,8 @@ void Millipede::start()
                 int offset = event.data;
                 int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
                 int frame_id = offset / zf_block_num;
-                print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.task_count[frame_id]);
-                if (zf_stats_.last_task(frame_id)) {
+                print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
+                if (zf_stats_.last_symbol(frame_id)) {
                     printf("here\n");
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
                     zf_stats_.precoder_exist_in_frame[frame_id] = true;
@@ -1014,7 +1014,7 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
-    zf_stats_.init(zf_block_num, TASK_BUFFER_FRAME_NUM, 64, 1);
+    zf_stats_.init(zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
 
     int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
     demul_stats_.init(demul_block_num, ul_data_subframe_num_perframe,

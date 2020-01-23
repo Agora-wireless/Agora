@@ -53,24 +53,26 @@ struct RX_stats {
     int max_task_pilot_count;
 };
 
-struct Data_stats {
+struct Frame_stats {
     int frame_count;
-    Table<int> task_count;
-    int max_task_count;
     int* symbol_count;
     int max_symbol_count;
-
-    void init(int max_tasks, int max_symbols, int max_frame, int max_data_subframe, int align)
+    bool last_symbol(int frame_id)
     {
-        task_count.calloc(max_frame, max_data_subframe, align);
-        alloc_buffer_1d(&symbol_count, max_frame, align, 1);
+        if (++symbol_count[frame_id] == max_symbol_count) {
+            symbol_count[frame_id] = 0;
+            return (true);
+        }
+        return (false);
+    }
+    void init(int max_symbols, int max_frame, int align)
+    {
         frame_count = 0;
-        max_task_count = max_tasks;
+        alloc_buffer_1d(&symbol_count, max_frame, align, 1);
         max_symbol_count = max_symbols;
     }
     void fini()
     {
-        task_count.free();
         free_buffer_1d(&symbol_count);
     }
     void update_frame_count(void)
@@ -78,18 +80,45 @@ struct Data_stats {
         if (++frame_count == 1e9)
             frame_count = 0;
     }
+};
+
+struct ZF_stats : public Frame_stats {
+    bool* precoder_exist_in_frame;
+    void init(int max_symbols, int max_frame, int align)
+    {
+        Frame_stats::init(max_symbols, max_frame, align);
+        alloc_buffer_1d(&precoder_exist_in_frame, max_frame, align, 1);
+    }
+    void fini()
+    {
+        free_buffer_1d(&precoder_exist_in_frame);
+        Frame_stats::fini();
+    }
+};
+
+struct Data_stats : public Frame_stats {
+    int frame_count;
+    int* symbol_count;
+    int max_symbol_count;
+
+    Table<int> task_count;
+    int max_task_count;
+
+    void init(int max_tasks, int max_symbols, int max_frame, int max_data_subframe, int align)
+    {
+        Frame_stats::init(max_symbols, max_frame, align);
+        task_count.calloc(max_frame, max_data_subframe, align);
+        max_task_count = max_tasks;
+    }
+    void fini()
+    {
+        task_count.free();
+        Frame_stats::fini();
+    }
     bool last_task(int frame_id, int data_subframe_id)
     {
         if (++task_count[frame_id][data_subframe_id] == max_task_count) {
             task_count[frame_id][data_subframe_id] = 0;
-            return (true);
-        }
-        return (false);
-    }
-    bool last_symbol(int frame_id)
-    {
-        if (++symbol_count[frame_id] == max_symbol_count) {
-            symbol_count[frame_id] = 0;
             return (true);
         }
         return (false);
@@ -100,38 +129,6 @@ struct FFT_stats : public Data_stats {
     int* symbol_data_count;
     int max_symbol_data_count;
     Table<bool> data_exist_in_symbol;
-};
-
-struct ZF_stats {
-    int* task_count;
-    int frame_count;
-    int max_task_count;
-    bool* precoder_exist_in_frame;
-    bool last_task(int frame_id)
-    {
-        if (++task_count[frame_id] == max_task_count) {
-            task_count[frame_id] = 0;
-            return (true);
-        }
-        return (false);
-    }
-    void init(int max_tasks, int max_frame, int max_data_subframe, int align)
-    {
-        alloc_buffer_1d(&task_count, max_frame, align, 1);
-        alloc_buffer_1d(&precoder_exist_in_frame, max_frame, align, 1);
-        frame_count = 0;
-        max_task_count = max_tasks;
-    }
-    void fini()
-    {
-        free_buffer_1d(&task_count);
-        free_buffer_1d(&precoder_exist_in_frame);
-    }
-    void update_frame_count(void)
-    {
-        if (++frame_count == 1e9)
-            frame_count = 0;
-    }
 };
 
 /* TODO: clean up the legency code below */
