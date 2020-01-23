@@ -239,7 +239,7 @@ void Millipede::start()
                         if (fft_stats_.last_symbol(frame_id)) {
                             stats_manager_->update_fft_processed(fft_stats_.frame_count);
                             print_per_frame_done(PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
-                            update_frame_count(&(fft_stats_.frame_count));
+                            fft_stats_.update_frame_count();
                             int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
                             schedule_task_set(TASK_ZF, zf_block_num, frame_id, consumer_zf);
                         }
@@ -277,7 +277,7 @@ void Millipede::start()
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
                     zf_stats_.precoder_exist_in_frame[frame_id] = true;
                     print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id);
-                    update_frame_count(&(zf_stats_.frame_count));
+                    zf_stats_.update_frame_count();
                     int subframe_num_perframe = config_->symbol_num_perframe;
                     /* if all the data in a frame has arrived when ZF is done */
                     if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
@@ -333,7 +333,7 @@ void Millipede::start()
                         fft_stats_.symbol_data_count[frame_id] = 0;
                         print_per_frame_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id);
 
-                        update_frame_count(&demul_stats_.frame_count);
+                        demul_stats_.update_frame_count();
                     }
                     // save_demul_data_to_file(frame_id, data_subframe_id);
                     demul_count++;
@@ -364,7 +364,7 @@ void Millipede::start()
                         stats_manager_->update_decode_processed(decode_stats_.frame_count);
                         print_per_frame_done(PRINT_DECODE, decode_stats_.frame_count, frame_id);
                         stats_manager_->update_stats_in_functions_uplink(decode_stats_.frame_count);
-                        update_frame_count(&decode_stats_.frame_count);
+                        decode_stats_.update_frame_count();
                     }
                 }
             } break;
@@ -383,7 +383,7 @@ void Millipede::start()
                     if (encode_stats_.last_symbol(frame_id)) {
                         stats_manager_->update_encode_processed(encode_stats_.frame_count);
                         print_per_frame_done(PRINT_ENCODE, encode_stats_.frame_count, frame_id);
-                        update_frame_count(&encode_stats_.frame_count);
+                        encode_stats_.update_frame_count();
                     }
                 }
             } break;
@@ -418,7 +418,7 @@ void Millipede::start()
                     if (precode_stats_.last_symbol(frame_id)) {
                         stats_manager_->update_precode_processed(precode_stats_.frame_count);
                         print_per_frame_done(PRINT_PRECODE, precode_stats_.frame_count, frame_id);
-                        update_frame_count(&precode_stats_.frame_count);
+                        precode_stats_.update_frame_count();
                     }
                 }
             } break;
@@ -446,7 +446,7 @@ void Millipede::start()
                         schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, consumer_fft);
                         stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
                         print_per_frame_done(PRINT_IFFT, ifft_stats_.frame_count, frame_id);
-                        update_frame_count(&ifft_stats_.frame_count);
+                        ifft_stats_.update_frame_count();
                     }
                 }
             } break;
@@ -472,7 +472,7 @@ void Millipede::start()
                         stats_manager_->update_tx_processed(tx_stats_.frame_count);
                         print_per_frame_done(PRINT_TX, tx_stats_.frame_count, frame_id);
                         stats_manager_->update_stats_in_functions_downlink(tx_stats_.frame_count);
-                        update_frame_count(&tx_stats_.frame_count);
+                        tx_stats_.update_frame_count();
                     }
                     tx_count++;
                     if (tx_count == tx_stats_.max_symbol_count * 9000) {
@@ -676,13 +676,6 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
             exit(0);
         }
     }
-}
-
-inline void Millipede::update_frame_count(int* frame_count)
-{
-    *frame_count = *frame_count + 1;
-    if (*frame_count == 1e9)
-        *frame_count = 0;
 }
 
 void Millipede::schedule_fft_task(UNUSED int offset, UNUSED int frame_count,
