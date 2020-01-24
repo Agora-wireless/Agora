@@ -990,11 +990,9 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
-    zf_stats_.init(zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
+    zf_stats_.init(config_->zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
 
-    int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
-    demul_stats_.init(demul_block_num, ul_data_subframe_num_perframe,
+    demul_stats_.init(config_->demul_block_num, ul_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     decode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM, ul_data_subframe_num_perframe,
@@ -1026,8 +1024,7 @@ void Millipede::initialize_downlink_buffers()
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    int precode_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
-    precode_stats_.init(precode_block_num, dl_data_subframe_num_perframe,
+    precode_stats_.init(config_->demul_block_num, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     ifft_stats_.init(BS_ANT_NUM, dl_data_subframe_num_perframe,

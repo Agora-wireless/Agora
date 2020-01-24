@@ -55,9 +55,8 @@ void DoPrecode::launch(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int demul_block_size = config_->demul_block_size;
-    int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
-    int sc_id = offset % demul_block_num * demul_block_size;
-    int total_data_subframe_id = offset / demul_block_num;
+    int sc_id = offset % config_->demul_block_num * demul_block_size;
+    int total_data_subframe_id = offset / config_->demul_block_num;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;

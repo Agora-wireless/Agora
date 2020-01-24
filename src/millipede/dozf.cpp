@@ -47,9 +47,8 @@ void DoZF::ZF_time_orthogonal(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
-    int frame_id = offset / zf_block_num;
-    int sc_id = offset % zf_block_num * zf_block_size;
+    int frame_id = offset / config_->zf_block_num;
+    int sc_id = offset % config_->zf_block_num * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
@@ -194,9 +193,8 @@ void DoZF::ZF_freq_orthogonal(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
-    int frame_id = offset / zf_block_num;
-    int sc_id = offset % zf_block_num * zf_block_size;
+    int frame_id = offset / config_->zf_block_num;
+    int sc_id = offset % config_->zf_block_num * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid, frame_id, sc_id, sc_id / UE_NUM);
 #endif
@@ -276,9 +274,8 @@ void DoZF::Predict(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
-    int frame_id = offset / zf_block_num;
-    int sc_id = offset % zf_block_num * zf_block_size;
+    int frame_id = offset / config_->zf_block_num;
+    int sc_id = offset % config_->zf_block_num * zf_block_size;
 
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
