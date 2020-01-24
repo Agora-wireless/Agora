@@ -478,7 +478,8 @@ pin_worker(thread_type thread, int tid, Config* config_)
 void* Millipede::worker(int tid)
 {
     pin_worker(Worker, tid, config_);
-    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
+    moodycamel::ProducerToken ptok_complete(complete_task_queue_);
+    Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize operators */
     auto computeFFT = new DoFFT(config_, tid, fft_queue_, consumer,
@@ -549,7 +550,8 @@ void* Millipede::worker(int tid)
 void* Millipede::worker_fft(int tid)
 {
     pin_worker(Worker_FFT, tid, config_);
-    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
+    moodycamel::ProducerToken ptok_complete(complete_task_queue_);
+    Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize IFFT operator */
     auto computeFFT = new DoFFT(config_, tid, fft_queue_, consumer,
@@ -568,7 +570,8 @@ void* Millipede::worker_fft(int tid)
 void* Millipede::worker_zf(int tid)
 {
     pin_worker(Worker_ZF, tid, config_);
-    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
+    moodycamel::ProducerToken ptok_complete(complete_task_queue_);
+    Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
@@ -582,7 +585,8 @@ void* Millipede::worker_zf(int tid)
 void* Millipede::worker_demul(int tid)
 {
     pin_worker(Worker_Demul, tid, config_);
-    Consumer consumer(complete_task_queue_, *task_ptoks_ptr[tid]);
+    moodycamel::ProducerToken ptok_complete(complete_task_queue_);
+    Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize Demul operator */
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
@@ -935,11 +939,6 @@ void Millipede::initialize_queues()
     tx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(64, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
     for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++)
         tx_ptoks_ptr[i] = new moodycamel::ProducerToken(tx_queue_);
-
-    int TASK_THREAD_NUM = config_->worker_thread_num;
-    task_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(64, TASK_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
-    for (int i = 0; i < TASK_THREAD_NUM; i++)
-        task_ptoks_ptr[i] = new moodycamel::ProducerToken(complete_task_queue_);
 }
 
 void Millipede::initialize_uplink_buffers()
