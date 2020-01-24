@@ -253,7 +253,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     /* Tokens */
-    moodycamel::ProducerToken** task_ptoks_ptr;
     moodycamel::ProducerToken** rx_ptoks_ptr;
     moodycamel::ProducerToken** tx_ptoks_ptr;
 };
