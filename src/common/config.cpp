@@ -127,6 +127,8 @@ Config::Config(std::string jsonfile)
     /* frame configurations */
     if (freq_orthogonal_pilot)
         zf_block_size = UE_NUM;
+    demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+    zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
     symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
     size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_NUM;
     pilot_symbol_num_perframe = tddConf.value("pilot_num", pilot_num_default);
