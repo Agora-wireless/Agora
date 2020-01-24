@@ -293,8 +293,7 @@ void Millipede::start()
                 if (demul_stats_.last_task(frame_id, data_subframe_id)) {
                     max_equaled_frame = frame_id;
 #ifdef USE_LDPC
-                    schedule_task_set(TASK_DECODE, decode_stats_.max_task_count,
-                        total_data_subframe_id, consumer_decode);
+                    consumer_decode.schedule_task_set(total_data_subframe_id);
 #endif
                     print_per_subframe_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id, data_subframe_id);
                     if (++demul_stats_.symbol_count[frame_id] == demul_stats_.max_symbol_count) {
