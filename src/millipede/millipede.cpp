@@ -99,7 +99,7 @@ void Millipede::start()
     moodycamel::ProducerToken ptok_fft(fft_queue_);
     Consumer consumer_fft(fft_queue_, ptok_fft, fft_stats_.max_task_count, TASK_FFT);
     moodycamel::ProducerToken ptok_zf(zf_queue_);
-    Consumer consumer_zf(zf_queue_, ptok_zf, zf_stats_.max_symbol_count, TASK_ZF);
+    Consumer consumer_zf(zf_queue_, ptok_zf, zf_stats_.max_task_count, TASK_ZF);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     Consumer consumer_demul(demul_queue_, ptok_demul, demul_stats_.max_task_count, TASK_DEMUL);
     moodycamel::ProducerToken ptok_decode(decode_queue_);

@@ -84,9 +84,14 @@ struct Frame_stats {
 
 struct ZF_stats : public Frame_stats {
     bool* precoder_exist_in_frame;
-    void init(int max_symbols, int max_frame, int align)
+    int& max_task_count;
+    ZF_stats(void)
+        : max_task_count(max_symbol_count)
     {
-        Frame_stats::init(max_symbols, max_frame, align);
+    }
+    void init(int max_tasks, int max_frame, int align)
+    {
+        Frame_stats::init(max_tasks, max_frame, align);
         alloc_buffer_1d(&precoder_exist_in_frame, max_frame, align, 1);
     }
     void fini()
