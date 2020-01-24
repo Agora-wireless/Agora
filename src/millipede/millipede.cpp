@@ -255,8 +255,7 @@ void Millipede::start()
             } break;
             case EVENT_ZF: {
                 int offset = event.data;
-                int zf_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->zf_block_size;
-                int frame_id = offset / zf_block_num;
+                int frame_id = offset / zf_stats_.max_symbol_count;
                 print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
                     printf("here\n");
@@ -282,12 +281,13 @@ void Millipede::start()
 
             case EVENT_DEMUL: {
                 int offset = event.data;
-                int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
-                int sc_id = offset % demul_block_num * config_->demul_block_size;
-                int total_data_subframe_id = offset / demul_block_num;
-                int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+                int block_size = config_->demul_block_size;
+                int block_num = demul_stats_.max_task_count;
+                int sc_id = offset % block_num * block_size;
+                int total_data_subframe_id = offset / block_num;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
                 print_per_task_done(PRINT_DEMUL, frame_id, data_subframe_id, sc_id);
                 /* if this subframe is ready */
                 if (demul_stats_.last_task(frame_id, data_subframe_id)) {
@@ -329,7 +329,7 @@ void Millipede::start()
 
             case EVENT_DECODE: {
                 int offset = event.data;
-                int num_code_blocks = UE_NUM * LDPC_config.nblocksInSymbol;
+                int num_code_blocks = decode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
@@ -368,12 +368,12 @@ void Millipede::start()
             case EVENT_PRECODE: {
                 /* Precoding is done, schedule ifft */
                 int offset = event.data;
-                int demul_block_size = config_->demul_block_size;
-                int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
-                int sc_id = offset % demul_block_num * demul_block_size;
-                int total_data_subframe_id = offset / demul_block_num;
-                int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+                int block_size = config_->demul_block_size;
+                int block_num = precode_stats_.max_task_count;
+                int sc_id = offset % block_num * block_size;
+                int total_data_subframe_id = offset / block_num;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+                int frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
                 print_per_task_done(PRINT_PRECODE, frame_id, data_subframe_id, sc_id);
                 if (precode_stats_.last_task(frame_id, data_subframe_id)) {
@@ -906,8 +906,6 @@ void Millipede::initialize_vars_from_cfg(Config* cfg)
         cout << config_->pilots_[i] << ",";
     cout << endl;
 #endif
-
-    LDPC_config = config_->LDPC_config;
     mod_type = config_->mod_type;
 }
 
@@ -999,7 +997,7 @@ void Millipede::initialize_uplink_buffers()
     demul_stats_.init(demul_block_num, ul_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    decode_stats_.init(LDPC_config.nblocksInSymbol * UE_NUM, ul_data_subframe_num_perframe,
+    decode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM, ul_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     delay_fft_queue.calloc(TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32);
@@ -1025,11 +1023,11 @@ void Millipede::initialize_downlink_buffers()
     dl_precoder_buffer_.malloc(OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
     dl_encoded_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
 
-    encode_stats_.init(LDPC_config.nblocksInSymbol * UE_NUM, dl_data_subframe_num_perframe,
+    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    int demul_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
-    precode_stats_.init(demul_block_num, dl_data_subframe_num_perframe,
+    int precode_block_num = 1 + (OFDM_DATA_NUM - 1) / config_->demul_block_size;
+    precode_stats_.init(precode_block_num, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
     ifft_stats_.init(BS_ANT_NUM, dl_data_subframe_num_perframe,
