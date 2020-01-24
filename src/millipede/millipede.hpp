@@ -100,8 +100,6 @@ public:
     void getEqualData(float** ptr, int* size);
 
 private:
-    LDPCconfig LDPC_config;
-
     /* lookup table for 16 QAM, real and imag */
     size_t mod_type;
     float** qam16_table_;
