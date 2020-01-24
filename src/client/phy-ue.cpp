@@ -104,7 +104,7 @@ Phy_UE::Phy_UE(Config* cfg)
     }
 
     printf("new RU\n");
-    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, message_queue_, tx_queue_));
+    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, &message_queue_, &tx_queue_));
 
     // initilize all kinds of checkers
     cropper_checker_ = new size_t[dl_symbol_perframe * TASK_BUFFER_FRAME_NUM];
@@ -784,7 +784,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
 
 #if DEBUG_PRINT_PILOT
     cout << "Pilot data" << endl;
-    for (int i = 0; i < OFDM_CA_NUM; i++)
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
         cout << pilots_[i] << ",";
     cout << endl;
 #endif
@@ -829,7 +829,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     data_sc_start = cfg->OFDM_DATA_START;
     nUEs = cfg->UE_NUM;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and cfg->nUEs >= RX_THREAD_NUM ? RX_THREAD_NUM : cfg->nUEs; // FIXME: read number of cores and assing accordingly
+    rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM ? RX_THREAD_NUM : nUEs; // FIXME: read number of cores and assing accordingly
     core_offset = cfg->core_offset;
     numAntennas = nUEs * cfg->nChannels;
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data symbols, %zu DL data symbols\n",

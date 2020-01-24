@@ -156,14 +156,13 @@ void RadioConfig::initBSRadio(int i)
     args["serial"] = _cfg->radio_ids.at(i);
     baStn[i] = SoapySDR::Device::make(args);
     for (auto ch : { 0, 1 }) {
-        baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
-        baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
+        baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, _cfg->rate);
+        baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, _cfg->rate);
     }
     rxStreams[i] = baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
     txStreams[i] = baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
 
     remainingJobs--;
-    return 0;
 }
 
 void* RadioConfig::configureBSRadio_launch(void* in_context)
@@ -176,7 +175,7 @@ void* RadioConfig::configureBSRadio_launch(void* in_context)
     return 0;
 }
 
-void* RadioConfig::configureBSRadio(int tid)
+void RadioConfig::configureBSRadio(int i)
 {
     //load channels
     std::vector<size_t> channels;
@@ -238,12 +237,11 @@ void* RadioConfig::configureBSRadio(int tid)
 
     // we disable channel 1 because of the internal LDO issue.
     // This will be fixed in the next revision (E) of Iris.
-    if (cfg->nChannels == 1) {
+    if (_cfg->nChannels == 1) {
         baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
     }
     remainingJobs--;
-    return 0;
 }
 
 bool RadioConfig::radioStart()
