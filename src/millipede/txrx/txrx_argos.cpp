@@ -191,9 +191,11 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     // downlink socket buffer
     // char *tx_buffer_ptr = obj_ptr->tx_buffer_;
     // char *tx_cur_buffer_ptr;
+#if DEBUG_DOWNLINK
     size_t txSymsPerFrame = cfg->dl_data_symbol_num_perframe;
     std::vector<size_t> txSymbols = cfg->DLSymbols[0];
     std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
+#endif
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -353,10 +355,10 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     //int* buffer_status = obj_ptr->tx_buffer_status_;
 
     Config* cfg = obj_ptr->config_;
-    //RadioConfig *radio = obj_ptr->radioconfig_;
+    RadioConfig *radio = obj_ptr->radioconfig_;
 
     int ret;
-    int tx_offset;
+    int offset;
     //int ant_id, symbol_id, frame_id;
     //struct timespec tv, tv2;
 
@@ -408,7 +410,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         //{
         size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
         UNUSED void* txbuf[2];
-        //long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+        long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
 #if SEPARATE_TX_RX
         int flags = 1; // HAS_TIME
         if (symbol_id == txSymbols.back())

@@ -28,7 +28,7 @@ Millipede::Millipede(Config* cfg)
     printf("enter constructor\n");
 
     this->config_ = cfg;
-    initialize_vars_from_cfg(config_);
+    initialize_vars_from_cfg();
 
     int TASK_THREAD_NUM = cfg->worker_thread_num;
     int SOCKET_RX_THREAD_NUM = cfg->socket_thread_num;
@@ -995,7 +995,7 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, U
 #endif
 }
 
-void Millipede::initialize_vars_from_cfg(Config* cfg)
+void Millipede::initialize_vars_from_cfg()
 {
     dl_IQ_data = &config_->dl_IQ_data;
 

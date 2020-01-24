@@ -13,11 +13,6 @@
 #include <cstdint>
 #include <csignal>
 #include "config.hpp"
-enum RadioType
-{
- eNB=0,
- UE=1
-};
 
 class ClientRadioConfig
 {
@@ -56,7 +51,6 @@ private:
     std::vector<SoapySDR::Stream *> rxStreams;
     size_t _radioNum;
     size_t _antennaNum;
-    RadioType _radioType; 
     std::atomic<size_t> remainingJobs;
     ClientRadioConfigContext *context;
 };

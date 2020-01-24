@@ -92,7 +92,7 @@ public:
     void print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id);
     void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id);
 
-    void initialize_vars_from_cfg(Config* cfg);
+    void initialize_vars_from_cfg();
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();

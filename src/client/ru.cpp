@@ -66,16 +66,15 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
 }
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config* config,
-    moodycamel::ConcurrentQueue<Event_data>& in_message_queue,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue)
+    moodycamel::ConcurrentQueue<Event_data>* in_message_queue,
+    moodycamel::ConcurrentQueue<Event_data>* in_task_queue)
     : RU(n_rx_thread, n_tx_thread, config)
-    , message_queue_(in_message_queue)
-    , task_queue_(in_task_queue)
-
 {
+    message_queue_ = in_message_queue;
+    task_queue_ = in_task_queue;
     task_ptok.resize(thread_num_);
     for (int i = 0; i < thread_num_; i++)
-        task_ptok[i].reset(new moodycamel::ProducerToken(task_queue_));
+        task_ptok[i].reset(new moodycamel::ProducerToken(*task_queue_));
 }
 
 RU::~RU()
@@ -205,12 +204,12 @@ void RU::sendThread(int tid)
 
     std::vector<size_t>& txSymbols = config_->ULSymbols[0];
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(message_queue_);
+    moodycamel::ProducerToken local_ptok(*message_queue_);
     while (config_->running) {
 
         Event_data task_event;
         //ret = task_queue_.try_dequeue(task_event);
-        ret = task_queue_.try_dequeue_from_producer(*task_ptok[tid], task_event);
+        ret = task_queue_->try_dequeue_from_producer(*task_ptok[tid], task_event);
         if (!ret)
             continue;
 
@@ -230,32 +229,32 @@ void RU::sendThread(int tid)
             struct Packet* pkt = (struct Packet*)pilot_buffer_;
             new (pkt) Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
             //ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(), frame_id, cfg->pilotSymbols[0][p_id], p_id);
-            if (sendto(tx_socket_[tid], (char *)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr *)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
+            if (sendto(tx_socket_[tid], (char*)obj_ptr->pilot_buffer_, packet_length, 0, (struct sockaddr*)&obj_ptr->cliaddr_[tid], sizeof(obj_ptr->cliaddr_[tid])) < 0) {
                 perror("loopSend: socket sendto failed");
                 exit(0);
             }
         }
 #if DEBUG_SEND
-            printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, config_->pilotSymbols[0][ant_id], ant_id);
+        printf("TX thread %d: finished TX pilot for frame %d at symbol %d on ant %d\n", tid, frame_id, config_->pilotSymbols[0][ant_id], ant_id);
 #endif
-        }
-        for (symbol_id = 0; symbol_id < txSymbols.size(); symbol_id++) {
-            //for (ant_id = 0; ant_id < config_->getNumAntennas(); ant_id++)
-            {
-                offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), config_->getNumAntennas(), frame_id, symbol_id, ant_id);
-                // send data (one OFDM symbol)
-                struct Packet* pkt = (struct Packet*)(tx_buffer_ + offset * packet_length);
-                new (pkt) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
+    }
+    for (symbol_id = 0; symbol_id < txSymbols.size(); symbol_id++) {
+        //for (ant_id = 0; ant_id < config_->getNumAntennas(); ant_id++)
+        {
+            offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), config_->getNumAntennas(), frame_id, symbol_id, ant_id);
+            // send data (one OFDM symbol)
+            struct Packet* pkt = (struct Packet*)(tx_buffer_ + offset * packet_length);
+            new (pkt) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
 
-                if (sendto(tx_socket_[tid], (char*)pkt, packet_length, 0, (struct sockaddr*)&cliaddr_[tid], sizeof(cliaddr_[tid])) < 0) {
-                    perror("loopSend: socket sendto failed");
-                    exit(0);
-                }
+            if (sendto(tx_socket_[tid], (char*)pkt, packet_length, 0, (struct sockaddr*)&cliaddr_[tid], sizeof(cliaddr_[tid])) < 0) {
+                perror("loopSend: socket sendto failed");
+                exit(0);
             }
-#if DEBUG_SEND
-            printf("TX thread %d: finished TX for frame %d, symbol %d, ant %d\n", tid, frame_id, txSymbols[symbol_id], ant_id);
-#endif
         }
+#if DEBUG_SEND
+        printf("TX thread %d: finished TX for frame %d, symbol %d, ant %d\n", tid, frame_id, txSymbols[symbol_id], ant_id);
+#endif
+    }
 #else
         //symbol_id = task_event.data / config_->getNumAntennas();
         for (symbol_id = 0; symbol_id < txSymbols.size(); symbol_id++) {
@@ -302,15 +301,15 @@ void RU::sendThread(int tid)
         }
 #endif
 
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_SENT;
-        packet_message.data = offset;
-        //packet_message.more_data = frame_id;
-        if (config_->running && !message_queue_.enqueue(local_ptok, packet_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
+    Event_data packet_message;
+    packet_message.event_type = EVENT_PACKET_SENT;
+    packet_message.data = offset;
+    //packet_message.more_data = frame_id;
+    if (config_->running && !message_queue_->enqueue(local_ptok, packet_message)) {
+        printf("socket message enqueue failed\n");
+        exit(0);
     }
+}
 }
 
 /*****  Receive threads   *****/
@@ -347,7 +346,7 @@ void RU::taskThread(int tid)
 
     // usleep(10000-tid*2000);
     // use token to speed up
-    moodycamel::ProducerToken local_ptok(message_queue_);
+    moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ProducerToken local_ctok(task_queue_);
     //moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
@@ -418,7 +417,7 @@ void RU::taskThread(int tid)
         packet_message.event_type = EVENT_RX_SYMBOL;
         // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
         packet_message.data = cursor + tid * buffer_frame_num_;
-        if (!message_queue_.enqueue(local_ptok, packet_message)) {
+        if (!message_queue_->enqueue(local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
@@ -429,14 +428,14 @@ void RU::taskThread(int tid)
             do_tx_task.event_type = TASK_SEND;
             do_tx_task.data = ant_id;
             do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
-            if (!task_queue_.enqueue(*task_ptok[tid], do_tx_task)) {
+            if (!task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
                 printf("task enqueue failed\n");
                 exit(0);
             }
         }
 
         //printf("enqueue offset %d\n", offset);
-        int cur_queue_len = message_queue_.size_approx();
+        int cur_queue_len = message_queue_->size_approx();
         maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
 
         packet_num++;
@@ -476,7 +475,7 @@ void RU::taskThread(int tid)
                 packet_message.event_type = EVENT_PACKET_RECEIVED;
                 // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
                 packet_message.data = cursor + tid * buffer_frame_num_;
-                if (!message_queue_.enqueue(local_ptok, packet_message)) {
+                if (!message_queue_->enqueue(local_ptok, packet_message)) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
@@ -530,7 +529,7 @@ void RU::taskThread(int tid)
             //stats
 
             //printf("enqueue offset %d\n", offset);
-            int cur_queue_len = message_queue_.size_approx();
+            int cur_queue_len = message_queue_->size_approx();
             maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
 
             packet_num++;
