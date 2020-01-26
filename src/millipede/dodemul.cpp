@@ -42,39 +42,42 @@ DoDemul::~DoDemul()
 
 void DoDemul::launch(int offset)
 {
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int demul_block_size = config_->demul_block_size;
-    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
-    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int sc_id = offset % config_->demul_block_num * demul_block_size;
+    int total_data_subframe_id = offset / config_->demul_block_num;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-
-#if DEBUG_PRINT_IN_TASK
-    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
-#endif
 
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
 
 #if DEBUG_PRINT_IN_TASK
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
 #endif
 
     int transpose_block_size = config_->transpose_block_size;
+    int gather_step_size = 8 * transpose_block_size;
     __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4,
         transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
-    int gather_step_size = 8 * transpose_block_size;
 
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    float* tar_data_ptr = (float*)spm_buffer;
     // int mat_elem = UE_NUM * BS_ANT_NUM;
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
 
     /* i = 0, 1, ..., 32/8
      * iterate through cache lines (each cache line has 8 subcarriers) */
     for (int i = 0; i < max_sc_ite / 8; i++) {
+        int cur_block_id = (sc_id + i * 8) / transpose_block_size;
+        int sc_inblock_idx = (i * 8) % transpose_block_size;
+        int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
+        float* src_data_ptr = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
 /* for a cache line size of 64 bytes, each read load 8 subcarriers
          * use spatial locality to reduce latency */
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -89,15 +92,6 @@ void DoDemul::launch(int offset)
         //         _mm_prefetch((char *)(precoder_ptr + 8 * line_idx), _MM_HINT_T2);
         //     }
         // }
-
-        int BS_ANT_NUM = config_->BS_ANT_NUM;
-        int UE_NUM = config_->UE_NUM;
-        int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-        int cur_block_id = (sc_id + i * 8) / transpose_block_size;
-        int sc_inblock_idx = (i * 8) % transpose_block_size;
-        int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
-        float* tar_data_ptr = (float*)spm_buffer;
-        float* src_data_ptr = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
 
         /* gather data for all antennas and 8 subcarriers in the same cache line */
         for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
@@ -251,11 +245,12 @@ void DoDemul::launch(int offset)
 void DoDemul::DemulSingleSC(int offset)
 {
     double start_time = get_time();
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int demul_block_size = config_->demul_block_size;
-    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
-    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+    int sc_id = offset % config_->demul_block_num * demul_block_size;
+    int total_data_subframe_id = offset / config_->demul_block_num;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 #if DEBUG_PRINT_IN_TASK
@@ -270,7 +265,6 @@ void DoDemul::DemulSingleSC(int offset)
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int cur_block_id = sc_id / transpose_block_size;
     int sc_inblock_idx = sc_id % transpose_block_size;
     int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;

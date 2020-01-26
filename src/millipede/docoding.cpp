@@ -108,25 +108,24 @@ DoEncode::~DoEncode()
 
 void DoEncode::launch(int offset)
 {
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    int nblocksInSymbol = LDPC_config.nblocksInSymbol;
+    int cur_cb_id = offset % nblocksInSymbol;
+    int UE_NUM = config_->UE_NUM;
+    int ue_id = (offset / nblocksInSymbol) % UE_NUM;
+    int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    int cb_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-    int symbol_offset = offset % TASK_BUFFER_SUBFRAME_NUM;
     int symbol_id = symbol_offset % data_subframe_num_perframe;
-
 #if DEBUG_PRINT_IN_TASK
     int frame_id = symbol_offset / data_subframe_num_perframe;
-    printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
+    printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cur_cb_id);
 #endif
 
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
 
-    LDPCconfig LDPC_config = config_->LDPC_config;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int ue_id = cb_id / LDPC_config.nblocksInSymbol;
-    int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
     int8_t* input_ptr = (int8_t*)raw_data_buffer_[symbol_id] + input_offset;
@@ -188,25 +187,24 @@ DoDecode::~DoDecode()
 
 void DoDecode::launch(int offset)
 {
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    int nblocksInSymbol = LDPC_config.nblocksInSymbol;
+    int cur_cb_id = offset % nblocksInSymbol;
+    int UE_NUM = config_->UE_NUM;
+    int ue_id = (offset / nblocksInSymbol) % UE_NUM;
+    int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    int cb_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-    int symbol_offset = offset % TASK_BUFFER_SUBFRAME_NUM;
     int symbol_id = symbol_offset % data_subframe_num_perframe;
-
 #if DEBUG_PRINT_IN_TASK
     int frame_id = symbol_offset / data_subframe_num_perframe;
-    printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cb_id);
+    printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid, frame_id, symbol_id, cur_cb_id);
 #endif
 
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
 
-    LDPCconfig LDPC_config = config_->LDPC_config;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int ue_id = cb_id / LDPC_config.nblocksInSymbol;
-    int cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
     int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
     int output_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
     int llr_buffer_offset = output_offset * config_->mod_type;

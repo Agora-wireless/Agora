@@ -53,20 +53,20 @@ DoPrecode::~DoPrecode()
 
 void DoPrecode::launch(int offset)
 {
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int demul_block_size = config_->demul_block_size;
+    int sc_id = offset % config_->demul_block_num * demul_block_size;
+    int total_data_subframe_id = offset / config_->demul_block_num;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int OFDM_DATA_START = config_->OFDM_DATA_START;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int demul_block_size = config_->demul_block_size;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-    int sc_id = offset / TASK_BUFFER_SUBFRAME_NUM * demul_block_size;
-    int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
-    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
 
@@ -93,26 +93,24 @@ void DoPrecode::launch(int offset)
                 _mm_prefetch((char*)(precoder_buffer_[precoder_offset] + line_idx * 8), _MM_HINT_T0);
             }
 
-            complex_float* data_ptr;
+            complex_float* data_ptr = modulated_buffer_temp;
             if ((unsigned)current_data_subframe_id == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
-                data_ptr = modulated_buffer_temp;
                 for (int user_id = 0; user_id < UE_NUM; user_id++)
-                    *(data_ptr + user_id) = { config_->pilots_[cur_sc_id], 0 };
+                    data_ptr[user_id] = { config_->pilots_[cur_sc_id], 0 };
             } else {
                 _mm_prefetch((char*)(dl_IQ_data[current_data_subframe_id] + cur_sc_id), _MM_HINT_T0);
-                data_ptr = modulated_buffer_temp;
                 for (int user_id = 0; user_id < UE_NUM - 1; user_id++) {
                     // int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
                     int8_t* raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * user_id];
                     // cout<<*raw_data_ptr<<", ";
                     _mm_prefetch((char*)dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (user_id + 1)], _MM_HINT_T0);
-                    *(data_ptr + user_id) = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
-                    // cout<<(*(data_ptr + user_id)).real<<"+"<<(*(data_ptr + user_id)).imag<<"j, ";
+                    data_ptr[user_id] = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
+                    // cout << data_ptr[user_id].real << "+" << data_ptr[user_id].imag << "j, ";
                 }
                 // cout<<endl;
 
                 int8_t* raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
-                *(data_ptr + UE_NUM - 1) = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
+                data_ptr[UE_NUM - 1] = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
             }
 
             // mat_precoder size: UE_NUM \times BS_ANT_NUM
@@ -174,7 +172,7 @@ void DoPrecode::launch(int offset)
 
     float* precoded_ptr = (float*)precoded_buffer_temp;
     for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
-        int ifft_buffer_offset = ant_id + BS_ANT_NUM * (current_data_subframe_id + frame_id * data_subframe_num_perframe);
+        int ifft_buffer_offset = ant_id + BS_ANT_NUM * total_data_subframe_id;
         float* ifft_ptr = (float*)&dl_ifft_buffer_[ifft_buffer_offset][sc_id + OFDM_DATA_START];
         for (int i = 0; i < demul_block_size / 4; i++) {
             float* input_shifted_ptr = precoded_ptr + 4 * i * 2 * BS_ANT_NUM + ant_id * 2;
