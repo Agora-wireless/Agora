@@ -14,7 +14,9 @@ class RadioConfig;
 #include <pthread.h>
 #include <vector>
 
+#include "client_radio.hpp"
 #include "concurrentqueue.h"
+#include <fstream> // std::ifstream
 
 class RU {
 public:
@@ -35,7 +37,9 @@ public:
      * mode: tx=1 or rx=0 operation
      * in_queue: message queue to communicate with main thread
     */
-    RU(int n_rx_thread, int n_tx_thread, Config* cfg, moodycamel::ConcurrentQueue<Event_data>* in_queue, moodycamel::ConcurrentQueue<Event_data>* in_queue_task);
+    RU(int n_rx_thread, int n_tx_thread, Config* cfg,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_task);
     ~RU();
 
     void calibrateRadios(std::vector<std::vector<std::complex<float>>>&, std::vector<std::vector<std::complex<float>>>&, int);
@@ -71,7 +75,7 @@ private:
     int* tx_socket_;
 #else
 
-    RadioConfig* radioconfig_;
+    ClientRadioConfig* radioconfig_;
 #endif
 
     Table<char>* buffer_;
@@ -88,8 +92,8 @@ private:
     int thread_num_;
     int tx_thread_num_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data>& message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>& task_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
     std::vector<std::unique_ptr<moodycamel::ProducerToken>> task_ptok;
     //std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
     int core_id_;

@@ -78,7 +78,6 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     bool ret = radioconfig_->radioStart();
     if (!ret)
         return created_threads;
-    calib_mat = radioconfig_->get_calib_mat();
     int nradio_per_thread = config_->nRadios / rx_thread_num_;
     int rem_thread_nradio = config_->nRadios % rx_thread_num_;
 
@@ -192,9 +191,11 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     // downlink socket buffer
     // char *tx_buffer_ptr = obj_ptr->tx_buffer_;
     // char *tx_cur_buffer_ptr;
-    size_t txSymsPerFrame = cfg->dlSymsPerFrame;
+#if DEBUG_DOWNLINK
+    size_t txSymsPerFrame = cfg->dl_data_symbol_num_perframe;
     std::vector<size_t> txSymbols = cfg->DLSymbols[0];
     std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
+#endif
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -243,15 +244,12 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
             frame_id = (int)(frameTime >> 32);
             symbol_id = (int)((frameTime >> 16) & 0xFFFF);
             ant_id = rid * cfg->nChannels;
-            int rx_symbol_id = cfg->getPilotSFIndex(frame_id, symbol_id);
-            if (rx_symbol_id < 0)
-                rx_symbol_id = cfg->getUlSFIndex(frame_id, symbol_id) + cfg->pilotSymsPerFrame;
             struct Packet* pkt = (struct Packet*)cur_ptr_buffer;
-            new (pkt) Packet(frame_id, rx_symbol_id, 0 /* cell_id */, ant_id);
+            new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
             if (cfg->nChannels == 2) {
                 struct Packet* pkt2 = (struct Packet*)cur_ptr_buffer2;
-                new (pkt2) Packet(frame_id, rx_symbol_id, 0 /* cell_id */, ant_id + 1);
+                new (pkt2) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + 1);
             }
 
 #if MEASURE_TIME
@@ -309,7 +307,7 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
                 symbol_id = txSymbols[sym_id];
                 int tx_frame_id = frame_id + TX_FRAME_DELTA;
                 void* txbuf[2];
-                long long frameTime = ((long long)tx_frame_id << 32) | (symbol_id << 16);
+                long long frameTime = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
                 int flags = 1; // HAS_TIME
                 if (symbol_id == (int)txSymbols.back())
                     flags = 2; // HAS_TIME & END_BURST, fixme
@@ -357,10 +355,10 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     //int* buffer_status = obj_ptr->tx_buffer_status_;
 
     Config* cfg = obj_ptr->config_;
-    //RadioConfig *radio = obj_ptr->radioconfig_;
+    RadioConfig *radio = obj_ptr->radioconfig_;
 
     int ret;
-    int tx_offset;
+    int offset;
     //int ant_id, symbol_id, frame_id;
     //struct timespec tv, tv2;
 
@@ -412,7 +410,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         //{
         size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
         UNUSED void* txbuf[2];
-        //long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+        long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
 #if SEPARATE_TX_RX
         int flags = 1; // HAS_TIME
         if (symbol_id == txSymbols.back())

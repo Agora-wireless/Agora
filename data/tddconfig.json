@@ -10,7 +10,7 @@
  "symbol_size" : 2432,
  "prefix" : 128,
  "postfix" : 128,
- "beacon_mode" : "beamsweep",
+ "beamsweep" : true,
  "beacon_antenna" : 0,
  "sample_calibrate" : false,
  "calTxGainA" : 40,
