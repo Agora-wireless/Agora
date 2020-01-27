@@ -138,11 +138,19 @@ struct FFT_stats : public Data_stats {
     Table<bool> data_exist_in_symbol;
 };
 
-
 struct RC_stats {
-    int* task_count;
-    int frame_count = 0;
+    int frame_count;
     int max_task_count;
+    RC_stats(void)
+        : frame_count(0)
+        , max_task_count(1)
+    {
+    }
+    void update_frame_count(void)
+    {
+        if (++frame_count == 1e9)
+            frame_count = 0;
+    }
 };
 
 /* TODO: clean up the legency code below */
