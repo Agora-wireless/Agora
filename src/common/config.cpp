@@ -66,6 +66,8 @@ Config::Config(std::string jsonfile)
     zf_block_size = tddConf.value("zf_block_size", 1);
     if (freq_orthogonal_pilot)
         zf_block_size = UE_NUM;
+    demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+    zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
     /* frame configurations */
     if (tddConf.find("frames") == tddConf.end()) {
@@ -134,10 +136,12 @@ Config::Config(std::string jsonfile)
             BS_ANT_NUM = nAntennas;
     }
 
+
     if (isUE and !freq_orthogonal_pilot and nRadios != pilot_symbol_num_perframe) {
         std::cerr << "Number of Pilot Symbols don't match number of Clients!" << std::endl;
         exit(0);
     }
+
 
     mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
     printf("modulation: %s\n", modulation.c_str());
