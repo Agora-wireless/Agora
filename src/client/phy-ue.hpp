@@ -314,7 +314,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data> demul_queue_; // = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* main thread message queue */
     moodycamel::ConcurrentQueue<Event_data> message_queue_; // = moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM  * 36);
-    moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
+    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
