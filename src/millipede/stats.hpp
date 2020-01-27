@@ -82,6 +82,9 @@ public:
     void update_zf_processed(int frame_id) { zf_processed[frame_id % 10000] = get_time(); };
     double get_zf_processed(int frame_id) { return zf_processed[frame_id % 10000]; };
 
+    void update_rc_processed(int frame_id) { rc_processed[frame_id % 10000] = get_time(); };
+    double get_rc_processed(int frame_id) { return rc_processed[frame_id % 10000]; };
+
     void update_decode_processed(int frame_id) { decode_processed[frame_id % 10000] = get_time(); };
     double get_decode_processed(int frame_id) { return decode_processed[frame_id % 10000]; };
 
@@ -119,6 +122,9 @@ public:
     void update_stats_in_doprecode(int frame_id, int thread_num, int thread_num_offset);
     double get_time_in_doprecode(int frame_id) { return precode_time_in_function[frame_id % 10000]; };
 
+    void update_stats_in_rc(int frame_id, int thread_num, int thread_num_offset);
+    double get_time_in_rc(int frame_id) { return zf_time_in_function[frame_id % 10000]; };
+
     /* accumulated task duration for all frames in each worker thread*/
     Stats_worker csi_stats_worker;
     Stats_worker fft_stats_worker;
@@ -128,6 +134,7 @@ public:
     Stats_worker encode_stats_worker;
     Stats_worker ifft_stats_worker;
     Stats_worker precode_stats_worker;
+    Stats_worker rc_stats_worker;
     Table<double> frame_start;
 
 private:
@@ -159,6 +166,7 @@ private:
     double ifft_processed[10000] __attribute__((aligned(4096)));
     double tx_processed_first[10000] __attribute__((aligned(4096)));
     double tx_processed[10000] __attribute__((aligned(4096)));
+    double rc_processed[10000] __attribute__((aligned(4096)));
 
     double csi_time_in_function[10000] __attribute__((aligned(4096)));
     double fft_time_in_function[10000] __attribute__((aligned(4096)));
@@ -168,6 +176,7 @@ private:
     double precode_time_in_function[10000] __attribute__((aligned(4096)));
     double decode_time_in_function[10000] __attribute__((aligned(4096)));
     double encode_time_in_function[10000] __attribute__((aligned(4096)));
+    double rc_time_in_function[10000] __attribute__((aligned(4096)));
 
 #if DEBUG_UPDATE_STATS_DETAILED
     Table<double> csi_time_in_function_details;
@@ -184,6 +193,7 @@ private:
     Stats_worker encode_stats_worker_old;
     Stats_worker ifft_stats_worker_old;
     Stats_worker precode_stats_worker_old;
+    Stats_worker rc_stats_worker_old;
 
     Stats_worker_per_frame csi_stats_per_frame;
     Stats_worker_per_frame fft_stats_per_frame;
@@ -193,6 +203,7 @@ private:
     Stats_worker_per_frame encode_stats_per_frame;
     Stats_worker_per_frame ifft_stats_per_frame;
     Stats_worker_per_frame precode_stats_per_frame;
+    Stats_worker_per_frame rc_stats_per_frame;
 };
 
 #endif

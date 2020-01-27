@@ -10,10 +10,12 @@
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
-    Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
+    Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer,
+    Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , csi_buffer_(in_csi_buffer)
+    , recip_buffer_(in_recip_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
@@ -47,6 +49,9 @@ void DoZF::ZF_time_orthogonal(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
+    bool downlink_mode = config_->downlink_mode;
+    bool recipCalEn = config_->recipCalEn;
+
     int frame_id = offset / config_->zf_block_num;
     int sc_id = offset % config_->zf_block_num * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
@@ -139,7 +144,19 @@ void DoZF::ZF_time_orthogonal(int offset)
         cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        cx_float* ptr_out = (cx_float*)precoder_buffer_[cur_offset];
+        cx_float* ptr_out;
+        if (downlink_mode) {
+            cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
+            if (recipCalEn) {
+                cx_float* calib = (cx_float *)(&recip_buffer_[frame_id][cur_sc_id * BS_ANT_NUM]);
+                cx_fvec vec_calib(calib, BS_ANT_NUM, false);
+                mat_calib = diagmat(vec_calib);
+            } else
+                mat_calib.eye();
+            mat_input = mat_calib * mat_input;
+            ptr_out = (cx_float*)dl_precoder_buffer_[cur_offset];
+        } else 
+            ptr_out = (cx_float*)precoder_buffer_[cur_offset];
         cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED

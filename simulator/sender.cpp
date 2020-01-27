@@ -68,13 +68,14 @@ socket_num(in_thread_num), core_offset(in_core_offset), delay(in_delay)
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
     OFDM_FRAME_LEN = cfg->OFDM_FRAME_LEN;
-    subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
+    subframe_num_perframe = UE_NUM + data_subframe_num_perframe; //cfg->symbol_num_perframe;
     downlink_mode = cfg->downlink_mode;
     packet_length = cfg->packet_length;
     packet_header_offset = cfg->packet_header_offset;
     buffer_length = tx_buf_offset + packet_length;
-    max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
+    //max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe; 
+    max_subframe_id = downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
     max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
 
     packet_count_per_subframe.calloc(BUFFER_FRAME_NUM, max_subframe_id, 64);
@@ -215,8 +216,13 @@ void Sender::startTX()
         cur_ptr_ = i;
         int data_index = subframe_id * BS_ANT_NUM + ant_id;
         int* ptr = (int *)(trans_buffer_[cur_ptr_]+tx_buf_offset);
+	int symbol_id = 0;
+	if (subframe_id < UE_NUM)
+	    symbol_id = config_->pilotSymbols[0][subframe_id];
+	else
+	    symbol_id = config_->ULSymbols[0][subframe_id-UE_NUM];
         (*ptr) = frame_id;
-        (*(ptr+1)) = subframe_id;
+        (*(ptr+1)) = symbol_id; //subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
         memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
@@ -268,8 +274,13 @@ void Sender::startTX()
         int tx_ant_id = data_ptr % BS_ANT_NUM;
         int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
         int* ptr = (int *)(trans_buffer_[data_ptr] + tx_buf_offset);
+	int symbol_id = 0;
+	if (subframe_id < UE_NUM)
+	    symbol_id = config_->pilotSymbols[0][subframe_id];
+	else
+	    symbol_id = config_->ULSymbols[0][subframe_id-UE_NUM];
         (*ptr) = frame_id;
-        (*(ptr+1)) = subframe_id;
+        (*(ptr+1)) = symbol_id; //subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = tx_ant_id;
         memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -438,8 +449,13 @@ void *Sender::loopSend_main(int tid)
         cur_ptr_ = i;
         int data_index = subframe_id * BS_ANT_NUM + ant_id;
         int* ptr = (int *)(trans_buffer_[cur_ptr_]+tx_buf_offset);
+	int symbol_id = 0;
+	if (subframe_id < UE_NUM)
+	    symbol_id = config_->pilotSymbols[0][subframe_id];
+	else
+	    symbol_id = config_->ULSymbols[0][subframe_id-UE_NUM];
         (*ptr) = frame_id;
-        (*(ptr+1)) = subframe_id;
+        (*(ptr+1)) = symbol_id; //subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = ant_id;
         memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);   
@@ -493,8 +509,13 @@ void *Sender::loopSend_main(int tid)
         int tx_ant_id = data_ptr % BS_ANT_NUM;
         int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
         int* ptr = (int *)(trans_buffer_[data_ptr] + tx_buf_offset);
+	int symbol_id = 0;
+	if (subframe_id < UE_NUM)
+	    symbol_id = config_->pilotSymbols[0][subframe_id];
+	else
+	    symbol_id = config_->ULSymbols[0][subframe_id-UE_NUM];
         (*ptr) = frame_id;
-        (*(ptr+1)) = subframe_id;
+        (*(ptr+1)) = symbol_id; //subframe_id;
         (*(ptr+2)) = cell_id;
         (*(ptr+3)) = tx_ant_id;
         memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset, (char *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -629,12 +650,12 @@ void *Sender::loopSend(int tid)
     // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     printf("max_subframe_id: %d\n", max_subframe_id);
     int ant_num_this_thread = BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1: 0);
-#ifdef DEBUG_SENDER
-    //double start_time_send = get_time();
-    //double start_time_msg = get_time();
-    //double end_time_send = get_time();
-    //double end_time_msg = get_time();
-    //double end_time_prev = get_time();
+#if DEBUG_SENDER
+    double start_time_send = get_time();
+    double start_time_msg = get_time();
+    double end_time_send = get_time();
+    double end_time_msg = get_time();
+    double end_time_prev = get_time();
 #endif
 
     printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n", tid, ant_num_this_thread, BS_ANT_NUM, thread_num);

@@ -27,6 +27,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
         Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
         Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
+	Table<complex_float>& in_calib_buffer, 
         Stats* in_stats_manager);
     ~DoFFT();
 
@@ -67,6 +68,7 @@ private:
     Table<int>& socket_buffer_status_;
     Table<complex_float>& data_buffer_;
     Table<complex_float>& csi_buffer_;
+    Table<complex_float>& calib_buffer_;
     Table<double>* FFT_task_duration;
     int* FFT_task_count;
     Table<double>* CSI_task_duration;

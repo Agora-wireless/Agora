@@ -10,7 +10,7 @@
 #ifdef USE_ARGOS
 #define GENERATE_DATA
 #endif
-#define SEPARATE_TX_RX 0
+#define SEPARATE_TX_RX 1
 
 #define MOD_ORDER 4
 
@@ -27,6 +27,7 @@
 #define SOCKET_BUFFER_FRAME_NUM 100
 #define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
+#define SETTLE_TIME_MS 1
 
 #define EVENT_PACKET_RECEIVED 0
 #define EVENT_FFT 1
@@ -41,6 +42,7 @@
 
 #define EVENT_DECODE 9
 #define EVENT_ENCODE 10
+#define EVENT_RC 11
 
 #define TASK_FFT 0
 #define TASK_ZF 1
@@ -52,6 +54,7 @@
 #define TASK_SEND 7
 #define TASK_DECODE 8
 #define TASK_ENCODE 9
+#define TASK_RC 10
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1
@@ -65,6 +68,8 @@
 #define PRINT_TX 9
 #define PRINT_DECODE 10
 #define PRINT_ENCODE 11
+#define PRINT_RC 12
+#define PRINT_FFT_CAL 13
 
 #define BIGSTATION 0
 // #define ENABLE_DOWNLINK 0
@@ -94,7 +99,8 @@
 #define DEBUG_PRINT_STATS_PER_THREAD 0
 #define DEBUG_UPDATE_STATS 1
 #define DEBUG_UPDATE_STATS_DETAILED 1
-#define DEBUG_PRINT_PILOT 0
+#define DEBUG_PRINT_PILOT 1
+#define DEBUG_DL_PILOT 1
 #define DEBUG_PLOT 0
 #define MEASURE_TIME 1
 
@@ -103,7 +109,10 @@
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
 #define WRITE_DEMUL 0
-#define DEBUG_DOWNLINK 1
+#define DEBUG_RADIO_TX 0
+#define DEBUG_RADIO_RX 0
+#define DEBUG_DOWNLINK 0
+#define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4
 #define CORR_RST 0x0
@@ -127,6 +136,15 @@ typedef enum {
     Master_RX,
     Master_TX,
 } thread_type;
+
+typedef enum {
+    UL,
+    DL,
+    PILOT,
+    CAL_DL,
+    CAL_UL,
+    UNKNOWN
+} symbol_type;
 
 struct LDPCconfig {
     uint16_t Bg;

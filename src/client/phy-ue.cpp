@@ -104,7 +104,7 @@ Phy_UE::Phy_UE(Config* cfg)
     }
 
     printf("new RU\n");
-    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, message_queue_, tx_queue_));
+    ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, &message_queue_, &tx_queue_));
 
     // initilize all kinds of checkers
     cropper_checker_ = new size_t[dl_symbol_perframe * TASK_BUFFER_FRAME_NUM];
@@ -246,9 +246,20 @@ void Phy_UE::start()
                 int buffer_frame_num = dl_symbol_perframe * TASK_BUFFER_FRAME_NUM * numAntennas;
                 int rx_thread_id = offset / buffer_frame_num;
                 int offset_in_current_buffer = offset % buffer_frame_num;
-                char* rx_buffer_ptr = rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length;
-                symbol_id = *((int*)rx_buffer_ptr + 1);
-                frame_id = *((int*)rx_buffer_ptr);
+                char *rx_buffer_ptr = rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length;
+                symbol_id = *((int *)rx_buffer_ptr + 1);
+                frame_id = *((int *)rx_buffer_ptr);
+            #if WRITE_RECV
+                if (frame_id < 10 && cfg->getDlSFIndex(frame_id, symbol_id) == 0) {
+                    ant_id = *((int *)rx_buffer_ptr + 3);
+                    int len = cfg->sampsPerSymbol;
+                    void *cur_buf = (rx_buffer_ptr + packet_header_offset);
+                    std::string filename = "sig_ant"+std::to_string(ant_id)+"_f"+std::to_string(frame_id)+".bin";
+                    fp = fopen(filename.c_str(),"wb");
+                    fwrite(cur_buf, sizeof(std::complex<short>), cfg->sampsPerSymbol, fp);
+                    fclose(fp);
+                }
+            #endif      
 
                 if (ul_data_symbol_perframe > 0 && prev_frame_id == cfg->maxFrame)
                     printf("received start indication frame with frame_id %zu\n", frame_id);
@@ -418,7 +429,7 @@ void Phy_UE::start()
             case EVENT_PACKET_SENT: {
                 int offset = event.data;
                 size_t frame_id, total_symbol_id, symbol_id, ant_id;
-                interpretOffset3d(cfg->ulSymsPerFrame, cfg->getNumAntennas(), offset, &frame_id, &total_symbol_id, &symbol_id, &ant_id);
+                interpretOffset3d(cfg->ul_data_symbol_num_perframe, cfg->getNumAntennas(), offset, &frame_id, &total_symbol_id, &symbol_id, &ant_id);
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
                 printf("Main thread: finished TX for frame %d, symbol %d, ant %d\n", frame_id, symbol_id, ant_id);
 #endif
@@ -498,18 +509,50 @@ void Phy_UE::doFFT(int tid, int offset)
 
     // remove CP, do FFT
     int dl_symbol_id = cfg->getDlSFIndex(frame_id, symbol_id);
-    int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM, rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id);
+    int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM, rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id); 
+    short *cur_ptr_buffer_ushort = (short *)(cur_ptr_buffer + cfg->packet_header_offset);
+
+    size_t sym_offset = 0;
+    if(cfg->isPilot(frame_id, symbol_id)) {
+       if (frame_id == 3*TX_FRAME_DELTA) {
+           std::string fname = "rxpilot"+std::to_string(symbol_id)+".bin";
+           FILE *f = fopen(fname.c_str(), "wb");
+           fwrite(cur_ptr_buffer_ushort, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
+           fclose(f);
+       }
+    
+    #if DEBUG_DL_PILOT    
+        std::vector<std::complex<double>> vec;
+        for(size_t i = 0; i < cfg->sampsPerSymbol; i++)
+            vec.push_back(std::complex<double>(cur_ptr_buffer_ushort[2*i]/32768.0, cur_ptr_buffer_ushort[2*i+1]/32768.0));
+        sym_offset = CommsLib::find_pilot_seq(vec, cfg->pilot_cd64, cfg->pilot_cd64.size());
+        sym_offset = sym_offset < cfg->pilot_cd64.size() ? 0 : sym_offset - cfg->pilot_cd64.size();
+        double noise_power = 0;
+        for (size_t i = 0; i < sym_offset; i++)
+            noise_power += std::pow(std::abs(vec[i]), 2);
+        double signal_power = 0;
+        for (size_t i = sym_offset; i < 2 * sym_offset; i++)
+            signal_power += std::pow(std::abs(vec[i]), 2);
+        double SNR = 10*std::log10(signal_power/noise_power);
+        printf("frame %d symbol %d ant %d: corr offset %zu, SNR %2.1f \n", frame_id, symbol_id, ant_id, sym_offset, SNR);
+    #endif
+    } else {
+       if (frame_id == 3*TX_FRAME_DELTA) {
+           std::string fname = "rxdata"+std::to_string(symbol_id)+".bin";
+           FILE *f = fopen(fname.c_str(), "wb");
+           fwrite(cur_ptr_buffer_ushort, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
+           fclose(f);
+       }
+    }
 
     // transfer ushort to float
     size_t delay_offset = (dl_prefix_len + CP_LEN) * 2; //GetFrameStart(cur_ptr_buffer_ushort, prefix_len, postfix_len);
-    short* cur_ptr_buffer_ushort = (short*)(cur_ptr_buffer + cfg->packet_header_offset);
     //float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) * packet_header_offset);
     float* cur_fft_buffer_float = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
-    for (size_t i = 0; i < (FFT_LEN)*2; i++)
-        cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[delay_offset + i] / 32768.2f;
-    //cur_fft_buffer_float[i] = cur_radio_buffer[delay_offset + i];
-    //memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float));
+    for(size_t i = 0; i < (FFT_LEN) * 2; i++)
+        cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[delay_offset + i]/32768.2f;
+    //memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float)); 
 
     // perform fft
     mufft_execute_plan_1d(mufftplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id],
@@ -741,7 +784,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
 
 #if DEBUG_PRINT_PILOT
     cout << "Pilot data" << endl;
-    for (int i = 0; i < OFDM_CA_NUM; i++)
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
         cout << pilots_[i] << ",";
     cout << endl;
 #endif
@@ -763,7 +806,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     tx_packet_length = packet_length - packet_header_offset;
 #endif
 
-    symbol_perframe = cfg->symbolsPerFrame;
+    symbol_perframe = cfg->symbol_num_perframe;
     dl_pilot_symbol_perframe = DL_PILOT_SYMS;
     ul_pilot_symbol_perframe = cfg->pilot_symbol_num_perframe;
     ul_data_symbol_perframe = cfg->ul_data_symbol_num_perframe;
@@ -786,7 +829,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     data_sc_start = cfg->OFDM_DATA_START;
     nUEs = cfg->UE_NUM;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and cfg->nUEs >= RX_THREAD_NUM ? RX_THREAD_NUM : cfg->nUEs; // FIXME: read number of cores and assing accordingly
+    rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM ? RX_THREAD_NUM : nUEs; // FIXME: read number of cores and assing accordingly
     core_offset = cfg->core_offset;
     numAntennas = nUEs * cfg->nChannels;
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data symbols, %zu DL data symbols\n",
