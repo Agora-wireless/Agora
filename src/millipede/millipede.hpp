@@ -78,12 +78,10 @@ public:
     //     int id;
     // };
 
-    inline void update_frame_count(int* frame_count);
     /* Add tasks into task queue based on event type */
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
         Consumer const& consumer);
     void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
-    void schedule_zf_task(int frame_id, Consumer const& consumer);
     void schedule_rc_task(int frame_id, Consumer const& consumer);
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
@@ -104,8 +102,6 @@ public:
     void getEqualData(float** ptr, int* size);
 
 private:
-    LDPCconfig LDPC_config;
-
     /* lookup table for 16 QAM, real and imag */
     size_t mod_type;
     float** qam16_table_;
@@ -262,7 +258,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     /* Tokens */
-    moodycamel::ProducerToken** task_ptoks_ptr;
     moodycamel::ProducerToken** rx_ptoks_ptr;
     moodycamel::ProducerToken** tx_ptoks_ptr;
 };

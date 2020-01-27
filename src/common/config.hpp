@@ -101,7 +101,9 @@ public:
     size_t demul_thread_num;
     size_t zf_thread_num;
     size_t demul_block_size;
+    int demul_block_num;
     size_t zf_block_size;
+    int zf_block_num;
 
     bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
