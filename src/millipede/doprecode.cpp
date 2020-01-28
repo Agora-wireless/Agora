@@ -103,7 +103,8 @@ void DoPrecode::launch(int offset)
                     // int *raw_data_ptr = &dl_IQ_data[current_data_subframe_id * UE_NUM + user_id][cur_sc_id];
                     int8_t* raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * user_id];
                     // cout<<*raw_data_ptr<<", ";
-                    _mm_prefetch((char*)dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (user_id + 1)], _MM_HINT_T0);
+                    int8_t* next_raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (user_id + 1)];
+                    _mm_prefetch((char*)next_raw_data_ptr, _MM_HINT_T0);
                     data_ptr[user_id] = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
                     // cout << data_ptr[user_id].real << "+" << data_ptr[user_id].imag << "j, ";
                 }
