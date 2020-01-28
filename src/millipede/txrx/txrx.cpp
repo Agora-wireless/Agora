@@ -16,18 +16,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + RX_THREAD_NUM;
 
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
-    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-    dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
-    downlink_mode = cfg->downlink_mode;
-    packet_length = cfg->packet_length;
-    packet_header_offset = cfg->packet_header_offset;
-
     /* initialize random seed: */
     srand(time(NULL));
     rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
@@ -63,13 +51,12 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-
     printf("create RX threads\n");
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     std::vector<pthread_t> created_threads;
-    if (!downlink_mode) {
+    if (!config_->downlink_mode) {
         for (int i = 0; i < rx_thread_num_; i++) {
             pthread_t recv_thread_;
             // record the thread id
@@ -189,6 +176,7 @@ void* PacketTXRX::loopRecv(int tid)
 
         int recvlen = -1;
 
+        int packet_length = config_->packet_length;
         struct Packet* pkt = (struct Packet*)&buffer_ptr[offset * packet_length];
         // start_time= get_time();
         // if ((recvlen = recvfrom(socket_[tid], (char *)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
@@ -239,6 +227,9 @@ void* PacketTXRX::loopRecv(int tid)
 void* PacketTXRX::loopSend(int tid)
 {
     pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = 0;
     int remote_port_id = 7000 + tid;
@@ -287,6 +278,7 @@ void* PacketTXRX::loopSend(int tid)
         int frame_id = total_data_subframe_id / data_subframe_num_perframe;
         int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
         int symbol_id = current_data_subframe_id + UE_NUM;
+        int packet_length = config_->packet_length;
         char* cur_buffer_ptr = tx_buffer_ + (current_data_subframe_id * BS_ANT_NUM + ant_id) * packet_length;
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -333,6 +325,13 @@ void* PacketTXRX::loopSend(int tid)
 void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
+    int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
+    int downlink_mode = config_->downlink_mode;
+    int packet_length = config_->packet_length;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = 8000 + tid;
     int remote_port_id = 7000 + tid;
