@@ -401,11 +401,11 @@ void DoIFFT::launch(int offset)
     int CP_LEN = config_->CP_LEN;
     int packet_header_offset = config_->packet_header_offset;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-  
+
     int ant_id = offset % BS_ANT_NUM;
-    int subframe_id = offset / BS_ANT_NUM;
 #if DEBUG_PRINT_IN_TASK
-    int frame_id = subframe_id / data_subframe_num_perframe;
+    int total_data_subframe_id = offset / BS_ANT_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
     printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, current_data_subframe_id, ant_id);
 #endif
@@ -428,20 +428,19 @@ void DoIFFT::launch(int offset)
 
     // calculate data for downlink socket buffer
     float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[offset][0]);
-    int socket_subframe_offset = subframe_id % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe);
+    int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
     int packet_length = config_->packet_length;
-    char* socket_ptr = &dl_socket_buffer_[socket_subframe_offset * BS_ANT_NUM * packet_length];
+    char* socket_ptr = &dl_socket_buffer_[socket_subframe_offset * packet_length];
     //int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
-    size_t socket_offset = packet_header_offset + ant_id * packet_length + TX_PREFIX_LEN * sizeof(short) * 2;
+    socket_ptr += packet_header_offset + ant_id * packet_length + TX_PREFIX_LEN * sizeof(short) * 2;
 
     // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
     //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
     //     // ifft scaled results by 2048, 16 = 2^15/2048
-    //     *((short *)(socket_ptr + socket_offset) + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
-    //     *((short *)(socket_ptr + socket_offset) + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
+    //     *((short *)socket_ptr + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
+    //     *((short *)socket_ptr + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
     // }
 
-    socket_ptr = socket_ptr + socket_offset;
     for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
         //__m256 scale_factor = _mm256_set1_ps(16);
         __m256 scale_factor = _mm256_set1_ps(32768.0 / OFDM_CA_NUM);
