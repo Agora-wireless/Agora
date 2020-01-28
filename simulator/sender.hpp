@@ -70,15 +70,6 @@ public:
 
 private:
   Config *config_;
-  int BS_ANT_NUM, UE_NUM;
-  int OFDM_FRAME_LEN;
-  int subframe_num_perframe, data_subframe_num_perframe;
-  int packet_length;
-  int packet_header_offset;
-  int buffer_length;
-  int max_subframe_id;
-  int max_length_;
-  bool downlink_mode;
 
   pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
