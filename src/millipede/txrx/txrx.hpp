@@ -127,15 +127,6 @@ public:
 #endif
 
 private:
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
-    bool downlink_mode;
-    int packet_length;
-    int packet_header_offset;
-
 #if USE_IPV4
     struct sockaddr_in servaddr_[10]; /* server address */
 #else
@@ -184,7 +175,7 @@ private:
 
     Config* config_;
 #if USE_ARGOS
-    RadioConfig *radioconfig_;
+    RadioConfig* radioconfig_;
 #endif
     int radios_per_thread;
 };
