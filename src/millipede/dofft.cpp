@@ -70,8 +70,7 @@ void DoFFT::launch(int offset)
     size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
     size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     size_t OFDM_DATA_START = config_->OFDM_DATA_START;
-    size_t packet_header_offset = config_->packet_header_offset;
-    short* cur_buffer_ptr_ushort = (short*)(cur_buffer_ptr + packet_header_offset + OFDM_PREFIX_LEN * sizeof(short) * 2);
+    short* cur_buffer_ptr_ushort = &pkt->data[2 * OFDM_PREFIX_LEN];
     // float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
