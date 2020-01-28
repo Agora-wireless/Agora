@@ -215,16 +215,14 @@ void Sender::startTX() {
   for (int i = 0; i < max_length_; i++) {
     cur_ptr_ = i;
     int data_index = subframe_id * BS_ANT_NUM + ant_id;
-    int *ptr = (int *)(trans_buffer_[cur_ptr_] + tx_buf_offset);
-    int symbol_id = 0;
-    if (subframe_id < UE_NUM)
-      symbol_id = config_->pilotSymbols[0][subframe_id];
-    else
-      symbol_id = config_->ULSymbols[0][subframe_id - UE_NUM];
-    (*ptr) = frame_id;
-    (*(ptr + 1)) = symbol_id; // subframe_id;
-    (*(ptr + 2)) = cell_id;
-    (*(ptr + 3)) = ant_id;
+    struct Packet *pkt =
+        (struct Packet *)(trans_buffer_[cur_ptr_] + tx_buf_offset);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = (subframe_id < UE_NUM)
+                         ? config_->pilotSymbols[0][subframe_id]
+                         : config_->ULSymbols[0][subframe_id - UE_NUM];
+    pkt->cell_id = cell_id;
+    pkt->ant_id = ant_id;
     memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset,
            (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -274,16 +272,6 @@ void Sender::startTX() {
       continue;
     int tx_ant_id = data_ptr % BS_ANT_NUM;
     int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
-    int *ptr = (int *)(trans_buffer_[data_ptr] + tx_buf_offset);
-    int symbol_id = 0;
-    if (subframe_id < UE_NUM)
-      symbol_id = config_->pilotSymbols[0][subframe_id];
-    else
-      symbol_id = config_->ULSymbols[0][subframe_id - UE_NUM];
-    (*ptr) = frame_id;
-    (*(ptr + 1)) = symbol_id; // subframe_id;
-    (*(ptr + 2)) = cell_id;
-    (*(ptr + 3)) = tx_ant_id;
     memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset,
            (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -454,16 +442,14 @@ void *Sender::loopSend_main(int tid) {
   for (int i = 0; i < max_length_; i++) {
     cur_ptr_ = i;
     int data_index = subframe_id * BS_ANT_NUM + ant_id;
-    int *ptr = (int *)(trans_buffer_[cur_ptr_] + tx_buf_offset);
-    int symbol_id = 0;
-    if (subframe_id < UE_NUM)
-      symbol_id = config_->pilotSymbols[0][subframe_id];
-    else
-      symbol_id = config_->ULSymbols[0][subframe_id - UE_NUM];
-    (*ptr) = frame_id;
-    (*(ptr + 1)) = symbol_id; // subframe_id;
-    (*(ptr + 2)) = cell_id;
-    (*(ptr + 3)) = ant_id;
+    struct Packet *pkt =
+        (struct Packet *)(trans_buffer_[cur_ptr_] + tx_buf_offset);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = (subframe_id < UE_NUM)
+                         ? config_->pilotSymbols[0][subframe_id]
+                         : config_->ULSymbols[0][subframe_id - UE_NUM];
+    pkt->cell_id = cell_id;
+    pkt->ant_id = ant_id;
     memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset,
            (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -515,16 +501,14 @@ void *Sender::loopSend_main(int tid) {
       continue;
     int tx_ant_id = data_ptr % BS_ANT_NUM;
     int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
-    int *ptr = (int *)(trans_buffer_[data_ptr] + tx_buf_offset);
-    int symbol_id = 0;
-    if (subframe_id < UE_NUM)
-      symbol_id = config_->pilotSymbols[0][subframe_id];
-    else
-      symbol_id = config_->ULSymbols[0][subframe_id - UE_NUM];
-    (*ptr) = frame_id;
-    (*(ptr + 1)) = symbol_id; // subframe_id;
-    (*(ptr + 2)) = cell_id;
-    (*(ptr + 3)) = tx_ant_id;
+    struct Packet *pkt =
+        (struct Packet *)(trans_buffer_[data_ptr] + tx_buf_offset);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = (subframe_id < UE_NUM)
+                         ? config_->pilotSymbols[0][subframe_id]
+                         : config_->ULSymbols[0][subframe_id - UE_NUM];
+    pkt->cell_id = cell_id;
+    pkt->ant_id = ant_id;
     memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset,
            (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -680,8 +664,8 @@ void *Sender::loopSend(int tid) {
 
     used_socker_id = data_ptr % socket_num;
 
-    int *ptr = (int *)trans_buffer_[data_ptr];
-    int subframe_id = (*(ptr + 1));
+    struct Packet *pkt = (struct Packet *)trans_buffer_[data_ptr];
+    int subframe_id = pkt->symbol_id;
 #if DEBUG_SENDER
     start_time_send = get_time();
 #endif
@@ -712,8 +696,9 @@ void *Sender::loopSend(int tid) {
 #if DEBUG_SENDER
     end_time_send = get_time();
     // printf("Thread %d transmit frame %d, subframe %d, ant %d, total: %d, at
-    // %.5f %.5f, %.5f\n", tid,  *ptr, *(ptr+1), *(ptr+3), total_tx_packets,
-    // cur_time, end_time_send-start_time_send, cur_time-start_time_msg);
+    // %.5f %.5f, %.5f\n", tid,  pkt->frame_id, pkt->symbol_id, pkt->ant_id,
+    // total_tx_packets, cur_time, end_time_send-start_time_send,
+    // cur_time-start_time_msg);
     start_time_msg = end_time_send;
 #endif
 
@@ -728,7 +713,7 @@ void *Sender::loopSend(int tid) {
     end_time_msg = get_time();
     printf("Thread %d transmit frame %d, subframe %d, ant %d, send time: %.3f, "
            "msg time: %.3f, last iteration: %.3f\n",
-           tid, *ptr, *(ptr + 1), *(ptr + 3), total_tx_packets,
+           tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, total_tx_packets,
            end_time_send - start_time_send, end_time_msg - start_time_msg,
            start_time_send - end_time_prev);
     end_time_prev = get_time();
