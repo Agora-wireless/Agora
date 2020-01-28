@@ -32,17 +32,16 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + RX_THREAD_NUM;
 
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
-    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-    dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
-    downlink_mode = cfg->downlink_mode;
-    packet_length = cfg->packet_length;
-    packet_header_offset = cfg->packet_header_offset;
+    BS_ANT_NUM = config_->BS_ANT_NUM;
+    UE_NUM = config_->UE_NUM;
+    OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    subframe_num_perframe = config_->symbol_num_perframe;
+    data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
+    dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
+    downlink_mode = config_->downlink_mode;
+    packet_length = config_->packet_length;
 
     //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
@@ -381,18 +380,18 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     printf("packet receiver thread %d start\n", tid);
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
-    int core_id = obj_ptr->core_id_;
-
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    bool downlink_mode = obj_ptr->downlink_mode;
-    int packet_length = obj_ptr->packet_length;
+    Config* config_ = obj_ptr->config_;
+    int core_id = config_->core_id_;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int subframe_num_perframe = config_->subframe_num_perframe;
+    int data_subframe_num_perframe = config_->data_subframe_num_perframe;
+    int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
+    int dl_data_subframe_num_perframe = config_->dl_data_subframe_num_perframe;
+    bool downlink_mode = config_->downlink_mode;
+    int packet_length = config_->packet_length;
 
     uint16_t nic;
     struct rte_mbuf* bufs[BURST_SIZE * 2] __attribute__((aligned(64)));
@@ -617,7 +616,7 @@ void* PacketTXRX::loopSend(int tid)
         total_data_subframe_id = offset / BS_ANT_NUM;
         current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
         //subframe_id = current_data_subframe_id + UE_NUM;
-        subframe_id = cfg->DLSymbols[0][current_data_subframe_id];
+        subframe_id = config_->DLSymbols[0][current_data_subframe_id];
         frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
         int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;

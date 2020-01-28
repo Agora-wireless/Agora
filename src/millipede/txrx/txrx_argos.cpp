@@ -16,19 +16,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + RX_THREAD_NUM;
 
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
-    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-    dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
-    downlink_mode = cfg->downlink_mode;
-    packet_length = cfg->packet_length;
-    packet_header_offset = cfg->packet_header_offset;
-
-    //frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
     srand(time(NULL));
     rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
@@ -68,7 +55,6 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     buffer_frame_num_ = in_buffer_frame_num;
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should be integer
     buffer_length_ = in_buffer_length;
-
     printf("create RX threads\n");
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
@@ -81,7 +67,7 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     int nradio_per_thread = config_->nRadios / rx_thread_num_;
     int rem_thread_nradio = config_->nRadios % rx_thread_num_;
 
-    if (!downlink_mode) {
+    if (!config_->downlink_mode) {
         for (int i = 0; i < rx_thread_num_; i++) {
             pthread_t recv_thread_;
             // record the thread id
@@ -156,7 +142,7 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     //printf("Recv thread: thread %d start\n", tid);
     int nradio_cur_thread = ((EventHandlerContext<PacketTXRX>*)in_context)->radios;
     //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    Config* cfg = obj_ptr->config_;
+    Config* config_ = obj_ptr->config_;
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
     pin_to_core_with_offset(Worker_RX, obj_ptr->core_id_, tid);
@@ -169,8 +155,8 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     //int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
     //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
     //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    int packet_length = obj_ptr->packet_length;
-    int packet_header_offset = obj_ptr->packet_header_offset;
+    int packet_length = config_->packet_length;
+    int packet_header_offset = config_->packet_header_offset;
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&obj_ptr->mutex);
     printf("Thread %d: waiting for release\n", tid);
@@ -192,15 +178,15 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     // char *tx_buffer_ptr = obj_ptr->tx_buffer_;
     // char *tx_cur_buffer_ptr;
 #if DEBUG_DOWNLINK
-    size_t txSymsPerFrame = cfg->dl_data_symbol_num_perframe;
-    std::vector<size_t> txSymbols = cfg->DLSymbols[0];
-    std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
+    size_t txSymsPerFrame = config_->dl_data_symbol_num_perframe;
+    std::vector<size_t> txSymbols = config_->DLSymbols[0];
+    std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
 #endif
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
-    int nradio_per_thread = cfg->nRadios / obj_ptr->rx_thread_num_;
-    int rem_thread_nradio = cfg->nRadios % obj_ptr->rx_thread_num_; //obj_ptr->thread_num_*(cfg->nRadios/obj_ptr->thread_num_);
+    int nradio_per_thread = config_->nRadios / obj_ptr->rx_thread_num_;
+    int rem_thread_nradio = config_->nRadios % obj_ptr->rx_thread_num_; //obj_ptr->thread_num_*(config_->nRadios/obj_ptr->thread_num_);
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     RadioConfig* radio = obj_ptr->radioconfig_;
 
@@ -210,7 +196,7 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     char* buffer2 = (*obj_ptr->buffer_)[tid] + packet_length;
     int* buffer_status2 = (*obj_ptr->buffer_status_)[tid] + 1;
     int* cur_ptr_buffer_status2 = buffer_status2;
-    if (cfg->nChannels == 2) {
+    if (config_->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
     } else {
         cur_ptr_buffer2 = (char*)calloc(packet_length, sizeof(char));
@@ -219,14 +205,14 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     long long frameTime;
     int prev_frame_id = -1;
 
-    while (cfg->running) {
+    while (config_->running) {
         // if buffer is full, exit
         if (cur_ptr_buffer_status[0] == 1) {
             printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
             //for (int l = 0 ; l < buffer_frame_num; l++)
             //    printf("%d ", buffer_status[l]);
             //printf("\n\n");
-            cfg->running = false;
+            config_->running = false;
             break;
         }
         int ant_id, frame_id, symbol_id;
@@ -239,15 +225,15 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
             char* samp1 = cur_ptr_buffer + packet_header_offset;
             char* samp2 = cur_ptr_buffer2 + packet_header_offset;
             void* samp[2] = { (void*)samp1, (void*)samp2 };
-            while (cfg->running && radio->radioRx(rid, samp, frameTime) <= 0)
+            while (config_->running && radio->radioRx(rid, samp, frameTime) <= 0)
                 ;
             frame_id = (int)(frameTime >> 32);
             symbol_id = (int)((frameTime >> 16) & 0xFFFF);
-            ant_id = rid * cfg->nChannels;
+            ant_id = rid * config_->nChannels;
             struct Packet* pkt = (struct Packet*)cur_ptr_buffer;
             new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
-            if (cfg->nChannels == 2) {
+            if (config_->nChannels == 2) {
                 struct Packet* pkt2 = (struct Packet*)cur_ptr_buffer2;
                 new (pkt2) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + 1);
             }
@@ -269,8 +255,8 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
             offset = cur_ptr_buffer_status - buffer_status;
             // move ptr & set status to full
             cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
-            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + cfg->nChannels) % buffer_frame_num;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * cfg->nChannels) % buffer_length;
+            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + config_->nChannels) % buffer_frame_num;
+            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * config_->nChannels) % buffer_length;
             // push EVENT_RX_ENB event into the queue
             Event_data packet_message;
             packet_message.event_type = EVENT_PACKET_RECEIVED;
@@ -281,11 +267,11 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
-            if (cfg->nChannels == 2) {
+            if (config_->nChannels == 2) {
                 offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute
                 cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
-                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + cfg->nChannels) % buffer_frame_num;
-                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * cfg->nChannels) % buffer_length;
+                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + config_->nChannels) % buffer_frame_num;
+                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * config_->nChannels) % buffer_length;
                 // push EVENT_RX_ENB event into the queue
                 Event_data packet_message2;
                 packet_message2.event_type = EVENT_PACKET_RECEIVED;
@@ -311,13 +297,13 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
                 int flags = 1; // HAS_TIME
                 if (symbol_id == (int)txSymbols.back())
                     flags = 2; // HAS_TIME & END_BURST, fixme
-                if (ant_id != (int)cfg->ref_ant)
+                if (ant_id != (int)config_->ref_ant)
                     txbuf[0] = zeros.data();
-                else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
-                    txbuf[0] = cfg->pilot_ci16.data();
+                else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                    txbuf[0] = config_->pilot_ci16.data();
                 else
-                    txbuf[0] = (void*)cfg->dl_IQ_symbol[sym_id];
-                radio->radioTx(ant_id / cfg->nChannels, txbuf, flags, frameTime);
+                    txbuf[0] = (void*)config_->dl_IQ_symbol[sym_id];
+                radio->radioTx(ant_id / config_->nChannels, txbuf, flags, frameTime);
             }
 #endif
         }
@@ -330,22 +316,23 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     PacketTXRX* obj_ptr = ((EventHandlerContext<PacketTXRX>*)in_context)->obj_ptr;
     int tid = ((EventHandlerContext<PacketTXRX>*)in_context)->id;
     printf("packet sender thread %d start\n", tid);
+    Config* config_ = obj_ptr->config_;
 
     moodycamel::ConcurrentQueue<Event_data>* task_queue_ = obj_ptr->task_queue_;
     // get pointer to message queue
     moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
     pin_to_core_with_offset(Worker_TX, obj_ptr->tx_core_id_, tid);
 
-    int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    int UE_NUM = obj_ptr->UE_NUM;
-    //int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    //int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    //int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
-    int packet_length = obj_ptr->packet_length;
-    int packet_header_offset = obj_ptr->packet_header_offset;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    //int OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    //int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    //int subframe_num_perframe = config_->subframe_num_perframe;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    //int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
+    //int dl_data_subframe_num_perframe = config_->dl_data_subframe_num_perframe;
+    int packet_length = config_->packet_length;
+    int packet_header_offset = config_->packet_header_offset;
 
     // downlink socket buffer
     char* tx_buffer_ptr = obj_ptr->tx_buffer_;
@@ -354,8 +341,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     //int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
     //int* buffer_status = obj_ptr->tx_buffer_status_;
 
-    Config* cfg = obj_ptr->config_;
-    RadioConfig *radio = obj_ptr->radioconfig_;
+    RadioConfig* radio = obj_ptr->radioconfig_;
 
     int ret;
     int offset;
@@ -364,20 +350,20 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
 
     //int txSymsPerFrame = 0;
     std::vector<size_t> txSymbols;
-    if (cfg->isUE) {
-        //txSymsPerFrame = cfg->ulSymsPerFrame;
-        txSymbols = cfg->ULSymbols[0];
+    if (config_->isUE) {
+        //txSymsPerFrame = config_->ulSymsPerFrame;
+        txSymbols = config_->ULSymbols[0];
     } else {
-        //txSymsPerFrame = cfg->dlSymsPerFrame;
-        txSymbols = cfg->DLSymbols[0];
+        //txSymsPerFrame = config_->dlSymsPerFrame;
+        txSymbols = config_->DLSymbols[0];
     }
-    std::vector<std::complex<int16_t>> zeros(cfg->sampsPerSymbol);
+    std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ConsumerToken local_ctok = (*task_queue_);
     // moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
     moodycamel::ProducerToken* local_ptok = obj_ptr->rx_ptoks_[tid];
-    while (cfg->running) {
+    while (config_->running) {
 
         Event_data task_event;
         //ret = task_queue_->try_dequeue(task_event);
@@ -391,7 +377,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
             exit(0);
         }
 
-        //ant_id = task_event.data; //% cfg->getNumAntennas();
+        //ant_id = task_event.data; //% config_->getNumAntennas();
 
         offset = task_event.data;
         int ant_id = offset / (TASK_BUFFER_FRAME_NUM * data_subframe_num_perframe);
@@ -405,7 +391,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length + packet_header_offset;
         frame_id += TX_FRAME_DELTA;
 
-        //symbol_id = task_event.data / cfg->getNumAntennas();
+        //symbol_id = task_event.data / config_->getNumAntennas();
         //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
         //{
         size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
@@ -416,19 +402,19 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         if (symbol_id == txSymbols.back())
             flags = 2; // HAS_TIME & END_BURST, fixme
 #endif
-        if (cfg->nChannels == 1 || ant_id % 2 == 0) {
+        if (config_->nChannels == 1 || ant_id % 2 == 0) {
 #if DEBUG_DOWNLINK
-            if (ant_id != (int)cfg->ref_ant)
+            if (ant_id != (int)config_->ref_ant)
                 txbuf[0] = zeros.data();
-            else if (cfg->getDownlinkPilotId(frame_id, symbol_id) >= 0)
-                txbuf[0] = cfg->pilot_ci16.data();
+            else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                txbuf[0] = config_->pilot_ci16.data();
             else
-                txbuf[0] = (void*)cfg->dl_IQ_symbol[current_data_subframe_id];
+                txbuf[0] = (void*)config_->dl_IQ_symbol[current_data_subframe_id];
 #else
             txbuf[0] = tx_cur_buffer_ptr;
 #endif
             //buffer_status[offset] = 0;
-        } else if (cfg->nChannels == 2 && ant_id % 2 == 1) {
+        } else if (config_->nChannels == 2 && ant_id % 2 == 1) {
             txbuf[1] = tx_cur_buffer_ptr + packet_length; //FIXME
             //buffer_status[offset+1] = 0;
         }
@@ -438,7 +424,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv);
 #if SEPARATE_TX_RX
-        radio->radioTx(ant_id / cfg->nChannels, txbuf, flags, frameTime);
+        radio->radioTx(ant_id / config_->nChannels, txbuf, flags, frameTime);
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
