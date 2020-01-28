@@ -386,8 +386,8 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
         int tx_subframe_id = current_data_subframe_id + UE_NUM;
-        int socket_subframe_offset = total_data_subframe_id % (data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM);
-        tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length + packet_header_offset;
+        int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
+        tx_cur_buffer_ptr = tx_buffer_ptr + socket_subframe_offset * packet_length + packet_header_offset;
         frame_id += TX_FRAME_DELTA;
 
         //symbol_id = task_event.data / config_->getNumAntennas();
