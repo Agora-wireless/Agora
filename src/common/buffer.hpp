@@ -34,6 +34,7 @@ struct Packet {
     uint32_t symbol_id;
     uint32_t cell_id;
     uint32_t ant_id;
+    uint32_t fill[12];
     short data[];
     Packet(int f, int s, int c, int a)
         : frame_id(f)
