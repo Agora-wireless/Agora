@@ -624,10 +624,11 @@ void* PacketTXRX::loopSend(int tid)
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
-        *((int*)cur_buffer_ptr) = frame_id;
-        *((int*)cur_buffer_ptr + 1) = subframe_id;
-        *((int*)cur_buffer_ptr + 2) = cell_id;
-        *((int*)cur_buffer_ptr + 3) = ant_id;
+        struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+        pkt->frame_id = frame_id;
+        pkt->symbol_id = subframe_id;
+        pkt->cell_id = cell_id;
+        pkt->ant_id = ant_id;
 
         // send data (one OFDM symbol)
         if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr*)&remote_addr, sizeof(remote_addr)) < 0) {
