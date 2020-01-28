@@ -432,16 +432,15 @@ void DoIFFT::launch(int offset)
     int packet_length = config_->packet_length;
     char* socket_ptr = &dl_socket_buffer_[socket_subframe_offset * packet_length];
     //int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
-    size_t socket_offset = packet_header_offset + ant_id * packet_length + TX_PREFIX_LEN * sizeof(short) * 2;
+    socket_ptr += packet_header_offset + ant_id * packet_length + TX_PREFIX_LEN * sizeof(short) * 2;
 
     // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
     //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
     //     // ifft scaled results by 2048, 16 = 2^15/2048
-    //     *((short *)(socket_ptr + socket_offset) + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
-    //     *((short *)(socket_ptr + socket_offset) + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
+    //     *((short *)socket_ptr + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
+    //     *((short *)socket_ptr + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
     // }
 
-    socket_ptr = socket_ptr + socket_offset;
     for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
         //__m256 scale_factor = _mm256_set1_ps(16);
         __m256 scale_factor = _mm256_set1_ps(32768.0 / OFDM_CA_NUM);
