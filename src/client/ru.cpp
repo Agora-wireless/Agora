@@ -455,17 +455,8 @@ void RU::taskThread(int tid)
             int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
             int ant_id = it * config_->nChannels;
 #if DEBUG_RECV
-            printf("receive thread %d: frame_id %d, symbol_id %d, cell_id %d, ant_id %d frametime %llx\n",
-                tid, frame_id, symbol_id, cell_id, ant_id, frameTime);
-//          printf("receive samples: %d %d %d %d %d %d %d %d ...\n",
-//                   *((RadioBufElemeType *)&pkt[0]->data[1],
-//                   *((RadioBufElemeType *)&pkt[0]->data[2],
-//                   *((RadioBufElemeType *)&pkt[0]->data[3],
-//                   *((RadioBufElemeType *)&pkt[0]->data[4],
-//                   *((RadioBufElemeType *)&pkt[0]->data[5],
-//                   *((RadioBufElemeType *)&pkt[0]->data[6],
-//                   *((RadioBufElemeType *)&pkt[0]->data[7],
-//                   *((RadioBufElemeType *)&pkt[0]->data[8]);
+            printf("receive thread %d: frame_id %d, symbol_id %d, ant_id %d frametime %llx\n",
+                tid, frame_id, symbol_id, ant_id, frameTime);
 #endif
             for (size_t ch = 0; ch < config_->nChannels; ++ch) {
                 new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
