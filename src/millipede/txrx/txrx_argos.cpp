@@ -67,35 +67,18 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     int nradio_per_thread = config_->nRadios / rx_thread_num_;
     int rem_thread_nradio = config_->nRadios % rx_thread_num_;
 
-    if (!config_->downlink_mode) {
-        for (int i = 0; i < rx_thread_num_; i++) {
-            pthread_t recv_thread_;
-            // record the thread id
-            rx_context[i].obj_ptr = this;
-            rx_context[i].id = i;
-
-            rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
-            // start socket thread
-            if (pthread_create(&recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void*)(&rx_context[i])) != 0) {
-                perror("socket recv thread create failed");
-                exit(0);
-            }
-            created_threads.push_back(recv_thread_);
+    for (int i = 0; i < rx_thread_num_; i++) {
+        pthread_t recv_thread_;
+        // record the thread id
+        rx_context[i].obj_ptr = this;
+        rx_context[i].id = i;
+        rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
+        // start socket thread
+        if (pthread_create(&recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void*)(&rx_context[i])) != 0) {
+            perror("socket recv thread create failed");
+            exit(0);
         }
-    } else {
-        for (int i = 0; i < rx_thread_num_; i++) {
-            pthread_t recv_thread_;
-            // record the thread id
-            rx_context[i].obj_ptr = this;
-            rx_context[i].id = i;
-            rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
-            // start socket thread
-            if (pthread_create(&recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void*)(&rx_context[i])) != 0) {
-                perror("socket recv thread create failed");
-                exit(0);
-            }
-            created_threads.push_back(recv_thread_);
-        }
+        created_threads.push_back(recv_thread_);
     }
     sleep(1);
     pthread_cond_broadcast(&cond);
