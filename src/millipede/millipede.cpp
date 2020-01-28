@@ -1,4 +1,4 @@
-	/**
+/**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
  * 
@@ -257,7 +257,7 @@ void Millipede::start()
                         print_per_subframe_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id, subframe_id);
                         if (fft_stats_.symbol_cal_count[frame_id] == fft_stats_.max_symbol_cal_count) {
                             print_per_frame_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id);
-                            schedule_rc_task(frame_id, consumer_rc);
+                            consumer_rc.schedule_task_set(frame_id);
                         }
                     }
                 }
@@ -266,7 +266,7 @@ void Millipede::start()
                 int frame_id = event.data;
                 stats_manager_->update_rc_processed(rc_stats_.frame_count);
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
-                update_frame_count(&(rc_stats_.frame_count));
+                rc_stats_.update_frame_count();
             } break;
             case EVENT_ZF: {
                 int offset = event.data;
@@ -711,19 +711,6 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
             printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
 #endif
     }
-}
-
-
-void Millipede::schedule_rc_task(int frame_id, Consumer const& consumer)
-{
-    /* schedule normal ZF for all data subcarriers */
-    Event_data do_rc_task;
-    do_rc_task.event_type = TASK_RC;
-    do_rc_task.data = frame_id;
-    consumer.try_handle(do_rc_task);
-#if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
-    printf("Main thread: created Reciprocity Cal tasks for frame: %d\n", frame_id);
-#endif
 }
 
 void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end_subframe_id, Consumer const& consumer)
