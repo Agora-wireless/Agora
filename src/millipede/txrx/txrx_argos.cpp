@@ -386,8 +386,7 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
         int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
         int tx_subframe_id = current_data_subframe_id + UE_NUM;
-        int frame_id_in_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
-        int socket_subframe_offset = frame_id_in_buffer * data_subframe_num_perframe + current_data_subframe_id;
+        int socket_subframe_offset = total_data_subframe_id % (data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM);
         tx_cur_buffer_ptr = tx_buffer_ptr + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length + packet_header_offset;
         frame_id += TX_FRAME_DELTA;
 
