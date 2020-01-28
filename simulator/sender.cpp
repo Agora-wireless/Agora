@@ -215,7 +215,6 @@ void Sender::startTX() {
   int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
   int data_subframe_num_perframe = config_->data_symbol_num_perframe;
   int downlink_mode = config_->downlink_mode;
-  int packet_header_offset = config_->packet_header_offset;
   // max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
   int max_subframe_id =
       downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
@@ -232,8 +231,7 @@ void Sender::startTX() {
                          : config_->ULSymbols[0][subframe_id - UE_NUM];
     pkt->cell_id = cell_id;
     pkt->ant_id = ant_id;
-    memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset,
-           (char *)IQ_data_coded[data_index],
+    memcpy(pkt->data, (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
 
     ant_id++;
@@ -281,8 +279,9 @@ void Sender::startTX() {
       continue;
     int tx_ant_id = data_ptr % BS_ANT_NUM;
     int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
-    memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset,
-           (char *)IQ_data_coded[data_index],
+    struct Packet *pkt =
+        (struct Packet *)(trans_buffer_[data_ptr] + tx_buf_offset);
+    memcpy(pkt->data, (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
     // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char
     // *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
@@ -447,7 +446,6 @@ void *Sender::loopSend_main(int tid) {
   int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
   int data_subframe_num_perframe = config_->data_symbol_num_perframe;
   int downlink_mode = config_->downlink_mode;
-  int packet_header_offset = config_->packet_header_offset;
   // max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
   int max_subframe_id =
       downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
@@ -469,8 +467,7 @@ void *Sender::loopSend_main(int tid) {
                          : config_->ULSymbols[0][subframe_id - UE_NUM];
     pkt->cell_id = cell_id;
     pkt->ant_id = ant_id;
-    memcpy(trans_buffer_[cur_ptr_] + tx_buf_offset + packet_header_offset,
-           (char *)IQ_data_coded[data_index],
+    memcpy(pkt->data, (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
 
     ant_id++;
@@ -528,8 +525,7 @@ void *Sender::loopSend_main(int tid) {
                          : config_->ULSymbols[0][subframe_id - UE_NUM];
     pkt->cell_id = cell_id;
     pkt->ant_id = ant_id;
-    memcpy(trans_buffer_[data_ptr] + tx_buf_offset + packet_header_offset,
-           (char *)IQ_data_coded[data_index],
+    memcpy(pkt->data, (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
     // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char
     // *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
