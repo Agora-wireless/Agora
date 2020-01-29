@@ -125,7 +125,6 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     pin_to_core_with_offset(Worker_RX, core_id_, tid);
 
     int packet_length = config_->packet_length;
-    int packet_header_offset = config_->packet_header_offset;
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
@@ -150,57 +149,41 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
 #endif
 
-    char* cur_ptr_buffer = buffer;
-    int* cur_ptr_buffer_status = buffer_status;
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    RadioConfig* radio = radioconfig_;
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num_ is at least 2
-    char* cur_ptr_buffer2;
-    char* buffer2 = (*buffer_)[tid] + packet_length;
-    int* buffer_status2 = (*buffer_status_)[tid] + 1;
-    int* cur_ptr_buffer_status2 = buffer_status2;
-    if (config_->nChannels == 2) {
-        cur_ptr_buffer2 = buffer2;
-    } else {
-        cur_ptr_buffer2 = (char*)calloc(packet_length, sizeof(char));
-    }
-    int offset = 0;
+    int cursor = 0;
     long long frameTime;
     int prev_frame_id = -1;
+    int nChannels = config_->nChannels;
 
     while (config_->running) {
-        // if buffer is full, exit
-        if (cur_ptr_buffer_status[0] == 1) {
-            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
-            //for (int l = 0 ; l < buffer_frame_num_; l++)
-            //    printf("%d ", buffer_status[l]);
-            //printf("\n\n");
-            config_->running = false;
-            break;
-        }
-        int ant_id, frame_id, symbol_id;
         // receive data
-        for (int rid = radio_lo; rid < radio_hi; rid++) // FIXME: this must be threaded
-        {
-            // this is probably a really bad implementation, and needs to be revamped
-            char* samp1 = cur_ptr_buffer + packet_header_offset;
-            char* samp2 = cur_ptr_buffer2 + packet_header_offset;
-            void* samp[2] = { (void*)samp1, (void*)samp2 };
-            while (config_->running && radio->radioRx(rid, samp, frameTime) <= 0)
-                ;
-            frame_id = (int)(frameTime >> 32);
-            symbol_id = (int)((frameTime >> 16) & 0xFFFF);
-            ant_id = rid * config_->nChannels;
-            struct Packet* pkt = (struct Packet*)cur_ptr_buffer;
-            new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-            if (config_->nChannels == 2) {
-                struct Packet* pkt2 = (struct Packet*)cur_ptr_buffer2;
-                new (pkt2) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + 1);
+        for (int rid = radio_lo; rid < radio_hi; rid++) { // FIXME: this must be threaded
+            // if buffer is full, exit
+            if (buffer_status[cursor] == 1) {
+                printf("Receive thread %d buffer full, cursor: %d\n", tid, cursor);
+                //for (int l = 0 ; l < buffer_frame_num_; l++)
+                //    printf("%d ", buffer_status[l]);
+                //printf("\n\n");
+                config_->running = false;
+                break;
             }
 
+            struct Packet* pkt[nChannels];
+            void* samp[nChannels];
+            for (int ch = 0; ch < nChannels; ++ch) {
+                pkt[ch] = (struct Packet*)&buffer[(cursor + ch) * packet_length];
+                samp[ch] = pkt[ch]->data;
+            }
+
+            // this is probably a really bad implementation, and needs to be revamped
+            while (config_->running && radioconfig_->radioRx(rid, samp, frameTime) <= 0)
+                ;
+            int frame_id = (int)(frameTime >> 32);
+            int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
+            int ant_id = rid * nChannels;
 #if MEASURE_TIME
             // read information from received packet
             // frame_id = *((int *)cur_ptr_buffer);
@@ -213,41 +196,26 @@ void* PacketTXRX::loopRecv_Argos(int tid)
                 }
             }
 #endif
-
-            // get the position in buffer
-            offset = cur_ptr_buffer_status - buffer_status;
-            // move ptr & set status to full
-            cur_ptr_buffer_status[0] = 1; // has data, after it is read it should be set to 0
-            cur_ptr_buffer_status = buffer_status + (cur_ptr_buffer_status - buffer_status + config_->nChannels) % buffer_frame_num_;
-            cur_ptr_buffer = buffer + (cur_ptr_buffer - buffer + packet_length * config_->nChannels) % buffer_length_;
-            // push EVENT_RX_ENB event into the queue
-            Event_data packet_message;
-            packet_message.event_type = EVENT_PACKET_RECEIVED;
-            // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
-            //packet_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num_
-            packet_message.data = generateOffset2d_setbits(tid, offset, 28);
-            if (!message_queue_->enqueue(*local_ptok, packet_message)) {
-                printf("socket message enqueue failed\n");
-                exit(0);
-            }
-            if (config_->nChannels == 2) {
-                offset = cur_ptr_buffer_status2 - buffer_status; // offset is absolute
-                cur_ptr_buffer_status2[0] = 1; // has data, after doing fft, it is set to 0
-                cur_ptr_buffer_status2 = buffer_status2 + (cur_ptr_buffer_status2 - buffer_status2 + config_->nChannels) % buffer_frame_num_;
-                cur_ptr_buffer2 = buffer2 + (cur_ptr_buffer2 - buffer2 + packet_length * config_->nChannels) % buffer_length_;
+            for (int ch = 0; ch < nChannels; ++ch) {
+                new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
+                // move ptr & set status to full
+                buffer_status[cursor] = 1; // has data, after it is read it should be set to 0
                 // push EVENT_RX_ENB event into the queue
-                Event_data packet_message2;
-                packet_message2.event_type = EVENT_PACKET_RECEIVED;
-                // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
-                //packet_message2.data = offset + tid * buffer_frame_num_;
-                packet_message.data = generateOffset2d_setbits(tid, offset, 28);
-                if (!message_queue_->enqueue(*local_ptok, packet_message2)) {
+                Event_data packet_message;
+                packet_message.event_type = EVENT_PACKET_RECEIVED;
+                // data records the position of this packet in the buffer &
+                // tid of this socket (so that task thread could know which buffer it should visit)
+                //packet_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num_
+                packet_message.data = generateOffset2d_setbits(tid, cursor, 28);
+                if (!message_queue_->enqueue(*local_ptok, packet_message)) {
                     printf("socket message enqueue failed\n");
                     exit(0);
                 }
+                ++cursor;
+                cursor %= buffer_frame_num_;
             }
 #if DEBUG_RECV
-            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, offset %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, offset + tid * buffer_frame_num);
+            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, cell_id %d, ant_id %d, cursor %d\n", tid, frame_id, rx_symbol_id, cell_id, ant_id, cursor + tid * buffer_frame_num);
 #endif
 #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
             if (rx_symbol_id > 0)
@@ -266,7 +234,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
                     txbuf[0] = config_->pilot_ci16.data();
                 else
                     txbuf[0] = (void*)config_->dl_IQ_symbol[sym_id];
-                radio->radioTx(ant_id / config_->nChannels, txbuf, flags, frameTime);
+                radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
             }
 #endif
         }
@@ -295,8 +263,6 @@ void* PacketTXRX::loopSend_Argos(int tid)
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     //int tx_buffer_frame_num = tx_buffer_frame_num_;
     //int* buffer_status = tx_buffer_status_;
-
-    RadioConfig* radio = radioconfig_;
 
     int ret;
     int offset;
@@ -378,7 +344,7 @@ void* PacketTXRX::loopSend_Argos(int tid)
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv);
 #if SEPARATE_TX_RX
-        radio->radioTx(ant_id / config_->nChannels, txbuf, flags, frameTime);
+        radioconfig_->radioTx(ant_id / config_->nChannels, txbuf, flags, frameTime);
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
