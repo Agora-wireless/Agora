@@ -7,16 +7,7 @@ RadioConfig::RadioConfig(Config* cfg)
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
     //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    auto channels = Utils::strToChannels(_cfg->channel);
 
     this->_radioNum = _cfg->nRadios;
     this->_antennaNum = _radioNum * _cfg->nChannels;
@@ -32,11 +23,12 @@ RadioConfig::RadioConfig(Config* cfg)
     baStn.resize(_radioNum);
     txStreams.resize(_radioNum);
     rxStreams.resize(_radioNum);
-    remainingJobs = _radioNum;
+    std::atomic_int threadCount = ATOMIC_VAR_INIT((int)_radioNum);
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
         RadioConfigContext* context = new RadioConfigContext;
-        context->ptr = this;
+        context->brs = this;
+	context->threadCount = &threadCount;
         context->tid = i;
         pthread_t init_thread_;
         if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context) != 0) {
@@ -48,7 +40,7 @@ RadioConfig::RadioConfig(Config* cfg)
 #endif
     }
 
-    while (remainingJobs > 0)
+    while (threadCount > 0)
         ;
 
     // Perform DC Offset & IQ Imbalance Calibration
@@ -59,14 +51,15 @@ RadioConfig::RadioConfig(Config* cfg)
             dciqCalibrationProc(1);
     }
 
-    remainingJobs = _radioNum;
+    threadCount = (int)_radioNum;
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
         RadioConfigContext* context = new RadioConfigContext;
-        context->ptr = this;
+        context->brs = this;
+	context->threadCount = &threadCount;
         context->tid = i;
-        pthread_t init_thread_;
-        if (pthread_create(&init_thread_, NULL, RadioConfig::configureBSRadio_launch, (void*)(&context[i])) != 0) {
+        pthread_t configure_thread_;
+        if (pthread_create(&configure_thread_, NULL, RadioConfig::configureBSRadio_launch, context) != 0) {
             perror("init thread create failed");
             exit(0);
         }
@@ -75,8 +68,9 @@ RadioConfig::RadioConfig(Config* cfg)
 #endif
     }
 
-    while (remainingJobs > 0)
+    while (threadCount > 0)
         ;
+
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end " << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
         for (size_t c = 0; c < _cfg->nChannels; c++) {
@@ -128,27 +122,18 @@ RadioConfig::RadioConfig(Config* cfg)
 void* RadioConfig::initBSRadio_launch(void* in_context)
 {
     RadioConfigContext* context = (RadioConfigContext*)in_context;
-    RadioConfig* me = context->ptr;
-    int tid = context->tid;
-    delete context;
-    me->initBSRadio(tid);
+    RadioConfig* brs = context->brs;
+    brs->initBSRadio(context);
     return 0;
 }
 
-void RadioConfig::initBSRadio(int i)
+void RadioConfig::initBSRadio(RadioConfigContext* context)
 {
-    //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    size_t i = context->tid;
+    std::atomic_int* threadCount = context->threadCount;
+    delete context;
 
+    auto channels = Utils::strToChannels(_cfg->channel);
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
     args["driver"] = "iris";
@@ -162,32 +147,25 @@ void RadioConfig::initBSRadio(int i)
     rxStreams[i] = baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
     txStreams[i] = baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
 
-    remainingJobs--;
+    (*threadCount)--;
 }
 
 void* RadioConfig::configureBSRadio_launch(void* in_context)
 {
     RadioConfigContext* context = ((RadioConfigContext*)in_context);
-    RadioConfig* me = context->ptr;
-    int tid = context->tid;
-    delete context;
-    me->configureBSRadio(tid);
+    RadioConfig* brs = context->brs;
+    brs->configureBSRadio(context);
     return 0;
 }
 
-void RadioConfig::configureBSRadio(int i)
+void RadioConfig::configureBSRadio(RadioConfigContext* context)
 {
+    size_t i = context->tid;
+    std::atomic_int* threadCount = context->threadCount;
+    delete context;
+
     //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    auto channels = Utils::strToChannels(_cfg->channel);
 
     // resets the DATA_clk domain logic.
     baStn[i]->writeSetting("RESET_DATA_LOGIC", "");
@@ -241,7 +219,7 @@ void RadioConfig::configureBSRadio(int i)
         baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
     }
-    remainingJobs--;
+    (*threadCount)--;
 }
 
 bool RadioConfig::radioStart()
