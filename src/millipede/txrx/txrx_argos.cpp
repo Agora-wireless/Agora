@@ -71,7 +71,7 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
         rx_context[i].obj_ptr = this;
         rx_context[i].id = i;
         // start socket thread
-        if (pthread_create(&recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void*)(&rx_context[i])) != 0) {
+        if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv_Argos>, &rx_context[i]) != 0) {
             perror("socket recv thread create failed");
             exit(0);
         }
@@ -103,7 +103,7 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
         tx_context[i].obj_ptr = this;
         tx_context[i].id = i;
 
-        if (pthread_create(&send_thread_, NULL, PacketTXRX::loopSend_Argos, (void*)(&tx_context[i])) != 0) {
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopSend_Argos>, &tx_context[i]) != 0) {
             perror("socket Transmit thread create failed");
             exit(0);
         }
@@ -114,50 +114,37 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     return created_threads;
 }
 
-void* PacketTXRX::loopRecv_Argos(void* in_context)
+void* PacketTXRX::loopRecv_Argos(int tid)
 {
-    // get the pointer of class & tid
-    PacketTXRX* obj_ptr = ((EventHandlerContext<PacketTXRX>*)in_context)->obj_ptr;
-    int tid = ((EventHandlerContext<PacketTXRX>*)in_context)->id;
-    Config* config_ = obj_ptr->config_;
     //printf("Recv thread: thread %d start\n", tid);
-    int radio_lo = tid * config_->nRadios / obj_ptr->rx_thread_num_;
-    int radio_hi = (tid + 1) * config_->nRadios / obj_ptr->rx_thread_num_;
+    int radio_lo = tid * config_->nRadios / rx_thread_num_;
+    int radio_hi = (tid + 1) * config_->nRadios / rx_thread_num_;
     int nradio_cur_thread = radio_hi - radio_lo;
     //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
-    pin_to_core_with_offset(Worker_RX, obj_ptr->core_id_, tid);
+    pin_to_core_with_offset(Worker_RX, core_id_, tid);
 
-    //int BS_ANT_NUM = obj_ptr->BS_ANT_NUM;
-    //int UE_NUM = obj_ptr->UE_NUM;
-    //int OFDM_CA_NUM = obj_ptr->OFDM_CA_NUM;
-    //int OFDM_DATA_NUM = obj_ptr->OFDM_DATA_NUM;
-    //int subframe_num_perframe = obj_ptr->subframe_num_perframe;
-    //int data_subframe_num_perframe = obj_ptr->data_subframe_num_perframe;
-    //int ul_data_subframe_num_perframe = obj_ptr->ul_data_subframe_num_perframe;
-    //int dl_data_subframe_num_perframe = obj_ptr->dl_data_subframe_num_perframe;
     int packet_length = config_->packet_length;
     int packet_header_offset = config_->packet_header_offset;
     //// Use mutex to sychronize data receiving across threads
-    pthread_mutex_lock(&obj_ptr->mutex);
+    pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
 
-    pthread_cond_wait(&obj_ptr->cond, &obj_ptr->mutex);
-    pthread_mutex_unlock(&obj_ptr->mutex); // unlocking for all other threads
+    pthread_cond_wait(&cond, &mutex);
+    pthread_mutex_unlock(&mutex); // unlocking for all other threads
 
     // use token to speed up
     //moodycamel::ProducerToken local_ptok(*message_queue_);
-    moodycamel::ProducerToken* local_ptok = obj_ptr->rx_ptoks_[tid];
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
 
-    char* buffer = (*obj_ptr->buffer_)[tid];
-    int* buffer_status = (*obj_ptr->buffer_status_)[tid];
-    int buffer_length = obj_ptr->buffer_length_;
-    int buffer_frame_num = obj_ptr->buffer_frame_num_;
-    double* frame_start = (*obj_ptr->frame_start_)[tid];
+    char* buffer = (*buffer_)[tid];
+    int* buffer_status = (*buffer_status_)[tid];
+    int buffer_length = buffer_length_;
+    int buffer_frame_num = buffer_frame_num_;
+    double* frame_start = (*frame_start_)[tid];
 
     // downlink socket buffer
-    // char *tx_buffer_ptr = obj_ptr->tx_buffer_;
+    // char *tx_buffer_ptr = tx_buffer_;
     // char *tx_cur_buffer_ptr;
 #if DEBUG_DOWNLINK
     size_t txSymsPerFrame = config_->dl_data_symbol_num_perframe;
@@ -168,13 +155,13 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    RadioConfig* radio = obj_ptr->radioconfig_;
+    RadioConfig* radio = radioconfig_;
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num is at least 2
     char* cur_ptr_buffer2;
-    char* buffer2 = (*obj_ptr->buffer_)[tid] + packet_length;
-    int* buffer_status2 = (*obj_ptr->buffer_status_)[tid] + 1;
+    char* buffer2 = (*buffer_)[tid] + packet_length;
+    int* buffer_status2 = (*buffer_status_)[tid] + 1;
     int* cur_ptr_buffer_status2 = buffer_status2;
     if (config_->nChannels == 2) {
         cur_ptr_buffer2 = buffer2;
@@ -289,17 +276,9 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     return 0;
 }
 
-void* PacketTXRX::loopSend_Argos(void* in_context)
+void* PacketTXRX::loopSend_Argos(int tid)
 {
-    PacketTXRX* obj_ptr = ((EventHandlerContext<PacketTXRX>*)in_context)->obj_ptr;
-    int tid = ((EventHandlerContext<PacketTXRX>*)in_context)->id;
-    printf("packet sender thread %d start\n", tid);
-    Config* config_ = obj_ptr->config_;
-
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_ = obj_ptr->task_queue_;
-    // get pointer to message queue
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
-    pin_to_core_with_offset(Worker_TX, obj_ptr->tx_core_id_, tid);
+    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
@@ -313,13 +292,13 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     int packet_header_offset = config_->packet_header_offset;
 
     // downlink socket buffer
-    char* tx_buffer_ptr = obj_ptr->tx_buffer_;
+    char* tx_buffer_ptr = tx_buffer_;
     char* tx_cur_buffer_ptr;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    //int tx_buffer_frame_num = obj_ptr->tx_buffer_frame_num_;
-    //int* buffer_status = obj_ptr->tx_buffer_status_;
+    //int tx_buffer_frame_num = tx_buffer_frame_num_;
+    //int* buffer_status = tx_buffer_status_;
 
-    RadioConfig* radio = obj_ptr->radioconfig_;
+    RadioConfig* radio = radioconfig_;
 
     int ret;
     int offset;
@@ -339,13 +318,13 @@ void* PacketTXRX::loopSend_Argos(void* in_context)
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     //moodycamel::ConsumerToken local_ctok = (*task_queue_);
-    // moodycamel::ProducerToken *local_ctok = (obj_ptr->task_ptok[tid]);
-    moodycamel::ProducerToken* local_ptok = obj_ptr->rx_ptoks_[tid];
+    // moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     while (config_->running) {
 
         Event_data task_event;
         //ret = task_queue_->try_dequeue(task_event);
-        ret = task_queue_->try_dequeue_from_producer(*obj_ptr->tx_ptoks_[tid], task_event);
+        ret = task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event);
         if (!ret)
             continue;
 
