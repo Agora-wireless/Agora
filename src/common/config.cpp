@@ -84,7 +84,7 @@ Config::Config(std::string jsonfile)
             sched += "P";
         if (downlink_mode) { // here it is assumed either dl or ul to be active at one time
             size_t dl_symbol_start = pilot_symbol_num_perframe + dl_data_symbol_start;
-	    size_t dl_symbol_end = dl_symbol_start + dl_data_symbol_num_perframe;
+            size_t dl_symbol_end = dl_symbol_start + dl_data_symbol_num_perframe;
             for (size_t s = pilot_symbol_num_perframe; s < dl_symbol_start; s++)
                 sched += "G";
             for (size_t s = dl_symbol_start; s < dl_symbol_end; s++)
@@ -99,8 +99,8 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-	framePeriod = 1;
-	printf("frame schedule %s\n", sched.c_str());
+        framePeriod = 1;
+        printf("frame schedule %s\n", sched.c_str());
     } else {
         json jframes = tddConf.value("frames", json::array());
         framePeriod = jframes.size();
@@ -136,12 +136,10 @@ Config::Config(std::string jsonfile)
             BS_ANT_NUM = nAntennas;
     }
 
-
     if (isUE and !freq_orthogonal_pilot and nRadios != pilot_symbol_num_perframe) {
         std::cerr << "Number of Pilot Symbols don't match number of Clients!" << std::endl;
         exit(0);
     }
-
 
     mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
     printf("modulation: %s\n", modulation.c_str());

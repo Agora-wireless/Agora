@@ -84,7 +84,6 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
         std::cout << std::endl;
     }
 
-
     std::cout << "radio init done!" << std::endl;
 }
 
