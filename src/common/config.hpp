@@ -17,10 +17,10 @@
 #ifdef JSON
 #include "Symbols.hpp"
 #include "buffer.hpp"
+#include "comms-lib.h"
 #include "memory_manage.h"
 #include "utils.h"
 #include <nlohmann/json.hpp>
-#include "comms-lib.h"
 //#include <itpp/itbase.h>
 //using namespace itpp;
 using json = nlohmann::json;
@@ -58,7 +58,7 @@ public:
     std::vector<uint32_t> coeffs;
     std::vector<std::complex<int16_t>> pilot_ci16;
     std::vector<std::complex<float>> pilot_cf32;
-    std::vector<std::complex<double> > pilot_cd64;
+    std::vector<std::complex<double>> pilot_cd64;
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float* pilots_;
@@ -67,7 +67,7 @@ public:
     Table<complex_float> ul_IQ_modul;
     Table<complex_float> dl_IQ_modul;
     Table<std::complex<int16_t>> dl_IQ_symbol;
-    std::vector<std::complex<float> > pilotsF;
+    std::vector<std::complex<float>> pilotsF;
 
     double freq;
     double txgainA;

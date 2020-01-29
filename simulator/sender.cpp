@@ -281,6 +281,12 @@ void Sender::startTX() {
     int data_index = subframe_id * BS_ANT_NUM + tx_ant_id;
     struct Packet *pkt =
         (struct Packet *)(trans_buffer_[data_ptr] + tx_buf_offset);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = (subframe_id < UE_NUM)
+                         ? config_->pilotSymbols[0][subframe_id]
+                         : config_->ULSymbols[0][subframe_id - UE_NUM];
+    pkt->cell_id = cell_id;
+    pkt->ant_id = ant_id;
     memcpy(pkt->data, (char *)IQ_data_coded[data_index],
            sizeof(ushort) * OFDM_FRAME_LEN * 2);
     // fastMemcpy(trans_buffer_[data_ptr] + tx_buf_offset + data_offset, (char

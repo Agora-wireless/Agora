@@ -148,14 +148,14 @@ void DoZF::ZF_time_orthogonal(int offset)
         if (downlink_mode) {
             cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
             if (recipCalEn) {
-                cx_float* calib = (cx_float *)(&recip_buffer_[frame_id][cur_sc_id * BS_ANT_NUM]);
+                cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][cur_sc_id * BS_ANT_NUM]);
                 cx_fvec vec_calib(calib, BS_ANT_NUM, false);
                 mat_calib = diagmat(vec_calib);
             } else
                 mat_calib.eye();
             mat_input = mat_calib * mat_input;
             ptr_out = (cx_float*)dl_precoder_buffer_[cur_offset];
-        } else 
+        } else
             ptr_out = (cx_float*)precoder_buffer_[cur_offset];
         cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
 
