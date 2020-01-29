@@ -215,7 +215,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
                 cursor %= buffer_frame_num_;
             }
 #if DEBUG_RECV
-            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id %d, offset %d\n", tid, frame_id, symbol_id, ant_id, offset + tid * buffer_frame_num);
+            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id %d, offset %d\n", tid, frame_id, symbol_id, ant_id, cursor);
 #endif
 #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
             if (rx_symbol_id > 0)
