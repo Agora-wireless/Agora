@@ -60,8 +60,8 @@ Phy_UE::Phy_UE(Config* cfg)
 #ifdef SIM
     // read pilot
     int pilot_len = (FFT_LEN + CP_LEN);
-    ul_pilot_aligned = new char[packet_length];
-    memcpy((void*)&ul_pilot_aligned[prefix_len * sizeof(uint32_t) + packet_header_offset * sizeof(int)], pilot_ci16.data(), pilot_len * sizeof(uint32_t));
+    //ul_pilot_aligned = new char[packet_length];
+    //memcpy((void*)&ul_pilot_aligned[prefix_len * sizeof(uint32_t) + packet_header_offset * sizeof(int)], pilot_ci16.data(), pilot_len * sizeof(uint32_t));
 #endif
 
     ////////////////////////////////////////
@@ -246,14 +246,14 @@ void Phy_UE::start()
                 int buffer_frame_num = dl_symbol_perframe * TASK_BUFFER_FRAME_NUM * numAntennas;
                 int rx_thread_id = offset / buffer_frame_num;
                 int offset_in_current_buffer = offset % buffer_frame_num;
-                char* rx_buffer_ptr = rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length;
-                symbol_id = *((int*)rx_buffer_ptr + 1);
-                frame_id = *((int*)rx_buffer_ptr);
+                struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length);
+                frame_id = pkt->frame_id;
+                symbol_id = pkt->symbol_id;
 #if WRITE_RECV
                 if (frame_id < 10 && cfg->getDlSFIndex(frame_id, symbol_id) == 0) {
-                    ant_id = *((int*)rx_buffer_ptr + 3);
+                    ant_id = pkt->ant_id;
                     int len = cfg->sampsPerSymbol;
-                    void* cur_buf = (rx_buffer_ptr + packet_header_offset);
+                    void* cur_buf = pkt->data;
                     std::string filename = "sig_ant" + std::to_string(ant_id) + "_f" + std::to_string(frame_id) + ".bin";
                     fp = fopen(filename.c_str(), "wb");
                     fwrite(cur_buf, sizeof(std::complex<short>), cfg->sampsPerSymbol, fp);
@@ -420,7 +420,7 @@ void Phy_UE::start()
                 std::string filename = "bin/ul_tx_buf.bin";
                 FILE* fp = fopen(filename.c_str(), "wb");
                 int frame_samp_size = (cfg->getTxPackageLength() * numAntennas * ul_data_symbol_perframe);
-                fwrite(&tx_buffer_[offset * frame_samp_size], sizeof(complex_float), (CP_LEN + FFT_LEN + cfg->packet_header_offset) * numAntennas * dl_data_symbol_perframe, fp);
+                fwrite(&tx_buffer_[offset * frame_samp_size], sizeof(complex_float), (CP_LEN + FFT_LEN + offsetof(Packet, data)) * numAntennas * dl_data_symbol_perframe, fp);
                 //fwrite(tx_buffer_.buffer[offset].data(), sizeof(std::complex<short>), (CP_LEN+FFT_LEN+4) * numAntennas * dl_data_symbol_perframe, fp);
                 fclose(fp);
 #endif
@@ -510,21 +510,20 @@ void Phy_UE::doFFT(int tid, int offset)
     // remove CP, do FFT
     int dl_symbol_id = cfg->getDlSFIndex(frame_id, symbol_id);
     int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM, rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id);
-    short* cur_ptr_buffer_ushort = (short*)(cur_ptr_buffer + cfg->packet_header_offset);
 
     size_t sym_offset = 0;
     if (cfg->isPilot(frame_id, symbol_id)) {
         if (frame_id == 3 * TX_FRAME_DELTA) {
             std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
             FILE* f = fopen(fname.c_str(), "wb");
-            fwrite(cur_ptr_buffer_ushort, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
+            fwrite(pkt->data, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
             fclose(f);
         }
 
 #if DEBUG_DL_PILOT
         std::vector<std::complex<double>> vec;
         for (size_t i = 0; i < cfg->sampsPerSymbol; i++)
-            vec.push_back(std::complex<double>(cur_ptr_buffer_ushort[2 * i] / 32768.0, cur_ptr_buffer_ushort[2 * i + 1] / 32768.0));
+            vec.push_back(std::complex<double>(pkt->data[2 * i] / 32768.0, pkt->data[2 * i + 1] / 32768.0));
         sym_offset = CommsLib::find_pilot_seq(vec, cfg->pilot_cd64, cfg->pilot_cd64.size());
         sym_offset = sym_offset < cfg->pilot_cd64.size() ? 0 : sym_offset - cfg->pilot_cd64.size();
         double noise_power = 0;
@@ -540,18 +539,18 @@ void Phy_UE::doFFT(int tid, int offset)
         if (frame_id == 3 * TX_FRAME_DELTA) {
             std::string fname = "rxdata" + std::to_string(symbol_id) + ".bin";
             FILE* f = fopen(fname.c_str(), "wb");
-            fwrite(cur_ptr_buffer_ushort, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
+            fwrite(pkt->data, 2 * sizeof(int16_t), cfg->sampsPerSymbol, f);
             fclose(f);
         }
     }
 
     // transfer ushort to float
-    size_t delay_offset = (dl_prefix_len + CP_LEN) * 2; //GetFrameStart(cur_ptr_buffer_ushort, prefix_len, postfix_len);
+    size_t delay_offset = (dl_prefix_len + CP_LEN) * 2; //GetFrameStart(pkt->data, prefix_len, postfix_len);
     //float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) * packet_header_offset);
     float* cur_fft_buffer_float = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
     for (size_t i = 0; i < (FFT_LEN)*2; i++)
-        cur_fft_buffer_float[i] = cur_ptr_buffer_ushort[delay_offset + i] / 32768.2f;
+        cur_fft_buffer_float[i] = pkt->data[delay_offset + i] / 32768.2f;
     //memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float));
 
     // perform fft
@@ -732,15 +731,15 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         char* cur_tx_buffer = &tx_buffer_[tx_offset];
 #ifdef SIM
         //complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer + prefix_len*sizeof(complex_float) + cfg->packet_header_offset);
-        short* tx_buffer_ptr = (short*)(cur_tx_buffer + prefix_len * sizeof(std::complex<short>) + cfg->packet_header_offset);
-        int* tx_buffer_hdr = (int*)cur_tx_buffer;
-        tx_buffer_hdr[0] = frame_id;
-        tx_buffer_hdr[1] = symbol_id;
-        tx_buffer_hdr[2] = ant_id;
-        tx_buffer_hdr[3] = 0; // rsvd
+        struct Packet* pkt = (struct Packet*)cur_tx_buffer;
+        pkt->frame_id = frame_id;
+        pkt->symbol_id = symbol_id;
+        pkt->cell_id = 0;
+        pkt->ant_id = ant_id;
+        short* tx_buffer_ptr = &pkt->data[2 * prefix_len];
 #else
         //complex_float* tx_buffer_ptr = (complex_float*)((char*)cur_tx_buffer + cfg->prefix*sizeof(complex_float));
-        short* tx_buffer_ptr = (short*)(cur_tx_buffer + prefix_len * sizeof(std::complex<short>));
+        short* tx_buffer_ptr = (short*)cur_tx_buffer + 2 * prefix_len;
 #endif
         // fft shift
         //for(int j = 0; j < (FFT_LEN); j++) {
@@ -799,11 +798,10 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     //dl_data_subframe_start = cfg->dl_data_symbol_start;
     //dl_data_subframe_end = cfg->dl_data_symbol_end;
     packet_length = cfg->packet_length;
-    packet_header_offset = cfg->packet_header_offset;
 #ifdef SIM
     tx_packet_length = cfg->packet_length;
 #else
-    tx_packet_length = packet_length - packet_header_offset;
+    tx_packet_length = packet_length - offsetof(Packet, data);
 #endif
 
     symbol_perframe = cfg->symbol_num_perframe;
