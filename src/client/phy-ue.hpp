@@ -159,10 +159,10 @@ public:
     /* Add tasks into task queue based on event type */
     void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data>* in_queue, moodycamel::ProducerToken const& ptok);
 
-    void initialize_vars_from_cfg(Config* cfg);
+    void initialize_vars_from_cfg(void);
 
 private:
-    Config* cfg;
+    Config* config_;
     size_t symbol_perframe;
     size_t ul_pilot_symbol_perframe;
     size_t dl_pilot_symbol_perframe;
