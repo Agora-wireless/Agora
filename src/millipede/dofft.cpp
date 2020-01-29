@@ -70,8 +70,7 @@ void DoFFT::launch(int offset)
     size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
     size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     size_t OFDM_DATA_START = config_->OFDM_DATA_START;
-    size_t packet_header_offset = config_->packet_header_offset;
-    short* cur_buffer_ptr_ushort = (short*)(cur_buffer_ptr + packet_header_offset + OFDM_PREFIX_LEN * sizeof(short) * 2);
+    short* cur_buffer_ptr_ushort = &pkt->data[2 * OFDM_PREFIX_LEN];
     // float *cur_fft_buffer_float = (float *)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[FFT_buffer_target_id] + ant_id * OFDM_CA_NUM);
     // float *cur_fft_buffer_float = (float *)(fft_buffer_.FFT_inputs[tid] + ant_id * OFDM_CA_NUM);
@@ -399,7 +398,6 @@ void DoIFFT::launch(int offset)
     int TX_PREFIX_LEN = config_->TX_PREFIX_LEN;
     int OFDM_CA_NUM = config_->OFDM_CA_NUM;
     int CP_LEN = config_->CP_LEN;
-    int packet_header_offset = config_->packet_header_offset;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
 
     int ant_id = offset % BS_ANT_NUM;
@@ -430,15 +428,15 @@ void DoIFFT::launch(int offset)
     float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[offset][0]);
     int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
     int packet_length = config_->packet_length;
-    char* socket_ptr = &dl_socket_buffer_[socket_subframe_offset * packet_length];
+    struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[socket_subframe_offset * packet_length] + ant_id * packet_length);
     //int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
-    socket_ptr += packet_header_offset + ant_id * packet_length + TX_PREFIX_LEN * sizeof(short) * 2;
+    short* socket_ptr = &pkt->data[2 * TX_PREFIX_LEN];
 
     // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
     //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
     //     // ifft scaled results by 2048, 16 = 2^15/2048
-    //     *((short *)socket_ptr + 2 * sc_id ) = (short)(*shifted_input_ptr * 16);
-    //     *((short *)socket_ptr + 2 * sc_id + 1 ) = (short)(*(shifted_input_ptr+1) * 16);
+    //     socket_ptr[2 * sc_id] = (short)(*shifted_input_ptr * 16);
+    //     socket_ptr[2 * sc_id + 1] = (short)(*(shifted_input_ptr+1) * 16);
     // }
 
     for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
@@ -452,10 +450,10 @@ void DoIFFT::launch(int offset)
         __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
         integer1 = _mm256_packs_epi32(integer1, integer2);
         integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
-        //_mm256_stream_si256((__m256i*)(socket_ptr + sc_id * 4), integer1);
-        _mm256_stream_si256((__m256i*)(socket_ptr + (sc_id + CP_LEN) * 4), integer1);
+        //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
+        _mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id + CP_LEN], integer1);
         if (sc_id >= OFDM_CA_NUM - CP_LEN) // add CP
-            _mm256_stream_si256((__m256i*)(socket_ptr + (sc_id + CP_LEN - OFDM_CA_NUM) * 4), integer1);
+            _mm256_stream_si256((__m256i*)&socket_ptr[2 * (sc_id + CP_LEN - OFDM_CA_NUM)], integer1);
     }
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id << ", data: ";

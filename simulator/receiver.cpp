@@ -26,7 +26,6 @@ Receiver::Receiver(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
   dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
   downlink_mode = cfg->downlink_mode;
   packet_length = cfg->packet_length;
-  packet_header_offset = cfg->packet_header_offset;
 
   /* initialize random seed: */
   srand(time(NULL));
