@@ -102,10 +102,6 @@ struct ZF_stats : public Frame_stats {
 };
 
 struct Data_stats : public Frame_stats {
-    int frame_count;
-    int* symbol_count;
-    int max_symbol_count;
-
     Table<int> task_count;
     int max_task_count;
 

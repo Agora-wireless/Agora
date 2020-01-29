@@ -866,7 +866,7 @@ void Millipede::print_per_subframe_done(UNUSED int task_type, UNUSED int frame_c
             fft_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx(),
             get_time() - stats_manager_->get_pilot_received(frame_count));
         break;
-    case (PRINT_FFT_RC):
+    case (PRINT_RC):
         printf("Main thread: cal symbol FFT done frame: %d, %d, subframe: %d, num sumbframes done: %d\n",
             frame_count, frame_id, subframe_id, fft_stats_.symbol_cal_count[frame_id]);
         break;
