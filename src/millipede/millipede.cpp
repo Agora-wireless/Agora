@@ -999,8 +999,8 @@ void Millipede::initialize_uplink_buffers()
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int UE_NUM = config_->UE_NUM;
 
-    socket_buffer_size_ = (long long)packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    socket_buffer_status_size_ = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    socket_buffer_status_size_ = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe;
+    socket_buffer_size_ = (long long)packet_length * socket_buffer_status_size_;
     printf("socket_buffer_size %lld, socket_buffer_status_size %d\n", socket_buffer_size_, socket_buffer_status_size_);
     socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
@@ -1052,8 +1052,8 @@ void Millipede::initialize_downlink_buffers()
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int UE_NUM = config_->UE_NUM;
 
-    dl_socket_buffer_size_ = (long long)data_subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM * packet_length * BS_ANT_NUM;
-    dl_socket_buffer_status_size_ = data_subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    dl_socket_buffer_status_size_ = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe;
+    dl_socket_buffer_size_ = (long long)packet_length * dl_socket_buffer_status_size_;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
     dl_ifft_buffer_.calloc(BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, OFDM_CA_NUM, 64);
