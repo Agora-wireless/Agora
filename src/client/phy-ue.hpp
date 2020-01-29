@@ -187,7 +187,6 @@ private:
     size_t rx_thread_num;
     size_t packet_length;
     size_t tx_packet_length;
-    size_t packet_header_offset;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
     float* pilots_;
