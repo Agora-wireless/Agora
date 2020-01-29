@@ -389,11 +389,11 @@ bool RadioConfig::radioStart()
             if (calib) {
                 if (isRefAnt) {
                     baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
-		    // looks like the best solution is to just use one
-		    // antenna at the reference node and leave the 2nd
-		    // antenna unused. We either have to use one anntena
-		    // per board, or if we use both channels we need to
-		    // exclude reference board from beamforming
+                    // looks like the best solution is to just use one
+                    // antenna at the reference node and leave the 2nd
+                    // antenna unused. We either have to use one anntena
+                    // per board, or if we use both channels we need to
+                    // exclude reference board from beamforming
                 } else {
                     std::vector<std::complex<float>> recipCalDlPilot;
                     recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
