@@ -32,7 +32,7 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Armadillo)
 
 SET(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-SET(USE_ARGOS True CACHE STRING "USE_ARGOS defaulting to 'False'")
+SET(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 SET(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 
 message(STATUS "USE_DPDK: ${USE_DPDK}")
