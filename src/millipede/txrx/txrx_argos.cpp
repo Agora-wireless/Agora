@@ -255,11 +255,9 @@ void* PacketTXRX::loopSend_Argos(int tid)
     //int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
     //int dl_data_subframe_num_perframe = config_->dl_data_subframe_num_perframe;
     int packet_length = config_->packet_length;
-    int packet_header_offset = config_->packet_header_offset;
+    int nChannels = config_->nChannels;
 
     // downlink socket buffer
-    char* tx_buffer_ptr = tx_buffer_;
-    char* tx_cur_buffer_ptr;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
     //int tx_buffer_frame_num = tx_buffer_frame_num_;
     //int* buffer_status = tx_buffer_status_;
@@ -308,7 +306,8 @@ void* PacketTXRX::loopSend_Argos(int tid)
 
         int tx_subframe_id = current_data_subframe_id + UE_NUM;
         int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
-        tx_cur_buffer_ptr = tx_buffer_ptr + socket_subframe_offset * packet_length + packet_header_offset;
+        struct Packet* pkt = (struct Packet*)&tx_buffer_[socket_subframe_offset * packet_length];
+        char* tx_cur_buffer_ptr = (char*)pkt->data;
         frame_id += TX_FRAME_DELTA;
 
         //symbol_id = task_event.data / config_->getNumAntennas();
@@ -322,29 +321,27 @@ void* PacketTXRX::loopSend_Argos(int tid)
         if (symbol_id == txSymbols.back())
             flags = 2; // HAS_TIME & END_BURST, fixme
 #endif
-        if (config_->nChannels == 1 || ant_id % 2 == 0) {
+        int ch = ant_id % nChannels;
 #if DEBUG_DOWNLINK
-            if (ant_id != (int)config_->ref_ant)
-                txbuf[0] = zeros.data();
-            else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
-                txbuf[0] = config_->pilot_ci16.data();
-            else
-                txbuf[0] = (void*)config_->dl_IQ_symbol[current_data_subframe_id];
+        if (ant_id != (int)config_->ref_ant)
+            txbuf[ch] = zeros.data();
+        else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+            txbuf[ch] = config_->pilot_ci16.data();
+        else
+            txbuf[ch] = (void*)config_->dl_IQ_symbol[current_data_subframe_id];
 #else
-            txbuf[0] = tx_cur_buffer_ptr;
+        txbuf[ch] = tx_cur_buffer_ptr + ch * packet_length;
 #endif
-            //buffer_status[offset] = 0;
-        } else if (config_->nChannels == 2 && ant_id % 2 == 1) {
-            txbuf[1] = tx_cur_buffer_ptr + packet_length; //FIXME
-            //buffer_status[offset+1] = 0;
-        }
+            //buffer_status[offset+ch] = 0;
 #if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n", tid, frame_id, symbol_id, ant_id, offset,
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n",
+            tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
+
         //clock_gettime(CLOCK_MONOTONIC, &tv);
 #if SEPARATE_TX_RX
-        radioconfig_->radioTx(ant_id / config_->nChannels, txbuf, flags, frameTime);
+        radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 #endif
         //clock_gettime(CLOCK_MONOTONIC, &tv2);
 
