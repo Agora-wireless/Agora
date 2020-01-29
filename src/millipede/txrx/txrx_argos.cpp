@@ -64,15 +64,12 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     bool ret = radioconfig_->radioStart();
     if (!ret)
         return created_threads;
-    int nradio_per_thread = config_->nRadios / rx_thread_num_;
-    int rem_thread_nradio = config_->nRadios % rx_thread_num_;
 
     for (int i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread_;
         // record the thread id
         rx_context[i].obj_ptr = this;
         rx_context[i].id = i;
-        rx_context[i].radios = (i < rem_thread_nradio) ? nradio_per_thread + 1 : nradio_per_thread;
         // start socket thread
         if (pthread_create(&recv_thread_, NULL, PacketTXRX::loopRecv_Argos, (void*)(&rx_context[i])) != 0) {
             perror("socket recv thread create failed");
@@ -122,10 +119,12 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
     // get the pointer of class & tid
     PacketTXRX* obj_ptr = ((EventHandlerContext<PacketTXRX>*)in_context)->obj_ptr;
     int tid = ((EventHandlerContext<PacketTXRX>*)in_context)->id;
-    //printf("Recv thread: thread %d start\n", tid);
-    int nradio_cur_thread = ((EventHandlerContext<PacketTXRX>*)in_context)->radios;
-    //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     Config* config_ = obj_ptr->config_;
+    //printf("Recv thread: thread %d start\n", tid);
+    int radio_lo = tid * config_->nRadios / obj_ptr->rx_thread_num_;
+    int radio_hi = (tid + 1) * config_->nRadios / obj_ptr->rx_thread_num_;
+    int nradio_cur_thread = radio_hi - radio_lo;
+    //printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     // get pointer of message queue
     moodycamel::ConcurrentQueue<Event_data>* message_queue_ = obj_ptr->message_queue_;
     pin_to_core_with_offset(Worker_RX, obj_ptr->core_id_, tid);
@@ -168,8 +167,6 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
-    int nradio_per_thread = config_->nRadios / obj_ptr->rx_thread_num_;
-    int rem_thread_nradio = config_->nRadios % obj_ptr->rx_thread_num_; //obj_ptr->thread_num_*(config_->nRadios/obj_ptr->thread_num_);
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     RadioConfig* radio = obj_ptr->radioconfig_;
 
@@ -200,10 +197,8 @@ void* PacketTXRX::loopRecv_Argos(void* in_context)
         }
         int ant_id, frame_id, symbol_id;
         // receive data
-        for (int it = 0; it < nradio_cur_thread; it++) // FIXME: this must be threaded
+        for (int rid = radio_lo; rid < radio_hi; rid++) // FIXME: this must be threaded
         {
-            //int rid = tid * obj_ptr->radios_per_thread + it;
-            int rid = (tid < rem_thread_nradio) ? tid * (nradio_per_thread + 1) + it : tid * (nradio_per_thread) + rem_thread_nradio + it;
             // this is probably a really bad implementation, and needs to be revamped
             char* samp1 = cur_ptr_buffer + packet_header_offset;
             char* samp2 = cur_ptr_buffer2 + packet_header_offset;

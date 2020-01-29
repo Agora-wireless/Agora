@@ -80,9 +80,6 @@ public:
     //     {
     //         PacketTXRX *ptr;
     //         int tid;
-    // #ifdef USE_ARGOS
-    //         int radios;
-    // #endif
     //     };
 
 public:
@@ -177,7 +174,6 @@ private:
 #if USE_ARGOS
     RadioConfig* radioconfig_;
 #endif
-    int radios_per_thread;
 };
 
 #endif
