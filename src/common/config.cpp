@@ -207,8 +207,8 @@ Config::Config(std::string jsonfile)
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     float* pilots_2048 = (float*)aligned_alloc(64, 2048 * sizeof(float));
-    r = fread(pilots_2048, sizeof(float), OFDM_CA_NUM, fp);
-    if (r < OFDM_CA_NUM)
+    r = fread(pilots_2048, sizeof(float), 2048, fp);
+    if (r < 2048)
         printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
     for (size_t i = 0; i < OFDM_CA_NUM; i++) {
