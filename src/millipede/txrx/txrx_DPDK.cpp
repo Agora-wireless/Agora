@@ -612,22 +612,21 @@ void* PacketTXRX::loopSend(int tid)
         // printf("In transmitter\n");
 
         offset = task_event.data;
-        ant_id = offset % BS_ANT_NUM;
-        total_data_subframe_id = offset / BS_ANT_NUM;
-        current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+        //ant_id = offset % BS_ANT_NUM;
+        //total_data_subframe_id = offset / BS_ANT_NUM;
+        //current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
         //subframe_id = current_data_subframe_id + UE_NUM;
-        subframe_id = config_->DLSymbols[0][current_data_subframe_id];
-        frame_id = total_data_subframe_id / data_subframe_num_perframe;
+        //subframe_id = config_->DLSymbols[0][current_data_subframe_id];
+        //frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
-        int socket_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
         // int data_subframe_offset = frame_id * data_subframe_num_perframe + current_data_subframe_id;
-        cur_buffer_ptr = dl_buffer + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;
+        cur_buffer_ptr = dl_buffer + offset * packet_length;
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-        pkt->frame_id = frame_id;
-        pkt->symbol_id = subframe_id;
-        pkt->cell_id = cell_id;
-        pkt->ant_id = ant_id;
+        pkt->frame_id = offset / (BS_ANT_NUM * data_subframe_num_perframe);
+        pkt->symbol_id = config_->DLSymbols[0][offset / BS_ANT_NUM % data_subframe_num_perframe];
+        pkt->cell_id = 0;
+        pkt->ant_id = offset % BS_ANT_NUM;
 
         // send data (one OFDM symbol)
         if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr*)&remote_addr, sizeof(remote_addr)) < 0) {
