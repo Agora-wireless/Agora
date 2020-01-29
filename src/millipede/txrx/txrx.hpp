@@ -119,8 +119,8 @@ public:
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
-    static void* loopRecv_Argos(void* context);
-    static void* loopSend_Argos(void* context);
+    void* loopRecv_Argos(int tid);
+    void* loopSend_Argos(int tid);
 #endif
 
 private:
