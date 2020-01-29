@@ -1,5 +1,5 @@
-#include "radio_lib.hpp"
 #include "matplotlibcpp.h"
+#include "radio_lib.hpp"
 
 namespace plt = matplotlibcpp;
 
@@ -441,8 +441,8 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
     size_t seq_len = _cfg->pilot_cf32.size();
     size_t fft_len = _cfg->OFDM_CA_NUM;
     std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len << std::endl;
-    std::vector<std::complex<double> > pilot_cd64;
-    std::vector<std::complex<int16_t> > pilot_cs16;
+    std::vector<std::complex<double>> pilot_cd64;
+    std::vector<std::complex<int16_t>> pilot_cs16;
 
     for (size_t i = 0; i < seq_len; i++) {
         std::complex<float> cf = _cfg->pilot_cf32[i];
@@ -450,20 +450,20 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
-    std::vector<std::complex<int16_t> > pre(_cfg->prefix, 0);
-    std::vector<std::complex<int16_t> > post(_cfg->postfix, 0);
+    std::vector<std::complex<int16_t>> pre(_cfg->prefix, 0);
+    std::vector<std::complex<int16_t>> post(_cfg->postfix, 0);
     pilot_cs16.insert(pilot_cs16.begin(), pre.begin(), pre.end());
     pilot_cs16.insert(pilot_cs16.end(), post.begin(), post.end());
     size_t read_len = pilot_cs16.size();
 
     // Transmitting from only one chain, create a null vector for chainB
-    std::vector<std::complex<int16_t> > dummy_cs16(read_len, 0);
+    std::vector<std::complex<int16_t>> dummy_cs16(read_len, 0);
 
     std::vector<void*> txbuff0(2);
     txbuff0[0] = pilot_cs16.data();
     txbuff0[1] = dummy_cs16.data();
 
-    std::vector<std::vector<std::complex<int16_t> > > buff;
+    std::vector<std::vector<std::complex<int16_t>>> buff;
     //int ant = _cfg->nChannels;
     size_t M = _cfg->nAntennas;
     size_t R = _cfg->nRadios;
@@ -478,7 +478,7 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
         }
     }
 
-    std::vector<std::complex<int16_t> > dummybuff(read_len);
+    std::vector<std::complex<int16_t>> dummybuff(read_len);
     drain_buffers();
 
     for (size_t i = 0; i < R; i++) {
@@ -531,8 +531,8 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
     std::vector<size_t> start_dn(R);
 
     for (size_t i = 0; i < R; i++) {
-        std::vector<std::complex<double> > up(read_len);
-        std::vector<std::complex<double> > dn(read_len);
+        std::vector<std::complex<double>> up(read_len);
+        std::vector<std::complex<double>> dn(read_len);
         std::transform(buff[ref_ant * R + i].begin(), buff[ref_ant * R + i].end(), up.begin(),
             [](std::complex<int16_t> ci) { return std::complex<double>(ci.real() / 32768.0, ci.imag() / 32768.0); });
         std::transform(buff[i * R + ref_ant].begin(), buff[i * R + ref_ant].end(), dn.begin(),
@@ -554,28 +554,26 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
 
 #if DEBUG_PLOT
         std::vector<double> up_I(read_len);
-        std::transform( up.begin(), up.end(), up_I.begin(), []( std::complex<double> cd ) {
-        return cd.real(); });
+        std::transform(up.begin(), up.end(), up_I.begin(), [](std::complex<double> cd) { return cd.real(); });
 
         std::vector<double> dn_I(read_len);
-        std::transform( dn.begin(), dn.end(), dn_I.begin(), []( std::complex<double> cd ) {
-        return cd.real(); });
+        std::transform(dn.begin(), dn.end(), dn_I.begin(), [](std::complex<double> cd) { return cd.real(); });
 
         plt::figure_size(1200, 780);
         plt::plot(up_I);
         plt::xlim(0, read_len);
         plt::ylim(-1, 1);
-        plt::title("ant "+std::to_string(ref_ant)+" (ref) to ant " + std::to_string(i));
+        plt::title("ant " + std::to_string(ref_ant) + " (ref) to ant " + std::to_string(i));
         plt::legend();
-        plt::save("up_"+std::to_string(i)+".png");
+        plt::save("up_" + std::to_string(i) + ".png");
 
         plt::figure_size(1200, 780);
         plt::plot(dn_I);
         plt::xlim(0, read_len);
         plt::ylim(-1, 1);
-        plt::title("ant "+std::to_string(i)+" to ant (ref)" + std::to_string(ref_ant));
+        plt::title("ant " + std::to_string(i) + " to ant (ref)" + std::to_string(ref_ant));
         plt::legend();
-        plt::save("dn_"+std::to_string(i)+".png");
+        plt::save("dn_" + std::to_string(i) + ".png");
 #endif
     }
 
@@ -617,5 +615,3 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
 //        }
 //    }
 //}
-
-
