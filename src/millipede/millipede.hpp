@@ -111,7 +111,6 @@ private:
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
-    EventHandlerContext<Millipede>* context;
     /*****************************************************
      * Buffers
      *****************************************************/
