@@ -66,7 +66,7 @@ RadioConfig::RadioConfig(Config* cfg)
         context->ptr = this;
         context->tid = i;
         pthread_t init_thread_;
-        if (pthread_create(&init_thread_, NULL, RadioConfig::configureBSRadio_launch, (void*)(&context[i])) != 0) {
+        if (pthread_create(&init_thread_, NULL, configureBSRadio_launch, (void*)context) != 0) {
             perror("init thread create failed");
             exit(0);
         }

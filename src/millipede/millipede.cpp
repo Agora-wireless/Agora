@@ -646,20 +646,21 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
 {
     int ret;
     for (int i = tid_start; i < tid_end; i++) {
-        context[i].obj_ptr = this;
-        context[i].id = i;
+        auto context = new EventHandlerContext<Millipede>;
+        context->obj_ptr = this;
+        context->id = i;
         switch (thread) {
         case Worker:
-            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker>, &context[i]);
+            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker>, context);
             break;
         case Worker_FFT:
-            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_fft>, &context[i]);
+            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_fft>, context);
             break;
         case Worker_ZF:
-            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_zf>, &context[i]);
+            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_zf>, context);
             break;
         case Worker_Demul:
-            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_demul>, &context[i]);
+            ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_demul>, context);
             break;
         default:
             printf("ERROR: Wrong thread type to create workers\n");
@@ -979,7 +980,6 @@ void Millipede::initialize_uplink_buffers()
 
     int TASK_THREAD_NUM = config_->worker_thread_num;
     alloc_buffer_1d(&task_threads, TASK_THREAD_NUM, 64, 0);
-    alloc_buffer_1d(&context, TASK_THREAD_NUM, 64, 0);
     // task_threads = (pthread_t *)malloc(TASK_THREAD_NUM * sizeof(pthread_t));
     // context = (EventHandlerContext *)malloc(TASK_THREAD_NUM * sizeof(EventHandlerContext));
 

@@ -45,8 +45,11 @@ struct EventHandlerContext {
 template <class C, void* (C::*run_thread)(int)>
 void* pthread_fun_wrapper(void* context)
 {
-    C* obj = reinterpret_cast<C*>(((EventHandlerContext<C>*)context)->obj_ptr);
-    return (obj->*run_thread)(((EventHandlerContext<C>*)context)->id);
+    EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+    C* obj = reinterpret_cast<C*>(eh_context->obj_ptr);
+    int id = eh_context->id;
+    delete eh_context;
+    return (obj->*run_thread)(id);
 }
 
 class Utils {
