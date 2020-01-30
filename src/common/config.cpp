@@ -58,22 +58,6 @@ Config::Config(std::string jsonfile)
     tx_port = tddConf.value("tx_port", 7991);
     rx_port = tddConf.value("rx_port", 7891);
 
-    /* Millipede configurations */
-    core_offset = tddConf.value("core_offset", 18);
-    transpose_block_size = tddConf.value("transpose_block_size", 16);
-    worker_thread_num = tddConf.value("worker_thread_num", 25);
-    socket_thread_num = tddConf.value("socket_thread_num", 4);
-    fft_thread_num = tddConf.value("fft_thread_num", 4);
-    demul_thread_num = tddConf.value("demul_thread_num", 11);
-    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
-
-    demul_block_size = tddConf.value("demul_block_size", 48);
-    zf_block_size = tddConf.value("zf_block_size", 1);
-    if (freq_orthogonal_pilot)
-        zf_block_size = UE_NUM;
-    demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
-    zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
-
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
     prefix = tddConf.value("prefix", 0);
@@ -148,10 +132,28 @@ Config::Config(std::string jsonfile)
         exit(0);
     }
 
+    /* Millipede configurations */
+    core_offset = tddConf.value("core_offset", 18);
+    transpose_block_size = tddConf.value("transpose_block_size", 16);
+    worker_thread_num = tddConf.value("worker_thread_num", 25);
+    socket_thread_num = tddConf.value("socket_thread_num", 4);
+    fft_thread_num = tddConf.value("fft_thread_num", 4);
+    demul_thread_num = tddConf.value("demul_thread_num", 11);
+    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
+
+    demul_block_size = tddConf.value("demul_block_size", 48);
+    zf_block_size = tddConf.value("zf_block_size", 1);
+    if (freq_orthogonal_pilot)
+        zf_block_size = UE_NUM;
+    demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+    zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+
+    /* Modulation configurations */
     mod_type = modulation == "64QAM" ? CommsLib::QAM64 : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
     printf("modulation: %s\n", modulation.c_str());
     mod_order = (size_t)pow(2, mod_type);
-    /* LDPC configurations */
+
+    /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
