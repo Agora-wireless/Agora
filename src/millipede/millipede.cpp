@@ -28,7 +28,13 @@ Millipede::Millipede(Config* cfg)
     printf("enter constructor\n");
 
     this->config_ = cfg;
-    initialize_vars_from_cfg();
+#if DEBUG_PRINT_PILOT
+    size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    cout << "Pilot data" << endl;
+    for (size_t i = 0; i < OFDM_CA_NUM; i++)
+        cout << config_->pilots_[i] << ",";
+    cout << endl;
+#endif
 
     int TASK_THREAD_NUM = cfg->worker_thread_num;
     int SOCKET_RX_THREAD_NUM = cfg->socket_thread_num;
@@ -514,13 +520,13 @@ void* Millipede::worker(int tid)
 #ifdef USE_LDPC
         dl_encoded_buffer_,
 #else
-        *dl_IQ_data,
+        config_->dl_IQ_data,
 #endif
         stats_manager_);
 
 #ifdef USE_LDPC
     auto* computeEncoding = new DoEncode(config_, tid, encode_queue_, consumer,
-        *dl_IQ_data, dl_encoded_buffer_, stats_manager_);
+        config_->dl_IQ_data, dl_encoded_buffer_, stats_manager_);
     auto* computeDecoding = new DoDecode(config_, tid, decode_queue_, consumer,
         demod_soft_buffer_, decoded_buffer_, stats_manager_);
 #endif
@@ -615,7 +621,7 @@ void* Millipede::worker_demul(int tid)
 #ifdef USE_LDPC
         dl_encoded_buffer_,
 #else
-        *dl_IQ_data,
+        config_->dl_IQ_data,
 #endif
         stats_manager_);
 
@@ -935,20 +941,6 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id, U
 #endif
 }
 
-void Millipede::initialize_vars_from_cfg()
-{
-    dl_IQ_data = &config_->dl_IQ_data;
-
-#if DEBUG_PRINT_PILOT
-    size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    cout << "Pilot data" << endl;
-    for (size_t i = 0; i < OFDM_CA_NUM; i++)
-        cout << config_->pilots_[i] << ",";
-    cout << endl;
-#endif
-    mod_type = config_->mod_type;
-}
-
 void Millipede::initialize_queues()
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
@@ -1011,6 +1003,7 @@ void Millipede::initialize_uplink_buffers()
 
     equal_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
     demod_hard_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+    size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
     decoded_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
 
