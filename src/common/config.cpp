@@ -45,7 +45,6 @@ Config::Config(std::string jsonfile)
     OFDM_DATA_START = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     UE_NUM = tddConf.value("ue_num", 8);
     downlink_mode = tddConf.value("downlink_mode", false);
-    packet_header_offset = tddConf.value("packet_header_offset", 64);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
 
     rx_addr = tddConf.value("rx_addr", "127.0.0.1");
@@ -163,8 +162,8 @@ Config::Config(std::string jsonfile)
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
-    packet_length = packet_header_offset + sizeof(short) * sampsPerSymbol * 2;
-    //packet_length = packet_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
+    packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
+    //packet_length = offsetof(Packet, data) + sizeof(short) * OFDM_FRAME_LEN * 2;
 
 #ifdef USE_ARGOS
     std::vector<std::vector<double>> gold_ifft = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
