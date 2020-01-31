@@ -151,6 +151,7 @@ void DoDemul::launch(int offset)
             double duration3 = get_time() - start_time3;
             Demul_task_duration[tid * 8][3] += duration3;
 #endif
+            // int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout<< "Demuled data: ";
             // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
