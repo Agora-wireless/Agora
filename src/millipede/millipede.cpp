@@ -209,6 +209,7 @@ void Millipede::start()
                 /* if this is the first frame or the previous frame is all processed, schedule FFT for this packet */
                 if ((frame_count == 0 && fft_stats_.frame_count < 100) || (fft_stats_.frame_count > 0 && previous_frame_done)) {
                     schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
+                    prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] = 0;
                 } else {
                     /* if the previous frame is not finished, store offset in queue */
                     delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]] = offset;
@@ -696,9 +697,6 @@ void Millipede::schedule_fft_task(UNUSED int offset, UNUSED int frame_count,
         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n",
             frame_count, frame_id, get_time() - stats_manager_->get_pilot_received(frame_count));
 #endif
-#if !BIGSTATION
-        prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] = 0;
-#endif
     }
 }
 
@@ -712,6 +710,9 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
             int offset_rx = delay_fft_queue[frame_id][i];
             schedule_fft_task(offset_rx, frame_count + 1, frame_id, data_subframe_id + UE_NUM, 0, consumer);
         }
+#if !BIGSTATION
+        prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] = 0;
+#endif
         delay_fft_queue_cnt[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
         if (config_->downlink_mode)
