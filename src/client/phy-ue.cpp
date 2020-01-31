@@ -103,7 +103,6 @@ Phy_UE::Phy_UE(Config* cfg)
             dl_data_buffer_[i].resize(data_sc_len);
     }
 
-    printf("new RU\n");
     ru_.reset(new RU(rx_thread_num, rx_thread_num, cfg, &message_queue_, &tx_queue_));
 
     // initilize all kinds of checkers
@@ -278,7 +277,7 @@ void Phy_UE::start()
                         {
                             //modul_buffer_[l2_offset] = ul_IQ_modul[i];
                             //l2_buffer_status_[l2_offset] = 1;
-                            printf("At frame %d (prev is %d) scheduling tx for frame %d with l2_offset %d\n", frame_id, prev_frame_id, tx_frame_id, l2_offset);
+                            //printf("At frame %d (prev is %d) scheduling tx for frame %d with l2_offset %d\n", frame_id, prev_frame_id, tx_frame_id, l2_offset);
                             Event_data do_modul_task;
                             do_modul_task.event_type = TASK_MODUL;
                             do_modul_task.data = l2_offset;
@@ -711,7 +710,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     size_t txbuf_offset = frame_offset * frame_samp_size + (tx_packet_length * numAntennas * ul_symbol_id);
 
     size_t IFFT_buffer_target_id = frame_offset * (numAntennas * ul_data_symbol_perframe) + ul_symbol_id * numAntennas;
-    for (size_t ant_id = 0; ant_id < nUEs; ant_id++) // TODO consider nChannels=2 case
+    for (size_t ant_id = 0; ant_id < numAntennas; ant_id++) // TODO consider nChannels=2 case
     {
         //cx_float* modul_ptr = (cx_float *)(&modul_buffer_[offset][ant_id * data_sc_len]);
         //cx_float *tar_out = (cx_float *)ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id+ant_id];
@@ -730,7 +729,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         complex_float* cur_modul_buf = &ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id][0];
         for (size_t n = 0; n < FFT_LEN; n++) {
             //printf("ul_symbol_id %d, ue_id %d, sc %d\n", ul_symbol_id, ant_id, n);
-            cur_modul_buf[n] = ul_IQ_modul[ul_symbol_id * nUEs + ant_id][n];
+            cur_modul_buf[n] = ul_IQ_modul[ul_symbol_id * numAntennas + ant_id][n];
         }
         //void *tar_out = (void *)ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id+ant_id];
         //memcpy(tar_out, (void *)cur_modul_buf, FFT_LEN * sizeof(complex_float));
@@ -845,7 +844,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM ? RX_THREAD_NUM : nUEs; // FIXME: read number of cores and assing accordingly
     core_offset = cfg->core_offset;
-    numAntennas = nUEs * cfg->nChannels;
+    numAntennas = cfg->UE_ANT_NUM;
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data symbols, %zu DL data symbols\n",
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe, ul_data_symbol_perframe, dl_data_symbol_perframe);
 
@@ -858,7 +857,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
 void Phy_UE::getDemulData(long long** ptr, int* size)
 {
     *ptr = (long long*)&equal_buffer_[max_equaled_frame * dl_data_symbol_perframe][0];
-    *size = nUEs * FFT_LEN;
+    *size = numAntennas * FFT_LEN;
 }
 
 void Phy_UE::getEqualPCData(float** ptr, int* size, int ue_id)
@@ -870,7 +869,7 @@ void Phy_UE::getEqualPCData(float** ptr, int* size, int ue_id)
 void Phy_UE::getEqualData(float** ptr, int* size, int ue_id)
 {
     *ptr = (float*)&equal_buffer_[max_equaled_frame * dl_data_symbol_perframe * numAntennas + ue_id][0];
-    *size = nUEs * non_null_sc_len * 2;
+    *size = numAntennas * non_null_sc_len * 2;
 }
 
 extern "C" {

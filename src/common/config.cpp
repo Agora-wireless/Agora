@@ -19,14 +19,16 @@ Config::Config(std::string jsonfile)
     isUE = tddConf.value("UE", false);
     BS_ANT_NUM = tddConf.value("antenna_num", 8);
     UE_NUM = tddConf.value("ue_num", 8);
+    UE_ANT_NUM = UE_NUM;
     Utils::loadDevices(hub_file, hub_ids);
     Utils::loadDevices(serial_file, radio_ids);
     if (radio_ids.size() != 0) {
         nRadios = radio_ids.size();
         nAntennas = nChannels * nRadios;
-        if (isUE)
-            UE_NUM = nAntennas;
-        else {
+        if (isUE) {
+            UE_ANT_NUM = nAntennas;
+            UE_NUM = nRadios;
+        } else {
             if (ref_ant >= nAntennas)
                 ref_ant = 0;
             if (BS_ANT_NUM != nAntennas)
@@ -74,7 +76,7 @@ Config::Config(std::string jsonfile)
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
-        size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_NUM;
+        size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
         pilot_symbol_num_perframe = tddConf.value("pilot_num", pilot_num_default);
         data_symbol_num_perframe = tddConf.value("data_subframe_num_perframe", symbol_num_perframe - pilot_symbol_num_perframe);
         ul_data_symbol_num_perframe = tddConf.value("ul_subframe_num_perframe", downlink_mode ? 0 : symbol_num_perframe - pilot_symbol_num_perframe);
@@ -144,7 +146,7 @@ Config::Config(std::string jsonfile)
     demul_block_size = tddConf.value("demul_block_size", 48);
     zf_block_size = tddConf.value("zf_block_size", 1);
     if (freq_orthogonal_pilot)
-        zf_block_size = UE_NUM;
+        zf_block_size = UE_ANT_NUM;
     demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
     zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
@@ -250,14 +252,14 @@ Config::Config(std::string jsonfile)
         exit(1);
     }
 
-    dl_IQ_data.malloc(data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64);
-    dl_IQ_modul.malloc(data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64); // used for debug
+    dl_IQ_data.malloc(data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
+    dl_IQ_modul.malloc(data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64); // used for debug
     dl_IQ_symbol.malloc(data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
-    ul_IQ_data.malloc(ul_data_symbol_num_perframe * UE_NUM, OFDM_DATA_NUM, 64);
-    ul_IQ_modul.malloc(ul_data_symbol_num_perframe * UE_NUM, OFDM_CA_NUM, 64);
+    ul_IQ_data.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
+    ul_IQ_modul.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
 
 #ifdef GENERATE_DATA
-    for (size_t i = 0; i < data_symbol_num_perframe * UE_NUM; i++) {
+    for (size_t i = 0; i < data_symbol_num_perframe * UE_ANT_NUM; i++) {
         for (size_t j = 0; j < OFDM_DATA_NUM; j++)
             dl_IQ_data[i][j] = rand() % mod_order;
 
@@ -275,7 +277,7 @@ Config::Config(std::string jsonfile)
             }
         }
 
-        size_t c = i / UE_NUM;
+        size_t c = i / UE_ANT_NUM;
         std::vector<std::complex<float>> ifft_dl_data = CommsLib::IFFT(ifft_in_data, OFDM_CA_NUM);
         ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
         for (size_t j = 0; j < sampsPerSymbol; j++) {
@@ -287,7 +289,7 @@ Config::Config(std::string jsonfile)
         }
     }
 
-    for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_NUM; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {
         for (size_t j = 0; j < OFDM_DATA_NUM; j++)
             ul_IQ_data[i][j] = rand() % mod_order;
         std::vector<std::complex<float>> modul_data = CommsLib::modulate(std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM), mod_type);
@@ -308,7 +310,7 @@ Config::Config(std::string jsonfile)
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < UE_NUM; j++) {
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
             r = fread(dl_IQ_data[i] + j * OFDM_CA_NUM, sizeof(int8_t), OFDM_CA_NUM, fd);
             if (r < OFDM_CA_NUM)
                 printf("bad read from file %s (batch %zu) \n", filename1.c_str(), i);
@@ -321,20 +323,20 @@ Config::Config(std::string jsonfile)
 
 #ifdef USE_ARGOS
     // read uplink
-    std::string filename2 = cur_directory1 + "/data/tx_ul_data_" + std::to_string(BS_ANT_NUM) + "x" + std::to_string(UE_NUM) + ".bin";
+    std::string filename2 = cur_directory1 + "/data/tx_ul_data_" + std::to_string(BS_ANT_NUM) + "x" + std::to_string(UE_ANT_NUM) + ".bin";
     fp = fopen(filename2.c_str(), "rb");
     if (fp == NULL) {
         std::cerr << "Openning File " << filename2 << " fails. Error: " << strerror(errno) << std::endl;
     }
-    size_t total_sc = OFDM_DATA_NUM * UE_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
+    size_t total_sc = OFDM_DATA_NUM * UE_ANT_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
     L2_data = new mac_dtype[total_sc];
     r = fread(L2_data, sizeof(mac_dtype), total_sc, fp);
     if (r < total_sc)
         printf("bad read from file %s \n", filename2.c_str());
     fclose(fp);
     for (size_t i = 0; i < total_sc; i++) {
-        size_t sid = i / (data_sc_len * UE_NUM);
-        size_t cid = i % (data_sc_len * UE_NUM) + OFDM_DATA_START;
+        size_t sid = i / (data_sc_len * UE_ANT_NUM);
+        size_t cid = i % (data_sc_len * UE_ANT_NUM) + OFDM_DATA_START;
         ul_IQ_modul[sid][cid] = L2_data[i];
     }
 #endif
@@ -342,7 +344,7 @@ Config::Config(std::string jsonfile)
 
     running = true;
     std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
-    std::cout << "UE_NUM " << UE_NUM << std::endl;
+    std::cout << "UE_ANT_NUM " << UE_ANT_NUM << std::endl;
     std::cout << "PILOT SYM NUM " << pilot_symbol_num_perframe << std::endl;
     std::cout << "UL SYM NUM " << ul_data_symbol_num_perframe << std::endl;
     std::cout << "DL SYM NUM " << dl_data_symbol_num_perframe << std::endl;

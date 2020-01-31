@@ -108,6 +108,7 @@ public:
     bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
     size_t UE_NUM;
+    size_t UE_ANT_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
     size_t OFDM_DATA_START;
