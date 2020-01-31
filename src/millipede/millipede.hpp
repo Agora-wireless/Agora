@@ -96,7 +96,7 @@ public:
     void free_uplink_buffers();
     void free_downlink_buffers();
 
-    void save_demul_data_to_file(int frame_id, int data_subframe_id);
+    void save_demul_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 

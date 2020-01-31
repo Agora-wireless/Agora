@@ -130,6 +130,9 @@ public:
     int rx_port;
     int tx_port;
 
+    /* used in sender to control how many frames to send*/
+    int tx_frame_num;
+
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
