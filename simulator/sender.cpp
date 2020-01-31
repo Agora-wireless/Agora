@@ -344,7 +344,8 @@ void Sender::startTX() {
         }
 #if DEBUG_SENDER
         printf("Finished transmit all antennas in frame: %d, "
-               "next scheduled: %d, in %.5f us\n", tx_frame_count, frame_id, get_time()-start_time);
+               "next scheduled: %d, in %.5f us\n",
+               tx_frame_count, frame_id, get_time() - start_time);
         start_time = get_time();
 #endif
         tick_start = RDTSC();
