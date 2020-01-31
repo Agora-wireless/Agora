@@ -537,7 +537,7 @@ void* Millipede::worker(int tid)
     Doer** computers;
 #ifdef USE_LDPC
     Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeZF, computeReciprocity, computeFFT };
-    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecode };
+    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecoding };
 #else
     Doer* compute_DL[] = { computeIFFT, computePrecode, computeZF, computeReciprocity, computeFFT };
     Doer* compute_UL[] = { computeZF, computeFFT, computeDemul };
