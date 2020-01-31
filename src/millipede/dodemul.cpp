@@ -65,7 +65,7 @@ void DoDemul::launch(int offset)
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
-    
+
     // int mat_elem = UE_NUM * BS_ANT_NUM;
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
@@ -120,7 +120,6 @@ void DoDemul::launch(int offset)
             // cout<<"Precoder: "<< mat_precoder<<endl;
             // cout << "Raw data: " << mat_data.st() <<endl;
 
-
 #if EXPORT_CONSTELLATION
             cx_float* equal_ptr = (cx_float*)(&equal_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
 #else
@@ -152,7 +151,7 @@ void DoDemul::launch(int offset)
             double duration3 = get_time() - start_time3;
             Demul_task_duration[tid * 8][3] += duration3;
 #endif
-            int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+            // int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout<< "Demuled data: ";
             // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
@@ -202,7 +201,7 @@ void DoDemul::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
     Demul_task_duration[tid * 8][0] += duration;
-    if (duration > 500) 
+    if (duration > 500)
         printf("Thread %d Demul takes %.2f\n", tid, duration);
 #endif
     /* inform main thread */

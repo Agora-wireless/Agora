@@ -318,8 +318,9 @@ void Millipede::start()
                         demul_stats_.symbol_count[frame_id] = 0;
 #endif
                         stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
-                        if (stats_manager_->last_frame_id == config_->tx_frame_num - 1) goto finish;
-#else   
+                        if (stats_manager_->last_frame_id == config_->tx_frame_num - 1)
+                            goto finish;
+#else
                         demul_stats_.symbol_count[frame_id] = 0;
 #endif
                         stats_manager_->update_demul_processed(demul_stats_.frame_count);
@@ -341,6 +342,7 @@ void Millipede::start()
                 }
             } break;
 
+#ifdef USE_LDPC
             case EVENT_DECODE: {
                 int offset = event.data;
                 int num_code_blocks = decode_stats_.max_task_count;
@@ -357,7 +359,8 @@ void Millipede::start()
                         stats_manager_->update_decode_processed(decode_stats_.frame_count);
                         print_per_frame_done(PRINT_DECODE, decode_stats_.frame_count, frame_id);
                         stats_manager_->update_stats_in_functions_uplink(decode_stats_.frame_count);
-                        if (stats_manager_->last_frame_id == config_->tx_frame_num - 1) goto finish;
+                        if (stats_manager_->last_frame_id == config_->tx_frame_num - 1)
+                            goto finish;
                         decode_stats_.update_frame_count();
                     }
                 }
@@ -379,6 +382,7 @@ void Millipede::start()
                     }
                 }
             } break;
+#endif /* defined(USE_LDPC) */
 
             case EVENT_PRECODE: {
                 /* Precoding is done, schedule ifft */
@@ -454,7 +458,8 @@ void Millipede::start()
                         stats_manager_->update_tx_processed(tx_stats_.frame_count);
                         print_per_frame_done(PRINT_TX, tx_stats_.frame_count, frame_id);
                         stats_manager_->update_stats_in_functions_downlink(tx_stats_.frame_count);
-                        if (stats_manager_->last_frame_id == config_->tx_frame_num - 1) goto finish;
+                        if (stats_manager_->last_frame_id == config_->tx_frame_num - 1)
+                            goto finish;
                         tx_stats_.update_frame_count();
                     }
                     tx_count++;
@@ -534,7 +539,7 @@ void* Millipede::worker(int tid)
     Doer** computers;
 #ifdef USE_LDPC
     Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeZF, computeReciprocity, computeFFT };
-    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecode };
+    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecoding };
 #else
     Doer* compute_DL[] = { computeIFFT, computePrecode, computeZF, computeReciprocity, computeFFT };
     Doer* compute_UL[] = { computeZF, computeFFT, computeDemul };
@@ -1114,8 +1119,7 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
     std::string filename = cur_directory + "/data/demul_data.bin";
     FILE* fp = fopen(filename.c_str(), "wb");
     for (int i = 0; i < data_subframe_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * 
-                data_subframe_num_perframe + i;
+        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + i;
         for (int sc = 0; sc < OFDM_DATA_NUM; sc++) {
             uint8_t* ptr = &demod_hard_buffer_[total_data_subframe_id][sc * UE_NUM];
             fwrite(ptr, UE_NUM, sizeof(uint8_t), fp);
