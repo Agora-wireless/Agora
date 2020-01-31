@@ -60,6 +60,8 @@ public:
     double compute_count_percentage(Stats_worker stats_in_worker, int total_count, int thread_id);
     void print_summary(int last_frame_id);
 
+    int last_frame_id;
+
     /* stats for the master thread */
     void update_pilot_received(int frame_id) { pilot_received[frame_id % 10000] = get_time(); };
     double get_pilot_received(int frame_id) { return pilot_received[frame_id % 10000]; };

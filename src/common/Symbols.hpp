@@ -72,10 +72,7 @@
 #define PRINT_FFT_CAL 13
 
 #define BIGSTATION 0
-// #define ENABLE_DOWNLINK 0
-#define ENABLE_DECODE 1
 #define USE_IPV4 1
-//#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
 #define EXPORT_CONSTELLATION 0
@@ -108,7 +105,7 @@
 #define DEBUG_SENDER 0
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
-#define WRITE_DEMUL 0
+// #define WRITE_DEMUL 0
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0

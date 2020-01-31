@@ -52,6 +52,8 @@ Config::Config(std::string jsonfile)
     tx_addr = tddConf.value("tx_addr", "127.0.0.1");
     tx_port = tddConf.value("tx_port", 7991);
     rx_port = tddConf.value("rx_port", 7891);
+    
+    tx_frame_num = tddConf.value("tx_frame_num", 9600);
 
     /* Millipede configurations */
     core_offset = tddConf.value("core_offset", 18);
