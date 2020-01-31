@@ -2,13 +2,19 @@
 MOD_ORDER = 16;
 N_SC = 2048;
 SC_IND_DATA = 1:2048;
-NUM_BS_ANT = 32; 
+NUM_BS_ANT = 8; 
 NUM_UE = 8;
 N_SYMS = 70;
 N_OFDM_SYMS = (N_SYMS-NUM_UE)*NUM_UE; 
-NUM_SUBFRAME = 10;
 N_DATA_SYMS = N_OFDM_SYMS * length(SC_IND_DATA);
+% used to generate new pilot files in time domain and frequency domain
+% pilot in time domain: pilot_t_2048.bin
+% pilot in frequency domain: pilot_f_2048.bin
 GENERATE_PILOT = 0;
+% used to generate new data files 
+% original data (tx_data) for all users before modulation: orig_data_2048_ant%d.bin 
+% CSI matrix: H_2048_ant%d.bin
+% received data for all ants after transmitting through noisy channels: rx_data_2048_ant%d.bin
 GENERATE_DATA = 0;
 CP_LEN = 0;
 frmLen = 100;       % frame length
@@ -17,6 +23,8 @@ frmLen = 100;       % frame length
 if GENERATE_PILOT
     pilot_f = randi(3,length(SC_IND_DATA),1)-2;
     pilot_f(pilot_f==0) = 1;
+    pilot_f(1:424) = 0;
+    pilot_f(1625:2048) = 0;
     pilot_t = ifft(pilot_f, N_SC);
     fileID = fopen('../data/pilot_f_2048.bin','w');
     fwrite(fileID,pilot_f,'float');
@@ -40,12 +48,17 @@ end
 %% Generate data
 if GENERATE_DATA
     tx_data = randi(MOD_ORDER, 1, N_DATA_SYMS) - 1;
-    fileID_data = fopen(sprintf('orig_data_2048_ant%d.bin',NUM_BS_ANT),'w');
-    fwrite(fileID_data,tx_data,'int');
+    tx_data_for_saving = reshape(tx_data, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
+    tx_data_for_saving = permute(tx_data_for_saving,[1,3,2]);
+    fileID_data = fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fwrite(fileID_data,tx_data_for_saving(:),'uint8');
     fclose(fileID_data);
 else
     fileID_data = fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT));
-    tx_data = fread(fileID_data,[N_DATA_SYMS,1],'int');
+    tx_data_for_saving = fread(fileID_data,[N_DATA_SYMS,1],'uint8');
+    tx_data_for_saving = reshape(tx_data_for_saving, length(SC_IND_DATA), NUM_UE, N_OFDM_SYMS/NUM_UE);
+    tx_data = permute(tx_data_for_saving,[1,3,2]);
+    tx_data = tx_data(:);
     fclose(fileID);
 end
 
@@ -105,9 +118,7 @@ if(CP_LEN > 0)
     tx_payload_mat = cat(2,tx_cp,tx_payload_mat);
 end
 
-%% Generate CSI
-
-
+%% Generate CSI matrix
 
 if GENERATE_DATA
     % Create the Rayleigh distributed channel response matrix
@@ -123,7 +134,7 @@ if GENERATE_DATA
     H_vec_float = zeros(1,size(H_vec,2)*2);
     H_vec_float(1:2:end) = real(H_vec);
     H_vec_float(2:2:end) = imag(H_vec);   
-    fileID = fopen(sprintf('H_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT),'w');
     fwrite(fileID,H_vec_float,'float');
     fclose(fileID);
 else
@@ -175,7 +186,7 @@ if GENERATE_DATA
     rx_vec_float(1:2:end) = real(rx_vec);
     rx_vec_float(2:2:end) = imag(rx_vec);
 
-    fileID = fopen(sprintf('rx_data_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fileID = fopen(sprintf('../data/rx_data_2048_ant%d.bin',NUM_BS_ANT),'w');
     fwrite(fileID,rx_vec_float,'float');
     fclose(fileID);
     rx_mat_all = permute(rx_mat_all,[1,3,2]);
@@ -225,7 +236,8 @@ end
 rx_data = reshape(rx_data,N_SC,N_OFDM_SYMS/NUM_UE, NUM_UE);
 tx_data_mat = reshape(tx_data,N_SC,N_SYMS-NUM_UE,NUM_UE);
 fprintf("Uplink: correct data demodulation: %d/%d\n",sum(sum(sum(rx_data(425:1624,:,:)==tx_data_mat(425:1624,:,:)))),length(rx_data(:))/N_SC*1200);
-squeeze(rx_data(425:430,1,:))
+% show data of symbol 0 and all users from subcarrier 425 to 430
+disp(squeeze(rx_data(425:430,1,:)));
 % rx_data = permute(rx_data,[2,3,1]);
 
 % % Reshape to a vector
@@ -239,6 +251,19 @@ squeeze(rx_data(425:430,1,:))
 % 
 % 
 % rx_mat = tx_vec.reshape(tx_vec,N_SC,NUM_SUBFRAME);
+
+
+
+
+
+
+
+
+
+
+
+
+
 %% Downlink data analysis
 
 fprintf("Downlink.....\n");
@@ -247,7 +272,7 @@ rx_data_from_file = fread(fileID,[1,N_SC*N_SYMS*NUM_BS_ANT*2],'float');
 rx_data_from_file_float = rx_data_from_file(1:2:end)+1j*rx_data_from_file(2:2:end);
 rx_data_from_file_float = reshape(rx_data_from_file_float,N_SC,NUM_BS_ANT,N_SYMS);
 rx_data_from_file_float = permute(rx_data_from_file_float,[1,3,2]);
-rx_pilot_from_file = rx_data_from_file_float(:,1:8,:);
+% rx_pilot_from_file = rx_data_from_file_float(:,1:8,:);
 
 fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
 H_from_file = fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
@@ -261,6 +286,7 @@ for i = 1:NUM_UE
 end
 fprintf("CSI_estimation error: %d/%d\n",sum(sum(sum(abs(CSI_est(425:1624,:,:)-H_from_file_float(425:1624,:,:))>0.5*1e-1))),length(H_from_file_float(:)));
 
+%% Precoder calculation and precoding
 
 precoder_from_file = zeros(N_SC,NUM_BS_ANT,NUM_UE);
 for i = 1:N_SC
@@ -268,18 +294,22 @@ for i = 1:N_SC
     precoder_from_file(i,:,:) = pinv(H_est);
 end
 
-tx_data_dl_raw = reshape(tx_data,N_SC,NUM_UE,N_SYMS-NUM_UE);
-tx_data_dl = reshape(tx_syms,N_SC,NUM_UE,N_SYMS-NUM_UE);
+% original data before modulation
+tx_data_dl_raw = reshape(tx_data,N_SC,N_SYMS-NUM_UE, NUM_UE);
+tx_data_dl_raw = permute(tx_data_dl_raw, [1, 3, 2]);
+% original data after modulation
+tx_data_dl = reshape(tx_syms,N_SC,N_SYMS-NUM_UE, NUM_UE);
+tx_data_dl = permute(tx_data_dl, [1, 3, 2]);
 
 precoded_data = zeros(N_SC,NUM_BS_ANT,N_SYMS-NUM_UE);
 dl_rx_data_f = zeros(N_SC,NUM_BS_ANT,N_SYMS-NUM_UE);
 for i = 1:1200
-    precoded_data(424+i,:,:) = squeeze(precoder_from_file(424+i,:,:))*squeeze(tx_data_dl(i,:,:));
+    precoded_data(424+i,:,:) = squeeze(precoder_from_file(424+i,:,:))*squeeze(tx_data_dl(424+i,:,:));
     dl_rx_data_f(424+i,:,:) = squeeze(precoded_data(424+i,:,:));
 %     dl_rx_data_f(424+i,:,:) = squeeze(H_from_file_float(424+i,:,:))*squeeze(precoded_data(424+i,:,:));
 end
 
-ifft_data = ifft(precoded_data,N_SC,1);
+% ifft_data = ifft(precoded_data,N_SC,1);
 dl_rx_data = ifft(dl_rx_data_f,N_SC,1);
 
 dl_rx_data_fft_orig = fft(dl_rx_data,N_SC,1);
@@ -299,5 +329,6 @@ switch(MOD_ORDER)
 end
 
 ue_rx_data = reshape(ue_rx_data,N_SC,NUM_UE,N_SYMS-NUM_UE);
-fprintf("Downlink: correct data demodulation: %d/%d\n",sum(sum(sum(ue_rx_data(425:425+1199,:,:)==tx_data_dl_raw(1:1200,:,:)))),1200*NUM_UE*(N_SYMS-NUM_UE));
-
+fprintf("Downlink: correct data demodulation: %d/%d\n",sum(sum(sum(ue_rx_data(425:425+1199,:,:)==tx_data_dl_raw(425:425+1199,:,:)))),1200*NUM_UE*(N_SYMS-NUM_UE));
+% show data of symbol 0 and all users from subcarrier 425 to 430
+squeeze(ue_rx_data(425:430,:,1))
