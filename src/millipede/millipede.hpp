@@ -240,7 +240,9 @@ private:
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> zf_queue_;
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+#ifdef USE_LDPC
     moodycamel::ConcurrentQueue<Event_data> decode_queue_;
+#endif
     /* main thread message queue for data receiving */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     /* main thread message queue for task completion*/
@@ -250,7 +252,9 @@ private:
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> rc_queue_;
     // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+#ifdef USE_LDPC
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
+#endif
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
