@@ -122,7 +122,6 @@ public:
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
 
-    size_t packet_header_offset;
     size_t packet_length;
 
     std::string rx_addr;
