@@ -65,25 +65,16 @@ void DoDemul::launch(int offset)
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
-    float* tar_data_ptr = (float*)spm_buffer;
+    
     // int mat_elem = UE_NUM * BS_ANT_NUM;
     // int cache_line_num = mat_elem / 8;
     // int ue_data_cache_line_num = UE_NUM/8;
     int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
-
-    /* i = 0, 1, ..., 32/8
-     * iterate through cache lines (each cache line has 8 subcarriers) */
+    /* iterate through cache lines (each cache line has 8 subcarriers) */
     for (int i = 0; i < max_sc_ite / 8; i++) {
-        int cur_block_id = (sc_id + i * 8) / transpose_block_size;
-        int sc_inblock_idx = (i * 8) % transpose_block_size;
-        int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
-        float* src_data_ptr = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
-/* for a cache line size of 64 bytes, each read load 8 subcarriers
-         * use spatial locality to reduce latency */
 #if DEBUG_UPDATE_STATS_DETAILED
         double start_time1 = get_time();
 #endif
-
         // for (int j = 0; j < 1; j++) {
         //     int cur_sc_id = i * 8 + j + sc_id;
         //     int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
@@ -93,14 +84,17 @@ void DoDemul::launch(int offset)
         //     }
         // }
 
-        /* gather data for all antennas and 8 subcarriers in the same cache line */
+        /* gather data for all antennas and 8 subcarriers in the same cache line 
+         * 1 subcarrier and 4 ants per iteration */
+        int cur_block_id = (sc_id + i * 8) / transpose_block_size;
+        int sc_inblock_idx = (sc_id + i * 8) % transpose_block_size;
+        int cur_sc_offset = cur_block_id * transpose_block_size * BS_ANT_NUM + sc_inblock_idx;
+        float* src_data_ptr = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
+        float* tar_data_ptr = (float*)spm_buffer;
         for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-            /* 1 subcarrier and 4 ants per iteration */
             for (int j = 0; j < 8; j++) {
                 __m256 data_rx = _mm256_i32gather_ps(src_data_ptr + j * 2, index, 4);
                 _mm256_store_ps(tar_data_ptr + j * BS_ANT_NUM * 2, data_rx);
-                // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1),
-                //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
             }
             src_data_ptr += gather_step_size;
             tar_data_ptr += 8;
@@ -110,7 +104,7 @@ void DoDemul::launch(int offset)
         Demul_task_duration[tid * 8][1] += duration1;
 #endif
 
-        /* perform computation for 8 subcarriers */
+        /* computation for 8 subcarriers */
         for (int j = 0; j < 8; j++) {
             /* create input data matrix */
             cx_float* data_ptr = (cx_float*)(spm_buffer + j * BS_ANT_NUM);
@@ -123,14 +117,16 @@ void DoDemul::launch(int offset)
                 precoder_offset = precoder_offset - cur_sc_id % UE_NUM;
             cx_float* precoder_ptr = (cx_float*)precoder_buffer_[precoder_offset];
             cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
-// cout<<"Precoder: "<< mat_precoder<<endl;
+            // cout<<"Precoder: "<< mat_precoder<<endl;
+            // cout << "Raw data: " << mat_data.st() <<endl;
 
-/* create output matrix for equalization */
+
 #if EXPORT_CONSTELLATION
             cx_float* equal_ptr = (cx_float*)(&equal_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
 #else
             cx_float* equal_ptr = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - sc_id) * UE_NUM]);
 #endif
+            /* create output matrix for equalization */
             cx_fmat mat_equaled(equal_ptr, UE_NUM, 1, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -138,7 +134,6 @@ void DoDemul::launch(int offset)
 #endif
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
-            // cout<<mat_equaled.st()<<endl;
 
 #if DEBUG_UPDATE_STATS_DETAILED
             double start_time3 = get_time();
@@ -152,12 +147,12 @@ void DoDemul::launch(int offset)
             /* decode with hard decision */
             uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
             demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, UE_NUM);
-// demod_16qam_hard_loop((float *)equal_ptr, demul_ptr, UE_NUM);
+
 #if DEBUG_UPDATE_STATS_DETAILED
             double duration3 = get_time() - start_time3;
             Demul_task_duration[tid * 8][3] += duration3;
 #endif
-
+            int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout<< "Demuled data: ";
             // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
@@ -172,30 +167,6 @@ void DoDemul::launch(int offset)
 #endif
         }
     }
-
-    // #if !ENABLE_DECODE
-    // // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
-    // // cout<< "Demuled data: \n";
-    // __m256i index2 = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4,
-    //                                     UE_NUM* 4 + 1, UE_NUM * 6, UE_NUM* 6 + 1);
-    // for (int i = 0; i < UE_NUM; i++) {
-    //     float* equal_ptr = (float *)(equaled_buffer_temp + i);
-    //     uint8_t *demul_ptr = (&demod_hard_buffer_[total_data_subframe_id][OFDM_DATA_NUM * i + sc_id]);
-    //     // cout<<"UE "<<i<<": ";
-    //     for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) {
-    //         __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
-    //         demod_16qam_loop_simd((float *)&equal_T_temp, demul_ptr, double_num_in_simd256, 1);
-
-    //         // for (int k = 0; k < double_num_in_simd256; k++) {
-    //         //     // printf("(%.3f,%.3f) ", ((float *)&equal_T_temp)[k * 2], ((float *)&equal_T_temp)[k * 2 + 1]);
-    //         //     printf("%i ", *(demul_ptr + k));;
-    //         // }
-    //         equal_ptr += UE_NUM * double_num_in_simd256 * 2;
-    //         demul_ptr += double_num_in_simd256;
-    //     }
-    //     // cout<<endl;
-    // }
-    // #endif
 
 #ifdef USE_LDPC
     // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
@@ -231,9 +202,8 @@ void DoDemul::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
     Demul_task_duration[tid * 8][0] += duration;
-    if (duration > 500) {
+    if (duration > 500) 
         printf("Thread %d Demul takes %.2f\n", tid, duration);
-    }
 #endif
     /* inform main thread */
     Event_data demul_finish_event;
