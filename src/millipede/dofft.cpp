@@ -135,12 +135,12 @@ void DoFFT::launch(int offset)
         //else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
         //    RC_task_duration[tid * 8][2] += duration2;
 #endif
-    // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-    // printf("FFT output\n");
-    // for (int i = OFDM_DATA_START; i < OFDM_CA_NUM - OFDM_DATA_START * 2; i++) {
-    //     std::cout <<"("<<i<<", "<<(*(fft_buffer_.FFT_inputs[0] +i)).re<<","<<(*(fft_buffer_.FFT_inputs[0] +i)).im<<") ";
-    // }
-    // printf("\n");
+        // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+        // printf("FFT output\n");
+        // for (int i = OFDM_DATA_START; i < OFDM_CA_NUM - OFDM_DATA_START * 2; i++) {
+        //     std::cout <<"("<<i<<", "<<(*(fft_buffer_.FFT_inputs[0] +i)).re<<","<<(*(fft_buffer_.FFT_inputs[0] +i)).im<<") ";
+        // }
+        // printf("\n");
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid, frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
@@ -151,10 +151,10 @@ void DoFFT::launch(int offset)
     size_t BS_ANT_NUM = config_->BS_ANT_NUM;
     int transpose_block_size = config_->transpose_block_size;
     if (cur_symbol_type == PILOT) {
-        int pilot_id = config_->getPilotSFIndex(frame_id, subframe_id); 
+        int pilot_id = config_->getPilotSFIndex(frame_id, subframe_id);
         int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * config_->pilot_symbol_num_perframe + pilot_id;
         int sc_idx = config_->OFDM_DATA_START;
-        float* cur_fft_buffer_float_output = (float*)(fft_buffer_.FFT_inputs[0]); 
+        float* cur_fft_buffer_float_output = (float*)(fft_buffer_.FFT_inputs[0]);
         float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
 
         int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
@@ -183,7 +183,7 @@ void DoFFT::launch(int offset)
                 sc_idx += 8;
             }
         }
-        // for (int i =0;i<OFDM_DATA_NUM*BS_ANT_NUM; i++) 
+        // for (int i =0;i<OFDM_DATA_NUM*BS_ANT_NUM; i++)
         //     std::cout<<"("<<i<<", "<<csi_buffer_[subframe_offset][i].real<<"+j"<<csi_buffer_[subframe_offset][i].imag<<") ";
         // std::cout<<std::endl;
     } else if (cur_symbol_type == UL) {
