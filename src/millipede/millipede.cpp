@@ -342,6 +342,7 @@ void Millipede::start()
                 }
             } break;
 
+#ifdef USE_LDPC
             case EVENT_DECODE: {
                 int offset = event.data;
                 int num_code_blocks = decode_stats_.max_task_count;
@@ -381,6 +382,7 @@ void Millipede::start()
                     }
                 }
             } break;
+#endif /* defined(USE_LDPC) */
 
             case EVENT_PRECODE: {
                 /* Precoding is done, schedule ifft */
