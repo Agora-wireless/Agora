@@ -49,7 +49,6 @@ Config::Config(std::string jsonfile)
     bwFilter = rate + 2 * nco;
     radioRfFreq = freq - nco;
     beacon_ant = tddConf.value("beacon_antenna", 0);
-    beacon_len = tddConf.value("beacon_len", 256);
     beamsweep = tddConf.value("beamsweep", false);
     sampleCalEn = tddConf.value("sample_calibrate", false);
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
@@ -177,19 +176,33 @@ Config::Config(std::string jsonfile)
 
 #ifdef USE_ARGOS
     std::vector<std::vector<double>> gold_ifft = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
-    std::vector<std::complex<int16_t>> coeffs_ci16 = Utils::double_to_int16(gold_ifft);
-    coeffs = Utils::cint16_to_uint32(coeffs_ci16, true, "QI");
-    beacon_ci16.resize(256);
-    for (size_t i = 0; i < 128; i++) {
-        beacon_ci16[i] = std::complex<int16_t>((int16_t)(gold_ifft[0][i] * 32768), (int16_t)(gold_ifft[1][i] * 32768));
-        beacon_ci16[i + 128] = beacon_ci16[i];
+    std::vector<std::complex<int16_t>> gold_ifft_ci16 = Utils::double_to_cint16(gold_ifft);
+
+    std::vector<std::vector<double>> sts_seq = CommsLib::getSequence(0, CommsLib::STS_SEQ);
+    std::vector<std::complex<int16_t>> sts_seq_ci16 = Utils::double_to_cint16(sts_seq);
+
+    // Populate STS (stsReps repetitions)
+    int stsReps = 15;
+    for (int i = 0; i < stsReps; i++) {
+        beacon_ci16.insert(beacon_ci16.end(), sts_seq_ci16.begin(), sts_seq_ci16.end());
     }
 
-    std::vector<std::complex<int16_t>> pre0(prefix, 0);
-    std::vector<std::complex<int16_t>> post0(sampsPerSymbol - 256 - prefix, 0);
-    beacon_ci16.insert(beacon_ci16.begin(), pre0.begin(), pre0.end());
-    beacon_ci16.insert(beacon_ci16.end(), post0.begin(), post0.end());
+    // Populate gold sequence (two reps, 128 each)
+    int goldReps = 2;
+    for (int i = 0; i < goldReps; i++) {
+        beacon_ci16.insert(beacon_ci16.end(), gold_ifft_ci16.begin(), gold_ifft_ci16.end());
+    }
+
+    beacon_len = beacon_ci16.size();
+
+    if (sampsPerSymbol < beacon_len + prefix + postfix) {
+        std::string msg = "Minimum supported subframe_size is ";
+        msg += std::to_string(beacon_len);
+        throw std::invalid_argument(msg);
+    }
+
     beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
+    coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
@@ -242,11 +255,7 @@ Config::Config(std::string jsonfile)
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
-    pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
-    std::vector<uint32_t> pre(prefix, 0);
-    std::vector<uint32_t> post(postfix, 0);
-    pilot.insert(pilot.begin(), pre.begin(), pre.end());
-    pilot.insert(pilot.end(), post.begin(), post.end());
+    pilot = Utils::cint16_to_uint32(pilot_ci16, false, "QI");
     if (pilot.size() != sampsPerSymbol) {
         std::cout << "generated pilot symbol size does not match configured symbol size!" << std::endl;
         exit(1);
