@@ -369,13 +369,29 @@ void RU::taskThread(int tid)
     int packet_num = 0;
     long long frameTime;
 
+    int all_trigs = 0;
+    struct timespec tv, tv2;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+
     int maxQueueLength = 0;
     int cursor = 0;
     while (config_->running) {
+        clock_gettime(CLOCK_MONOTONIC, &tv2);
+        double diff = ((tv2.tv_sec - tv.tv_sec) * 1e9 + (tv2.tv_nsec - tv.tv_nsec)) / 1e9;
+        if (diff > 2) {
+            int total_trigs = radio->triggers(tid);
+            std::cout << "new triggers: " << total_trigs - all_trigs << ", total: " << total_trigs << std::endl;
+            all_trigs = total_trigs;
+            tv = tv2;
+        }
         // if buffer is full, exit
         if (buffer_status[cursor] == 1) {
-            printf("RX thread %d buffer full\n", tid);
+            printf("RX thread %d at cursor %d buffer full\n", tid, cursor);
             //exit(0);
+            for (size_t a = 0; a < buffer_frame_num_; a++) {
+		printf("%d ", buffer_status[a]);
+            }
+            printf("");
             config_->running = false;
             break;
         }
@@ -449,7 +465,7 @@ void RU::taskThread(int tid)
                 pkt[ch] = (struct Packet*)&buffer[(cursor + ch) * config_->packet_length];
                 samp[ch] = pkt[ch]->data;
             }
-            while (config_->running && radio->radioRx(it, samp, frameTime) <= 0)
+            while (config_->running && radio->radioRx(it, samp, frameTime) < config_->sampsPerSymbol)
                 ;
             int frame_id = (int)(frameTime >> 32);
             int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
