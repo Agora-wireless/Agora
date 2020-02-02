@@ -239,9 +239,6 @@ void Phy_UE::start()
             // if EVENT_RX_SYMBOL, do crop
             case EVENT_PACKET_RECEIVED: {
                 int offset = event.data;
-                Event_data do_crop_task;
-                do_crop_task.event_type = TASK_FFT;
-                do_crop_task.data = offset;
 
                 int buffer_frame_num = rx_buffer_status_size;
                 int rx_thread_id = offset / buffer_frame_num;
@@ -289,6 +286,9 @@ void Phy_UE::start()
                 //demul_begin = std::chrono::system_clock::now();
 
                 if (dl_data_symbol_perframe > 0 && (cfg->isPilot(frame_id, symbol_id) || cfg->isDownlink(frame_id, symbol_id))) {
+                    Event_data do_crop_task;
+                    do_crop_task.event_type = TASK_FFT;
+                    do_crop_task.data = offset;
                     schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT
 
@@ -296,6 +296,9 @@ void Phy_UE::start()
                     cropper_created_checker_[cropper_created_checker_id]++;
 #endif
                 }
+		else { // if we are not entering doFFT, let's reset buffer here
+                    rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty
+		}
             } break;
 
             case EVENT_FFT: {
@@ -848,7 +851,7 @@ void Phy_UE::initialize_vars_from_cfg(Config* cfg)
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data symbols, %zu DL data symbols\n",
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe, ul_data_symbol_perframe, dl_data_symbol_perframe);
 
-    tx_buffer_status_size = (ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
+    tx_buffer_status_size = (ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM * 36);
     tx_buffer_size = tx_packet_length * tx_buffer_status_size;
     rx_buffer_status_size = (dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM * 36);
     rx_buffer_size = packet_length * rx_buffer_status_size;
