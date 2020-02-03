@@ -354,7 +354,7 @@ void Millipede::start()
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
                     print_per_subframe_done(PRINT_DECODE, decode_stats_.frame_count, frame_id, data_subframe_id);
-                    if (decode_stats_.symbol_count[frame_id] == decode_stats_.max_symbol_count) {
+                    if (++decode_stats_.symbol_count[frame_id] == decode_stats_.max_symbol_count) {
 #if !BIGSTATION
                         schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, data_subframe_id, consumer_fft);
                         prev_frame_counter[frame_id] = 0;
