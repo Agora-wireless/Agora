@@ -126,6 +126,7 @@ void Millipede::start()
         /* start downlink transmitter */
         tx_threads = receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
             dl_socket_buffer_status_size_, dl_socket_buffer_size_);
+#if !BIGSTATION
         prev_frame_counter = ifft_stats_.symbol_count;
         prev_frame_counter_max = ifft_stats_.max_symbol_count;
     } else {
@@ -135,6 +136,7 @@ void Millipede::start()
         prev_frame_counter = demul_stats_.symbol_count;
 #endif
         prev_frame_counter_max = demul_stats_.max_symbol_count;
+#endif /* !BIGSTATION */
     }
 
     /* counters for printing summary */
