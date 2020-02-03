@@ -16,8 +16,8 @@ Config::Config(std::string jsonfile)
     nCells = tddConf.value("cells", 1);
     channel = tddConf.value("channel", "A");
     nChannels = std::min(channel.size(), (size_t)2);
-    isUE = tddConf.value("UE", false);
     BS_ANT_NUM = tddConf.value("antenna_num", 8);
+    isUE = tddConf.value("UE", false);
     UE_NUM = tddConf.value("ue_num", 8);
     UE_ANT_NUM = UE_NUM;
     Utils::loadDevices(hub_file, hub_ids);
@@ -131,6 +131,10 @@ Config::Config(std::string jsonfile)
     if (isUE and !freq_orthogonal_pilot and nRadios != pilot_symbol_num_perframe) {
         std::cerr << "Number of Pilot Symbols don't match number of Clients!" << std::endl;
         exit(0);
+    }
+    if (!isUE and !freq_orthogonal_pilot and tddConf.find("ue_num") == tddConf.end()) {
+        UE_NUM = pilot_symbol_num_perframe;
+        UE_ANT_NUM = UE_NUM;
     }
 
     /* Millipede configurations */
@@ -283,9 +287,9 @@ Config::Config(std::string jsonfile)
                 dl_IQ_modul[i][j].im = 0;
                 ifft_in_data.push_back(0);
             } else {
-                dl_IQ_modul[i][j].re = modul_data[j-OFDM_DATA_START].real();
-                dl_IQ_modul[i][j].im = modul_data[j-OFDM_DATA_START].imag();
-                ifft_in_data.push_back(modul_data[j-OFDM_DATA_START]);
+                dl_IQ_modul[i][j].re = modul_data[j - OFDM_DATA_START].real();
+                dl_IQ_modul[i][j].im = modul_data[j - OFDM_DATA_START].imag();
+                ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
             }
         }
 
