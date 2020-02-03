@@ -321,8 +321,7 @@ void Millipede::start()
                         /* schedule fft for the next frame if there are delayed fft tasks */
 #ifndef USE_LDPC
 #if !BIGSTATION
-                        if (!schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
-                            demul_stats_.symbol_count[frame_id] = demul_stats_.max_symbol_count;
+                        schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, data_subframe_id, consumer_fft);
 #endif
                         stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
                         if (stats_manager_->last_frame_id == config_->tx_frame_num - 1)
@@ -435,8 +434,7 @@ void Millipede::start()
                     if (ifft_stats_.last_symbol(frame_id)) {
 #if !BIGSTATION
                         /* schedule fft for next frame */
-                        if (!schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
-                            ifft_stats_.symbol_count[frame_id] = ifft_stats_.max_symbol_count;
+                        schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, consumer_fft);
 #endif
                         stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
                         print_per_frame_done(PRINT_IFFT, ifft_stats_.frame_count, frame_id);
@@ -703,6 +701,9 @@ void Millipede::schedule_fft_task(int offset, int frame_count,
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n",
             frame_count, frame_id, get_time() - stats_manager_->get_pilot_received(frame_count));
+#endif
+#if !BIGSTATION
+        prev_frame_counter[(frame_id + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM] = 0;
 #endif
     }
 }
