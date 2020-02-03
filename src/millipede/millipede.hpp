@@ -174,8 +174,10 @@ private:
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
     Data_stats demul_stats_;
+#ifdef USE_LDPC
     Data_stats decode_stats_;
     Data_stats encode_stats_;
+#endif
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
