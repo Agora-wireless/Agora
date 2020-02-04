@@ -210,6 +210,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
+    int UE_NUM = config_->UE_NUM;
     int frame_id = offset / config_->zf_block_num;
     int sc_id = offset % config_->zf_block_num * zf_block_size;
 #if DEBUG_PRINT_IN_TASK
@@ -222,7 +223,6 @@ void DoZF::ZF_freq_orthogonal(int offset)
 #endif
     int transpose_block_size = config_->transpose_block_size;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
     for (int i = 0; i < UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
         // directly gather data from FFT buffer
