@@ -253,13 +253,6 @@ bool RadioConfig::radioStart()
 
     std::vector<std::string> _tddSched;
     drain_buffers();
-    calib = false;
-    for (size_t f = 0; f < _cfg->framePeriod; f++) {
-        std::string sched = _cfg->frames[f];
-        if (sched.find("C") != std::string::npos
-            && sched.find("L") != std::string::npos)
-            calib = true;
-    }
     json conf;
     conf["tdd_enabled"] = true;
     conf["frame_mode"] = "free_running";
@@ -312,7 +305,7 @@ bool RadioConfig::radioStart()
             ++ndx;
         }
         baStn[i]->writeSetting("BEACON_START", std::to_string(_radioNum));
-        if (calib) {
+        if (_cfg->recipCalEn) {
             if (isRefAnt) {
                 baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
                 // looks like the best solution is to just use one
