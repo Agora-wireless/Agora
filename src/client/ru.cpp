@@ -189,7 +189,7 @@ void RU::sendThread(int tid)
     int packet_length = config_->packet_length;
 #ifndef SIM
     ClientRadioConfig* radio = radioconfig_;
-    packet_length -= config_->packet_header_offset;
+    packet_length -= offsetof(Packet, data);
 #endif
 
     int ret;
@@ -507,7 +507,7 @@ void RU::taskThread(int tid)
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
                     size_t tx_symbol = txSymbols[tx_symbol_id];
                     //int tx_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(), config_->getNumAntennas(), tx_frame_id, tx_symbol_id, ant_id);
-                    int tx_packet_length = config_->packet_length - config_->packet_header_offset;
+                    int tx_packet_length = config_->packet_length - offsetof(Packet, data);
                     int frame_samp_size = tx_packet_length * n_ant * txSymbols.size();
                     int tx_offset = tx_frame_offset * frame_samp_size + tx_packet_length * (n_ant * tx_symbol_id + ant_id);
                     void* txbuf[2];

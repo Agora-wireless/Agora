@@ -89,20 +89,18 @@ public:
     void print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id);
     void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id);
 
-    void initialize_vars_from_cfg();
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
     void free_uplink_buffers();
     void free_downlink_buffers();
 
-    void save_demul_data_to_file(int frame_id, int data_subframe_id);
+    void save_demul_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 
 private:
     /* lookup table for 16 QAM, real and imag */
-    size_t mod_type;
     float** qam16_table_;
     Config* config_;
     int max_equaled_frame = 0;
@@ -113,7 +111,6 @@ private:
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
-    EventHandlerContext<Millipede>* context;
     /*****************************************************
      * Buffers
      *****************************************************/
@@ -191,7 +188,6 @@ private:
      * First dimension: data_subframe_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
-    Table<int8_t>* dl_IQ_data;
     Table<long long> dl_IQ_data_long;
 
     /** 

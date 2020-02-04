@@ -1,5 +1,5 @@
 #include "cpu_attach.hpp"
-#include "ittnotify.h"
+// #include "ittnotify.h"
 #include <armadillo>
 #include <complex.h>
 #include <math.h>
@@ -36,13 +36,13 @@ static double bench_ZF_warmup(unsigned Nx, unsigned Ny, unsigned iterations) {
   cx_fmat mat_input(real_H, imag_H);
   cx_fmat mat_output(Ny, Nx);
 
-  __itt_resume();
+  // __itt_resume();
   double start_time = test_get_time();
   for (unsigned i = 0; i < iterations; i++) {
     pinv(mat_output, mat_input, 1e-1, "dc");
   }
   double end_time = test_get_time();
-  __itt_pause();
+  // __itt_pause();
 
   return end_time - start_time;
 }
@@ -56,13 +56,13 @@ static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations) {
 
   // std::cout<<mat_input<<std::endl;
 
-  __itt_resume();
+  // __itt_resume();
   double start_time = test_get_time();
   for (unsigned i = 0; i < iterations; i++) {
     pinv(mat_output, mat_input, 1e-1, "dc");
   }
   double end_time = test_get_time();
-  __itt_pause();
+  // __itt_pause();
 
   return end_time - start_time;
 }
@@ -79,11 +79,11 @@ static double bench_multiply_dim1(unsigned Nx, unsigned Ny,
   cx_fmat result(1, Ny);
 
   double start_time = test_get_time();
-  __itt_resume();
+  // __itt_resume();
   for (unsigned i = 0; i < iterations; i++) {
     result = mat_left * mat_right;
   }
-  __itt_pause();
+  // __itt_pause();
   double end_time = test_get_time();
 
   return end_time - start_time;
@@ -101,11 +101,11 @@ static double bench_multiply_dim2(unsigned Nx, unsigned Ny,
   cx_fmat result(Nx, 1);
 
   double start_time = test_get_time();
-  __itt_resume();
+  // __itt_resume();
   for (unsigned i = 0; i < iterations; i++) {
     result = mat_left * mat_right;
   }
-  __itt_pause();
+  // __itt_pause();
   double end_time = test_get_time();
 
   return end_time - start_time;
@@ -134,35 +134,35 @@ static double bench_multiply_transpose(unsigned Nx, unsigned Ny,
 static void run_benchmark_ZF(unsigned Nx, unsigned Ny, unsigned iterations) {
   double zf_time1 = bench_ZF_warmup(Nx, Ny, iterations);
   // hpctoolkit_sampling_start();
-  __itt_pause();
+  // __itt_pause();
   double zf_time2 = bench_ZF(Nx, Ny, iterations);
   double zf_time3 = bench_ZF(Nx, Ny, iterations);
   double zf_time4 = bench_ZF(Nx, Ny, iterations);
   double zf_time5 = bench_ZF(Nx, Ny, iterations);
   double zf_time6 = bench_ZF(Nx, Ny, iterations);
   double zf_time7 = bench_ZF(Nx, Ny, iterations);
-  __itt_pause();
+  // __itt_pause();
   // hpctoolkit_sampling_start();
 
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time1 / iterations);
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time2 / iterations);
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time3 / iterations);
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time4 / iterations);
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time5 / iterations);
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time6 / iterations);
-  printf("ZF:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * zf_time7 / iterations);
 }
 
 static void run_benchmark_multiply(int dim, unsigned Nx, unsigned Ny,
                                    unsigned iterations) {
-  __itt_pause();
+  // __itt_pause();
   double mul_time1 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations)
                                 : bench_multiply_dim2(Nx, Ny, iterations);
   double mul_time2 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations)
@@ -173,21 +173,21 @@ static void run_benchmark_multiply(int dim, unsigned Nx, unsigned Ny,
                                 : bench_multiply_dim2(Nx, Ny, iterations);
   double mul_time5 = (dim == 1) ? bench_multiply_dim1(Nx, Ny, iterations)
                                 : bench_multiply_dim2(Nx, Ny, iterations);
-  __itt_pause();
+  // __itt_pause();
 
   if (dim == 1)
     printf("(1 x %04u) * (%04u x %04u)\n", Nx, Nx, Ny);
   if (dim == 2)
     printf("(%04u x %04u) * (%04u x 1)\n", Nx, Ny, Ny);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time1 / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time2 / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time3 / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time4 / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time5 / iterations);
 }
 
@@ -206,32 +206,32 @@ static void run_benchmark_precode(unsigned Nx, unsigned Ny,
   double mul_time5_precode = bench_multiply_transpose(Nx, Ny, iterations);
 
   printf("Equalization: (%04u x %04u) * (%04u x 1)\n", Nx, Ny, Ny);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time1_equal / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time2_equal / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time3_equal / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time4_equal / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time5_equal / iterations);
 
   printf("Precoding: (%04u x %04u) * (%04u x 1)\n", Ny, Nx, Nx);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time1_precode / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time2_precode / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time3_precode / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time4_precode / iterations);
-  printf("Multiply:              %04u x %04u  %12.3f us iteration\n", Nx, Ny,
+  printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
          1000000.0 * mul_time5_precode / iterations);
 }
 
 int main(int argc, char *argv[]) {
-  __itt_pause();
+  // __itt_pause();
   putenv("MKL_THREADING_LAYER=sequential");
   std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
             << std::endl;

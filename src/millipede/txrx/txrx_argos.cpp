@@ -18,8 +18,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
 
     /* initialize random seed: */
     srand(time(NULL));
-    rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
-    tx_context = new EventHandlerContext<PacketTXRX>[tx_thread_num_];
 
     radioconfig_ = new RadioConfig(config_);
 }
@@ -38,8 +36,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
 PacketTXRX::~PacketTXRX()
 {
     delete[] socket_;
-    delete[] tx_context;
-    delete[] rx_context;
     radioconfig_->radioStop();
     delete radioconfig_;
     delete config_;
@@ -68,10 +64,11 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     for (int i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread_;
         // record the thread id
-        rx_context[i].obj_ptr = this;
-        rx_context[i].id = i;
+        auto context = new EventHandlerContext<PacketTXRX>;
+        context->obj_ptr = this;
+        context->id = i;
         // start socket thread
-        if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv_Argos>, &rx_context[i]) != 0) {
+        if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv_Argos>, context) != 0) {
             perror("socket recv thread create failed");
             exit(0);
         }
@@ -99,11 +96,10 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
 
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
-
-        tx_context[i].obj_ptr = this;
-        tx_context[i].id = i;
-
-        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopSend_Argos>, &tx_context[i]) != 0) {
+        auto context = new EventHandlerContext<PacketTXRX>;
+        context->obj_ptr = this;
+        context->id = i;
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopSend_Argos>, context) != 0) {
             perror("socket Transmit thread create failed");
             exit(0);
         }

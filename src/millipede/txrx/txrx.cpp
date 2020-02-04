@@ -18,8 +18,7 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
 
     /* initialize random seed: */
     srand(time(NULL));
-    rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
-    tx_context = new EventHandlerContext<PacketTXRX>[tx_thread_num_];
+    
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset,
@@ -36,8 +35,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in
 PacketTXRX::~PacketTXRX()
 {
     delete[] socket_;
-    delete[] tx_context;
-    delete[] rx_context;
     delete config_;
 }
 
@@ -60,10 +57,11 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
         for (int i = 0; i < rx_thread_num_; i++) {
             pthread_t recv_thread_;
             // record the thread id
-            rx_context[i].obj_ptr = this;
-            rx_context[i].id = i;
+            EventHandlerContext<PacketTXRX>* context = (EventHandlerContext<PacketTXRX>*)malloc(sizeof(*context));
+            context->obj_ptr = this;
+            context->id = i;
             // start socket thread
-            if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>, &rx_context[i]) != 0) {
+            if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>, context) != 0) {
                 perror("socket recv thread create failed");
                 exit(0);
             }
@@ -85,31 +83,13 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     printf("create TX or TXRX threads\n");
     // create new threads
     std::vector<pthread_t> created_threads;
-#ifdef USE_DPDK
-    unsigned int lcore_id;
-    int worker_id = 0;
-    int thread_id;
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
-    {
-        // launch communication and task thread onto specific core
-        if (worker_id >= rx_thread_num_) {
-            thread_id = worker_id - rx_thread_num_;
-            tx_context[thread_id].obj_ptr = this;
-            tx_context[thread_id].id = thread_id;
-            rte_eal_remote_launch((lcore_function_t*)loopSend,
-                &tx_context[thread_id], lcore_id);
-            printf("TX: launched thread %d on core %d\n", thread_id, lcore_id);
-        }
-        worker_id++;
-    }
-#else
 
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
-
-        tx_context[i].obj_ptr = this;
-        tx_context[i].id = i;
-        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, &tx_context[i]) != 0)
+        EventHandlerContext<PacketTXRX>* context = (EventHandlerContext<PacketTXRX>*)malloc(sizeof(*context));
+        context->obj_ptr = this;
+        context->id = i;
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context) != 0)
         // if (pthread_create( &send_thread_, NULL, PacketTXRX::loopTXRX, (void *)(&tx_context[i])) != 0)
         {
             perror("socket Transmit thread create failed");
@@ -118,7 +98,6 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
 
         created_threads.push_back(send_thread_);
     }
-#endif
 
     return created_threads;
 }

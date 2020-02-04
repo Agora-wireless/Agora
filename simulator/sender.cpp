@@ -173,7 +173,6 @@ Sender::~Sender() {
   IQ_data.free();
 
   delete[] socket_;
-  delete[] context;
   delete config_;
   pthread_mutex_destroy(&lock_);
 }
@@ -185,17 +184,15 @@ void Sender::startTX() {
   alloc_buffer_1d(&frame_start, 10240, 4096, 1);
   alloc_buffer_1d(&frame_end, 10240, 4096, 1);
   /* create send threads */
-  context = new EventHandlerContext<Sender>[thread_num + 1];
   std::vector<pthread_t> created_threads;
   for (int i = 0; i < thread_num; i++) {
     pthread_t send_thread_;
-
-    context[i].obj_ptr = this;
-    context[i].id = i;
-
+    EventHandlerContext<Sender>* context = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+    context->obj_ptr = this;
+    context->id = i;
     if (pthread_create(&send_thread_, NULL,
                        pthread_fun_wrapper<Sender, &Sender::loopSend>,
-                       &context[i]) != 0) {
+                       context) != 0) {
       // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void
       // *)(&context[i])) != 0) {
       perror("socket send thread create failed");
@@ -247,19 +244,15 @@ void Sender::startTX() {
     }
   }
 
-  // double start_time = get_time();
+#if DEBUG_SENDER
+  double start_time = get_time();
+#endif
   int tx_frame_count = 0;
+  uint64_t ticks_5 = (uint64_t)500000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_100 = (uint64_t)150000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_200 = (uint64_t)20000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_500 = (uint64_t)10000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_all = (uint64_t)delay * CPU_FREQ / 1e6 / 70;
-
-  uint64_t ticks_5 = (uint64_t)5000000 * CPU_FREQ / 1e6 / 70;
-
-  // ticks_100 = (uint64_t) 100000 * CPU_FREQ / 1e6 / 70;
-  // ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
-  // ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
-  // ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
   // push tasks of the first subframe into task queue
   for (int i = 0; i < BS_ANT_NUM; i++) {
@@ -272,7 +265,7 @@ void Sender::startTX() {
   int ret;
   signal(SIGINT, intHandler);
   uint64_t tick_start = RDTSC();
-  while (keep_running && tx_frame_count < 9600) {
+  while (keep_running) {
     int data_ptr;
     ret = message_queue_.try_dequeue(data_ptr);
     if (!ret)
@@ -308,7 +301,7 @@ void Sender::startTX() {
       // printf("Finished transmit all antennas in frame: %d, subframe: %d, at
       // %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id,
       // cur_time,cur_time-start_time);
-      if (tx_frame_count == 5) {
+      if (tx_frame_count <= 5) {
         while ((RDTSC() - tick_start) < ticks_5)
           _mm_pause();
       } else if (tx_frame_count < 100) {
@@ -330,6 +323,8 @@ void Sender::startTX() {
       if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
         frame_end[tx_frame_count] = get_time();
         tx_frame_count++;
+        if (tx_frame_count == config_->tx_frame_num)
+          break;
         packet_count_per_frame[tx_frame_id] = 0;
         if (downlink_mode) {
           if (frame_id < 500) {
@@ -344,9 +339,12 @@ void Sender::startTX() {
             // delay_busy_cpu(int(data_subframe_num_perframe*71.3*2.3e3/6));
           }
         }
-        // printf("Finished transmit all antennas in frame: %d, next scheduled:
-        // %d, in %.5f us\n", tx_frame_id, frame_id,  get_time()-start_time);
-        // start_time = get_time();
+#if DEBUG_SENDER
+        printf("Finished transmit all antennas in frame: %d, "
+               "next scheduled: %d, in %.5f us\n",
+               tx_frame_count, frame_id, get_time() - start_time);
+        start_time = get_time();
+#endif
         tick_start = RDTSC();
       }
       packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
@@ -407,16 +405,15 @@ void Sender::startTXfromMain(double *in_frame_start, double *in_frame_end) {
   frame_end = in_frame_end;
 
   /* create send threads */
-  context = new EventHandlerContext<Sender>[thread_num + 1];
   std::vector<pthread_t> created_threads;
   for (int i = 0; i < thread_num; i++) {
     pthread_t send_thread_;
-
-    context[i].obj_ptr = this;
-    context[i].id = i;
+    EventHandlerContext<Sender>* context = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+    context->obj_ptr = this;
+    context->id = i;
     if (pthread_create(&send_thread_, NULL,
                        pthread_fun_wrapper<Sender, &Sender::loopSend>,
-                       &context[i]) != 0) {
+                       context) != 0) {
       // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void
       // *)(&context[i])) != 0) {
       perror("socket send thread create failed");
@@ -431,11 +428,12 @@ void Sender::startTXfromMain(double *in_frame_start, double *in_frame_end) {
   pthread_cond_broadcast(&cond);
 
   pthread_t main_send_thread_;
-  context[thread_num].obj_ptr = this;
-  context[thread_num].id = thread_num;
+  EventHandlerContext<Sender>* context = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+  context->obj_ptr = this;
+  context->id = thread_num;
   if (pthread_create(&main_send_thread_, NULL,
                      pthread_fun_wrapper<Sender, &Sender::loopSend_main>,
-                     &context[thread_num]) != 0) {
+                     context) != 0) {
     // if(pthread_create( &main_send_thread_, NULL, Sender::loopSend_main, (void
     // *)(&context[thread_num])) != 0) {
     perror("socket main send thread create failed");
@@ -491,17 +489,11 @@ void *Sender::loopSend_main(int tid) {
 
   // double start_time = get_time();
   int tx_frame_count = 0;
+  uint64_t ticks_5 = (uint64_t)500000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_100 = (uint64_t)150000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_200 = (uint64_t)20000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_500 = (uint64_t)10000 * CPU_FREQ / 1e6 / 70;
   uint64_t ticks_all = (uint64_t)delay * CPU_FREQ / 1e6 / 70;
-
-  uint64_t ticks_5 = (uint64_t)5000000 * CPU_FREQ / 1e6 / 70;
-
-  // ticks_100 = (uint64_t) 100000 * CPU_FREQ / 1e6 / 70;
-  // ticks_200 = (uint64_t) 20000 * CPU_FREQ / 1e6 / 70;
-  // ticks_500 = (uint64_t) 10000 * CPU_FREQ / 1e6 / 70;
-  // ticks_all = (uint64_t) delay * CPU_FREQ / 1e6 / 70;
 
   // push tasks of the first subframe into task queue
   for (int i = 0; i < BS_ANT_NUM; i++) {
@@ -516,7 +508,7 @@ void *Sender::loopSend_main(int tid) {
 
   frame_start[0] = get_time();
   uint64_t tick_start = RDTSC();
-  while (keep_running && tx_frame_count < 9600) {
+  while (keep_running) {
     int data_ptr;
     ret = message_queue_.try_dequeue(data_ptr);
     if (!ret)
@@ -552,7 +544,7 @@ void *Sender::loopSend_main(int tid) {
       // printf("Finished transmit all antennas in frame: %d, subframe: %d, at
       // %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id,
       // cur_time,cur_time-start_time);
-      if (tx_frame_count == 5) {
+      if (tx_frame_count <= 5) {
         while ((RDTSC() - tick_start) < ticks_5)
           _mm_pause();
       } else if (tx_frame_count < 100) {
@@ -593,6 +585,8 @@ void *Sender::loopSend_main(int tid) {
         tick_start = RDTSC();
 
         tx_frame_count++;
+        if (tx_frame_count == config_->tx_frame_num)
+          break;
         frame_start[tx_frame_count] = get_time();
         // printf("Finished transmit all antennas in frame: %d, in %.5f us\n",
         // tx_frame_count -1, frame_end[tx_frame_count - 1] -
@@ -673,9 +667,7 @@ void *Sender::loopSend(int tid) {
       BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1 : 0);
 #if DEBUG_SENDER
   double start_time_send = get_time();
-  double start_time_msg = get_time();
   double end_time_send = get_time();
-  double end_time_msg = get_time();
   double end_time_prev = get_time();
 #endif
 
@@ -723,15 +715,6 @@ void *Sender::loopSend(int tid) {
 #endif
     }
 
-#if DEBUG_SENDER
-    end_time_send = get_time();
-    // printf("Thread %d transmit frame %d, subframe %d, ant %d, total: %d, at
-    // %.5f %.5f, %.5f\n", tid,  pkt->frame_id, pkt->symbol_id, pkt->ant_id,
-    // total_tx_packets, cur_time, end_time_send-start_time_send,
-    // cur_time-start_time_msg);
-    start_time_msg = end_time_send;
-#endif
-
     if (!message_queue_.enqueue(data_ptr)) {
       printf("send message enqueue failed\n");
       exit(0);
@@ -740,12 +723,11 @@ void *Sender::loopSend(int tid) {
     total_tx_packets++;
 
 #if DEBUG_SENDER
-    end_time_msg = get_time();
-    printf("Thread %d transmit frame %d, subframe %d, ant %d, send time: %.3f, "
-           "msg time: %.3f, last iteration: %.3f\n",
+    end_time_send = get_time();
+    printf("Thread %d transmit frame %d, subframe %d, ant %d, total: %d, "
+           "tx time: %.3f, since last iteration: %.3f\n",
            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, total_tx_packets,
-           end_time_send - start_time_send, end_time_msg - start_time_msg,
-           start_time_send - end_time_prev);
+           end_time_send - start_time_send, end_time_send - end_time_prev);
     end_time_prev = get_time();
 #endif
 
