@@ -253,6 +253,7 @@ bool RadioConfig::radioStart()
 
     std::vector<std::string> _tddSched;
     drain_buffers();
+    calib = false;
     for (size_t f = 0; f < _cfg->framePeriod; f++) {
         std::string sched = _cfg->frames[f];
         if (sched.find("C") != std::string::npos
