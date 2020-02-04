@@ -326,6 +326,8 @@ void Millipede::start()
                         stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
                         if (stats_manager_->last_frame_id == config_->tx_frame_num - 1)
                             goto finish;
+#else
+                        demul_stats_.symbol_count[frame_id] = 0;
 #endif
                         stats_manager_->update_demul_processed(demul_stats_.frame_count);
                         zf_stats_.precoder_exist_in_frame[frame_id] = false;
