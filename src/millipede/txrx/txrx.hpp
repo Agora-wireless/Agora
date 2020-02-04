@@ -165,8 +165,6 @@ private:
     int core_id_;
     int tx_core_id_;
 
-    EventHandlerContext<PacketTXRX>* tx_context;
-    EventHandlerContext<PacketTXRX>* rx_context;
     // PacketTXRXContext* tx_context;
     // PacketTXRXContext* rx_context;
 

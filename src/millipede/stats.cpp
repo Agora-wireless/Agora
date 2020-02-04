@@ -218,6 +218,7 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
     printf("sum: %.3f\n", sum_time_this_frame);
 #endif
 #endif
+    last_frame_id = frame_id;
 }
 
 void Stats::update_stats_in_functions_downlink(int frame_id)
@@ -256,6 +257,7 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
     printf("sum: %.3f\n", sum_time_this_frame);
 #endif
 #endif
+    last_frame_id = frame_id;
 }
 
 void Stats::update_stats_in_dofft(UNUSED int frame_id, int thread_num, int thread_num_offset)

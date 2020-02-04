@@ -123,13 +123,15 @@ public:
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
 
-    size_t packet_header_offset;
     size_t packet_length;
 
     std::string rx_addr;
     std::string tx_addr;
     int rx_port;
     int tx_port;
+
+    /* used in sender to control how many frames to send*/
+    int tx_frame_num;
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;

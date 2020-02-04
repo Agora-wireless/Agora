@@ -71,7 +71,6 @@ Config::Config(std::string jsonfile)
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     OFDM_DATA_START = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     downlink_mode = tddConf.value("downlink_mode", false);
-    packet_header_offset = tddConf.value("packet_header_offset", 64);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
@@ -138,6 +137,7 @@ Config::Config(std::string jsonfile)
     }
 
     /* Millipede configurations */
+    tx_frame_num = tddConf.value("tx_frame_num", 9600);
     core_offset = tddConf.value("core_offset", 18);
     transpose_block_size = tddConf.value("transpose_block_size", 16);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
@@ -175,8 +175,8 @@ Config::Config(std::string jsonfile)
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
-    packet_length = packet_header_offset + sizeof(short) * sampsPerSymbol * 2;
-    //packet_length = packet_header_offset + sizeof(short) * OFDM_FRAME_LEN * 2;
+    packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
+    //packet_length = offsetof(Packet, data) + sizeof(short) * OFDM_FRAME_LEN * 2;
 
 #ifdef USE_ARGOS
     std::vector<std::vector<double>> gold_ifft = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
