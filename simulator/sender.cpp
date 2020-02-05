@@ -173,7 +173,6 @@ Sender::~Sender() {
   IQ_data.free();
 
   delete[] socket_;
-  delete[] context;
   delete config_;
   pthread_mutex_destroy(&lock_);
 }
@@ -185,17 +184,15 @@ void Sender::startTX() {
   alloc_buffer_1d(&frame_start, 10240, 4096, 1);
   alloc_buffer_1d(&frame_end, 10240, 4096, 1);
   /* create send threads */
-  context = new EventHandlerContext<Sender>[thread_num + 1];
   std::vector<pthread_t> created_threads;
   for (int i = 0; i < thread_num; i++) {
     pthread_t send_thread_;
-
-    context[i].obj_ptr = this;
-    context[i].id = i;
-
+    EventHandlerContext<Sender>* context = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+    context->obj_ptr = this;
+    context->id = i;
     if (pthread_create(&send_thread_, NULL,
                        pthread_fun_wrapper<Sender, &Sender::loopSend>,
-                       &context[i]) != 0) {
+                       context) != 0) {
       // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void
       // *)(&context[i])) != 0) {
       perror("socket send thread create failed");
@@ -408,16 +405,15 @@ void Sender::startTXfromMain(double *in_frame_start, double *in_frame_end) {
   frame_end = in_frame_end;
 
   /* create send threads */
-  context = new EventHandlerContext<Sender>[thread_num + 1];
   std::vector<pthread_t> created_threads;
   for (int i = 0; i < thread_num; i++) {
     pthread_t send_thread_;
-
-    context[i].obj_ptr = this;
-    context[i].id = i;
+    EventHandlerContext<Sender>* context = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+    context->obj_ptr = this;
+    context->id = i;
     if (pthread_create(&send_thread_, NULL,
                        pthread_fun_wrapper<Sender, &Sender::loopSend>,
-                       &context[i]) != 0) {
+                       context) != 0) {
       // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void
       // *)(&context[i])) != 0) {
       perror("socket send thread create failed");
@@ -432,11 +428,12 @@ void Sender::startTXfromMain(double *in_frame_start, double *in_frame_end) {
   pthread_cond_broadcast(&cond);
 
   pthread_t main_send_thread_;
-  context[thread_num].obj_ptr = this;
-  context[thread_num].id = thread_num;
+  EventHandlerContext<Sender>* context = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+  context->obj_ptr = this;
+  context->id = thread_num;
   if (pthread_create(&main_send_thread_, NULL,
                      pthread_fun_wrapper<Sender, &Sender::loopSend_main>,
-                     &context[thread_num]) != 0) {
+                     context) != 0) {
     // if(pthread_create( &main_send_thread_, NULL, Sender::loopSend_main, (void
     // *)(&context[thread_num])) != 0) {
     perror("socket main send thread create failed");
