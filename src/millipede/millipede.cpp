@@ -1114,7 +1114,7 @@ void Millipede::free_downlink_buffers()
 
 void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 {
-#if WRITE_DEMUL
+#ifdef WRITE_DEMUL
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
