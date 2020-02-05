@@ -188,7 +188,7 @@ void DoFFT::launch(int offset)
         // std::cout<<std::endl;
     } else if (cur_symbol_type == UL) {
         int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
-        int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+        int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
         int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + data_subframe_id;
         float* src_ptr = (float*)fft_buffer_.FFT_inputs[0] + config_->OFDM_DATA_START * 2;
         float* tar_ptr = (float*)&data_buffer_[subframe_offset][0];
