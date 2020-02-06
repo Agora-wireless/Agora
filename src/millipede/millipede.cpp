@@ -321,6 +321,7 @@ void Millipede::start()
 #ifndef USE_LDPC
 #if !BIGSTATION
                         schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, data_subframe_id, consumer_fft);
+#else
                         demul_stats_.symbol_count[frame_id] = 0;
 #endif
                         stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
@@ -360,6 +361,7 @@ void Millipede::start()
                     if (++decode_stats_.symbol_count[frame_id] == decode_stats_.max_symbol_count) {
 #if !BIGSTATION
                         schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, data_subframe_id, consumer_fft);
+#else
                         prev_frame_counter[frame_id] = 0;
 #endif
                         stats_manager_->update_decode_processed(decode_stats_.frame_count);
@@ -711,7 +713,7 @@ void Millipede::schedule_fft_task(int offset, int frame_count,
 }
 
 #if !BIGSTATION
-bool Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id,
+void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id,
     Consumer const& consumer)
 {
     frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
@@ -727,9 +729,7 @@ bool Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
         else
             printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
 #endif
-        return (true);
     }
-    return (false);
 }
 #endif /* !BIGSTATION */
 
