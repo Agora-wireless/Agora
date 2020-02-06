@@ -388,10 +388,6 @@ void RU::taskThread(int tid)
         if (buffer_status[cursor] == 1) {
             printf("RX thread %d at cursor %d buffer full\n", tid, cursor);
             //exit(0);
-            for (size_t a = 0; a < buffer_frame_num_; a++) {
-		printf("%d ", buffer_status[a]);
-            }
-            printf("");
             config_->running = false;
             break;
         }
@@ -465,7 +461,7 @@ void RU::taskThread(int tid)
                 pkt[ch] = (struct Packet*)&buffer[(cursor + ch) * config_->packet_length];
                 samp[ch] = pkt[ch]->data;
             }
-            while (config_->running && radio->radioRx(it, samp, frameTime) < config_->sampsPerSymbol)
+            while (config_->running && radio->radioRx(it, samp, frameTime) < (int)config_->sampsPerSymbol)
                 ;
             int frame_id = (int)(frameTime >> 32);
             int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
