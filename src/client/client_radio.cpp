@@ -180,7 +180,7 @@ bool ClientRadioConfig::radioStart()
                 _tddSched[r].replace(s, 1, "T");
             else if (c == 'D')
                 _tddSched[r].replace(s, 1, "R");
-            else if (c != 'D' and c != 'U' and c != 'P')
+            else if (c != 'P')
                 _tddSched[r].replace(s, 1, "G");
         }
         std::cout << _tddSched[r] << std::endl;
