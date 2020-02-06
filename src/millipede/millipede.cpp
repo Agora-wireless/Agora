@@ -146,7 +146,7 @@ void Millipede::start()
     int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
-    int PILOT_NUM = config_->pilot_symbol_num_perframe;
+    //int PILOT_NUM = config_->pilot_symbol_num_perframe;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int dl_data_subframe_start = config_->dl_data_symbol_start;
     int dl_data_subframe_end = config_->dl_data_symbol_end;
@@ -278,7 +278,7 @@ void Millipede::start()
                     zf_stats_.precoder_exist_in_frame[frame_id] = true;
                     print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id);
                     zf_stats_.update_frame_count();
-                    int subframe_num_perframe = config_->symbol_num_perframe;
+                    //int subframe_num_perframe = config_->symbol_num_perframe;
                     /* if all the data in a frame has arrived when ZF is done */
                     if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
                         schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
