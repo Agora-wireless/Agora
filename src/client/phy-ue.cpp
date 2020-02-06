@@ -214,7 +214,8 @@ void Phy_UE::start()
     int ret = 0;
     int l2_offset = 0;
     max_equaled_frame = 0;
-    int frame_id, symbol_id, dl_symbol_id, total_symbol_id, ant_id;
+    int frame_id, symbol_id, dl_symbol_id;
+    //int ant_id, total_symbol_id;
     size_t frame_id_t, symbol_id_t, dl_symbol_id_t, total_symbol_id_t, ant_id_t;
     int prev_frame_id = config_->maxFrame;
     while (config_->running && !SignalHandler::gotExitSignal()) {
@@ -248,7 +249,7 @@ void Phy_UE::start()
                 symbol_id = pkt->symbol_id;
 #if WRITE_RECV
                 if (frame_id < 10 && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
-                    ant_id = pkt->ant_id;
+                    int ant_id = pkt->ant_id;
                     int len = config_->sampsPerSymbol;
                     void* cur_buf = pkt->data;
                     std::string filename = "sig_ant" + std::to_string(ant_id) + "_f" + std::to_string(frame_id) + ".bin";
@@ -258,8 +259,8 @@ void Phy_UE::start()
                 }
 #endif
 
-                if (ul_data_symbol_perframe > 0 && prev_frame_id == config_->maxFrame)
-                    printf("received start indication frame with frame_id %zu\n", frame_id);
+                //if (ul_data_symbol_perframe > 0 && prev_frame_id == config_->maxFrame)
+                //    printf("received start indication frame with frame_id %zu\n", frame_id);
                 // check if downlink is enabled, and a new frame has
                 // started. if yes, schedule l2 traffic
                 if (ul_data_symbol_perframe > 0 && frame_id != prev_frame_id) {
@@ -302,7 +303,7 @@ void Phy_UE::start()
                 int offset_csi = event.data;
                 interpretOffset2d(numAntennas, offset_csi, &frame_id_t, &ant_id_t);
                 frame_id = frame_id_t;
-                ant_id = ant_id_t;
+                //ant_id = ant_id_t;
                 // checker to count # of pilots/users
                 csi_checker_[frame_id]++;
 
@@ -328,9 +329,9 @@ void Phy_UE::start()
                 int offset_eq = event.data;
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_eq, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t, &ant_id_t);
                 frame_id = frame_id_t;
-                total_symbol_id = total_symbol_id_t;
+                //total_symbol_id = total_symbol_id_t;
                 dl_symbol_id = dl_symbol_id_t;
-                ant_id = ant_id_t;
+                //ant_id = ant_id_t;
 
                 Event_data do_demul_task;
                 do_demul_task.event_type = TASK_DEMUL;
@@ -375,9 +376,9 @@ void Phy_UE::start()
                 int offset_demul = event.data;
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_demul, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t, &ant_id_t);
                 frame_id = frame_id_t;
-                total_symbol_id = total_symbol_id_t;
+                //total_symbol_id = total_symbol_id_t;
                 dl_symbol_id = dl_symbol_id_t;
-                ant_id = ant_id_t;
+                //ant_id = ant_id_t;
 
                 demul_checker_[frame_id][dl_symbol_id]++;
                 // if this subframe is ready
@@ -441,10 +442,9 @@ void Phy_UE::start()
 
             case EVENT_PACKET_SENT: {
                 int offset = event.data;
-                size_t frame_id, total_symbol_id, symbol_id, ant_id;
-                interpretOffset3d(config_->ul_data_symbol_num_perframe, config_->getNumAntennas(), offset, &frame_id, &total_symbol_id, &symbol_id, &ant_id);
+                interpretOffset3d(config_->ul_data_symbol_num_perframe, config_->getNumAntennas(), offset, &frame_id_t, &total_symbol_id_t, &symbol_id_t, &ant_id_t);
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
-                printf("Main thread: finished TX for frame %d, symbol %d, ant %d\n", frame_id, symbol_id, ant_id);
+                printf("Main thread: finished TX for frame %d, symbol %d, ant %d\n", frame_id_t, symbol_id_t, ant_id_t);
 #endif
             } break;
 
