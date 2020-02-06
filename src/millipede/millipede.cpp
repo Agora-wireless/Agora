@@ -1134,10 +1134,10 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 
 void Millipede::getDemulData(int** ptr, int* size)
 {
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int UE_NUM = config_->UE_NUM;
-    *ptr = (int*)&equal_buffer_[max_equaled_frame * data_subframe_num_perframe][0];
+    *ptr = (int*)&demod_hard_buffer_[max_equaled_frame * ul_data_subframe_num_perframe][0];
     *size = UE_NUM * OFDM_DATA_NUM;
 }
 
