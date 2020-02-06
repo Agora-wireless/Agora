@@ -685,8 +685,8 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
     }
 }
 
-void Millipede::schedule_fft_task(UNUSED int offset, UNUSED int frame_count,
-    UNUSED int frame_id, UNUSED int subframe_id, UNUSED int ant_id,
+void Millipede::schedule_fft_task(int offset, int frame_count,
+    int frame_id, UNUSED int subframe_id, UNUSED int ant_id,
     Consumer const& consumer)
 {
     Event_data do_fft_task;
@@ -718,10 +718,9 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
 {
     frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
     if (delay_fft_queue_cnt[frame_id] > 0) {
-        int UE_NUM = config_->UE_NUM;
         for (int i = 0; i < delay_fft_queue_cnt[frame_id]; i++) {
             int offset_rx = delay_fft_queue[frame_id][i];
-            schedule_fft_task(offset_rx, frame_count + 1, frame_id, data_subframe_id + UE_NUM, 0, consumer);
+            schedule_fft_task(offset_rx, frame_count + 1, frame_id, data_subframe_id, 0, consumer);
         }
         delay_fft_queue_cnt[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
