@@ -365,6 +365,8 @@ void Millipede::start()
 #if !BIGSTATION
                         if (schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
                             decode_stats_.symbol_count[frame_id] = 0;
+#else
+                        decode_stats_.symbol_count[frame_id] = 0;
 #endif
                         stats_manager_->update_decode_processed(decode_stats_.frame_count);
                         print_per_frame_done(PRINT_DECODE, decode_stats_.frame_count, frame_id);
@@ -442,6 +444,8 @@ void Millipede::start()
                         /* schedule fft for next frame */
                         if (schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
                             ifft_stats_.symbol_count[frame_id] = 0;
+#else
+                        ifft_stats_.symbol_count[frame_id] = 0;
 #endif
                         stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
                         print_per_frame_done(PRINT_IFFT, ifft_stats_.frame_count, frame_id);
