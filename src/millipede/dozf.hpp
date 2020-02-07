@@ -47,7 +47,9 @@ public:
      */
     void launch(int offset);
 
+private:
     void ZF_time_orthogonal(int offset);
+    void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
 
     void ZF_freq_orthogonal(int offset);
 
@@ -74,7 +76,6 @@ public:
      */
     void Predict(int offset);
 
-private:
     Table<complex_float> csi_buffer_;
     Table<complex_float> recip_buffer_;
     Table<complex_float> precoder_buffer_;
