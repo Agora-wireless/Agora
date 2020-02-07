@@ -7,22 +7,14 @@ RadioConfig::RadioConfig(Config* cfg)
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
     //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    auto channels = Utils::strToChannels(_cfg->channel);
 
     this->_radioNum = _cfg->nRadios;
     this->_antennaNum = _radioNum * _cfg->nChannels;
     std::cout << "radio num is " << this->_radioNum << std::endl;
-    isUE = _cfg->isUE;
-    if (!isUE and _cfg->hub_ids.size() != 0) {
+    if (_cfg->isUE) 
+        throw std::invalid_argument("Bad config! Not a UE!");
+    if (_cfg->hub_ids.size() != 0) {
         args["driver"] = "remote";
         args["timeout"] = "1000000";
         args["serial"] = _cfg->hub_ids.at(0);
@@ -32,11 +24,12 @@ RadioConfig::RadioConfig(Config* cfg)
     baStn.resize(_radioNum);
     txStreams.resize(_radioNum);
     rxStreams.resize(_radioNum);
-    remainingJobs = _radioNum;
+    std::atomic_int threadCount = ATOMIC_VAR_INIT((int)_radioNum);
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
         RadioConfigContext* context = new RadioConfigContext;
-        context->ptr = this;
+        context->brs = this;
+	context->threadCount = &threadCount;
         context->tid = i;
         pthread_t init_thread_;
         if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context) != 0) {
@@ -48,7 +41,7 @@ RadioConfig::RadioConfig(Config* cfg)
 #endif
     }
 
-    while (remainingJobs > 0)
+    while (threadCount > 0)
         ;
 
     // Perform DC Offset & IQ Imbalance Calibration
@@ -59,14 +52,15 @@ RadioConfig::RadioConfig(Config* cfg)
             dciqCalibrationProc(1);
     }
 
-    remainingJobs = _radioNum;
+    threadCount = (int)_radioNum;
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
         RadioConfigContext* context = new RadioConfigContext;
-        context->ptr = this;
+        context->brs = this;
+	context->threadCount = &threadCount;
         context->tid = i;
-        pthread_t init_thread_;
-        if (pthread_create(&init_thread_, NULL, configureBSRadio_launch, (void*)context) != 0) {
+        pthread_t configure_thread_;
+        if (pthread_create(&configure_thread_, NULL, RadioConfig::configureBSRadio_launch, context) != 0) {
             perror("init thread create failed");
             exit(0);
         }
@@ -75,8 +69,9 @@ RadioConfig::RadioConfig(Config* cfg)
 #endif
     }
 
-    while (remainingJobs > 0)
+    while (threadCount > 0)
         ;
+
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end " << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
         for (size_t c = 0; c < _cfg->nChannels; c++) {
@@ -128,27 +123,18 @@ RadioConfig::RadioConfig(Config* cfg)
 void* RadioConfig::initBSRadio_launch(void* in_context)
 {
     RadioConfigContext* context = (RadioConfigContext*)in_context;
-    RadioConfig* me = context->ptr;
-    int tid = context->tid;
-    delete context;
-    me->initBSRadio(tid);
+    RadioConfig* brs = context->brs;
+    brs->initBSRadio(context);
     return 0;
 }
 
-void RadioConfig::initBSRadio(int i)
+void RadioConfig::initBSRadio(RadioConfigContext* context)
 {
-    //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    size_t i = context->tid;
+    std::atomic_int* threadCount = context->threadCount;
+    delete context;
 
+    auto channels = Utils::strToChannels(_cfg->channel);
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
     args["driver"] = "iris";
@@ -162,32 +148,25 @@ void RadioConfig::initBSRadio(int i)
     rxStreams[i] = baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
     txStreams[i] = baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
 
-    remainingJobs--;
+    (*threadCount)--;
 }
 
 void* RadioConfig::configureBSRadio_launch(void* in_context)
 {
     RadioConfigContext* context = ((RadioConfigContext*)in_context);
-    RadioConfig* me = context->ptr;
-    int tid = context->tid;
-    delete context;
-    me->configureBSRadio(tid);
+    RadioConfig* brs = context->brs;
+    brs->configureBSRadio(context);
     return 0;
 }
 
-void RadioConfig::configureBSRadio(int i)
+void RadioConfig::configureBSRadio(RadioConfigContext* context)
 {
+    size_t i = context->tid;
+    std::atomic_int* threadCount = context->threadCount;
+    delete context;
+
     //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    auto channels = Utils::strToChannels(_cfg->channel);
 
     // resets the DATA_clk domain logic.
     baStn[i]->writeSetting("RESET_DATA_LOGIC", "");
@@ -241,13 +220,13 @@ void RadioConfig::configureBSRadio(int i)
         baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
     }
-    remainingJobs--;
+    (*threadCount)--;
 }
 
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    if (!isUE && _cfg->downlink_mode) {
+    if (_cfg->sampleCalEn) {
         std::cout << "start sample offset correction" << std::endl;
         int iter = 0;
         int max_iter = 3;
@@ -266,9 +245,6 @@ bool RadioConfig::radioStart()
             std::cout << "sample offset calibration successful!" << std::endl;
     }
 
-    // send through the first radio for now
-    //int beacon_ant = 1;
-    int flags(0); // = SOAPY_SDR_WAIT_TRIGGER;
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
     std::vector<uint32_t> beacon = _cfg->beacon;
     std::vector<unsigned> beacon_weights(_cfg->nAntennas);
@@ -276,139 +252,81 @@ bool RadioConfig::radioStart()
     std::vector<uint32_t> pilot = _cfg->pilot;
 
     std::vector<std::string> _tddSched;
-    if (isUE) {
-        _tddSched.resize(this->_radioNum);
-        for (size_t r = 0; r < _radioNum; r++) {
-            _tddSched[r] = _cfg->frames[0];
-            for (size_t s = 0; s < _cfg->frames[0].size(); s++) {
-                char c = _cfg->frames[0].at(s);
-                if (c == 'P' and _cfg->pilotSymbols[0][r] != s)
-                    _tddSched[r].replace(s, 1, "G");
-                else if (c == 'U')
-                    _tddSched[r].replace(s, 1, "T");
-                else if (c == 'D')
-                    _tddSched[r].replace(s, 1, "R");
-                else
-                    _tddSched[r].replace(s, 1, "G");
-            }
-            std::cout << _tddSched[r] << std::endl;
-        }
-        //beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) + 82 (Client FE Delay)
-        int clTrigOffset = _cfg->beacon_len + 249;
-        int sf_start = clTrigOffset / _cfg->sampsPerSymbol;
-        int sp_start = clTrigOffset % _cfg->sampsPerSymbol;
-        for (size_t i = 0; i < this->_radioNum; i++) {
-            json conf;
-            conf["tdd_enabled"] = true;
-            conf["frame_mode"] = "continuous_resync";
-            int max_frame_ = (int)(2.0 / ((_cfg->sampsPerSymbol * _cfg->symbol_num_perframe) / _cfg->rate));
-            conf["max_frame"] = max_frame_;
-            conf["dual_pilot"] = (_cfg->nChannels == 2);
-            std::vector<std::string> jframes;
-            jframes.push_back(_tddSched[i]);
-            conf["frames"] = jframes;
-            conf["symbol_size"] = _cfg->sampsPerSymbol;
-            std::string confString = conf.dump();
-            baStn[i]->writeSetting("TDD_CONFIG", confString);
-            baStn[i]->setHardwareTime(SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, _cfg->rate), "TRIGGER");
-            baStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
-            baStn[i]->writeSetting("TDD_MODE", "true");
-            baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
-            if (_cfg->nChannels == 2)
-                baStn[i]->writeRegisters("TX_RAM_B", 0, pilot);
-            baStn[i]->activateStream(this->rxStreams[i], flags, 0);
-            baStn[i]->activateStream(this->txStreams[i]);
+    drain_buffers();
+    json conf;
+    conf["tdd_enabled"] = true;
+    conf["frame_mode"] = "free_running";
+    conf["max_frame"] = 0;
+    conf["symbol_size"] = _cfg->sampsPerSymbol;
+    conf["beacon_start"] = _cfg->prefix;
+    conf["beacon_stop"] = _cfg->prefix + _cfg->beacon_len;
 
-            std::string corrConfString = "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) + "}";
-            baStn[i]->writeSetting("CORR_CONFIG", corrConfString);
-            baStn[i]->writeRegisters("CORR_COE", 0, _cfg->coeffs);
-
-            baStn[i]->writeSetting("CORR_START", "A");
-        }
-    } else {
-        drain_buffers();
+    size_t ndx = 0;
+    for (size_t i = 0; i < this->_radioNum; i++) {
+        bool isRefAnt = (i == _cfg->ref_ant);
+        baStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
+        baStn[i]->writeSetting("TDD_MODE", "true");
+        std::vector<std::string> tddSched;
         for (size_t f = 0; f < _cfg->framePeriod; f++) {
             std::string sched = _cfg->frames[f];
-            if (sched.find("C") != std::string::npos
-                && sched.find("L") != std::string::npos)
-                calib = true;
+            size_t schedSize = sched.size();
+            for (size_t s = 0; s < schedSize; s++) {
+                char c = _cfg->frames[f].at(s);
+                if (c == 'C')
+                    sched.replace(s, 1, isRefAnt ? "R" : "P");
+                else if (c == 'L')
+                    sched.replace(s, 1, isRefAnt ? "P" : "R");
+                else if (c == 'P')
+                    sched.replace(s, 1, "R");
+                else if (c == 'U')
+                    sched.replace(s, 1, "R");
+                else if (c == 'D')
+                    sched.replace(s, 1, "T");
+                else if (c != 'B')
+                    sched.replace(s, 1, "G");
+            }
+            std::cout << sched << std::endl;
+            tddSched.push_back(sched);
         }
-        json conf;
-        conf["tdd_enabled"] = true;
-        conf["frame_mode"] = "free_running";
-        conf["max_frame"] = 0;
-        conf["symbol_size"] = _cfg->sampsPerSymbol;
-        conf["beacon_start"] = _cfg->prefix;
-        conf["beacon_stop"] = _cfg->prefix + _cfg->beacon_len;
+        conf["frames"] = tddSched;
+        std::string confString = conf.dump();
+        baStn[i]->writeSetting("TDD_CONFIG", confString);
 
-        std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
-        size_t ndx = 0;
-        for (size_t i = 0; i < this->_radioNum; i++) {
-            bool isRefAnt = (i == _cfg->ref_ant);
-            baStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
-            baStn[i]->writeSetting("TDD_MODE", "true");
-            std::vector<std::string> tddSched;
-            for (size_t f = 0; f < _cfg->framePeriod; f++) {
-                std::string sched = _cfg->frames[f];
-                size_t schedSize = sched.size();
-                for (size_t s = 0; s < schedSize; s++) {
-                    char c = _cfg->frames[f].at(s);
-                    if (c == 'C')
-                        sched.replace(s, 1, isRefAnt ? "R" : "P");
-                    else if (c == 'L')
-                        sched.replace(s, 1, isRefAnt ? "P" : "R");
-                    else if (c == 'P')
-                        sched.replace(s, 1, "R");
-                    else if (c == 'U')
-                        sched.replace(s, 1, "R");
-                    else if (c == 'D')
-                        sched.replace(s, 1, "T");
-                    else if (c != 'B')
-                        sched.replace(s, 1, "G");
-                }
-                std::cout << sched << std::endl;
-                tddSched.push_back(sched);
+        baStn[i]->writeRegisters("BEACON_RAM", 0, beacon);
+        for (char const& c : _cfg->channel) {
+            bool isBeaconAntenna = !_cfg->beamsweep && ndx == _cfg->beacon_ant;
+            std::vector<unsigned> beacon_weights(_cfg->nAntennas, isBeaconAntenna ? 1 : 0);
+            std::string tx_ram_wgt = "BEACON_RAM_WGT_";
+            if (_cfg->beamsweep) {
+                for (size_t j = 0; j < _cfg->nAntennas; j++)
+                    beacon_weights[j] = CommsLib::hadamard2(ndx, j);
             }
-            conf["frames"] = tddSched;
-            std::string confString = conf.dump();
-            baStn[i]->writeSetting("TDD_CONFIG", confString);
-
-            baStn[i]->writeRegisters("BEACON_RAM", 0, beacon);
-            for (char const& c : _cfg->channel) {
-                bool isBeaconAntenna = !_cfg->beamsweep && ndx == _cfg->beacon_ant;
-                std::vector<unsigned> beacon_weights(_cfg->nAntennas, isBeaconAntenna ? 1 : 0);
-                std::string tx_ram_wgt = "BEACON_RAM_WGT_";
-                if (_cfg->beamsweep) {
-                    for (size_t j = 0; j < _cfg->nAntennas; j++)
-                        beacon_weights[j] = CommsLib::hadamard2(ndx, j);
-                }
-                baStn[i]->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
-                ++ndx;
-            }
-            baStn[i]->writeSetting("BEACON_START", std::to_string(_radioNum));
-            if (calib) {
-                if (isRefAnt) {
-                    baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
-                    // looks like the best solution is to just use one
-                    // antenna at the reference node and leave the 2nd
-                    // antenna unused. We either have to use one anntena
-                    // per board, or if we use both channels we need to
-                    // exclude reference board from beamforming
-                } else {
-                    std::vector<std::complex<float>> recipCalDlPilot;
-                    recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
-                    baStn[i]->writeRegisters("TX_RAM_A", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
-                    if (_cfg->nChannels == 2) {
-                        recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
-                        baStn[i]->writeRegisters("TX_RAM_B", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
-                    }
-                }
-            }
-
-            baStn[i]->setHardwareTime(0, "TRIGGER");
-            baStn[i]->activateStream(this->rxStreams[i]);
-            baStn[i]->activateStream(this->txStreams[i]);
+            baStn[i]->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
+            ++ndx;
         }
+        baStn[i]->writeSetting("BEACON_START", std::to_string(_radioNum));
+        if (_cfg->recipCalEn) {
+            if (isRefAnt) {
+                baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
+                // looks like the best solution is to just use one
+                // antenna at the reference node and leave the 2nd
+                // antenna unused. We either have to use one anntena
+                // per board, or if we use both channels we need to
+                // exclude reference board from beamforming
+            } else {
+                std::vector<std::complex<float>> recipCalDlPilot;
+                recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
+                baStn[i]->writeRegisters("TX_RAM_A", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
+                if (_cfg->nChannels == 2) {
+                    recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
+                    baStn[i]->writeRegisters("TX_RAM_B", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
+                }
+            }
+        }
+
+        baStn[i]->setHardwareTime(0, "TRIGGER");
+        baStn[i]->activateStream(this->rxStreams[i]);
+        baStn[i]->activateStream(this->txStreams[i]);
     }
 
     std::cout << "radio start done!" << std::endl;
@@ -549,8 +467,6 @@ void RadioConfig::radioStop()
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->writeSetting("TDD_MODE", "false");
         baStn[i]->writeSetting("TDD_CONFIG", tddConfStr);
-        if (isUE)
-            baStn[i]->writeSetting("CORR_CONFIG", corrConfStr);
     }
 }
 

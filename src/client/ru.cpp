@@ -369,12 +369,24 @@ void RU::taskThread(int tid)
     int packet_num = 0;
     long long frameTime;
 
+    int all_trigs = 0;
+    struct timespec tv, tv2;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+
     int maxQueueLength = 0;
     int cursor = 0;
     while (config_->running) {
+        clock_gettime(CLOCK_MONOTONIC, &tv2);
+        double diff = ((tv2.tv_sec - tv.tv_sec) * 1e9 + (tv2.tv_nsec - tv.tv_nsec)) / 1e9;
+        if (diff > 2) {
+            int total_trigs = radio->triggers(tid);
+            std::cout << "new triggers: " << total_trigs - all_trigs << ", total: " << total_trigs << std::endl;
+            all_trigs = total_trigs;
+            tv = tv2;
+        }
         // if buffer is full, exit
         if (buffer_status[cursor] == 1) {
-            printf("RX thread %d buffer full\n", tid);
+            printf("RX thread %d at cursor %d buffer full\n", tid, cursor);
             //exit(0);
             config_->running = false;
             break;
@@ -449,23 +461,14 @@ void RU::taskThread(int tid)
                 pkt[ch] = (struct Packet*)&buffer[(cursor + ch) * config_->packet_length];
                 samp[ch] = pkt[ch]->data;
             }
-            while (config_->running && radio->radioRx(it, samp, frameTime) <= 0)
+            while (config_->running && radio->radioRx(it, samp, frameTime) < (int)config_->sampsPerSymbol)
                 ;
             int frame_id = (int)(frameTime >> 32);
             int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
             int ant_id = it * config_->nChannels;
 #if DEBUG_RECV
-            printf("receive thread %d: frame_id %d, symbol_id %d, cell_id %d, ant_id %d frametime %llx\n",
-                tid, frame_id, symbol_id, cell_id, ant_id, frameTime);
-//          printf("receive samples: %d %d %d %d %d %d %d %d ...\n",
-//                   *((RadioBufElemeType *)&pkt[0]->data[1],
-//                   *((RadioBufElemeType *)&pkt[0]->data[2],
-//                   *((RadioBufElemeType *)&pkt[0]->data[3],
-//                   *((RadioBufElemeType *)&pkt[0]->data[4],
-//                   *((RadioBufElemeType *)&pkt[0]->data[5],
-//                   *((RadioBufElemeType *)&pkt[0]->data[6],
-//                   *((RadioBufElemeType *)&pkt[0]->data[7],
-//                   *((RadioBufElemeType *)&pkt[0]->data[8]);
+            printf("receive thread %d: frame_id %d, symbol_id %d, ant_id %d frametime %llx\n",
+                tid, frame_id, symbol_id, ant_id, frameTime);
 #endif
             for (size_t ch = 0; ch < config_->nChannels; ++ch) {
                 new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);

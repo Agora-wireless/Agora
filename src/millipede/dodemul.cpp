@@ -46,7 +46,7 @@ void DoDemul::launch(int offset)
     int demul_block_size = config_->demul_block_size;
     int sc_id = offset % config_->demul_block_num * demul_block_size;
     int total_data_subframe_id = offset / config_->demul_block_num;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
 #if DEBUG_UPDATE_STATS
