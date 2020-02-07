@@ -404,7 +404,8 @@ void Millipede::start()
 
                 print_per_task_done(PRINT_PRECODE, frame_id, data_subframe_id, sc_id);
                 if (precode_stats_.last_task(frame_id, data_subframe_id)) {
-                    consumer_ifft.schedule_task_set(total_data_subframe_id);
+                    int offset = precode_stats_.frame_count * data_subframe_num_perframe + data_subframe_id;
+                    consumer_ifft.schedule_task_set(offset);
                     if (data_subframe_id < dl_data_subframe_end - 1) {
 #ifdef USE_LDPC
                         consumer_encode.schedule_task_set(total_data_subframe_id);
@@ -426,12 +427,11 @@ void Millipede::start()
                 int offset = event.data;
                 int ant_id = offset % BS_ANT_NUM;
                 int total_data_subframe_id = offset / BS_ANT_NUM;
-                int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+                int frame_id = total_data_subframe_id / data_subframe_num_perframe % TASK_BUFFER_FRAME_NUM;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;
                 Consumer consumer_tx(tx_queue_, *tx_ptoks_ptr[ptok_id], 1, TASK_SEND);
                 consumer_tx.schedule_task_set(offset);
-                frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
                 print_per_task_done(PRINT_IFFT, frame_id, data_subframe_id, ant_id);
 
                 if (ifft_stats_.last_task(frame_id, data_subframe_id)) {
