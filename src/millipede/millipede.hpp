@@ -81,7 +81,9 @@ public:
     /* Add tasks into task queue based on event type */
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
         Consumer const& consumer);
-    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
+#if !BIGSTATION
+    bool schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
+#endif
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
@@ -174,15 +176,18 @@ private:
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
     Data_stats demul_stats_;
+#ifdef USE_LDPC
     Data_stats decode_stats_;
     Data_stats encode_stats_;
+#endif
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
+#if !BIGSTATION
     Table<int> delay_fft_queue;
     int* delay_fft_queue_cnt;
-
+#endif
     /** 
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM
@@ -229,8 +234,10 @@ private:
     long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
+#if !BIGSTATION
     int* prev_frame_counter;
     int prev_frame_counter_max;
+#endif
     /*****************************************************
      * Concurrent queues 
      *****************************************************/
@@ -238,7 +245,9 @@ private:
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> zf_queue_;
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+#ifdef USE_LDPC
     moodycamel::ConcurrentQueue<Event_data> decode_queue_;
+#endif
     /* main thread message queue for data receiving */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     /* main thread message queue for task completion*/
@@ -248,7 +257,9 @@ private:
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> rc_queue_;
     // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+#ifdef USE_LDPC
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
+#endif
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
