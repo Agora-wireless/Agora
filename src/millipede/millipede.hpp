@@ -82,7 +82,7 @@ public:
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
         Consumer const& consumer);
 #if !BIGSTATION
-    bool schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
+    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
 #endif
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
@@ -234,10 +234,6 @@ private:
     long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
-#if !BIGSTATION
-    int* prev_frame_counter;
-    int prev_frame_counter_max;
-#endif
     /*****************************************************
      * Concurrent queues 
      *****************************************************/
