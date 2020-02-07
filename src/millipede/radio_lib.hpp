@@ -38,8 +38,8 @@ private:
     };
     static void* initBSRadio_launch(void* in_context);
     static void* configureBSRadio_launch(void* in_context);
-    void initBSRadio(RadioConfigContext *context);
-    void configureBSRadio(RadioConfigContext *context);
+    void initBSRadio(RadioConfigContext* context);
+    void configureBSRadio(RadioConfigContext* context);
     bool correctSampleOffset(size_t, bool);
     static void drain_rx_buffer(SoapySDR::Device* ibsSdrs, SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp);
     void drain_buffers();
