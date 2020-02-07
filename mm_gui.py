@@ -6,9 +6,9 @@ from BeamformerWrapper import *
 import numpy as np
 import pyqtgraph as pg
 import math
+import json
 import threading
 from threading import Thread
-
 
 
 class readDataThread(QtCore.QThread):
@@ -101,14 +101,21 @@ if __name__ == '__main__':
 
 	filename = "data/tddconfig_512.json"
 	#cfg = Config(filename)
-	comp = CoMP(filename)
         nusers = 4
         data_len = 48
 	mode = ''
-        if len(sys.argv) > 2:
-            nusers = int(sys.argv[1])
-            data_len = int(sys.argv[2])
-            if len(sys.argv) == 4: mode = (sys.argv[3])
+        if len(sys.argv) > 1:
+            filename = sys.argv[1]
+        with open(filename) as json_file:
+            data = json.load(json_file)
+            if 'ue_num' not in data:
+                sched = data['frames']
+                nusers = sched[0].count('P')
+            else:
+                nusers = data['ue_num']
+            data_len = int(data['ofdm_data_num'])
+        print('nusers %d, data_len %d' %(nusers, data_len))
+	comp = CoMP(filename)
 	app = QtGui.QApplication(sys.argv)
 	w = MainWindow(comp=comp, userNum=nusers, FFT_len=data_len, mode=mode, update_interval=1000)
 	w.show()
