@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import json
 
 
-lib = cdll.LoadLibrary('./libcomp.so')
+lib = cdll.LoadLibrary('./build/libcomp.so')
 
 
 class Config(object):

@@ -1,7 +1,5 @@
 {
  "symbol_size" : 1,
- "prefix" : 160,
- "postfix" : 160,
  "ofdm_ca_num" : 2048,
  "ofdm_data_num" : 1200,
  "cp_len" : 0,
