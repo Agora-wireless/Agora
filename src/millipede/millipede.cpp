@@ -232,7 +232,8 @@ void Millipede::start()
                             consumer_zf.schedule_task_set(frame_id);
                         }
                     } else if (config_->isUplink(frame_id, subframe_id)) {
-                        fft_stats_.data_exist_in_symbol[frame_id][subframe_id] = true;
+                        int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
+                        fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = true;
                         fft_stats_.symbol_data_count[frame_id]++;
                         print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id, subframe_id);
                         if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count) {
@@ -242,7 +243,7 @@ void Millipede::start()
                         /* if precoder exist, schedule demodulation */
                         if (zf_stats_.precoder_exist_in_frame[frame_id]) {
                             int start_data_subframe_id, end_data_subframe_id;
-                            start_data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
+                            start_data_subframe_id = data_subframe_id;
                             end_data_subframe_id = fft_stats_.symbol_data_count[frame_id];
                             if (end_data_subframe_id < start_data_subframe_id)
                                 end_data_subframe_id = start_data_subframe_id + 1;
@@ -726,10 +727,8 @@ void Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
 void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end_subframe_id, Consumer const& consumer)
 {
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    std::vector<size_t> ul_syms_ind = config_->ULSymbols[0];
     for (int data_subframe_id = start_subframe_id; data_subframe_id < end_subframe_id; data_subframe_id++) {
-	int cur_data_subframe= ul_syms_ind[data_subframe_id];
-        if (fft_stats_.data_exist_in_symbol[frame_id][cur_data_subframe]) {
+        if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
             /* schedule demodulation task for subcarrier blocks */
             int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
             consumer.schedule_task_set(total_data_subframe_id);
@@ -738,7 +737,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
                 frame_id, start_subframe_id, data_subframe_id);
 #endif
             /* clear data status after scheduling */
-            fft_stats_.data_exist_in_symbol[frame_id][cur_data_subframe] = false;
+            fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = false;
         }
     }
 }
@@ -1025,7 +1024,7 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     alloc_buffer_1d(&(fft_stats_.symbol_cal_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_stats_.max_symbol_cal_count = 2;
-    fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
+    fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, ul_data_subframe_num_perframe, 64);
 
     zf_stats_.init(config_->zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
 
