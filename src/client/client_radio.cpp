@@ -7,16 +7,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
     //load channels
-    std::vector<size_t> channels;
-    if (_cfg->nChannels == 1)
-        channels = { 0 };
-    else if (_cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        _cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    auto channels = Utils::strToChannels(_cfg->channel);
 
     this->_radioNum = _cfg->nRadios;
     this->_antennaNum = _radioNum * _cfg->nChannels;
@@ -94,16 +85,7 @@ void* ClientRadioConfig::initClientRadio(void* in_context)
     Config* cfg = rc->_cfg;
 
     //load channels
-    std::vector<size_t> channels;
-    if (cfg->nChannels == 1)
-        channels = { 0 };
-    else if (cfg->nChannels == 2)
-        channels = { 0, 1 };
-    else {
-        std::cout << "Error! Supported number of channels 1 or 2, setting to 2!" << std::endl;
-        cfg->nChannels = 2;
-        channels = { 0, 1 };
-    }
+    auto channels = Utils::strToChannels(cfg->channel);
 
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
@@ -198,7 +180,7 @@ bool ClientRadioConfig::radioStart()
                 _tddSched[r].replace(s, 1, "T");
             else if (c == 'D')
                 _tddSched[r].replace(s, 1, "R");
-            else
+            else if (c != 'P')
                 _tddSched[r].replace(s, 1, "G");
         }
         std::cout << _tddSched[r] << std::endl;
@@ -296,9 +278,9 @@ int ClientRadioConfig::radioRx(size_t r /*radio id*/, void** buffs, long long& f
         long long frameTimeNs = 0;
         int ret = clStn[r]->readStream(this->rxStreams[r], buffs, _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
         frameTime = frameTimeNs; //SoapySDR::timeNsToTicks(frameTimeNs, _rate);
+#if DEBUG_RADIO_RX
         if (ret != (int)_cfg->sampsPerSymbol)
             std::cout << "invalid return " << ret << " from radio " << r << std::endl;
-#if DEBUG_RADIO_RX
         else
             std::cout << "radio " << r << "received " << ret << std::endl;
 #endif
@@ -320,16 +302,21 @@ void ClientRadioConfig::drain_buffers()
     }
 }
 
-void ClientRadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs, SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp)
+void ClientRadioConfig::drain_rx_buffer(SoapySDR::Device* dev, SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp)
 {
     long long frameTime = 0;
     int flags = 0, r = 0, i = 0;
     long timeoutUs(0);
     while (r != -1) {
-        r = ibsSdrs->readStream(istream, buffs.data(), symSamp, flags, frameTime, timeoutUs);
+        r = dev->readStream(istream, buffs.data(), symSamp, flags, frameTime, timeoutUs);
         i++;
     }
     //std::cout << "Number of reads needed to drain: " << i << std::endl;
+}
+
+int ClientRadioConfig::triggers(int i)
+{
+    return std::stoi(clStn[i]->readSetting("TRIGGER_COUNT"));
 }
 
 void ClientRadioConfig::readSensors()

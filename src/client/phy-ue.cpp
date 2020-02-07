@@ -29,7 +29,7 @@ Phy_UE::Phy_UE(Config* config)
     task_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM * rx_symbol_perframe * numAntennas * 36);
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe * numAntennas * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM * symbol_perframe * numAntennas * 36);
-    ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
+    fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
 
     printf("initializing buffers...\n");
@@ -48,8 +48,8 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize IFFT buffer
     size_t IFFT_buffer_block_num = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    ifft_buffer_.IFFT_inputs.malloc(IFFT_buffer_block_num, FFT_LEN, 0);
-    ifft_buffer_.IFFT_outputs.malloc(IFFT_buffer_block_num, FFT_LEN, 0);
+    ifft_buffer_.IFFT_inputs.malloc(IFFT_buffer_block_num, FFT_LEN, 64);
+    ifft_buffer_.IFFT_outputs.malloc(IFFT_buffer_block_num, FFT_LEN, 64);
 
     // initialize muplans for ifft
     for (size_t i = 0; i < TASK_THREAD_NUM; i++)
@@ -103,7 +103,6 @@ Phy_UE::Phy_UE(Config* config)
             dl_data_buffer_[i].resize(data_sc_len);
     }
 
-    printf("new RU\n");
     ru_.reset(new RU(rx_thread_num, rx_thread_num, config_, &message_queue_, &tx_queue_));
 
     // initilize all kinds of checkers
@@ -198,7 +197,7 @@ void Phy_UE::start()
     //       combine the task queues into one queue
     moodycamel::ProducerToken ptok(task_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
-    moodycamel::ProducerToken ptok_ifft(ifft_queue_);
+    moodycamel::ProducerToken ptok_fft(fft_queue_);
     //moodycamel::ProducerToken ptok_tx(tx_queue_);
 
     // for message_queue, main thread is a consumer, it is multiple producers
@@ -213,10 +212,12 @@ void Phy_UE::start()
 
     Event_data events_list[dequeue_bulk_size];
     int ret = 0;
-    size_t l2_offset = 0;
+    int l2_offset = 0;
     max_equaled_frame = 0;
-    size_t frame_id, symbol_id, dl_symbol_id, total_symbol_id, ant_id;
-    size_t prev_frame_id = config_->maxFrame;
+    int frame_id, symbol_id, dl_symbol_id;
+    //int ant_id, total_symbol_id;
+    size_t frame_id_t, symbol_id_t, dl_symbol_id_t, total_symbol_id_t, ant_id_t;
+    int prev_frame_id = config_->maxFrame;
     while (config_->running && !SignalHandler::gotExitSignal()) {
         // get a bulk of events
         ret = message_queue_.try_dequeue_bulk(ctok, events_list, dequeue_bulk_size);
@@ -239,11 +240,8 @@ void Phy_UE::start()
             // if EVENT_RX_SYMBOL, do crop
             case EVENT_PACKET_RECEIVED: {
                 int offset = event.data;
-                Event_data do_crop_task;
-                do_crop_task.event_type = TASK_FFT;
-                do_crop_task.data = offset;
 
-                int buffer_frame_num = dl_symbol_perframe * TASK_BUFFER_FRAME_NUM * numAntennas;
+                int buffer_frame_num = rx_buffer_status_size;
                 int rx_thread_id = offset / buffer_frame_num;
                 int offset_in_current_buffer = offset % buffer_frame_num;
                 struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id] + offset_in_current_buffer * packet_length);
@@ -251,7 +249,7 @@ void Phy_UE::start()
                 symbol_id = pkt->symbol_id;
 #if WRITE_RECV
                 if (frame_id < 10 && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
-                    ant_id = pkt->ant_id;
+                    int ant_id = pkt->ant_id;
                     int len = config_->sampsPerSymbol;
                     void* cur_buf = pkt->data;
                     std::string filename = "sig_ant" + std::to_string(ant_id) + "_f" + std::to_string(frame_id) + ".bin";
@@ -261,31 +259,34 @@ void Phy_UE::start()
                 }
 #endif
 
-                if (ul_data_symbol_perframe > 0 && prev_frame_id == config_->maxFrame)
-                    printf("received start indication frame with frame_id %zu\n", frame_id);
+                //if (ul_data_symbol_perframe > 0 && prev_frame_id == config_->maxFrame)
+                //    printf("received start indication frame with frame_id %zu\n", frame_id);
                 // check if downlink is enabled, and a new frame has
                 // started. if yes, schedule l2 traffic
                 if (ul_data_symbol_perframe > 0 && frame_id != prev_frame_id) {
                     // schedule L2 downlink traffic for frame=frame_id+TX_RX_FRAME_OFFSET
-                    int tx_frame_id = frame_id + TX_RX_FRAME_OFFSET;
+                    int tx_frame_id = (frame_id + TX_RX_FRAME_OFFSET);
                     for (size_t i = 0; i < ul_data_symbol_perframe; i++) {
                         l2_offset = generateOffset2d(tx_frame_id % TASK_BUFFER_FRAME_NUM, i);
                         //if (l2_buffer_status_[l2_offset] == 0)
                         {
                             //modul_buffer_[l2_offset] = ul_IQ_modul[i];
                             //l2_buffer_status_[l2_offset] = 1;
-                            //printf("scheduling tx for frame %d\n", tx_frame_id);
+                            //printf("At frame %d (prev is %d) scheduling tx for frame %d with l2_offset %d\n", frame_id, prev_frame_id, tx_frame_id, l2_offset);
                             Event_data do_modul_task;
                             do_modul_task.event_type = TASK_MODUL;
                             do_modul_task.data = l2_offset;
-                            schedule_task(do_modul_task, &ifft_queue_, ptok_ifft);
+                            schedule_task(do_modul_task, &fft_queue_, ptok_fft);
                         }
                     }
                     prev_frame_id = frame_id;
                 }
                 //demul_begin = std::chrono::system_clock::now();
 
-                if (dl_symbol_perframe > 0 && (config_->isPilot(frame_id, symbol_id) || config_->isDownlink(frame_id, symbol_id))) {
+                if (dl_data_symbol_perframe > 0 && (config_->isPilot(frame_id, symbol_id) || config_->isDownlink(frame_id, symbol_id))) {
+                    Event_data do_crop_task;
+                    do_crop_task.event_type = TASK_FFT;
+                    do_crop_task.data = offset;
                     schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT
 
@@ -293,11 +294,16 @@ void Phy_UE::start()
                     cropper_created_checker_[cropper_created_checker_id]++;
 #endif
                 }
+		else { // if we are not entering doFFT, let's reset buffer here
+                    rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty
+		}
             } break;
 
             case EVENT_FFT: {
                 int offset_csi = event.data;
-                interpretOffset2d(numAntennas, offset_csi, &frame_id, &ant_id);
+                interpretOffset2d(numAntennas, offset_csi, &frame_id_t, &ant_id_t);
+                frame_id = frame_id_t;
+                //ant_id = ant_id_t;
                 // checker to count # of pilots/users
                 csi_checker_[frame_id]++;
 
@@ -321,7 +327,11 @@ void Phy_UE::start()
 
             case EVENT_ZF: {
                 int offset_eq = event.data;
-                interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_eq, &frame_id, &total_symbol_id, &dl_symbol_id, &ant_id);
+                interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_eq, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t, &ant_id_t);
+                frame_id = frame_id_t;
+                //total_symbol_id = total_symbol_id_t;
+                dl_symbol_id = dl_symbol_id_t;
+                //ant_id = ant_id_t;
 
                 Event_data do_demul_task;
                 do_demul_task.event_type = TASK_DEMUL;
@@ -364,7 +374,11 @@ void Phy_UE::start()
             case EVENT_DEMUL: {
                 // do nothing
                 int offset_demul = event.data;
-                interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_demul, &frame_id, &total_symbol_id, &dl_symbol_id, &ant_id);
+                interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_demul, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t, &ant_id_t);
+                frame_id = frame_id_t;
+                //total_symbol_id = total_symbol_id_t;
+                dl_symbol_id = dl_symbol_id_t;
+                //ant_id = ant_id_t;
 
                 demul_checker_[frame_id][dl_symbol_id]++;
                 // if this subframe is ready
@@ -428,10 +442,9 @@ void Phy_UE::start()
 
             case EVENT_PACKET_SENT: {
                 int offset = event.data;
-                size_t frame_id, total_symbol_id, symbol_id, ant_id;
-                interpretOffset3d(config_->ul_data_symbol_num_perframe, config_->getNumAntennas(), offset, &frame_id, &total_symbol_id, &symbol_id, &ant_id);
+                interpretOffset3d(config_->ul_data_symbol_num_perframe, config_->getNumAntennas(), offset, &frame_id_t, &total_symbol_id_t, &symbol_id_t, &ant_id_t);
 #if DEBUG_PRINT_PER_SUBFRAME_DONE
-                printf("Main thread: finished TX for frame %d, symbol %d, ant %d\n", frame_id, symbol_id, ant_id);
+                printf("Main thread: finished TX for frame %d, symbol %d, ant %d\n", frame_id_t, symbol_id_t, ant_id_t);
 #endif
             } break;
 
@@ -479,10 +492,10 @@ void Phy_UE::taskThread(int tid)
     while (config_->running) {
         if (demul_queue_.try_dequeue(event))
             doDemul(tid, event.data);
-        else if (ifft_queue_.try_dequeue(event))
-            doFFT(tid, event.data);
-        else if (task_queue_.try_dequeue(event))
+        else if (fft_queue_.try_dequeue(event))
             doTransmit(tid, event.data, 0); //, event.more_data);
+        else if (task_queue_.try_dequeue(event))
+            doFFT(tid, event.data);
     }
 }
 
@@ -682,9 +695,9 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     int ul_symbol_id = 0; //offset % TASK_BUFFER_FRAME_NUM;
     interpreteOffset2d(offset, &frame_offset, &ul_symbol_id);
 
-    int frame_id = frame;
+    size_t frame_id = frame;
 
-    int frame_samp_size = (tx_packet_length * numAntennas * ul_data_symbol_perframe);
+    size_t frame_samp_size = (tx_packet_length * numAntennas * ul_data_symbol_perframe);
 
     //for (int ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe; ul_symbol_id++)
     //{
@@ -693,10 +706,10 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     int symbol_id = config_->ULSymbols[frame_period_id][ul_symbol_id];
 #endif
     //int modulbuf_offset = (data_sc_len * numAntennas * ul_symbol_id);
-    int txbuf_offset = frame_offset * frame_samp_size + (tx_packet_length * numAntennas * ul_symbol_id);
+    size_t txbuf_offset = frame_offset * frame_samp_size + (tx_packet_length * numAntennas * ul_symbol_id);
 
-    int IFFT_buffer_target_id = frame_offset * (numAntennas * ul_data_symbol_perframe) + ul_symbol_id * numAntennas;
-    for (size_t ant_id = 0; ant_id < nUEs; ant_id++) // TODO consider nChannels=2 case
+    size_t IFFT_buffer_target_id = frame_offset * (numAntennas * ul_data_symbol_perframe) + ul_symbol_id * numAntennas;
+    for (size_t ant_id = 0; ant_id < numAntennas; ant_id++) // TODO consider nChannels=2 case
     {
         //cx_float* modul_ptr = (cx_float *)(&modul_buffer_[offset][ant_id * data_sc_len]);
         //cx_float *tar_out = (cx_float *)ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id+ant_id];
@@ -715,7 +728,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         complex_float* cur_modul_buf = &ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id][0];
         for (size_t n = 0; n < FFT_LEN; n++) {
             //printf("ul_symbol_id %d, ue_id %d, sc %d\n", ul_symbol_id, ant_id, n);
-            cur_modul_buf[n] = ul_IQ_modul[ul_symbol_id * nUEs + ant_id][n];
+            cur_modul_buf[n] = ul_IQ_modul[ul_symbol_id * numAntennas + ant_id][n];
         }
         //void *tar_out = (void *)ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id+ant_id];
         //memcpy(tar_out, (void *)cur_modul_buf, FFT_LEN * sizeof(complex_float));
@@ -727,7 +740,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         float max_val = abs(mat_ifft_out).max();
         mat_ifft_out /= max_val;
 
-        int tx_offset = txbuf_offset + ant_id * tx_packet_length;
+        size_t tx_offset = txbuf_offset + ant_id * tx_packet_length;
         char* cur_tx_buffer = &tx_buffer_[tx_offset];
 #ifdef SIM
         //complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer + prefix_len*sizeof(complex_float) + config_->packet_header_offset);
@@ -829,20 +842,20 @@ void Phy_UE::initialize_vars_from_cfg(void)
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM ? RX_THREAD_NUM : nUEs; // FIXME: read number of cores and assing accordingly
     core_offset = config_->core_offset;
-    numAntennas = nUEs * config_->nChannels;
+    numAntennas = config_->UE_ANT_NUM;
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data symbols, %zu DL data symbols\n",
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe, ul_data_symbol_perframe, dl_data_symbol_perframe);
 
-    tx_buffer_status_size = (ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
+    tx_buffer_status_size = (ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM * 36);
     tx_buffer_size = tx_packet_length * tx_buffer_status_size;
-    rx_buffer_status_size = (dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
+    rx_buffer_status_size = (dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM * 36);
     rx_buffer_size = packet_length * rx_buffer_status_size;
 }
 
 void Phy_UE::getDemulData(long long** ptr, int* size)
 {
     *ptr = (long long*)&equal_buffer_[max_equaled_frame * dl_data_symbol_perframe][0];
-    *size = nUEs * FFT_LEN;
+    *size = numAntennas * FFT_LEN;
 }
 
 void Phy_UE::getEqualPCData(float** ptr, int* size, int ue_id)
@@ -854,7 +867,7 @@ void Phy_UE::getEqualPCData(float** ptr, int* size, int ue_id)
 void Phy_UE::getEqualData(float** ptr, int* size, int ue_id)
 {
     *ptr = (float*)&equal_buffer_[max_equaled_frame * dl_data_symbol_perframe * numAntennas + ue_id][0];
-    *size = nUEs * non_null_sc_len * 2;
+    *size = numAntennas * non_null_sc_len * 2;
 }
 
 extern "C" {
