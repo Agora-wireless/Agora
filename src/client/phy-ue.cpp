@@ -293,10 +293,9 @@ void Phy_UE::start()
                     int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM);
                     cropper_created_checker_[cropper_created_checker_id]++;
 #endif
-                }
-		else { // if we are not entering doFFT, let's reset buffer here
+                } else { // if we are not entering doFFT, let's reset buffer here
                     rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty
-		}
+                }
             } break;
 
             case EVENT_FFT: {

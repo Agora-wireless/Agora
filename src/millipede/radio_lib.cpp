@@ -12,7 +12,7 @@ RadioConfig::RadioConfig(Config* cfg)
     this->_radioNum = _cfg->nRadios;
     this->_antennaNum = _radioNum * _cfg->nChannels;
     std::cout << "radio num is " << this->_radioNum << std::endl;
-    if (_cfg->isUE) 
+    if (_cfg->isUE)
         throw std::invalid_argument("Bad config! Not a UE!");
     if (_cfg->hub_ids.size() != 0) {
         args["driver"] = "remote";
@@ -29,7 +29,7 @@ RadioConfig::RadioConfig(Config* cfg)
 #ifdef THREADED_INIT
         RadioConfigContext* context = new RadioConfigContext;
         context->brs = this;
-	context->threadCount = &threadCount;
+        context->threadCount = &threadCount;
         context->tid = i;
         pthread_t init_thread_;
         if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context) != 0) {
@@ -57,7 +57,7 @@ RadioConfig::RadioConfig(Config* cfg)
 #ifdef THREADED_INIT
         RadioConfigContext* context = new RadioConfigContext;
         context->brs = this;
-	context->threadCount = &threadCount;
+        context->threadCount = &threadCount;
         context->tid = i;
         pthread_t configure_thread_;
         if (pthread_create(&configure_thread_, NULL, RadioConfig::configureBSRadio_launch, context) != 0) {
