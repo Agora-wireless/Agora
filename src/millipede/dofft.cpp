@@ -304,7 +304,9 @@ void DoIFFT::launch(int offset)
     // mufft_execute_plan_1d(muplans_ifft_[tid], dl_ifft_buffer_.IFFT_outputs[offset],
     //     dl_ifft_buffer_.IFFT_inputs[offset]);
 
-    DftiComputeBackward(mkl_handle, dl_ifft_buffer_[offset]);
+    int dl_ifft_buffer_size = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int buffer_subframe_offset = offset % dl_ifft_buffer_size;
+    DftiComputeBackward(mkl_handle, dl_ifft_buffer_[buffer_subframe_offset]);
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id <<", offset: "<<offset <<", output data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
@@ -313,8 +315,9 @@ void DoIFFT::launch(int offset)
     // cout<<"\n\n"<<endl;
 
     // calculate data for downlink socket buffer
-    float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[offset][0]);
-    int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
+    float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[buffer_subframe_offset][0]);
+    int dl_socket_buffer_status_size = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe;
+    int socket_subframe_offset = offset % dl_socket_buffer_status_size;
     int packet_length = config_->packet_length;
     struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[socket_subframe_offset * packet_length] + ant_id * packet_length);
     //int socket_offset = sizeof(int) * 16 + ant_id * packet_length;

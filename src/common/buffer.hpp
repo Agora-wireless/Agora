@@ -48,7 +48,9 @@ struct Packet {
 struct RX_stats {
     int* task_count;
     int* task_pilot_count;
+#if !BIGSTATION
     int* fft_created_count;
+#endif
     // int frame_count = 0;
     int max_task_count;
     int max_task_pilot_count;
