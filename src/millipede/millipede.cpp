@@ -128,12 +128,15 @@ void Millipede::start()
             dl_socket_buffer_status_size_, dl_socket_buffer_size_);
     }
 
+#if !BIGSTATION
+    int cur_frame_id = 0;
+#endif
+
     /* counters for printing summary */
     int demul_count = 0;
     int tx_count = 0;
     double demul_begin = get_time();
     double tx_begin = get_time();
-    int cur_frame_id = 0;
 
     bool prev_demul_scheduled = false;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
