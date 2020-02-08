@@ -234,10 +234,6 @@ private:
     long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
-#if !BIGSTATION
-    int* prev_frame_counter;
-    int prev_frame_counter_max;
-#endif
     /*****************************************************
      * Concurrent queues 
      *****************************************************/
