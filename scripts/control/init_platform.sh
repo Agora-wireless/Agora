@@ -1,7 +1,5 @@
 #! /bin/bash
 
-set -e
-
 if [ -z "${hydra_root_dir}" ]; then
   echo "hydra_root_dir variable not set"
   exit

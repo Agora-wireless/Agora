@@ -145,7 +145,7 @@ function install_dpdk() {
   meson build >> /tmp/Hydra/install.log 2>&1
   cd build
   ninja >> /tmp/Hydra/install.log 2>&1
-  DESTDIR=./install ninja install >> /tmp/Hydra/install.log 2>&1
+  DESTDIR=${RTE_SDK}/build/install ninja install >> /tmp/Hydra/install.log 2>&1
 }
 
 function install_intel_lib() {

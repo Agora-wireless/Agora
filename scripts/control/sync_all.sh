@@ -42,7 +42,7 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
   if [ "${hostname}" == "$(echo ${server_name} | tr -d '"')" ]; then
     continue
   fi
-  echo "Run rsync ${hostname}->$(echo ${server_name} | tr -d '"')"
+  echo "Copying ${hydra_root_dir}, ${hostname} -> $(echo ${server_name} | tr -d '"') at ${HYDRA_RUNNER_ROOT}/Agora/"
   eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/src $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
   eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/simulator $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
   eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
