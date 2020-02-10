@@ -141,12 +141,6 @@ public:
 
 private:
     Config* config_;
-    int BS_ANT_NUM, PILOT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
-    bool downlink_mode;
-    LDPCconfig LDPC_config;
 
     int task_thread_num;
     int fft_thread_num;
