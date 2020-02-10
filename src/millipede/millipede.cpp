@@ -514,8 +514,11 @@ void* Millipede::worker(int tid)
     auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
+    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, precoder_buffer_, stats_manager_);
+
+    auto computeDnZF = new DoDnZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -540,11 +543,11 @@ void* Millipede::worker(int tid)
     int queue_num;
     Doer** computers;
 #ifdef USE_LDPC
-    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeZF, computeReciprocity, computeFFT };
-    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecoding };
+    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeDnZF, computeReciprocity, computeFFT };
+    Doer* compute_UL_LDPC[] = { computeUpZF, computeFFT, computeDemul, computeDecoding };
 #else
-    Doer* compute_DL[] = { computeIFFT, computePrecode, computeZF, computeReciprocity, computeFFT };
-    Doer* compute_UL[] = { computeZF, computeFFT, computeDemul };
+    Doer* compute_DL[] = { computeIFFT, computePrecode, computeDnZF, computeReciprocity, computeFFT };
+    Doer* compute_UL[] = { computeUpZF, computeFFT, computeDemul };
 #endif
 
 #define NITEMS(a) (sizeof(a) / sizeof(*a))
@@ -601,11 +604,11 @@ void* Millipede::worker_zf(int tid)
     Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize ZF operator */
-    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
+    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, precoder_buffer_, stats_manager_);
 
     while (true) {
-        computeZF->try_launch();
+        computeUpZF->try_launch();
     }
 }
 
