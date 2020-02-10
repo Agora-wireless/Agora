@@ -10,14 +10,11 @@
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
-    Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , csi_buffer_(in_csi_buffer)
-    , recip_buffer_(in_recip_buffer)
     , precoder_buffer_(in_precoder_buffer)
-    , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
@@ -43,14 +40,13 @@ void DoZF::launch(int offset)
         ZF_freq_orthogonal(offset);
     else
         ZF_time_orthogonal(offset);
+    finish(offset);
 }
 
 void DoZF::ZF_time_orthogonal(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int zf_block_size = config_->zf_block_size;
-    bool downlink_mode = config_->downlink_mode;
-    bool recipCalEn = config_->recipCalEn;
 
     int frame_id = offset / config_->zf_block_num;
     int sc_id = offset % config_->zf_block_num * zf_block_size;
@@ -144,19 +140,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        cx_float* ptr_out;
-        if (downlink_mode) {
-            cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
-            if (recipCalEn) {
-                cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][cur_sc_id * BS_ANT_NUM]);
-                cx_fvec vec_calib(calib, BS_ANT_NUM, false);
-                mat_calib = diagmat(vec_calib);
-            } else
-                mat_calib.eye();
-            mat_input = mat_calib * mat_input;
-            ptr_out = (cx_float*)dl_precoder_buffer_[cur_offset];
-        } else
-            ptr_out = (cx_float*)precoder_buffer_[cur_offset];
+        cx_float* ptr_out = (cx_float*)precoder(&mat_input, frame_id, cur_sc_id, cur_offset);
         cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -198,12 +182,6 @@ void DoZF::ZF_time_orthogonal(int offset)
         }
 #endif
     }
-
-    // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_ZF;
-    ZF_finish_event.data = offset;
-    consumer_.handle(ZF_finish_event);
 }
 
 void DoZF::ZF_freq_orthogonal(int offset)
@@ -255,7 +233,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_in_buffer];
+    cx_float* ptr_out = (cx_float*)precoder(&mat_input, frame_id, sc_id, offset_in_buffer);
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -280,11 +258,6 @@ void DoZF::ZF_freq_orthogonal(int offset)
         printf("Thread %d ZF takes %.2f\n", tid, duration);
     }
 #endif
-    // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_ZF;
-    ZF_finish_event.data = offset;
-    consumer_.handle(ZF_finish_event);
 }
 
 void DoZF::Predict(int offset)
@@ -303,13 +276,71 @@ void DoZF::Predict(int offset)
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_DATA_NUM + sc_id;
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_next_frame];
+    cx_float* ptr_out = (cx_float*)precoder(&mat_input, frame_id, sc_id, offset_next_frame);
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     pinv(mat_output, mat_input, 1e-1, "dc");
 
     // inform main thread
-    Event_data pred_finish_event;
-    pred_finish_event.event_type = EVENT_ZF;
-    pred_finish_event.data = offset_next_frame;
-    consumer_.handle(pred_finish_event);
+    finish(offset_next_frame);
+}
+
+DoUpZF::DoUpZF(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+    Table<complex_float>& in_csi_buffer,
+    Table<complex_float>& in_precoder_buffer,
+    Stats* in_stats_manager)
+    : DoZF(in_config, in_tid, in_task_queue, in_consumer, in_csi_buffer,
+          in_precoder_buffer, in_stats_manager)
+{
+}
+
+void* DoUpZF::precoder(void*, int, int, int offset)
+{
+    void* ptr_out = (cx_float*)precoder_buffer_[offset];
+    return (ptr_out);
+}
+
+void DoUpZF::finish(int offset)
+{
+    // inform main thread
+    Event_data ZF_finish_event;
+    ZF_finish_event.event_type = EVENT_UP_ZF;
+    ZF_finish_event.data = offset;
+    consumer_.handle(ZF_finish_event);
+}
+
+DoDnZF::DoDnZF(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
+    Table<complex_float>& in_precoder_buffer,
+    Stats* in_stats_manager)
+    : DoZF(in_config, in_tid, in_task_queue, in_consumer, in_csi_buffer,
+          in_precoder_buffer, in_stats_manager)
+    , recip_buffer_(in_recip_buffer)
+{
+}
+
+void* DoDnZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
+{
+    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
+    cx_float* ptr_out;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    if (config_->recipCalEn) {
+        cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][sc_id * BS_ANT_NUM]);
+        cx_fvec vec_calib(calib, BS_ANT_NUM, false);
+        cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
+        mat_calib = diagmat(vec_calib);
+        mat_input = mat_calib * mat_input;
+    }
+    ptr_out = (cx_float*)precoder_buffer_[offset];
+    return (ptr_out);
+}
+
+void DoDnZF::finish(int offset)
+{
+    // inform main thread
+    Event_data ZF_finish_event;
+    ZF_finish_event.event_type = EVENT_DN_ZF;
+    ZF_finish_event.data = offset;
+    consumer_.handle(ZF_finish_event);
 }
