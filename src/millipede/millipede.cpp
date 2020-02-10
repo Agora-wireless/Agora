@@ -205,14 +205,12 @@ void Millipede::start()
                 /* in BigStation, schedule FFT whenever a packet is received */
                 schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
 #else
-                bool previous_frame_done = frame_id == cur_frame_id;
-                /* if this is the first frame or the previous frame is all processed, schedule FFT for this packet */
-                if ((frame_count == 0 && fft_stats_.frame_count < 100) || (fft_stats_.frame_count > 0 && previous_frame_done)) {
+                /* if all previous frames are processed, schedule FFT for this packet */
+                if (frame_id == cur_frame_id) {
                     schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
                 } else {
                     /* if the previous frame is not finished, store offset in queue */
-                    delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]] = offset;
-                    delay_fft_queue_cnt[frame_id]++;
+                    delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]++] = offset;
                 }
 #endif
             } break;
