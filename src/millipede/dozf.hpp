@@ -25,8 +25,8 @@ class DoZF : public Doer {
 public:
     DoZF(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-        Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
-        Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer,
+        Table<complex_float>& in_csi_buffer,
+        Table<complex_float>& in_precoder_buffer,
         Stats* in_stats_manager);
     ~DoZF();
 
@@ -47,9 +47,9 @@ public:
      */
     void launch(int offset);
 
-private:
+protected:
     void ZF_time_orthogonal(int offset);
-    void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
+    virtual void* precoder(void* mat_input, int frame_id, int sc_id, int offset) = 0;
 
     void ZF_freq_orthogonal(int offset);
 
@@ -77,10 +77,8 @@ private:
     void Predict(int offset);
 
     Table<complex_float> csi_buffer_;
-    Table<complex_float> recip_buffer_;
-    Table<complex_float> precoder_buffer_;
-    Table<complex_float> dl_precoder_buffer_;
     complex_float* pred_csi_buffer_;
+    Table<complex_float> precoder_buffer_;
 
     Table<double>* ZF_task_duration;
     int* ZF_task_count;
@@ -90,6 +88,31 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM */
     complex_float* csi_gather_buffer;
+};
+
+class DoUpZF : public DoZF {
+public:
+    DoUpZF(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<complex_float>& in_csi_buffer,
+        Table<complex_float>& in_precoder_buffer,
+        Stats* in_stats_manager);
+
+private:
+    void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
+};
+
+class DoDnZF : public DoZF {
+public:
+    DoDnZF(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
+        Table<complex_float>& in_precoder_buffer,
+        Stats* in_stats_manager);
+
+private:
+    void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
+    Table<complex_float> recip_buffer_;
 };
 
 #endif

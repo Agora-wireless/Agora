@@ -10,14 +10,11 @@
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
-    Table<complex_float>& in_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , csi_buffer_(in_csi_buffer)
-    , recip_buffer_(in_recip_buffer)
     , precoder_buffer_(in_precoder_buffer)
-    , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
@@ -49,25 +46,6 @@ void DoZF::launch(int offset)
     ZF_finish_event.event_type = EVENT_ZF;
     ZF_finish_event.data = offset;
     consumer_.handle(ZF_finish_event);
-}
-
-void* DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
-{
-    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
-    cx_float* ptr_out;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    if (config_->downlink_mode) {
-        if (config_->recipCalEn) {
-            cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][sc_id * BS_ANT_NUM]);
-            cx_fvec vec_calib(calib, BS_ANT_NUM, false);
-            cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
-            mat_calib = diagmat(vec_calib);
-            mat_input = mat_calib * mat_input;
-        }
-        ptr_out = (cx_float*)dl_precoder_buffer_[offset];
-    } else
-        ptr_out = (cx_float*)precoder_buffer_[offset];
-    return (ptr_out);
 }
 
 void DoZF::ZF_time_orthogonal(int offset)
@@ -260,7 +238,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_in_buffer];
+    cx_float* ptr_out = (cx_float*)precoder(&mat_input, frame_id, sc_id, offset_in_buffer);
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -303,7 +281,7 @@ void DoZF::Predict(int offset)
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_DATA_NUM + sc_id;
-    cx_float* ptr_out = (cx_float*)precoder_buffer_[offset_next_frame];
+    cx_float* ptr_out = (cx_float*)precoder(&mat_input, frame_id, sc_id, offset_next_frame);
     cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
     pinv(mat_output, mat_input, 1e-1, "dc");
 
@@ -312,4 +290,47 @@ void DoZF::Predict(int offset)
     pred_finish_event.event_type = EVENT_ZF;
     pred_finish_event.data = offset_next_frame;
     consumer_.handle(pred_finish_event);
+}
+
+DoUpZF::DoUpZF(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+    Table<complex_float>& in_csi_buffer,
+    Table<complex_float>& in_precoder_buffer,
+    Stats* in_stats_manager)
+    : DoZF(in_config, in_tid, in_task_queue, in_consumer, in_csi_buffer,
+          in_precoder_buffer, in_stats_manager)
+{
+}
+
+void* DoUpZF::precoder(void*, int, int, int offset)
+{
+    void* ptr_out = (cx_float*)precoder_buffer_[offset];
+    return (ptr_out);
+}
+
+DoDnZF::DoDnZF(Config* in_config, int in_tid,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
+    Table<complex_float>& in_precoder_buffer,
+    Stats* in_stats_manager)
+    : DoZF(in_config, in_tid, in_task_queue, in_consumer, in_csi_buffer,
+          in_precoder_buffer, in_stats_manager)
+    , recip_buffer_(in_recip_buffer)
+{
+}
+
+void* DoDnZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
+{
+    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
+    cx_float* ptr_out;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    if (config_->recipCalEn) {
+        cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][sc_id * BS_ANT_NUM]);
+        cx_fvec vec_calib(calib, BS_ANT_NUM, false);
+        cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
+        mat_calib = diagmat(vec_calib);
+        mat_input = mat_calib * mat_input;
+    }
+    ptr_out = (cx_float*)precoder_buffer_[offset];
+    return (ptr_out);
 }
