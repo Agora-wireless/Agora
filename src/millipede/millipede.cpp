@@ -266,7 +266,8 @@ void Millipede::start()
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
                 rc_stats_.update_frame_count();
             } break;
-            case EVENT_ZF: {
+            case EVENT_UP_ZF:
+            case EVENT_DN_ZF: {
                 int offset = event.data;
 
                 int frame_id = offset / zf_stats_.max_symbol_count;
@@ -280,7 +281,7 @@ void Millipede::start()
                     /* if all the data in a frame has arrived when ZF is done */
                     if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
                         schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
-                    if (config_->downlink_mode) {
+                    if (event.event_type == EVENT_DN_ZF) {
                         /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
                         int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
 #ifdef USE_LDPC
@@ -512,8 +513,11 @@ void* Millipede::worker(int tid)
     auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
+    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, precoder_buffer_, stats_manager_);
+
+    auto computeDnZF = new DoDnZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -538,11 +542,11 @@ void* Millipede::worker(int tid)
     int queue_num;
     Doer** computers;
 #ifdef USE_LDPC
-    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeZF, computeReciprocity, computeFFT };
-    Doer* compute_UL_LDPC[] = { computeZF, computeFFT, computeDemul, computeDecoding };
+    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeDnZF, computeReciprocity, computeFFT };
+    Doer* compute_UL_LDPC[] = { computeUpZF, computeFFT, computeDemul, computeDecoding };
 #else
-    Doer* compute_DL[] = { computeIFFT, computePrecode, computeZF, computeReciprocity, computeFFT };
-    Doer* compute_UL[] = { computeZF, computeFFT, computeDemul };
+    Doer* compute_DL[] = { computeIFFT, computePrecode, computeDnZF, computeReciprocity, computeFFT };
+    Doer* compute_UL[] = { computeUpZF, computeFFT, computeDemul };
 #endif
 
 #define NITEMS(a) (sizeof(a) / sizeof(*a))
@@ -599,11 +603,11 @@ void* Millipede::worker_zf(int tid)
     Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize ZF operator */
-    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
+    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, precoder_buffer_, stats_manager_);
 
     while (true) {
-        computeZF->try_launch();
+        computeUpZF->try_launch();
     }
 }
 
