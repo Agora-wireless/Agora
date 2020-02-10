@@ -29,20 +29,21 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
-#define EVENT_PACKET_RECEIVED 0
-#define EVENT_FFT 1
-#define EVENT_ZF 2
-#define EVENT_DEMUL 3
-
-#define EVENT_PRED 4
-#define EVENT_MODUL 5
-#define EVENT_IFFT 6
-#define EVENT_PRECODE 7
-#define EVENT_PACKET_SENT 8
-
-#define EVENT_DECODE 9
-#define EVENT_ENCODE 10
-#define EVENT_RC 11
+enum EventType {
+    EVENT_PACKET_RECEIVED,
+    EVENT_FFT,
+    EVENT_UP_ZF,
+    EVENT_DN_ZF,
+    EVENT_DEMUL,
+    EVENT_PRED,
+    EVENT_MODUL,
+    EVENT_IFFT,
+    EVENT_PRECODE,
+    EVENT_PACKET_SENT,
+    EVENT_DECODE,
+    EVENT_ENCODE,
+    EVENT_RC,
+};
 
 #define TASK_FFT 0
 #define TASK_ZF 1

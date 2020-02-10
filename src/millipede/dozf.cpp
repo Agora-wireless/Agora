@@ -40,12 +40,7 @@ void DoZF::launch(int offset)
         ZF_freq_orthogonal(offset);
     else
         ZF_time_orthogonal(offset);
-
-    // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_ZF;
-    ZF_finish_event.data = offset;
-    consumer_.handle(ZF_finish_event);
+    finish(offset);
 }
 
 void DoZF::ZF_time_orthogonal(int offset)
@@ -286,10 +281,7 @@ void DoZF::Predict(int offset)
     pinv(mat_output, mat_input, 1e-1, "dc");
 
     // inform main thread
-    Event_data pred_finish_event;
-    pred_finish_event.event_type = EVENT_ZF;
-    pred_finish_event.data = offset_next_frame;
-    consumer_.handle(pred_finish_event);
+    finish(offset_next_frame);
 }
 
 DoUpZF::DoUpZF(Config* in_config, int in_tid,
@@ -306,6 +298,15 @@ void* DoUpZF::precoder(void*, int, int, int offset)
 {
     void* ptr_out = (cx_float*)precoder_buffer_[offset];
     return (ptr_out);
+}
+
+void DoUpZF::finish(int offset)
+{
+    // inform main thread
+    Event_data ZF_finish_event;
+    ZF_finish_event.event_type = EVENT_UP_ZF;
+    ZF_finish_event.data = offset;
+    consumer_.handle(ZF_finish_event);
 }
 
 DoDnZF::DoDnZF(Config* in_config, int in_tid,
@@ -333,4 +334,13 @@ void* DoDnZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
     }
     ptr_out = (cx_float*)precoder_buffer_[offset];
     return (ptr_out);
+}
+
+void DoDnZF::finish(int offset)
+{
+    // inform main thread
+    Event_data ZF_finish_event;
+    ZF_finish_event.event_type = EVENT_DN_ZF;
+    ZF_finish_event.data = offset;
+    consumer_.handle(ZF_finish_event);
 }
