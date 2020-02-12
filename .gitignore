@@ -42,7 +42,6 @@ Thumbs.db
 
 # CMake #
 #########
-build
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
@@ -52,6 +51,7 @@ Testing
 CTestTestfile.cmake
 
 # Executables #
-sender
-sim
-millipede
+###############
+/sender
+/sim
+/millipede
