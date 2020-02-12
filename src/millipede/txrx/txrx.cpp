@@ -504,8 +504,8 @@ void* PacketTXRX::loopTXRX(int tid)
 
                 int offset = task_event.data;
                 int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-                int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int ant_id = offset % BS_ANT_NUM;
+                int total_data_subframe_id = offset / BS_ANT_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 

@@ -142,7 +142,6 @@ void Millipede::start()
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int subframe_num_perframe = config_->symbol_num_perframe;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
     //int PILOT_NUM = config_->pilot_symbol_num_perframe;
@@ -440,8 +439,8 @@ void Millipede::start()
             case EVENT_PACKET_SENT: {
                 /* Data is sent */
                 int offset = event.data;
-                int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int ant_id = offset % BS_ANT_NUM;
+                int total_data_subframe_id = offset / BS_ANT_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, data_subframe_id, ant_id);
