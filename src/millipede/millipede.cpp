@@ -498,6 +498,8 @@ pin_worker(thread_type thread, int tid, Config* config_)
     pin_to_core_with_offset(thread, core_offset, tid);
 }
 
+#if !BIGSTATION
+
 void* Millipede::worker(int tid)
 {
     pin_worker(Worker, tid, config_);
@@ -575,6 +577,7 @@ void* Millipede::worker(int tid)
     }
 }
 
+#else /* BIGSTATION */
 void* Millipede::worker_fft(int tid)
 {
     pin_worker(Worker_FFT, tid, config_);
@@ -646,6 +649,7 @@ void* Millipede::worker_demul(int tid)
         }
     }
 }
+#endif /* !BIGSTATION */
 
 void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
 {
@@ -655,9 +659,11 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
         context->obj_ptr = this;
         context->id = i;
         switch (thread) {
+#if !BIGSTATION
         case Worker:
             ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker>, context);
             break;
+#else
         case Worker_FFT:
             ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_fft>, context);
             break;
@@ -667,6 +673,7 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
         case Worker_Demul:
             ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_demul>, context);
             break;
+#endif
         default:
             printf("ERROR: Wrong thread type to create workers\n");
             exit(0);
