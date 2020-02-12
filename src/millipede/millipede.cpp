@@ -540,37 +540,26 @@ void* Millipede::worker(int tid)
     auto* computeReciprocity = new Reciprocity(config_, tid, rc_queue_, consumer,
         calib_buffer_, recip_buffer_, stats_manager_);
 
-    int queue_num;
-    Doer** computers;
+    Doer* computers[] = {
+        computeIFFT,
+        computePrecode,
 #ifdef USE_LDPC
-    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeDnZF, computeReciprocity, computeFFT };
-    Doer* compute_UL_LDPC[] = { computeUpZF, computeFFT, computeDemul, computeDecoding };
-#else
-    Doer* compute_DL[] = { computeIFFT, computePrecode, computeDnZF, computeReciprocity, computeFFT };
-    Doer* compute_UL[] = { computeUpZF, computeFFT, computeDemul };
+        computeEncoding,
 #endif
+        computeDnZF,
+        computeUpZF,
+        computeReciprocity,
+        computeFFT,
+        computeDemul,
+#ifdef USE_LDPC
+        computeDecoding,
+#endif
+    };
 
 #define NITEMS(a) (sizeof(a) / sizeof(*a))
-#ifdef USE_LDPC
-    if (config_->downlink_mode) {
-        queue_num = NITEMS(compute_DL_LDPC);
-        computers = compute_DL_LDPC;
-    } else {
-        queue_num = NITEMS(compute_UL_LDPC);
-        computers = compute_UL_LDPC;
-    }
-#else
-    if (config_->downlink_mode) {
-        queue_num = NITEMS(compute_DL);
-        computers = compute_DL;
-    } else {
-        queue_num = NITEMS(compute_UL);
-        computers = compute_UL;
-    }
-#endif
 
     while (true) {
-        for (int i = 0; i < queue_num; i++) {
+        for (size_t i = 0; i < NITEMS(computers); i++) {
             if (computers[i]->try_launch())
                 break;
         }
