@@ -89,6 +89,7 @@ public:
 #endif
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
+    void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
     void print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id);
     void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id);

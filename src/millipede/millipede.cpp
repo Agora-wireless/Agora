@@ -199,26 +199,7 @@ void Millipede::start()
                 int subframe_id = pkt->symbol_id;
                 int ant_id = pkt->ant_id;
 
-                if (rx_stats_.task_count[frame_id]++ == 0) {
-                    stats_manager_->update_pilot_received(frame_count);
-#if DEBUG_PRINT_PER_FRAME_START
-                    int prev_frame_id = (frame_count + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM;
-                    printf("Main thread: data received from frame %d, subframe %d, in %.5f us, rx in prev frame: %d\n",
-                        frame_count, pkt->symbol_id,
-                        stats_manager_->get_pilot_received(frame_count) - stats_manager_->get_pilot_received(frame_count - 1),
-                        rx_stats_.task_count[prev_frame_id]);
-#endif
-                }
-
-                if (config_->isPilot(frame_count, pkt->symbol_id) && rx_stats_.task_count[frame_id] == rx_stats_.max_task_pilot_count) {
-                    stats_manager_->update_pilot_all_received(frame_count);
-                    print_per_frame_done(PRINT_RX_PILOTS, frame_count, frame_id);
-                } else if (rx_stats_.task_count[frame_id] == rx_stats_.max_task_count) {
-                    stats_manager_->update_rx_processed(frame_count);
-                    print_per_frame_done(PRINT_RX, frame_count, frame_id);
-                    rx_stats_.task_count[frame_id] = 0;
-                }
-
+                update_rx_counters(frame_count, frame_id, pkt->symbol_id);
 #if BIGSTATION
                 /* in BigStation, schedule FFT whenever a packet is received */
                 schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
@@ -757,6 +738,31 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
     }
 }
 
+void Millipede::update_rx_counters(int frame_count, int frame_id, int subframe_id)
+{
+    if (config_->isPilot(frame_count, subframe_id)) {
+        if (++rx_stats_.task_pilot_count[frame_id] == rx_stats_.max_task_pilot_count) {
+            rx_stats_.task_pilot_count[frame_id] = 0;
+            stats_manager_->update_pilot_all_received(frame_count);
+            print_per_frame_done(PRINT_RX_PILOTS, frame_count, frame_id);
+        }
+    }
+    if (rx_stats_.task_count[frame_id]++ == 0) {
+        stats_manager_->update_pilot_received(frame_count);
+#if DEBUG_PRINT_PER_FRAME_START
+        int prev_frame_id = (frame_count + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM;
+        printf("Main thread: data received from frame %d, subframe %d, in %.5f us, rx in prev frame: %d\n",
+            frame_count, subframe_id,
+            stats_manager_->get_pilot_received(frame_count) - stats_manager_->get_pilot_received(frame_count - 1),
+            rx_stats_.task_count[prev_frame_id]);
+#endif
+    } else if (rx_stats_.task_count[frame_id] == rx_stats_.max_task_count) {
+        stats_manager_->update_rx_processed(frame_count);
+        print_per_frame_done(PRINT_RX, frame_count, frame_id);
+        rx_stats_.task_count[frame_id] = 0;
+    }
+}
+
 void Millipede::print_per_frame_done(int task_type, int frame_count, int frame_id)
 {
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
@@ -1013,6 +1019,7 @@ void Millipede::initialize_uplink_buffers()
     rx_stats_.max_task_count = max_packet_num_per_frame;
     rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM;
     alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     rx_stats_.fft_created_count = 0;
     fft_stats_.init(BS_ANT_NUM, PILOT_NUM,
         TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
@@ -1086,6 +1093,7 @@ void Millipede::free_uplink_buffers()
     decoded_buffer_.free();
 
     free_buffer_1d(&(rx_stats_.task_count));
+    free_buffer_1d(&(rx_stats_.task_pilot_count));
     fft_stats_.fini();
     fft_stats_.data_exist_in_symbol.free();
     free_buffer_1d(&(fft_stats_.symbol_data_count));
