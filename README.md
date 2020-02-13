@@ -22,21 +22,31 @@ Install muFFT:
 
 	git clone https://github.com/Themaister/muFFT.git
 	cd muFFT
-  git checkout 6d716ab
+    git checkout 6d716ab
 	make
 	sudo make install
 
+Intel MKL and compiler can be installed by installing Parallel Studio XE
+
+* Available at https://software.intel.com/en-us/parallel-studio-xe/choose-download/student-linux-fortran
+
+Install Intel FlexRAN (optional, only used for LDPC):
+
+* Available at https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules
+* Requires gtest Google Test 1.7.0: https://github.com/google/googletest/releases/tag/release-1.7.0
+
+
 Compile Millipede:
 
-	cd millipede
+	cd Millipede
 	mkdir build
 	cd build
 	cmake ..
-	make -j36 (36 is the number of cores, on the server it can be 36)
+	make -j 
 
 2. Run
-* In one terminal, run "./millipede" to start the receiver
-* In another terminal, run "./sender 4 4 1 20" to start the sender, the four arguments are: # of sockets, # of threads (should be same as # of sockets), offset of CPU core index (change the value according to which socket the NIC is installed), and delay between symbols
+* In one terminal, run "./millipede data/tddconfig-sim-ul.json" to start Millipede with Uplink configuration 
+* In another terminal, run "./sender 4 2 5000 data/tddconfig-sim-ul.json" to start the sender with Uplink configuration, the four arguments are: # of threads, offset of CPU core index (change the value according to which socket the NIC is installed), frame duration in microseconds, config filename
 
 3. Other information
 * CoMP.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
@@ -47,7 +57,7 @@ Compile Millipede:
 
 To compile test_matrix.cpp:
 
-	g++ -I/opt/intel/vtune_amplifier/include -o test_matrix ../test_matrix.cpp ../cpu_attach.cpp -std=c++11 -w -O3 -mavx2 -mavx -g -larmadillo -lpthread /opt/intel/vtune_amplifier/lib64/libittnotify.a -ldl
+	g++ -o test_matrix test_matrix.cpp cpu_attach.cpp -std=c++11 -w -O3 -mavx2 -g -larmadillo -lpthread -lm -ldl 
 
 To compile test_mufft.c:
 
