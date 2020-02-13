@@ -526,7 +526,7 @@ static void run_benchmark_demod(unsigned N, unsigned iterations)
 int main(int argc, char *argv[])
 {
     __itt_pause();
-    putenv( "MKL_THREADING_LAYER=sequential" );
+    setenv("MKL_THREADING_LAYER", "sequential");
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
     if (argc != 4)
     {

@@ -6,8 +6,8 @@
 
 Required packages LAPACK, BLAS, Boost, Doxygen
 
-	sudo apt-get install liblapack-dev, libblas-dev, libboost-all-dev
-	sudo apt-get install doxygen
+	sudo apt-get install liblapack-dev libblas-dev libboost-all-dev
+	sudo apt-get install doxygen nlohmann-json-dev
 
 Install Armadillo:
 
@@ -22,10 +22,9 @@ Install muFFT:
 
 	git clone https://github.com/Themaister/muFFT.git
 	cd muFFT
+  git checkout 6d716ab
 	make
 	sudo make install
-
-	
 
 Compile Millipede:
 

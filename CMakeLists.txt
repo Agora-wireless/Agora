@@ -88,14 +88,8 @@ endif ()
 
 
 # Intel MKL
-find_path(MKL_INCLUDE_DIR 
-          NAMES mkl_dfti.h
-          PATHS /opt/intel/*/linux/mkl/include)
-set (MKL_LINK_DIR ${MKL_INCLUDE_DIR}/../lib/intel64)
-message(STATUS "MKL_INCLUDE_DIR: ${MKL_INCLUDE_DIR}")
-message(STATUS "MKL_LINK_DIR: ${MKL_LINK_DIR}")
-include_directories(${MKL_INCLUDE_DIR})
-link_directories(${MKL_LINK_DIR})
+set(BLA_VENDOR Intel10_64lp)
+find_package(BLAS)
 
 include_directories(
 	src/common/
