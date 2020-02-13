@@ -9,11 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-int flushCache() {
+void flushCache() {
   const size_t bigger_than_cachesize = 2 * 1024; // 100 * 1024 * 1024;
   long *p = new long[bigger_than_cachesize];
   // When you want to "flush" cache.
-  for (int i = 0; i < bigger_than_cachesize; i++) {
+  for (size_t i = 0; i < bigger_than_cachesize; i++) {
     p[i] = rand();
   }
   delete p;
@@ -22,7 +22,8 @@ int flushCache() {
 static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   int *input;
   complex_float *output_mod;
-  float **mod_table = init_modulation_table(4);
+  Table<float> mod_table;
+  init_modulation_table(mod_table, 4);
   uint8_t *output_demod_loop;
   uint8_t *output_demod_sse;
   uint8_t *output_demod_avx2;
@@ -129,7 +130,8 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   int *input;
   complex_float *output_mod;
 
-  float **mod_table = init_modulation_table(6);
+  Table<float> mod_table;
+  init_modulation_table(mod_table, 6);
   unsigned int num = 100;
   uint8_t *output_demod_loop;
   uint8_t *output_demod_sse;
