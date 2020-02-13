@@ -466,7 +466,7 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
 void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
 {
     printf("saving timestamps to file.........\n");
-    printf("Total processed frames %d \n", last_frame_id);
+    printf("Total processed frames %d \n", last_frame_id + 1);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");

@@ -481,11 +481,11 @@ void Millipede::start()
         } /* end of for */
     } /* end of while */
 finish:
-    this->stop();
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
+    this->stop();
     save_demul_data_to_file(last_frame_id);
     //exit(0);
 }
