@@ -7,8 +7,11 @@
  "cp_len" : 0,
  "tx_prefix_len" : 0,
  "ofdm_prefix_len" : 0,
- "worker_thread_num" : 15,
- "demul_block_size" : 12,
- "antennta_num": 8
+ "worker_thread_num" : 30,
+ "demul_block_size" : 40,
+ "antennta_num": 8,
+ "rx_addr": "10.0.0.3",
+ "tx_addr": "10.0.0.4",
+ "modulation": "16QAM",
+ "tx_frame_num":4000
 }
-
