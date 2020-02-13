@@ -66,10 +66,13 @@ public:
     void start();
     void stop();
 
-    void* worker(int tid);
+#if BIGSTATION
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
+#else
+    void* worker(int tid);
+#endif
     void create_threads(thread_type thread, int tid_start, int tid_end);
 
     // struct EventHandlerContext
