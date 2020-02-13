@@ -48,8 +48,14 @@ set (TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx.cpp)
 
 
 # Intel MKL
-set(BLA_VENDOR Intel10_64lp)
-find_package(BLAS)
+find_path(MKL_INCLUDE_DIR 
+          NAMES mkl_dfti.h
+          PATHS /opt/intel/*/linux/mkl/include)
+set (MKL_LINK_DIR ${MKL_INCLUDE_DIR}/../lib/intel64)
+message(STATUS "MKL_INCLUDE_DIR: ${MKL_INCLUDE_DIR}")
+message(STATUS "MKL_LINK_DIR: ${MKL_LINK_DIR}")
+include_directories(${MKL_INCLUDE_DIR})
+link_directories(${MKL_LINK_DIR})
 
 include_directories(
 	${SOURCE_DIR}/src/common/
