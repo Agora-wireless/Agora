@@ -140,7 +140,6 @@ void Millipede::start()
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int subframe_num_perframe = config_->symbol_num_perframe;
-    int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
     //int PILOT_NUM = config_->pilot_symbol_num_perframe;
@@ -438,8 +437,8 @@ void Millipede::start()
             case EVENT_PACKET_SENT: {
                 /* Data is sent */
                 int offset = event.data;
-                int ant_id = offset / TASK_BUFFER_SUBFRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int ant_id = offset % BS_ANT_NUM;
+                int total_data_subframe_id = offset / BS_ANT_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
                 // printf("In main thread: tx finished for frame %d subframe %d ant %d\n", frame_id, data_subframe_id, ant_id);
@@ -497,6 +496,8 @@ pin_worker(thread_type thread, int tid, Config* config_)
     pin_to_core_with_offset(thread, core_offset, tid);
 }
 
+#if !BIGSTATION
+
 void* Millipede::worker(int tid)
 {
     pin_worker(Worker, tid, config_);
@@ -537,43 +538,33 @@ void* Millipede::worker(int tid)
     auto* computeReciprocity = new Reciprocity(config_, tid, rc_queue_, consumer,
         calib_buffer_, recip_buffer_, stats_manager_);
 
-    int queue_num;
-    Doer** computers;
+    Doer* computers[] = {
+        computeIFFT,
+        computePrecode,
 #ifdef USE_LDPC
-    Doer* compute_DL_LDPC[] = { computeIFFT, computePrecode, computeEncoding, computeDnZF, computeReciprocity, computeFFT };
-    Doer* compute_UL_LDPC[] = { computeUpZF, computeFFT, computeDemul, computeDecoding };
-#else
-    Doer* compute_DL[] = { computeIFFT, computePrecode, computeDnZF, computeReciprocity, computeFFT };
-    Doer* compute_UL[] = { computeUpZF, computeFFT, computeDemul };
+        computeEncoding,
 #endif
+        computeDnZF,
+        computeUpZF,
+        computeReciprocity,
+        computeFFT,
+        computeDemul,
+#ifdef USE_LDPC
+        computeDecoding,
+#endif
+    };
 
 #define NITEMS(a) (sizeof(a) / sizeof(*a))
-#ifdef USE_LDPC
-    if (config_->downlink_mode) {
-        queue_num = NITEMS(compute_DL_LDPC);
-        computers = compute_DL_LDPC;
-    } else {
-        queue_num = NITEMS(compute_UL_LDPC);
-        computers = compute_UL_LDPC;
-    }
-#else
-    if (config_->downlink_mode) {
-        queue_num = NITEMS(compute_DL);
-        computers = compute_DL;
-    } else {
-        queue_num = NITEMS(compute_UL);
-        computers = compute_UL;
-    }
-#endif
 
     while (true) {
-        for (int i = 0; i < queue_num; i++) {
+        for (size_t i = 0; i < NITEMS(computers); i++) {
             if (computers[i]->try_launch())
                 break;
         }
     }
 }
 
+#else /* BIGSTATION */
 void* Millipede::worker_fft(int tid)
 {
     pin_worker(Worker_FFT, tid, config_);
@@ -645,6 +636,7 @@ void* Millipede::worker_demul(int tid)
         }
     }
 }
+#endif /* !BIGSTATION */
 
 void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
 {
@@ -654,9 +646,11 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
         context->obj_ptr = this;
         context->id = i;
         switch (thread) {
+#if !BIGSTATION
         case Worker:
             ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker>, context);
             break;
+#else
         case Worker_FFT:
             ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_fft>, context);
             break;
@@ -666,6 +660,7 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
         case Worker_Demul:
             ret = pthread_create(&task_threads[i], NULL, pthread_fun_wrapper<Millipede, &Millipede::worker_demul>, context);
             break;
+#endif
         default:
             printf("ERROR: Wrong thread type to create workers\n");
             exit(0);
@@ -678,7 +673,7 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
 }
 
 void Millipede::schedule_fft_task(int offset, int frame_count,
-    int frame_id, UNUSED int subframe_id, UNUSED int ant_id,
+    UNUSED int frame_id, UNUSED int subframe_id, UNUSED int ant_id,
     Consumer const& consumer)
 {
     Event_data do_fft_task;
@@ -689,16 +684,23 @@ void Millipede::schedule_fft_task(int offset, int frame_count,
     printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d, subframe: %d, ant: %d\n",
         frame_count, frame_id, subframe_id, ant_id);
 #endif
-    rx_stats_.fft_created_count[frame_id]++;
-    if (rx_stats_.fft_created_count[frame_id] == 1) {
+#if BIGSTATION
+    if (rx_stats_.fft_created_count == frame_id) {
         stats_manager_->update_processing_started(frame_count);
-    } else if (rx_stats_.fft_created_count[frame_id] == rx_stats_.max_task_count) {
-        rx_stats_.fft_created_count[frame_id] = 0;
+        rx_stats_.fft_created_count++;
+        rx_stats_.fft_created_count %= TASK_BUFFER_FRAME_NUM;
+    }
+#else
+    if (rx_stats_.fft_created_count++ == 0) {
+        stats_manager_->update_processing_started(frame_count);
+    } else if (rx_stats_.fft_created_count == rx_stats_.max_task_count) {
+        rx_stats_.fft_created_count = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n",
             frame_count, frame_id, get_time() - stats_manager_->get_pilot_received(frame_count));
 #endif
     }
+#endif /* BIGSTATION */
 }
 
 #if !BIGSTATION
@@ -718,7 +720,7 @@ bool Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
         else
             printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
 #endif
-        return (rx_stats_.fft_created_count[frame_id] == 0);
+        return (rx_stats_.fft_created_count == 0);
     }
     return (false);
 }
@@ -1024,9 +1026,7 @@ void Millipede::initialize_uplink_buffers()
     rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM;
     alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(&(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
-#if !BIGSTATION
-    alloc_buffer_1d(&(rx_stats_.fft_created_count), TASK_BUFFER_FRAME_NUM, 64, 1);
-#endif
+    rx_stats_.fft_created_count = 0;
     fft_stats_.init(BS_ANT_NUM, PILOT_NUM,
         TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
     alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
@@ -1100,9 +1100,6 @@ void Millipede::free_uplink_buffers()
 
     free_buffer_1d(&(rx_stats_.task_count));
     free_buffer_1d(&(rx_stats_.task_pilot_count));
-#if !BIGSTATION
-    free_buffer_1d(&(rx_stats_.fft_created_count));
-#endif
     fft_stats_.fini();
     fft_stats_.data_exist_in_symbol.free();
     free_buffer_1d(&(fft_stats_.symbol_data_count));
