@@ -26,7 +26,7 @@ Install muFFT:
 	make
 	sudo make install
 
-Intel MKL and compiler can be installed by installing Parallel Studio XE
+Intel MKL and compiler can be installed by installing Parallel Studio XE:
 
 * Available at https://software.intel.com/en-us/parallel-studio-xe/choose-download/student-linux-fortran
 
@@ -49,10 +49,20 @@ Compile Millipede:
 * In another terminal, run "./sender 4 2 5000 data/tddconfig-sim-ul.json" to start the sender with Uplink configuration, the four arguments are: # of threads, offset of CPU core index (change the value according to which socket the NIC is installed), frame duration in microseconds, config filename
 
 3. Other information
-* CoMP.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
-* I added some debug information settings in Symbols.hpp
-* Thread number settings are in CoMP.hpp
-* test_matrix.cpp is for unit tests of matrix operations
+* millipede.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
+* Eebug information settings are in Symbols.hpp
+* test/test_millipede is used for correctness test
+  * The sender sends 1 frame, Millipede processes it and compares results with gound truth data.
+  * Gound truth data is produced by MATLAB file generate_data_dl.m. 
+
+Compile and run Millipede test:
+
+	cd test/test_millipede
+	cmake .
+	make -j
+	./test_millipede.sh
+
+* test_matrix.cpp is for unit tests of matrix operations (inversion and multiplication)
 * test_mufft.c is for unit tests of FFT and IFFT
 
 To compile test_matrix.cpp:
