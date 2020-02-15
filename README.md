@@ -36,6 +36,15 @@ Install Intel FlexRAN (optional, only used for LDPC):
 * Requires gtest Google Test 1.7.0: https://github.com/google/googletest/releases/tag/release-1.7.0
 
 
+Set environment vairables for Intel libraries before compiling:
+
+	source path_to/compilervars.sh intel64
+
+E.g., 
+
+	source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64
+
+
 Compile Millipede:
 
 	cd Millipede
@@ -55,7 +64,7 @@ Compile Millipede:
   * The sender sends 1 frame, Millipede processes it and compares results with gound truth data.
   * Gound truth data is produced by MATLAB file generate_data_dl.m. 
 
-Compile and run Millipede test:
+To compile and run Millipede test:
 
 	cd test/test_millipede
 	cmake .
