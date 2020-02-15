@@ -45,6 +45,7 @@ Millipede::Millipede(Config* cfg)
         printf("initialize downlink buffers\n");
         initialize_downlink_buffers();
     }
+
     stats_manager_ = new Stats(config_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM);
 
     /* initialize TXRX threads*/
@@ -512,11 +513,13 @@ void* Millipede::worker(int tid)
     auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, precoder_buffer_, stats_manager_);
-
-    auto computeDnZF = new DoDnZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
+    DoZF* computeZF;
+    if (config_->downlink_mode)
+        computeZF = new DoDnZF(config_, tid, zf_queue_, consumer,
+            csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
+    else
+        computeZF = new DoUpZF(config_, tid, zf_queue_, consumer,
+            csi_buffer_, precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -544,8 +547,7 @@ void* Millipede::worker(int tid)
 #ifdef USE_LDPC
         computeEncoding,
 #endif
-        computeDnZF,
-        computeUpZF,
+        computeZF,
         computeReciprocity,
         computeFFT,
         computeDemul,
