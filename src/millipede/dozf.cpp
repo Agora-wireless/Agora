@@ -105,33 +105,6 @@ void DoZF::ZF_time_orthogonal(int offset)
             }
         }
 
-        // // gather data for all users and antennas
-        // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-        //     float *src_csi_ptr = (float *)fft_buffer_.FFT_outputs[subframe_offset+ue_idx] + sc_id * 2;
-        //     for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-        //         // fetch 4 complex floats for 4 ants
-        //         __m256 pilot_rx = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-
-        //         if (pilots_[sc_id] > 0) {
-        //             _mm256_store_ps(tar_csi_ptr, pilot_rx);
-        //         }
-        //         else if (pilots_[sc_id] < 0){
-        //             __m256 pilot_tx = _mm256_set1_ps(pilots_[sc_id]);
-        //             __m256 csi_est = _mm256_mul_ps(pilot_rx, pilot_tx);
-        //             _mm256_store_ps(tar_csi_ptr, csi_est);
-        //         }
-        //         else {
-        //             _mm256_store_ps(tar_csi_ptr, _mm256_setzero_ps());
-        //         }
-
-        //         // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1),
-        //         //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-        //         src_csi_ptr += 8 * OFDM_CA_NUM;
-        //         tar_csi_ptr += 8;
-
-        //     }
-        // }
-
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration1 = get_time() - start_time1;
         (*ZF_task_duration)[tid * 8][1] += duration1;
@@ -169,10 +142,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         //     tar_ptr += 16;
         //     src_ptr += 16;
         // }
-// #if DEBUG_UPDATE_STATS
-//     double duration3 = get_time() - start_time3;
-//     (*ZF_task_duration)[tid][3] += duration3;
-// #endif
+
 #if DEBUG_UPDATE_STATS
         ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
         double duration = get_time() - start_time1;
