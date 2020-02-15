@@ -326,8 +326,8 @@ Config::Config(std::string jsonfile)
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe * UE_ANT_NUM; i++) {
-        r = fread(dl_IQ_data[i], sizeof(int8_t), OFDM_CA_NUM, fd);
-        if (r < OFDM_CA_NUM)
+        r = fread(dl_IQ_data[i], sizeof(int8_t), OFDM_DATA_NUM, fd);
+        if (r < OFDM_DATA_NUM)
             printf("bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
     fclose(fd);
