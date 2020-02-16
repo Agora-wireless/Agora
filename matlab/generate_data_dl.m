@@ -1,7 +1,8 @@
 %% Parameters
 MOD_ORDER = 16;
 N_SC = 2048;
-SC_IND_DATA = 1:2048;
+SC_IND_DATA = 425:1624;
+OFDM_START_OFFSET = 424;
 NUM_BS_ANT = 8; 
 NUM_UE = 8;
 N_SYMS = 70;
@@ -21,10 +22,9 @@ frmLen = 100;       % frame length
 
 %% Generate pilot
 if GENERATE_PILOT
-    pilot_f = randi(3,length(SC_IND_DATA),1)-2;
+    pilot_f = randi(3,N_SC,1)-2;
     pilot_f(pilot_f==0) = 1;
-    pilot_f(1:424) = 0;
-    pilot_f(1625:2048) = 0;
+    pilot_f(setdiff(1:N_SC, SC_IND_DATA)) = 0;
     pilot_t = ifft(pilot_f, N_SC);
     fileID = fopen('../data/pilot_f_2048.bin','w');
     fwrite(fileID,pilot_f,'float');
@@ -35,8 +35,7 @@ if GENERATE_PILOT
 else
     fileID = fopen('../data/pilot_f_2048.bin');
     pilot_f = fread(fileID,[2048,1],'float');
-    pilot_f(1:424) = 0;
-    pilot_f(1625:2048) = 0; 
+    pilot_f(setdiff(1:N_SC, SC_IND_DATA)) = 0;
     pilot_t = ifft(pilot_f,2048);
    
     fclose(fileID);
@@ -56,6 +55,8 @@ if GENERATE_DATA
 else
     fileID_data = fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT));
     tx_data_for_saving = fread(fileID_data,[N_DATA_SYMS,1],'uint8');
+%     tx_data_for_saving = reshape(tx_data_for_saving, NUM_UE, length(SC_IND_DATA),N_OFDM_SYMS/NUM_UE);
+%     tx_data = permute(tx_data_for_saving,[2,3,1]);
     tx_data_for_saving = reshape(tx_data_for_saving, length(SC_IND_DATA), NUM_UE, N_OFDM_SYMS/NUM_UE);
     tx_data = permute(tx_data_for_saving,[1,3,2]);
     tx_data = tx_data(:);
@@ -97,8 +98,8 @@ end
 
 % Reshape the symbol vector to a matrix with one column per OFDM symbol
 % size: N_SC \times N_OFDM_SYMS/NUM_UE \times NUM_UE
-tx_syms_mat = reshape(tx_syms, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
-tx_data_orig = reshape(tx_data, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
+tx_syms_mat = zeros(N_SC, N_OFDM_SYMS/NUM_UE, NUM_UE);
+tx_syms_mat(SC_IND_DATA,:,:) = reshape(tx_syms, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
 % Construct the IFFT input matrix
 % ifft_in_mat = zeros(NUM_BS_ANT, N_SC, N_OFDM_SYMS/NUM_BS_ANT);
 
@@ -176,7 +177,7 @@ for i = 1:NUM_UE
     pilot_est(:,i,:) = squeeze(squeeze(fft(rx_mat_all(:,i,:),N_SC,1)));
     CSI_est(:,i,:) = squeeze(squeeze(fft(rx_mat_all(:,i,:),N_SC,1))).*repmat(pilot_f,1,NUM_BS_ANT);
 end
-fprintf("CSI_estimation error: %d/%d\n",sum(sum(sum(abs(CSI_est(425:1624,:,:)-H_noisy(425:1624,:,:))>0.5*1e-1))),length(H_noisy(:)));
+fprintf("CSI_estimation error: %d/%d\n",sum(sum(sum(abs(CSI_est(SC_IND_DATA,:,:)-H_noisy(SC_IND_DATA,:,:))>0.5*1e-1))),length(H_noisy(:)));
 
 
 if GENERATE_DATA
@@ -200,11 +201,11 @@ H_est = squeeze(CSI_est(1,:,:));
 rx_mat_data = rx_mat_all(:,NUM_UE+1:N_SYMS,:);
 rx_data_fft = fft(rx_mat_data,N_SC,1);
 
-precoder_all = zeros(N_SC,NUM_BS_ANT,NUM_UE);
-rx_syms_mat = zeros(N_SC,N_SYMS-NUM_UE,NUM_UE);
-for i = 1:N_SC
-   precoder_all(i,:,:) = pinv(squeeze(CSI_est(i,:,:))); 
-   rx_syms_mat(i,:,:) = squeeze(rx_data_fft(i,:,:)) * squeeze(precoder_all(i,:,:));  
+precoder_all = zeros(length(SC_IND_DATA),NUM_BS_ANT,NUM_UE);
+rx_syms_mat = zeros(length(SC_IND_DATA),N_SYMS-NUM_UE,NUM_UE);
+for i = 1:length(SC_IND_DATA)
+   precoder_all(i,:,:) = pinv(squeeze(CSI_est(OFDM_START_OFFSET+i,:,:))); 
+   rx_syms_mat(i,:,:) = squeeze(rx_data_fft(OFDM_START_OFFSET+i,:,:)) * squeeze(precoder_all(i,:,:));  
 end
 
 
@@ -233,11 +234,11 @@ switch(MOD_ORDER)
         rx_data = arrayfun(demod_fcn_16qam, rx_syms_mat(:));
 end
 
-rx_data = reshape(rx_data,N_SC,N_OFDM_SYMS/NUM_UE, NUM_UE);
-tx_data_mat = reshape(tx_data,N_SC,N_SYMS-NUM_UE,NUM_UE);
-fprintf("Uplink: correct data demodulation: %d/%d\n",sum(sum(sum(rx_data(425:1624,:,:)==tx_data_mat(425:1624,:,:)))),length(rx_data(:))/N_SC*1200);
+rx_data = reshape(rx_data,length(SC_IND_DATA),N_OFDM_SYMS/NUM_UE, NUM_UE);
+tx_data_mat = reshape(tx_data,length(SC_IND_DATA),N_SYMS-NUM_UE,NUM_UE);
+fprintf("Uplink: correct data demodulation: %d/%d\n",sum(sum(sum(rx_data==tx_data_mat))),length(tx_data_mat(:)));
 % show data of symbol 0 and all users from subcarrier 425 to 430
-disp(squeeze(rx_data(425:430,1,:)));
+disp(squeeze(rx_data(1:6,1,:)));
 % rx_data = permute(rx_data,[2,3,1]);
 
 % % Reshape to a vector
@@ -284,7 +285,7 @@ CSI_est = zeros(N_SC,NUM_UE,NUM_BS_ANT);
 for i = 1:NUM_UE
     CSI_est(:,i,:) = squeeze(fft(rx_data_from_file_float(:,i,:),N_SC,1)).*repmat(pilot_f,1,NUM_BS_ANT);
 end
-fprintf("CSI_estimation error: %d/%d\n",sum(sum(sum(abs(CSI_est(425:1624,:,:)-H_from_file_float(425:1624,:,:))>0.5*1e-1))),length(H_from_file_float(:)));
+fprintf("CSI_estimation error: %d/%d\n",sum(sum(sum(abs(CSI_est(SC_IND_DATA,:,:)-H_from_file_float(SC_IND_DATA,:,:))>0.5*1e-1))),length(H_from_file_float(:)));
 
 %% Precoder calculation and precoding
 
@@ -295,17 +296,17 @@ for i = 1:N_SC
 end
 
 % original data before modulation
-tx_data_dl_raw = reshape(tx_data,N_SC,N_SYMS-NUM_UE, NUM_UE);
+tx_data_dl_raw = reshape(tx_data,length(SC_IND_DATA),N_SYMS-NUM_UE, NUM_UE);
 tx_data_dl_raw = permute(tx_data_dl_raw, [1, 3, 2]);
 % original data after modulation
-tx_data_dl = reshape(tx_syms,N_SC,N_SYMS-NUM_UE, NUM_UE);
+tx_data_dl = reshape(tx_syms,length(SC_IND_DATA),N_SYMS-NUM_UE, NUM_UE);
 tx_data_dl = permute(tx_data_dl, [1, 3, 2]);
 
 precoded_data = zeros(N_SC,NUM_BS_ANT,N_SYMS-NUM_UE);
 dl_rx_data_f = zeros(N_SC,NUM_BS_ANT,N_SYMS-NUM_UE);
-for i = 1:1200
-    precoded_data(424+i,:,:) = squeeze(precoder_from_file(424+i,:,:))*squeeze(tx_data_dl(424+i,:,:));
-    dl_rx_data_f(424+i,:,:) = squeeze(precoded_data(424+i,:,:));
+for i = 1:length(SC_IND_DATA)
+    precoded_data(OFDM_START_OFFSET+i,:,:) = squeeze(precoder_from_file(OFDM_START_OFFSET+i,:,:))*squeeze(tx_data_dl(i,:,:));
+    dl_rx_data_f(OFDM_START_OFFSET+i,:,:) = squeeze(precoded_data(OFDM_START_OFFSET+i,:,:));
 %     dl_rx_data_f(424+i,:,:) = squeeze(H_from_file_float(424+i,:,:))*squeeze(precoded_data(424+i,:,:));
 end
 
@@ -313,9 +314,9 @@ end
 dl_rx_data = ifft(dl_rx_data_f,N_SC,1);
 
 dl_rx_data_fft_orig = fft(dl_rx_data,N_SC,1);
-dl_rx_data_fft = zeros(N_SC,NUM_UE,N_SYMS-NUM_UE);
-for i = 1:1200
-    dl_rx_data_fft(424+i,:,:) = (squeeze(H_from_file_float(424+i,:,:))*squeeze(dl_rx_data_fft_orig(424+i,:,:)));
+dl_rx_data_fft = zeros(length(SC_IND_DATA),NUM_UE,N_SYMS-NUM_UE);
+for i = 1:length(SC_IND_DATA)
+    dl_rx_data_fft(i,:,:) = (squeeze(H_from_file_float(OFDM_START_OFFSET+i,:,:))*squeeze(dl_rx_data_fft_orig(OFDM_START_OFFSET+i,:,:)));
 end
 
 
@@ -328,7 +329,7 @@ switch(MOD_ORDER)
         ue_rx_data = arrayfun(demod_fcn_16qam, dl_rx_data_fft(:));
 end
 
-ue_rx_data = reshape(ue_rx_data,N_SC,NUM_UE,N_SYMS-NUM_UE);
-fprintf("Downlink: correct data demodulation: %d/%d\n",sum(sum(sum(ue_rx_data(425:425+1199,:,:)==tx_data_dl_raw(425:425+1199,:,:)))),1200*NUM_UE*(N_SYMS-NUM_UE));
+ue_rx_data = reshape(ue_rx_data,length(SC_IND_DATA),NUM_UE,N_SYMS-NUM_UE);
+fprintf("Downlink: correct data demodulation: %d/%d\n",sum(sum(sum(ue_rx_data==tx_data_dl_raw))),length(SC_IND_DATA)*NUM_UE*(N_SYMS-NUM_UE));
 % show data of symbol 0 and all users from subcarrier 425 to 430
-squeeze(ue_rx_data(425:430,:,1))
+squeeze(ue_rx_data(1:6,:,1))
