@@ -76,7 +76,7 @@ void Millipede::stop()
 {
     std::cout << "stopping threads " << std::endl;
     config_->running = false;
-    usleep(1000);
+    usleep(2000);
     receiver_.reset();
 }
 
@@ -483,8 +483,9 @@ finish:
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
-    this->stop();
     save_demul_data_to_file(last_frame_id);
+    save_ifft_data_to_file(last_frame_id);
+    this->stop();
     //exit(0);
 }
 
@@ -1146,6 +1147,27 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
         for (int sc = 0; sc < OFDM_DATA_NUM; sc++) {
             uint8_t* ptr = &demod_hard_buffer_[total_data_subframe_id][sc * UE_NUM];
             fwrite(ptr, UE_NUM, sizeof(uint8_t), fp);
+        }
+    }
+    fclose(fp);
+#endif
+}
+
+void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
+{
+#ifdef WRITE_IFFT
+    int data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/ifft_data.bin";
+    FILE* fp = fopen(filename.c_str(), "wb");
+    for (int i = 0; i < data_subframe_num_perframe; i++) {
+        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + i;
+        for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
+            int offset = total_data_subframe_id * BS_ANT_NUM + ant_id;
+            float* ptr = (float*)dl_ifft_buffer_[offset];
+            fwrite(ptr, OFDM_CA_NUM * 2, sizeof(float), fp);
         }
     }
     fclose(fp);
