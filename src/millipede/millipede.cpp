@@ -147,6 +147,7 @@ void Millipede::start()
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int dl_data_subframe_start = config_->dl_data_symbol_start;
     int dl_data_subframe_end = config_->dl_data_symbol_end;
+    // int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int packet_length = config_->packet_length;
     int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;
 
@@ -364,8 +365,8 @@ void Millipede::start()
 
             case EVENT_ENCODE: {
                 int offset = event.data;
-                int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int num_code_blocks = encode_stats_.max_task_count;
+                int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
@@ -397,7 +398,7 @@ void Millipede::start()
                     consumer_ifft.schedule_task_set(offset);
                     if (data_subframe_id < dl_data_subframe_end - 1) {
 #ifdef USE_LDPC
-                        consumer_encode.schedule_task_set(total_data_subframe_id);
+                        consumer_encode.schedule_task_set(total_data_subframe_id + 1);
 #else
                         consumer_precode.schedule_task_set(total_data_subframe_id + 1);
 #endif
@@ -1137,6 +1138,7 @@ void Millipede::free_downlink_buffers()
 void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 {
 #ifdef WRITE_DEMUL
+    printf("saving demul data...\n");
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
@@ -1157,14 +1159,18 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
 {
 #ifdef WRITE_IFFT
+    printf("saving ifft data...\n");
     int data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
+    int dl_data_subframe_start = config_->dl_data_symbol_start;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int OFDM_CA_NUM = config_->OFDM_CA_NUM;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/ifft_data.bin";
     FILE* fp = fopen(filename.c_str(), "wb");
+
     for (int i = 0; i < data_subframe_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe + i;
+        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe 
+                                    + i + dl_data_subframe_start;
         for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
             int offset = total_data_subframe_id * BS_ANT_NUM + ant_id;
             float* ptr = (float*)dl_ifft_buffer_[offset];

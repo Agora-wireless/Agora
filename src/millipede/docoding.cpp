@@ -58,18 +58,7 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
-
-    const long int buffer_len = 1024 * 1024;
     LDPCconfig LDPC_config = config_->LDPC_config;
-    int numFillerBits = 0;
-    int numMsgBits = LDPC_config.cbLen - numFillerBits;
-    int numMsgBytes = (numMsgBits + 7) / 8;
-    ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
-    alloc_buffer_1d(&(ldpc_decoder_5gnr_response.varNodes), buffer_len, 32, 1);
-    // ldpc_decoder_5gnr_response.varNodes = aligned_alloc()aligned_malloc<int16_t>(buffer_len, 32);
-    // memset(ldpc_decoder_5gnr_response.varNodes, 0, numMsgBytes);
-    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
-
     int Zc = LDPC_config.Zc;
     if ((Zc % 15) == 0)
         i_LS = 7;
@@ -154,7 +143,7 @@ void DoEncode::launch(int offset)
     }
 #endif
 
-    // inform main thread
+    /* inform main thread */
     Event_data Encode_finish_event;
     Encode_finish_event.event_type = EVENT_ENCODE;
     Encode_finish_event.data = offset;
@@ -183,6 +172,14 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
     ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
     ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
     ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+
+    const long int buffer_len = 1024 * 1024;
+    int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    // int numMsgBytes = (numMsgBits + 7) / 8;
+    ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
+    alloc_buffer_1d(&(ldpc_decoder_5gnr_response.varNodes), buffer_len, 32, 1);
+    // ldpc_decoder_5gnr_response.varNodes = aligned_alloc()aligned_malloc<int16_t>(buffer_len, 32);
+    // memset(ldpc_decoder_5gnr_response.varNodes, 0, numMsgBytes);
 }
 
 DoDecode::~DoDecode()
@@ -217,7 +214,7 @@ void DoDecode::launch(int offset)
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n",
     //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, input_offset, llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
-    // inform main thread
+    
 
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
@@ -227,7 +224,7 @@ void DoDecode::launch(int offset)
         printf("Thread %d Decode takes %.2f\n", tid, duration);
     }
 #endif
-
+    /* inform main thread */
     Event_data Decode_finish_event;
     Decode_finish_event.event_type = EVENT_DECODE;
     Decode_finish_event.data = offset;

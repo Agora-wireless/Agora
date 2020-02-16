@@ -110,20 +110,25 @@ void check_correctness_dl(Config *cfg)
     int error_cnt = 0;
     int total_count = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        for (int ant = 0; ant < BS_ANT_NUM; ant++) {
-            // printf("symbol %d, antenna %d\n", i, ant);
-            for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) {
-                total_count++;
-                int offset = BS_ANT_NUM * i + ant;
-                // if (i == 0)
-                //     printf("sc :%d, (%.3f, %.3f) diff: %.3f\n", sc / 2, 
-                //         raw_data[offset][sc], ifft_data[offset][sc], 
-                //         fabs(raw_data[offset][sc] - ifft_data[offset][sc]));
-                if (fabs(raw_data[offset][sc] - ifft_data[offset][sc]) > 2) {
-                    error_cnt++;
+        if (i != DL_PILOT_SYMS - 1) {
+            for (int ant = 0; ant < BS_ANT_NUM; ant++) {
+                // printf("symbol %d, antenna %d\n", i, ant);
+                for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) {
+                    total_count++;
+                    int offset = BS_ANT_NUM * i + ant;
+                    // if (i == 0)
+                    //     printf("sc :%d, (%.3f, %.3f) diff: %.3f\n", sc / 2, 
+                    //         raw_data[offset][sc], ifft_data[offset][sc], 
+                    //         fabs(raw_data[offset][sc] - ifft_data[offset][sc]));
+                    if (fabs(raw_data[offset][sc] - ifft_data[offset][sc]) > 2) {
+                        // printf("sc :%d, (%.3f, %.3f) diff: %.3f\n", sc / 2, 
+                        //     raw_data[offset][sc], ifft_data[offset][sc], 
+                        //     fabs(raw_data[offset][sc] - ifft_data[offset][sc]));
+                        error_cnt++;
+                    }
                 }
+                // if (i == 0) printf("\n");
             }
-            // if (i == 0) printf("\n");
         }
     }    
     printf("======================\n");
