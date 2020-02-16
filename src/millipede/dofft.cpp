@@ -235,10 +235,8 @@ void DoFFT::launch(int offset)
         (*CSI_task_duration)[tid * 8][3] += duration2;
 #endif
 
-    // after finish
-    socket_buffer_status_[socket_thread_id][offset] = 0; // now empty
-    // printf("In doFFT: emptied socket buffer frame: %d, subframe: %d, ant: %d, offset: %d\n",frame_id, subframe_id, ant_id, offset);
-    // inform main thread
+    /* after finish, reset socket buffer status */
+    socket_buffer_status_[socket_thread_id][offset] = 0; 
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
     if (cur_symbol_type == 0) {
@@ -249,6 +247,7 @@ void DoFFT::launch(int offset)
         (*CSI_task_duration)[tid * 8][0] += duration;
     }
 #endif
+    /* inform main thread */
     Event_data fft_finish_event;
     fft_finish_event.event_type = EVENT_FFT;
     int subframe_num_perframe = config_->symbol_num_perframe;
@@ -296,25 +295,23 @@ void DoIFFT::launch(int offset)
     printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid, frame_id, current_data_subframe_id, ant_id);
 #endif
 
-    // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id << ", input data: ";
-    // for (int j = 0; j <OFDM_CA_NUM; j++) {
-    //     cout << dl_ifft_buffer_.IFFT_inputs[offset][j].real << "+" << dl_ifft_buffer_.IFFT_inputs[offset][j].imag << "j,   ";
-    // }
-    // cout<<"\n\n"<<endl;
-    // mufft_execute_plan_1d(muplans_ifft_[tid], dl_ifft_buffer_.IFFT_outputs[offset],
-    //     dl_ifft_buffer_.IFFT_inputs[offset]);
-
     int dl_ifft_buffer_size = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int buffer_subframe_offset = offset % dl_ifft_buffer_size;
+
+
+#if DEBUG_UPDATE_STATS_DETAILED
+    double start_time1 = get_time();
+    double duration1 = start_time1 - start_time;
+    (*task_duration)[tid * 8][1] += duration1;
+#endif
     DftiComputeBackward(mkl_handle, dl_ifft_buffer_[buffer_subframe_offset]);
 
-    // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id <<", offset: "<<offset <<", output data: ";
-    // for (int j = 0; j <OFDM_CA_NUM; j++) {
-    //     cout << dl_ifft_buffer_.IFFT_outputs[offset][j].real << "+" << dl_ifft_buffer_.IFFT_outputs[offset][j].imag << "j,   ";
-    // }
-    // cout<<"\n\n"<<endl;
+#if DEBUG_UPDATE_STATS_DETAILED
+    double start_time2 = get_time();
+    double duration2 = start_time2 - start_time1;
+    (*task_duration)[tid * 8][2] += duration2;
+#endif
 
-    // calculate data for downlink socket buffer
     float* ifft_output_ptr = (float*)(&dl_ifft_buffer_[buffer_subframe_offset][0]);
     int dl_socket_buffer_status_size = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe;
     int socket_subframe_offset = offset % dl_socket_buffer_status_size;
@@ -346,6 +343,12 @@ void DoIFFT::launch(int offset)
         if (sc_id >= OFDM_CA_NUM - CP_LEN) // add CP
             _mm256_stream_si256((__m256i*)&socket_ptr[2 * (sc_id + CP_LEN - OFDM_CA_NUM)], integer1);
     }
+
+#if DEBUG_UPDATE_STATS_DETAILED
+    double start_time3 = get_time();
+    double duration3 = start_time3 - start_time2;
+    (*task_duration)[tid * 8][3] += duration3;
+#endif
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<< current_data_subframe_id<<", ant: " << ant_id << ", data: ";
     // for (int j = 0; j <OFDM_CA_NUM; j++) {
