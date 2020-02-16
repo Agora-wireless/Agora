@@ -24,13 +24,10 @@ DoDemul::DoDemul(Config* in_config, int in_tid,
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int demul_block_size = config_->demul_block_size;
-    // spm_buffer = (complex_float*)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
     int UE_NUM = config_->UE_NUM;
     alloc_buffer_1d(&spm_buffer, 8 * BS_ANT_NUM, 64, 0);
     alloc_buffer_1d(&equaled_buffer_temp, demul_block_size * UE_NUM, 64, 0);
     alloc_buffer_1d(&equaled_buffer_temp_transposed, demul_block_size * UE_NUM, 64, 0);
-    // equaled_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
-    // equaled_buffer_temp_transposed = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
 
     ue_num_simd256 = UE_NUM / double_num_in_simd256;
 }
@@ -80,7 +77,7 @@ void DoDemul::launch(int offset)
         // for (int j = 0; j < 1; j++) {
         //     int cur_sc_id = i * 8 + j + sc_id;
         //     int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
-        //     cx_float* precoder_ptr = (cx_float *)precoder_buffer_.precoder[precoder_offset];
+        //     cx_float* precoder_ptr = (cx_float *)precoder_buffer_[precoder_offset];
         //     for (int line_idx = 0; line_idx < cache_line_num; line_idx ++) {
         //         _mm_prefetch((char *)(precoder_ptr + 8 * line_idx), _MM_HINT_T2);
         //     }

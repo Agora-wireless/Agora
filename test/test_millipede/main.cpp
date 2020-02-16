@@ -29,9 +29,7 @@ void check_correctness(Config *cfg)
     int BS_ANT_NUM = cfg->BS_ANT_NUM;
     int UE_NUM = cfg->UE_NUM;
     int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
-    int OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    int OFDM_DATA_START = cfg->OFDM_DATA_START;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant" +
@@ -39,10 +37,10 @@ void check_correctness(Config *cfg)
     std::string demul_data_filename = cur_directory + "/data/demul_data.bin";
     Table<uint8_t> raw_data;
     Table<uint8_t> demul_data;
-    raw_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64);
+    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
     demul_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
                     
-    read_from_file(raw_data_filename, raw_data, OFDM_CA_NUM, cfg);    
+    read_from_file(raw_data_filename, raw_data, OFDM_DATA_NUM, cfg);    
     read_from_file(demul_data_filename, demul_data, OFDM_DATA_NUM, cfg);   
 
     int error_cnt = 0;
@@ -51,7 +49,7 @@ void check_correctness(Config *cfg)
         for (int sc = 0; sc < OFDM_DATA_NUM; sc++) {
             for (int ue = 0; ue < UE_NUM; ue++) {
                 total_count++;
-                int offset_in_raw = OFDM_CA_NUM * ue + sc + OFDM_DATA_START;
+                int offset_in_raw = OFDM_DATA_NUM * ue + sc;
                 int offset_in_demul = UE_NUM * sc + ue;
                 // if (i == 1)
                 //     printf("(%d, %u, %u) ", sc, raw_data[i][offset_in_raw], demul_data[i][offset_in_demul]);
