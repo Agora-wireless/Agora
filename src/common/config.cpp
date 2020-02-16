@@ -356,22 +356,6 @@ Config::Config(std::string jsonfile)
 #endif
 #endif
 
-#ifndef USE_LDPC
-/* transpose dl_IQ_data if LDPC is not enabled 
- * dimension change from subcarrier-adjacent to user-adjacent */
-    int8_t* temp_data = (int8_t*)aligned_alloc(64, OFDM_DATA_NUM * UE_ANT_NUM * sizeof(int8_t));
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {  
-        memcpy(temp_data, dl_IQ_data[i], OFDM_DATA_NUM * UE_ANT_NUM * sizeof(int8_t));
-        for (size_t j = 0; j < OFDM_DATA_NUM * UE_ANT_NUM; j++) {
-            int ue_id = j % UE_ANT_NUM;
-            int sc_id = j / UE_ANT_NUM;
-            int offset_orig = ue_id * OFDM_DATA_NUM + sc_id;
-            dl_IQ_data[i][j] = temp_data[offset_orig];
-        }
-    }
-    free(temp_data);
-#endif
-
     running = true;
     std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
     std::cout << "UE_ANT_NUM " << UE_ANT_NUM << std::endl;
