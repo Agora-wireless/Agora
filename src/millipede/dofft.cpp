@@ -304,7 +304,17 @@ void DoIFFT::launch(int offset)
     double duration1 = start_time1 - start_time;
     (*task_duration)[tid * 8][1] += duration1;
 #endif
+    // printf("data before ifft\n");
+    // for (int i = 0; i < OFDM_CA_NUM; i++) 
+    //     printf("%.3f+j%.3f ", dl_ifft_buffer_[buffer_subframe_offset][i].re, dl_ifft_buffer_[buffer_subframe_offset][i].im);
+    // printf("\n");
+
     DftiComputeBackward(mkl_handle, dl_ifft_buffer_[buffer_subframe_offset]);
+
+    // printf("data after ifft\n");
+    // for (int i = 0; i < OFDM_CA_NUM; i++) 
+    //     printf("%.3f+j%.3f ", dl_ifft_buffer_[buffer_subframe_offset][i].re, dl_ifft_buffer_[buffer_subframe_offset][i].im);
+    // printf("\n");
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
@@ -320,15 +330,8 @@ void DoIFFT::launch(int offset)
     //int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
     short* socket_ptr = &pkt->data[2 * TX_PREFIX_LEN];
 
-    // for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++) {
-    //     float *shifted_input_ptr = (float *)(ifft_output_ptr + 2 * sc_id);
-    //     // ifft scaled results by 2048, 16 = 2^15/2048
-    //     socket_ptr[2 * sc_id] = (short)(*shifted_input_ptr * 16);
-    //     socket_ptr[2 * sc_id + 1] = (short)(*(shifted_input_ptr+1) * 16);
-    // }
-
     for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
-        //__m256 scale_factor = _mm256_set1_ps(16);
+        /* ifft scaled results by OFDM_CA_NUM */
         __m256 scale_factor = _mm256_set1_ps(32768.0 / OFDM_CA_NUM);
         __m256 ifft1 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id);
         __m256 ifft2 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id + 8);

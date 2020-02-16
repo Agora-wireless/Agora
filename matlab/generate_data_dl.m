@@ -313,6 +313,19 @@ end
 % ifft_data = ifft(precoded_data,N_SC,1);
 dl_rx_data = ifft(dl_rx_data_f,N_SC,1);
 
+if GENERATE_DATA
+    dl_rx_data_saving = dl_rx_data(:).* N_SC;
+    dl_rx_data_saving_float = zeros(1,length(dl_rx_data_saving)*2);
+    dl_rx_data_saving_float(1:2:end) = real(dl_rx_data_saving);
+    dl_rx_data_saving_float(2:2:end) = imag(dl_rx_data_saving);
+
+    fileID = fopen(sprintf('../data/dl_ifft_data_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fwrite(fileID,dl_rx_data_saving_float,'float');
+    fclose(fileID);
+end
+
+
+
 dl_rx_data_fft_orig = fft(dl_rx_data,N_SC,1);
 dl_rx_data_fft = zeros(length(SC_IND_DATA),NUM_UE,N_SYMS-NUM_UE);
 for i = 1:length(SC_IND_DATA)
