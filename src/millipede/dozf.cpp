@@ -16,20 +16,18 @@ DoZF::DoZF(Config* in_config, int in_tid,
     , csi_buffer_(in_csi_buffer)
     , precoder_buffer_(in_precoder_buffer)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
-    alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
-
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
-
-    csi_gather_buffer = (complex_float*)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), BS_ANT_NUM * UE_NUM * sizeof(complex_float));
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    alloc_buffer_1d(&pred_csi_buffer, BS_ANT_NUM * UE_NUM, 64, 0);
+    alloc_buffer_1d(&csi_gather_buffer, BS_ANT_NUM * UE_NUM, 64, 0);
 }
 
 DoZF::~DoZF()
 {
-    free(csi_gather_buffer);
-    free_buffer_1d(&pred_csi_buffer_);
+    free_buffer_1d(&csi_gather_buffer);
+    free_buffer_1d(&pred_csi_buffer);
 }
 
 void DoZF::launch(int offset)
@@ -223,7 +221,7 @@ void DoZF::Predict(int offset)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
-    cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
+    cx_float* ptr_in = (cx_float*)pred_csi_buffer;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);

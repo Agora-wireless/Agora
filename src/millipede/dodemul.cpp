@@ -21,23 +21,25 @@ DoDemul::DoDemul(Config* in_config, int in_tid,
     , Demul_task_duration(in_stats_manager->demul_stats_worker.task_duration)
 {
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
-    // Demul_task_duration = in_Demul_task_duration;
-    // Demul_task_count = in_Demul_task_count;
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int demul_block_size = config_->demul_block_size;
-    spm_buffer = (complex_float*)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
+    // spm_buffer = (complex_float*)aligned_alloc(64, 8 * BS_ANT_NUM * sizeof(complex_float));
     int UE_NUM = config_->UE_NUM;
-    equaled_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
-    equaled_buffer_temp_transposed = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
+    alloc_buffer_1d(&spm_buffer, 8 * BS_ANT_NUM, 64, 0);
+    alloc_buffer_1d(&equaled_buffer_temp, demul_block_size * UE_NUM, 64, 0);
+    alloc_buffer_1d(&equaled_buffer_temp_transposed, demul_block_size * UE_NUM, 64, 0);
+    // equaled_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
+    // equaled_buffer_temp_transposed = (complex_float*)aligned_alloc(64, demul_block_size * UE_NUM * sizeof(complex_float));
 
     ue_num_simd256 = UE_NUM / double_num_in_simd256;
 }
 
 DoDemul::~DoDemul()
 {
-    free(spm_buffer);
-    free(equaled_buffer_temp);
+    free_buffer_1d(&spm_buffer);
+    free_buffer_1d(&equaled_buffer_temp);
+    free_buffer_1d(&equaled_buffer_temp_transposed);
 }
 
 void DoDemul::launch(int offset)
