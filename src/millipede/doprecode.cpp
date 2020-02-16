@@ -93,18 +93,19 @@ void DoPrecode::launch(int offset)
                 for (int user_id = 0; user_id < UE_NUM; user_id++)
                     data_ptr[user_id] = { config_->pilots_[cur_sc_id], 0 };
             } else {
-                _mm_prefetch((char*)(dl_IQ_data[current_data_subframe_id] + cur_sc_id), _MM_HINT_T0);
+                int subframe_id_in_buffer = current_data_subframe_id - config_->dl_data_symbol_start;
+                _mm_prefetch((char*)(dl_IQ_data[subframe_id_in_buffer] + cur_sc_id), _MM_HINT_T0);
                 // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, cur_sc_id);
                 // printf("raw data: \n");
                 for (int user_id = 0; user_id < UE_NUM - 1; user_id++) {
-                    int8_t* raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * user_id];
-                    int8_t* next_raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (user_id + 1)];
+                    int8_t* raw_data_ptr = &dl_IQ_data[subframe_id_in_buffer][cur_sc_id + OFDM_DATA_NUM * user_id];
+                    int8_t* next_raw_data_ptr = &dl_IQ_data[subframe_id_in_buffer][cur_sc_id + OFDM_DATA_NUM * (user_id + 1)];
                     _mm_prefetch((char*)next_raw_data_ptr, _MM_HINT_T0);
                     // printf("%u ", *raw_data_ptr);
                     data_ptr[user_id] = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
                 }
                 // printf("\n");
-                int8_t* raw_data_ptr = &dl_IQ_data[current_data_subframe_id][cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
+                int8_t* raw_data_ptr = &dl_IQ_data[subframe_id_in_buffer][cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
                 data_ptr[UE_NUM - 1] = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
             }
 
