@@ -7,33 +7,33 @@
 #ifndef PACKETTXRX
 #define PACKETTXRX
 
-#include <iostream>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <stdlib.h>
-#include <vector>
-#include <ctime>
-#include <algorithm>
-#include <numeric>
-#include <pthread.h>
-#include <cassert>
-#include <unistd.h>
-#include <chrono>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <mutex>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "net.hpp"
+#include "offset.h"
+#include <algorithm>
+#include <arpa/inet.h>
+#include <cassert>
+#include <chrono>
+#include <ctime>
+#include <fcntl.h>
+#include <iostream>
+#include <mutex>
+#include <netinet/in.h>
+#include <numeric>
+#include <pthread.h>
+#include <stdio.h> /* for fprintf */
+#include <stdlib.h>
+#include <string.h> /* for memcpy */
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
-#ifdef USE_ARGOS  
+#ifdef USE_ARGOS
 #include "radio_lib.hpp"
 #else
 #include "config.hpp"
@@ -49,17 +49,16 @@
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 #include <rte_ether.h>
+#include <rte_flow.h>
 #include <rte_ip.h>
 #include <rte_malloc.h>
 #include <rte_pause.h>
 #include <rte_prefetch.h>
 #include <rte_udp.h>
-#include <rte_flow.h>
 #endif
 
-
-#define RX_RING_SIZE 8192*4
-#define TX_RING_SIZE 8192*4
+#define RX_RING_SIZE 8192 * 4
+#define TX_RING_SIZE 8192 * 4
 
 #define NUM_MBUFS ((32 * 1024) - 1)
 #define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2)
@@ -69,45 +68,35 @@
 #define ETH_HDRLEN 14
 #define IP4_HDRLEN 20
 #define UDP_HDRLEN 8
-#define MAX_JUMBO_FRAME_SIZE 9600//9600
+#define MAX_JUMBO_FRAME_SIZE 9600 //9600
 #define EMPTY_MASK 0x0
 #define FULL_MASK 0xffffffff
 
-
-
-
 typedef unsigned short ushort;
-class PacketTXRX
-{
+class PacketTXRX {
 public:
-    
-//     // use for create pthread 
-//     struct PacketTXRXContext
-//     {
-//         PacketTXRX *ptr;
-//         int tid;
-// #ifdef USE_ARGOS
-//         int radios;
-// #endif
-//     };
+    //     // use for create pthread
+    //     struct PacketTXRXContext
+    //     {
+    //         PacketTXRX *ptr;
+    //         int tid;
+    //     };
 
 public:
-    PacketTXRX(Config *cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
+    PacketTXRX(Config* cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
     /**
      * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
-    */ 
-    PacketTXRX(Config *cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,  int in_core_offset, 
-            moodycamel::ConcurrentQueue<Event_data> * in_queue_message, moodycamel::ConcurrentQueue<Event_data> * in_queue_task, 
-            moodycamel::ProducerToken **in_rx_ptoks, moodycamel::ProducerToken **in_tx_ptoks);
+    */
+    PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_message, moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+        moodycamel::ProducerToken** in_rx_ptoks, moodycamel::ProducerToken** in_tx_ptoks);
     ~PacketTXRX();
-    
 
 #ifdef USE_DPDK
-    int nic_dpdk_init(uint16_t port, struct rte_mempool *mbuf_pool);
-    int process_arp(struct rte_mbuf *mbuf, struct ether_hdr *eth_h, int len, int tid);
+    int nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool);
+    int process_arp(struct rte_mbuf* mbuf, struct ether_hdr* eth_h, int len, int tid);
 #endif
-
 
     /**
      * called in main threads to start the socket threads
@@ -116,48 +105,34 @@ public:
      * in_buffer_frame_num: number of packets the ring buffer could hold
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + RX_THREAD_NUM - 1}
-    */ 
-  std::vector<pthread_t> startRecv(Table<char> &in_buffer, Table<int> &in_buffer_status, int in_buffer_frame_num, long long in_buffer_length,
-				   Table<double> &in_frame_start);
+    */
+    std::vector<pthread_t> startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, long long in_buffer_length,
+        Table<double>& in_frame_start);
     std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length);
     /**
      * receive thread
     */
-    void *loopRecv(int tid);
-    void *loopTXRX(int tid);
-    void *loopSend(int tid);
+    void* loopRecv(int tid);
+    void* loopTXRX(int tid);
+    void* loopSend(int tid);
 #ifdef USE_DPDK
-    static void* loopRecv_DPDK(void *context);
-#endif 
+    static void* loopRecv_DPDK(void* context);
+#endif
 #if USE_ARGOS
-    static void* loopRecv_Argos(void *context);
-    static void* loopSend_Argos(void *context);
-    std::vector<std::vector<std::complex<float>>> get_calib_mat() { return calib_mat; }
+    void* loopRecv_Argos(int tid);
+    void* loopSend_Argos(int tid);
 #endif
 
-
- 
 private:
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
-    bool downlink_mode;
-    int packet_length;
-    int packet_header_offset;
-
-
 #if USE_IPV4
-    struct sockaddr_in servaddr_[10];    /* server address */
+    struct sockaddr_in servaddr_[10]; /* server address */
 #else
-    struct sockaddr_in6 servaddr_[10];    /* server address */
+    struct sockaddr_in6 servaddr_[10]; /* server address */
 #endif
     int* socket_;
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-
 
 #ifdef USE_DPDK
     struct ether_addr server_eth_addr;
@@ -167,8 +142,8 @@ private:
     int dst_port_start = 8000;
 #endif
 
-    Table<char> *buffer_;
-    Table<int> *buffer_status_;
+    Table<char>* buffer_;
+    Table<int>* buffer_status_;
     long long buffer_length_;
     int buffer_frame_num_;
 
@@ -181,27 +156,22 @@ private:
     int rx_thread_num_;
     int tx_thread_num_;
 
-    Table<double> *frame_start_;
+    Table<double>* frame_start_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data> *message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> *task_queue_;
-    moodycamel::ProducerToken **rx_ptoks_;
-    moodycamel::ProducerToken **tx_ptoks_;
+    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+    moodycamel::ProducerToken** rx_ptoks_;
+    moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
 
-    EventHandlerContext<PacketTXRX> *tx_context;
-    EventHandlerContext<PacketTXRX> *rx_context;
     // PacketTXRXContext* tx_context;
     // PacketTXRXContext* rx_context;
 
-    Config *config_;
+    Config* config_;
 #if USE_ARGOS
-    RadioConfig *radioconfig_;
-    std::vector<std::vector<std::complex<float>>> calib_mat;
+    RadioConfig* radioconfig_;
 #endif
-    int radios_per_thread;
 };
-
 
 #endif

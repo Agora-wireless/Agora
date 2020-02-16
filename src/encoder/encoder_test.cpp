@@ -1,7 +1,7 @@
-#include <fstream>
+#include "cyclic_shift.hpp"
 #include "encoder.hpp"
 #include "iobuffer.hpp"
-#include "cyclic_shift.hpp"
+#include <fstream>
 
 std::string input_filename = "test_vectors/input_BG1_Zc192.bin";
 std::string reference_filename = "test_vectors/output_BG1_Zc192.bin";
@@ -19,14 +19,17 @@ char* read_binfile(std::string filename, int buffer_size)
     return x;
 }
 
-int main(){
+int main()
+{
     // __declspec (align(PROC_BYTES)) int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = {0};
     // __declspec (align(PROC_BYTES)) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = {0};
     // __declspec (align(PROC_BYTES)) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = {0};
-    ALIGNED_(PROC_BYTES) int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = {0};
-    ALIGNED_(PROC_BYTES) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = {0};
-    ALIGNED_(PROC_BYTES) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = {0};
-
+    ALIGNED_(PROC_BYTES)
+    int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
+    ALIGNED_(PROC_BYTES)
+    int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
+    ALIGNED_(PROC_BYTES)
+    int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
 
     // input -----------------------------------------------------------
     // these values depend on the application
@@ -34,24 +37,24 @@ int main(){
     int numberCodeblocks = 1;
     uint16_t Bg = 1;
 
-    int nRows = (Bg==1) ? 46 : 42;
+    int nRows = (Bg == 1) ? 46 : 42;
     uint32_t cbEncLen = nRows * Zc;
-    uint32_t cbLen = (Bg==1) ? Zc * 22 : Zc * 10;
-    uint32_t cbCodewLen = (Bg==1) ? Zc * 66 : Zc * 50;
-    const int16_t *pShiftMatrix;
-    const int16_t *pMatrixNumPerCol;
-    const int16_t *pAddr;
+    uint32_t cbLen = (Bg == 1) ? Zc * 22 : Zc * 10;
+    uint32_t cbCodewLen = (Bg == 1) ? Zc * 66 : Zc * 50;
+    const int16_t* pShiftMatrix;
+    const int16_t* pMatrixNumPerCol;
+    const int16_t* pAddr;
 
-    int8_t *input[numberCodeblocks];                            
-    int8_t *parity[numberCodeblocks];
-    int8_t *output[numberCodeblocks];
-    int8_t *reference[numberCodeblocks];
+    int8_t* input[numberCodeblocks];
+    int8_t* parity[numberCodeblocks];
+    int8_t* output[numberCodeblocks];
+    int8_t* reference[numberCodeblocks];
 
-    for (int i=0; i<numberCodeblocks; i++){
-        input[i] = (int8_t*) read_binfile(input_filename, (cbLen+7)>>3);
+    for (int i = 0; i < numberCodeblocks; i++) {
+        input[i] = (int8_t*)read_binfile(input_filename, (cbLen + 7) >> 3);
         parity[i] = (int8_t*)malloc(BG1_ROW_TOTAL * PROC_BYTES * sizeof(int8_t));
         output[i] = (int8_t*)malloc(BG1_COL_TOTAL * PROC_BYTES * sizeof(int8_t));
-        reference[i] = (int8_t*) read_binfile(reference_filename, (cbEncLen+7)>>3);
+        reference[i] = (int8_t*)read_binfile(reference_filename, (cbEncLen + 7) >> 3);
     }
 
     // i_Ls decides the base matrix entries
@@ -70,7 +73,7 @@ int main(){
         i_LS = 2;
     else if ((Zc % 3) == 0)
         i_LS = 1;
-    else 
+    else
         i_LS = 0;
 
     if (Bg == 1) {
@@ -92,16 +95,16 @@ int main(){
 
     LDPC_ENCODER ldpc_encoder_func = ldpc_select_encoder_func(Bg);
 
-    for (int n=0; n<numberCodeblocks; n++){
+    for (int n = 0; n < numberCodeblocks; n++) {
         t_start = clock();
-        // read input into z-bit segments 
+        // read input into z-bit segments
         ldpc_adapter_func(input[n], internalBuffer0, Zc, cbLen, 1);
         // encode
-        ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t) Zc, i_LS);
-        // scatter the output back to compacted 
+        ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
+        // scatter the output back to compacted
         // combine the input sequence and the parity bits into codeword outputs
-        memcpy(internalBuffer2, internalBuffer0+2*PROC_BYTES, (cbLen/Zc-2)*PROC_BYTES);
-        memcpy(internalBuffer2+(cbLen/Zc-2)*PROC_BYTES, internalBuffer1, cbEncLen/Zc*PROC_BYTES);
+        memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES, (cbLen / Zc - 2) * PROC_BYTES);
+        memcpy(internalBuffer2 + (cbLen / Zc - 2) * PROC_BYTES, internalBuffer1, cbEncLen / Zc * PROC_BYTES);
 
         // printf("internalBuffer1:\n");
         // for (int i = 0; i < BG1_ROW_TOTAL * PROC_BYTES; i++) {
@@ -112,7 +115,7 @@ int main(){
         ldpc_adapter_func(output[n], internalBuffer2, Zc, cbCodewLen, 0);
         t_end = clock();
 
-        t_encoder[n] = (t_start-t_end)/CLOCKS_PER_SEC*(1e9);
+        t_encoder[n] = (t_start - t_end) / CLOCKS_PER_SEC * (1e9);
         t_total = t_total + t_encoder[n];
 
         // this is for testing only because intel's reference files only provide the parity bits
@@ -123,33 +126,33 @@ int main(){
     printf("--------5gnr ldpc encoder test--------\n");
     printf("there are %d code blocks in total\n", numberCodeblocks);
 
-    int err_cnt = 0 ;
-    for (int n=0; n<numberCodeblocks; n++){
+    int err_cnt = 0;
+    for (int n = 0; n < numberCodeblocks; n++) {
         printf("the encoding for the %dth code block took %f nano seconds\n", n, t_encoder[n]);
-        int8_t *parity_buffer = parity[n];
-        int8_t *reference_buffer = reference[n];
-        for(int i=0; i<(cbEncLen>>3); i++){
+        int8_t* parity_buffer = parity[n];
+        int8_t* reference_buffer = reference[n];
+        for (int i = 0; i < (cbEncLen >> 3); i++) {
             uint8_t error = parity_buffer[i] ^ reference_buffer[i];
             // printf("%d: (%i %i), error: %i\n", i, reference_buffer[i], parity_buffer[i], error);
-            for (int j=0; j<8; j++){
+            for (int j = 0; j < 8; j++) {
                 err_cnt += error & 1;
                 error >>= 1;
             }
         }
     }
 
-    double ber = (double)err_cnt/cbEncLen/numberCodeblocks;
+    double ber = (double)err_cnt / cbEncLen / numberCodeblocks;
     printf("the bit error rate is %f (%d/%d)\n", ber, err_cnt, (cbEncLen * numberCodeblocks));
 
-    double thruput = (double)cbLen*numberCodeblocks/t_total*125;
+    double thruput = (double)cbLen * numberCodeblocks / t_total * 125;
     printf("the encoder's speed is %f MB/sec\n", thruput);
 
-    for(int n=0; n<numberCodeblocks; n++){
+    for (int n = 0; n < numberCodeblocks; n++) {
         free(input[n]);
         free(reference[n]);
         free(parity[n]);
         free(output[n]);
     }
 
-    return 0; 
+    return 0;
 }

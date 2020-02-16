@@ -6,29 +6,30 @@
 #ifndef DODEMUL
 #define DODEMUL
 
-#include <iostream>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-#include <armadillo>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
-#include "gettime.h"
-#include "offset.h"
-#include "modulation.hpp"
 #include "config.hpp"
+#include "doer.hpp"
+#include "gettime.h"
+#include "modulation.hpp"
+#include "offset.h"
 #include "stats.hpp"
+#include <armadillo>
+#include <iostream>
+#include <stdio.h> /* for fprintf */
+#include <string.h> /* for memcpy */
+#include <vector>
 // #include "mkl_dfti.h"
 
-
-class DoDemul
-{
+class DoDemul : public Doer {
 public:
-    DoDemul(Config *cfg, int in_tid, int in_demod_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-	    Table<complex_float> &in_data_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_equal_buffer,
-	    Table<uint8_t> &in_demul_hard_buffer, Table<int8_t> &in_demod_soft_buffer, Stats *in_stats_manager);
+    DoDemul(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<complex_float>& in_data_buffer, Table<complex_float>& in_precoder_buffer,
+        Table<complex_float>& in_equal_buffer,
+        Table<uint8_t>& in_demul_hard_buffer, Table<int8_t>& in_demod_soft_buffer,
+        Stats* in_stats_manager);
     ~DoDemul();
 
     /**
@@ -58,50 +59,33 @@ public:
      *     3. perform demodulation on equalized data matrix   
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void Demul(int offset);
+    void launch(int offset);
 
     void DemulSingleSC(int offset);
-    
- 
+
 private:
-    Config *config_;
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
+    Table<complex_float>& data_buffer_;
+    Table<complex_float>& precoder_buffer_;
+    Table<complex_float>& equal_buffer_;
+    Table<uint8_t>& demod_hard_buffer_;
+    Table<int8_t>& demod_soft_buffer_;
 
-    int tid;
-    int transpose_block_size;
-    int demul_block_size;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
-    
-
-
-    Table<complex_float> &data_buffer_;
-    Table<complex_float> &precoder_buffer_;
-    Table<complex_float> &equal_buffer_;
-    Table<uint8_t> &demod_hard_buffer_;
-    Table<int8_t> &demod_soft_buffer_;
-
-    Table<double> &Demul_task_duration;
-    int *Demul_task_count;
+    Table<double>& Demul_task_duration;
+    int* Demul_task_count;
 
     /** 
      * Intermediate buffer to gather raw data
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM */
-    complex_float *spm_buffer;
+    complex_float* spm_buffer;
 
     /** 
      * Intermediate buffers for equalized data
      * dimension: UE_NUM * demul_block_size */
-    complex_float *equaled_buffer_temp;
-    complex_float *equaled_buffer_temp_transposed;
+    complex_float* equaled_buffer_temp;
+    complex_float* equaled_buffer_temp_transposed;
 
     int ue_num_simd256;
-
-
 };
-
 
 #endif

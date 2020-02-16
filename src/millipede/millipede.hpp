@@ -7,70 +7,72 @@
 #ifndef MILLIPEDE_HEAD
 #define MILLIPEDE_HEAD
 
-#include <unistd.h>
-#include <memory>
-#include <iostream>
-#include <vector>
+#include "mufft/fft.h"
 #include <fcntl.h>
-#include <system_error>
+#include <iostream>
+#include <memory>
 #include <pthread.h>
 #include <queue>
-#include "mufft/fft.h"
+#include <system_error>
+#include <unistd.h>
+#include <vector>
 // #include <complex.h>
-#include <math.h>
-#include <tuple>
-#include <armadillo>
-#include <immintrin.h>
-#include <emmintrin.h>
-#include <stdint.h>
-#include <signal.h>
 #include <algorithm>
+#include <armadillo>
+#include <emmintrin.h>
+#include <immintrin.h>
+#include <math.h>
+#include <signal.h>
+#include <stdint.h>
+#include <tuple>
 // #include <aff3ct.hpp>
 #include "mkl_dfti.h"
 // #include <hpctoolkit.h>
 // #include <cblas.h>
 // #include <stdio.h>
 // #include "cpu_attach.hpp"
-#include "txrx.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
+#include "dodemul.hpp"
+#include "dofft.hpp"
+#include "doprecode.hpp"
+#include "dozf.hpp"
 #include "gettime.h"
 #include "offset.h"
-#include "dofft.hpp"
-#include "dozf.hpp"
-#include "dodemul.hpp"
-#include "doprecode.hpp"
+#include "reciprocity.hpp"
+#include "txrx.hpp"
 
 #ifdef USE_LDPC
 #include "docoding.hpp"
 #endif
 
-#include "memory_manage.h"
-#include "stats.hpp"
 #include "config.hpp"
+#include "memory_manage.h"
 #include "signalHandler.hpp"
+#include "stats.hpp"
 #include "utils.h"
 
-class Millipede
-{
+class Millipede {
 public:
     /* optimization parameters for block transpose (see the slides for more details) */
-    static const int transpose_block_size = 8;
     static const int transpose_block_num = 256;
     /* dequeue bulk size, used to reduce the overhead of dequeue in main thread */
     static const int dequeue_bulk_size = 32;
     static const int dequeue_bulk_size_single = 8;
 
-    Millipede(Config *);
+    Millipede(Config*);
     ~Millipede();
 
     void start();
     void stop();
 
-    void *worker(int tid);
-    void *worker_fft(int tid);
-    void *worker_zf(int tid);
-    void *worker_demul(int tid);
+#if BIGSTATION
+    void* worker_fft(int tid);
+    void* worker_zf(int tid);
+    void* worker_demul(int tid);
+#else
+    void* worker(int tid);
+#endif
     void create_threads(thread_type thread, int tid_start, int tid_end);
 
     // struct EventHandlerContext
@@ -79,75 +81,46 @@ public:
     //     int id;
     // };
 
-    inline void update_frame_count(int *frame_count);
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data> * in_queue, moodycamel::ProducerToken const& ptok);
     void schedule_fft_task(int offset, int frame_count, int frame_id, int subframe_id, int ant_id,
-    moodycamel::ProducerToken const& ptok);
-    void schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok);
-    void schedule_zf_task(int frame_id, moodycamel::ProducerToken const& ptok_zf);
-    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, moodycamel::ProducerToken const& ptok_demul);
-    void schedule_decode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_decode);
-    void schedule_encode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_encode);
-    void schedule_precode_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_precode);
-    void schedule_ifft_task(int frame_id, int data_subframe_id, moodycamel::ProducerToken const& ptok_ifft);  
+        Consumer const& consumer);
+#if !BIGSTATION
+    bool schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id, Consumer const& consumer);
+#endif
+    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
     void print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id);
-    void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id); 
+    void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id);
 
-    void initialize_vars_from_cfg(Config *cfg);
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
     void free_uplink_buffers();
     void free_downlink_buffers();
 
-
-    void save_demul_data_to_file(int frame_id, int data_subframe_id);
-    void getDemulData(int **ptr, int *size);
-    void getEqualData(float **ptr, int *size);    
+    void save_demul_data_to_file(int frame_id);
+    void save_ifft_data_to_file(int frame_id);
+    void getDemulData(int** ptr, int* size);
+    void getEqualData(float** ptr, int* size);
 
 private:
-    int BS_ANT_NUM, UE_NUM, PILOT_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
-    int dl_data_subframe_start, dl_data_subframe_end;
-    bool downlink_mode;
-    int packet_length;
-
-    int TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
-    int FFT_THREAD_NUM, DEMUL_THREAD_NUM, ZF_THREAD_NUM;
-    int CORE_OFFSET;
-    int demul_block_size, demul_block_num;
-    int zf_block_size, zf_block_num;
-
-
-    LDPCconfig LDPC_config;
-
     /* lookup table for 16 QAM, real and imag */
-    size_t mod_type;
-    float **qam16_table_;
-    float *pilots_;
-    Config *cfg_;
+    float** qam16_table_;
+    Config* config_;
     int max_equaled_frame = 0;
-    float csi_format_offset;
-    int buffer_frame_num;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    Stats *stats_manager_;
+    Stats* stats_manager_;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
-    pthread_t *task_threads;
-    EventHandlerContext<Millipede> *context;
+    pthread_t* task_threads;
     /*****************************************************
      * Buffers
-     *****************************************************/ 
-    /* Uplink */   
+     *****************************************************/
+    /* Uplink */
     /** 
      * received data 
      * Frist dimension: SOCKET_THREAD_NUM
@@ -200,36 +173,30 @@ private:
 
     Table<int8_t> demod_soft_buffer_;
 
-    /** 
-     * Predicted CSI data 
-     * First dimension: OFDM_CA_NUM 
-     * Second dimension: BS_ANT_NUM * UE_NUM
-     */
-    Table<complex_float> pred_csi_buffer_;
-
-
     Table<uint8_t> decoded_buffer_;
 
     RX_stats rx_stats_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
+    RC_stats rc_stats_;
     Data_stats demul_stats_;
+#ifdef USE_LDPC
     Data_stats decode_stats_;
     Data_stats encode_stats_;
+#endif
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
+#if !BIGSTATION
     Table<int> delay_fft_queue;
-    int *delay_fft_queue_cnt;
-
-    /* Downlink */   
+    int* delay_fft_queue_cnt;
+#endif
     /** 
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
-    Table<int8_t> *dl_IQ_data;
     Table<long long> dl_IQ_data_long;
 
     /** 
@@ -238,14 +205,6 @@ private:
      * Second dimension: OFDM_CA_NUM
      */
     // RawDataBuffer dl_rawdata_buffer_;
-
-
-    /** 
-     * Modulated data
-     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
-     */
-    Table<complex_float> dl_modulated_buffer_;
 
     /**
      * Data for IFFT
@@ -264,17 +223,8 @@ private:
 
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
-
-    /**
-     * Precoded data
-     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
-     */
-    Table<complex_float> dl_precoded_data_buffer_;
-
-
+    Table<complex_float> calib_buffer_;
     Table<int8_t> dl_encoded_buffer_;
-
 
     /**
      * Data for transmission
@@ -283,40 +233,39 @@ private:
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
      * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      */
-    char *dl_socket_buffer_;
-    int *dl_socket_buffer_status_;
+    char* dl_socket_buffer_;
+    int* dl_socket_buffer_status_;
     long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
-
-    int *prev_frame_counter;
-    int prev_frame_counter_max;
     /*****************************************************
      * Concurrent queues 
-     *****************************************************/ 
+     *****************************************************/
     /* Uplink*/
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> zf_queue_;
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+#ifdef USE_LDPC
     moodycamel::ConcurrentQueue<Event_data> decode_queue_;
+#endif
     /* main thread message queue for data receiving */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     /* main thread message queue for task completion*/
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
 
-
     /* Downlink*/
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
+    moodycamel::ConcurrentQueue<Event_data> rc_queue_;
     // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+#ifdef USE_LDPC
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
+#endif
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     /* Tokens */
-    moodycamel::ProducerToken **task_ptoks_ptr;
-    moodycamel::ProducerToken **rx_ptoks_ptr;
-    moodycamel::ProducerToken **tx_ptoks_ptr;
-
+    moodycamel::ProducerToken** rx_ptoks_ptr;
+    moodycamel::ProducerToken** tx_ptoks_ptr;
 };
 
 #endif

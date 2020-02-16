@@ -1,0 +1,13 @@
+{
+ "symbol_size" : 1,
+ "ofdm_ca_num" : 2048,
+ "ofdm_data_num" : 1200,
+ "cp_len" : 0,
+ "tx_prefix_len" : 0,
+ "ofdm_prefix_len" : 0,
+ "worker_thread_num" : 1,
+ "demul_block_size" : 40,
+ "antennta_num": 8,
+ "modulation": "16QAM",
+ "tx_frame_num":1
+}
