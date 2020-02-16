@@ -28,7 +28,7 @@
 
 // #include "mkl_dfti.h"
 
-class DoEncode : publiic Doer {
+class DoEncode : public Doer {
 public:
     DoEncode(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
@@ -60,7 +60,7 @@ private:
     __attribute__((aligned(64))) int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
     __attribute__((aligned(64))) int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
     __attribute__((aligned(64))) int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
-}
+};
 
 class DoDecode : public Doer {
 public:
@@ -80,8 +80,8 @@ private:
     Table<uint8_t>& decoded_buffer_;
     Table<double>& Decode_task_duration;
     int* Decode_task_count;
-    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
-    };
-}
+    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
+    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response{};
+};
 
 #endif

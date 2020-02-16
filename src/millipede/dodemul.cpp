@@ -145,11 +145,6 @@ void DoDemul::launch(int offset)
             /* decode with hard decision */
             uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_subframe_id][cur_sc_id * UE_NUM]);
             demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, UE_NUM);
-
-#if DEBUG_UPDATE_STATS_DETAILED
-            double duration3 = get_time() - start_time3;
-            Demul_task_duration[tid * 8][3] += duration3;
-#endif
             // int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
             // printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id,cur_sc_id, sc_id);
             // cout<< "Demuled data: ";
@@ -160,6 +155,11 @@ void DoDemul::launch(int offset)
             // cout<<endl;
 #endif
 
+#if DEBUG_UPDATE_STATS_DETAILED
+            double duration3 = get_time() - start_time3;
+            Demul_task_duration[tid * 8][3] += duration3;
+#endif
+
 #if DEBUG_UPDATE_STATS
             Demul_task_count[tid * 16] = Demul_task_count[tid * 16] + 1;
 #endif
@@ -167,10 +167,6 @@ void DoDemul::launch(int offset)
     }
 
 #ifdef USE_LDPC
-    // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
-    // cout<< "Demuled data: \n";
-    int UE_NUM = config_->UE_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     __m256i index2 = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1, UE_NUM * 4,
         UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
@@ -189,7 +185,8 @@ void DoDemul::launch(int offset)
         demod_16qam_soft_avx2((equal_T_ptr - max_sc_ite * 2), demul_ptr, num_sc_avx2);
         if (rest > 0)
             demod_16qam_soft_sse((equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2), demul_ptr + config_->mod_type * num_sc_avx2, rest);
-
+        // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n", tid, frame_id, current_data_subframe_id, sc_id);
+        // cout<< "Demuled data: \n";
         // cout<<"UE "<<i<<": ";
         // for (int k = 0; k < max_sc_ite * config_->mod_order; k++)
         //     printf("%i ", demul_ptr[k]);

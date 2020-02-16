@@ -60,6 +60,8 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
 
     const long int buffer_len = 1024 * 1024;
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    int numFillerBits = 0;
     int numMsgBits = LDPC_config.cbLen - numFillerBits;
     int numMsgBytes = (numMsgBits + 7) / 8;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
@@ -172,6 +174,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 {
     // decoder setup --------------------------------------------------------------
     int16_t numFillerBits = 0;
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
     ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
     ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
     ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
@@ -227,5 +231,5 @@ void DoDecode::launch(int offset)
     Event_data Decode_finish_event;
     Decode_finish_event.event_type = EVENT_DECODE;
     Decode_finish_event.data = offset;
-    consume_.handle(Decode_finish_event);
+    consumer_.handle(Decode_finish_event);
 }

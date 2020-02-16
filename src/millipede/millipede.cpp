@@ -364,6 +364,7 @@ void Millipede::start()
 
             case EVENT_ENCODE: {
                 int offset = event.data;
+                int TASK_BUFFER_SUBFRAME_NUM = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
                 int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
