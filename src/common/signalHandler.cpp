@@ -1,7 +1,7 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
-#include <signal.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "signalHandler.hpp"
 
@@ -43,7 +43,7 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
 * @param[in] _ignored Not used but required by function prototype
 *                     to match required handler.
 */
-void SignalHandler::exitSignalHandler(int _ignored)
+void SignalHandler::exitSignalHandler(int)
 {
     mbGotExitSignal = true;
 }
@@ -53,9 +53,7 @@ void SignalHandler::exitSignalHandler(int _ignored)
 */
 void SignalHandler::setupSignalHandlers()
 {
-    if (signal((int) SIGINT, SignalHandler::exitSignalHandler) == SIG_ERR)
-    {
+    if (signal((int)SIGINT, SignalHandler::exitSignalHandler) == SIG_ERR) {
         throw SignalException("!!!!! Error setting up signal handlers !!!!!");
     }
 }
-

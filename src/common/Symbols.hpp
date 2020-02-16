@@ -1,5 +1,8 @@
 #ifndef SYMBOLS
 #define SYMBOLS
+
+#include <stdint.h>
+
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
@@ -7,7 +10,7 @@
 #ifdef USE_ARGOS
 #define GENERATE_DATA
 #endif
-#define SEPARATE_TX_RX 0
+#define SEPARATE_TX_RX 1
 
 #define MOD_ORDER 4
 
@@ -24,22 +27,23 @@
 #define SOCKET_BUFFER_FRAME_NUM 100
 #define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
+#define SETTLE_TIME_MS 1
 
-
-#define EVENT_PACKET_RECEIVED 0
-#define EVENT_FFT 1
-#define EVENT_ZF 2
-#define EVENT_DEMUL 3
-
-#define EVENT_PRED 4
-#define EVENT_MODUL 5
-#define EVENT_IFFT 6
-#define EVENT_PRECODE 7
-#define EVENT_PACKET_SENT 8
-
-#define EVENT_DECODE 9
-#define EVENT_ENCODE 10
-
+enum EventType {
+    EVENT_PACKET_RECEIVED,
+    EVENT_FFT,
+    EVENT_UP_ZF,
+    EVENT_DN_ZF,
+    EVENT_DEMUL,
+    EVENT_PRED,
+    EVENT_MODUL,
+    EVENT_IFFT,
+    EVENT_PRECODE,
+    EVENT_PACKET_SENT,
+    EVENT_DECODE,
+    EVENT_ENCODE,
+    EVENT_RC,
+};
 
 #define TASK_FFT 0
 #define TASK_ZF 1
@@ -51,6 +55,7 @@
 #define TASK_SEND 7
 #define TASK_DECODE 8
 #define TASK_ENCODE 9
+#define TASK_RC 10
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1
@@ -64,13 +69,11 @@
 #define PRINT_TX 9
 #define PRINT_DECODE 10
 #define PRINT_ENCODE 11
-
+#define PRINT_RC 12
+#define PRINT_FFT_CAL 13
 
 #define BIGSTATION 0
-// #define ENABLE_DOWNLINK 0
-#define ENABLE_DECODE 1
 #define USE_IPV4 1
-//#define USE_DPDK 0
 #define CONNECT_UDP 1
 #define USE_RDTSC 1
 #define EXPORT_CONSTELLATION 0
@@ -79,7 +82,6 @@
 
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10
-
 
 #define DEBUG_PRINT_PER_FRAME_DONE 1
 #define DEBUG_PRINT_PER_SUBFRAME_DONE 0
@@ -95,7 +97,8 @@
 #define DEBUG_PRINT_STATS_PER_THREAD 0
 #define DEBUG_UPDATE_STATS 1
 #define DEBUG_UPDATE_STATS_DETAILED 1
-#define DEBUG_PRINT_PILOT 0
+#define DEBUG_PRINT_PILOT 1
+#define DEBUG_DL_PILOT 1
 #define DEBUG_PLOT 0
 #define MEASURE_TIME 1
 
@@ -103,31 +106,43 @@
 #define DEBUG_SENDER 0
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
-#define WRITE_DEMUL 0
-#define DEBUG_DOWNLINK 1
+// #define WRITE_DEMUL 0
+#define DEBUG_RADIO_TX 0
+#define DEBUG_RADIO_RX 0
+#define DEBUG_DOWNLINK 0
+#define WRITE_RECV 0
 
-#define CORR_THRESHOLD    0x4
-#define CORR_RST          0x0
-#define CORR_SCNT         0x8
-#define CORR_CONF         60
-#define RF_RST_REG        48
-#define TDD_CONF_REG      120
-#define SCH_ADDR_REG      136
-#define SCH_MODE_REG      140
-#define TX_GAIN_CTRL      88
+#define CORR_THRESHOLD 0x4
+#define CORR_RST 0x0
+#define CORR_SCNT 0x8
+#define CORR_CONF 60
+#define RF_RST_REG 48
+#define TDD_CONF_REG 120
+#define SCH_ADDR_REG 136
+#define SCH_MODE_REG 140
+#define TX_GAIN_CTRL 88
 
 typedef enum {
-	Master,
-	Worker,
-	Worker_FFT,
-	Worker_ZF,
-	Worker_Demul,
-	Worker_RX,
-	Worker_TX,
-	Worker_TXRX,
-	Master_RX,
-	Master_TX,
+    Master,
+    Worker,
+    Worker_FFT,
+    Worker_ZF,
+    Worker_Demul,
+    Worker_RX,
+    Worker_TX,
+    Worker_TXRX,
+    Master_RX,
+    Master_TX,
 } thread_type;
+
+typedef enum {
+    UL,
+    DL,
+    PILOT,
+    CAL_DL,
+    CAL_UL,
+    UNKNOWN
+} symbol_type;
 
 struct LDPCconfig {
     uint16_t Bg;
@@ -142,7 +157,6 @@ struct LDPCconfig {
 };
 
 typedef struct LDPCconfig LDPCconfig;
-
 
 static const int MAX_FRAME_ID = 1e4;
 static const int float_num_in_simd256 = 8;

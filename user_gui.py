@@ -96,7 +96,7 @@ class MainWindow(QtGui.QMainWindow):
 		
 if __name__ == '__main__':
 
-	filename = "data/userconfig.json"
+	filename = "data/userconfig_512.json"
 	ue = UserClass(filename)
         nusers = 4
         data_len = 52

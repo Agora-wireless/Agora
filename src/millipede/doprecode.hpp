@@ -6,31 +6,35 @@
 #ifndef DOPRECODE
 #define DOPRECODE
 
-#include <iostream>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-#include <armadillo>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
-#include "gettime.h"
-#include "offset.h"
-#include "modulation.hpp"
 #include "config.hpp"
+#include "doer.hpp"
+#include "gettime.h"
 #include "memory_manage.h"
+#include "modulation.hpp"
+#include "offset.h"
 #include "stats.hpp"
+#include <armadillo>
+#include <iostream>
+#include <stdio.h> /* for fprintf */
+#include <string.h> /* for memcpy */
+#include <vector>
 // #include "mkl_dfti.h"
 
-
-class DoPrecode
-{
+class DoPrecode : public Doer {
 public:
-    DoPrecode(Config *cfg, int in_tid, int in_demul_block_size, int in_transpose_block_size,
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-	Table<complex_float> &in_dl_modulated_buffer, Table<complex_float> &in_precoder_buffer, Table<complex_float> &in_dl_precoded_data_buffer, 
-        Table<complex_float> &in_dl_ifft_buffer, Table<int8_t> &in_dl_IQ_data, Table<int8_t> &in_dl_encoded_data,
-        Stats *in_stats_manager);
+    DoPrecode(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<complex_float>& in_precoder_buffer,
+        Table<complex_float>& in_dl_ifft_buffer,
+#ifdef USE_LDPC
+        Table<int8_t>& in_dl_encoded_data,
+#else
+        Table<int8_t>& in_dl_IQ_data,
+#endif
+        Stats* in_stats_manager);
     ~DoPrecode();
 
     /**
@@ -60,37 +64,32 @@ public:
      *     3. perform demodulation on equalized data matrix   
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void Precode(int offset);
-    
- 
-private:
-    Config *config_;
-    int BS_ANT_NUM, UE_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int data_subframe_num_perframe;
+    void launch(int offset);
 
-    int tid;
-    int transpose_block_size;
-    int demul_block_size;
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
-    
-    Table<complex_float> &dl_modulated_buffer_;
-    Table<complex_float> &precoder_buffer_;
-    Table<complex_float> &dl_precoded_data_buffer_;
-    Table<complex_float> &dl_ifft_buffer_;
-    Table<int8_t> &dl_IQ_data;
+private:
+    /**
+     * Modulated data
+     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * second dimension: UE_NUM * OFDM_CA_NUM
+     */
+
+    Table<complex_float>& precoder_buffer_;
+
+    /**
+     * Precoded data
+     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
+     */
+
+    Table<complex_float>& dl_ifft_buffer_;
+    Table<int8_t>& dl_IQ_data;
     Table<float> qam_table;
 
-    Table<double> &Precode_task_duration;
-    int *Precode_task_count;
+    Table<double>& Precode_task_duration;
+    int* Precode_task_count;
 
-    complex_float *modulated_buffer_temp;
-    complex_float *precoded_buffer_temp;
-
-
+    complex_float* modulated_buffer_temp;
+    complex_float* precoded_buffer_temp;
 };
-
 
 #endif

@@ -6,29 +6,29 @@
 #ifndef DOFFT
 #define DOFFT
 
-#include <iostream>
-#include <stdio.h>  /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
+#include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
-#include "Symbols.hpp"
+#include "config.hpp"
+#include "doer.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "mkl_dfti.h"
 #include "mufft/fft.h"
-#include "config.hpp"
+#include "offset.h"
 #include "stats.hpp"
+#include <iostream>
+#include <stdio.h> /* for fprintf */
+#include <string.h> /* for memcpy */
+#include <vector>
 
-
-class DoFFT
-{
+class DoFFT : public Doer {
 public:
-    DoFFT(Config *cfg, int in_tid, int in_transpose_block_size, 
-        moodycamel::ConcurrentQueue<Event_data> *in_complete_task_queue, moodycamel::ProducerToken *in_task_ptok,
-	Table<char> &in_socket_buffer, Table<int> &in_socket_buffer_status, Table<complex_float> &in_data_buffer, Table<complex_float> &in_csi_buffer, float *in_pilots,
-        Table<complex_float> &in_dl_ifft_buffer, char *in_dl_socket_buffer, 
-        Stats *in_stats_manager);
+    DoFFT(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
+        Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
+        Table<complex_float>& in_calib_buffer,
+        Stats* in_stats_manager);
     ~DoFFT();
 
     /**
@@ -61,14 +61,34 @@ public:
      *        if subframe is data, copy data from fft_buffer_.FFT_outputs to data_buffer_ and do block transpose     
      *     4. add an event to the message queue to infrom main thread the completion of this task
      */
-    void FFT(int offset);
+    void launch(int offset);
 
+private:
+    Table<char>& socket_buffer_;
+    Table<int>& socket_buffer_status_;
+    Table<complex_float>& data_buffer_;
+    Table<complex_float>& csi_buffer_;
+    Table<complex_float>& calib_buffer_;
+    Table<double>* FFT_task_duration;
+    int* FFT_task_count;
+    Table<double>* CSI_task_duration;
+    int* CSI_task_count;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    FFTBuffer fft_buffer_;
+};
+
+class DoIFFT : public Doer {
+public:
+    DoIFFT(Config* in_config, int in_tid,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
+        Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
+        Stats* in_stats_manager);
+    ~DoIFFT();
 
     /**
      * Do modulation and ifft tasks for one OFDM symbol
      * @param tid: task thread index, used for selecting task ptok
-     * @param offset: offset of the OFDM symbol in dl_modulated_buffer_
-     * Buffers: dl_IQ_data_long, dl_modulated_buffer_
+     * Buffers: dl_IQ_data_long
      *     Input buffer: dl_IQ_data_long
      *     Output buffer: dl_iffted_data_buffer_
      *     Intermediate buffer: dl_ifft_buffer_
@@ -88,58 +108,15 @@ public:
      *     2. perform block-wise transpose on IFFT outputs and store results in dl_iffted_data_buffer_
      *     2. add an event to the message queue to infrom main thread the completion of this task
      */
-    void IFFT(int offset);
+    void launch(int offset);
 
-    
 private:
-    Config *config_;
-    int BS_ANT_NUM, PILOT_NUM;
-    int OFDM_CA_NUM;
-    int OFDM_DATA_NUM;
-    int OFDM_DATA_START;
-    int OFDM_PREFIX_LEN;
-    int subframe_num_perframe, data_subframe_num_perframe;
-    int packet_length;
-    int buffer_subframe_num_;
-
-    int tid;
-    int transpose_block_size;
-
-    moodycamel::ConcurrentQueue<Event_data> *complete_task_queue_;
-    moodycamel::ProducerToken *task_ptok;
-
-    Table<char> &socket_buffer_;
-    Table<int> &socket_buffer_status_;
-    Table<complex_float> &data_buffer_;
-    Table<complex_float> &csi_buffer_;
-    float *pilots_;
-
-    char *dl_socket_buffer_;;
-    Table<complex_float> &dl_ifft_buffer_;
-
-
-    // int packet_length;
-    Table<double> *FFT_task_duration;
-    Table<double> *CSI_task_duration;
-    int *FFT_task_count;
-    int *CSI_task_count;
-    Table<double> *IFFT_task_duration;
-    int *IFFT_task_count;
-
-    FFTBuffer fft_buffer_;
-
+    Table<complex_float>& dl_ifft_buffer_;
+    char* dl_socket_buffer_;
+    ;
+    Table<double>* task_duration;
+    int* task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    MKL_LONG mkl_status;
-
-    DFTI_DESCRIPTOR_HANDLE mkl_handle_dl;
-    MKL_LONG mkl_status_dl;
-
-    
-
-    // mufft_plan_1d *muplans_;
-
-
 };
-
 
 #endif
