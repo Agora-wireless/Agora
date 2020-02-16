@@ -28,27 +28,23 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
 #endif
     , Precode_task_duration(in_stats_manager->precode_stats_worker.task_duration)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    
+    Precode_task_count = in_stats_manager->precode_stats_worker.task_count;
 
     size_t mod_type = config_->mod_type;
     init_modulation_table(qam_table, mod_type);
 
-    Precode_task_count = in_stats_manager->precode_stats_worker.task_count;
-    // Precode_task_duration = in_Precode_task_duration;
-    // Precode_task_count = in_Precode_task_count;
-
-    modulated_buffer_temp = (complex_float*)aligned_alloc(64, UE_NUM * sizeof(complex_float));
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
     int demul_block_size = config_->demul_block_size;
-    precoded_buffer_temp = (complex_float*)aligned_alloc(64, demul_block_size * BS_ANT_NUM * sizeof(complex_float));
-    // precoded_buffer_temp = (complex_float **)aligned_alloc(64, demul_block_size * sizeof(complex_float *));
-    // for (int i = 0; i < demul_block_size; i++) {
-    //     precoded_buffer_temp[i] =  (complex_float *)aligned_alloc(64, BS_ANT_NUM * sizeof(complex_float))
-    // }
+    alloc_buffer_1d(&modulated_buffer_temp, UE_NUM, 64, 0);
+    alloc_buffer_1d(&precoded_buffer_temp, demul_block_size * BS_ANT_NUM, 64, 0);
 }
 
 DoPrecode::~DoPrecode()
 {
+    free_buffer_1d(&modulated_buffer_temp);
+    free_buffer_1d(&precoded_buffer_temp);
 }
 
 void DoPrecode::launch(int offset)
@@ -67,14 +63,13 @@ void DoPrecode::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
+#if DEBUG_PRINT_IN_TASK
+    printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n", tid, frame_id, current_data_subframe_id, sc_id);
+#endif
 
     __m256i index = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
-
     int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
-
-    // double start_time = get_time();
     int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
-    // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d, max_sc_ite: %d\n", tid, frame_id, current_data_subframe_id, sc_id, max_sc_ite);
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
 #if DEBUG_UPDATE_STATS_DETAILED
