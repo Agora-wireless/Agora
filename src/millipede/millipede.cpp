@@ -128,9 +128,7 @@ void Millipede::start()
             dl_socket_buffer_status_size_, dl_socket_buffer_size_);
     }
 
-#if !BIGSTATION
     int cur_frame_id = 0;
-#endif
 
     /* counters for printing summary */
     int demul_count = 0;
@@ -203,6 +201,10 @@ void Millipede::start()
 #if BIGSTATION
                 /* in BigStation, schedule FFT whenever a packet is received */
                 schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
+                if (cur_frame_id == frame_id) {
+                    stats_manager_->update_processing_started(frame_count);
+                    cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                }
 #else
                 /* if all previous frames are processed, schedule FFT for this packet */
                 if (frame_id == cur_frame_id) {
@@ -686,17 +688,11 @@ void Millipede::schedule_fft_task(int offset, int frame_count,
     printf("Main thread: created FFT tasks for frame: %d, frame buffer: %d, subframe: %d, ant: %d\n",
         frame_count, frame_id, subframe_id, ant_id);
 #endif
-#if BIGSTATION
-    if (rx_stats_.fft_created_count == frame_id) {
+#if !BIGSTATION
+    if (fft_created_count++ == 0) {
         stats_manager_->update_processing_started(frame_count);
-        rx_stats_.fft_created_count++;
-        rx_stats_.fft_created_count %= TASK_BUFFER_FRAME_NUM;
-    }
-#else
-    if (rx_stats_.fft_created_count++ == 0) {
-        stats_manager_->update_processing_started(frame_count);
-    } else if (rx_stats_.fft_created_count == rx_stats_.max_task_count) {
-        rx_stats_.fft_created_count = 0;
+    } else if (fft_created_count == rx_stats_.max_task_count) {
+        fft_created_count = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
         printf("Main thread: created FFT tasks for all packets in frame: %d, frame buffer: %d in %.5f us\n",
             frame_count, frame_id, get_time() - stats_manager_->get_pilot_received(frame_count));
@@ -722,7 +718,7 @@ bool Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int da
         else
             printf("Main thread in demul: schedule fft for %d packets for frame %d is done\n", delay_fft_queue_cnt[frame_id], frame_id);
 #endif
-        return (rx_stats_.fft_created_count == 0);
+        return (fft_created_count == 0);
     }
     return (false);
 }
@@ -1028,7 +1024,9 @@ void Millipede::initialize_uplink_buffers()
     rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM;
     alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(&(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
-    rx_stats_.fft_created_count = 0;
+#if !BIGSTATION
+    fft_created_count = 0;
+#endif
     fft_stats_.init(BS_ANT_NUM, PILOT_NUM,
         TASK_BUFFER_FRAME_NUM, subframe_num_perframe, 64);
     alloc_buffer_1d(&(fft_stats_.symbol_data_count), TASK_BUFFER_FRAME_NUM, 64, 1);
