@@ -86,7 +86,7 @@ add_library(comp MODULE
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
 
-target_link_libraries(comp -lpthread -lmufft -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
 
 # LDPC support
 if (${USE_LDPC})
@@ -137,14 +137,14 @@ set(SOURCES main.cpp
             ${LDPC_SOURCES})
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread /usr/local/lib/libmufft.a -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 set(SENDER_SOURCES ${SOURCE_DIR}/simulator/sender_cli.cpp
                    ${SOURCE_DIR}/simulator/sender.cpp 
                    ${COMMON_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender -lpthread -lmufft)
+target_link_libraries(sender -lpthread ${MKL_LIBS})
 
 
 set(SIMULATOR_SOURCES ${SOURCE_DIR}/simulator/main.cpp
@@ -154,7 +154,7 @@ set(SIMULATOR_SOURCES ${SOURCE_DIR}/simulator/main.cpp
                       ${COMMON_SOURCES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
-target_link_libraries(sim -lpthread -lmufft)
+target_link_libraries(sim -lpthread ${MKL_LIBS})
 
 
 
