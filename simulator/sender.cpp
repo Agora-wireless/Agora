@@ -372,7 +372,7 @@ void Sender::startTX() {
     }
   }
 
-  printf("Print results\n");
+  printf("printing sender results to file...\n");
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/matlab/tx_result.txt";
@@ -617,7 +617,7 @@ void *Sender::loopSend_main(int tid) {
     }
   }
 
-  printf("Print results\n");
+  printf("printing sender results to file...\n");
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/matlab/tx_result.txt";

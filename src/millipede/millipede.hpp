@@ -65,10 +65,13 @@ public:
     void start();
     void stop();
 
-    void* worker(int tid);
+#if BIGSTATION
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
+#else
+    void* worker(int tid);
+#endif
     void create_threads(thread_type thread, int tid_start, int tid_end);
 
     // struct EventHandlerContext
@@ -97,6 +100,7 @@ public:
     void free_downlink_buffers();
 
     void save_demul_data_to_file(int frame_id);
+    void save_ifft_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 
@@ -233,10 +237,6 @@ private:
     long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
-#if !BIGSTATION
-    int* prev_frame_counter;
-    int prev_frame_counter_max;
-#endif
     /*****************************************************
      * Concurrent queues 
      *****************************************************/

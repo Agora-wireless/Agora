@@ -162,7 +162,7 @@ void init_qam64_table(Table<float>& qam64_table)
   ***********************************************************************************
   */
 
-complex_float mod_single(int x, float** mod_table)
+complex_float mod_single(int x, Table<float> &mod_table)
 {
     complex_float re;
     re.re = mod_table[x][0];
