@@ -7,7 +7,6 @@
 #ifndef SIMULATOR_HEAD
 #define SIMULATOR_HEAD
 
-#include "mufft/fft.h"
 #include <fcntl.h>
 #include <iostream>
 #include <memory>

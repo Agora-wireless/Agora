@@ -7,7 +7,6 @@
 #ifndef MILLIPEDE_HEAD
 #define MILLIPEDE_HEAD
 
-#include "mufft/fft.h"
 #include <fcntl.h>
 #include <iostream>
 #include <memory>

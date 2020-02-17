@@ -48,12 +48,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize IFFT buffer
     size_t IFFT_buffer_block_num = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    ifft_buffer_.IFFT_inputs.malloc(IFFT_buffer_block_num, FFT_LEN, 64);
-    ifft_buffer_.IFFT_outputs.malloc(IFFT_buffer_block_num, FFT_LEN, 64);
-
-    // initialize muplans for ifft
-    for (size_t i = 0; i < TASK_THREAD_NUM; i++)
-        muifftplans_[i] = mufft_create_plan_1d_c2c(FFT_LEN, MUFFT_INVERSE, MUFFT_FLAG_CPU_ANY);
+    ifft_buffer_.IFFT_inputs.calloc(IFFT_buffer_block_num,  FFT_LEN, 64);
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
@@ -74,12 +69,11 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num = numAntennas * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    fft_buffer_.FFT_inputs.malloc(FFT_buffer_block_num, FFT_LEN, 0);
-    fft_buffer_.FFT_outputs.malloc(FFT_buffer_block_num, FFT_LEN, 0);
+    fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num,  FFT_LEN, 64);
 
-    // initialize muplans for fft
-    for (size_t i = 0; i < TASK_THREAD_NUM; i++)
-        mufftplans_[i] = mufft_create_plan_1d_c2c(FFT_LEN, MUFFT_FORWARD, MUFFT_FLAG_CPU_ANY);
+    (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX,
+        1, FFT_LEN);
+    (void)DftiCommitDescriptor(mkl_handle);
 
     // initialize CSI buffer
     csi_buffer_.resize(numAntennas * TASK_BUFFER_FRAME_NUM);
@@ -134,16 +128,10 @@ Phy_UE::Phy_UE(Config* config)
 
 Phy_UE::~Phy_UE()
 {
-    for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
-        mufft_free_plan_1d(mufftplans_[i]);
-    }
+    DftiFreeDescriptor(&mkl_handle);
     // release FFT_buffer
     fft_buffer_.FFT_inputs.free();
-    fft_buffer_.FFT_outputs.free();
     ifft_buffer_.IFFT_inputs.free();
-    ifft_buffer_.IFFT_outputs.free();
-    //delete ul_pilot_aligned;
-    //delete ul_pilot;
 }
 
 void Phy_UE::schedule_task(Event_data do_task, moodycamel::ConcurrentQueue<Event_data>* in_queue, moodycamel::ProducerToken const& ptok)
@@ -425,7 +413,7 @@ void Phy_UE::start()
                 for (int ii = 0; ii < ul_data_symbol_perframe; ii++) {
                     int IFFT_buffer_target_id = offset * (numAntennas * ul_data_symbol_perframe) + ii * numAntennas;
                     for (int jj = 0; jj < numAntennas; jj++) {
-                        fwrite(ifft_buffer_.IFFT_outputs[IFFT_buffer_target_id + jj], sizeof(complex_float), FFT_LEN, fp);
+                        fwrite(ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + jj], sizeof(complex_float), FFT_LEN, fp);
                     }
                 }
                 fclose(fp);
@@ -567,15 +555,14 @@ void Phy_UE::doFFT(int tid, int offset)
     //memcpy((void *)cur_fft_buffer_float, (void *)(cur_radio_buffer + delay_offset), FFT_LEN * 2 * sizeof(float));
 
     // perform fft
-    mufft_execute_plan_1d(mufftplans_[tid], fft_buffer_.FFT_outputs[FFT_buffer_target_id],
-        fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
+    DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doCrop thread %d: frame: %d, symbol: %d, ant: %d\n", tid, frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
 #endif
     int csi_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, numAntennas, frame_id, ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) * numAntennas + ant_id;
     float* csi_buffer_ptr = (float*)(csi_buffer_[csi_offset].data());
-    float* fft_buffer_ptr = (float*)fft_buffer_.FFT_outputs[FFT_buffer_target_id];
+    float* fft_buffer_ptr = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
     Event_data crop_finish_event;
     // if it is pilot part, do CE
     if (config_->isPilot(frame_id, symbol_id)) {
@@ -730,12 +717,9 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
             //printf("ul_symbol_id %d, ue_id %d, sc %d\n", ul_symbol_id, ant_id, n);
             cur_modul_buf[n] = ul_IQ_modul[ul_symbol_id * numAntennas + ant_id][n];
         }
-        //void *tar_out = (void *)ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id+ant_id];
-        //memcpy(tar_out, (void *)cur_modul_buf, FFT_LEN * sizeof(complex_float));
 
-        mufft_execute_plan_1d(muifftplans_[tid], ifft_buffer_.IFFT_outputs[IFFT_buffer_target_id + ant_id],
-            ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id]);
-        cx_float* ifft_out_buffer = (cx_float*)ifft_buffer_.IFFT_outputs[IFFT_buffer_target_id + ant_id];
+        DftiComputeBackward(mkl_handle, ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id]);
+        cx_float* ifft_out_buffer = (cx_float*)ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id];
         cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
         float max_val = abs(mat_ifft_out).max();
         mat_ifft_out /= max_val;
