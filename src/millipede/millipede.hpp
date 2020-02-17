@@ -108,6 +108,9 @@ private:
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
     Config* config_;
+#if !BIGSTATION
+    int fft_created_count;
+#endif
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
