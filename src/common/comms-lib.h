@@ -25,8 +25,8 @@
 #include <string.h> /* for memcpy */
 #include <unistd.h>
 #include <vector>
-//#include "fft.h"
-#include "mufft/fft.h"
+#include "mkl_dfti.h"
+#include "memory_manage.h"
 
 class CommsLib {
 public:

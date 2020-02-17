@@ -35,6 +35,14 @@ cmake_minimum_required(VERSION 2.8.12)
 #
 project (testing)
 
+
+if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
+  message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
+  message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
+endif()
+
+
+
 #
 # Wireless SDK options
 #
@@ -70,20 +78,23 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mavx2 -mavx")
 set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
 
 
-include_directories(/opt/intel/mkl/include
-                    ${SDK_DIR}/test/phy/common
-                    ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-                    ${SDK_DIR}/source/phy/lib_common
-                    ../../src/encoder)
+include_directories(
+  /opt/intel/mkl/include
+  ${SDK_DIR}/test/phy/common
+  ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${SDK_DIR}/source/phy/lib_common
+  ../../src/encoder)
 
-set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h
-                ../../src/encoder/cyclic_shift.hpp
-                ../../src/encoder/encoder.hpp
-                ../../src/encoder/iobuffer.hpp)
+set(HEADER_FILES 
+  ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h
+  ../../src/encoder/cyclic_shift.hpp
+  ../../src/encoder/encoder.hpp
+  ../../src/encoder/iobuffer.hpp)
 
-set(SOURCES ../../src/encoder/cyclic_shift.cpp
-            ../../src/encoder/encoder.cpp
-            ../../src/encoder/iobuffer.cpp)
+set(SOURCES 
+  ../../src/encoder/cyclic_shift.cpp
+  ../../src/encoder/encoder.cpp
+  ../../src/encoder/iobuffer.cpp)
 
 
 add_executable(test_ldpc test_ldpc.cpp ${SOURCES} ${HEADER_FILES})
@@ -94,9 +105,9 @@ set(LIB_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/bui
 #                  ${CMAKE_CURRENT_SOURCE_DIR}/decoder/src/common/libutility.a
 #                  ${CMAKE_CURRENT_SOURCE_DIR}/decoder/src/lib_common/libcommon.a)
 target_link_libraries (test_ldpc
-                  ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-                  ${LIB_DIR}/test/phy/common/utility.a
-                  ${LIB_DIR}/source/phy/lib_common/libcommon.a)
+  ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+  ${LIB_DIR}/test/phy/common/utility.a
+  ${LIB_DIR}/source/phy/lib_common/libcommon.a)
 
 add_definitions(-DUSE_LDPC)
 set(MOD_SOURCES ../../src/common/modulation.cpp)
@@ -104,7 +115,7 @@ include_directories(../../src/common)
 
 add_executable(test_mod_ldpc test_mod_ldpc.cpp ${SOURCES} ${MOD_SOURCES} ${HEADER_FILES})
 
-target_link_libraries (test_mod_ldpc
-                  ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-                  ${LIB_DIR}/test/phy/common/utility.a
-                  ${LIB_DIR}/source/phy/lib_common/libcommon.a)
+target_link_libraries(test_mod_ldpc
+  ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+  ${LIB_DIR}/test/phy/common/utility.a
+  ${LIB_DIR}/source/phy/lib_common/libcommon.a)
