@@ -238,13 +238,11 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
 
 static void run_benchmark_16qam(unsigned iterations, unsigned mode) {
   double time = bench_mod_16qam(iterations, mode);
-
   printf("time: %.2f us\n", time);
 }
 
 static void run_benchmark_64qam(unsigned iterations, unsigned mode) {
   double time = bench_mod_64qam(iterations, mode);
-
   printf("time: %.2f us\n", time);
 }
 
@@ -277,5 +275,7 @@ int main(int argc, char *argv[]) {
       run_benchmark_16qam(iterations, mode);
     else if (mod_order == 64)
       run_benchmark_64qam(iterations, mode);
+    else
+      printf("Error: modulation order not supported!\n");
   }
 }
