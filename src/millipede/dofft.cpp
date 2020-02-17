@@ -301,8 +301,6 @@ void DoIFFT::launch(int offset)
     //     cout << dl_ifft_buffer_.IFFT_inputs[offset][j].real << "+" << dl_ifft_buffer_.IFFT_inputs[offset][j].imag << "j,   ";
     // }
     // cout<<"\n\n"<<endl;
-    // mufft_execute_plan_1d(muplans_ifft_[tid], dl_ifft_buffer_.IFFT_outputs[offset],
-    //     dl_ifft_buffer_.IFFT_inputs[offset]);
 
     DftiComputeBackward(mkl_handle, dl_ifft_buffer_[offset]);
 
