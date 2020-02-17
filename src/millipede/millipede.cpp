@@ -195,12 +195,11 @@ void Millipede::start()
                 int frame_count = pkt->frame_id % 10000;
                 int frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
                 int subframe_id = pkt->symbol_id;
-                int ant_id = pkt->ant_id;
 
-                update_rx_counters(frame_count, frame_id, pkt->symbol_id);
+                update_rx_counters(frame_count, frame_id, subframe_id);
 #if BIGSTATION
                 /* in BigStation, schedule FFT whenever a packet is received */
-                schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
+                schedule_fft_task(offset, frame_count, consumer_fft);
                 if (cur_frame_id == frame_id) {
                     stats_manager_->update_processing_started(frame_count);
                     cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
@@ -208,7 +207,7 @@ void Millipede::start()
 #else
                 /* if all previous frames are processed, schedule FFT for this packet */
                 if (frame_id == cur_frame_id) {
-                    schedule_fft_task(offset, frame_count, frame_id, subframe_id, ant_id, consumer_fft);
+                    schedule_fft_task(offset, frame_count, consumer_fft);
                 } else {
                     /* if the previous frame is not finished, store offset in queue */
                     delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]++] = offset;
@@ -315,7 +314,7 @@ void Millipede::start()
                         /* schedule fft for the next frame if there are delayed fft tasks */
 #ifndef USE_LDPC
 #if !BIGSTATION
-                        if (!schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
+                        if (!schedule_delayed_fft_tasks(demul_stats_.frame_count, frame_id, consumer_fft))
                             cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
 #endif
                         stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
@@ -352,7 +351,7 @@ void Millipede::start()
                     print_per_subframe_done(PRINT_DECODE, decode_stats_.frame_count, frame_id, data_subframe_id);
                     if (decode_stats_.last_symbol(frame_id)) {
 #if !BIGSTATION
-                        if (!schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
+                        if (!schedule_delayed_fft_tasks(decode_stats_.frame_count, frame_id, consumer_fft))
                             cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
 #endif
                         stats_manager_->update_decode_processed(decode_stats_.frame_count);
@@ -429,7 +428,7 @@ void Millipede::start()
                     if (ifft_stats_.last_symbol(frame_id)) {
 #if !BIGSTATION
                         /* schedule fft for next frame */
-                        if (!schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, data_subframe_id, consumer_fft))
+                        if (!schedule_delayed_fft_tasks(ifft_stats_.frame_count, frame_id, consumer_fft))
                             cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
 #endif
                         stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
@@ -677,7 +676,6 @@ void Millipede::create_threads(thread_type thread, int tid_start, int tid_end)
 }
 
 void Millipede::schedule_fft_task(int offset, int frame_count,
-    UNUSED int frame_id, UNUSED int subframe_id, UNUSED int ant_id,
     Consumer const& consumer)
 {
     Event_data do_fft_task;
@@ -702,14 +700,14 @@ void Millipede::schedule_fft_task(int offset, int frame_count,
 }
 
 #if !BIGSTATION
-bool Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id, int data_subframe_id,
+bool Millipede::schedule_delayed_fft_tasks(int frame_count, int frame_id,
     Consumer const& consumer)
 {
     frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
     if (delay_fft_queue_cnt[frame_id] > 0) {
         for (int i = 0; i < delay_fft_queue_cnt[frame_id]; i++) {
             int offset_rx = delay_fft_queue[frame_id][i];
-            schedule_fft_task(offset_rx, frame_count + 1, frame_id, data_subframe_id, 0, consumer);
+            schedule_fft_task(offset_rx, frame_count + 1, consumer);
         }
         delay_fft_queue_cnt[frame_id] = 0;
 #if DEBUG_PRINT_PER_FRAME_ENTER_QUEUE
