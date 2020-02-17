@@ -307,53 +307,47 @@ std::vector<std::complex<float>> CommsLib::getPilotSc(int fftSize)
 
 std::vector<std::complex<float>> CommsLib::IFFT(std::vector<std::complex<float>> in, int fftsize, bool normalize)
 {
-    std::vector<std::complex<float>> out(in.size());
-
-    void* fft_in = mufft_alloc(fftsize * sizeof(std::complex<float>));
-    void* fft_out = mufft_alloc(fftsize * sizeof(std::complex<float>));
-    mufft_plan_1d* mufftplan = mufft_create_plan_1d_c2c(fftsize, MUFFT_INVERSE, MUFFT_FLAG_CPU_ANY);
-
-    memcpy(fft_in, in.data(), fftsize * sizeof(std::complex<float>));
-    mufft_execute_plan_1d(mufftplan, fft_out, fft_in);
-    memcpy(out.data(), fft_out, fftsize * sizeof(std::complex<float>));
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCommitDescriptor(mkl_handle);
+    Table<std::complex<float>> IFFT_inputs;
+    IFFT_inputs.calloc(1, fftsize, 64);
+    memcpy(IFFT_inputs[0], in.data(), fftsize * sizeof(std::complex<float>));
+    DftiComputeBackward(mkl_handle, IFFT_inputs[0]);
+    DftiFreeDescriptor(&mkl_handle);
+    memcpy(in.data(), IFFT_inputs[0], fftsize * sizeof(std::complex<float>));
     if (normalize) {
         //for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
         float max_val = 0;
         //int max_ind = 0;
         float scale = 0.5;
         for (int i = 0; i < fftsize; i++) {
-            if (std::abs(out[i]) > max_val) {
-                max_val = std::abs(out[i]);
+            if (std::abs(in[i]) > max_val) {
+                max_val = std::abs(in[i]);
                 //max_ind = i;
             }
         }
         std::cout << "IFFT output is normalized with " << std::to_string(max_val) << std::endl;
         //std::cout << "max sample is " << std::to_string(out[max_ind].real()) << "+1j*" << std::to_string(out[max_ind].imag()) << std::endl;
         for (int i = 0; i < fftsize; i++)
-            out[i] /= (max_val / scale);
+            in[i] /= (max_val / scale);
     }
-    mufft_free_plan_1d(mufftplan);
-    mufft_free(fft_in);
-    mufft_free(fft_out);
-    return out;
+    return in;
 }
 
 std::vector<std::complex<float>> CommsLib::FFT(std::vector<std::complex<float>> in, int fftsize)
 {
-    std::vector<std::complex<float>> out(in.size());
-
-    void* fft_in = mufft_alloc(fftsize * sizeof(std::complex<float>));
-    void* fft_out = mufft_alloc(fftsize * sizeof(std::complex<float>));
-    mufft_plan_1d* mufftplan = mufft_create_plan_1d_c2c(fftsize, MUFFT_FORWARD, MUFFT_FLAG_CPU_ANY);
-
-    memcpy(fft_in, in.data(), fftsize * sizeof(std::complex<float>));
-    mufft_execute_plan_1d(mufftplan, fft_out, fft_in);
-    memcpy(out.data(), fft_out, fftsize * sizeof(std::complex<float>));
-
-    mufft_free_plan_1d(mufftplan);
-    mufft_free(fft_in);
-    mufft_free(fft_out);
-    return out;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCommitDescriptor(mkl_handle);
+    Table<std::complex<float>> FFT_inputs;
+    FFT_inputs.calloc(1, fftsize, 64);
+    memcpy(FFT_inputs[0], in.data(), fftsize * sizeof(std::complex<float>));
+    /* compute FFT */
+    DftiComputeForward(mkl_handle, FFT_inputs[0]);
+    memcpy(in.data(), FFT_inputs[0], fftsize * sizeof(std::complex<float>));
+    DftiFreeDescriptor(&mkl_handle);
+    return in;
 }
 
 std::vector<std::complex<float>> CommsLib::composeRefSymbol(std::vector<std::complex<float>> pilot, size_t offset, size_t period, size_t fftSize, bool timeDomain)

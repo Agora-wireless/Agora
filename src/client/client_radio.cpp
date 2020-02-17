@@ -205,9 +205,10 @@ bool ClientRadioConfig::radioStart()
         clStn[i]->setHardwareTime(SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, _cfg->rate), "TRIGGER");
         clStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
         clStn[i]->writeSetting("TDD_MODE", "true");
-        clStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
-        if (_cfg->nChannels == 2)
-            clStn[i]->writeRegisters("TX_RAM_B", 0, pilot);
+        for (char const& c : _cfg->channel) {
+            std::string tx_ram = "TX_RAM_";
+            clStn[i]->writeRegisters(tx_ram + c, 0, pilot);
+        }
         clStn[i]->activateStream(this->rxStreams[i], flags, 0);
         clStn[i]->activateStream(this->txStreams[i]);
 
@@ -215,7 +216,7 @@ bool ClientRadioConfig::radioStart()
         clStn[i]->writeSetting("CORR_CONFIG", corrConfString);
         clStn[i]->writeRegisters("CORR_COE", 0, _cfg->coeffs);
 
-        clStn[i]->writeSetting("CORR_START", "A");
+        clStn[i]->writeSetting("CORR_START", (_cfg->channel == "B") ? "B" : "A");
     }
 
     std::cout << "radio start done!" << std::endl;
