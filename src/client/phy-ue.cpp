@@ -281,10 +281,9 @@ void Phy_UE::start()
                     int cropper_created_checker_id = (frame_id % TASK_BUFFER_FRAME_NUM);
                     cropper_created_checker_[cropper_created_checker_id]++;
 #endif
-                }
-		else { // if we are not entering doFFT, let's reset buffer here
+                } else { // if we are not entering doFFT, let's reset buffer here
                     rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty
-		}
+                }
             } break;
 
             case EVENT_FFT: {
@@ -313,7 +312,7 @@ void Phy_UE::start()
 
             } break;
 
-            case EVENT_ZF: {
+            case EVENT_UP_ZF: {
                 int offset_eq = event.data;
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_eq, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t, &ant_id_t);
                 frame_id = frame_id_t;
@@ -617,7 +616,7 @@ void Phy_UE::doFFT(int tid, int offset)
             equ_buffer_ptr[2 * j] = (y_re * csi_re + y_im * csi_im) / (csi_re * csi_re + csi_im * csi_im); //fft_buffer_ptr[2*i] / csi_re;
             equ_buffer_ptr[2 * j + 1] = (y_im * csi_re - y_re * csi_im) / (csi_re * csi_re + csi_im * csi_im); //fft_buffer_ptr[2*i+1] / csi_im;
         }
-        crop_finish_event.event_type = EVENT_ZF;
+        crop_finish_event.event_type = EVENT_UP_ZF;
         crop_finish_event.data = eq_buffer_offset; //generateOffset3d(numAntennas, dl_symbol_perframe, frame_id, dl_symbol_id, ant_id);
     }
 

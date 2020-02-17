@@ -6,7 +6,7 @@
 
 #include "millipede.hpp"
 
-void read_from_file(std::string filename, Table<uint8_t>& data, int ofdm_size, Config* cfg)
+void read_from_file_ul(std::string filename, Table<uint8_t>& data, int ofdm_size, Config* cfg)
 {
     int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
     size_t UE_NUM = cfg->UE_NUM;
@@ -24,14 +24,30 @@ void read_from_file(std::string filename, Table<uint8_t>& data, int ofdm_size, C
     } 
 }
 
-void check_correctness(Config *cfg)  
+void read_from_file_dl(std::string filename, Table<float>& data, int ofdm_size, Config* cfg)
+{
+    int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
+    size_t BS_ANT_NUM = cfg->BS_ANT_NUM;
+    FILE *fp = fopen(filename.c_str(), "rb");
+    if (fp == NULL) {
+        printf("open file failed: %s\n", filename.c_str());
+        std::cerr << "Error: " << strerror(errno) << std::endl;
+    }
+    for (size_t i = 0; i < data_symbol_num_perframe * BS_ANT_NUM; i++) {
+        if ((unsigned) ofdm_size * 2 != 
+            fread(data[i], sizeof(float), ofdm_size * 2, fp)) {
+            printf("read file failed: %s\n", filename.c_str());
+            std::cerr << "Error: " << strerror(errno) << std::endl;
+        }
+    } 
+}
+
+void check_correctness_ul(Config *cfg)  
 {
     int BS_ANT_NUM = cfg->BS_ANT_NUM;
     int UE_NUM = cfg->UE_NUM;
-    int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
-    int OFDM_CA_NUM = cfg->OFDM_CA_NUM;
+    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    int OFDM_DATA_START = cfg->OFDM_DATA_START;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant" +
@@ -39,11 +55,11 @@ void check_correctness(Config *cfg)
     std::string demul_data_filename = cur_directory + "/data/demul_data.bin";
     Table<uint8_t> raw_data;
     Table<uint8_t> demul_data;
-    raw_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64);
+    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
     demul_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
                     
-    read_from_file(raw_data_filename, raw_data, OFDM_CA_NUM, cfg);    
-    read_from_file(demul_data_filename, demul_data, OFDM_DATA_NUM, cfg);   
+    read_from_file_ul(raw_data_filename, raw_data, OFDM_DATA_NUM, cfg);    
+    read_from_file_ul(demul_data_filename, demul_data, OFDM_DATA_NUM, cfg);   
 
     int error_cnt = 0;
     int total_count = 0;
@@ -51,26 +67,79 @@ void check_correctness(Config *cfg)
         for (int sc = 0; sc < OFDM_DATA_NUM; sc++) {
             for (int ue = 0; ue < UE_NUM; ue++) {
                 total_count++;
-                int offset_in_raw = OFDM_CA_NUM * ue + sc + OFDM_DATA_START;
+                int offset_in_raw = OFDM_DATA_NUM * ue + sc;
                 int offset_in_demul = UE_NUM * sc + ue;
-                // if (i == 1)
+                // if (i == 0)
                 //     printf("(%d, %u, %u) ", sc, raw_data[i][offset_in_raw], demul_data[i][offset_in_demul]);
                 if (raw_data[i][offset_in_raw] != demul_data[i][offset_in_demul]) 
                     error_cnt++;
             }
-            // if (i == 1)
+            // if (i == 0)
             //     printf("\n");
         }
     }    
     printf("======================\n");
-    printf("Error rate: %d/%d\n", error_cnt, total_count);
+    printf("Uplink test: \n\n");
     if (error_cnt == 0) 
-        printf("Passed test!\n");
+        printf("Passed uplink test!\n");
     else 
-        printf("Failed test!\n");
-    printf("======================\n");
+        printf("Failed uplink test! Error rate: %d/%d\n", error_cnt, total_count);
+    printf("======================\n\n");
     raw_data.free();
     demul_data.free();
+}
+
+void check_correctness_dl(Config *cfg)  
+{
+    int BS_ANT_NUM = cfg->BS_ANT_NUM;
+    int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
+    int OFDM_CA_NUM = cfg->OFDM_CA_NUM;
+
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string raw_data_filename = cur_directory + "/data/dl_ifft_data_2048_ant" +
+                         std::to_string(BS_ANT_NUM) + ".bin";
+    std::string ifft_data_filename = cur_directory + "/data/ifft_data.bin";
+    Table<float> raw_data;
+    Table<float> ifft_data;
+    raw_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, OFDM_CA_NUM * 2, 64);
+    ifft_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, OFDM_CA_NUM * 2, 64);
+                    
+    read_from_file_dl(raw_data_filename, raw_data, OFDM_CA_NUM, cfg);    
+    read_from_file_dl(ifft_data_filename, ifft_data, OFDM_CA_NUM, cfg);   
+
+    int error_cnt = 0;
+    int total_count = 0;
+    for (int i = 0; i < data_symbol_num_perframe; i++) {
+        if (i != DL_PILOT_SYMS - 1) {
+            for (int ant = 0; ant < BS_ANT_NUM; ant++) {
+                // printf("symbol %d, antenna %d\n", i, ant);
+                for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) {
+                    total_count++;
+                    int offset = BS_ANT_NUM * i + ant;
+                    // if (i == 0)
+                    //     printf("sc :%d, (%.3f, %.3f) diff: %.3f\n", sc / 2, 
+                    //         raw_data[offset][sc], ifft_data[offset][sc], 
+                    //         fabs(raw_data[offset][sc] - ifft_data[offset][sc]));
+                    if (fabs(raw_data[offset][sc] - ifft_data[offset][sc]) > 2) {
+                        // printf("sc :%d, (%.3f, %.3f) diff: %.3f\n", sc / 2, 
+                        //     raw_data[offset][sc], ifft_data[offset][sc], 
+                        //     fabs(raw_data[offset][sc] - ifft_data[offset][sc]));
+                        error_cnt++;
+                    }
+                }
+                // if (i == 0) printf("\n");
+            }
+        }
+    }    
+    printf("======================\n");
+    printf("Downlink test: \n\n");
+    if (error_cnt == 0) 
+        printf("Passed downlink test!\n");
+    else 
+        printf("Failed downlink test! Error rate: %d/%d\n", error_cnt, total_count);
+    printf("======================\n\n");
+    raw_data.free();
+    ifft_data.free();
 }
 
 
@@ -93,7 +162,12 @@ int main(int argc, char* argv[])
         signalHandler.setupSignalHandlers();
         millipede_cli = new Millipede(cfg);
         millipede_cli->start();
-        check_correctness(cfg);
+
+        if (cfg->downlink_mode)
+            check_correctness_dl(cfg);
+        else
+            check_correctness_ul(cfg);
+
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
         std::cerr << "SignalException: " << e.what() << std::endl;
