@@ -66,14 +66,11 @@ public:
     void start();
     void stop();
 
-#if BIGSTATION
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
-#else
     void* worker(int tid);
-#endif
-    void create_threads(thread_type thread, int tid_start, int tid_end);
+    void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
     // struct EventHandlerContext
     // {
@@ -82,10 +79,6 @@ public:
     // };
 
     /* Add tasks into task queue based on event type */
-    void schedule_fft_task(int offset, int frame_count, Consumer const& consumer);
-#if !BIGSTATION
-    bool schedule_delayed_fft_tasks(int frame_count, int frame_id, Consumer const& consumer);
-#endif
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
@@ -107,9 +100,7 @@ private:
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
     Config* config_;
-#if !BIGSTATION
     int fft_created_count;
-#endif
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
@@ -189,10 +180,9 @@ private:
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
-#if !BIGSTATION
     Table<int> delay_fft_queue;
     int* delay_fft_queue_cnt;
-#endif
+
     /** 
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM
