@@ -7,7 +7,6 @@
 #ifndef MILLIPEDE_HEAD
 #define MILLIPEDE_HEAD
 
-#include "mufft/fft.h"
 #include <fcntl.h>
 #include <iostream>
 #include <memory>
@@ -93,6 +92,7 @@ public:
     void free_downlink_buffers();
 
     void save_demul_data_to_file(int frame_id);
+    void save_ifft_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 

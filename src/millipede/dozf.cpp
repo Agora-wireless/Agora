@@ -16,22 +16,18 @@ DoZF::DoZF(Config* in_config, int in_tid,
     , csi_buffer_(in_csi_buffer)
     , precoder_buffer_(in_precoder_buffer)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
-    alloc_buffer_1d(&pred_csi_buffer_, BS_ANT_NUM * UE_NUM, 64, 0);
-
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
-    // ZF_task_duration = in_ZF_task_duration;
-    // ZF_task_count = in_ZF_task_count;
-
-    csi_gather_buffer = (complex_float*)aligned_alloc(BS_ANT_NUM * UE_NUM * sizeof(complex_float), BS_ANT_NUM * UE_NUM * sizeof(complex_float));
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    alloc_buffer_1d(&pred_csi_buffer, BS_ANT_NUM * UE_NUM, 64, 0);
+    alloc_buffer_1d(&csi_gather_buffer, BS_ANT_NUM * UE_NUM, 64, 0);
 }
 
 DoZF::~DoZF()
 {
-    free(csi_gather_buffer);
-    free_buffer_1d(&pred_csi_buffer_);
+    free_buffer_1d(&csi_gather_buffer);
+    free_buffer_1d(&pred_csi_buffer);
 }
 
 void DoZF::launch(int offset)
@@ -65,7 +61,6 @@ void DoZF::ZF_time_orthogonal(int offset)
         int cur_sc_id = sc_id + i;
         int cur_offset = offset_in_buffer + i;
         int transpose_block_size = config_->transpose_block_size;
-        // directly gather data from FFT buffer
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4,
             transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
         int transpose_block_id = cur_sc_id / transpose_block_size;
@@ -74,16 +69,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         int subframe_offset = frame_id * UE_NUM;
         float* tar_csi_ptr = (float*)csi_gather_buffer;
 
-        // // if (sc_id == 4) {
-        // //     cout<<"csi_buffer_ for subframe "<<subframe_offset<<endl;
-        // //     for (int i=0;i<BS_ANT_NUM*OFDM_CA_NUM; i++) {
-        // //         cout<<"("<<i<<",  "<<csi_buffer_.CSI[subframe_offset][i].real<<","<<csi_buffer_.CSI[subframe_offset][i].imag<<") ";
-        // //     }
-
-        // //     cout<<endl;
-        // // }
-
-        // gather data for all users and antennas
+        
         // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
         // int mat_elem = UE_NUM * BS_ANT_NUM;
         // int cache_line_num = mat_elem / 8;
@@ -92,10 +78,11 @@ void DoZF::ZF_time_orthogonal(int offset)
         //     // _mm_prefetch((char *)(tar_csi_ptr + 16 * line_idx), _MM_HINT_ET1);
         // }
 
+        /* gather csi matrix of all users and antennas */
         for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
             float* src_csi_ptr = (float*)csi_buffer_[subframe_offset + ue_idx] + offset_in_csi_buffer * 2;
             for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-                // fetch 4 complex floats for 4 ants
+                /* fetch 4 complex floats for 4 ants */
                 __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
                 _mm256_store_ps(tar_csi_ptr, t_csi);
                 // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1),
@@ -104,33 +91,6 @@ void DoZF::ZF_time_orthogonal(int offset)
                 tar_csi_ptr += 8;
             }
         }
-
-        // // gather data for all users and antennas
-        // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) {
-        //     float *src_csi_ptr = (float *)fft_buffer_.FFT_outputs[subframe_offset+ue_idx] + sc_id * 2;
-        //     for (int ant_idx = 0; ant_idx < BS_ANT_NUM; ant_idx += 4) {
-        //         // fetch 4 complex floats for 4 ants
-        //         __m256 pilot_rx = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-
-        //         if (pilots_[sc_id] > 0) {
-        //             _mm256_store_ps(tar_csi_ptr, pilot_rx);
-        //         }
-        //         else if (pilots_[sc_id] < 0){
-        //             __m256 pilot_tx = _mm256_set1_ps(pilots_[sc_id]);
-        //             __m256 csi_est = _mm256_mul_ps(pilot_rx, pilot_tx);
-        //             _mm256_store_ps(tar_csi_ptr, csi_est);
-        //         }
-        //         else {
-        //             _mm256_store_ps(tar_csi_ptr, _mm256_setzero_ps());
-        //         }
-
-        //         // printf("Frame %d, sc: %d, UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", frame_id, sc_id, ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float *)tar_csi_ptr+1),
-        //         //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),  *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-        //         src_csi_ptr += 8 * OFDM_CA_NUM;
-        //         tar_csi_ptr += 8;
-
-        //     }
-        // }
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration1 = get_time() - start_time1;
@@ -156,11 +116,6 @@ void DoZF::ZF_time_orthogonal(int offset)
         double duration3 = get_time() - start_time2;
         (*ZF_task_duration)[tid * 8][3] += duration3;
 #endif
-
-        // float *tar_ptr = (float *)precoder_buffer_.precoder[cur_offset];
-        // // float temp = *tar_ptr;
-        // float *src_ptr = (float *)ptr_out;
-
         // // int mat_elem = UE_NUM * BS_ANT_NUM;
         // // int cache_line_num = mat_elem / 8;
         // for (int line_idx = 0; line_idx < cache_line_num; line_idx++) {
@@ -169,10 +124,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         //     tar_ptr += 16;
         //     src_ptr += 16;
         // }
-// #if DEBUG_UPDATE_STATS
-//     double duration3 = get_time() - start_time3;
-//     (*ZF_task_duration)[tid][3] += duration3;
-// #endif
+
 #if DEBUG_UPDATE_STATS
         ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
         double duration = get_time() - start_time1;
@@ -203,7 +155,6 @@ void DoZF::ZF_freq_orthogonal(int offset)
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     for (int i = 0; i < UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
-        // directly gather data from FFT buffer
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2, transpose_block_size * 2 + 1, transpose_block_size * 4,
             transpose_block_size * 4 + 1, transpose_block_size * 6, transpose_block_size * 6 + 1);
 
@@ -270,7 +221,7 @@ void DoZF::Predict(int offset)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     int offset_in_buffer = frame_id * OFDM_DATA_NUM + sc_id;
-    cx_float* ptr_in = (cx_float*)pred_csi_buffer_;
+    cx_float* ptr_in = (cx_float*)pred_csi_buffer;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);

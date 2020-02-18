@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
     if (argc == 2)
         confFile = std::string("/") + std::string(argv[1]);
     else
-        confFile = "/data/tddconfig.json";
+        confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
     Config* cfg = new Config(filename.c_str());

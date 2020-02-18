@@ -466,7 +466,7 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
 void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
 {
     printf("saving timestamps to file.........\n");
-    printf("Total processed frames %d \n", last_frame_id);
+    printf("Total processed frames %d \n", last_frame_id + 1);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
@@ -544,6 +544,7 @@ void Stats::print_summary(UNUSED int last_frame_id)
     int ZF_total_count = compute_total_count(zf_stats_worker, task_thread_num);
     int Demul_total_count = compute_total_count(demul_stats_worker, task_thread_num);
 #if USE_LDPC
+    int UE_NUM = config_->UE_NUM;
     int Decode_total_count = compute_total_count(decode_stats_worker, task_thread_num);
     int Encode_total_count = compute_total_count(encode_stats_worker, task_thread_num);
     int nblocksInSymbol = config_->LDPC_config.nblocksInSymbol;
