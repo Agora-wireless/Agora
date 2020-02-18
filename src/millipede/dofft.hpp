@@ -13,7 +13,6 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "mkl_dfti.h"
-#include "mufft/fft.h"
 #include "offset.h"
 #include "stats.hpp"
 #include <iostream>

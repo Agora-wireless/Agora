@@ -23,7 +23,7 @@
 #include <system_error>
 #include <tuple>
 #include <unistd.h>
-//#include "mufft/fft.h"
+#include "mkl_dfti.h"
 
 //typedef std::vector<complex_float> myVec;
 typedef std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>> myVec;
@@ -227,6 +227,7 @@ private:
      * Second dimension: OFDM_CA_NUM
      */
     IFFTBuffer ifft_buffer_;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
 
     /**
      * Data before modulation
@@ -242,8 +243,6 @@ private:
      * Second dimension: OFDM_CA_NUM * UE_NUM
      */
     std::vector<myVec> modul_buffer_;
-
-    mufft_plan_1d* muifftplans_[TASK_THREAD_NUM];
 
     /*****************************************************
      * Downlink 
@@ -303,8 +302,6 @@ private:
     std::vector<int> data_sc_ind_;
     std::vector<int> pilot_sc_ind_;
     std::vector<int> non_null_sc_ind_;
-
-    mufft_plan_1d* mufftplans_[TASK_THREAD_NUM];
 
     /* Concurrent queues */
     /* task queue for uplink FFT */

@@ -6,8 +6,8 @@
 
 Required packages LAPACK, BLAS, Boost, Doxygen
 
-	sudo apt-get install liblapack-dev, libblas-dev, libboost-all-dev
-	sudo apt-get install doxygen
+	sudo apt-get install liblapack-dev libblas-dev libboost-all-dev
+	sudo apt-get install doxygen nlohmann-json-dev
 
 Install Armadillo:
 
@@ -22,33 +22,61 @@ Install muFFT:
 
 	git clone https://github.com/Themaister/muFFT.git
 	cd muFFT
+    git checkout 6d716ab
 	make
 	sudo make install
 
-	
+Intel MKL and compiler can be installed by installing Parallel Studio XE:
+
+* Available at https://software.intel.com/en-us/parallel-studio-xe/choose-download/student-linux-fortran
+
+Install Intel FlexRAN (optional, only used for LDPC):
+
+* Available at https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules
+* Requires gtest Google Test 1.7.0: https://github.com/google/googletest/releases/tag/release-1.7.0
+
+
+Set environment vairables for Intel libraries before compiling:
+
+	source path_to/compilervars.sh intel64
+
+E.g., 
+
+	source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64
+
 
 Compile Millipede:
 
-	cd millipede
+	cd Millipede
 	mkdir build
 	cd build
 	cmake ..
-	make -j36 (36 is the number of cores, on the server it can be 36)
+	make -j 
 
 2. Run
-* In one terminal, run "./millipede" to start the receiver
-* In another terminal, run "./sender 4 4 1 20" to start the sender, the four arguments are: # of sockets, # of threads (should be same as # of sockets), offset of CPU core index (change the value according to which socket the NIC is installed), and delay between symbols
+* In one terminal, run "./millipede data/tddconfig-sim-ul.json" to start Millipede with Uplink configuration 
+* In another terminal, run "./sender 4 2 5000 data/tddconfig-sim-ul.json" to start the sender with Uplink configuration, the four arguments are: # of threads, offset of CPU core index (change the value according to which socket the NIC is installed), frame duration in microseconds, config filename
 
 3. Other information
-* CoMP.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
-* I added some debug information settings in Symbols.hpp
-* Thread number settings are in CoMP.hpp
-* test_matrix.cpp is for unit tests of matrix operations
+* millipede.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
+* Eebug information settings are in Symbols.hpp
+* test/test_millipede is used for correctness test
+  * The sender sends 1 frame, Millipede processes it and compares results with gound truth data.
+  * Gound truth data is produced by MATLAB file generate_data_dl.m. 
+
+To compile and run Millipede test:
+
+	cd test/test_millipede
+	cmake .
+	make -j
+	./test_millipede.sh
+
+* test_matrix.cpp is for unit tests of matrix operations (inversion and multiplication)
 * test_mufft.c is for unit tests of FFT and IFFT
 
 To compile test_matrix.cpp:
 
-	g++ -I/opt/intel/vtune_amplifier/include -o test_matrix ../test_matrix.cpp ../cpu_attach.cpp -std=c++11 -w -O3 -mavx2 -mavx -g -larmadillo -lpthread /opt/intel/vtune_amplifier/lib64/libittnotify.a -ldl
+	g++ -o test_matrix test_matrix.cpp cpu_attach.cpp -std=c++11 -w -O3 -mavx2 -g -larmadillo -lpthread -lm -ldl 
 
 To compile test_mufft.c:
 

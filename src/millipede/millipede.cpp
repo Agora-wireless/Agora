@@ -13,9 +13,7 @@ Millipede::Millipede(Config* cfg)
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
     printf("Main thread: on core %d\n", sched_getcpu());
-    putenv("MKL_THREADING_LAYER=sequential");
-    // char thread_cmd[] = "MKL_THREADING_LAYER=sequential";
-    // putenv(thread_cmd);
+    setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
     std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl;
     // openblas_set_num_threads(1);
     printf("enter constructor\n");
@@ -47,6 +45,7 @@ Millipede::Millipede(Config* cfg)
         printf("initialize downlink buffers\n");
         initialize_downlink_buffers();
     }
+
     stats_manager_ = new Stats(config_, 4, TASK_THREAD_NUM, FFT_THREAD_NUM, ZF_THREAD_NUM, DEMUL_THREAD_NUM);
 
     /* initialize TXRX threads*/
@@ -145,6 +144,7 @@ void Millipede::start()
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int dl_data_subframe_start = config_->dl_data_symbol_start;
     int dl_data_subframe_end = config_->dl_data_symbol_end;
+    // int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int packet_length = config_->packet_length;
     int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;
 
@@ -354,7 +354,8 @@ void Millipede::start()
 
             case EVENT_ENCODE: {
                 int offset = event.data;
-                int total_data_subframe_id = offset % TASK_BUFFER_SUBFRAME_NUM;
+                int num_code_blocks = encode_stats_.max_task_count;
+                int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
 
@@ -386,7 +387,7 @@ void Millipede::start()
                     consumer_ifft.schedule_task_set(offset);
                     if (data_subframe_id < dl_data_subframe_end - 1) {
 #ifdef USE_LDPC
-                        consumer_encode.schedule_task_set(total_data_subframe_id);
+                        consumer_encode.schedule_task_set(total_data_subframe_id + 1);
 #else
                         consumer_precode.schedule_task_set(total_data_subframe_id + 1);
 #endif
@@ -483,12 +484,13 @@ void Millipede::start()
         } /* end of for */
     } /* end of while */
 finish:
-    this->stop();
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
     save_demul_data_to_file(last_frame_id);
+    save_ifft_data_to_file(last_frame_id);
+    this->stop();
     //exit(0);
 }
 
@@ -515,11 +517,13 @@ void* Millipede::worker(int tid)
     auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, precoder_buffer_, stats_manager_);
-
-    auto computeDnZF = new DoDnZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
+    DoZF* computeZF;
+    if (config_->downlink_mode)
+        computeZF = new DoDnZF(config_, tid, zf_queue_, consumer,
+            csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
+    else
+        computeZF = new DoUpZF(config_, tid, zf_queue_, consumer,
+            csi_buffer_, precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -547,8 +551,7 @@ void* Millipede::worker(int tid)
 #ifdef USE_LDPC
         computeEncoding,
 #endif
-        computeDnZF,
-        computeUpZF,
+        computeZF,
         computeReciprocity,
         computeFFT,
         computeDemul,
@@ -1057,6 +1060,7 @@ void Millipede::free_downlink_buffers()
 void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 {
 #ifdef WRITE_DEMUL
+    printf("saving demul data...\n");
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int UE_NUM = config_->UE_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
@@ -1068,6 +1072,31 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
         for (int sc = 0; sc < OFDM_DATA_NUM; sc++) {
             uint8_t* ptr = &demod_hard_buffer_[total_data_subframe_id][sc * UE_NUM];
             fwrite(ptr, UE_NUM, sizeof(uint8_t), fp);
+        }
+    }
+    fclose(fp);
+#endif
+}
+
+void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
+{
+#ifdef WRITE_IFFT
+    printf("saving ifft data...\n");
+    int data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
+    int dl_data_subframe_start = config_->dl_data_symbol_start;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/ifft_data.bin";
+    FILE* fp = fopen(filename.c_str(), "wb");
+
+    for (int i = 0; i < data_subframe_num_perframe; i++) {
+        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe 
+                                    + i + dl_data_subframe_start;
+        for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
+            int offset = total_data_subframe_id * BS_ANT_NUM + ant_id;
+            float* ptr = (float*)dl_ifft_buffer_[offset];
+            fwrite(ptr, OFDM_CA_NUM * 2, sizeof(float), fp);
         }
     }
     fclose(fp);

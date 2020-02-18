@@ -78,7 +78,7 @@ protected:
     void Predict(int offset);
 
     Table<complex_float> csi_buffer_;
-    complex_float* pred_csi_buffer_;
+    complex_float* pred_csi_buffer;
     Table<complex_float> precoder_buffer_;
 
     Table<double>* ZF_task_duration;
