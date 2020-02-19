@@ -10,6 +10,6 @@
  "worker_thread_num" : 15,
  "demul_block_size" : 80,
  "downlink_mode" : true,
- "antennta_num": 8
+ "antenna_num": 8
 }
 
