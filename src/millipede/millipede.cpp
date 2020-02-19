@@ -126,7 +126,7 @@ void Millipede::start()
             dl_socket_buffer_status_size_, dl_socket_buffer_size_);
     }
 
-    int cur_frame_id = TASK_BUFFER_FRAME_NUM - 1;
+    int cur_frame_id = 0;
 
     /* counters for printing summary */
     int demul_count = 0;
@@ -305,7 +305,7 @@ void Millipede::start()
                     if (demul_stats_.last_symbol(frame_id)) {
                         /* schedule fft for the next frame if there are delayed fft tasks */
 #ifndef USE_LDPC
-                        cur_frame_id = frame_id;
+                        cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         frame_count = demul_stats_.frame_count;
                         stats_manager_->update_stats_in_functions_uplink(demul_stats_.frame_count);
                         if (stats_manager_->last_frame_id == config_->tx_frame_num - 1)
@@ -340,7 +340,7 @@ void Millipede::start()
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
                     print_per_subframe_done(PRINT_DECODE, decode_stats_.frame_count, frame_id, data_subframe_id);
                     if (decode_stats_.last_symbol(frame_id)) {
-                        cur_frame_id = frame_id;
+                        cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         frame_count = decode_stats_.frame_count;
                         stats_manager_->update_decode_processed(decode_stats_.frame_count);
                         print_per_frame_done(PRINT_DECODE, decode_stats_.frame_count, frame_id);
@@ -415,7 +415,7 @@ void Millipede::start()
 
                 if (ifft_stats_.last_task(frame_id, data_subframe_id)) {
                     if (ifft_stats_.last_symbol(frame_id)) {
-                        cur_frame_id = frame_id;
+                        cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         frame_count = ifft_stats_.frame_count;
                         stats_manager_->update_ifft_processed(ifft_stats_.frame_count);
                         print_per_frame_done(PRINT_IFFT, ifft_stats_.frame_count, frame_id);
@@ -1091,8 +1091,8 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (int i = 0; i < data_subframe_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe 
-                                    + i + dl_data_subframe_start;
+        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
+            + i + dl_data_subframe_start;
         for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
             int offset = total_data_subframe_id * BS_ANT_NUM + ant_id;
             float* ptr = (float*)dl_ifft_buffer_[offset];
