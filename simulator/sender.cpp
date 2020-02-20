@@ -79,51 +79,15 @@ Sender::Sender(Config *cfg, int in_thread_num, int in_core_offset, int in_delay)
 
   socket_ = new int[socket_num];
   for (int i = 0; i < socket_num; i++) {
-#if USE_IPV4
-    servaddr_[i].sin_family = AF_INET;
-    servaddr_[i].sin_port = htons(8000 + i);
-    servaddr_[i].sin_addr.s_addr =
-        inet_addr(config_->rx_addr.c_str()); //("10.0.0.3");
-    memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero));
-
-    cliaddr_.sin_family = AF_INET;
-    cliaddr_.sin_port =
-        htons(6000 + i); // htons(0);  // out going port is random
-    // cliaddr_.sin_addr.s_addr = inet_addr("127.0.0.1");
-    // cliaddr_.sin_addr.s_addr = inet_addr("10.0.0.2");
-    cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
-    memset(cliaddr_.sin_zero, 0, sizeof(cliaddr_.sin_zero));
-    if ((socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-      printf("cannot create socket\n");
-      exit(0);
-    }
-
-#else
-    servaddr_[i].sin6_family = AF_INET6;
-    servaddr_[i].sin6_port = htons(8000 + i);
-    inet_pton(AF_INET6, "fe80::f436:d735:b04a:864a", &servaddr_[i].sin6_addr);
-
-    cliaddr_.sin6_family = AF_INET6;
-    cliaddr_.sin6_port = htons(6000 + i);
-    cliaddr_.sin6_addr = in6addr_any;
-    if ((socket_[i] = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-      printf("cannot create socket\n");
-      exit(0);
-    } else {
-      printf("Created socket: %d\n", i);
-    }
-#endif
-
     // int sock_buf_size = 1024*1024*64*8;
-    // if (setsockopt(socket_[i], SOL_SOCKET, SO_SNDBUF, (void*)&sock_buf_size,
-    // sizeof(sock_buf_size))<0)
-    //{
-    //    printf("Error setting buffer size to %d\n", sock_buf_size);
-    // }
-
-    /*Bind socket with address struct*/
-    if (bind(socket_[i], (struct sockaddr *)&cliaddr_, sizeof(cliaddr_)) != 0)
-      perror("socket bind failed");
+#if USE_IPV4
+    socket_[i] = setup_socket_ipv4(config_->ue_tx_port + i, false, 0);
+    setup_sockaddr_remote_ipv4(&servaddr_[i], config_->bs_port + i, config_->rx_addr.c_str());
+    memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero));
+#else
+    socket_[i] = setup_socket_ipv6(config_->ue_tx_port + i, false, 0);
+    setup_sockaddr_remote_ipv6(&servaddr_[i], config_->bs_port + i, "fe80::f436:d735:b04a:864a");
+#endif
 
 #if !defined(USE_DPDK) && CONNECT_UDP
     if (connect(socket_[i], (struct sockaddr *)&servaddr_[i],
@@ -386,17 +350,6 @@ void Sender::startTX() {
     fprintf(fp_debug, "%.5f\n", frame_end[ii]);
   }
   exit(0);
-
-  // pthread_t main_send_thread_;
-  // context[thread_num].ptr = this;
-  // context[thread_num].tid = thread_num;
-  // if(pthread_create( &main_send_thread_, NULL, Sender::loopSend_main, (void
-  // *)(&context[thread_num])) != 0) {
-  //     perror("socket main send thread create failed");
-  //     exit(0);
-  // }
-  // printf("Created main tx thread\n");
-  // created_threads.push_back(main_send_thread_);
 }
 
 void Sender::startTXfromMain(double *in_frame_start, double *in_frame_end) {
