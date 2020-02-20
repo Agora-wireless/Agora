@@ -25,7 +25,7 @@ DoFFT::DoFFT(Config* in_config, int in_tid,
 {
     (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX,
         1, config_->OFDM_CA_NUM);
-    // mkl_status = DftiSetValue(mkl_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+    // auto mkl_status = DftiSetValue(mkl_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
     (void)DftiCommitDescriptor(mkl_handle);
 
     int FFT_buffer_block_num = 1;
