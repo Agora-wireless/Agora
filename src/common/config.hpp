@@ -128,8 +128,9 @@ public:
 
     std::string rx_addr;
     std::string tx_addr;
-    int rx_port;
-    int tx_port;
+    int bs_port;
+    int ue_rx_port;
+    int ue_tx_port;
 
     /* used in sender to control how many frames to send*/
     int tx_frame_num;

@@ -56,8 +56,9 @@ Config::Config(std::string jsonfile)
 
     rx_addr = tddConf.value("rx_addr", "127.0.0.1");
     tx_addr = tddConf.value("tx_addr", "127.0.0.1");
-    tx_port = tddConf.value("tx_port", 7991);
-    rx_port = tddConf.value("rx_port", 7891);
+    bs_port = tddConf.value("bs_port", 8000);
+    ue_rx_port = tddConf.value("ue_rx_port", 7000);
+    ue_tx_port = tddConf.value("ue_tx_port", 6000);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
@@ -365,6 +366,10 @@ Config::Config(std::string jsonfile)
     std::cout << "DL SYM NUM " << dl_data_symbol_num_perframe << std::endl;
     std::cout << "OFDM_CA_NUM " << OFDM_CA_NUM << std::endl;
     std::cout << "OFDM_DATA_NUM " << OFDM_DATA_NUM << std::endl;
+    std::cout << "Packet length " << packet_length << std::endl;
+    if (packet_length >= 9000)
+        std::cout << "\033[1;31mWarning: packet length is larger than jumbo frame size (9000)! " 
+            << "Packets will be fragmented.\033[0m" << std::endl;
     std::cout << "Config Done!" << std::endl;
 }
 

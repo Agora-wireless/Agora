@@ -34,6 +34,7 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "utils.h"
+#include "net.hpp"
 
 #define CPU_FREQ 2.3e9
 
