@@ -7,7 +7,7 @@
  "ofdm_prefix_len" : 0,
  "worker_thread_num" : 1,
  "demul_block_size" : 40,
- "antennta_num": 8,
+ "antenna_num": 8,
  "modulation": "16QAM",
  "downlink_mode" : true,
  "tx_frame_num":1
