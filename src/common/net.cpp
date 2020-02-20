@@ -18,7 +18,7 @@ void set_socket_buf_size(int socket_local, int sock_buf_size)
     }
 }
 
-int setup_socket_ipv4(int port_id, int sock_buf_size)
+int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
 {
     struct sockaddr_in local_addr;
     local_addr.sin_family = AF_INET;
@@ -30,10 +30,10 @@ int setup_socket_ipv4(int port_id, int sock_buf_size)
         printf("ERROR: cannot create IPV4 socket\n");
         exit(0);
     } else {
-        printf("Created IPV4 socket\n");
+        printf("Created IPV4 socket on port %d\n", port_id);
     }
-
-    set_socket_buf_size(socket_local, sock_buf_size);
+    if (set_sock_size)
+        set_socket_buf_size(socket_local, sock_buf_size);
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr)) != 0) {
         printf("socket bind failed\n");
@@ -42,7 +42,7 @@ int setup_socket_ipv4(int port_id, int sock_buf_size)
     return socket_local;
 }
 
-int setup_socket_ipv6(int port_id, int sock_buf_size)
+int setup_socket_ipv6(int port_id, bool set_sock_size, int sock_buf_size)
 {
     struct sockaddr_in6 local_addr;
     local_addr.sin6_family = AF_INET6;
@@ -54,10 +54,10 @@ int setup_socket_ipv6(int port_id, int sock_buf_size)
         printf("ERROR: cannot create IPV6 socket\n");
         exit(0);
     } else {
-        printf("Created IPV6 socket\n");
+        printf("Created IPV6 socket on port %d\n", port_id);
     }
-
-    set_socket_buf_size(socket_local, sock_buf_size);
+    if (set_sock_size)
+        set_socket_buf_size(socket_local, sock_buf_size);
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr)) != 0) {
         printf("socket bind failed\n");

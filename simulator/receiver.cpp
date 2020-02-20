@@ -121,7 +121,7 @@ void *Receiver::loopRecv(int tid) {
   struct sockaddr_in servaddr_local;
   int socket_local;
   servaddr_local.sin_family = AF_INET;
-  servaddr_local.sin_port = htons(7000 + tid);
+  servaddr_local.sin_port = htons(config_->ue_rx_port + tid);
   servaddr_local.sin_addr.s_addr =
       INADDR_ANY; // inet_addr("10.225.92.16");//inet_addr("127.0.0.1");
   memset(servaddr_local.sin_zero, 0, sizeof(servaddr_local.sin_zero));
@@ -138,7 +138,7 @@ void *Receiver::loopRecv(int tid) {
   int socket_local;
   servaddr_local.sin6_family = AF_INET6;
   servaddr_local.sin6_addr = in6addr_any;
-  servaddr_local.sin6_port = htons(7000 + tid);
+  servaddr_local.sin6_port = htons(config_->ue_rx_port + tid);
 
   if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
     printf("RX thread %d cannot create IPV6 socket\n", tid);

@@ -13,11 +13,9 @@ Simulator::Simulator(Config *cfg, int in_task_thread_num, int in_socket_tx_num,
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
   printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
   printf("Main thread: on core %d\n", sched_getcpu());
-  // char thread_cmd[] = "MKL_THREADING_LAYER=sequential";
-  // putenv(thread_cmd);
-  setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
-  std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
-            << std::endl;
+  // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
+  // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
+  //           << std::endl;
   printf("enter constructor\n");
 
   this->config_ = cfg;

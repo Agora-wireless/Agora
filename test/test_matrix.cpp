@@ -232,9 +232,9 @@ static void run_benchmark_precode(unsigned Nx, unsigned Ny,
 
 int main(int argc, char *argv[]) {
   // __itt_pause();
-  setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
-  std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
-            << std::endl;
+  // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
+  // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
+  //           << std::endl;
   if (argc != 5) {
     fprintf(stderr, "Usage: %s [iterations] [Nx] [Ny] mode\n", argv[0]);
     return 1;

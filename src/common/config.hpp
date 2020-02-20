@@ -122,13 +122,15 @@ public:
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
+    bool bigstation_mode;
 
     size_t packet_length;
 
     std::string rx_addr;
     std::string tx_addr;
-    int rx_port;
-    int tx_port;
+    int bs_port;
+    int ue_rx_port;
+    int ue_tx_port;
 
     /* used in sender to control how many frames to send*/
     int tx_frame_num;
