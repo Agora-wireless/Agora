@@ -569,11 +569,11 @@ void* PacketTXRX::loopSend(int tid)
     int local_port_id = 0;
     int remote_port_id = 7000 + tid;
 #if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv4(local_port_id, true,sock_buf_size);
     struct sockaddr_in remote_addr;
     setup_sockaddr_remote_ipv4(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #else
-    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
     struct sockaddr_in6 remote_addr;
     setup_sockaddr_remote_ipv6(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #endif

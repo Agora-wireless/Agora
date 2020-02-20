@@ -105,13 +105,13 @@ void* PacketTXRX::loopRecv(int tid)
 {
     pin_to_core_with_offset(Worker_RX, core_id_, tid);
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    int local_port_id = 8000 + tid;
+    int local_port_id = config_->bs_port + tid;
 #if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
     // struct sockaddr_in local_addr;
     // setup_sockaddr_local_ipv4(&local_addr, local_port_id);
 #else
-    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
     // struct sockaddr_in6 local_addr;
     // setup_sockaddr_local_ipv6(&local_addr, local_port_id);
 #endif
@@ -209,14 +209,14 @@ void* PacketTXRX::loopSend(int tid)
     int UE_NUM = config_->UE_NUM;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    int local_port_id = 0;
-    int remote_port_id = 7000 + tid;
+    int local_port_id = config_->bs_port;
+    int remote_port_id = config_->ue_rx_port + tid;
 #if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
     struct sockaddr_in remote_addr;
     setup_sockaddr_remote_ipv4(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #else
-    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
     struct sockaddr_in6 remote_addr;
     setup_sockaddr_remote_ipv6(&remote_addr, remote_port_id, config_->tx_addr.c_str());
 #endif
@@ -310,16 +310,16 @@ void* PacketTXRX::loopTXRX(int tid)
     int downlink_mode = config_->downlink_mode;
     int packet_length = config_->packet_length;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    int local_port_id = 8000 + tid;
-    int remote_port_id = 7000 + tid;
+    int local_port_id = config_->bs_port + tid;
+    int remote_port_id = config_->ue_rx_port + tid;
 #if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
     struct sockaddr_in remote_addr;
     setup_sockaddr_remote_ipv4(&remote_addr, remote_port_id, config_->tx_addr.c_str());
     // struct sockaddr_in local_addr;
     // setup_sockaddr_local_ipv4(&local_addr, local_port_id);
 #else
-    int socket_local = setup_socket_ipv6(local_port_id, sock_buf_size);
+    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
     struct sockaddr_in6 remote_addr;
     setup_sockaddr_remote_ipv6(&remote_addr, remote_port_id, config_->tx_addr.c_str());
     // struct sockaddr_in6 local_addr;

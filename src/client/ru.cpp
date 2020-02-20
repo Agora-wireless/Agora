@@ -14,7 +14,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
     for (int i = 0; i < n_rx_thread; i++) {
         /* Create sockets at different port numbers */
         servaddr_[i].sin_family = AF_INET;
-        servaddr_[i].sin_port = htons(config_->rx_port + i);
+        servaddr_[i].sin_port = htons(config_->bs_port + i);
         servaddr_[i].sin_addr.s_addr = INADDR_ANY;
         memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero));
 
@@ -37,7 +37,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
             printf("rx socket %d bind failed\n", i);
             exit(0);
         } else
-            printf("rx socket %d bind to port %d successful\n", i, config_->rx_port + i);
+            printf("rx socket %d bind to port %d successful\n", i, config_->bs_port + i);
     }
 
     tx_socket_ = new int[n_tx_thread];
@@ -45,7 +45,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
     for (int i = 0; i < n_tx_thread; i++) {
 
         cliaddr_[i].sin_family = AF_INET;
-        cliaddr_[i].sin_port = htons(config_->tx_port + i);
+        cliaddr_[i].sin_port = htons(config_->ue_tx_port + i);
         cliaddr_[i].sin_addr.s_addr = inet_addr(config_->tx_addr.c_str());
         //cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
         memset(cliaddr_[i].sin_zero, 0, sizeof(cliaddr_[i].sin_zero));
