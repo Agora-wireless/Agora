@@ -134,7 +134,6 @@ void Millipede::start()
     double demul_begin = get_time();
     double tx_begin = get_time();
 
-    bool prev_demul_scheduled = false;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int subframe_num_perframe = config_->symbol_num_perframe;
@@ -225,23 +224,11 @@ void Millipede::start()
                         fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = true;
                         fft_stats_.symbol_data_count[frame_id]++;
                         print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id, subframe_id);
-                        if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count) {
+                        if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
                             print_per_frame_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id);
-                            prev_demul_scheduled = false;
-                        }
                         /* if precoder exist, schedule demodulation */
-                        if (zf_stats_.precoder_exist_in_frame[frame_id]) {
-                            int start_data_subframe_id, end_data_subframe_id;
-                            start_data_subframe_id = data_subframe_id;
-                            end_data_subframe_id = fft_stats_.symbol_data_count[frame_id];
-                            if (end_data_subframe_id < start_data_subframe_id)
-                                end_data_subframe_id = start_data_subframe_id + 1;
-                            if (!prev_demul_scheduled) {
-                                start_data_subframe_id = 0;
-                                prev_demul_scheduled = true;
-                            }
-                            schedule_demul_task(frame_id, start_data_subframe_id, end_data_subframe_id, consumer_demul);
-                        }
+                        if (zf_stats_.precoder_exist_in_frame[frame_id])
+                            schedule_demul_task(frame_id, data_subframe_id, data_subframe_id + 1, consumer_demul);
                     } else if (config_->isCalDlPilot(frame_id, subframe_id) || config_->isCalUlPilot(frame_id, subframe_id)) {
                         fft_stats_.symbol_cal_count[frame_id]++;
                         print_per_subframe_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id, subframe_id);
@@ -271,8 +258,7 @@ void Millipede::start()
                     zf_stats_.update_frame_count();
                     //int subframe_num_perframe = config_->symbol_num_perframe;
                     /* if all the data in a frame has arrived when ZF is done */
-                    if (fft_stats_.symbol_data_count[frame_id] == fft_stats_.max_symbol_data_count)
-                        schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
+                    schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
                     if (event.event_type == EVENT_DN_ZF) {
                         /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
                         int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
