@@ -127,7 +127,6 @@ struct Data_stats : public Frame_stats {
 };
 
 struct FFT_stats : public Data_stats {
-    int* symbol_data_count;
     int max_symbol_data_count;
     int* symbol_cal_count;
     int max_symbol_cal_count;
