@@ -224,7 +224,7 @@ void Millipede::start()
                         fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = true;
                         print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id, subframe_id);
                         /* if precoder exist, schedule demodulation */
-                        if (zf_stats_.precoder_exist_in_frame[frame_id])
+                        if (zf_stats_.coded_frame == frame_id)
                             schedule_demul_task(frame_id, data_subframe_id, data_subframe_id + 1, consumer_demul);
                     } else if (config_->isCalDlPilot(frame_id, subframe_id) || config_->isCalUlPilot(frame_id, subframe_id)) {
                         fft_stats_.symbol_cal_count[frame_id]++;
@@ -250,7 +250,7 @@ void Millipede::start()
                 print_per_task_done(PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
                     stats_manager_->update_zf_processed(zf_stats_.frame_count);
-                    zf_stats_.precoder_exist_in_frame[frame_id] = true;
+                    zf_stats_.coded_frame = frame_id;
                     print_per_frame_done(PRINT_ZF, zf_stats_.frame_count, frame_id);
                     zf_stats_.update_frame_count();
                     //int subframe_num_perframe = config_->symbol_num_perframe;
@@ -295,7 +295,7 @@ void Millipede::start()
                             goto finish;
 #endif
                         stats_manager_->update_demul_processed(demul_stats_.frame_count);
-                        zf_stats_.precoder_exist_in_frame[frame_id] = false;
+                        zf_stats_.coded_frame = -1;
                         print_per_frame_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id);
 
                         demul_stats_.update_frame_count();
@@ -785,7 +785,7 @@ void Millipede::print_per_subframe_done(UNUSED int task_type, UNUSED int frame_c
         break;
     case (PRINT_FFT_DATA):
         printf("Main thread: data FFT done frame %d, %d, subframe %d, precoder status: %d, fft queue: %d, zf queue: %d, demul queue: %d, in %.2f\n",
-            frame_count, frame_id, subframe_id, zf_stats_.precoder_exist_in_frame[frame_id],
+            frame_count, frame_id, subframe_id, zf_stats_.coded_frame == frame_id,
             fft_queue_.size_approx(), zf_queue_.size_approx(), demul_queue_.size_approx(),
             get_time() - stats_manager_->get_pilot_received(frame_count));
         break;
