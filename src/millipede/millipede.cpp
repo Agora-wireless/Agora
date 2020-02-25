@@ -221,7 +221,7 @@ void Millipede::start()
                         }
                     } else if (config_->isUplink(frame_id, subframe_id)) {
                         int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
-                        fft_stats_.cur_frame_for_symbol[data_subframe_id] = frame_id + 1;
+                        fft_stats_.cur_frame_for_symbol[data_subframe_id] = frame_id;
                         print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id, subframe_id);
                         /* if precoder exist, schedule demodulation */
                         if (zf_stats_.coded_frame == frame_id)
@@ -643,7 +643,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
 {
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     for (int data_subframe_id = start_subframe_id; data_subframe_id < end_subframe_id; data_subframe_id++) {
-        if (fft_stats_.cur_frame_for_symbol[data_subframe_id] == frame_id + 1) {
+        if (fft_stats_.cur_frame_for_symbol[data_subframe_id] == frame_id) {
             /* schedule demodulation task for subcarrier blocks */
             int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
             consumer.schedule_task_set(total_data_subframe_id);
@@ -652,7 +652,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
                 frame_id, start_subframe_id, data_subframe_id);
 #endif
             /* clear cur frame after scheduling */
-            fft_stats_.cur_frame_for_symbol[data_subframe_id] = 0;
+            fft_stats_.cur_frame_for_symbol[data_subframe_id] = -1;
         }
     }
 }
@@ -942,7 +942,9 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     alloc_buffer_1d(&(fft_stats_.symbol_cal_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_stats_.max_symbol_cal_count = 2;
-    alloc_buffer_1d(&fft_stats_.cur_frame_for_symbol, ul_data_subframe_num_perframe, 64, 1);
+    alloc_buffer_1d(&fft_stats_.cur_frame_for_symbol, ul_data_subframe_num_perframe, 64, 0);
+    for (int i = 0; i < ul_data_subframe_num_perframe; ++i)
+        fft_stats_.cur_frame_for_symbol[i] = -1;
 
     zf_stats_.init(config_->zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
 
