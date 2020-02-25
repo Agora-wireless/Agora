@@ -221,15 +221,14 @@ void Millipede::start()
                         }
                     } else if (config_->isUplink(frame_id, subframe_id)) {
                         int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
-                        fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = true;
+                        fft_stats_.cur_frame_for_symbol[data_subframe_id] = frame_id;
                         print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1, frame_id, subframe_id);
                         /* if precoder exist, schedule demodulation */
                         if (zf_stats_.coded_frame == frame_id)
                             schedule_demul_task(frame_id, data_subframe_id, data_subframe_id + 1, consumer_demul);
                     } else if (config_->isCalDlPilot(frame_id, subframe_id) || config_->isCalUlPilot(frame_id, subframe_id)) {
-                        fft_stats_.symbol_cal_count[frame_id]++;
                         print_per_subframe_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id, subframe_id);
-                        if (fft_stats_.symbol_cal_count[frame_id] == fft_stats_.max_symbol_cal_count) {
+                        if (++fft_stats_.symbol_cal_count[frame_id] == fft_stats_.max_symbol_cal_count) {
                             print_per_frame_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id);
                             consumer_rc.schedule_task_set(frame_id);
                         }
@@ -240,6 +239,7 @@ void Millipede::start()
                 int frame_id = event.data;
                 stats_manager_->update_rc_processed(rc_stats_.frame_count);
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
+                fft_stats_.symbol_cal_count[frame_id] = 0;
                 rc_stats_.update_frame_count();
             } break;
             case EVENT_UP_ZF:
@@ -295,7 +295,6 @@ void Millipede::start()
                             goto finish;
 #endif
                         stats_manager_->update_demul_processed(demul_stats_.frame_count);
-                        zf_stats_.coded_frame = -1;
                         print_per_frame_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id);
 
                         demul_stats_.update_frame_count();
@@ -643,7 +642,7 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
 {
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     for (int data_subframe_id = start_subframe_id; data_subframe_id < end_subframe_id; data_subframe_id++) {
-        if (fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id]) {
+        if (fft_stats_.cur_frame_for_symbol[data_subframe_id] == frame_id) {
             /* schedule demodulation task for subcarrier blocks */
             int total_data_subframe_id = frame_id * data_subframe_num_perframe + data_subframe_id;
             consumer.schedule_task_set(total_data_subframe_id);
@@ -651,8 +650,6 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
             printf("Main thread: created Demodulation task for frame: %d,, start subframe: %d, current subframe: %d\n",
                 frame_id, start_subframe_id, data_subframe_id);
 #endif
-            /* clear data status after scheduling */
-            fft_stats_.data_exist_in_symbol[frame_id][data_subframe_id] = false;
         }
     }
 }
@@ -942,7 +939,9 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     alloc_buffer_1d(&(fft_stats_.symbol_cal_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_stats_.max_symbol_cal_count = 2;
-    fft_stats_.data_exist_in_symbol.calloc(TASK_BUFFER_FRAME_NUM, ul_data_subframe_num_perframe, 64);
+    alloc_buffer_1d(&fft_stats_.cur_frame_for_symbol, ul_data_subframe_num_perframe, 64, 0);
+    for (int i = 0; i < ul_data_subframe_num_perframe; ++i)
+        fft_stats_.cur_frame_for_symbol[i] = -1;
 
     zf_stats_.init(config_->zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
 
@@ -1008,7 +1007,8 @@ void Millipede::free_uplink_buffers()
     free_buffer_1d(&(rx_stats_.task_count));
     free_buffer_1d(&(rx_stats_.task_pilot_count));
     fft_stats_.fini();
-    fft_stats_.data_exist_in_symbol.free();
+    free_buffer_1d(&fft_stats_.symbol_cal_count);
+    free_buffer_1d(&fft_stats_.cur_frame_for_symbol);
     zf_stats_.fini();
     demul_stats_.fini();
 #ifdef USE_LDPC
