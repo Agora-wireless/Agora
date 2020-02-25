@@ -295,7 +295,6 @@ void Millipede::start()
                             goto finish;
 #endif
                         stats_manager_->update_demul_processed(demul_stats_.frame_count);
-                        zf_stats_.coded_frame = -1;
                         print_per_frame_done(PRINT_DEMUL, demul_stats_.frame_count, frame_id);
 
                         demul_stats_.update_frame_count();
@@ -651,8 +650,6 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id, int end
             printf("Main thread: created Demodulation task for frame: %d,, start subframe: %d, current subframe: %d\n",
                 frame_id, start_subframe_id, data_subframe_id);
 #endif
-            /* clear cur frame after scheduling */
-            fft_stats_.cur_frame_for_symbol[data_subframe_id] = -1;
         }
     }
 }
