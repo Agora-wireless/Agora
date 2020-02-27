@@ -32,8 +32,7 @@
 enum EventType {
     EVENT_PACKET_RECEIVED,
     EVENT_FFT,
-    EVENT_UP_ZF,
-    EVENT_DN_ZF,
+    EVENT_ZF,
     EVENT_DEMUL,
     EVENT_PRED,
     EVENT_MODUL,

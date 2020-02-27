@@ -48,7 +48,7 @@ public:
     void launch(int offset);
 
 protected:
-    virtual void finish(int offset) = 0;
+    void finish(int offset);
     void ZF_time_orthogonal(int offset);
     virtual void* precoder(void* mat_input, int frame_id, int sc_id, int offset) = 0;
 
@@ -101,7 +101,6 @@ public:
 
 private:
     void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
-    void finish(int offset);
 };
 
 class DoDnZF : public DoZF {
@@ -115,7 +114,6 @@ public:
 private:
     void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
     Table<complex_float> recip_buffer_;
-    void finish(int offset);
 };
 
 #endif
