@@ -10,11 +10,14 @@
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_precoder_buffer,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
+    Table<complex_float>& in_ul_precoder_buffer, Table<complex_float>& in_dl_precoder_buffer,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , csi_buffer_(in_csi_buffer)
-    , precoder_buffer_(in_precoder_buffer)
+    , recip_buffer_(in_recip_buffer)
+    , ul_precoder_buffer_(in_ul_precoder_buffer)
+    , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
@@ -46,6 +49,25 @@ void DoZF::finish(int offset)
     ZF_finish_event.event_type = EVENT_ZF;
     ZF_finish_event.data = offset;
     consumer_.handle(ZF_finish_event);
+}
+
+void* DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
+{
+    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
+    cx_float* ptr_out;
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    if (config_->downlink_mode) {
+        if (config_->recipCalEn) {
+            cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][sc_id * BS_ANT_NUM]);
+            cx_fvec vec_calib(calib, BS_ANT_NUM, false);
+            cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
+            mat_calib = diagmat(vec_calib);
+            mat_input = mat_calib * mat_input;
+        }
+        ptr_out = (cx_float*)dl_precoder_buffer_[offset];
+    } else
+        ptr_out = (cx_float*)ul_precoder_buffer_[offset];
+    return (ptr_out);
 }
 
 void DoZF::ZF_time_orthogonal(int offset)
@@ -241,47 +263,4 @@ void DoZF::Predict(int offset)
 
     // inform main thread
     finish(offset_next_frame);
-}
-
-DoUpZF::DoUpZF(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer,
-    Table<complex_float>& in_precoder_buffer,
-    Stats* in_stats_manager)
-    : DoZF(in_config, in_tid, in_task_queue, in_consumer, in_csi_buffer,
-          in_precoder_buffer, in_stats_manager)
-{
-}
-
-void* DoUpZF::precoder(void*, int, int, int offset)
-{
-    void* ptr_out = (cx_float*)precoder_buffer_[offset];
-    return (ptr_out);
-}
-
-DoDnZF::DoDnZF(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
-    Table<complex_float>& in_precoder_buffer,
-    Stats* in_stats_manager)
-    : DoZF(in_config, in_tid, in_task_queue, in_consumer, in_csi_buffer,
-          in_precoder_buffer, in_stats_manager)
-    , recip_buffer_(in_recip_buffer)
-{
-}
-
-void* DoDnZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
-{
-    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
-    cx_float* ptr_out;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    if (config_->recipCalEn) {
-        cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][sc_id * BS_ANT_NUM]);
-        cx_fvec vec_calib(calib, BS_ANT_NUM, false);
-        cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
-        mat_calib = diagmat(vec_calib);
-        mat_input = mat_calib * mat_input;
-    }
-    ptr_out = (cx_float*)precoder_buffer_[offset];
-    return (ptr_out);
 }
