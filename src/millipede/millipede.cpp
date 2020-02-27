@@ -242,8 +242,7 @@ void Millipede::start()
                 fft_stats_.symbol_cal_count[frame_id] = 0;
                 rc_stats_.update_frame_count();
             } break;
-            case EVENT_UP_ZF:
-            case EVENT_DN_ZF: {
+            case EVENT_ZF: {
                 int offset = event.data;
 
                 int frame_id = offset / zf_stats_.max_symbol_count;
@@ -256,7 +255,7 @@ void Millipede::start()
                     //int subframe_num_perframe = config_->symbol_num_perframe;
                     /* if all the data in a frame has arrived when ZF is done */
                     schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
-                    if (event.event_type == EVENT_DN_ZF) {
+                    if (config_->downlink_mode) {
                         /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
                         int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
 #ifdef USE_LDPC

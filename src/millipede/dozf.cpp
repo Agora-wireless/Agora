@@ -39,6 +39,15 @@ void DoZF::launch(int offset)
     finish(offset);
 }
 
+void DoZF::finish(int offset)
+{
+    // inform main thread
+    Event_data ZF_finish_event;
+    ZF_finish_event.event_type = EVENT_ZF;
+    ZF_finish_event.data = offset;
+    consumer_.handle(ZF_finish_event);
+}
+
 void DoZF::ZF_time_orthogonal(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
@@ -69,7 +78,6 @@ void DoZF::ZF_time_orthogonal(int offset)
         int subframe_offset = frame_id * UE_NUM;
         float* tar_csi_ptr = (float*)csi_gather_buffer;
 
-        
         // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
         // int mat_elem = UE_NUM * BS_ANT_NUM;
         // int cache_line_num = mat_elem / 8;
@@ -251,15 +259,6 @@ void* DoUpZF::precoder(void*, int, int, int offset)
     return (ptr_out);
 }
 
-void DoUpZF::finish(int offset)
-{
-    // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_UP_ZF;
-    ZF_finish_event.data = offset;
-    consumer_.handle(ZF_finish_event);
-}
-
 DoDnZF::DoDnZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
     Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
@@ -285,13 +284,4 @@ void* DoDnZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset)
     }
     ptr_out = (cx_float*)precoder_buffer_[offset];
     return (ptr_out);
-}
-
-void DoDnZF::finish(int offset)
-{
-    // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_DN_ZF;
-    ZF_finish_event.data = offset;
-    consumer_.handle(ZF_finish_event);
 }
