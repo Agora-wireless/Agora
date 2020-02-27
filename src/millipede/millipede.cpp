@@ -497,13 +497,8 @@ void* Millipede::worker(int tid)
     auto computeIFFT = new DoIFFT(config_, tid, ifft_queue_, consumer,
         dl_ifft_buffer_, dl_socket_buffer_, stats_manager_);
 
-    DoZF* computeZF;
-    if (config_->downlink_mode)
-        computeZF = new DoDnZF(config_, tid, zf_queue_, consumer,
-            csi_buffer_, recip_buffer_, dl_precoder_buffer_, stats_manager_);
-    else
-        computeZF = new DoUpZF(config_, tid, zf_queue_, consumer,
-            csi_buffer_, precoder_buffer_, stats_manager_);
+    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
     auto computeDemul = new DoDemul(config_, tid, demul_queue_, consumer,
         data_buffer_, precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_, stats_manager_);
@@ -577,11 +572,11 @@ void* Millipede::worker_zf(int tid)
     Consumer consumer(complete_task_queue_, ptok_complete);
 
     /* initialize ZF operator */
-    auto computeUpZF = new DoUpZF(config_, tid, zf_queue_, consumer,
-        csi_buffer_, precoder_buffer_, stats_manager_);
+    auto computeZF = new DoZF(config_, tid, zf_queue_, consumer,
+        csi_buffer_, recip_buffer_, precoder_buffer_, dl_precoder_buffer_, stats_manager_);
 
     while (true) {
-        computeUpZF->try_launch();
+        computeZF->try_launch();
     }
 }
 
