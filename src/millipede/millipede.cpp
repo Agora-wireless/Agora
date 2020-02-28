@@ -41,7 +41,7 @@ Millipede::Millipede(Config* cfg)
     printf("initialize uplink buffers\n");
     initialize_uplink_buffers();
 
-    if (config_->downlink_mode) {
+    if (config_->dl_data_symbol_num_perframe > 0) {
         printf("initialize downlink buffers\n");
         initialize_downlink_buffers();
     }
@@ -67,7 +67,7 @@ Millipede::~Millipede()
 {
     free_uplink_buffers();
     /* downlink */
-    if (config_->downlink_mode)
+    if (config_->dl_data_symbol_num_perframe > 0)
         free_downlink_buffers();
 }
 
@@ -120,7 +120,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
     std::vector<pthread_t> tx_threads;
-    if (config_->downlink_mode) {
+    if (config_->dl_data_symbol_num_perframe > 0) {
         /* start downlink transmitter */
         tx_threads = receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
             dl_socket_buffer_status_size_, dl_socket_buffer_size_);
@@ -560,7 +560,7 @@ void* Millipede::worker_fft(int tid)
 
     while (true) {
         if (computeFFT->try_launch()) {
-        } else if (config_->downlink_mode && computeIFFT->try_launch()) {
+        } else if (config_->dl_data_symbol_num_perframe > 0 && computeIFFT->try_launch()) {
         }
     }
 }
@@ -603,7 +603,7 @@ void* Millipede::worker_demul(int tid)
     // int cur_frame_id = 0;
 
     while (true) {
-        if (config_->downlink_mode) {
+        if (config_->dl_data_symbol_num_perframe > 0) {
             computePrecode->try_launch();
         } else {
             // int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
