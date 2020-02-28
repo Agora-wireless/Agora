@@ -922,7 +922,7 @@ void Millipede::initialize_uplink_buffers()
     demod_soft_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
     decoded_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
 
-    int max_packet_num_per_frame = BS_ANT_NUM * (PILOT_NUM + (config_->downlink_mode ? 0 : ul_data_subframe_num_perframe));
+    int max_packet_num_per_frame = BS_ANT_NUM * (PILOT_NUM + ul_data_subframe_num_perframe);
     rx_stats_.max_task_count = max_packet_num_per_frame;
     rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM;
     alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
