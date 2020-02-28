@@ -48,7 +48,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize IFFT buffer
     size_t IFFT_buffer_block_num = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    ifft_buffer_.IFFT_inputs.calloc(IFFT_buffer_block_num,  FFT_LEN, 64);
+    ifft_buffer_.IFFT_inputs.calloc(IFFT_buffer_block_num, FFT_LEN, 64);
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
@@ -69,7 +69,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num = numAntennas * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num,  FFT_LEN, 64);
+    fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num, FFT_LEN, 64);
 
     (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX,
         1, FFT_LEN);
@@ -312,7 +312,7 @@ void Phy_UE::start()
 
             } break;
 
-            case EVENT_UP_ZF: {
+            case EVENT_ZF: {
                 int offset_eq = event.data;
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas, offset_eq, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t, &ant_id_t);
                 frame_id = frame_id_t;
@@ -616,7 +616,7 @@ void Phy_UE::doFFT(int tid, int offset)
             equ_buffer_ptr[2 * j] = (y_re * csi_re + y_im * csi_im) / (csi_re * csi_re + csi_im * csi_im); //fft_buffer_ptr[2*i] / csi_re;
             equ_buffer_ptr[2 * j + 1] = (y_im * csi_re - y_re * csi_im) / (csi_re * csi_re + csi_im * csi_im); //fft_buffer_ptr[2*i+1] / csi_im;
         }
-        crop_finish_event.event_type = EVENT_UP_ZF;
+        crop_finish_event.event_type = EVENT_ZF;
         crop_finish_event.data = eq_buffer_offset; //generateOffset3d(numAntennas, dl_symbol_perframe, frame_id, dl_symbol_id, ant_id);
     }
 
