@@ -50,7 +50,7 @@ public:
 private:
     void finish(int offset);
     void ZF_time_orthogonal(int offset);
-    void* precoder(void* mat_input, int frame_id, int sc_id, int offset);
+    void precoder(void* mat_input, int frame_id, int sc_id, int offset, bool downlink_mode);
 
     void ZF_freq_orthogonal(int offset);
 
