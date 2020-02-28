@@ -255,7 +255,7 @@ void Millipede::start()
                     //int subframe_num_perframe = config_->symbol_num_perframe;
                     /* if all the data in a frame has arrived when ZF is done */
                     schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
-                    if (config_->downlink_mode) {
+                    if (config_->dl_data_symbol_num_perframe > 0) {
                         /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
                         int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
 #ifdef USE_LDPC
