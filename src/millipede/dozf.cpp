@@ -54,22 +54,23 @@ void DoZF::finish(int offset)
 void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset, bool downlink_mode)
 {
     cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
-    cx_float* ptr_out;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
+    cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
+    cx_fmat mat_ul_precoder(ptr_ul_out, UE_NUM, BS_ANT_NUM, false);
+    pinv(mat_ul_precoder, mat_input, 1e-1, "dc");
     if (downlink_mode) {
+        cx_float* ptr_dl_out = (cx_float*)dl_precoder_buffer_[offset];
+        cx_fmat mat_dl_precoder(ptr_dl_out, UE_NUM, BS_ANT_NUM, false);
         if (config_->recipCalEn) {
             cx_float* calib = (cx_float*)(&recip_buffer_[frame_id][sc_id * BS_ANT_NUM]);
             cx_fvec vec_calib(calib, BS_ANT_NUM, false);
             cx_fmat mat_calib(BS_ANT_NUM, BS_ANT_NUM);
             mat_calib = diagmat(vec_calib);
-            mat_input = mat_calib * mat_input;
-        }
-        ptr_out = (cx_float*)dl_precoder_buffer_[offset];
-    } else
-        ptr_out = (cx_float*)ul_precoder_buffer_[offset];
-    cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
-    pinv(mat_output, mat_input, 1e-1, "dc");
+            mat_dl_precoder = inv(mat_calib) * mat_ul_precoder;
+        } else
+            mat_dl_precoder = mat_ul_precoder;
+    }
 }
 
 void DoZF::ZF_time_orthogonal(int offset)
@@ -132,10 +133,8 @@ void DoZF::ZF_time_orthogonal(int offset)
         cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        if (config_->ul_data_symbol_num_perframe > 0)
-            precoder(&mat_input, frame_id, cur_sc_id, cur_offset, false);
-        if (config_->dl_data_symbol_num_perframe > 0)
-            precoder(&mat_input, frame_id, cur_sc_id, cur_offset, true);
+        precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
+            config_->dl_data_symbol_num_perframe > 0);
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double start_time2 = get_time();
@@ -216,10 +215,8 @@ void DoZF::ZF_freq_orthogonal(int offset)
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    if (config_->ul_data_symbol_num_perframe > 0)
-        precoder(&mat_input, frame_id, sc_id, offset_in_buffer, false);
-    if (config_->dl_data_symbol_num_perframe > 0)
-        precoder(&mat_input, frame_id, sc_id, offset_in_buffer, true);
+    precoder(&mat_input, frame_id, sc_id, offset_in_buffer,
+        config_->dl_data_symbol_num_perframe > 0);
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
@@ -259,10 +256,8 @@ void DoZF::Predict(int offset)
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer], sizeof(cx_float) * BS_ANT_NUM * UE_NUM);
     cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
     int offset_next_frame = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * OFDM_DATA_NUM + sc_id;
-    if (config_->ul_data_symbol_num_perframe > 0)
-        precoder(&mat_input, frame_id, sc_id, offset_next_frame, false);
-    if (config_->dl_data_symbol_num_perframe > 0)
-        precoder(&mat_input, frame_id, sc_id, offset_next_frame, true);
+    precoder(&mat_input, frame_id, sc_id, offset_next_frame,
+        config_->dl_data_symbol_num_perframe > 0);
 
     // inform main thread
     finish(offset_next_frame);
