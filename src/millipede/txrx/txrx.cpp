@@ -85,12 +85,10 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
 
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
-        EventHandlerContext<PacketTXRX>* context = (EventHandlerContext<PacketTXRX>*)malloc(sizeof(*context));
+        auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
         context->id = i;
-        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context) != 0)
-        // if (pthread_create( &send_thread_, NULL, PacketTXRX::loopTXRX, (void *)(&tx_context[i])) != 0)
-        {
+        if (pthread_create(&send_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context) != 0) {
             perror("socket Transmit thread create failed");
             exit(0);
         }
