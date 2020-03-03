@@ -52,20 +52,22 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     std::vector<pthread_t> created_threads;
-    if (!config_->downlink_mode) {
-        for (int i = 0; i < rx_thread_num_; i++) {
-            pthread_t recv_thread_;
-            // record the thread id
-            EventHandlerContext<PacketTXRX>* context = (EventHandlerContext<PacketTXRX>*)malloc(sizeof(*context));
-            context->obj_ptr = this;
-            context->id = i;
-            // start socket thread
-            if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>, context) != 0) {
-                perror("socket recv thread create failed");
-                exit(0);
-            }
-            created_threads.push_back(recv_thread_);
+
+    if (config_->downlink_mode)
+        return created_threads;
+
+    for (int i = 0; i < rx_thread_num_; i++) {
+        pthread_t recv_thread_;
+        // record the thread id
+        auto context = new EventHandlerContext<PacketTXRX>;
+        context->obj_ptr = this;
+        context->id = i;
+        // start socket thread
+        if (pthread_create(&recv_thread_, NULL, pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>, context) != 0) {
+            perror("socket recv thread create failed");
+            exit(0);
         }
+        created_threads.push_back(recv_thread_);
     }
     return created_threads;
 }
@@ -119,8 +121,8 @@ void* PacketTXRX::loopRecv(int tid)
     // moodycamel::ProducerToken *local_ptok = new moodycamel::ProducerToken(*message_queue_);
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
 
-    char* buffer_ptr = (*buffer_)[tid];
-    int* buffer_status_ptr = (*buffer_status_)[tid];
+    char* buffer = (*buffer_)[tid];
+    int* buffer_status = (*buffer_status_)[tid];
     double* frame_start = (*frame_start_)[tid];
 
     // walk through all the pages
@@ -145,7 +147,7 @@ void* PacketTXRX::loopRecv(int tid)
 
     while (true) {
         // if buffer is full, exit
-        if (buffer_status_ptr[offset] == 1) {
+        if (buffer_status[offset] == 1) {
             printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
             exit(0);
         }
@@ -153,7 +155,7 @@ void* PacketTXRX::loopRecv(int tid)
         int recvlen = -1;
 
         int packet_length = config_->packet_length;
-        struct Packet* pkt = (struct Packet*)&buffer_ptr[offset * packet_length];
+        struct Packet* pkt = (struct Packet*)&buffer[offset * packet_length];
         // start_time= get_time();
         // if ((recvlen = recvfrom(socket_[tid], (char *)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
         if ((recvlen = recv(socket_local, (char*)pkt, packet_length, 0)) < 0) {
@@ -182,7 +184,7 @@ void* PacketTXRX::loopRecv(int tid)
 #endif
         // get the position in buffer
         // move ptr & set status to full
-        buffer_status_ptr[offset] = 1; // has data, after doing fft, it is set to 0
+        buffer_status[offset] = 1; // has data, after doing fft, it is set to 0
         // push EVENT_packet_RECEIVED event into the queue
         Event_data packet_message;
         packet_message.event_type = EVENT_PACKET_RECEIVED;
@@ -198,11 +200,13 @@ void* PacketTXRX::loopRecv(int tid)
         if (offset == buffer_frame_num_)
             offset = 0;
     }
+    return 0;
 }
 
 void* PacketTXRX::loopSend(int tid)
 {
     pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
@@ -235,17 +239,16 @@ void* PacketTXRX::loopSend(int tid)
     while (true) {
 
         Event_data task_event;
-        // ret = task_queue_->try_dequeue(task_event);
-        ret = task_queue_->try_dequeue_from_producer(*(tx_ptoks_[tid]), task_event);
+        //ret = task_queue_->try_dequeue(task_event);
+        ret = task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event);
         if (!ret)
             continue;
+
         // printf("tx queue length: %d\n", task_queue_->size_approx());
         if (task_event.event_type != TASK_SEND) {
             printf("Wrong event type!");
             exit(0);
         }
-
-        // printf("In transmitter\n");
 
         int offset = task_event.data;
         int ant_id = offset % BS_ANT_NUM;
@@ -266,7 +269,8 @@ void* PacketTXRX::loopSend(int tid)
         }
 
 #if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, symbol_id, ant_id, offset,
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n",
+            tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
 
@@ -547,4 +551,5 @@ void* PacketTXRX::loopTXRX(int tid)
                 rx_offset = 0;
         }
     }
+    return 0;
 }

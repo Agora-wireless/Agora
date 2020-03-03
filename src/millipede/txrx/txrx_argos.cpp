@@ -259,7 +259,6 @@ void* PacketTXRX::loopSend_Argos(int tid)
     //int* buffer_status = tx_buffer_status_;
 
     int ret;
-    int offset;
     //int ant_id, symbol_id, frame_id;
     //struct timespec tv, tv2;
 
@@ -292,9 +291,7 @@ void* PacketTXRX::loopSend_Argos(int tid)
             exit(0);
         }
 
-        //ant_id = task_event.data; //% config_->getNumAntennas();
-
-        offset = task_event.data;
+        int offset = task_event.data;
         int ant_id = offset % BS_ANT_NUM;
         int total_data_subframe_id = offset / BS_ANT_NUM;
         int frame_id = total_data_subframe_id / data_subframe_num_perframe;
@@ -330,7 +327,7 @@ void* PacketTXRX::loopSend_Argos(int tid)
 #endif
             //buffer_status[offset+ch] = 0;
 #if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %zu\n",
+        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
