@@ -126,8 +126,8 @@ Config::Config(std::string jsonfile)
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;
-    dl_data_symbol_start = downlink_mode ? DLSymbols[0][0] - pilot_symbol_num_perframe : 0;
-    dl_data_symbol_end = downlink_mode ? DLSymbols[0].back() - pilot_symbol_num_perframe + 1 : 0;
+    dl_data_symbol_start = dl_data_symbol_num_perframe > 0 ? DLSymbols[0][0] - pilot_symbol_num_perframe : 0;
+    dl_data_symbol_end = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].back() - pilot_symbol_num_perframe + 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot and nRadios != pilot_symbol_num_perframe) {
         std::cerr << "Number of Pilot Symbols don't match number of Clients!" << std::endl;
@@ -275,7 +275,7 @@ Config::Config(std::string jsonfile)
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id ++) {
+        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
             std::vector<int8_t> in_modul;
             for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
                 int cur_offset = j * UE_ANT_NUM + ue_id;
@@ -368,8 +368,8 @@ Config::Config(std::string jsonfile)
     std::cout << "OFDM_DATA_NUM " << OFDM_DATA_NUM << std::endl;
     std::cout << "Packet length " << packet_length << std::endl;
     if (packet_length >= 9000)
-        std::cout << "\033[1;31mWarning: packet length is larger than jumbo frame size (9000)! " 
-            << "Packets will be fragmented.\033[0m" << std::endl;
+        std::cout << "\033[1;31mWarning: packet length is larger than jumbo frame size (9000)! "
+                  << "Packets will be fragmented.\033[0m" << std::endl;
     std::cout << "Config Done!" << std::endl;
 }
 
