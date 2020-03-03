@@ -41,7 +41,7 @@ Millipede::Millipede(Config* cfg)
     printf("initialize uplink buffers\n");
     initialize_uplink_buffers();
 
-    if (config_->downlink_mode) {
+    if (config_->dl_data_symbol_num_perframe > 0) {
         printf("initialize downlink buffers\n");
         initialize_downlink_buffers();
     }
@@ -67,7 +67,7 @@ Millipede::~Millipede()
 {
     free_uplink_buffers();
     /* downlink */
-    if (config_->downlink_mode)
+    if (config_->dl_data_symbol_num_perframe > 0)
         free_downlink_buffers();
 }
 
@@ -120,7 +120,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
     std::vector<pthread_t> tx_threads;
-    if (config_->downlink_mode) {
+    if (config_->dl_data_symbol_num_perframe > 0) {
         /* start downlink transmitter */
         tx_threads = receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
             dl_socket_buffer_status_size_, dl_socket_buffer_size_);
@@ -255,7 +255,7 @@ void Millipede::start()
                     //int subframe_num_perframe = config_->symbol_num_perframe;
                     /* if all the data in a frame has arrived when ZF is done */
                     schedule_demul_task(frame_id, 0, fft_stats_.max_symbol_data_count, consumer_demul);
-                    if (config_->downlink_mode) {
+                    if (config_->dl_data_symbol_num_perframe > 0) {
                         /* if downlink data transmission is enabled, schedule downlink encode/modulation for the first data subframe */
                         int total_data_subframe_id = frame_id * data_subframe_num_perframe + dl_data_subframe_start;
 #ifdef USE_LDPC
@@ -560,7 +560,7 @@ void* Millipede::worker_fft(int tid)
 
     while (true) {
         if (computeFFT->try_launch()) {
-        } else if (config_->downlink_mode && computeIFFT->try_launch()) {
+        } else if (config_->dl_data_symbol_num_perframe > 0 && computeIFFT->try_launch()) {
         }
     }
 }
@@ -603,7 +603,7 @@ void* Millipede::worker_demul(int tid)
     // int cur_frame_id = 0;
 
     while (true) {
-        if (config_->downlink_mode) {
+        if (config_->dl_data_symbol_num_perframe > 0) {
             computePrecode->try_launch();
         } else {
             // int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
@@ -922,7 +922,7 @@ void Millipede::initialize_uplink_buffers()
     demod_soft_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
     decoded_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
 
-    int max_packet_num_per_frame = BS_ANT_NUM * (PILOT_NUM + (config_->downlink_mode ? 0 : ul_data_subframe_num_perframe));
+    int max_packet_num_per_frame = BS_ANT_NUM * (PILOT_NUM + ul_data_subframe_num_perframe);
     rx_stats_.max_task_count = max_packet_num_per_frame;
     rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM;
     alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
