@@ -203,13 +203,45 @@ void* PacketTXRX::loopRecv(int tid)
     return 0;
 }
 
-void* PacketTXRX::loopSend(int tid)
+int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
 {
-    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+    Event_data task_event;
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
+        return (-1);
+
+    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    if (task_event.event_type != TASK_SEND) {
+        printf("Wrong event type!");
+        exit(0);
+    }
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int packet_length = config_->packet_length;
+    int offset = task_event.data;
+    int ant_id = offset % BS_ANT_NUM;
+    int total_data_subframe_id = offset / BS_ANT_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+    int symbol_id = current_data_subframe_id + UE_NUM;
+    char* cur_buffer_ptr = tx_buffer_ + (current_data_subframe_id * BS_ANT_NUM + ant_id) * packet_length;
+    // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
+    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+
+    // send data (one OFDM symbol)
+    if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr*)remote_addr, sizeof(*remote_addr)) < 0) {
+        perror("socket sendto failed");
+        exit(0);
+    }
+    return (offset);
+}
+
+void* PacketTXRX::loopSend(int tid)
+{
+    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = config_->bs_port;
     int remote_port_id = config_->ue_rx_port + tid;
@@ -225,7 +257,6 @@ void* PacketTXRX::loopSend(int tid)
 
     // auto begin = std::chrono::system_clock::now();
     // int packet_count = 0;
-    int ret;
     // int *cur_ptr_buffer_status;
     // int total_data_sumframe_id;
     // int cell_id = 0;
@@ -237,42 +268,14 @@ void* PacketTXRX::loopSend(int tid)
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ConsumerToken local_ctok(*task_queue_);
     while (true) {
-
-        Event_data task_event;
-        //ret = task_queue_->try_dequeue(task_event);
-        ret = task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event);
-        if (!ret)
-            continue;
-
-        // printf("tx queue length: %d\n", task_queue_->size_approx());
-        if (task_event.event_type != TASK_SEND) {
-            printf("Wrong event type!");
-            exit(0);
-        }
-
-        int offset = task_event.data;
-        int ant_id = offset % BS_ANT_NUM;
-        int total_data_subframe_id = offset / BS_ANT_NUM;
-        int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-        int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
-        int symbol_id = current_data_subframe_id + UE_NUM;
-        int packet_length = config_->packet_length;
-        char* cur_buffer_ptr = tx_buffer_ + (current_data_subframe_id * BS_ANT_NUM + ant_id) * packet_length;
-        // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
-        struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-        new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-        // send data (one OFDM symbol)
-        if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr*)&remote_addr, sizeof(remote_addr)) < 0) {
-            perror("socket sendto failed");
-            exit(0);
-        }
-
 #if DEBUG_BS_SENDER
         printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
 #endif
+        int offset = dequeue_send(tid, socket_local, &remote_addr);
+        if (offset == -1)
+            continue;
 
         Event_data packet_message;
         packet_message.event_type = EVENT_PACKET_SENT;
@@ -306,7 +309,6 @@ void* PacketTXRX::loopTXRX(int tid)
     pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int UE_NUM = config_->UE_NUM;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
@@ -351,7 +353,6 @@ void* PacketTXRX::loopTXRX(int tid)
     // TX pointers
     // float *tx_data_buffer = tx_data_buffer_;
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    int ret;
     // float *tx_cur_ptr_data;
 
     int max_subframe_id = downlink_mode ? UE_NUM : (UE_NUM + ul_data_subframe_num_perframe);
@@ -492,37 +493,11 @@ void* PacketTXRX::loopTXRX(int tid)
                     // last_finished_frame_id++;
                 }
             } else {
-                Event_data task_event;
-                // ret = task_queue_->try_dequeue(task_event);
-                ret = task_queue_->try_dequeue_from_producer(*(tx_ptoks_[tid]), task_event);
-                if (!ret)
+                int offset = dequeue_send(tid, socket_local, &remote_addr);
+                if (offset == -1)
                     continue;
-                // printf("tx queue length: %d\n", task_queue_->size_approx());
-                if (task_event.event_type != TASK_SEND) {
-                    printf("Wrong event type!");
-                    exit(0);
-                }
-
-                int offset = task_event.data;
-                int ant_id = offset % BS_ANT_NUM;
-                int total_data_subframe_id = offset / BS_ANT_NUM;
-                int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-                int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
-
-                int symbol_id = current_data_subframe_id + UE_NUM;
-                int frame_id_in_buffer = frame_id % SOCKET_BUFFER_FRAME_NUM;
-                int socket_subframe_offset = frame_id_in_buffer * data_subframe_num_perframe + current_data_subframe_id;
-                char* cur_buffer_ptr = tx_buffer_ + (socket_subframe_offset * BS_ANT_NUM + ant_id) * packet_length;
-                // tx_cur_ptr_data = (tx_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM * BS_ANT_NUM);
-                struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-                new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-                // send data (one OFDM symbol)
-                if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0, (struct sockaddr*)&remote_addr, sizeof(remote_addr)) < 0) {
-                    perror("socket sendto failed");
-                    exit(0);
-                }
                 tx_packet_num_per_frame++;
+                int frame_id_in_buffer = offset / BS_ANT_NUM / config_->data_symbol_num_perframe % SOCKET_BUFFER_FRAME_NUM;
                 tx_pkts_in_frame_count[frame_id_in_buffer]++;
 
 #if DEBUG_BS_SENDER
