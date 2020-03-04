@@ -115,6 +115,12 @@ public:
     void* loopRecv(int tid);
     void* loopTXRX(int tid);
     void* loopSend(int tid);
+#if USE_IPV4
+    typedef struct sockaddr_in sockaddr_t;
+#else
+    typedef struct sockaddr_in6 sockaddr_t;
+#endif
+    int dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
