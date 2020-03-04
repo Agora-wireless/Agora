@@ -121,6 +121,7 @@ public:
     typedef struct sockaddr_in6 sockaddr_t;
 #endif
     int dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr);
+    struct Packet* recv_enqueue(int tid, int socket_local, int rx_offset);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
