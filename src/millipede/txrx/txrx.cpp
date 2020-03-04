@@ -101,6 +101,42 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     return created_threads;
 }
 
+struct Packet* PacketTXRX::recv_enqueue(int tid, int socket_local, int rx_offset)
+{
+    char* rx_buffer = (*buffer_)[tid];
+    int* rx_buffer_status = (*buffer_status_)[tid];
+
+    // if rx_buffer is full, exit
+    if (rx_buffer_status[rx_offset] == 1) {
+        printf("Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        exit(0);
+    }
+    int packet_length = config_->packet_length;
+    struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
+    int recvlen = recv(socket_local, (char*)pkt, packet_length, 0);
+    if (recvlen < 0) {
+        perror("recv failed");
+        exit(0);
+    }
+
+    // get the position in rx_buffer
+    // move ptr & set status to full
+    rx_buffer_status[rx_offset] = 1; // has data, after doing fft, it is set to 0
+    // push EVENT_PACKET_RECEIVED event into the queue
+    Event_data rx_message;
+    rx_message.event_type = EVENT_PACKET_RECEIVED;
+    // data records the position of this packet in the rx_buffer & tid of this socket (so that task thread could know which rx_buffer it should visit)
+    rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
+    // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
+    // if ( !message_queue_->enqueue(rx_message ) ) {
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    if (!message_queue_->enqueue(*local_ptok, rx_message)) {
+        printf("socket message enqueue failed\n");
+        exit(0);
+    }
+    return pkt;
+}
+
 void* PacketTXRX::loopRecv(int tid)
 {
     pin_to_core_with_offset(Worker_RX, core_id_, tid);
@@ -119,23 +155,20 @@ void* PacketTXRX::loopRecv(int tid)
     // use token to speed up
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     // moodycamel::ProducerToken *local_ptok = new moodycamel::ProducerToken(*message_queue_);
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-
-    char* buffer = (*buffer_)[tid];
-    int* buffer_status = (*buffer_status_)[tid];
-    double* frame_start = (*frame_start_)[tid];
+    int rx_buffer_frame_num = buffer_frame_num_;
+    double* rx_frame_start = (*frame_start_)[tid];
 
     // walk through all the pages
 #if 0
     double temp;
     for (int i = 0; i < 20; i++) {
-        temp = frame_start[i * 512];
+        temp = rx_frame_start[i * 512];
     }
 #endif
 
     // loop recv
     // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
-    int offset = 0;
+    int rx_offset = 0;
     // int packet_num = 0;
     // int ret = 0;
     // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
@@ -146,59 +179,27 @@ void* PacketTXRX::loopRecv(int tid)
     // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
 
     while (true) {
-        // if buffer is full, exit
-        if (buffer_status[offset] == 1) {
-            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
-            exit(0);
-        }
-
-        int recvlen = -1;
-
-        int packet_length = config_->packet_length;
-        struct Packet* pkt = (struct Packet*)&buffer[offset * packet_length];
-        // start_time= get_time();
-        // if ((recvlen = recvfrom(socket_[tid], (char *)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
-        if ((recvlen = recv(socket_local, (char*)pkt, packet_length, 0)) < 0) {
-            // if ((recvlen = recvfrom(socket_local, (char *)pkt, packet_length, 0, (struct sockaddr *) &local_addr, &addrlen)) < 0) {
-            perror("recv failed");
-            exit(0);
-        }
-
+        struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
 #if MEASURE_TIME
         // read information from received packet
         int frame_id = pkt->frame_id;
 #if DEBUG_RECV
-        int subframe_id = pkt->symbol_id;
-        // int cell_id = pkt->cell_id;
+        int symbol_id = pkt->symbol_id;
         int ant_id = pkt->ant_id;
-        printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, subframe_id, ant_id);
+        printf("RX thread %d received frame %d subframe %d, ant %d\n", tid, frame_id, symbol_id, ant_id);
 #endif
         if (frame_id > prev_frame_id) {
-            *(frame_start + frame_id) = get_time();
+            *(rx_frame_start + frame_id) = get_time();
             prev_frame_id = frame_id;
             if (frame_id % 512 == 200) {
-                _mm_prefetch((char*)(frame_start + frame_id + 512), _MM_HINT_T0);
-                // double temp = frame_start[frame_id+3];
+                _mm_prefetch((char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
+                // double temp = rx_frame_start[frame_id+3];
             }
         }
 #endif
-        // get the position in buffer
-        // move ptr & set status to full
-        buffer_status[offset] = 1; // has data, after doing fft, it is set to 0
-        // push EVENT_packet_RECEIVED event into the queue
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_RECEIVED;
-        // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
-        packet_message.data = generateOffset2d_setbits(tid, offset, 28);
-        // packet_message.data = offset + tid * buffer_frame_num_;
-        // if ( !message_queue_->enqueue(packet_message ) ) {
-        if (!message_queue_->enqueue(*local_ptok, packet_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
-        offset++;
-        if (offset == buffer_frame_num_)
-            offset = 0;
+        rx_offset++;
+        if (rx_offset == rx_buffer_frame_num)
+            rx_offset = 0;
     }
     return 0;
 }
@@ -312,7 +313,6 @@ void* PacketTXRX::loopTXRX(int tid)
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
-    int packet_length = config_->packet_length;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = config_->bs_port + tid;
     int remote_port_id = config_->ue_rx_port + tid;
@@ -335,8 +335,6 @@ void* PacketTXRX::loopTXRX(int tid)
     moodycamel::ConsumerToken local_ctok(*task_queue_);
 
     // RX  pointers
-    char* rx_buffer_ptr = (*buffer_)[tid];
-    int* rx_buffer_status_ptr = (*buffer_status_)[tid];
     int rx_buffer_frame_num = buffer_frame_num_;
     double* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
@@ -373,25 +371,7 @@ void* PacketTXRX::loopTXRX(int tid)
 
     if (!downlink_mode) {
         while (true) {
-            // if buffer is full, exit
-            if (rx_buffer_status_ptr[rx_offset] == 1) {
-                printf("Receive thread %d buffer full, offset: %d\n", tid, rx_offset);
-                exit(0);
-            }
-            struct Packet* pkt = (struct Packet*)&rx_buffer_ptr[rx_offset * packet_length];
-
-            int recvlen = -1;
-
-            // start_time= get_time();
-            // if ((recvlen = recvfrom(socket_[tid], (char*)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
-            if ((recvlen = recv(socket_local, (char*)pkt, packet_length, 0)) < 0) {
-                // if ((recvlen = recvfrom(socket_local, (char*)pkt, packet_length, 0, (struct sockaddr *) &local_addr, &addrlen)) < 0) {
-                perror("recv failed");
-                exit(0);
-            }
-
-            // rx_packet_num_per_frame++;
-
+            struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
 #if MEASURE_TIME
             // read information from received packet
             frame_id = pkt->frame_id;
@@ -409,20 +389,6 @@ void* PacketTXRX::loopTXRX(int tid)
                 }
             }
 #endif
-            // get the position in buffer
-            // move ptr & set status to full
-            rx_buffer_status_ptr[rx_offset] = 1; // has data, after doing fft, it is set to 0
-
-            // push EVENT_PACKET_RECEIVED event into the queue
-            Event_data rx_message;
-            rx_message.event_type = EVENT_PACKET_RECEIVED;
-            // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
-            rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
-            // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
-            if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-                printf("socket message enqueue failed\n");
-                exit(0);
-            }
             rx_offset++;
             if (rx_offset == rx_buffer_frame_num)
                 rx_offset = 0;
@@ -430,29 +396,8 @@ void* PacketTXRX::loopTXRX(int tid)
     } else {
         while (true) {
             if (do_tx == 0) {
-                // if buffer is full, exit
-                if (rx_buffer_status_ptr[rx_offset] > 0) {
-                    printf("Receive thread %d buffer full, offset: %d, buffer value: %d, total length: %d\n", tid, rx_offset, rx_buffer_status_ptr[rx_offset], rx_buffer_frame_num);
-                    printf("Buffer status:\n");
-                    for (int i = 0; i < rx_buffer_frame_num; i++)
-                        printf("%d ", *(rx_buffer_status_ptr + i));
-                    printf("\n");
-                    exit(0);
-                }
-                struct Packet* pkt = (struct Packet*)&rx_buffer_ptr[rx_offset * packet_length];
-
-                int recvlen = -1;
-
-                // start_time= get_time();
-                // if ((recvlen = recvfrom(socket_[tid], (char*)pkt, packet_length, 0, (struct sockaddr *) &servaddr_[tid], &addrlen)) < 0)
-                if ((recvlen = recv(socket_local, (char*)pkt, packet_length, 0)) < 0) {
-                    // if ((recvlen = recvfrom(socket_local, (char*)pkt, packet_length, 0, (struct sockaddr *) &servaddr_local, &addrlen)) < 0) {
-                    perror("recv failed");
-                    exit(0);
-                }
-
+                struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
                 rx_packet_num_per_frame++;
-
                 frame_id = pkt->frame_id;
 
 #if MEASURE_TIME
@@ -469,20 +414,6 @@ void* PacketTXRX::loopTXRX(int tid)
                     }
                 }
 #endif
-
-                // get the position in buffer
-                // move ptr & set status to full
-                rx_buffer_status_ptr[rx_offset] = 1; // has data, after doing fft, it is set to 0
-
-                // push EVENT_PACKET_RECEIVED event into the queue
-                Event_data rx_message;
-                rx_message.event_type = EVENT_PACKET_RECEIVED;
-                // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
-                rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
-                if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-                    printf("socket message enqueue failed\n");
-                    exit(0);
-                }
 
                 rx_pkts_in_frame_count[frame_id % 10000]++;
                 if (rx_pkts_in_frame_count[frame_id] == max_rx_packet_num_per_frame) {
