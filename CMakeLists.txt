@@ -11,9 +11,9 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=c99 -Wall -g -mavx2 -march=broadwell -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -mavx2 -mavx -march=broadwell  -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -mavx2 -mavx -march=broadwell -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
-  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
+  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
@@ -121,9 +121,6 @@ set(MILLIPEDE_SOURCES
   src/millipede/doprecode.cpp
   src/millipede/reciprocity.cpp)
 
-add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES})
-target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
-
 # LDPC support
 if(${USE_LDPC})
   add_definitions(-DUSE_LDPC)
@@ -165,8 +162,11 @@ set(SOURCES
   ${LDPC_SOURCES})
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread -larmadillo
+target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+
+add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES})
+target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
 if(${USE_ARGOS})
   add_executable(user 
@@ -174,13 +174,13 @@ if(${USE_ARGOS})
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
-  target_link_libraries(user -lpthread -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+  target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
   add_library(ue_phy MODULE 
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
-  target_link_libraries(ue_phy -lpthread -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+  target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 else()
   set(SENDER_SOURCES
     simulator/sender_cli.cpp
@@ -188,7 +188,7 @@ else()
     ${COMMON_SOURCES})
 
   add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender -lpthread ${MKL_LIBS})
+  target_link_libraries(sender ${MKL_LIBS})
 
   set(SIMULATOR_SOURCES
     simulator/main.cpp
@@ -198,5 +198,5 @@ else()
     ${COMMON_SOURCES})
 
   add_executable(sim ${SIMULATOR_SOURCES})
-  target_link_libraries(sim -lpthread ${MKL_LIBS})
+  target_link_libraries(sim ${MKL_LIBS})
 endif()
