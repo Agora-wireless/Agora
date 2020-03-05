@@ -236,6 +236,14 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         perror("socket sendto failed");
         exit(0);
     }
+    Event_data tx_message;
+    tx_message.event_type = EVENT_PACKET_SENT;
+    tx_message.data = offset;
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    if (!message_queue_->enqueue(*local_ptok, tx_message)) {
+        printf("socket message enqueue failed\n");
+        exit(0);
+    }
     return (offset);
 }
 
@@ -265,9 +273,6 @@ void* PacketTXRX::loopSend(int tid)
     // int maxTaskQLen = 0;
 
     // use token to speed up
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    // moodycamel::ProducerToken local_ptok(*message_queue_);
-    moodycamel::ConsumerToken local_ctok(*task_queue_);
     while (true) {
 #if DEBUG_BS_SENDER
         printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n",
@@ -277,15 +282,6 @@ void* PacketTXRX::loopSend(int tid)
         int offset = dequeue_send(tid, socket_local, &remote_addr);
         if (offset == -1)
             continue;
-
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_SENT;
-        // data records the position of this packet in the buffer & tid of this socket (so that task thread could know which buffer it should visit)
-        packet_message.data = offset;
-        if (!message_queue_->enqueue(*local_ptok, packet_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
 
         // if (packet_count % (BS_ANT_NUM) == 0)
         // {
@@ -329,10 +325,6 @@ void* PacketTXRX::loopTXRX(int tid)
     // struct sockaddr_in6 local_addr;
     // setup_sockaddr_local_ipv6(&local_addr, local_port_id);
 #endif
-
-    // use token to speed up
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    moodycamel::ConsumerToken local_ctok(*task_queue_);
 
     // RX  pointers
     int rx_buffer_frame_num = buffer_frame_num_;
@@ -435,13 +427,6 @@ void* PacketTXRX::loopTXRX(int tid)
                 printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n", tid, frame_id, symbol_id, ant_id, offset,
                     message_queue_->size_approx());
 #endif
-                Event_data tx_message;
-                tx_message.event_type = EVENT_PACKET_SENT;
-                tx_message.data = offset;
-                if (!message_queue_->enqueue(*local_ptok, tx_message)) {
-                    printf("socket message enqueue failed\n");
-                    exit(0);
-                }
                 // if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
                 if (tx_pkts_in_frame_count[frame_id_in_buffer] == max_tx_packet_num_per_frame) {
                     do_tx = 0;
