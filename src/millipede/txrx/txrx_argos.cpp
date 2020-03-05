@@ -110,6 +110,52 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer, int* in_buffer_statu
     return created_threads;
 }
 
+struct Packet* PacketTXRX::recv_enqueue_Argos(int tid, int radio_id, int rx_offset)
+{
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    char* rx_buffer = (*buffer_)[tid];
+    int* rx_buffer_status = (*buffer_status_)[tid];
+    int packet_length = config_->packet_length;
+    long long frameTime;
+    int nChannels = config_->nChannels;
+    struct Packet* pkt[nChannels];
+    void* samp[nChannels];
+    for (int ch = 0; ch < nChannels; ++ch) {
+        // if rx_buffer is full, exit
+        if (rx_buffer_status[rx_offset + ch] == 1) {
+            printf("Receive thread %d buffer full, cursor: %d\n", tid, rx_offset);
+            config_->running = false;
+            break;
+        }
+        pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
+        samp[ch] = pkt[ch]->data;
+    }
+
+    // this is probably a really bad implementation, and needs to be revamped
+    while (config_->running && radioconfig_->radioRx(radio_id, samp, frameTime) <= 0)
+        ;
+    int frame_id = (int)(frameTime >> 32);
+    int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
+    int ant_id = radio_id * nChannels;
+    for (int ch = 0; ch < nChannels; ++ch) {
+        new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
+        // move ptr & set status to full
+        rx_buffer_status[rx_offset + ch] = 1; // has data, after it is read it should be set to 0
+        // push EVENT_RX_ENB event into the queue
+        Event_data packet_message;
+        packet_message.event_type = EVENT_PACKET_RECEIVED;
+        // data records the position of this packet in the rx_buffer &
+        // tid of this socket (so that task thread could know which rx_buffer it should visit)
+        //packet_message.data = offset + tid * rx_buffer_frame_num; // Note: offset < rx_buffer_frame_num_
+        packet_message.data = generateOffset2d_setbits(tid, rx_offset + ch, 28);
+        if (!message_queue_->enqueue(*local_ptok, packet_message)) {
+            printf("socket message enqueue failed\n");
+            exit(0);
+        }
+    }
+    return pkt[0];
+}
+
 void* PacketTXRX::loopRecv_Argos(int tid)
 {
     //printf("Recv thread: thread %d start\n", tid);
@@ -120,7 +166,6 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     // get pointer of message queue
     pin_to_core_with_offset(Worker_RX, core_id_, tid);
 
-    int packet_length = config_->packet_length;
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
@@ -128,12 +173,6 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     pthread_cond_wait(&cond, &mutex);
     pthread_mutex_unlock(&mutex); // unlocking for all other threads
 
-    // use token to speed up
-    //moodycamel::ProducerToken local_ptok(*message_queue_);
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-
-    char* buffer = (*buffer_)[tid];
-    int* buffer_status = (*buffer_status_)[tid];
     double* frame_start = (*frame_start_)[tid];
 
     // downlink socket buffer
@@ -149,37 +188,16 @@ void* PacketTXRX::loopRecv_Argos(int tid)
 
     // to handle second channel at each radio
     // this is assuming buffer_frame_num_ is at least 2
-    int cursor = 0;
-    long long frameTime;
+    int rx_offset = 0;
     int prev_frame_id = -1;
     int nChannels = config_->nChannels;
 
     while (config_->running) {
         // receive data
-        for (int rid = radio_lo; rid < radio_hi; rid++) { // FIXME: this must be threaded
-            // if buffer is full, exit
-            if (buffer_status[cursor] == 1) {
-                printf("Receive thread %d buffer full, cursor: %d\n", tid, cursor);
-                //for (int l = 0 ; l < buffer_frame_num_; l++)
-                //    printf("%d ", buffer_status[l]);
-                //printf("\n\n");
-                config_->running = false;
-                break;
-            }
-
-            struct Packet* pkt[nChannels];
-            void* samp[nChannels];
-            for (int ch = 0; ch < nChannels; ++ch) {
-                pkt[ch] = (struct Packet*)&buffer[(cursor + ch) * packet_length];
-                samp[ch] = pkt[ch]->data;
-            }
-
-            // this is probably a really bad implementation, and needs to be revamped
-            while (config_->running && radioconfig_->radioRx(rid, samp, frameTime) <= 0)
-                ;
-            int frame_id = (int)(frameTime >> 32);
-            int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
-            int ant_id = rid * nChannels;
+        for (int radio_id = radio_lo; radio_id < radio_hi; radio_id++) { // FIXME: this must be threaded
+            struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
+            rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
+            int frame_id = pkt->frame_id;
 #if MEASURE_TIME
             // read information from received packet
             // frame_id = *((int *)cur_ptr_buffer);
@@ -192,26 +210,9 @@ void* PacketTXRX::loopRecv_Argos(int tid)
                 }
             }
 #endif
-            for (int ch = 0; ch < nChannels; ++ch) {
-                new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
-                // move ptr & set status to full
-                buffer_status[cursor] = 1; // has data, after it is read it should be set to 0
-                // push EVENT_RX_ENB event into the queue
-                Event_data packet_message;
-                packet_message.event_type = EVENT_PACKET_RECEIVED;
-                // data records the position of this packet in the buffer &
-                // tid of this socket (so that task thread could know which buffer it should visit)
-                //packet_message.data = offset + tid * buffer_frame_num; // Note: offset < buffer_frame_num_
-                packet_message.data = generateOffset2d_setbits(tid, cursor, 28);
-                if (!message_queue_->enqueue(*local_ptok, packet_message)) {
-                    printf("socket message enqueue failed\n");
-                    exit(0);
-                }
-                ++cursor;
-                cursor %= buffer_frame_num_;
-            }
 #if DEBUG_RECV
-            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id %d, offset %d\n", tid, frame_id, symbol_id, ant_id, cursor);
+            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id %d, offset %d\n",
+                tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, rx_offset);
 #endif
 #if DEBUG_DOWNLINK && !SEPARATE_TX_RX
             if (rx_symbol_id > 0)
