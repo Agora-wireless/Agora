@@ -239,115 +239,90 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     return 0;
 }
 
+int PacketTXRX::dequeue_send_Argos(int tid)
+{
+    Event_data task_event;
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
+        return -1;
+
+    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    if (task_event.event_type != TASK_SEND) {
+        printf("Wrong event type!");
+        exit(0);
+    }
+
+    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int UE_NUM = config_->UE_NUM;
+    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int packet_length = config_->packet_length;
+    int nChannels = config_->nChannels;
+    int offset = task_event.data;
+    int ant_id = offset % BS_ANT_NUM;
+    int total_data_subframe_id = offset / BS_ANT_NUM;
+    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+
+    int tx_subframe_id = current_data_subframe_id + UE_NUM;
+    int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
+    struct Packet* pkt = (struct Packet*)&tx_buffer_[socket_subframe_offset * packet_length];
+    char* tx_cur_buffer_ptr = (char*)pkt->data;
+    frame_id += TX_FRAME_DELTA;
+
+    //symbol_id = task_event.data / config_->getNumAntennas();
+    //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
+    //{
+    size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
+    UNUSED void* txbuf[2];
+    long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+#if SEPARATE_TX_RX
+    size_t last = config_->isUE ? config_->ULSymbols[0].back() : config_->DLSymbols[0].back();
+    int flags = (symbol_id != last) ? 1 // HAS_TIME
+                                    : 2; // HAS_TIME & END_BURST, fixme
+#endif
+    int ch = ant_id % nChannels;
+#if DEBUG_DOWNLINK
+    std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
+    if (ant_id != (int)config_->ref_ant)
+        txbuf[ch] = zeros.data();
+    else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+        txbuf[ch] = config_->pilot_ci16.data();
+    else
+        txbuf[ch] = (void*)config_->dl_IQ_symbol[current_data_subframe_id];
+#else
+    txbuf[ch] = tx_cur_buffer_ptr + ch * packet_length;
+#endif
+        //buffer_status[offset+ch] = 0;
+#if DEBUG_BS_SENDER
+    printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n",
+        tid, frame_id, symbol_id, ant_id, offset,
+        message_queue_->size_approx());
+#endif
+
+    //clock_gettime(CLOCK_MONOTONIC, &tv);
+#if SEPARATE_TX_RX
+    radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
+#endif
+    //clock_gettime(CLOCK_MONOTONIC, &tv2);
+
+    //}
+
+    Event_data tx_message;
+    tx_message.event_type = EVENT_PACKET_SENT;
+    tx_message.data = offset;
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    if (!message_queue_->enqueue(*local_ptok, tx_message)) {
+        printf("socket message enqueue failed\n");
+        exit(0);
+    }
+    return offset;
+}
+
 void* PacketTXRX::loopSend_Argos(int tid)
 {
     pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
-    //int OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    //int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    //int subframe_num_perframe = config_->subframe_num_perframe;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    //int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
-    //int dl_data_subframe_num_perframe = config_->dl_data_subframe_num_perframe;
-    int packet_length = config_->packet_length;
-    int nChannels = config_->nChannels;
-
-    // downlink socket buffer
-    // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-    //int tx_buffer_frame_num = tx_buffer_frame_num_;
-    //int* buffer_status = tx_buffer_status_;
-
-    int ret;
-    //int ant_id, symbol_id, frame_id;
-    //struct timespec tv, tv2;
-
-    //int txSymsPerFrame = 0;
-    std::vector<size_t> txSymbols;
-    if (config_->isUE) {
-        //txSymsPerFrame = config_->ulSymsPerFrame;
-        txSymbols = config_->ULSymbols[0];
-    } else {
-        //txSymsPerFrame = config_->dlSymsPerFrame;
-        txSymbols = config_->DLSymbols[0];
-    }
-    std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
-    // use token to speed up
-    // moodycamel::ProducerToken local_ptok(*message_queue_);
-    //moodycamel::ConsumerToken local_ctok = (*task_queue_);
-    // moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     while (config_->running) {
-
-        Event_data task_event;
-        //ret = task_queue_->try_dequeue(task_event);
-        ret = task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event);
-        if (!ret)
-            continue;
-
-        // printf("tx queue length: %d\n", task_queue_->size_approx());
-        if (task_event.event_type != TASK_SEND) {
-            printf("Wrong event type!");
-            exit(0);
-        }
-
-        int offset = task_event.data;
-        int ant_id = offset % BS_ANT_NUM;
-        int total_data_subframe_id = offset / BS_ANT_NUM;
-        int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-        int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
-
-        int tx_subframe_id = current_data_subframe_id + UE_NUM;
-        int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
-        struct Packet* pkt = (struct Packet*)&tx_buffer_[socket_subframe_offset * packet_length];
-        char* tx_cur_buffer_ptr = (char*)pkt->data;
-        frame_id += TX_FRAME_DELTA;
-
-        //symbol_id = task_event.data / config_->getNumAntennas();
-        //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
-        //{
-        size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
-        UNUSED void* txbuf[2];
-        long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
-#if SEPARATE_TX_RX
-        int flags = 1; // HAS_TIME
-        if (symbol_id == txSymbols.back())
-            flags = 2; // HAS_TIME & END_BURST, fixme
-#endif
-        int ch = ant_id % nChannels;
-#if DEBUG_DOWNLINK
-        if (ant_id != (int)config_->ref_ant)
-            txbuf[ch] = zeros.data();
-        else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
-            txbuf[ch] = config_->pilot_ci16.data();
-        else
-            txbuf[ch] = (void*)config_->dl_IQ_symbol[current_data_subframe_id];
-#else
-        txbuf[ch] = tx_cur_buffer_ptr + ch * packet_length;
-#endif
-            //buffer_status[offset+ch] = 0;
-#if DEBUG_BS_SENDER
-        printf("In TX thread %d: Transmitted frame %d, subframe %d, ant %d, offset: %d, msg_queue_length: %d\n",
-            tid, frame_id, symbol_id, ant_id, offset,
-            message_queue_->size_approx());
-#endif
-
-        //clock_gettime(CLOCK_MONOTONIC, &tv);
-#if SEPARATE_TX_RX
-        radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
-#endif
-        //clock_gettime(CLOCK_MONOTONIC, &tv2);
-
-        //}
-
-        Event_data tx_message;
-        tx_message.event_type = EVENT_PACKET_SENT;
-        tx_message.data = offset;
-        if (!message_queue_->enqueue(*local_ptok, tx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
+        dequeue_send_Argos(tid);
     }
     return 0;
 }
