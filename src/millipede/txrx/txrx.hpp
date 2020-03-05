@@ -128,6 +128,7 @@ public:
 #if USE_ARGOS
     void* loopRecv_Argos(int tid);
     void* loopSend_Argos(int tid);
+    int dequeue_send_Argos(int tid);
     struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
 
