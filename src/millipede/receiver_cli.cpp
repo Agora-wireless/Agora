@@ -14,7 +14,8 @@ int main(int argc, char const* argv[])
         buffer_status[i] = new int[buffer_frame_num];
     }
 
-    std::vector<pthread_t> receive_threads = receiver.startRecv(buffer, buffer_status, buffer_frame_num, buffer_length);
+    std::vector<pthread_t> receive_threads = receiver.startRecv(
+        buffer, buffer_status, buffer_frame_num, buffer_length);
     pthread_join(receive_threads[0], NULL);
 
     for (int i = 0; i < thread_num; i++) {

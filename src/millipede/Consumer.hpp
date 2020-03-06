@@ -6,8 +6,8 @@
 class Consumer {
 public:
     Consumer(moodycamel::ConcurrentQueue<Event_data>& out_queue,
-        moodycamel::ProducerToken& out_token,
-        int task_count = 0, int task_tag = 0);
+        moodycamel::ProducerToken& out_token, int task_count = 0,
+        int task_tag = 0);
     void handle(const Event_data& event) const;
     void try_handle(const Event_data& event) const;
     void schedule_task_set(int task_setid) const;
@@ -20,8 +20,7 @@ private:
 };
 
 inline Consumer::Consumer(moodycamel::ConcurrentQueue<Event_data>& out_queue,
-    moodycamel::ProducerToken& out_token,
-    int task_count, int task_tag)
+    moodycamel::ProducerToken& out_token, int task_count, int task_tag)
     : out_queue_(out_queue)
     , out_token_(out_token)
     , task_count_(task_count)
@@ -29,8 +28,7 @@ inline Consumer::Consumer(moodycamel::ConcurrentQueue<Event_data>& out_queue,
 {
 }
 
-inline void
-Consumer::handle(const Event_data& event) const
+inline void Consumer::handle(const Event_data& event) const
 {
     if (!out_queue_.enqueue(out_token_, event)) {
         printf("message enqueue failed\n");
@@ -38,8 +36,7 @@ Consumer::handle(const Event_data& event) const
     }
 }
 
-inline void
-Consumer::try_handle(const Event_data& event) const
+inline void Consumer::try_handle(const Event_data& event) const
 {
     if (!out_queue_.try_enqueue(out_token_, event)) {
         printf("need more memory\n");
@@ -47,8 +44,7 @@ Consumer::try_handle(const Event_data& event) const
     }
 }
 
-inline void
-Consumer::schedule_task_set(int task_setid) const
+inline void Consumer::schedule_task_set(int task_setid) const
 {
     Event_data do_task;
     do_task.event_type = task_tag_;
