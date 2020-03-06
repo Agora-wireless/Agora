@@ -20,10 +20,10 @@ class RadioConfig;
 
 class RU {
 public:
-    // static const int OFDM_FRAME_LEN = SYMBOL_LEN; //OFDM_CA_NUM + OFDM_PREFIX_LEN + OFDM_POSTFIX_LEN;
-    // header 4 int for: frame_id, subframe_id, cell_id, ant_id
-    // ushort for: I/Q samples
-    // static const int package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+    // static const int OFDM_FRAME_LEN = SYMBOL_LEN; //OFDM_CA_NUM +
+    // OFDM_PREFIX_LEN + OFDM_POSTFIX_LEN; header 4 int for: frame_id,
+    // subframe_id, cell_id, ant_id ushort for: I/Q samples static const int
+    // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     // use for create pthread
     struct RUContext {
         RU* ptr;
@@ -36,28 +36,34 @@ public:
      * N_THREAD: socket thread number
      * mode: tx=1 or rx=0 operation
      * in_queue: message queue to communicate with main thread
-    */
+     */
     RU(int n_rx_thread, int n_tx_thread, Config* cfg,
         moodycamel::ConcurrentQueue<Event_data>* in_queue,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_task);
     ~RU();
 
-    void calibrateRadios(std::vector<std::vector<std::complex<float>>>&, std::vector<std::vector<std::complex<float>>>&, int);
+    void calibrateRadios(std::vector<std::vector<std::complex<float>>>&,
+        std::vector<std::vector<std::complex<float>>>&, int);
     void startRadios();
     /**
      * called in main threads to start the socket threads
      * in_buffer: ring buffer to save packets
-     * in_buffer_status: record the status of each memory block (0: empty, 1: full)
-     * in_buffer_frame_num: number of packets the ring buffer could hold
+     * in_buffer_status: record the status of each memory block (0: empty, 1:
+     * full) in_buffer_frame_num: number of packets the ring buffer could hold
      * in_buffer_length: size of ring buffer
-     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + N_THREAD - 1}
-    */
-    std::vector<pthread_t> startProc(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id = 0);
-    std::vector<pthread_t> startTX(char* in_buffer, char* in_pilot_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length, int in_core_id = 0);
+     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
+     * N_THREAD - 1}
+     */
+    std::vector<pthread_t> startProc(Table<char>& in_buffer,
+        Table<int>& in_buffer_status, int in_buffer_frame_num,
+        int in_buffer_length, int in_core_id = 0);
+    std::vector<pthread_t> startTX(char* in_buffer, char* in_pilot_buffer,
+        int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length,
+        int in_core_id = 0);
     /**
      * receive thread
      * context: PackageReceiverContext type
-    */
+     */
     static void* sendThread_launch(void* context);
     void sendThread(int tid);
     static void* taskThread_launch(void* context);
@@ -95,7 +101,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_;
     std::vector<std::unique_ptr<moodycamel::ProducerToken>> task_ptok;
-    //std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
+    // std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
     int core_id_;
     int tx_core_id_;
 };

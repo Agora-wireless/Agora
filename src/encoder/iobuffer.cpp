@@ -6,16 +6,18 @@
 #include "iobuffer.hpp"
 #include "encoder.hpp"
 
-void scatter_slow(uint8_t* dst, const uint8_t* src, unsigned num_bits, uint8_t src_offbits)
+void scatter_slow(
+    uint8_t* dst, const uint8_t* src, unsigned num_bits, uint8_t src_offbits)
 {
-    //Process byte by byte
+    // Process byte by byte
     while (num_bits != 0) {
         unsigned num_bits_inB = MIN(8, num_bits);
         uint8_t newB;
         if (src_offbits == 0)
             newB = src[0];
         else
-            newB = ((src[0] & 0xFF) >> src_offbits) | ((src[1] & 0xFF) << (8 - src_offbits));
+            newB = ((src[0] & 0xFF) >> src_offbits)
+                | ((src[1] & 0xFF) << (8 - src_offbits));
         dst[0] = newB & BITMASKU8(num_bits_inB);
         num_bits -= num_bits_inB;
 
@@ -24,9 +26,10 @@ void scatter_slow(uint8_t* dst, const uint8_t* src, unsigned num_bits, uint8_t s
     }
 }
 
-void gather_slow(uint8_t* dst, const uint8_t* src, int16_t num_bits, uint8_t dst_offbits)
+void gather_slow(
+    uint8_t* dst, const uint8_t* src, int16_t num_bits, uint8_t dst_offbits)
 {
-    //Process byte by byte
+    // Process byte by byte
     bool firstByte = true;
     while (num_bits > 0) {
         unsigned num_bits_inB = MIN(8, num_bits);
@@ -37,11 +40,14 @@ void gather_slow(uint8_t* dst, const uint8_t* src, int16_t num_bits, uint8_t dst
             src++;
         } else {
             if (firstByte) {
-                newB = (dst[0] & BITMASKU8(dst_offbits)) | (src[0] & 0xFF) << dst_offbits;
+                newB = (dst[0] & BITMASKU8(dst_offbits))
+                    | (src[0] & 0xFF) << dst_offbits;
                 num_bits_inB = 8 - dst_offbits;
                 firstByte = false;
             } else {
-                newB = ((src[0] & 0xFF) >> (8 - dst_offbits) | (src[1] & 0xFF) << dst_offbits) & BITMASKU8(num_bits_inB);
+                newB = ((src[0] & 0xFF) >> (8 - dst_offbits)
+                           | (src[1] & 0xFF) << dst_offbits)
+                    & BITMASKU8(num_bits_inB);
                 src++;
             }
         }
@@ -51,7 +57,8 @@ void gather_slow(uint8_t* dst, const uint8_t* src, int16_t num_bits, uint8_t dst
     }
 }
 
-void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t cbLen, int8_t direct)
+void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+    uint32_t cbLen, int8_t direct)
 {
     int8_t *p_buff_0, *p_buff_1;
     uint8_t dst_offbits = 0, src_offbits = 0;
@@ -63,7 +70,8 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t cbL
         p_buff_0 is the input, p_buff_1 is the buffer for barrel shifter */
         for (int16_t i = 0; i < cbLen / zcSize; i++) {
 
-            scatter_slow((uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
+            scatter_slow(
+                (uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
             uint8_t byteOffset = (src_offbits + zcSize) >> 3;
             src_offbits = (src_offbits + zcSize) - (byteOffset << 3);
             p_buff_0 = p_buff_0 + byteOffset;
@@ -73,7 +81,8 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t cbL
         /* storing encoded bits into output buffer
         p_buff_0 is the output, p_buff_1 is the buffer for processing data*/
         for (int16_t i = 0; i < cbLen / zcSize; i++) {
-            gather_slow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize, dst_offbits);
+            gather_slow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
+                dst_offbits);
             uint8_t byteOffset = (dst_offbits + zcSize) >> 3;
             dst_offbits = (dst_offbits + zcSize) - (byteOffset << 3);
             p_buff_0 = p_buff_0 + byteOffset;
@@ -85,15 +94,18 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t cbL
 // void print256_epi8(__m256i var)
 // {
 //     int8_t *val = (int8_t*) &var;
-//     printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
+//     printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i
+//     %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
 //            val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
-//            val[8], val[9], val[10], val[11], val[12], val[13], val[14], val[15],
-//            val[16], val[17], val[18], val[19], val[20], val[21], val[22], val[23],
-//            val[24], val[25], val[26], val[27], val[28], val[29], val[30], val[31]
+//            val[8], val[9], val[10], val[11], val[12], val[13], val[14],
+//            val[15], val[16], val[17], val[18], val[19], val[20], val[21],
+//            val[22], val[23], val[24], val[25], val[26], val[27], val[28],
+//            val[29], val[30], val[31]
 //            );
 // }
 
-void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t cbLen, int8_t direct)
+void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+    uint32_t cbLen, int8_t direct)
 {
     /* after 64, z is always a multiple of 8 so no need for shifting bytes*/
 
@@ -153,7 +165,8 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t c
     }
 }
 
-void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t cbLen, int8_t direct)
+void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+    uint32_t cbLen, int8_t direct)
 {
     /* use two __m256i to store one segment of length zc */
     int8_t *p_buff_in, *p_buff_out;
@@ -163,7 +176,8 @@ void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize, uint32_t 
     p_buff_out = pBuff1;
     int xtra_byte_num = (zcSize - 256) >> 3;
 
-    bit_mask = _mm256_set_epi32(0, 0, 0, 0, -(xtra_byte_num - 15), -(xtra_byte_num - 11), -(xtra_byte_num - 7), -1);
+    bit_mask = _mm256_set_epi32(0, 0, 0, 0, -(xtra_byte_num - 15),
+        -(xtra_byte_num - 11), -(xtra_byte_num - 7), -1);
 
     if (1 == direct) {
         for (int16_t i = 0; i < cbLen / zcSize; i++) {

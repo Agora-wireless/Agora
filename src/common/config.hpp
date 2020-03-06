@@ -22,7 +22,7 @@
 #include "utils.h"
 #include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
-//using namespace itpp;
+// using namespace itpp;
 using json = nlohmann::json;
 #endif
 typedef unsigned char uchar;
@@ -40,8 +40,8 @@ public:
     size_t mod_order;
 
     std::string conf;
-    //std::string beacon_file;
-    //std::string coeffs_file;
+    // std::string beacon_file;
+    // std::string coeffs_file;
     std::string pilot_file;
     std::string serial_file;
     std::string hub_file;
@@ -118,7 +118,8 @@ public:
     size_t OFDM_FRAME_LEN;
     size_t OFDM_SYM_LEN;
 
-    size_t symbol_num_perframe, pilot_symbol_num_perframe, data_symbol_num_perframe;
+    size_t symbol_num_perframe, pilot_symbol_num_perframe,
+        data_symbol_num_perframe;
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
