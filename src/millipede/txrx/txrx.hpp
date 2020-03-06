@@ -115,12 +115,21 @@ public:
     void* loopRecv(int tid);
     void* loopTXRX(int tid);
     void* loopSend(int tid);
+#if USE_IPV4
+    typedef struct sockaddr_in sockaddr_t;
+#else
+    typedef struct sockaddr_in6 sockaddr_t;
+#endif
+    int dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr);
+    struct Packet* recv_enqueue(int tid, int socket_local, int rx_offset);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
     void* loopRecv_Argos(int tid);
     void* loopSend_Argos(int tid);
+    int dequeue_send_Argos(int tid);
+    struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
 
 private:
