@@ -57,8 +57,7 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>&
 
     std::vector<pthread_t> created_threads;
 
-    bool ret = radioconfig_->radioStart();
-    if (!ret)
+    if (!radioconfig_->radioStart())
         return created_threads;
 
     for (int i = 0; i < rx_thread_num_; i++) {
@@ -255,14 +254,13 @@ int PacketTXRX::dequeue_send_Argos(int tid)
     int UE_NUM = config_->UE_NUM;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int packet_length = config_->packet_length;
-    int nChannels = config_->nChannels;
     int offset = task_event.data;
     int ant_id = offset % BS_ANT_NUM;
     int total_data_subframe_id = offset / BS_ANT_NUM;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id = total_data_subframe_id % data_subframe_num_perframe;
+    int symbol_id = current_data_subframe_id + UE_NUM;
 
-    int tx_subframe_id = current_data_subframe_id + UE_NUM;
     int socket_subframe_offset = offset % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
     struct Packet* pkt = (struct Packet*)&tx_buffer_[socket_subframe_offset * packet_length];
     char* tx_cur_buffer_ptr = (char*)pkt->data;
@@ -271,14 +269,14 @@ int PacketTXRX::dequeue_send_Argos(int tid)
     //symbol_id = task_event.data / config_->getNumAntennas();
     //for (symbol_id = 0; symbol_id < txSymsPerFrame; symbol_id++)
     //{
-    size_t symbol_id = tx_subframe_id; //txSymbols[tx_subframe_id];
     UNUSED void* txbuf[2];
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
 #if SEPARATE_TX_RX
-    size_t last = config_->isUE ? config_->ULSymbols[0].back() : config_->DLSymbols[0].back();
+    int last = config_->isUE ? config_->ULSymbols[0].back() : config_->DLSymbols[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
 #endif
+    int nChannels = config_->nChannels;
     int ch = ant_id % nChannels;
 #if DEBUG_DOWNLINK
     std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
