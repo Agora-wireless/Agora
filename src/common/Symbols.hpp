@@ -134,14 +134,7 @@ typedef enum {
     Master_TX,
 } thread_type;
 
-typedef enum {
-    UL,
-    DL,
-    PILOT,
-    CAL_DL,
-    CAL_UL,
-    UNKNOWN
-} symbol_type;
+typedef enum { UL, DL, PILOT, CAL_DL, CAL_UL, UNKNOWN } symbol_type;
 
 struct LDPCconfig {
     uint16_t Bg;

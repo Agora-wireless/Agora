@@ -1,11 +1,12 @@
 /*
-    cyclic right bit shift 
+    cyclic right bit shift
     the shift values are defined by the 5gnr ldpc standard in TS38212 5.3.2
  */
 
 #include "cyclic_shift.hpp"
 
-inline __m256i cycle_bit_shift_2to64(__m256i data, int16_t cyc_shift, int16_t zc)
+inline __m256i cycle_bit_shift_2to64(
+    __m256i data, int16_t cyc_shift, int16_t zc)
 {
     __m256i x1, x2, bit_mask;
     cyc_shift = cyc_shift % zc;
@@ -28,18 +29,27 @@ inline __m256i cycle_bit_shift_2to64(__m256i data, int16_t cyc_shift, int16_t zc
     return x1;
 }
 
-inline __m256i cycle_bit_shift_72to128(__m256i data, int16_t cyc_shift, int16_t zc)
+inline __m256i cycle_bit_shift_72to128(
+    __m256i data, int16_t cyc_shift, int16_t zc)
 {
     /* when zc is 88 or 104 or 120 */
     int8_t shuffle_table[8][32] = {
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // 72
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // 80
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // 88
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, -1, -1, -1, -1, -1, -1, -1, -1 }, // 96
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -1, -1, -1, -1, -1, -1 }, // 104
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -1, -1, -1, -1 }, // 112
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, -1, -1 }, // 120
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }, // 128
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1,
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // 72
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1,
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // 80
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // 88
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+            10, 11, -1, -1, -1, -1, -1, -1, -1, -1 }, // 96
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8,
+            9, 10, 11, 12, -1, -1, -1, -1, -1, -1 }, // 104
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1, 2, 3, 4, 5, 6, 7,
+            8, 9, 10, 11, 12, 13, -1, -1, -1, -1 }, // 112
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6,
+            7, 8, 9, 10, 11, 12, 13, 14, -1, -1 }, // 120
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4,
+            5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }, // 128
     };
 
     __m256i x0, x1, x2, bit_mask, shift_mask0;
@@ -52,14 +62,16 @@ inline __m256i cycle_bit_shift_72to128(__m256i data, int16_t cyc_shift, int16_t 
     int bit_shift = right_shift - (byte_shift << 3);
     int zc_index = (zc >> 3) - 9;
 
-    shift_mask0 = _mm256_loadu_si256((__m256i*)(shuffle_table[zc_index] + byte_shift));
+    shift_mask0
+        = _mm256_loadu_si256((__m256i*)(shuffle_table[zc_index] + byte_shift));
 
     // shift by bytes
     x0 = _mm256_shuffle_epi8(data, shift_mask0);
 
     // shift remaining bits
     uint8_t* p_data = (uint8_t*)&x0;
-    p_out[zc_in_bytes - 1] = (p_data[zc_in_bytes - 1] >> bit_shift) | (p_data[0] << (8 - bit_shift));
+    p_out[zc_in_bytes - 1] = (p_data[zc_in_bytes - 1] >> bit_shift)
+        | (p_data[0] << (8 - bit_shift));
     for (int i = 0; i < zc_in_bytes - 1; i++) {
         p_out[i] = (p_data[0] >> bit_shift) | (p_data[1] << (8 - bit_shift));
         p_data++;
@@ -76,7 +88,8 @@ inline __m256i cycle_bit_shift_72to128(__m256i data, int16_t cyc_shift, int16_t 
     return x2;
 }
 
-inline __m256i cycle_bit_shift_144to256(__m256i data, int16_t cyc_shift, int16_t zc)
+inline __m256i cycle_bit_shift_144to256(
+    __m256i data, int16_t cyc_shift, int16_t zc)
 {
     /* zc in this range is always a multiple of 16 */
 
@@ -99,8 +112,10 @@ inline __m256i cycle_bit_shift_144to256(__m256i data, int16_t cyc_shift, int16_t
     //     p_out_0[i] = p_in[i-zc_in_shorts+packed_shift];
     // }
 
-    memcpy(p_out_0, p_in + packed_shift, (zc_in_shorts - packed_shift) * sizeof(uint16_t));
-    memcpy(p_out_0 + zc_in_shorts - packed_shift, p_in, packed_shift * sizeof(uint16_t));
+    memcpy(p_out_0, p_in + packed_shift,
+        (zc_in_shorts - packed_shift) * sizeof(uint16_t));
+    memcpy(p_out_0 + zc_in_shorts - packed_shift, p_in,
+        packed_shift * sizeof(uint16_t));
     memset(p_out_0 + zc_in_shorts, 0, 32 - zc_in_shorts * sizeof(uint16_t));
 
     x1 = _mm256_srli_si256(x0, 2);
@@ -128,7 +143,8 @@ inline __m256i cycle_bit_shift_144to256(__m256i data, int16_t cyc_shift, int16_t
         e1 = 0;
     }
     // !! add exception for error
-    bit_mask = _mm256_set_epi64x(e1, e0, 0xffffffffffffffff, 0xffffffffffffffff);
+    bit_mask
+        = _mm256_set_epi64x(e1, e0, 0xffffffffffffffff, 0xffffffffffffffff);
 
     x1 = _mm256_and_si256(x1, bit_mask);
 
@@ -144,5 +160,6 @@ CYCLIC_BIT_SHIFT ldpc_select_shift_func(int16_t zcSize)
     else if (zcSize <= 256)
         return cycle_bit_shift_144to256;
     else
-        throw std::invalid_argument("cyclic shifter for zc larger than 256 has not been implemented");
+        throw std::invalid_argument(
+            "cyclic shifter for zc larger than 256 has not been implemented");
 }

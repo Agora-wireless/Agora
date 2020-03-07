@@ -20,7 +20,8 @@ public:
 protected:
     virtual void launch(int offset) = 0;
     Doer(Config* in_config, int in_tid,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer)
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+        Consumer& in_consumer)
         : config_(in_config)
         , tid(in_tid)
         , task_queue_(in_task_queue)
