@@ -25,15 +25,18 @@ public:
     void radioRx(void** buffs);
     int radioTx(size_t, void** buffs, int flags, long long& frameTime);
     int radioRx(size_t, void** buffs, long long& frameTime);
-    static void drain_rx_buffer(SoapySDR::Device* dev, SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp);
+    static void drain_rx_buffer(SoapySDR::Device* dev,
+        SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp);
     void drain_buffers();
     void go();
     int triggers(int i);
-    //static void dciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int, size_t, double, double);
-    //static void setIQBalance(SoapySDR::Device*, int, size_t, int, int);
-    //static void adjustCalibrationGains(std::vector<SoapySDR::Device*>, SoapySDR::Device*, size_t, double, bool plot = false);
-    //static std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*, size_t, size_t);
-    //void dciqCalibrationProc(size_t);
+    // static void dciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int,
+    // size_t, double, double); static void setIQBalance(SoapySDR::Device*, int,
+    // size_t, int, int); static void
+    // adjustCalibrationGains(std::vector<SoapySDR::Device*>, SoapySDR::Device*,
+    // size_t, double, bool plot = false); static
+    // std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*, size_t,
+    // size_t); void dciqCalibrationProc(size_t);
     ~ClientRadioConfig();
     struct ClientRadioConfigContext {
         ClientRadioConfig* ptr;

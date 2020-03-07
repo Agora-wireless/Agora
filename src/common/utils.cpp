@@ -3,7 +3,7 @@
  utility functions for file and text processing.
 
 ---------------------------------------------------------------------
- Copyright (c) 2018-2019, Rice University 
+ Copyright (c) 2018-2019, Rice University
  RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 ---------------------------------------------------------------------
 */
@@ -27,28 +27,21 @@ int pin_to_core(int core_id)
 void pin_to_core_with_offset(thread_type thread, int core_offset, int thread_id)
 {
 #ifdef ENABLE_CPU_ATTACH
-    const char* THREAD_TYPE_STRING[] = {
-        "Master",
-        "Worker",
-        "Worker (FFT)",
-        "Worker (ZF)",
-        "Worker (Demul)",
-        "RX",
-        "TX",
-        "TXRX",
-        "Master (RX)",
-        "Master (TX)"
-    };
+    const char* THREAD_TYPE_STRING[]
+        = { "Master", "Worker", "Worker (FFT)", "Worker (ZF)", "Worker (Demul)",
+              "RX", "TX", "TXRX", "Master (RX)", "Master (TX)" };
     int actual_core_id = core_offset + thread_id;
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
     /* reserve core 0 for kernel threads */
     if (actual_core_id >= num_cores)
         actual_core_id = actual_core_id - num_cores + 1;
     if (pin_to_core(actual_core_id) != 0) {
-        printf("%s thread %d: fail to pin to core %d\n", THREAD_TYPE_STRING[thread], thread_id, actual_core_id);
+        printf("%s thread %d: fail to pin to core %d\n",
+            THREAD_TYPE_STRING[thread], thread_id, actual_core_id);
         exit(0);
     } else {
-        printf("%s thread %d: pinned to core %d\n", THREAD_TYPE_STRING[thread], thread_id, actual_core_id);
+        printf("%s thread %d: pinned to core %d\n", THREAD_TYPE_STRING[thread],
+            thread_id, actual_core_id);
     }
 #endif
 }
@@ -65,17 +58,19 @@ std::vector<size_t> Utils::strToChannels(const std::string& channel)
     return (channels);
 }
 
-std::vector<std::complex<int16_t>> Utils::double_to_cint16(std::vector<std::vector<double>> in)
+std::vector<std::complex<int16_t>> Utils::double_to_cint16(
+    std::vector<std::vector<double>> in)
 {
     int len = in[0].size();
     std::vector<std::complex<int16_t>> out(len, 0);
     for (int i = 0; i < len; i++)
-        out[i] = std::complex<int16_t>((int16_t)(in[0][i] * 32768), (int16_t)(in[1][i] * 32768));
+        out[i] = std::complex<int16_t>(
+            (int16_t)(in[0][i] * 32768), (int16_t)(in[1][i] * 32768));
     return out;
 }
 
-std::vector<std::complex<float>> Utils::uint32tocfloat(std::vector<uint32_t> in,
-    const std::string& order)
+std::vector<std::complex<float>> Utils::uint32tocfloat(
+    std::vector<uint32_t> in, const std::string& order)
 {
     int len = in.size();
     std::vector<std::complex<float>> out(len, 0);
@@ -97,7 +92,8 @@ std::vector<std::complex<float>> Utils::uint32tocfloat(std::vector<uint32_t> in,
     return out;
 }
 
-std::vector<uint32_t> Utils::cint16_to_uint32(std::vector<std::complex<int16_t>> in, bool conj, std::string order)
+std::vector<uint32_t> Utils::cint16_to_uint32(
+    std::vector<std::complex<int16_t>> in, bool conj, std::string order)
 {
     std::vector<uint32_t> out(in.size(), 0);
     for (size_t i = 0; i < in.size(); i++) {
@@ -111,12 +107,14 @@ std::vector<uint32_t> Utils::cint16_to_uint32(std::vector<std::complex<int16_t>>
     return out;
 }
 
-std::vector<uint32_t> Utils::cfloat32_to_uint32(std::vector<std::complex<float>> in, bool conj, std::string order)
+std::vector<uint32_t> Utils::cfloat32_to_uint32(
+    std::vector<std::complex<float>> in, bool conj, std::string order)
 {
     std::vector<uint32_t> out(in.size(), 0);
     for (size_t i = 0; i < in.size(); i++) {
         uint16_t re = (uint16_t)(int16_t(in[i].real() * 32768.0));
-        uint16_t im = (uint16_t)(int16_t((conj ? -in[i].imag() : in[i].imag()) * 32768));
+        uint16_t im = (uint16_t)(
+            int16_t((conj ? -in[i].imag() : in[i].imag()) * 32768));
         if (order == "IQ")
             out[i] = (uint32_t)re << 16 | im;
         else if (order == "QI")
@@ -125,7 +123,8 @@ std::vector<uint32_t> Utils::cfloat32_to_uint32(std::vector<std::complex<float>>
     return out;
 }
 
-std::vector<std::vector<size_t>> Utils::loadSymbols(std::vector<std::string> frames, char sym)
+std::vector<std::vector<size_t>> Utils::loadSymbols(
+    std::vector<std::string> frames, char sym)
 {
     std::vector<std::vector<size_t>> symId;
     size_t frameSize = frames.size();
@@ -149,7 +148,8 @@ void Utils::loadDevices(std::string filename, std::vector<std::string>& data)
     std::ifstream myfile(filename, std::ifstream::in);
     if (myfile.is_open()) {
         while (getline(myfile, line)) {
-            //line.erase( std::remove (line.begin(), line.end(), ' '), line.end());
+            // line.erase( std::remove (line.begin(), line.end(), ' '),
+            // line.end());
             if (line.at(0) == '#')
                 continue;
             data.push_back(line);
@@ -162,7 +162,8 @@ void Utils::loadDevices(std::string filename, std::vector<std::string>& data)
         printf("Unable to open device file %s\n", filename.c_str());
 }
 
-void Utils::loadData(const char* filename, std::vector<std::complex<int16_t>>& data, int samples)
+void Utils::loadData(
+    const char* filename, std::vector<std::complex<int16_t>>& data, int samples)
 {
     FILE* fp = fopen(filename, "r");
     data.resize(samples);
@@ -171,13 +172,15 @@ void Utils::loadData(const char* filename, std::vector<std::complex<int16_t>>& d
         int ret = fscanf(fp, "%f %f", &real, &imag);
         if (ret < 0)
             break;
-        data[i] = std::complex<int16_t>(int16_t(real * 32768), int16_t(imag * 32768));
+        data[i] = std::complex<int16_t>(
+            int16_t(real * 32768), int16_t(imag * 32768));
     }
 
     fclose(fp);
 }
 
-void Utils::loadData(const char* filename, std::vector<unsigned>& data, int samples)
+void Utils::loadData(
+    const char* filename, std::vector<unsigned>& data, int samples)
 {
     FILE* fp = fopen(filename, "r");
     data.resize(samples);
@@ -223,7 +226,8 @@ void Utils::printVector(std::vector<std::complex<int16_t>>& data)
     }
 }
 
-void Utils::writeBinaryFile(std::string name, size_t elem_size, size_t buffer_size, void* buff)
+void Utils::writeBinaryFile(
+    std::string name, size_t elem_size, size_t buffer_size, void* buff)
 {
     FILE* f_handle = fopen(name.c_str(), "wb");
     fwrite(buff, elem_size, buffer_size, f_handle);

@@ -1,8 +1,9 @@
 #include "encoder.hpp"
 #include "cyclic_shift.hpp"
 
-void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixNumPerCol,
-    const int16_t* pAddr, const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS)
+void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
+    const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
+    const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS)
 {
     const int16_t *pTempAddr, *pTempMatrix;
     int8_t *pTempIn, *pTempOut;
@@ -12,7 +13,8 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
 
     for (int32_t j = 0; j < BG1_ROW_TOTAL; j++) {
-        _mm256_storeu_si256((__m256i*)(pDataOut + j * PROC_BYTES), _mm256_set1_epi8(0));
+        _mm256_storeu_si256(
+            (__m256i*)(pDataOut + j * PROC_BYTES), _mm256_set1_epi8(0));
     }
 
     pTempAddr = pAddr;
@@ -54,7 +56,7 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     x3 = _mm256_loadu_si256((__m256i*)(pTempOut + 2 * PROC_BYTES));
     x4 = _mm256_loadu_si256((__m256i*)(pTempOut + 3 * PROC_BYTES));
 
-    //first 384
+    // first 384
     // x5 is p_a1
     x5 = _mm256_xor_si256(x1, x2);
     x5 = _mm256_xor_si256(x5, x3);
@@ -67,7 +69,7 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     } else
         _mm256_storeu_si256((__m256i*)pDataOut, x5);
 
-    //second 384
+    // second 384
     // x7 is p_a2
     if (i_LS == 6)
         x6 = x5;
@@ -77,12 +79,12 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     x7 = _mm256_xor_si256(x1, x6);
     _mm256_storeu_si256((__m256i*)(pDataOut + PROC_BYTES), x7);
 
-    //third 384 - c2(x2)+w2(x7)=w3(x8)
+    // third 384 - c2(x2)+w2(x7)=w3(x8)
     // p_a3
     x8 = _mm256_xor_si256(x4, x6);
     _mm256_storeu_si256((__m256i*)(pDataOut + 3 * PROC_BYTES), x8);
 
-    //fourth 384 - c4(x4)+w1_0(x6)=w4(x9)
+    // fourth 384 - c4(x4)+w1_0(x6)=w4(x9)
     // pa_4
     x9 = _mm256_xor_si256(x3, x8);
     _mm256_storeu_si256((__m256i*)(pDataOut + 2 * PROC_BYTES), x9);
@@ -90,10 +92,11 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     // Rest of parity based on identity matrix
     // p_c's
     for (; i < 4 + BG1_COL_INF_NUM; i++) {
-        x1 = _mm256_loadu_si256((__m256i*)(pDataOut + (i - BG1_COL_INF_NUM) * PROC_BYTES));
+        x1 = _mm256_loadu_si256(
+            (__m256i*)(pDataOut + (i - BG1_COL_INF_NUM) * PROC_BYTES));
         for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
             addrOffset = (*pTempAddr++) >> 1;
-            //addrOffset = *pTempAddr++;
+            // addrOffset = *pTempAddr++;
             x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
             x3 = _mm256_loadu_si256((__m256i*)(pTempOut + addrOffset));
             x4 = _mm256_xor_si256(x2, x3);
@@ -102,8 +105,9 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     }
 }
 
-void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixNumPerCol,
-    const int16_t* pAddr, const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS)
+void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
+    const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
+    const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS)
 {
     const int16_t *pTempAddr, *pTempMatrix;
     int8_t *pTempIn, *pTempOut;
@@ -113,7 +117,8 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
 
     for (int32_t j = 0; j < BG2_ROW_TOTAL; j++) {
-        _mm256_storeu_si256((__m256i*)(pDataOut + j * PROC_BYTES), _mm256_set1_epi8(0));
+        _mm256_storeu_si256(
+            (__m256i*)(pDataOut + j * PROC_BYTES), _mm256_set1_epi8(0));
     }
 
     pTempAddr = pAddr;
@@ -132,7 +137,8 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     i = 1;
     for (; i < BG2_COL_INF_NUM; i++) {
         x1 = _mm256_loadu_si256((__m256i*)(pTempIn + i * PROC_BYTES));
-        // can add threading here *********************************************************
+        // can add threading here
+        // *********************************************************
         for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
             addrOffset = (*pTempAddr++) >> 1;
             x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
@@ -149,7 +155,7 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     x3 = _mm256_loadu_si256((__m256i*)(pTempOut + 2 * PROC_BYTES));
     x4 = _mm256_loadu_si256((__m256i*)(pTempOut + 3 * PROC_BYTES));
 
-    //first 384
+    // first 384
     // x5 is p_a1
     x5 = _mm256_xor_si256(x1, x2);
     x5 = _mm256_xor_si256(x5, x3);
@@ -163,7 +169,7 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
         _mm256_storeu_si256((__m256i*)pDataOut, x5);
     }
 
-    //second 384
+    // second 384
     // x7 is p_a2
     if ((i_LS == 3) || (i_LS == 7))
         x6 = cycle_bit_shift_p(x5, 1, zcSize);
@@ -173,12 +179,12 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     x7 = _mm256_xor_si256(x1, x6);
     _mm256_storeu_si256((__m256i*)(pDataOut + PROC_BYTES), x7);
 
-    //third 384 - c2(x2)+w2(x7)=w3(x8)
+    // third 384 - c2(x2)+w2(x7)=w3(x8)
     // p_a3
     x8 = _mm256_xor_si256(x2, x7);
     _mm256_storeu_si256((__m256i*)(pDataOut + 2 * PROC_BYTES), x8);
 
-    //fourth 384 - c4(x4)+w1_0(x6)=w4(x9)
+    // fourth 384 - c4(x4)+w1_0(x6)=w4(x9)
     // pa_4
     x9 = _mm256_xor_si256(x4, x6);
     _mm256_storeu_si256((__m256i*)(pDataOut + 3 * PROC_BYTES), x9);
@@ -186,7 +192,8 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut, const int16_t* pMatrixN
     // Rest of parity based on identity matrix
     // p_c's
     for (; i < 4 + BG2_COL_INF_NUM; i++) {
-        x1 = _mm256_loadu_si256((__m256i*)(pDataOut + (i - BG2_COL_INF_NUM) * PROC_BYTES));
+        x1 = _mm256_loadu_si256(
+            (__m256i*)(pDataOut + (i - BG2_COL_INF_NUM) * PROC_BYTES));
         for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
             addrOffset = (*pTempAddr++) >> 1;
             x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
