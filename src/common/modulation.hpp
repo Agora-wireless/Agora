@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 #ifndef COMPUTE_COMMON
 #define COMPUTE_COMMON

@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 #ifndef GETTIME_H
 #define GETTIME_H
@@ -14,8 +14,7 @@
 static inline uint64_t RDTSC()
 {
     unsigned int hi, lo;
-    __asm__ volatile("rdtsc"
-                     : "=a"(lo), "=d"(hi));
+    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t)hi << 32) | lo;
 };
 
