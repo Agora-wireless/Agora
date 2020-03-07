@@ -1,7 +1,7 @@
 /**
  * Author: Peiyao Zhao
  * E-Mail: pdszpy19930218@163.com
- * 
+ *
  */
 
 #ifndef BUFFER_HEAD
@@ -71,10 +71,7 @@ struct Frame_stats {
         alloc_buffer_1d(&symbol_count, max_frame, align, 1);
         max_symbol_count = max_symbols;
     }
-    void fini()
-    {
-        free_buffer_1d(&symbol_count);
-    }
+    void fini() { free_buffer_1d(&symbol_count); }
     void update_frame_count(void)
     {
         if (++frame_count == 1e9)
@@ -94,17 +91,15 @@ struct ZF_stats : public Frame_stats {
         Frame_stats::init(max_tasks, max_frame, align);
         coded_frame = -1;
     }
-    void fini()
-    {
-        Frame_stats::fini();
-    }
+    void fini() { Frame_stats::fini(); }
 };
 
 struct Data_stats : public Frame_stats {
     Table<int> task_count;
     int max_task_count;
 
-    void init(int max_tasks, int max_symbols, int max_frame, int max_data_subframe, int align)
+    void init(int max_tasks, int max_symbols, int max_frame,
+        int max_data_subframe, int align)
     {
         Frame_stats::init(max_symbols, max_frame, align);
         task_count.calloc(max_frame, max_data_subframe, align);
@@ -162,26 +157,30 @@ struct IFFTBuffer {
     Table<complex_float> IFFT_outputs;
 };
 
-inline size_t generateOffset2d(size_t max_dim1, size_t max_dim2, size_t dim1_id, size_t dim2_id)
+inline size_t generateOffset2d(
+    size_t max_dim1, size_t max_dim2, size_t dim1_id, size_t dim2_id)
 {
     dim1_id = dim1_id % max_dim1;
     return dim1_id * max_dim2 + dim2_id;
 }
 
-inline size_t generateOffset3d(size_t max_dim1, size_t max_dim2, size_t max_dim3, size_t dim1_id, size_t dim2_id, size_t dim3_id)
+inline size_t generateOffset3d(size_t max_dim1, size_t max_dim2,
+    size_t max_dim3, size_t dim1_id, size_t dim2_id, size_t dim3_id)
 {
     dim1_id = dim1_id % max_dim1;
     size_t dim2d_id = dim1_id * max_dim2 + dim2_id;
     return dim2d_id * max_dim3 + dim3_id;
 }
 
-inline void interpretOffset2d(size_t max_dim2, size_t offset, size_t* dim1_id, size_t* dim2_id)
+inline void interpretOffset2d(
+    size_t max_dim2, size_t offset, size_t* dim1_id, size_t* dim2_id)
 {
     *dim2_id = offset % max_dim2;
     *dim1_id = offset / max_dim2;
 }
 
-inline void interpretOffset3d(size_t max_dim2, size_t max_dim3, size_t offset, size_t* dim1_id, size_t* dim2d_id, size_t* dim2_id, size_t* dim3_id)
+inline void interpretOffset3d(size_t max_dim2, size_t max_dim3, size_t offset,
+    size_t* dim1_id, size_t* dim2d_id, size_t* dim2_id, size_t* dim3_id)
 {
     *dim3_id = offset % max_dim3;
     *dim2d_id = offset / max_dim3;

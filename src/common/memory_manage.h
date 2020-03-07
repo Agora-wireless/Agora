@@ -1,16 +1,15 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 #ifndef MEMORY_MANAGE
 #define MEMORY_MANAGE
+#include <cstdlib>
 #include <cstring>
 #include <stdio.h>
-#include <cstdlib>
 
-template <typename T>
-class Table {
+template <typename T> class Table {
 private:
     size_t dimension;
     void* data;
@@ -51,7 +50,6 @@ static void alloc_buffer_1d(T** buffer, U dim, int aligned_bytes, int init_zero)
         memset(*buffer, 0, dim * sizeof(T));
 };
 
-template <typename T>
-static void free_buffer_1d(T** buffer) { free(*buffer); };
+template <typename T> static void free_buffer_1d(T** buffer) { free(*buffer); };
 
 #endif
