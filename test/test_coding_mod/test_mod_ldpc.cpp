@@ -57,64 +57,70 @@ T* aligned_malloc(const int size, const unsigned alignment)
 #endif
 }
 
-int8_t cvt_to_int8(int8_t x, int start, int end)
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+static inline uint8_t bitreverse8(uint8_t x)
 {
-    int8_t re = 0;
-    int index = end - start - 1;
-    for (int i = start; i < end; i++) {
-        re |= ((x >> i) & 0x1) << index;
-        index--;
-    }
-    return re;
+#if __has_builtin(__builtin_bireverse8)
+    return (__builtin_bitreverse8(x));
+#else
+    x = (x << 4) | (x >> 4);
+    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
+    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
+    return (x);
+#endif
 }
 
-void adapt_bits_for_mod(int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
+/*
+ * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
+ * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
+ * at least 8*len/m bytes.
+ */
+static void adapt_bits_for_mod(
+    int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
 {
-    int start_bit = 0, end_bit = 0;
-    int out_idx = 0;
+    int bits_avail = 0;
+    uint16_t bits = 0;
     for (int i = 0; i < len; i++) {
-        end_bit = start_bit + mod_order;
-        while (end_bit <= 8) {
-            vec_out[out_idx] = cvt_to_int8(vec_in[i], start_bit, end_bit);
-            out_idx++;
-            start_bit = end_bit;
-            end_bit = start_bit + mod_order;
-        }
-
-        if (i + 1 < len) {
-            int nremaining_bits = 8 - start_bit;
-            int nbits_in_next = mod_order - (nremaining_bits);
-            int nremaining_bits_next = 8 - nbits_in_next;
-            vec_out[out_idx]
-                = (cvt_to_int8(vec_in[i], start_bit, 8) << nbits_in_next)
-                + (cvt_to_int8(vec_in[i + 1], 0, nbits_in_next));
-            out_idx++;
-            start_bit = nbits_in_next;
+        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
+        bits_avail += 8;
+        while (bits_avail >= mod_order) {
+            *vec_out++ = bits >> (16 - mod_order);
+            bits <<= mod_order;
+            bits_avail -= mod_order;
         }
     }
-    // printf("mod_order: %d\n", mod_order);
-    // printf("original\n");
-    // for (int i = 0; i < len; i++) {
-    //     std::cout << " " << std::bitset<8>(vec_in[i]);
-    // }
-    // printf("\n");
-    // printf("output\n");
-    // for (int i = 0; i < out_idx; i++) {
-    //     std::cout << " " << std::bitset<8>(vec_out[i]);
-    // }
-    // printf("\n");
+}
+
+
+uint8_t select_base_matrix_entry(uint16_t Zc) 
+{
+    uint8_t i_LS;
+    if ((Zc % 15) == 0)
+        i_LS = 7;
+    else if ((Zc % 13) == 0)
+        i_LS = 6;
+    else if ((Zc % 11) == 0)
+        i_LS = 5;
+    else if ((Zc % 9) == 0)
+        i_LS = 4;
+    else if ((Zc % 7) == 0)
+        i_LS = 3;
+    else if ((Zc % 5) == 0)
+        i_LS = 2;
+    else if ((Zc % 3) == 0)
+        i_LS = 1;
+    else
+        i_LS = 0;
+    return i_LS;
 }
 
 int main()
 {
 
     printf("--------5gnr ldpc test--------\n");
-    clock_t t_enc_start, t_enc_end, t_dec_start, t_dec_end;
-    double t_encoder[numberCodeblocks];
-    double t_enc_total = 0;
-    double t_decoder[numberCodeblocks];
-    double t_dec_total = 0;
-
     int8_t* input[numberCodeblocks];
     int8_t* encoded[numberCodeblocks];
     uint8_t* decoded[numberCodeblocks];
@@ -125,10 +131,11 @@ int main()
     // complex_float **mod_output;
 
     // uint16_t Zc_array[12] = {2,8,10,12,14,16,20,32,64,96,144,192};
-    int mod_order = 6;
+    int mod_order = 4;
+    printf("Modulation order: %d\n", mod_order);
     Table<float> mod_table;
     init_modulation_table(mod_table, mod_order);
-    uint16_t Zc_array[1] = { 32 };
+    uint16_t Zc_array[1] = { 72 };
     for (int zc_itr = 0; zc_itr < 1; zc_itr++) {
         uint16_t Zc = Zc_array[zc_itr];
         int nRows = (Bg == 1) ? 46 : 42;
@@ -145,9 +152,6 @@ int main()
 
         mod_input.calloc(numberCodeblocks, cbCodewLen / mod_order, 32);
         mod_output.calloc(numberCodeblocks, cbCodewLen / mod_order, 32);
-        // alloc_buffer_2d(&mod_input, numberCodeblocks, cbCodewLen / mod_order,
-        // 32, 1); alloc_buffer_2d(&mod_output, numberCodeblocks, cbCodewLen /
-        // mod_order, 32, 1);
 
         printf("Zc: %d, code block len: %d, encoded block len: %d, encoder "
                "buf: %d Bytes, decoder buf: %d Bytes, decoder iterations: %d\n",
@@ -167,11 +171,9 @@ int main()
 
         // randomly generate input
         srand(time(NULL));
-        for (int n = 0; n < numberCodeblocks; n++) {
-            int8_t* p_input = input[n];
+        for (int n = 0; n < numberCodeblocks; n++) 
             for (int i = 0; i < ((cbLen + 7) >> 3); i++)
-                p_input[i] = (int8_t)rand();
-        }
+                input[n][i] = (int8_t)rand();
 
         // encoder setup
         // -----------------------------------------------------------
@@ -181,23 +183,8 @@ int main()
         const int16_t* pMatrixNumPerCol;
         const int16_t* pAddr;
 
-        uint8_t i_LS; // i_Ls decides the base matrix entries
-        if ((Zc % 15) == 0)
-            i_LS = 7;
-        else if ((Zc % 13) == 0)
-            i_LS = 6;
-        else if ((Zc % 11) == 0)
-            i_LS = 5;
-        else if ((Zc % 9) == 0)
-            i_LS = 4;
-        else if ((Zc % 7) == 0)
-            i_LS = 3;
-        else if ((Zc % 5) == 0)
-            i_LS = 2;
-        else if ((Zc % 3) == 0)
-            i_LS = 1;
-        else
-            i_LS = 0;
+        // i_Ls decides the base matrix entries
+        uint8_t i_LS = select_base_matrix_entry(Zc); 
 
         if (Bg == 1) {
             pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
@@ -217,14 +204,12 @@ int main()
 
         double start_time = get_time();
         for (int n = 0; n < numberCodeblocks; n++) {
-            // t_enc_start = clock();
             // read input into z-bit segments
             ldpc_adapter_func(input[n], internalBuffer0, Zc, cbLen, 1);
             // encode
             ldpc_encoder_func(internalBuffer0, internalBuffer1,
                 pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
             // scatter the output back to compacted
-            // t_enc_end = clock();
             // combine the input sequence and the parity bits into codeword
             // outputs
             memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
@@ -233,16 +218,10 @@ int main()
                 internalBuffer1, cbEncLen / Zc * PROC_BYTES);
 
             ldpc_adapter_func(encoded[n], internalBuffer2, Zc, cbCodewLen, 0);
-
-            // t_encoder[n] = (t_enc_start-t_enc_end)/CLOCKS_PER_SEC*(1e9);
-            // t_enc_total = t_enc_total + t_encoder[n];
-
-            // printf("the encoding for the %dth code block took %f nano
-            // seconds\n", n, t_encoder[n]);
         }
         double end_time = get_time();
-        printf("encoding time: %.3f\n",
-            (end_time - start_time) / numberCodeblocks);
+        double encoding_time = end_time - start_time;
+        printf("encoding time: %.3f\n", encoding_time / numberCodeblocks);
 
         // generate llrs
         // replace this with channel output
@@ -257,35 +236,12 @@ int main()
             for (int i = 0; i < num_mod; i++)
                 mod_output[n][i]
                     = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
+            // TODO: add noise
             if (mod_order == 4)
                 demod_16qam_soft_avx2((float*)mod_output[n], llrs[n], num_mod);
             else if (mod_order == 6)
                 demod_64qam_soft_avx2((float*)mod_output[n], llrs[n], num_mod);
         }
-
-        // printf("llrs: \n");
-        // for (int i = 0; i < num_mod; i++) {
-        //     for (int j = 0; j < mod_order; j++)
-        //         printf("%i ", llrs[0][i * mod_order + j]);
-        //     printf("   ");
-        // }
-        // printf("\n");
-
-        // for (int n=0; n<numberCodeblocks; n++){
-        //     for (int i=0; i<cbCodewLen; i++){
-        //         uint8_t msgbyte = encoded[n][i/8];
-        //         if((msgbyte>>(i%8))&1) llrs[n][i] = -127;
-        //         else llrs[n][i] = 127;
-        //     }
-        // }
-
-        // printf("llrs: \n");
-        // for (int i = 0; i < num_mod; i++) {
-        //     for (int j = 0; j < mod_order; j++)
-        //         printf("%i ", llrs[0][i * mod_order + j]);
-        //     printf("   ");
-        // }
-        // printf("\n");
 
         // decoder setup
         // --------------------------------------------------------------
@@ -317,27 +273,19 @@ int main()
 
         // decoding
         // -------------------------------------------------------------------
+        printf("decoding-----------------------\n");
         start_time = get_time();
         for (int n = 0; n < numberCodeblocks; n++) {
-            // printf("decoding-----------------------\n");
             ldpc_decoder_5gnr_request.varNodes = llrs[n];
             ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
-            // t_dec_start = clock();
             bblib_ldpc_decoder_5gnr(
                 &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
-            // t_dec_end = clock();
-
-            // t_decoder[n] = (t_dec_start-t_dec_end)/CLOCKS_PER_SEC*(1e9);
-            // t_dec_total = t_dec_total + t_decoder[n];
-
             // memcpy(decoded[n],
-            // ldpc_decoder_5gnr_response.compactedMessageBytes, numMsgBytes);
-            // printf("the decoding for the %dth code block took %f nano
-            // seconds\n", n, t_decoder[n]);
+            // ldpc_decoder_5gnr_response.compactedMessageBytes, numMsgBytes);        
         }
         end_time = get_time();
-        printf("decoding time: %.3f\n",
-            (end_time - start_time) / numberCodeblocks);
+        double decoding_time = end_time - start_time;
+        printf("decoding time: %.3f\n", decoding_time / numberCodeblocks);
         // results
         // -----------------------------------------------------------------
         printf("results---------------------\n");
@@ -348,8 +296,8 @@ int main()
             uint8_t* input_buffer = (uint8_t*)input[n];
             uint8_t* output_buffer = decoded[n];
             for (int i = 0; i < (cbLen >> 3); i++) {
-                // printf("input: %i, output: %i\n", input_buffer[i],
-                // output_buffer[i]);
+                printf("input: %i, output: %i\n", input_buffer[i],
+                output_buffer[i]);
                 uint8_t error = input_buffer[i] ^ output_buffer[i];
                 for (int j = 0; j < 8; j++) {
                     err_cnt += error & 1;
@@ -362,11 +310,11 @@ int main()
         printf("the bit error rate is %f\n", ber);
 
         double enc_thruput
-            = (double)cbLen * numberCodeblocks / t_enc_total * 125;
-        printf("the encoder's speed is %f MB/sec\n", enc_thruput);
+            = (double)cbLen * numberCodeblocks / encoding_time;
+        printf("the encoder's speed is %f Mbps\n", enc_thruput);
         double dec_thruput
-            = (double)cbLen * numberCodeblocks / t_dec_total * 125;
-        printf("the decoder's speed is %f MB/sec\n", dec_thruput);
+            = (double)cbLen * numberCodeblocks / decoding_time;
+        printf("the decoder's speed is %f Mbps\n", dec_thruput);
 
         for (int n = 0; n < numberCodeblocks; n++) {
             free(input[n]);
@@ -374,6 +322,8 @@ int main()
             free(llrs[n]);
             free(decoded[n]);
         }
+        mod_input.free();
+        mod_output.free();
     }
 
     return 0;
