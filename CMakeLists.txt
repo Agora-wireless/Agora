@@ -126,6 +126,10 @@ target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY
 
 # LDPC support
 if(${USE_LDPC})
+  if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
+    message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
+    message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
+  endif()
   add_definitions(-DUSE_LDPC)
   # set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
   set(SDK_DIR /home/argos/Jian/5gnr_ldpc/intel_library)
