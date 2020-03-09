@@ -16,6 +16,7 @@
 #define COMMSLIB_HEADER
 
 #include "memory_manage.h"
+#include "buffer.hpp"
 #include "mkl_dfti.h"
 #include <algorithm>
 #include <complex.h>
@@ -54,6 +55,8 @@ public:
         std::vector<std::complex<float>>, int);
     static std::vector<std::complex<float>> IFFT(
         std::vector<std::complex<float>>, int, bool scale = true);
+    static void FFT(complex_float*, int);
+    static void IFFT(complex_float*, int, bool normalize = true);
     static size_t find_pilot_seq(std::vector<std::complex<double>> iq,
         std::vector<std::complex<double>> pilot, size_t seqLen);
     static int findLTS(std::vector<std::complex<double>> iq, int seqLen);

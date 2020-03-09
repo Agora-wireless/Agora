@@ -334,12 +334,8 @@ std::vector<std::complex<float>> CommsLib::IFFT(
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
     (void)DftiCommitDescriptor(mkl_handle);
-    Table<std::complex<float>> IFFT_inputs;
-    IFFT_inputs.calloc(1, fftsize, 64);
-    memcpy(IFFT_inputs[0], in.data(), fftsize * sizeof(std::complex<float>));
-    DftiComputeBackward(mkl_handle, IFFT_inputs[0]);
+    DftiComputeBackward(mkl_handle, in.data());
     DftiFreeDescriptor(&mkl_handle);
-    memcpy(in.data(), IFFT_inputs[0], fftsize * sizeof(std::complex<float>));
     if (normalize) {
         // for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
         float max_val = 0;
@@ -368,15 +364,41 @@ std::vector<std::complex<float>> CommsLib::FFT(
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
     (void)DftiCommitDescriptor(mkl_handle);
-    Table<std::complex<float>> FFT_inputs;
-    FFT_inputs.calloc(1, fftsize, 64);
-    memcpy(FFT_inputs[0], in.data(), fftsize * sizeof(std::complex<float>));
     /* compute FFT */
-    DftiComputeForward(mkl_handle, FFT_inputs[0]);
-    memcpy(in.data(), FFT_inputs[0], fftsize * sizeof(std::complex<float>));
+    DftiComputeForward(mkl_handle, in.data());
     DftiFreeDescriptor(&mkl_handle);
     return in;
 }
+
+void CommsLib::IFFT(
+    complex_float* in, int fftsize, bool normalize)
+{
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    (void)DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCommitDescriptor(mkl_handle);
+    DftiComputeBackward(mkl_handle, in);
+    DftiFreeDescriptor(&mkl_handle);
+    if (normalize) {
+        for (int i = 0; i < fftsize; i++) {
+            in[i].re /=fftsize;
+            in[i].im /=fftsize;
+        }
+    }
+}
+
+void CommsLib::FFT(
+    complex_float* in, int fftsize)
+{
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    (void)DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCommitDescriptor(mkl_handle);
+    /* compute FFT */
+    DftiComputeForward(mkl_handle, in);
+    DftiFreeDescriptor(&mkl_handle);
+}
+
 
 std::vector<std::complex<float>> CommsLib::composeRefSymbol(
     std::vector<std::complex<float>> pilot, size_t offset, size_t period,

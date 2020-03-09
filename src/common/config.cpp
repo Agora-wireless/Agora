@@ -184,15 +184,15 @@ Config::Config(std::string jsonfile)
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
-    LDPC_config.Zc = tddConf.value("Zc", 32);
+    LDPC_config.Zc = tddConf.value("Zc", 72);
     LDPC_config.nRows = (LDPC_config.Bg == 1) ? 46 : 42;
     LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
     LDPC_config.cbLen
         = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
     LDPC_config.cbCodewLen
         = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
-    LDPC_config.nblocksInSymbol
-        = 1; // OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+    LDPC_config.nblocksInSymbol = 
+        OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
     printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, "
            "encoded block len: %d, decoder iterations: %d\n",
@@ -261,17 +261,10 @@ Config::Config(std::string jsonfile)
         printf("open file %s faild.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    float* pilots_2048 = (float*)aligned_alloc(64, 2048 * sizeof(float));
-    r = fread(pilots_2048, sizeof(float), 2048, fp);
+    r = fread(pilots_, sizeof(float), 2048, fp);
     if (r < 2048)
         printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
-    for (size_t i = 0; i < OFDM_CA_NUM; i++) {
-        if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
-            pilots_[i] = 0;
-        else
-            pilots_[i] = pilots_2048[424 + i - OFDM_DATA_START];
-    }
 #endif
 
     pilotsF.resize(OFDM_CA_NUM);
