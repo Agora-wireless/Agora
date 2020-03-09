@@ -15,16 +15,16 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
 #ifdef USE_LDPC
     Table<int8_t>& in_dl_encoded_data,
 #else
-    Table<int8_t>& in_dl_IQ_data,
+    Table<int8_t>& in_dl_raw_data,
 #endif
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , precoder_buffer_(in_precoder_buffer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
 #ifdef USE_LDPC
-    , dl_IQ_data(in_dl_encoded_data)
+    , dl_raw_data(in_dl_encoded_data)
 #else
-    , dl_IQ_data(in_dl_IQ_data)
+    , dl_raw_data(in_dl_raw_data)
 #endif
     , Precode_task_duration(
           in_stats_manager->precode_stats_worker.task_duration)
@@ -105,17 +105,17 @@ void DoPrecode::launch(int offset)
                 int subframe_id_in_buffer
                     = current_data_subframe_id - config_->dl_data_symbol_start;
                 _mm_prefetch(
-                    (char*)(dl_IQ_data[subframe_id_in_buffer] + cur_sc_id),
+                    (char*)(dl_raw_data[subframe_id_in_buffer] + cur_sc_id),
                     _MM_HINT_T0);
                 // printf("In doPrecode thread %d: frame: %d, subframe: %d,
                 // subcarrier: %d\n", tid, frame_id, current_data_subframe_id,
                 // cur_sc_id); printf("raw data: \n");
                 for (int user_id = 0; user_id < UE_NUM - 1; user_id++) {
                     int8_t* raw_data_ptr
-                        = &dl_IQ_data[subframe_id_in_buffer]
+                        = &dl_raw_data[subframe_id_in_buffer]
                                      [cur_sc_id + OFDM_DATA_NUM * user_id];
                     int8_t* next_raw_data_ptr
-                        = &dl_IQ_data[subframe_id_in_buffer][cur_sc_id
+                        = &dl_raw_data[subframe_id_in_buffer][cur_sc_id
                             + OFDM_DATA_NUM * (user_id + 1)];
                     _mm_prefetch((char*)next_raw_data_ptr, _MM_HINT_T0);
                     // printf("%u ", *raw_data_ptr);
@@ -124,7 +124,7 @@ void DoPrecode::launch(int offset)
                 }
                 // printf("\n");
                 int8_t* raw_data_ptr
-                    = &dl_IQ_data[subframe_id_in_buffer]
+                    = &dl_raw_data[subframe_id_in_buffer]
                                  [cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
                 data_ptr[UE_NUM - 1]
                     = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);

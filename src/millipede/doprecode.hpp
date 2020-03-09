@@ -32,7 +32,7 @@ public:
 #ifdef USE_LDPC
         Table<int8_t>& in_dl_encoded_data,
 #else
-        Table<int8_t>& in_dl_IQ_data,
+        Table<int8_t>& in_dl_raw_data,
 #endif
         Stats* in_stats_manager);
     ~DoPrecode();
@@ -82,7 +82,7 @@ private:
      */
 
     Table<complex_float>& dl_ifft_buffer_;
-    Table<int8_t>& dl_IQ_data;
+    Table<int8_t>& dl_raw_data;
     Table<float> qam_table;
 
     Table<double>& Precode_task_duration;

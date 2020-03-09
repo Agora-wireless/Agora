@@ -575,7 +575,11 @@ finish:
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
+#ifdef USE_LDPC
+    save_decode_data_to_file(last_frame_id);
+#else
     save_demul_data_to_file(last_frame_id);
+#endif
     save_ifft_data_to_file(last_frame_id);
     this->stop();
     // exit(0);
@@ -1108,6 +1112,7 @@ void Millipede::initialize_uplink_buffers()
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int UE_NUM = config_->UE_NUM;
+    LDPCconfig LDPC_config = config_->LDPC_config;
 
     socket_buffer_status_size_
         = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe;
@@ -1131,8 +1136,10 @@ void Millipede::initialize_uplink_buffers()
     size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(
         TASK_BUFFER_SUBFRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
-    decoded_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+    size_t num_decoded_bytes = (LDPC_config.cbLen + 7) >> 3 
+        * LDPC_config.nblocksInSymbol;
+    decoded_buffer_.calloc(
+        TASK_BUFFER_SUBFRAME_NUM, num_decoded_bytes * UE_NUM, 64);
 
     int max_packet_num_per_frame
         = BS_ANT_NUM * (PILOT_NUM + ul_data_subframe_num_perframe);
@@ -1273,6 +1280,30 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
                 = &demod_hard_buffer_[total_data_subframe_id][sc * UE_NUM];
             fwrite(ptr, UE_NUM, sizeof(uint8_t), fp);
         }
+    }
+    fclose(fp);
+#endif
+}
+
+void Millipede::save_decode_data_to_file(UNUSED int frame_id)
+{
+#ifdef WRITE_DEMUL
+    printf("saving demul data...\n");
+    int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
+    int UE_NUM = config_->UE_NUM;
+    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    size_t num_decoded_bytes = (LDPC_config.cbLen + 7) >> 3 
+        * LDPC_config.nblocksInSymbol;
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/decode_data.bin";
+    FILE* fp = fopen(filename.c_str(), "wb");
+    for (int i = 0; i < data_subframe_num_perframe; i++) {
+        int total_data_subframe_id
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
+            + i;
+        uint8_t* ptr = decoded_buffer_[total_data_subframe_id];
+        fwrite(ptr, UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
     }
     fclose(fp);
 #endif

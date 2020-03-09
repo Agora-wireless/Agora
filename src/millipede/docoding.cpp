@@ -117,19 +117,20 @@ void DoEncode::launch(int offset)
 #endif
 
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
+    int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
+    int input_offset = cbLenBytes * nblocksInSymbol * ue_id + cbLenBytes * cur_cb_id;
+    int cbCodedBytes = LDPC_config.cbCodewLen / config_->mod_type;
     int output_offset
-        = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+        = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
     int8_t* input_ptr = (int8_t*)raw_data_buffer_[symbol_id] + input_offset;
     int8_t* output_ptr = encoded_buffer_temp;
-    // int8_t *output_ptr = encoded_buffer[symbol_offset] + output_offset;
+    
     ldpc_adapter_func(
         input_ptr, internalBuffer0, LDPC_config.Zc, LDPC_config.cbLen, 1);
-    // encode
     ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr,
         pShiftMatrix, (int16_t)LDPC_config.Zc, i_LS);
-    // scatter the output back to compacted
-    // combine the input sequence and the parity bits into codeword outputs
+    /* scatter the output back to compacted
+     * combine the input sequence and the parity bits into codeword outputs */
     memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
         (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES);
     memcpy(
@@ -217,20 +218,28 @@ void DoDecode::launch(int offset)
 #endif
 
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int input_offset = OFDM_DATA_NUM * ue_id + LDPC_config.cbLen * cur_cb_id;
-    int output_offset
+    int input_offset
         = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
-    int llr_buffer_offset = output_offset * config_->mod_type;
+    int llr_buffer_offset = input_offset * config_->mod_type;
     ldpc_decoder_5gnr_request.varNodes
         = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
+    int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
+    int output_offset = cbLenBytes * nblocksInSymbol * ue_id + cbLenBytes * cur_cb_id;
     ldpc_decoder_5gnr_response.compactedMessageBytes
-        = (uint8_t*)decoded_buffer_[symbol_offset] + input_offset;
-    // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d, llr
-    // offset %d, decode offset: %d, request_addr: %lx, response_addr: %lx\n",
-    //     tid, frame_id, symbol_id, cb_id, llr_buffer_offset, input_offset,
-    //     llr_buffer[symbol_offset] + llr_buffer_offset,decoded_buffer[0]);
+        = (uint8_t*)decoded_buffer_[symbol_offset] + output_offset;
+
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+
+    int frame_id = symbol_offset / data_subframe_num_perframe;
+    printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
+        frame_id, symbol_id, cur_cb_id);
+    printf("Decode data\n");
+    for(int i = 0; i < LDPC_config.cbLen >> 3; i++) {
+        // printf("%u ", *(ldpc_decoder_5gnr_response.compactedMessageBytes + i));
+        printf("%u ", *(decoded_buffer_[symbol_offset] + output_offset + i));
+    }
+    printf("\n");
 
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;

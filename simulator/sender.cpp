@@ -117,8 +117,13 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
 
     /* read from file */
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+#ifdef USE_LDPC
+    std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
+        + std::to_string(BS_ANT_NUM) + ".bin";
+#else 
     std::string filename = cur_directory + "/data/rx_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
+#endif
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file failed: %s\n", filename.c_str());
