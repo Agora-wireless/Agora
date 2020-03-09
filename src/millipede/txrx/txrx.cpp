@@ -436,28 +436,3 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
     }
     return offset;
 }
-
-void* PacketTXRX::loopSend(int tid)
-{
-    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
-
-    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    int local_port_id = config_->bs_port;
-    int remote_port_id = config_->ue_rx_port + tid;
-#if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-    struct sockaddr_in remote_addr;
-    setup_sockaddr_remote_ipv4(
-        &remote_addr, remote_port_id, config_->tx_addr.c_str());
-#else
-    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-    struct sockaddr_in6 remote_addr;
-    setup_sockaddr_remote_ipv6(
-        &remote_addr, remote_port_id, config_->tx_addr.c_str());
-#endif
-
-    while (true) {
-        dequeue_send(tid, socket_local, &remote_addr);
-    }
-    return 0;
-}
