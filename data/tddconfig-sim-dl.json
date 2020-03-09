@@ -10,11 +10,5 @@
  "worker_thread_num" : 25,
  "demul_block_size" : 48,
  "downlink_mode" : true,
- "rx_addr": "10.0.0.3",
- "tx_addr": "10.0.0.4",
- "bs_port": 8000,
- "ue_tx_port": 6000,
- "ue_rx_port": 7000,
- "modulation": "16QAM",
  "antenna_num": 8
 }
