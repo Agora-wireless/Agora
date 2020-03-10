@@ -371,8 +371,15 @@ Config::Config(std::string jsonfile)
     }
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
+#ifdef USE_LDPC
+    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_2048_ant"
+        + std::to_string(BS_ANT_NUM) + ".bin";
+    int num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
+#else
     std::string filename1 = cur_directory1 + "/data/orig_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
+    int num_bytes_per_ue = OFDM_DATA_NUM;
+#endif
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
         printf("open file %s faild.\n", filename1.c_str());
@@ -380,8 +387,8 @@ Config::Config(std::string jsonfile)
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         r = fread(
-            dl_IQ_data[i], sizeof(int8_t), OFDM_DATA_NUM * UE_ANT_NUM, fd);
-        if (r < OFDM_DATA_NUM)
+            dl_IQ_data[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
+        if (r < num_bytes_per_ue)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
