@@ -34,6 +34,8 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 
+find_package(Armadillo)
+
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
@@ -53,9 +55,9 @@ set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
               ${LIB_DIR}/source/phy/lib_common/libcommon.a)
 
 include_directories(
-  ${SDK_DIR}/decoder/src/common
-  ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr
-  ${SDK_DIR}/decoder/src/lib_common
+  ${SDK_DIR}/test/phy/common
+  ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
 set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
@@ -66,6 +68,5 @@ set(LDPC_SOURCES
   ${SOURCE_DIR}/src/encoder/iobuffer.cpp)
 
 add_executable(data_generator data_generator.cpp ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
-target_link_libraries(data_generator
-  ${LDPC_LIBS} ${MKL_LIBS})
+target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
 

@@ -115,11 +115,11 @@ void DoFFT::launch(int offset)
     }
 
     // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-    // frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id); printf("FFT
-    // input\n"); for (int i = OFDM_DATA_START; i < OFDM_CA_NUM -
-    // OFDM_DATA_START * 2); i++) {
-    //     std::cout <<"("<<i<<", "<<(*(fft_buffer_.FFT_inputs[0]
-    //     +i)).re<<","<<(*(fft_buffer_.FFT_inputs[0] +i)).im<<") ";
+    //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id); 
+    // printf("FFT input\n"); 
+    // for (int i = 0; i < OFDM_CA_NUM; i++) {
+    //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2), 
+    //         *(cur_fft_buffer_float + i * 2 + 1));
     // }
     // printf("\n");
 
@@ -148,14 +148,6 @@ void DoFFT::launch(int offset)
         // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
         //    RC_task_duration[tid * 8][2] += duration2;
 #endif
-        // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-        // frame_id%TASK_BUFFER_FRAME_NUM, subframe_id, ant_id); printf("FFT
-        // output\n"); for (int i = OFDM_DATA_START; i < OFDM_CA_NUM -
-        // OFDM_DATA_START * 2; i++) {
-        //     std::cout <<"("<<i<<", "<<(*(fft_buffer_.FFT_inputs[0]
-        //     +i)).re<<","<<(*(fft_buffer_.FFT_inputs[0] +i)).im<<") ";
-        // }
-        // printf("\n");
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
@@ -212,11 +204,14 @@ void DoFFT::launch(int offset)
                 sc_idx += 8;
             }
         }
-        // for (int i =0;i<OFDM_DATA_NUM*BS_ANT_NUM; i++)
-        //     std::cout<<"("<<i<<",
-        //     "<<csi_buffer_[subframe_offset][i].real<<"+j"<<csi_buffer_[subframe_offset][i].imag<<")
-        //     ";
-        // std::cout<<std::endl;
+        // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
+        //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id); 
+        // printf("FFT output\n"); 
+        // for (int i = 0; i < OFDM_CA_NUM; i++) {
+        //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2), 
+        //         *(cur_fft_buffer_float + i * 2 + 1));
+        // }
+        // printf("\n");
     } else if (cur_symbol_type == UL) {
         int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
         int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;

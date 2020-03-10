@@ -119,10 +119,9 @@ void DoEncode::launch(int offset)
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
     int input_offset = cbLenBytes * nblocksInSymbol * ue_id + cbLenBytes * cur_cb_id;
-    int cbCodedBytes = LDPC_config.cbCodewLen / config_->mod_type;
-    int output_offset
-        = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
-    int8_t* input_ptr = (int8_t*)raw_data_buffer_[symbol_id] + input_offset;
+    int symbol_id_in_buffer
+        = symbol_id - config_->dl_data_symbol_start;
+    int8_t* input_ptr = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
     int8_t* output_ptr = encoded_buffer_temp;
     
     ldpc_adapter_func(
@@ -139,10 +138,25 @@ void DoEncode::launch(int offset)
 
     ldpc_adapter_func(
         output_ptr, internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
+    int cbCodedBytes = LDPC_config.cbCodewLen / config_->mod_type;
+    int output_offset
+        = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
     int8_t* final_output_ptr
         = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
-    adapt_bits_for_mod(output_ptr, final_output_ptr, LDPC_config.cbCodewLen / 8,
+    adapt_bits_for_mod(output_ptr, final_output_ptr, 
+        (LDPC_config.cbCodewLen + 7) >> 3,
         config_->mod_type);
+
+    // int frame_id = symbol_offset / data_subframe_num_perframe;
+    // printf("In doEncode thread %d: frame: %d, symbol: %d, ue: %d, code block %d\n", 
+    //     tid, frame_id, symbol_id, ue_id, cur_cb_id);
+    // printf("Encoded data\n");
+    // int mod_type = config_->mod_type;
+    // int num_mod = LDPC_config.cbCodewLen / mod_type;
+    // for(int i = 0; i < num_mod; i++) {
+    //     printf("%u ", *(final_output_ptr + i));
+    // }
+    // printf("\n");
 
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
@@ -231,15 +245,15 @@ void DoDecode::launch(int offset)
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
-    int frame_id = symbol_offset / data_subframe_num_perframe;
-    printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
-        frame_id, symbol_id, cur_cb_id);
-    printf("Decode data\n");
-    for(int i = 0; i < LDPC_config.cbLen >> 3; i++) {
-        // printf("%u ", *(ldpc_decoder_5gnr_response.compactedMessageBytes + i));
-        printf("%u ", *(decoded_buffer_[symbol_offset] + output_offset + i));
-    }
-    printf("\n");
+    // int frame_id = symbol_offset / data_subframe_num_perframe;
+    // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
+    //     frame_id, symbol_id, cur_cb_id);
+    // printf("Decode data\n");
+    // for(int i = 0; i < LDPC_config.cbLen >> 3; i++) {
+    //     // printf("%u ", *(ldpc_decoder_5gnr_response.compactedMessageBytes + i));
+    //     printf("%u ", *(decoded_buffer_[symbol_offset] + output_offset + i));
+    // }
+    // printf("\n");
 
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
