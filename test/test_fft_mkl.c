@@ -1,4 +1,3 @@
-#include "mufft/fft.h"
 #include <complex.h>
 #include <cmath>
 #include <stdint.h>
@@ -9,10 +8,9 @@
 #include <immintrin.h>
 #include "cpu_attach.hpp"
 #include "mkl_dfti.h"
-#include "ittnotify.h"
 #include <iostream>
 
-static double mufft_get_time(void)
+static double fft_get_time(void)
 {
     struct timespec tv;
     clock_gettime(CLOCK_MONOTONIC, &tv);
@@ -42,42 +40,11 @@ int flushCacheRuntime(long *p, long long p_size)
 }
 
 
-static double bench_fft_1d(unsigned N, unsigned iterations, int direction)
+
+static double bench_fft_1d_mkl(unsigned N, unsigned iterations)
 {
-    complex float *input = (complex float *)mufft_alloc(N * sizeof(complex float));
-    complex float *output = (complex float *)mufft_alloc(N * sizeof(complex float));
-
-    srand(0);
-    for (unsigned i = 0; i < N; i++)
-    {
-        float real = (float)rand() / RAND_MAX - 0.5f;
-        float imag = (float)rand() / RAND_MAX - 0.5f;
-        input[i] = real + _Complex_I * imag;
-    }
-
-    mufft_plan_1d *muplan = mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
-
-    double start_time = mufft_get_time();
-    __itt_resume();
-    for (unsigned i = 0; i < iterations; i++)
-    {
-        mufft_execute_plan_1d(muplan, output, input);
-    }
-    __itt_pause();
-    double end_time = mufft_get_time();
-
-    mufft_free(input);
-    mufft_free(output);
-    mufft_free_plan_1d(muplan);
-
-    return end_time - start_time;
-}
-
-
-static double bench_fft_1d_mkl(unsigned N, unsigned iterations, int direction)
-{
-    complex float *input = (complex float *)mufft_alloc(N * sizeof(complex float));
-    complex float *output = (complex float *)mufft_alloc(N * sizeof(complex float));
+    float _Complex *input = (float _Complex *)aligned_alloc(64, N * sizeof(float _Complex));
+    float _Complex *output = (float _Complex *)aligned_alloc(64, N * sizeof(float _Complex));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -93,26 +60,22 @@ static double bench_fft_1d_mkl(unsigned N, unsigned iterations, int direction)
         input[i] = real + _Complex_I * imag;
     }
     
-    // mufft_plan_1d *muplan = mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
-
-    double start_time = mufft_get_time();
-    __itt_resume();
+    double start_time = fft_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
        status = DftiComputeForward( my_desc1_handle, input);
     }
-    __itt_pause();
-    double end_time = mufft_get_time();
+    double end_time = fft_get_time();
 
     status = DftiFreeDescriptor(&my_desc1_handle);
 
     return end_time - start_time;
 }
 
-static double bench_ifft_1d_mkl(unsigned N, unsigned iterations, int direction)
+static double bench_ifft_1d_mkl(unsigned N, unsigned iterations)
 {
-    complex float *input = (complex float *)mufft_alloc(N * sizeof(complex float));
-    complex float *output = (complex float *)mufft_alloc(N * sizeof(complex float));
+    float _Complex *input = (float _Complex *)aligned_alloc(64, N * sizeof(float _Complex));
+    float _Complex *output = (float _Complex *)aligned_alloc(64, N * sizeof(float _Complex));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -127,25 +90,23 @@ static double bench_ifft_1d_mkl(unsigned N, unsigned iterations, int direction)
         float imag = (float)rand() / RAND_MAX - 0.5f;;
         input[i] = real + _Complex_I * imag;
     }
-    
-    // mufft_plan_1d *muplan = mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
 
-    double start_time = mufft_get_time();
+    double start_time = fft_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
        status = DftiComputeBackward( my_desc1_handle, input);
     }
-    double end_time = mufft_get_time();
+    double end_time = fft_get_time();
 
     status = DftiFreeDescriptor(&my_desc1_handle);
 
     return end_time - start_time;
 }
 
-static double bench_fft_1d_mkl_out(unsigned N, unsigned iterations, int direction)
+static double bench_fft_1d_mkl_out(unsigned N, unsigned iterations)
 {
-    complex float *input = (complex float *)mufft_alloc(N * sizeof(complex float));
-    complex float *output = (complex float *)mufft_alloc(N * sizeof(complex float));
+    float _Complex *input = (float _Complex *)aligned_alloc(64, N * sizeof(float _Complex));
+    float _Complex *output = (float _Complex *)aligned_alloc(64, N * sizeof(float _Complex));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -163,14 +124,12 @@ static double bench_fft_1d_mkl_out(unsigned N, unsigned iterations, int directio
         input[i] = real + _Complex_I * imag;
     }
     
-    // mufft_plan_1d *muplan = mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
-
-    double start_time = mufft_get_time();
+    double start_time = fft_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
        status = DftiComputeForward( my_desc1_handle, input, output);
     }
-    double end_time = mufft_get_time();
+    double end_time = fft_get_time();
 
     status = DftiFreeDescriptor(&my_desc1_handle);
 
@@ -180,9 +139,9 @@ static double bench_fft_1d_mkl_out(unsigned N, unsigned iterations, int directio
 
 static double bench_data_type_convert(unsigned N, unsigned iterations)
 {
-    short *input_buffer = (short *)mufft_alloc(2 * N * sizeof(short)*10000);
-    float *input_buffer_float = (float *)mufft_alloc(2 * N * sizeof(float)*10000);
-    float *output_buffer = (float *)mufft_alloc(2 * N * sizeof(float)*10000);
+    short *input_buffer = (short *)aligned_alloc(64, 2* N * sizeof(short) * 10000);
+    float *input_buffer_float = (float *)aligned_alloc(64, 2 * N * sizeof(float) * 10000);
+    float *output_buffer = (float *)aligned_alloc(64, 2 * N * sizeof(float) * 10000);
 
     long long bigger_than_cachesize = 1000 * 1024 * 1024;//100 * 1024 * 1024;
     long *p = new long[bigger_than_cachesize];
@@ -200,11 +159,9 @@ static double bench_data_type_convert(unsigned N, unsigned iterations)
         input_buffer_float[i] = (float)rand() / RAND_MAX - 0.5f;
     }
     
-    // mufft_plan_1d *muplan = mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
     // flushCache();
     double duration = 0;
-    double start_time = mufft_get_time();
-    __itt_resume();
+    double start_time = fft_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
         // flushCache();
@@ -214,7 +171,7 @@ static double bench_data_type_convert(unsigned N, unsigned iterations)
         short *input = input_buffer;// + i % 10000 * N;
         float *input_float = input_buffer_float;// + i% 10000 * N;
         float *output = output_buffer;// + i% 10000 * N;
-        // start_time = mufft_get_time();
+        // start_time = fft_get_time();
         const __m256 magic = _mm256_set1_ps(float((1<<23) + (1<<15))/32768.f);
         const __m256i magic_i = _mm256_castps_si256(magic);
         for (int j = 0; j < N * 2; j += 16) {
@@ -272,10 +229,9 @@ static double bench_data_type_convert(unsigned N, unsigned iterations)
 
         // for(int j = 0; j < N * 2; j++)
         //     output[j] = input[j] * csi_format_offset;
-        // duration += mufft_get_time()-start_time;
+        // duration += fft_get_time()-start_time;
     }
-    __itt_pause();
-    double end_time = mufft_get_time();
+    double end_time = fft_get_time();
 
     return end_time-start_time;
 }
@@ -332,8 +288,8 @@ static void demod_16qam_loop2(float *vec_in, uint8_t *vec_out, int ue_num)
 
 static double bench_demod(unsigned N, unsigned iterations)
 {
-    float *input_buffer = (float *)mufft_alloc(2 * N * sizeof(float)*10000);
-    uint8_t *output_buffer = (uint8_t *)mufft_alloc(2 * N * sizeof(uint8_t)*10000);
+    float *input_buffer = (float *)aligned_alloc(64, 2 * N * sizeof(float)*10000);
+    uint8_t *output_buffer = (uint8_t *)aligned_alloc(64, 2 * N * sizeof(uint8_t)*10000);
 
     long long bigger_than_cachesize = 1000 * 1024 * 1024;//100 * 1024 * 1024;
     long *p = new long[bigger_than_cachesize];
@@ -346,10 +302,9 @@ static double bench_demod(unsigned N, unsigned iterations)
         input_buffer[i] = 2*((float)rand() / RAND_MAX - 0.5f);
     }
 
+    float _Complex *input = (float _Complex *)aligned_alloc(64, 2048 * sizeof(float _Complex));
+    float _Complex *output = (float _Complex *)aligned_alloc(64, 2048 * sizeof(float _Complex));
 
-
-    complex float *input = (complex float *)mufft_alloc(2048 * sizeof(complex float));
-    complex float *output = (complex float *)mufft_alloc(2048 * sizeof(complex float));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -368,9 +323,8 @@ static double bench_demod(unsigned N, unsigned iterations)
 
     // flushCache();
     double duration = 0;
-    double start_time = mufft_get_time();
-    start_time = mufft_get_time();
-    __itt_resume();
+    double start_time = fft_get_time();
+    start_time = fft_get_time();
     for (unsigned i = 0; i < iterations; i++)
     {
         // flushCache();
@@ -379,18 +333,17 @@ static double bench_demod(unsigned N, unsigned iterations)
         
         float *input_ptr = input_buffer;// + i % 10000 * N;
         uint8_t *output = output_buffer;// + i% 10000 * 64;
-        start_time = mufft_get_time();
+        start_time = fft_get_time();
         // _mm_prefetch((char *)(output+64), _MM_HINT_T1);
         demod_16qam_loop(input_ptr, output, N);
-        duration += mufft_get_time()-start_time;
+        duration += fft_get_time()-start_time;
         // demod_16qam_loop2(input_ptr, output, N);
         // status = DftiComputeForward( my_desc1_handle, input);
-        // bench_ifft_1d_mkl(2048, 10, MUFFT_INVERSE);
-        // bench_fft_1d_mkl_out(2048, 10, MUFFT_INVERSE);
+        // bench_ifft_1d_mkl(2048, 10);
+        // bench_fft_1d_mkl_out(2048, 10);
         // bench_data_type_convert(2048, 1);
     }
-    __itt_pause();
-    // double end_time = mufft_get_time();
+    // double end_time = fft_get_time();
     // duration = end_time - start_time;
 
     return duration;
@@ -400,61 +353,59 @@ static double bench_demod(unsigned N, unsigned iterations)
 static void run_benchmark_1d(unsigned N, unsigned iterations)
 {
     double flops = 5.0 * N * log2(N); // Estimation
-    __itt_pause();
-    double mufft_time_fft1 = bench_fft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_fft2 = bench_fft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_fft3 = bench_fft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_fft4 = bench_fft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_ifft = bench_fft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    __itt_pause();
+    double fft_time_fft1 = bench_fft_1d_mkl(N, iterations);
+    double fft_time_fft2 = bench_fft_1d_mkl(N, iterations);
+    double fft_time_fft3 = bench_fft_1d_mkl(N, iterations);
+    double fft_time_fft4 = bench_fft_1d_mkl(N, iterations);
+    double fft_time_ifft = bench_fft_1d_mkl(N, iterations);
     flops *= iterations;
 
-    double mufft_mflops_fft1 = flops / (1000000.0 * mufft_time_fft1);
-    double mufft_mflops_fft2 = flops / (1000000.0 * mufft_time_fft2);
-    double mufft_mflops_fft3 = flops / (1000000.0 * mufft_time_fft3);
-    double mufft_mflops_fft4 = flops / (1000000.0 * mufft_time_fft4);
-    double mufft_mflops_ifft = flops / (1000000.0 * mufft_time_ifft);
+    double fft_mflops_fft1 = flops / (1000000.0 * fft_time_fft1);
+    double fft_mflops_fft2 = flops / (1000000.0 * fft_time_fft2);
+    double fft_mflops_fft3 = flops / (1000000.0 * fft_time_fft3);
+    double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
+    double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
     printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft1, 1000000.0 * mufft_time_fft1 / iterations);
+            N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
     printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft2, 1000000.0 * mufft_time_fft2 / iterations);
+            N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
     printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft3, 1000000.0 * mufft_time_fft3 / iterations);
+            N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
     printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft4, 1000000.0 * mufft_time_fft4 / iterations);
+            N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
     printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_ifft, 1000000.0 * mufft_time_ifft / iterations);
+            N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 static void run_benchmark_1d_ifft(unsigned N, unsigned iterations)
 {
     double flops = 5.0 * N * log2(N); // Estimation
-    double mufft_time_fft1 = bench_ifft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_fft2 = bench_ifft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_fft3 = bench_ifft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_fft4 = bench_ifft_1d_mkl(N, iterations, MUFFT_INVERSE);
-    double mufft_time_ifft = bench_ifft_1d_mkl(N, iterations, MUFFT_INVERSE);
+    double fft_time_fft1 = bench_ifft_1d_mkl(N, iterations);
+    double fft_time_fft2 = bench_ifft_1d_mkl(N, iterations);
+    double fft_time_fft3 = bench_ifft_1d_mkl(N, iterations);
+    double fft_time_fft4 = bench_ifft_1d_mkl(N, iterations);
+    double fft_time_ifft = bench_ifft_1d_mkl(N, iterations);
     flops *= iterations;
 
-    double mufft_mflops_fft1 = flops / (1000000.0 * mufft_time_fft1);
-    double mufft_mflops_fft2 = flops / (1000000.0 * mufft_time_fft2);
-    double mufft_mflops_fft3 = flops / (1000000.0 * mufft_time_fft3);
-    double mufft_mflops_fft4 = flops / (1000000.0 * mufft_time_fft4);
-    double mufft_mflops_ifft = flops / (1000000.0 * mufft_time_ifft);
+    double fft_mflops_fft1 = flops / (1000000.0 * fft_time_fft1);
+    double fft_mflops_fft2 = flops / (1000000.0 * fft_time_fft2);
+    double fft_mflops_fft3 = flops / (1000000.0 * fft_time_fft3);
+    double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
+    double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
     printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft1, 1000000.0 * mufft_time_fft1 / iterations);
+            N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
     printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft2, 1000000.0 * mufft_time_fft2 / iterations);
+            N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
     printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft3, 1000000.0 * mufft_time_fft3 / iterations);
+            N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
     printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft4, 1000000.0 * mufft_time_fft4 / iterations);
+            N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
     printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_ifft, 1000000.0 * mufft_time_ifft / iterations);
+            N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 
@@ -462,75 +413,70 @@ static void run_benchmark_1d_ifft(unsigned N, unsigned iterations)
 static void run_benchmark_data_type(unsigned N, unsigned iterations)
 {
     double flops = 5.0 * N * log2(N); // Estimation
-     __itt_pause();
-    double mufft_time_fft1 = bench_data_type_convert(N, iterations);
-    double mufft_time_fft2 = bench_data_type_convert(N, iterations);
-    double mufft_time_fft3 = bench_data_type_convert(N, iterations);
-    double mufft_time_fft4 = bench_data_type_convert(N, iterations);
-    double mufft_time_ifft = bench_data_type_convert(N, iterations);
-     __itt_pause();
+    double fft_time_fft1 = bench_data_type_convert(N, iterations);
+    double fft_time_fft2 = bench_data_type_convert(N, iterations);
+    double fft_time_fft3 = bench_data_type_convert(N, iterations);
+    double fft_time_fft4 = bench_data_type_convert(N, iterations);
+    double fft_time_ifft = bench_data_type_convert(N, iterations);
     flops *= iterations;
 
-    double mufft_mflops_fft1 = flops / (1000000.0 * mufft_time_fft1);
-    double mufft_mflops_fft2 = flops / (1000000.0 * mufft_time_fft2);
-    double mufft_mflops_fft3 = flops / (1000000.0 * mufft_time_fft3);
-    double mufft_mflops_fft4 = flops / (1000000.0 * mufft_time_fft4);
-    double mufft_mflops_ifft = flops / (1000000.0 * mufft_time_ifft);
+    double fft_mflops_fft1 = flops / (1000000.0 * fft_time_fft1);
+    double fft_mflops_fft2 = flops / (1000000.0 * fft_time_fft2);
+    double fft_mflops_fft3 = flops / (1000000.0 * fft_time_fft3);
+    double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
+    double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
     printf("data type convert :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft1, 1000000.0 * mufft_time_fft1 / iterations);
+            N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
     printf("data type convert :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft2, 1000000.0 * mufft_time_fft2 / iterations);
+            N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
     printf("data type convert :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft3, 1000000.0 * mufft_time_fft3 / iterations);
+            N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
     printf("data type convert :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft4, 1000000.0 * mufft_time_fft4 / iterations);
+            N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
     printf("data type convert :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_ifft, 1000000.0 * mufft_time_ifft / iterations);
+            N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 
 static void run_benchmark_demod(unsigned N, unsigned iterations)
 {
     double flops = 5.0 * N * log2(N); // Estimation
-     __itt_pause();
-    double mufft_time_fft1 = bench_demod(N, iterations);
-    double mufft_time_fft2 = bench_demod(N, iterations);
-    double mufft_time_fft3 = bench_demod(N, iterations);
-    double mufft_time_fft4 = bench_demod(N, iterations);
-    double mufft_time_ifft = bench_demod(N, iterations);
-     __itt_pause();
+    double fft_time_fft1 = bench_demod(N, iterations);
+    double fft_time_fft2 = bench_demod(N, iterations);
+    double fft_time_fft3 = bench_demod(N, iterations);
+    double fft_time_fft4 = bench_demod(N, iterations);
+    double fft_time_ifft = bench_demod(N, iterations);
     flops *= iterations;
 
-    double mufft_mflops_fft1 = flops / (1000000.0 * mufft_time_fft1);
-    double mufft_mflops_fft2 = flops / (1000000.0 * mufft_time_fft2);
-    double mufft_mflops_fft3 = flops / (1000000.0 * mufft_time_fft3);
-    double mufft_mflops_fft4 = flops / (1000000.0 * mufft_time_fft4);
-    double mufft_mflops_ifft = flops / (1000000.0 * mufft_time_ifft);
+    double fft_mflops_fft1 = flops / (1000000.0 * fft_time_fft1);
+    double fft_mflops_fft2 = flops / (1000000.0 * fft_time_fft2);
+    double fft_mflops_fft3 = flops / (1000000.0 * fft_time_fft3);
+    double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
+    double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
     printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft1, 1000000.0 * mufft_time_fft1 / iterations);
+            N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
     printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft2, 1000000.0 * mufft_time_fft2 / iterations);
+            N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
     printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft3, 1000000.0 * mufft_time_fft3 / iterations);
+            N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
     printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_fft4, 1000000.0 * mufft_time_fft4 / iterations);
+            N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
     printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
-            N, mufft_mflops_ifft, 1000000.0 * mufft_time_ifft / iterations);
+            N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 
 int main(int argc, char *argv[])
 {
-    __itt_pause();
-    setenv("MKL_THREADING_LAYER", "sequential");
-    std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER") << std::endl; 
-    if (argc != 4)
-    {
-        fprintf(stderr, "Usage: %s [iterations] [Nx]\n",
+    //putenv("MKL_THREADING_LAYER=sequential");
+    //putenv("MKL_ENABLE_INSTRUCTIONS=AVX2");
+    //putenv("MKL_VERBOSE=1");
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s [iterations] [Nx] [mode]\n",
                 argv[0]);
         return 1;
     }
@@ -545,8 +491,7 @@ int main(int argc, char *argv[])
         printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
     }
 
-	if (argc == 4)
-    {
+    if (argc == 4) {
         unsigned iterations = strtoul(argv[1], NULL, 0);
         unsigned Nx = strtoul(argv[2], NULL, 0);
         unsigned mode = strtoul(argv[3], NULL, 0);
