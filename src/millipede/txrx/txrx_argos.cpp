@@ -100,7 +100,7 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
     tx_buffer_length_ = in_buffer_length;
     tx_buffer_ = in_buffer; // for save data
     tx_buffer_status_ = in_buffer_status; // for save status
-    // tx_data_buffer_ = in_data_buffer;
+
     printf("create TX or TXRX threads\n");
     // create new threads
     std::vector<pthread_t> created_threads;
@@ -131,15 +131,14 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
     char* rx_buffer = (*buffer_)[tid];
     int* rx_buffer_status = (*buffer_status_)[tid];
     int packet_length = config_->packet_length;
-    long long frameTime;
     int nChannels = config_->nChannels;
     struct Packet* pkt[nChannels];
     void* samp[nChannels];
     for (int ch = 0; ch < nChannels; ++ch) {
         // if rx_buffer is full, exit
         if (rx_buffer_status[rx_offset + ch] == 1) {
-            printf(
-                "Receive thread %d buffer full, cursor: %d\n", tid, rx_offset);
+            printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
+                rx_offset);
             config_->running = false;
             break;
         }
@@ -148,6 +147,7 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
     }
 
     // this is probably a really bad implementation, and needs to be revamped
+    long long frameTime;
     while (config_->running
         && radioconfig_->radioRx(radio_id, samp, frameTime) <= 0)
         ;
