@@ -169,28 +169,28 @@ void* PacketTXRX::loopTXRX(int tid)
     printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame,
         max_tx_packet_num_per_frame);
     int prev_frame_id = -1;
-    int rx_packet_num_per_frame = 0;
-    int tx_packet_num_per_frame = 0;
-    int do_tx = 0;
-    int rx_pkts_in_frame_count[10000] = { 0 };
+    bool do_tx = false;
+    enum { NUM_COUNTERS = 10000 };
+    int rx_pkts_in_frame_count[NUM_COUNTERS] = { 0 };
     // int last_finished_frame_id = 0;
 
-    int tx_pkts_in_frame_count[10000] = { 0 };
+    int tx_pkts_in_frame_count[NUM_COUNTERS] = { 0 };
     // int last_finished_tx_frame_id = 0;
 
     // double start_time= get_time();
 
-    if (!downlink_mode) {
-        while (true) {
+    while (true) {
+        if (!do_tx) {
             struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
-#if MEASURE_TIME
-            // read information from received packet
             frame_id = pkt->frame_id;
+
+#if MEASURE_TIME
 #if DEBUG_RECV
             int symbol_id = pkt->symbol_id;
             int ant_id = pkt->ant_id;
-            printf("RX thread %d received frame %d subframe %d, ant %d\n", tid,
-                frame_id, symbol_id, ant_id);
+            printf("RX thread %d received frame %d subframe %d, ant %d "
+                   "offset %d\n",
+                tid, frame_id, symbol_id, ant_id, rx_offset);
 #endif
             if (frame_id > prev_frame_id) {
                 *(rx_frame_start + frame_id) = get_time();
@@ -198,82 +198,49 @@ void* PacketTXRX::loopTXRX(int tid)
                 if (frame_id % 512 == 200) {
                     _mm_prefetch(
                         (char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
-                    // double temp = frame_start[frame_id+3];
                 }
             }
 #endif
-            rx_offset++;
-            if (rx_offset == rx_buffer_frame_num)
-                rx_offset = 0;
-        }
-    } else {
-        while (true) {
-            if (do_tx == 0) {
-                struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
-                rx_packet_num_per_frame++;
-                frame_id = pkt->frame_id;
 
-#if MEASURE_TIME
-#if DEBUG_RECV
-                int symbol_id = pkt->symbol_id;
-                int ant_id = pkt->ant_id;
-                printf("RX thread %d received frame %d subframe %d, ant %d "
-                       "offset %d\n",
-                    tid, frame_id, symbol_id, ant_id, rx_offset);
-#endif
-                if (frame_id > prev_frame_id) {
-                    *(rx_frame_start + frame_id) = get_time();
-                    prev_frame_id = frame_id;
-                    if (frame_id % 512 == 200) {
-                        _mm_prefetch((char*)(rx_frame_start + frame_id + 512),
-                            _MM_HINT_T0);
-                    }
-                }
-#endif
-
-                rx_pkts_in_frame_count[frame_id % 10000]++;
-                if (rx_pkts_in_frame_count[frame_id]
+            frame_id %= NUM_COUNTERS;
+            if (downlink_mode
+                && ++rx_pkts_in_frame_count[frame_id]
                     == max_rx_packet_num_per_frame) {
-                    do_tx = 1;
-                    rx_packet_num_per_frame = 0;
-                    rx_pkts_in_frame_count[frame_id] = 0;
-                    // printf("In TXRX thread %d: RX finished frame %d, current
-                    // frame %d\n", tid, last_finished_frame_id, prev_frame_id);
-                    // last_finished_frame_id++;
-                }
-            } else {
-                int offset = dequeue_send(tid, socket_local, &remote_addr);
-                if (offset == -1)
-                    continue;
-                tx_packet_num_per_frame++;
-                int frame_id_in_buffer = offset / BS_ANT_NUM
-                    / config_->data_symbol_num_perframe
-                    % SOCKET_BUFFER_FRAME_NUM;
-                tx_pkts_in_frame_count[frame_id_in_buffer]++;
+                do_tx = true;
+                rx_pkts_in_frame_count[frame_id] = 0;
+                // printf("In TXRX thread %d: RX finished frame %d, current
+                // frame %d\n", tid, last_finished_frame_id, prev_frame_id);
+                // last_finished_frame_id++;
+            }
+        } else {
+            int offset = dequeue_send(tid, socket_local, &remote_addr);
+            if (offset == -1)
+                continue;
+            int frame_id_in_buffer = offset / BS_ANT_NUM
+                / config_->data_symbol_num_perframe % SOCKET_BUFFER_FRAME_NUM;
+            assert(SOCKET_BUFFER_FRAME_NUM < NUM_COUNTERS);
+            tx_pkts_in_frame_count[frame_id_in_buffer]++;
 
 #if DEBUG_BS_SENDER
-                printf("In TX thread %d: Transmitted frame %d, subframe %d, "
-                       "ant %d, offset: %d, msg_queue_length: %d\n",
-                    tid, frame_id, symbol_id, ant_id, offset,
-                    message_queue_->size_approx());
+            printf("In TX thread %d: Transmitted frame %d, subframe %d, "
+                   "ant %d, offset: %d, msg_queue_length: %d\n",
+                tid, frame_id, symbol_id, ant_id, offset,
+                message_queue_->size_approx());
 #endif
-                // if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
-                if (tx_pkts_in_frame_count[frame_id_in_buffer]
-                    == max_tx_packet_num_per_frame) {
-                    do_tx = 0;
-                    tx_packet_num_per_frame = 0;
-                    tx_pkts_in_frame_count[frame_id_in_buffer] = 0;
-                    // printf("In TXRX thread %d: TX finished frame %d, current
-                    // frame %d\n", tid, last_finished_tx_frame_id,
-                    // prev_frame_id); prev_frame_id = tx_frame_id;
-                    // last_finished_tx_frame_id = (last_finished_tx_frame_id +
-                    // 1) % TASK_BUFFER_FRAME_NUM;
-                }
+            if (tx_pkts_in_frame_count[frame_id_in_buffer]
+                == max_tx_packet_num_per_frame) {
+                do_tx = false;
+                tx_pkts_in_frame_count[frame_id_in_buffer] = 0;
+                // printf("In TXRX thread %d: TX finished frame %d, current
+                // frame %d\n", tid, last_finished_tx_frame_id,
+                // prev_frame_id); prev_frame_id = tx_frame_id;
+                // last_finished_tx_frame_id = (last_finished_tx_frame_id +
+                // 1) % TASK_BUFFER_FRAME_NUM;
             }
-            rx_offset++;
-            if (rx_offset == rx_buffer_frame_num)
-                rx_offset = 0;
         }
+        rx_offset++;
+        if (rx_offset == rx_buffer_frame_num)
+            rx_offset = 0;
     }
     return 0;
 }
@@ -435,29 +402,4 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         exit(0);
     }
     return offset;
-}
-
-void* PacketTXRX::loopSend(int tid)
-{
-    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
-
-    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    int local_port_id = config_->bs_port;
-    int remote_port_id = config_->ue_rx_port + tid;
-#if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-    struct sockaddr_in remote_addr;
-    setup_sockaddr_remote_ipv4(
-        &remote_addr, remote_port_id, config_->tx_addr.c_str());
-#else
-    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-    struct sockaddr_in6 remote_addr;
-    setup_sockaddr_remote_ipv6(
-        &remote_addr, remote_port_id, config_->tx_addr.c_str());
-#endif
-
-    while (true) {
-        dequeue_send(tid, socket_local, &remote_addr);
-    }
-    return 0;
 }
