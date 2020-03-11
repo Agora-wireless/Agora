@@ -169,8 +169,6 @@ void* PacketTXRX::loopTXRX(int tid)
     printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame,
         max_tx_packet_num_per_frame);
     int prev_frame_id = -1;
-    int rx_packet_num_per_frame = 0;
-    int tx_packet_num_per_frame = 0;
     bool do_tx = false;
     enum { NUM_COUNTERS = 10000 };
     int rx_pkts_in_frame_count[NUM_COUNTERS] = { 0 };
@@ -184,7 +182,6 @@ void* PacketTXRX::loopTXRX(int tid)
     while (true) {
         if (!do_tx) {
             struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
-            rx_packet_num_per_frame++;
             frame_id = pkt->frame_id;
 
 #if MEASURE_TIME
@@ -210,7 +207,6 @@ void* PacketTXRX::loopTXRX(int tid)
                 && ++rx_pkts_in_frame_count[frame_id]
                     == max_rx_packet_num_per_frame) {
                 do_tx = true;
-                rx_packet_num_per_frame = 0;
                 rx_pkts_in_frame_count[frame_id] = 0;
                 // printf("In TXRX thread %d: RX finished frame %d, current
                 // frame %d\n", tid, last_finished_frame_id, prev_frame_id);
@@ -220,7 +216,6 @@ void* PacketTXRX::loopTXRX(int tid)
             int offset = dequeue_send(tid, socket_local, &remote_addr);
             if (offset == -1)
                 continue;
-            tx_packet_num_per_frame++;
             int frame_id_in_buffer = offset / BS_ANT_NUM
                 / config_->data_symbol_num_perframe % SOCKET_BUFFER_FRAME_NUM;
             assert(SOCKET_BUFFER_FRAME_NUM < NUM_COUNTERS);
@@ -232,11 +227,9 @@ void* PacketTXRX::loopTXRX(int tid)
                 tid, frame_id, symbol_id, ant_id, offset,
                 message_queue_->size_approx());
 #endif
-            // if (tx_packet_num_per_frame == max_tx_packet_num_per_frame) {
             if (tx_pkts_in_frame_count[frame_id_in_buffer]
                 == max_tx_packet_num_per_frame) {
                 do_tx = false;
-                tx_packet_num_per_frame = 0;
                 tx_pkts_in_frame_count[frame_id_in_buffer] = 0;
                 // printf("In TXRX thread %d: TX finished frame %d, current
                 // frame %d\n", tid, last_finished_tx_frame_id,
