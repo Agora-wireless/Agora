@@ -1,10 +1,10 @@
 /*
- Copyright (c) 2018-2019, Rice University 
+ Copyright (c) 2018-2019, Rice University
  RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
  Author(s): Rahman Doost-Mohamamdy: doost@rice.edu
- 
+
 ---------------------------------------------------------------------
- Utils functions  
+ Utils functions
 ---------------------------------------------------------------------
 */
 
@@ -36,8 +36,7 @@
 int pin_to_core(int core_id);
 void pin_to_core_with_offset(thread_type thread, int offset, int core_id);
 
-template <class T>
-struct EventHandlerContext {
+template <class T> struct EventHandlerContext {
     T* obj_ptr;
     int id;
 };
@@ -58,17 +57,26 @@ public:
     ~Utils();
 
     static std::vector<size_t> strToChannels(const std::string& channel);
-    static std::vector<std::complex<int16_t>> double_to_cint16(std::vector<std::vector<double>> in);
-    static std::vector<std::complex<float>> uint32tocfloat(std::vector<uint32_t> in, const std::string& order);
-    static std::vector<uint32_t> cint16_to_uint32(std::vector<std::complex<int16_t>> in, bool conj, std::string order);
-    static std::vector<uint32_t> cfloat32_to_uint32(std::vector<std::complex<float>> in, bool conj, std::string order);
-    static std::vector<std::vector<size_t>> loadSymbols(std::vector<std::string> frames, char sym);
-    static void loadDevices(std::string filename, std::vector<std::string>& data);
-    static void loadData(const char* filename, std::vector<std::complex<int16_t>>& data, int samples);
-    static void loadData(const char* filename, std::vector<unsigned>& data, int samples);
+    static std::vector<std::complex<int16_t>> double_to_cint16(
+        std::vector<std::vector<double>> in);
+    static std::vector<std::complex<float>> uint32tocfloat(
+        std::vector<uint32_t> in, const std::string& order);
+    static std::vector<uint32_t> cint16_to_uint32(
+        std::vector<std::complex<int16_t>> in, bool conj, std::string order);
+    static std::vector<uint32_t> cfloat32_to_uint32(
+        std::vector<std::complex<float>> in, bool conj, std::string order);
+    static std::vector<std::vector<size_t>> loadSymbols(
+        std::vector<std::string> frames, char sym);
+    static void loadDevices(
+        std::string filename, std::vector<std::string>& data);
+    static void loadData(const char* filename,
+        std::vector<std::complex<int16_t>>& data, int samples);
+    static void loadData(
+        const char* filename, std::vector<unsigned>& data, int samples);
     static void loadTDDConfig(const std::string filename, std::string& jconfig);
     static std::vector<std::string> split(const std::string& s, char delimiter);
     static void printVector(std::vector<std::complex<int16_t>>& data);
-    static void writeBinaryFile(std::string name, size_t elem_size, size_t buffer_size, void* buff);
+    static void writeBinaryFile(
+        std::string name, size_t elem_size, size_t buffer_size, void* buff);
 };
 #endif

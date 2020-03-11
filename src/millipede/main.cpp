@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 
 #include "millipede.hpp"

@@ -32,8 +32,7 @@
 enum EventType {
     EVENT_PACKET_RECEIVED,
     EVENT_FFT,
-    EVENT_UP_ZF,
-    EVENT_DN_ZF,
+    EVENT_ZF,
     EVENT_DEMUL,
     EVENT_PRED,
     EVENT_MODUL,
@@ -135,14 +134,7 @@ typedef enum {
     Master_TX,
 } thread_type;
 
-typedef enum {
-    UL,
-    DL,
-    PILOT,
-    CAL_DL,
-    CAL_UL,
-    UNKNOWN
-} symbol_type;
+typedef enum { UL, DL, PILOT, CAL_DL, CAL_UL, UNKNOWN } symbol_type;
 
 struct LDPCconfig {
     uint16_t Bg;
