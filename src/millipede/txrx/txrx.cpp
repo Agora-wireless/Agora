@@ -223,7 +223,7 @@ void* PacketTXRX::loopTXRX(int tid)
             tx_packet_num_per_frame++;
             int frame_id_in_buffer = offset / BS_ANT_NUM
                 / config_->data_symbol_num_perframe % SOCKET_BUFFER_FRAME_NUM;
-            frame_id_in_buffer %= NUM_COUNTERS;
+            assert(SOCKET_BUFFER_FRAME_NUM < NUM_COUNTERS);
             tx_pkts_in_frame_count[frame_id_in_buffer]++;
 
 #if DEBUG_BS_SENDER
