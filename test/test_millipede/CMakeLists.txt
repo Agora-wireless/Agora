@@ -170,6 +170,7 @@ add_executable(data_generator
   ${SOURCE_DIR}/data/data_generator/data_generator.cpp 
   ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
 target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
+target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 
 
