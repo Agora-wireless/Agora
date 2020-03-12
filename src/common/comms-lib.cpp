@@ -370,8 +370,7 @@ std::vector<std::complex<float>> CommsLib::FFT(
     return in;
 }
 
-void CommsLib::IFFT(
-    complex_float* in, int fftsize, bool normalize)
+void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize)
 {
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     (void)DftiCreateDescriptor(
@@ -381,14 +380,13 @@ void CommsLib::IFFT(
     DftiFreeDescriptor(&mkl_handle);
     if (normalize) {
         for (int i = 0; i < fftsize; i++) {
-            in[i].re /=fftsize;
-            in[i].im /=fftsize;
+            in[i].re /= fftsize;
+            in[i].im /= fftsize;
         }
     }
 }
 
-void CommsLib::FFT(
-    complex_float* in, int fftsize)
+void CommsLib::FFT(complex_float* in, int fftsize)
 {
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     (void)DftiCreateDescriptor(
@@ -398,7 +396,6 @@ void CommsLib::FFT(
     DftiComputeForward(mkl_handle, in);
     DftiFreeDescriptor(&mkl_handle);
 }
-
 
 std::vector<std::complex<float>> CommsLib::composeRefSymbol(
     std::vector<std::complex<float>> pilot, size_t offset, size_t period,

@@ -191,8 +191,8 @@ Config::Config(std::string jsonfile)
         = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
     LDPC_config.cbCodewLen
         = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
-    LDPC_config.nblocksInSymbol = 
-        OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+    LDPC_config.nblocksInSymbol
+        = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
     printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, "
            "encoded block len: %d, decoder iterations: %d\n",
@@ -374,11 +374,11 @@ Config::Config(std::string jsonfile)
 #ifdef USE_LDPC
     std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
-    int num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
+    size_t num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
 #else
     std::string filename1 = cur_directory1 + "/data/orig_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
-    int num_bytes_per_ue = OFDM_DATA_NUM;
+    size_t num_bytes_per_ue = OFDM_DATA_NUM;
 #endif
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
