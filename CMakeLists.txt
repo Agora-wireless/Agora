@@ -176,6 +176,7 @@ add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
   ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
 target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
+target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 if(${USE_ARGOS})
   add_executable(user 
