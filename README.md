@@ -54,6 +54,7 @@ Compile Millipede:
 	make -j 
 
 2. Run
+* First, run "./data_generator data/tddconfig-sim-ul.json" to generate required data files for Millipede
 * In one terminal, run "./millipede data/tddconfig-sim-ul.json" to start Millipede with Uplink configuration 
 * In another terminal, run "./sender 4 2 5000 data/tddconfig-sim-ul.json" to start the sender with Uplink configuration, the four arguments are: # of threads, offset of CPU core index (change the value according to which socket the NIC is installed), frame duration in microseconds, config filename
 

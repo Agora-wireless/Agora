@@ -172,6 +172,11 @@ add_executable(millipede ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -lpthread -larmadillo
   ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
+add_executable(data_generator 
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
+  ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
+target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
+
 if(${USE_ARGOS})
   add_executable(user 
        src/client/user-main.cpp
