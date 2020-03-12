@@ -115,10 +115,10 @@ void DoFFT::launch(int offset)
     }
 
     // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-    //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id); 
-    // printf("FFT input\n"); 
+    //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+    // printf("FFT input\n");
     // for (int i = 0; i < OFDM_CA_NUM; i++) {
-    //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2), 
+    //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2),
     //         *(cur_fft_buffer_float + i * 2 + 1));
     // }
     // printf("\n");
@@ -205,10 +205,10 @@ void DoFFT::launch(int offset)
             }
         }
         // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-        //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id); 
-        // printf("FFT output\n"); 
+        //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+        // printf("FFT output\n");
         // for (int i = 0; i < OFDM_CA_NUM; i++) {
-        //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2), 
+        //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2),
         //         *(cur_fft_buffer_float + i * 2 + 1));
         // }
         // printf("\n");
