@@ -73,7 +73,7 @@ void DoPrecode::launch(int offset)
 
     __m256i index
         = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
-    int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
+    // int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
     int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
@@ -92,8 +92,8 @@ void DoPrecode::launch(int offset)
             // for (int line_idx = 0; line_idx < precoder_cache_line_num;
             //      line_idx++) {
             //     _mm_prefetch(
-            //         (char*)(precoder_buffer_[precoder_offset] + line_idx * 8),
-            //         _MM_HINT_T0);
+            //         (char*)(precoder_buffer_[precoder_offset] + line_idx *
+            //         8), _MM_HINT_T0);
             // }
 
             complex_float* data_ptr = modulated_buffer_temp;
@@ -128,16 +128,17 @@ void DoPrecode::launch(int offset)
                 //     = &dl_raw_data[subframe_id_in_buffer]
                 //                  [cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
                 // data_ptr[UE_NUM - 1]
-                //     = mod_single_uint8((uint8_t) * (raw_data_ptr), qam_table);
+                //     = mod_single_uint8((uint8_t) * (raw_data_ptr),
+                //     qam_table);
                 for (int user_id = 0; user_id < UE_NUM; user_id++) {
 #ifdef USE_LDPC
                     int8_t* raw_data_ptr
                         = &dl_raw_data[total_data_subframe_id]
-                                     [cur_sc_id + OFDM_DATA_NUM * user_id];
+                                      [cur_sc_id + OFDM_DATA_NUM * user_id];
 #else
                     int8_t* raw_data_ptr
                         = &dl_raw_data[subframe_id_in_buffer]
-                                     [cur_sc_id + OFDM_DATA_NUM * user_id];
+                                      [cur_sc_id + OFDM_DATA_NUM * user_id];
 #endif
                     data_ptr[user_id] = mod_single_uint8(
                         (uint8_t) * (raw_data_ptr), qam_table);
@@ -157,7 +158,8 @@ void DoPrecode::launch(int offset)
             Precode_task_duration[tid * 8][1] += duration1;
 #endif
             mat_precoded = mat_data * mat_precoder;
-            // printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n",
+            // printf("In doPrecode thread %d: frame: %d, subframe: %d,
+            // subcarrier: %d\n",
             //     tid, frame_id, current_data_subframe_id, sc_id);
             // cout<<"Precoder: \n"<<mat_precoder<<endl;
             // cout<<"Data: \n"<<mat_data<<endl;

@@ -640,8 +640,9 @@ void* PacketTXRX::loopSend(int tid)
         // total_data_subframe_id = offset / BS_ANT_NUM;
         // current_data_subframe_id = total_data_subframe_id %
         // data_subframe_num_perframe; subframe_id = current_data_subframe_id +
-        // UE_NUM; subframe_id = config_->DLSymbols[0][current_data_subframe_id];
-        // frame_id = total_data_subframe_id / data_subframe_num_perframe;
+        // UE_NUM; subframe_id =
+        // config_->DLSymbols[0][current_data_subframe_id]; frame_id =
+        // total_data_subframe_id / data_subframe_num_perframe;
 
         // int data_subframe_offset = frame_id * data_subframe_num_perframe +
         // current_data_subframe_id;
