@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
 #else
     printf("LDPC not enabled\n");
 #endif
-    if (config_->freq_orthogonal_pilot) 
+    if (config_->freq_orthogonal_pilot)
         printf("use frequency-orthogonal pilots\n");
     else
         printf("use time-orthogonal pilots\n");
@@ -189,7 +189,6 @@ int main(int argc, char* argv[])
         int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES]
         = { 0 };
 
-    
     for (int n = 0; n < numberCodeblocks; n++) {
         for (int i = 0; i < input_lenth; i++)
             input[n][i] = (int8_t)rand();
@@ -276,10 +275,10 @@ int main(int argc, char* argv[])
 #else
         for (int i = 0; i < num_mod; i++)
             mod_input[n][i] = (uint8_t)(rand() % config_->mod_order);
-        // printf("symbol %d ue %d\n", n / UE_NUM, n % UE_NUM );
-        // for (int i = 0; i < num_mod; i++)
-        //     printf("%u ", mod_input[n][i]);
-        // printf("\n");
+            // printf("symbol %d ue %d\n", n / UE_NUM, n % UE_NUM );
+            // for (int i = 0; i < num_mod; i++)
+            //     printf("%u ", mod_input[n][i]);
+            // printf("\n");
 #endif
         for (int i = 0; i < num_mod; i++)
             mod_output[n][i]
@@ -320,7 +319,7 @@ int main(int argc, char* argv[])
     float* pilots_f = config_->pilots_;
     complex_float* pilots_t;
     alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 1);
-    for (int i = 0; i < OFDM_CA_NUM; i++) 
+    for (int i = 0; i < OFDM_CA_NUM; i++)
         pilots_t[i].re = pilots_f[i];
     // CommsLib::IFFT(pilots_t, OFDM_CA_NUM);
 
@@ -328,7 +327,7 @@ int main(int argc, char* argv[])
     Table<complex_float> tx_data_all_symbols;
     tx_data_all_symbols.calloc(symbol_num_perframe, UE_NUM * OFDM_CA_NUM, 64);
 
-    if(config_->freq_orthogonal_pilot) {
+    if (config_->freq_orthogonal_pilot) {
         complex_float* pilots_t_ue;
         alloc_buffer_1d(&pilots_t_ue, OFDM_CA_NUM, 64, 1);
         for (int i = 0; i < UE_NUM; i++) {
@@ -336,15 +335,16 @@ int main(int argc, char* argv[])
             /* Right now we assume one pilot symbol hold all user pilots
              * in freqency orthogonal pilot */
             memset(pilots_t_ue, 0, OFDM_CA_NUM * sizeof(complex_float));
-            for (int j = 0; j < OFDM_DATA_NUM; j += UE_NUM) {
-                pilots_t_ue[i + j].re = pilots_f[j];
+            for (int j = OFDM_DATA_START; j < OFDM_DATA_START + OFDM_DATA_NUM;
+                 j += UE_NUM) {
+                pilots_t_ue[i + j].re = pilots_f[i + j];
             }
-            CommsLib::IFFT(pilots_t_ue, OFDM_CA_NUM);
+            // CommsLib::IFFT(pilots_t_ue, OFDM_CA_NUM);
             memcpy(tx_data_all_symbols[0] + i * OFDM_CA_NUM, pilots_t_ue,
                 OFDM_CA_NUM * sizeof(complex_float));
         }
     } else {
-        for (int i = 0; i < UE_NUM; i++) 
+        for (int i = 0; i < UE_NUM; i++)
             memcpy(tx_data_all_symbols[i] + i * OFDM_CA_NUM, pilots_t,
                 OFDM_CA_NUM * sizeof(complex_float));
     }
@@ -389,7 +389,8 @@ int main(int argc, char* argv[])
             mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
         }
         for (int j = 0; j < BS_ANT_NUM; j++) {
-            CommsLib::IFFT(rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM);
+            CommsLib::IFFT(
+                rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM);
         }
     }
 
