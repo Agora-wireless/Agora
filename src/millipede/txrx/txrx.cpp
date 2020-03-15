@@ -160,8 +160,7 @@ void* PacketTXRX::loopTXRX(int tid)
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM *
     // SOCKET_BUFFER_FRAME_NUM float *tx_cur_ptr_data;
 
-    int max_subframe_id
-        = downlink_mode
+    int max_subframe_id = downlink_mode
         ? pilot_subframe_num_perframe
         : (pilot_subframe_num_perframe + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame

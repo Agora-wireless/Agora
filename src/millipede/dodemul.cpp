@@ -161,8 +161,8 @@ void DoDemul::launch(int offset)
             uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_subframe_id]
                                                      [cur_sc_id * UE_NUM]);
             demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, UE_NUM);
-            // cout<< "Demuled data:"; 
-            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) 
+            // cout<< "Demuled data:";
+            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++)
             //     cout<<+*(demul_ptr+ue_idx)<<" ";
             // cout<<endl;
             // cout<<endl;
