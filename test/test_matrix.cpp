@@ -248,7 +248,7 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Usage: %s [iterations] [Nx] [Ny] mode\n", argv[0]);
         return 1;
     }
-    
+
     int main_core_id = 2;
     if (stick_this_thread_to_core(main_core_id) != 0) {
         printf("Main thread: stitch main thread to core %d failed\n",
