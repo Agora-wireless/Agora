@@ -15,8 +15,8 @@
 #ifndef COMMSLIB_HEADER
 #define COMMSLIB_HEADER
 
-#include "memory_manage.h"
 #include "buffer.hpp"
+#include "memory_manage.h"
 #include "mkl_dfti.h"
 #include <algorithm>
 #include <complex.h>

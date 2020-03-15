@@ -94,8 +94,7 @@ static void adapt_bits_for_mod(
     }
 }
 
-
-uint8_t select_base_matrix_entry(uint16_t Zc) 
+uint8_t select_base_matrix_entry(uint16_t Zc)
 {
     uint8_t i_LS;
     if ((Zc % 15) == 0)
@@ -171,7 +170,7 @@ int main()
 
         // randomly generate input
         srand(time(NULL));
-        for (int n = 0; n < numberCodeblocks; n++) 
+        for (int n = 0; n < numberCodeblocks; n++)
             for (int i = 0; i < ((cbLen + 7) >> 3); i++)
                 input[n][i] = (int8_t)rand();
 
@@ -184,7 +183,7 @@ int main()
         const int16_t* pAddr;
 
         // i_Ls decides the base matrix entries
-        uint8_t i_LS = select_base_matrix_entry(Zc); 
+        uint8_t i_LS = select_base_matrix_entry(Zc);
 
         if (Bg == 1) {
             pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
@@ -281,7 +280,7 @@ int main()
             bblib_ldpc_decoder_5gnr(
                 &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
             // memcpy(decoded[n],
-            // ldpc_decoder_5gnr_response.compactedMessageBytes, numMsgBytes);        
+            // ldpc_decoder_5gnr_response.compactedMessageBytes, numMsgBytes);
         }
         end_time = get_time();
         double decoding_time = end_time - start_time;
@@ -297,7 +296,7 @@ int main()
             uint8_t* output_buffer = decoded[n];
             for (int i = 0; i < (cbLen >> 3); i++) {
                 printf("input: %i, output: %i\n", input_buffer[i],
-                output_buffer[i]);
+                    output_buffer[i]);
                 uint8_t error = input_buffer[i] ^ output_buffer[i];
                 for (int j = 0; j < 8; j++) {
                     err_cnt += error & 1;
@@ -309,11 +308,9 @@ int main()
         double ber = (double)err_cnt / cbLen / numberCodeblocks;
         printf("the bit error rate is %f\n", ber);
 
-        double enc_thruput
-            = (double)cbLen * numberCodeblocks / encoding_time;
+        double enc_thruput = (double)cbLen * numberCodeblocks / encoding_time;
         printf("the encoder's speed is %f Mbps\n", enc_thruput);
-        double dec_thruput
-            = (double)cbLen * numberCodeblocks / decoding_time;
+        double dec_thruput = (double)cbLen * numberCodeblocks / decoding_time;
         printf("the decoder's speed is %f Mbps\n", dec_thruput);
 
         for (int n = 0; n < numberCodeblocks; n++) {

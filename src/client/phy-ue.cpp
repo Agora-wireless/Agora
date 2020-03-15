@@ -715,7 +715,7 @@ void Phy_UE::doFFT(int tid, int offset)
             = generateOffset3d(TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
                 numAntennas, frame_id, dl_symbol_id - DL_PILOT_SYMS,
                 ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) *
-                         //dl_data_symbol_perframe + dl_data_symbol_id;
+                         // dl_data_symbol_perframe + dl_data_symbol_id;
 
         float* equ_buffer_ptr
             = (float*)(equal_buffer_[eq_buffer_offset].data());
