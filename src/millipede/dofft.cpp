@@ -72,15 +72,15 @@ void DoFFT::launch(int offset)
     short* cur_buffer_ptr_ushort = &pkt->data[2 * OFDM_PREFIX_LEN];
     float* cur_fft_buffer_float = (float*)(fft_buffer_.FFT_inputs[0]);
 
-    int cur_symbol_type = UNKNOWN;
+    auto cur_symbol_type = SymbolType::kUnknown;
     if (config_->isUplink(frame_id, subframe_id))
-        cur_symbol_type = UL;
+        cur_symbol_type = SymbolType::kUL;
     else if (config_->isPilot(frame_id, subframe_id))
-        cur_symbol_type = PILOT;
+        cur_symbol_type = SymbolType::kPilot;
     else if (config_->isCalDlPilot(frame_id, subframe_id))
-        cur_symbol_type = CAL_DL;
+        cur_symbol_type = SymbolType::kCalDL;
     else if (config_->isCalUlPilot(frame_id, subframe_id))
-        cur_symbol_type = CAL_UL;
+        cur_symbol_type = SymbolType::kCalUL;
 
     /* Use SIMD
      * reference:
@@ -126,13 +126,16 @@ void DoFFT::launch(int offset)
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time1 = get_time();
     double duration1 = start_time1 - start_time;
-    if (cur_symbol_type == UL)
+    if (cur_symbol_type == SymbolType::kUL) {
         (*FFT_task_duration)[tid * 8][1] += duration1;
-    else if (cur_symbol_type == PILOT)
+    } else if (cur_symbol_type == SymbolType::kPilot) {
         (*CSI_task_duration)[tid * 8][1] += duration1;
-        // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
-        //    (*RC_task_duration)[tid * 8][1] += duration1;
+    }
+
+    // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
+    //    (*RC_task_duration)[tid * 8][1] += duration1;
 #endif
+
     /* compute FFT */
     DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]);
     // DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0],
@@ -141,24 +144,29 @@ void DoFFT::launch(int offset)
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
     double duration2 = start_time2 - start_time1;
-    if (cur_symbol_type == UL)
+    if (cur_symbol_type == SymbolType::kUL) {
         (*FFT_task_duration)[tid * 8][2] += duration2;
-    else if (cur_symbol_type == PILOT)
+    } else if (cur_symbol_type == SymbolType::kPilot) {
         (*CSI_task_duration)[tid * 8][2] += duration2;
-        // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
-        //    RC_task_duration[tid * 8][2] += duration2;
+    }
+
+    // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
+    //    RC_task_duration[tid * 8][2] += duration2;
 #endif
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
         frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 #endif
+
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time_part3 = get_time();
 #endif
+
     size_t BS_ANT_NUM = config_->BS_ANT_NUM;
     int transpose_block_size = config_->transpose_block_size;
-    if (cur_symbol_type == PILOT) {
+
+    if (cur_symbol_type == SymbolType::kPilot) {
         int pilot_id = config_->getPilotSFIndex(frame_id, subframe_id);
         int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * config_->pilot_symbol_num_perframe
@@ -212,7 +220,7 @@ void DoFFT::launch(int offset)
         //         *(cur_fft_buffer_float + i * 2 + 1));
         // }
         // printf("\n");
-    } else if (cur_symbol_type == UL) {
+    } else if (cur_symbol_type == SymbolType::kUL) {
         int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
         int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
         int subframe_offset
@@ -241,8 +249,10 @@ void DoFFT::launch(int offset)
                 src_ptr += 16;
             }
         }
-    } else if (((cur_symbol_type == CAL_DL) && (ant_id == config_->ref_ant))
-        || ((cur_symbol_type == CAL_UL) && (ant_id != config_->ref_ant))) {
+    } else if (((cur_symbol_type == SymbolType::kCalDL)
+                   && (ant_id == config_->ref_ant))
+        || ((cur_symbol_type == SymbolType::kCalUL)
+               && (ant_id != config_->ref_ant))) {
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM);
         int ant_offset = ant_id * OFDM_DATA_NUM;
         float* src_ptr
@@ -262,20 +272,23 @@ void DoFFT::launch(int offset)
     } else {
         printf("unkown or unsupported symbol type.\n");
     }
+
 #if DEBUG_UPDATE_STATS_DETAILED
     double end_time = get_time();
     double duration3 = end_time - start_time_part3;
-    if (cur_symbol_type == 0)
+    if (cur_symbol_type == SymbolType::kUL) {
         (*FFT_task_duration)[tid * 8][3] += duration3;
-    else
+    } else {
         (*CSI_task_duration)[tid * 8][3] += duration2;
+    }
 #endif
 
-    /* after finish, reset socket buffer status */
+    /* After finish, reset socket buffer status */
     socket_buffer_status_[socket_thread_id][offset] = 0;
+
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
-    if (cur_symbol_type == 0) {
+    if (cur_symbol_type == SymbolType::kUL) {
         FFT_task_count[tid * 16] = FFT_task_count[tid * 16] + 1;
         (*FFT_task_duration)[tid * 8][0] += duration;
     } else {
@@ -283,7 +296,8 @@ void DoFFT::launch(int offset)
         (*CSI_task_duration)[tid * 8][0] += duration;
     }
 #endif
-    /* inform main thread */
+
+    /* Inform main thread */
     Event_data fft_finish_event;
     fft_finish_event.event_type = EVENT_FFT;
     int subframe_num_perframe = config_->symbol_num_perframe;

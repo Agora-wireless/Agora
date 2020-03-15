@@ -164,7 +164,7 @@ static inline std::string thread_type_str(ThreadType thread_type)
     return "Invalid thread type";
 }
 
-typedef enum { UL, DL, PILOT, CAL_DL, CAL_UL, UNKNOWN } symbol_type;
+enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
 struct LDPCconfig {
     uint16_t Bg;
