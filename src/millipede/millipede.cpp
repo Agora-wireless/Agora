@@ -502,7 +502,7 @@ void Millipede::start()
                 int data_subframe_id
                     = total_data_subframe_id % data_subframe_num_perframe;
                 // printf("In main thread: tx finished for ",
-                //     "frame %d subframe %d ant %d\n", 
+                //     "frame %d subframe %d ant %d\n",
                 //     frame_id, data_subframe_id, ant_id);
                 frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
 
