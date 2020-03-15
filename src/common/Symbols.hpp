@@ -2,14 +2,17 @@
 #define SYMBOLS
 
 #include <stdint.h>
+#include <string>
 
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
 //#define GENERATE_PILOT
+
 #ifdef USE_ARGOS
 #define GENERATE_DATA
 #endif
+
 #define SEPARATE_TX_RX 1
 
 #define MOD_ORDER 4
@@ -121,18 +124,45 @@ enum EventType {
 #define SCH_MODE_REG 140
 #define TX_GAIN_CTRL 88
 
-typedef enum {
-    Master,
-    Worker,
-    Worker_FFT,
-    Worker_ZF,
-    Worker_Demul,
-    Worker_RX,
-    Worker_TX,
-    Worker_TXRX,
-    Master_RX,
-    Master_TX,
-} thread_type;
+enum class ThreadType {
+    kMaster,
+    kWorker,
+    kWorkerFFT,
+    kWorkerZF,
+    kWorkerDemul,
+    kWorkerRX,
+    kWorkerTX,
+    kWorkerTXRX,
+    kMasterRX,
+    kMasterTX,
+};
+
+static inline std::string thread_type_str(ThreadType thread_type)
+{
+    switch (thread_type) {
+    case ThreadType::kMaster:
+        return "Master";
+    case ThreadType::kWorker:
+        return "Worker";
+    case ThreadType::kWorkerFFT:
+        return "Worker (FFT)";
+    case ThreadType::kWorkerZF:
+        return "Worker (ZF)";
+    case ThreadType::kWorkerDemul:
+        return "Worker (Demul)";
+    case ThreadType::kWorkerRX:
+        return "RX";
+    case ThreadType::kWorkerTX:
+        return "TX";
+    case ThreadType::kWorkerTXRX:
+        return "TXRX";
+    case ThreadType::kMasterRX:
+        return "Master (RX)";
+    case ThreadType::kMasterTX:
+        return "Master (TX)";
+    }
+    return "Invalid thread type";
+}
 
 typedef enum { UL, DL, PILOT, CAL_DL, CAL_UL, UNKNOWN } symbol_type;
 

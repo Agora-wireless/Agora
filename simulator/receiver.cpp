@@ -120,7 +120,7 @@ void* Receiver::loopRecv(int tid)
 {
 
     int core_offset = core_id_ + rx_thread_num_ + 2;
-    pin_to_core_with_offset(Worker_RX, core_offset, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;

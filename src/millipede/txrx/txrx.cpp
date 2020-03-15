@@ -116,7 +116,7 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
 
 void* PacketTXRX::loopTXRX(int tid)
 {
-    pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
@@ -160,8 +160,7 @@ void* PacketTXRX::loopTXRX(int tid)
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM *
     // SOCKET_BUFFER_FRAME_NUM float *tx_cur_ptr_data;
 
-    int max_subframe_id
-        = downlink_mode
+    int max_subframe_id = downlink_mode
         ? pilot_subframe_num_perframe
         : (pilot_subframe_num_perframe + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame
@@ -283,7 +282,8 @@ struct Packet* PacketTXRX::recv_enqueue(
 
 void* PacketTXRX::loopRecv(int tid)
 {
-    pin_to_core_with_offset(Worker_RX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerRX, core_id_, tid);
+
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = config_->bs_port + tid;
 #if USE_IPV4
