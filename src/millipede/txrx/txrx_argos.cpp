@@ -184,7 +184,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     int nradio_cur_thread = radio_hi - radio_lo;
     // printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     // get pointer of message queue
-    pin_to_core_with_offset(Worker_RX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerRX, core_id_, tid);
 
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
@@ -348,7 +348,7 @@ int PacketTXRX::dequeue_send_Argos(int tid)
 
 void* PacketTXRX::loopSend_Argos(int tid)
 {
-    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTX, tx_core_id_, tid);
 
     while (config_->running) {
         dequeue_send_Argos(tid);

@@ -584,7 +584,8 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
 
 void* PacketTXRX::loopSend(int tid)
 {
-    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTX, tx_core_id_, tid);
+
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = 0;
     int remote_port_id = 7000 + tid;

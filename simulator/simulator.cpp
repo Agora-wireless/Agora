@@ -23,7 +23,7 @@ Simulator::Simulator(Config* cfg, int in_task_thread_num, int in_socket_tx_num,
     this->config_ = cfg;
 
     initialize_vars_from_cfg(cfg);
-    pin_to_core_with_offset(Master, CORE_OFFSET, 0);
+    pin_to_core_with_offset(ThreadType::kMaster, CORE_OFFSET, 0);
 
     initialize_queues();
 

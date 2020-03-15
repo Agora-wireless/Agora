@@ -34,7 +34,7 @@ Millipede::Millipede(Config* cfg)
     int DEMUL_THREAD_NUM = cfg->demul_thread_num;
     int ZF_THREAD_NUM = cfg->zf_thread_num;
     int CORE_OFFSET = cfg->core_offset;
-    pin_to_core_with_offset(Master, CORE_OFFSET, 0);
+    pin_to_core_with_offset(ThreadType::kMaster, CORE_OFFSET, 0);
 
     initialize_queues();
 
@@ -502,7 +502,7 @@ void Millipede::start()
                 int data_subframe_id
                     = total_data_subframe_id % data_subframe_num_perframe;
                 // printf("In main thread: tx finished for ",
-                //     "frame %d subframe %d ant %d\n", 
+                //     "frame %d subframe %d ant %d\n",
                 //     frame_id, data_subframe_id, ant_id);
                 frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
 
@@ -586,17 +586,16 @@ finish:
     // exit(0);
 }
 
-static void pin_worker(thread_type thread, int tid, Config* config_)
+static void pin_worker(ThreadType thread_type, int tid, Config* config_)
 {
-    int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;
-    int CORE_OFFSET = config_->core_offset;
-    int core_offset = SOCKET_RX_THREAD_NUM + CORE_OFFSET + 1;
-    pin_to_core_with_offset(thread, core_offset, tid);
+    int socket_rx_thread_num = config_->socket_thread_num;
+    pin_to_core_with_offset(
+        thread_type, config_->core_offset + socket_rx_thread_num + 1, tid);
 }
 
 void* Millipede::worker(int tid)
 {
-    pin_worker(Worker, tid, config_);
+    pin_worker(ThreadType::kWorker, tid, config_);
     moodycamel::ProducerToken ptok_complete(complete_task_queue_);
     Consumer consumer(complete_task_queue_, ptok_complete);
 
@@ -660,7 +659,8 @@ void* Millipede::worker(int tid)
 
 void* Millipede::worker_fft(int tid)
 {
-    pin_worker(Worker_FFT, tid, config_);
+    pin_worker(ThreadType::kWorkerFFT, tid, config_);
+
     moodycamel::ProducerToken ptok_complete(complete_task_queue_);
     Consumer consumer(complete_task_queue_, ptok_complete);
 
@@ -681,7 +681,8 @@ void* Millipede::worker_fft(int tid)
 
 void* Millipede::worker_zf(int tid)
 {
-    pin_worker(Worker_ZF, tid, config_);
+    pin_worker(ThreadType::kWorkerZF, tid, config_);
+
     moodycamel::ProducerToken ptok_complete(complete_task_queue_);
     Consumer consumer(complete_task_queue_, ptok_complete);
 
@@ -696,7 +697,8 @@ void* Millipede::worker_zf(int tid)
 
 void* Millipede::worker_demul(int tid)
 {
-    pin_worker(Worker_Demul, tid, config_);
+    pin_worker(ThreadType::kWorkerDemul, tid, config_);
+
     moodycamel::ProducerToken ptok_complete(complete_task_queue_);
     Consumer consumer(complete_task_queue_, ptok_complete);
 
@@ -1058,9 +1060,9 @@ void Millipede::initialize_queues()
         512 * data_subframe_num_perframe * 4);
     zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
-    ;
+
     rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);
-    ;
+
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
