@@ -70,17 +70,15 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
 
     config_ = cfg;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
     int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int subframe_num_perframe
-        = UE_NUM + data_subframe_num_perframe; // config_->symbol_num_perframe;
+    int subframe_num_perframe = config_->symbol_num_perframe;
+    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
     int packet_length = config_->packet_length;
     int buffer_length = tx_buf_offset + packet_length;
-    // max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
     int max_subframe_id
-        = downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
+        = downlink_mode ? pilot_subframe_num_perframe : subframe_num_perframe;
     int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
 
     packet_count_per_subframe.calloc(BUFFER_FRAME_NUM, max_subframe_id, 64);
@@ -120,7 +118,7 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
 #ifdef USE_LDPC
     std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
-#else 
+#else
     std::string filename = cur_directory + "/data/rx_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
 #endif
@@ -130,9 +128,13 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (int i = 0; i < subframe_num_perframe * BS_ANT_NUM; i++) {
-        if (OFDM_FRAME_LEN * 2u
-            != fread(IQ_data[i], sizeof(float), OFDM_FRAME_LEN * 2, fp)) {
+        int expect_num_bytes = OFDM_FRAME_LEN * 2;
+        int actual_bytes
+            = fread(IQ_data[i], sizeof(float), expect_num_bytes, fp);
+        if (expect_num_bytes != actual_bytes) {
             printf("read file failed: %s\n", filename.c_str());
+            printf("i: %d, expected: %d, actual: %d\n", i, expect_num_bytes,
+                actual_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
         for (int j = 0; j < OFDM_FRAME_LEN * 2; j++) {
@@ -192,13 +194,13 @@ void Sender::startTX()
 
     /* load data to buffer */
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
-    // max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
-    int max_subframe_id
-        = downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
+    int max_subframe_id = downlink_mode
+        ? pilot_subframe_num_perframe
+        : pilot_subframe_num_perframe + data_subframe_num_perframe;
     int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
     int cell_id = 0;
     for (int i = 0; i < max_length_; i++) {
@@ -207,9 +209,9 @@ void Sender::startTX()
         struct Packet* pkt
             = (struct Packet*)(trans_buffer_[cur_ptr_] + tx_buf_offset);
         pkt->frame_id = frame_id;
-        pkt->symbol_id = (subframe_id < UE_NUM)
+        pkt->symbol_id = (subframe_id < pilot_subframe_num_perframe)
             ? config_->pilotSymbols[0][subframe_id]
-            : config_->ULSymbols[0][subframe_id - UE_NUM];
+            : config_->ULSymbols[0][subframe_id - pilot_subframe_num_perframe];
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
@@ -259,9 +261,9 @@ void Sender::startTX()
         struct Packet* pkt
             = (struct Packet*)(trans_buffer_[data_ptr] + tx_buf_offset);
         pkt->frame_id = frame_id;
-        pkt->symbol_id = (subframe_id < UE_NUM)
+        pkt->symbol_id = (subframe_id < pilot_subframe_num_perframe)
             ? config_->pilotSymbols[0][subframe_id]
-            : config_->ULSymbols[0][subframe_id - UE_NUM];
+            : config_->ULSymbols[0][subframe_id - pilot_subframe_num_perframe];
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
@@ -428,13 +430,13 @@ void* Sender::loopSend_main(int tid)
 {
     pin_to_core_with_offset(Master_TX, core_offset, 0);
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
-    // max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
-    int max_subframe_id
-        = downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
+    int max_subframe_id = downlink_mode
+        ? pilot_subframe_num_perframe
+        : pilot_subframe_num_perframe + data_subframe_num_perframe;
     int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
 
     // double frame_start[10240] __attribute__( ( aligned (4096) ) );
@@ -448,9 +450,9 @@ void* Sender::loopSend_main(int tid)
         struct Packet* pkt
             = (struct Packet*)(trans_buffer_[cur_ptr_] + tx_buf_offset);
         pkt->frame_id = frame_id;
-        pkt->symbol_id = (subframe_id < UE_NUM)
+        pkt->symbol_id = (subframe_id < pilot_subframe_num_perframe)
             ? config_->pilotSymbols[0][subframe_id]
-            : config_->ULSymbols[0][subframe_id - UE_NUM];
+            : config_->ULSymbols[0][subframe_id - pilot_subframe_num_perframe];
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
@@ -500,9 +502,9 @@ void* Sender::loopSend_main(int tid)
         struct Packet* pkt
             = (struct Packet*)(trans_buffer_[data_ptr] + tx_buf_offset);
         pkt->frame_id = frame_id;
-        pkt->symbol_id = (subframe_id < UE_NUM)
+        pkt->symbol_id = (subframe_id < pilot_subframe_num_perframe)
             ? config_->pilotSymbols[0][subframe_id]
-            : config_->ULSymbols[0][subframe_id - UE_NUM];
+            : config_->ULSymbols[0][subframe_id - pilot_subframe_num_perframe];
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
@@ -625,14 +627,14 @@ void* Sender::loopSend(int tid)
     pin_to_core_with_offset(Worker_TX, core_offset + 1, tid);
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
     int packet_length = config_->packet_length;
     int buffer_length = tx_buf_offset + packet_length;
-    // max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
-    int max_subframe_id
-        = downlink_mode ? UE_NUM : UE_NUM + data_subframe_num_perframe;
+    int max_subframe_id = downlink_mode
+        ? pilot_subframe_num_perframe
+        : pilot_subframe_num_perframe + data_subframe_num_perframe;
     // Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
@@ -648,7 +650,7 @@ void* Sender::loopSend(int tid)
     int used_socker_id = 0;
     int ret;
     int total_tx_packets = 0;
-    // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
+
     printf("max_subframe_id: %d\n", max_subframe_id);
     int ant_num_this_thread
         = BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1 : 0);
@@ -679,7 +681,7 @@ void* Sender::loopSend(int tid)
 #if DEBUG_SENDER
         start_time_send = get_time();
 #endif
-        if (!downlink_mode || subframe_id < UE_NUM) {
+        if (!downlink_mode || subframe_id < pilot_subframe_num_perframe) {
             /* send a message to the server */
 #if defined(USE_DPDK) || !CONNECT_UDP
             // if (send(socket_[used_socker_id], trans_buffer_[data_ptr].data(),

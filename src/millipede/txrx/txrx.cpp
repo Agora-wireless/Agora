@@ -118,7 +118,7 @@ void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
@@ -160,8 +160,8 @@ void* PacketTXRX::loopTXRX(int tid)
     // SOCKET_BUFFER_FRAME_NUM float *tx_cur_ptr_data;
 
     int max_subframe_id = config_->dl_data_symbol_num_perframe > 0
-        ? UE_NUM
-        : (UE_NUM + ul_data_subframe_num_perframe);
+        ? pilot_subframe_num_perframe
+        : (pilot_subframe_num_perframe + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame
         = max_subframe_id * BS_ANT_NUM / rx_thread_num_;
     int max_tx_packet_num_per_frame
@@ -221,12 +221,6 @@ void* PacketTXRX::loopTXRX(int tid)
             assert(SOCKET_BUFFER_FRAME_NUM < NUM_COUNTERS);
             tx_pkts_in_frame_count[frame_id_in_buffer]++;
 
-#if DEBUG_BS_SENDER
-            printf("In TX thread %d: Transmitted frame %d, subframe %d, "
-                   "ant %d, offset: %d, msg_queue_length: %d\n",
-                tid, frame_id, symbol_id, ant_id, offset,
-                message_queue_->size_approx());
-#endif
             if (tx_pkts_in_frame_count[frame_id_in_buffer]
                 == max_tx_packet_num_per_frame) {
                 do_tx = false;
@@ -318,12 +312,7 @@ void* PacketTXRX::loopRecv(int tid)
     // loop recv
     // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
     int rx_offset = 0;
-    // int packet_num = 0;
-    // int ret = 0;
-    // int max_subframe_id = config_->dl_data_symbol_num_perframe > 0 ? UE_NUM :
-    // subframe_num_perframe;
     int prev_frame_id = -1;
-    // int packet_num_per_frame = 0;
     // double start_time= get_time();
 
     // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
@@ -369,7 +358,7 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
     }
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int packet_length = config_->packet_length;
     int offset = task_event.data;
@@ -378,7 +367,14 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id
         = total_data_subframe_id % data_subframe_num_perframe;
-    int symbol_id = current_data_subframe_id + UE_NUM;
+    int symbol_id = current_data_subframe_id + pilot_subframe_num_perframe;
+
+#if DEBUG_BS_SENDER
+    printf("In TX thread %d: Transmitted frame %d, subframe %d, "
+           "ant %d, offset: %d, msg_queue_length: %zu\n",
+        tid, frame_id, symbol_id, ant_id, offset,
+        message_queue_->size_approx());
+#endif
 
     char* cur_buffer_ptr = tx_buffer_
         + (current_data_subframe_id * BS_ANT_NUM + ant_id) * packet_length;
