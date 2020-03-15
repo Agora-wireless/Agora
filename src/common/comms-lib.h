@@ -19,7 +19,7 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include <algorithm>
-#include <complex.h>
+#include <complex>
 #include <fstream> // std::ifstream
 #include <iostream>
 #include <math.h>
