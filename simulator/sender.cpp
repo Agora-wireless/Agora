@@ -71,7 +71,6 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
     config_ = cfg;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int subframe_num_perframe = config_->symbol_num_perframe;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int downlink_mode = config_->downlink_mode;
