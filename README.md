@@ -83,3 +83,7 @@ To compile test_mufft.c:
 
 	gcc -o test_mufft ../test_mufft.c /usr/local/lib/libmufft.a -lm -Wl,-no-undefined
 
+* Source code is formatted in a style derived from the "WebKit" style, and enforced by clang-format.  Running
+"clang-format -i $file" for a newly modified file will format it to match proper code style.
+
+* Source code is expected to compile without warnings.
