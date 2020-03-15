@@ -175,7 +175,7 @@ void check_correctness_dl(Config* cfg)
                 }
                 printf("symbol %d, ant %d, total diff %.3f\n", 
                     i, ant, sum_diff);
-                if (sum_diff > OFDM_CA_NUM * 8)
+                if (sum_diff > OFDM_CA_NUM * 10)
                     error_cnt++;
             }
         }

@@ -2,10 +2,12 @@
     accuracy and performance test for ldpc encoder implemented with AVX256 and
    Intel's decoder
  */
-
+#ifdef USE_LDPC
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#endif
+#include <armadillo>
 #include <bitset>
 #include <fstream>
 #include <immintrin.h>
@@ -16,19 +18,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <armadillo>
 
+#include "comms-lib.h"
+#include "config.hpp"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "config.hpp"
-#include "comms-lib.h"
 
 #include <time.h>
 
 using namespace arma;
 
-static const float NOISE_LEVEL = 1.0/200;
-
+static const float NOISE_LEVEL = 1.0 / 200;
 
 template <typename T>
 T* aligned_malloc(const int size, const unsigned alignment)
@@ -44,6 +44,7 @@ T* aligned_malloc(const int size, const unsigned alignment)
 #endif
 }
 
+#ifdef USE_LDPC
 #ifndef __has_builtin
 #define __has_builtin(x) 0
 #endif
@@ -66,7 +67,7 @@ static inline uint8_t bitreverse8(uint8_t x)
  * at least 8*len/m bytes.
  */
 static void adapt_bits_for_mod(
-    int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
+    int8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
 {
     int bits_avail = 0;
     uint16_t bits = 0;
@@ -81,7 +82,7 @@ static void adapt_bits_for_mod(
     }
 }
 
-uint8_t select_base_matrix_entry(uint16_t Zc) 
+uint8_t select_base_matrix_entry(uint16_t Zc)
 {
     uint8_t i_LS;
     if ((Zc % 15) == 0)
@@ -102,6 +103,7 @@ uint8_t select_base_matrix_entry(uint16_t Zc)
         i_LS = 0;
     return i_LS;
 }
+#endif
 
 float rand_float(float min, float max)
 {
@@ -112,7 +114,7 @@ float rand_float_from_short(float min, float max)
 {
     float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
     short rand_val_ushort = (short)(rand_val * 32768);
-    rand_val = (float) rand_val_ushort / 32768;
+    rand_val = (float)rand_val_ushort / 32768;
     return rand_val;
 }
 
@@ -126,18 +128,36 @@ int main(int argc, char* argv[])
         confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
+    printf("default config file: %s\n", filename.c_str());
     Config* config_ = new Config(filename.c_str());
 
+#ifdef USE_LDPC
+    printf("LDPC enabled\n");
+#else
+    printf("LDPC not enabled\n");
+#endif
+    if (config_->freq_orthogonal_pilot)
+        printf("use frequency-orthogonal pilots\n");
+    else
+        printf("use time-orthogonal pilots\n");
     printf("generating encoded and modulated data........\n");
     int mod_type = config_->mod_type;
-    auto LDPC_config = config_->LDPC_config; 
     int UE_NUM = config_->UE_NUM;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int OFDM_CA_NUM = config_->OFDM_CA_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int OFDM_DATA_START = config_->OFDM_DATA_START;
     int symbol_num_perframe = config_->symbol_num_perframe;
-    
+    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
+    int pilot_symbol_num_perframe = config_->pilot_symbol_num_perframe;
+    // randomly generate input
+    srand(time(NULL));
+    // srand(0);
+
+#ifdef USE_LDPC
+    auto LDPC_config = config_->LDPC_config;
+    int numberCodeblocks
+        = data_symbol_num_perframe * LDPC_config.nblocksInSymbol * UE_NUM;
     uint16_t Zc = LDPC_config.Zc;
     uint16_t Bg = LDPC_config.Bg;
     int16_t decoderIter = LDPC_config.decoderIter;
@@ -145,34 +165,18 @@ int main(int argc, char* argv[])
     uint32_t cbEncLen = LDPC_config.cbEncLen;
     uint32_t cbLen = LDPC_config.cbLen;
     uint32_t cbCodewLen = LDPC_config.cbCodewLen;
-    // int numberCodeblocks = 1;
-    int numberCodeblocks = config_->data_symbol_num_perframe 
-        * LDPC_config.nblocksInSymbol * config_->UE_NUM;
 
-    int16_t numFillerBits = 0;
-    
-
+    printf("total number of blocks: %d\n", numberCodeblocks);
     /* initialize buffers */
     int8_t* input[numberCodeblocks];
     int8_t* encoded[numberCodeblocks];
 
-    Table<int8_t> mod_input;
-    Table<complex_float> mod_output;   
-    
-    Table<float> mod_table;
-    init_modulation_table(mod_table, mod_type);
-    
     int input_lenth = ((cbLen + 7) >> 3);
     for (int i = 0; i < numberCodeblocks; i++) {
         input[i] = (int8_t*)malloc(input_lenth * sizeof(int8_t));
         encoded[i]
             = (int8_t*)malloc(BG1_COL_TOTAL * PROC_BYTES * sizeof(int8_t));
     }
-
-    mod_input.calloc(numberCodeblocks, OFDM_DATA_NUM, 32);
-    mod_output.calloc(numberCodeblocks, OFDM_DATA_NUM, 32);
-
-    printf("total number of blocks: %d\n", numberCodeblocks);
 
     // buffers for encoders
     __declspec(align(PROC_BYTES))
@@ -185,9 +189,6 @@ int main(int argc, char* argv[])
         int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES]
         = { 0 };
 
-    // randomly generate input
-    srand(time(NULL));
-    // srand(0);
     for (int n = 0; n < numberCodeblocks; n++) {
         for (int i = 0; i < input_lenth; i++)
             input[n][i] = (int8_t)rand();
@@ -206,27 +207,16 @@ int main(int argc, char* argv[])
     // }
     // printf("\n");
 
-    printf("saving raw data...\n");
-    std::string filename_input = cur_directory + "/data/LDPC_orig_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
-    FILE* fp_input = fopen(filename_input.c_str(), "wb");
-    for (int i = 0; i < numberCodeblocks; i++) {
-        uint8_t* ptr = (uint8_t*)input[i];
-        fwrite(ptr, input_lenth, sizeof(uint8_t), fp_input);
-    }
-    fclose(fp_input);
-
-
-    // encoder setup
-    // -----------------------------------------------------------
+    /* encoder setup
+     * ----------------------------------------------------------- */
 
     int16_t numChannelLlrs = cbCodewLen;
     const int16_t* pShiftMatrix;
     const int16_t* pMatrixNumPerCol;
     const int16_t* pAddr;
 
-    // i_Ls decides the base matrix entries
-    uint8_t i_LS = select_base_matrix_entry(Zc); 
+    /* i_Ls decides the base matrix entries */
+    uint8_t i_LS = select_base_matrix_entry(Zc);
 
     if (Bg == 1) {
         pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
@@ -238,8 +228,8 @@ int main(int argc, char* argv[])
         pAddr = Bg2Address;
     }
 
-    // encoding
-    // --------------------------------------------------------------------
+    /* encoding
+     * --------------------------------------------------------------- */
     printf("encoding----------------------\n");
     LDPC_ADAPTER_P ldpc_adapter_func = ldpc_select_adapter_func(Zc);
     LDPC_ENCODER ldpc_encoder_func = ldpc_select_encoder_func(Bg);
@@ -249,114 +239,145 @@ int main(int argc, char* argv[])
         // read input into z-bit segments
         ldpc_adapter_func(input[n], internalBuffer0, Zc, cbLen, 1);
         // encode
-        ldpc_encoder_func(internalBuffer0, internalBuffer1,
-            pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
+        ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol,
+            pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
         // scatter the output back to compacted
         // combine the input sequence and the parity bits into codeword
         // outputs
         memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
             (cbLen / Zc - 2) * PROC_BYTES);
-        memcpy(internalBuffer2 + (cbLen / Zc - 2) * PROC_BYTES,
-            internalBuffer1, cbEncLen / Zc * PROC_BYTES);
+        memcpy(internalBuffer2 + (cbLen / Zc - 2) * PROC_BYTES, internalBuffer1,
+            cbEncLen / Zc * PROC_BYTES);
 
         ldpc_adapter_func(encoded[n], internalBuffer2, Zc, cbCodewLen, 0);
     }
     double end_time = get_time();
     double encoding_time = end_time - start_time;
     printf("encoding time: %.3f\n", encoding_time / numberCodeblocks);
-
+    double enc_thruput = (double)cbLen * numberCodeblocks / encoding_time;
+    printf("the encoder's speed is %f Mbps\n", enc_thruput);
     int num_mod = cbCodewLen / mod_type;
+#else
+    int numberCodeblocks = data_symbol_num_perframe * UE_NUM;
+    int num_mod = OFDM_DATA_NUM;
+#endif
+    Table<uint8_t> mod_input;
+    Table<complex_float> mod_output;
+    mod_input.calloc(numberCodeblocks, OFDM_DATA_NUM, 32);
+    mod_output.calloc(numberCodeblocks, OFDM_DATA_NUM, 32);
+    Table<float> mod_table;
+    init_modulation_table(mod_table, mod_type);
+
     for (int n = 0; n < numberCodeblocks; n++) {
+#ifdef USE_LDPC
         adapt_bits_for_mod(
             encoded[n], mod_input[n], (cbCodewLen + 7) >> 3, mod_type);
-        for (int i = 0; i < num_mod; i++) {
+#else
+        for (int i = 0; i < num_mod; i++)
+            mod_input[n][i] = (uint8_t)(rand() % config_->mod_order);
+            // printf("symbol %d ue %d\n", n / UE_NUM, n % UE_NUM );
+            // for (int i = 0; i < num_mod; i++)
+            //     printf("%u ", mod_input[n][i]);
+            // printf("\n");
+#endif
+        for (int i = 0; i < num_mod; i++)
             mod_output[n][i]
                 = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
-            // printf("%.3f+%.3fi ", mod_output[n][i].re, mod_output[n][i].im);
-        }
     }
-    // printf("\n");
 
-    double enc_thruput
-            = (double)cbLen * numberCodeblocks / encoding_time;
-    printf("the encoder's speed is %f Mbps\n", enc_thruput);
-
-    // printf("Encoded data for mod\n");
-    // for (int n = 0; n < numberCodeblocks; n++) {
-    //     if (n % UE_NUM == 0) {
-    //         printf("symbol %d\n", n / UE_NUM);
-    //     }
-    //     printf("ue %d\n", n % UE_NUM);
-    //     for (int i = 0; i < num_mod; i++)
-    //         // std::cout << std::bitset<8>(input[n][i]) << " ";
-    //         printf("%u ", (uint8_t)mod_input[n][i]);
-    //     printf("\n");
-    // }
-    // printf("\n");
-
+    printf("saving raw data...\n");
+#ifdef USE_LDPC
+    std::string filename_input = cur_directory + "/data/LDPC_orig_data_2048_ant"
+        + std::to_string(BS_ANT_NUM) + ".bin";
+    FILE* fp_input = fopen(filename_input.c_str(), "wb");
+    for (int i = 0; i < numberCodeblocks; i++) {
+        uint8_t* ptr = (uint8_t*)input[i];
+        fwrite(ptr, input_lenth, sizeof(uint8_t), fp_input);
+    }
+    fclose(fp_input);
+#else
+    std::string filename_input = cur_directory + "/data/orig_data_2048_ant"
+        + std::to_string(BS_ANT_NUM) + ".bin";
+    FILE* fp_input = fopen(filename_input.c_str(), "wb");
+    for (int i = 0; i < numberCodeblocks; i++) {
+        uint8_t* ptr = (uint8_t*)mod_input[i];
+        fwrite(ptr, OFDM_DATA_NUM, sizeof(uint8_t), fp_input);
+    }
+    fclose(fp_input);
+#endif
 
     /* convert data into time domain */
-    Table<complex_float> IFFT_data; 
-    IFFT_data.calloc(UE_NUM * config_->data_symbol_num_perframe, OFDM_CA_NUM, 64);
-    for (int i = 0; i < UE_NUM * config_->data_symbol_num_perframe; i++) {
-        memcpy(IFFT_data[i] + OFDM_DATA_START, mod_output[i], 
+    Table<complex_float> IFFT_data;
+    IFFT_data.calloc(UE_NUM * data_symbol_num_perframe, OFDM_CA_NUM, 64);
+    for (int i = 0; i < UE_NUM * data_symbol_num_perframe; i++) {
+        memcpy(IFFT_data[i] + OFDM_DATA_START, mod_output[i],
             OFDM_DATA_NUM * sizeof(complex_float));
-        CommsLib::IFFT(IFFT_data[i], OFDM_CA_NUM);
+        // CommsLib::IFFT(IFFT_data[i], OFDM_CA_NUM);
     }
 
     /* get pilot data from file and convert to time domain */
     float* pilots_f = config_->pilots_;
     complex_float* pilots_t;
     alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 1);
-    for (int i = 0; i < OFDM_CA_NUM; i++) {
+    for (int i = 0; i < OFDM_CA_NUM; i++)
         pilots_t[i].re = pilots_f[i];
-    }
-    CommsLib::IFFT(pilots_t, OFDM_CA_NUM);
-    // printf("pilots_t\n");
-    // for (int i = 0; i < OFDM_CA_NUM; i++) {
-    //     printf("%.3f+%.3fi ", pilots_t[i].re, pilots_t[i].im);
-    // }
-    
+    // CommsLib::IFFT(pilots_t, OFDM_CA_NUM);
 
     /* put pilot and data symbols together */
     Table<complex_float> tx_data_all_symbols;
-    tx_data_all_symbols.calloc(symbol_num_perframe, 
-        UE_NUM * OFDM_CA_NUM, 64);
-    for (int i = 0; i < UE_NUM; i++) {
-        memcpy(tx_data_all_symbols[i] + i * OFDM_CA_NUM, pilots_t, 
-            OFDM_CA_NUM * sizeof(complex_float));
+    tx_data_all_symbols.calloc(symbol_num_perframe, UE_NUM * OFDM_CA_NUM, 64);
+
+    if (config_->freq_orthogonal_pilot) {
+        complex_float* pilots_t_ue;
+        alloc_buffer_1d(&pilots_t_ue, OFDM_CA_NUM, 64, 1);
+        for (int i = 0; i < UE_NUM; i++) {
+            /* TODO: fix user pilots distribution in pilot symbols */
+            /* Right now we assume one pilot symbol hold all user pilots
+             * in freqency orthogonal pilot */
+            memset(pilots_t_ue, 0, OFDM_CA_NUM * sizeof(complex_float));
+            for (int j = OFDM_DATA_START; j < OFDM_DATA_START + OFDM_DATA_NUM;
+                 j += UE_NUM) {
+                pilots_t_ue[i + j].re = pilots_f[i + j];
+            }
+            // CommsLib::IFFT(pilots_t_ue, OFDM_CA_NUM);
+            memcpy(tx_data_all_symbols[0] + i * OFDM_CA_NUM, pilots_t_ue,
+                OFDM_CA_NUM * sizeof(complex_float));
+        }
+    } else {
+        for (int i = 0; i < UE_NUM; i++)
+            memcpy(tx_data_all_symbols[i] + i * OFDM_CA_NUM, pilots_t,
+                OFDM_CA_NUM * sizeof(complex_float));
     }
 
-    for (int i = UE_NUM; i < symbol_num_perframe; i++) {
+    for (int i = pilot_symbol_num_perframe; i < symbol_num_perframe; i++) {
         for (int j = 0; j < UE_NUM; j++) {
-            memcpy(tx_data_all_symbols[i] + j * OFDM_CA_NUM, 
-                IFFT_data[(i - UE_NUM) * UE_NUM + j], 
+            memcpy(tx_data_all_symbols[i] + j * OFDM_CA_NUM,
+                IFFT_data[(i - pilot_symbol_num_perframe) * UE_NUM + j],
                 OFDM_CA_NUM * sizeof(complex_float));
         }
     }
-    
+
     /* generate CSI matrix */
     Table<complex_float> CSI_matrix;
     CSI_matrix.calloc(OFDM_CA_NUM, UE_NUM * BS_ANT_NUM, 32);
     for (int i = 0; i < UE_NUM * BS_ANT_NUM; i++) {
-        complex_float csi = {rand_float_from_short(-1, 1), 
-            rand_float_from_short(-1, 1)};
+        complex_float csi
+            = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
         // printf("noise of ant %d, ue %d\n", i % BS_ANT_NUM, i / BS_ANT_NUM );
-        for (int j = 0; j < OFDM_CA_NUM; j++)  {
-            complex_float noise = 
-                {rand_float_from_short(-1, 1) * NOISE_LEVEL, 
-                rand_float_from_short(-1, 1) * NOISE_LEVEL};
+        for (int j = 0; j < OFDM_CA_NUM; j++) {
+            complex_float noise = { rand_float_from_short(-1, 1) * NOISE_LEVEL,
+                rand_float_from_short(-1, 1) * NOISE_LEVEL };
             // printf("%.4f+%.4fi ", noise.re, noise.im);
             CSI_matrix[j][i].re = csi.re + noise.re;
             CSI_matrix[j][i].im = csi.im + noise.im;
-        } 
-        // printf("\n");  
+        }
+        // printf("\n");
     }
 
     /* generate rx data received by BS after going through channels */
     Table<complex_float> rx_data_all_symbols;
-    rx_data_all_symbols.calloc(symbol_num_perframe, 
-        OFDM_CA_NUM * BS_ANT_NUM, 64);
+    rx_data_all_symbols.calloc(
+        symbol_num_perframe, OFDM_CA_NUM * BS_ANT_NUM, 64);
     for (int i = 0; i < symbol_num_perframe; i++) {
         cx_float* ptr_in_data = (cx_float*)tx_data_all_symbols[i];
         cx_fmat mat_input_data(ptr_in_data, OFDM_CA_NUM, UE_NUM, false);
@@ -367,11 +388,20 @@ int main(int argc, char* argv[])
             cx_fmat mat_csi(ptr_in_csi, BS_ANT_NUM, UE_NUM);
             mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
         }
+        for (int j = 0; j < BS_ANT_NUM; j++) {
+            CommsLib::IFFT(
+                rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM);
+        }
     }
 
     printf("saving rx data...\n");
+#ifdef USE_LDPC
     std::string filename_rx = cur_directory + "/data/LDPC_rx_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
+#else
+    std::string filename_rx = cur_directory + "/data/rx_data_2048_ant"
+        + std::to_string(BS_ANT_NUM) + ".bin";
+#endif
     FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
     for (int i = 0; i < symbol_num_perframe; i++) {
         float* ptr = (float*)rx_data_all_symbols[i];
@@ -385,16 +415,16 @@ int main(int argc, char* argv[])
     //         if (j % OFDM_CA_NUM == 0) {
     //             printf("\nsymbol %d ant %d\n", i, j / OFDM_CA_NUM);
     //         }
-    //         printf("%.4f+%.4fi ", rx_data_all_symbols[i][j].re, 
+    //         printf("%.4f+%.4fi ", rx_data_all_symbols[i][j].re,
     //             rx_data_all_symbols[i][j].im);
     //     }
     //     printf("\n");
     // }
-    
 
+    /* ------------------------------------------------
+     * generate data for downlink test
+     * ------------------------------------------------ */
 
-    /* --------------------------------------- */
-    /* generate data for downlink test */
     /* compute precoder */
     Table<complex_float> precoder;
     precoder.calloc(OFDM_CA_NUM, UE_NUM * BS_ANT_NUM, 32);
@@ -404,63 +434,57 @@ int main(int argc, char* argv[])
         cx_float* ptr_out = (cx_float*)precoder[i];
         cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
         pinv(mat_output, mat_input, 1e-1, "dc");
-        // if (i >= OFDM_DATA_START && i < OFDM_DATA_START + OFDM_DATA_NUM) {
-        //     std::cout << "CSI of sc "<< i - OFDM_DATA_START << "\n";
-        //     std::cout << mat_input << std::endl;
-        // }
     }
 
     // printf("CSI \n");
     // // for (int i = 0; i < OFDM_CA_NUM; i++)
     // for (int j = 0; j < UE_NUM * BS_ANT_NUM; j++)
-    //     printf("%.3f+%.3fi ", 
-    //         CSI_matrix[OFDM_DATA_START][j].re, 
+    //     printf("%.3f+%.3fi ",
+    //         CSI_matrix[OFDM_DATA_START][j].re,
     //         CSI_matrix[OFDM_DATA_START][j].im);
     // printf("\n");
     // printf("precoder \n");
     // // for (int i = 0; i < OFDM_CA_NUM; i++)
     // for (int j = 0; j < UE_NUM * BS_ANT_NUM; j++)
-    //     printf("%.3f+%.3fi ", 
-    //         precoder[OFDM_DATA_START][j].re, 
+    //     printf("%.3f+%.3fi ",
+    //         precoder[OFDM_DATA_START][j].re,
     //         precoder[OFDM_DATA_START][j].im);
     // printf("\n");
-    
+
     /* prepare downlink data from mod_output */
-    Table<complex_float> dl_mod_data; 
-    dl_mod_data.calloc(config_->data_symbol_num_perframe, 
-        OFDM_CA_NUM * UE_NUM, 64);
-    for (int i = 0; i < config_->data_symbol_num_perframe; i++) {
+    Table<complex_float> dl_mod_data;
+    dl_mod_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64);
+    for (int i = 0; i < data_symbol_num_perframe; i++) {
         for (int j = 0; j < UE_NUM; j++)
-            memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START, 
-                mod_output[i * UE_NUM + j], 
+            memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
+                mod_output[i * UE_NUM + j],
                 OFDM_DATA_NUM * sizeof(complex_float));
-    }   
+    }
 
     // printf("dl mod data \n");
     // for (int i = 0; i < 10; i++) {
     //     for (int j = 0; j < UE_NUM; j++) {
     //         printf("symbol %d, ue %d\n", i, j);
-    //         for (int k = OFDM_DATA_START; 
+    //         for (int k = OFDM_DATA_START;
     //             k < OFDM_DATA_START + OFDM_DATA_NUM; k++) {
-    //             printf("%.3f+%.3fi ", 
-    //                 dl_mod_data[i][j * OFDM_CA_NUM + k].re, 
+    //             printf("%.3f+%.3fi ",
+    //                 dl_mod_data[i][j * OFDM_CA_NUM + k].re,
     //                 dl_mod_data[i][j * OFDM_CA_NUM + k].im);
     //         }
     //         printf("\n");
-    //     }  
+    //     }
     // }
 
     /* perform precoding and ifft */
-    Table<complex_float> dl_tx_data; 
-    dl_tx_data.calloc(config_->data_symbol_num_perframe, 
-        OFDM_CA_NUM * BS_ANT_NUM, 64);
-    for (int i = 0; i < config_->data_symbol_num_perframe; i++) {
+    Table<complex_float> dl_tx_data;
+    dl_tx_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * BS_ANT_NUM, 64);
+    for (int i = 0; i < data_symbol_num_perframe; i++) {
         cx_float* ptr_in_data = (cx_float*)dl_mod_data[i];
         cx_fmat mat_input_data(ptr_in_data, OFDM_CA_NUM, UE_NUM, false);
         cx_float* ptr_out = (cx_float*)dl_tx_data[i];
         cx_fmat mat_output(ptr_out, OFDM_CA_NUM, BS_ANT_NUM, false);
-        for (int j = OFDM_DATA_START; 
-            j < OFDM_DATA_NUM + OFDM_DATA_START; j++) {
+        for (int j = OFDM_DATA_START; j < OFDM_DATA_NUM + OFDM_DATA_START;
+             j++) {
             cx_float* ptr_in_precoder = (cx_float*)precoder[j];
             cx_fmat mat_precoder(ptr_in_precoder, UE_NUM, BS_ANT_NUM, false);
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
@@ -475,39 +499,44 @@ int main(int argc, char* argv[])
             complex_float* ptr_ifft = dl_tx_data[i] + j * OFDM_CA_NUM;
             CommsLib::IFFT(ptr_ifft, OFDM_CA_NUM, false);
         }
-    }  
-
+    }
 
     printf("saving dl tx data...\n");
-    std::string filename_dl_tx = cur_directory + 
-        "/data/LDPC_dl_ifft_data_2048_ant"
+#ifdef USE_LDPC
+    std::string filename_dl_tx = cur_directory
+        + "/data/LDPC_dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
+#else
+    std::string filename_dl_tx = cur_directory + "/data/dl_ifft_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
+#endif
+
     FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
-    for (int i = 0; i < config_->data_symbol_num_perframe; i++) {
+    for (int i = 0; i < data_symbol_num_perframe; i++) {
         float* ptr = (float*)dl_tx_data[i];
-        fwrite(ptr, OFDM_CA_NUM * BS_ANT_NUM * 2, 
-            sizeof(float), fp_dl_tx);
+        fwrite(ptr, OFDM_CA_NUM * BS_ANT_NUM * 2, sizeof(float), fp_dl_tx);
     }
     fclose(fp_dl_tx);
 
     // printf("rx data\n");
     // for (int i = 0; i < 10; i++) {
-        
+
     //     for (int j = 0; j < OFDM_CA_NUM * BS_ANT_NUM; j++) {
     //         if (j % OFDM_CA_NUM == 0) {
     //             printf("symbol %d ant %d\n", i, j / OFDM_CA_NUM);
     //         }
-    //         printf("%.3f+%.3fi ", dl_tx_data[i][j].re, 
+    //         printf("%.3f+%.3fi ", dl_tx_data[i][j].re,
     //             dl_tx_data[i][j].im);
     //     }
     // }
     // printf("\n");
 
-    
+#ifdef USE_LDPC
     for (int n = 0; n < numberCodeblocks; n++) {
         free(input[n]);
         free(encoded[n]);
     }
+#endif
 
     mod_input.free();
     mod_output.free();
@@ -516,7 +545,6 @@ int main(int argc, char* argv[])
     free_buffer_1d(&pilots_t);
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
-    
 
     return 0;
 }
