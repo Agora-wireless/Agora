@@ -60,7 +60,7 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer,
 
     std::vector<pthread_t> created_threads;
 
-    if (config_->downlink_mode)
+    if (config_->dl_data_symbol_num_perframe > 0)
         return created_threads;
 
     for (int i = 0; i < rx_thread_num_; i++) {
@@ -121,7 +121,6 @@ void* PacketTXRX::loopTXRX(int tid)
     int UE_NUM = config_->UE_NUM;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
-    int downlink_mode = config_->downlink_mode;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = config_->bs_port + tid;
     int remote_port_id = config_->ue_rx_port + tid;
@@ -160,8 +159,9 @@ void* PacketTXRX::loopTXRX(int tid)
     // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM *
     // SOCKET_BUFFER_FRAME_NUM float *tx_cur_ptr_data;
 
-    int max_subframe_id
-        = downlink_mode ? UE_NUM : (UE_NUM + ul_data_subframe_num_perframe);
+    int max_subframe_id = config_->dl_data_symbol_num_perframe > 0
+        ? UE_NUM
+        : (UE_NUM + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame
         = max_subframe_id * BS_ANT_NUM / rx_thread_num_;
     int max_tx_packet_num_per_frame
@@ -203,7 +203,7 @@ void* PacketTXRX::loopTXRX(int tid)
 #endif
 
             frame_id %= NUM_COUNTERS;
-            if (downlink_mode
+            if (config_->dl_data_symbol_num_perframe > 0
                 && ++rx_pkts_in_frame_count[frame_id]
                     == max_rx_packet_num_per_frame) {
                 do_tx = true;
@@ -320,7 +320,8 @@ void* PacketTXRX::loopRecv(int tid)
     int rx_offset = 0;
     // int packet_num = 0;
     // int ret = 0;
-    // int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
+    // int max_subframe_id = config_->dl_data_symbol_num_perframe > 0 ? UE_NUM :
+    // subframe_num_perframe;
     int prev_frame_id = -1;
     // int packet_num_per_frame = 0;
     // double start_time= get_time();
