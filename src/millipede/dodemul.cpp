@@ -161,8 +161,8 @@ void DoDemul::launch(int offset)
             uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_subframe_id]
                                                      [cur_sc_id * UE_NUM]);
             demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, UE_NUM);
-            // cout<< "Demuled data:"; 
-            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++) 
+            // cout<< "Demuled data:";
+            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++)
             //     cout<<+*(demul_ptr+ue_idx)<<" ";
             // cout<<endl;
             // cout<<endl;
@@ -219,10 +219,9 @@ void DoDemul::launch(int offset)
     if (duration > 500)
         printf("Thread %d Demul takes %.2f\n", tid, duration);
 #endif
-    /* inform main thread */
-    Event_data demul_finish_event;
-    demul_finish_event.event_type = EVENT_DEMUL;
-    demul_finish_event.data = offset;
+
+    /* Inform main thread */
+    Event_data demul_finish_event(EventType::kDemul, offset);
     consumer_.handle(demul_finish_event);
 }
 
@@ -310,11 +309,11 @@ void DoDemul::DemulSingleSC(int offset)
     // inform main thread
     double duration3 = get_time() - start_time;
     Demul_task_duration[tid][1] += duration3;
-    Event_data demul_finish_event;
-    demul_finish_event.event_type = EVENT_DEMUL;
-    demul_finish_event.data = offset;
+
+    Event_data demul_finish_event(EventType::kDemul, offset);
     Demul_task_count[tid] = Demul_task_count[tid] + 1;
     consumer_.handle(demul_finish_event);
+
     double duration = get_time() - start_time;
     Demul_task_duration[tid][0] += duration;
 }

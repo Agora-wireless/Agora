@@ -167,12 +167,9 @@ void DoEncode::launch(int offset)
     }
 #endif
 
-    /* inform main thread */
-    Event_data Encode_finish_event;
-    Encode_finish_event.event_type = EVENT_ENCODE;
-    Encode_finish_event.data = offset;
-
-    consumer_.handle(Encode_finish_event);
+    /* Inform main thread */
+    Event_data encode_finish_event(EventType::kEncode, offset);
+    consumer_.handle(encode_finish_event);
 }
 
 DoDecode::DoDecode(Config* in_config, int in_tid,
@@ -266,9 +263,8 @@ void DoDecode::launch(int offset)
         printf("Thread %d Decode takes %.2f\n", tid, duration);
     }
 #endif
-    /* inform main thread */
-    Event_data Decode_finish_event;
-    Decode_finish_event.event_type = EVENT_DECODE;
-    Decode_finish_event.data = offset;
-    consumer_.handle(Decode_finish_event);
+
+    /* Inform main thread */
+    Event_data decode_finish_event(EventType::kDecode, offset);
+    consumer_.handle(decode_finish_event);
 }
