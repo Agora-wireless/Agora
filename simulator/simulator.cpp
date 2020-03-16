@@ -71,7 +71,7 @@ void Simulator::start()
     int frame_count_rx = 0;
 
     int ret = 0;
-    event_data_t events_list[dequeue_bulk_size];
+    Event_data events_list[dequeue_bulk_size];
     int miss_count = 0;
     int total_count = 0;
 
@@ -107,7 +107,7 @@ void Simulator::start()
 
         /* handle each event */
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            event_data_t& event = events_list[bulk_count];
+            Event_data& event = events_list[bulk_count];
             switch (event.event_type) {
             case EventType::kPacketRX: {
                 int offset = event.data;
@@ -224,9 +224,9 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
 
 void Simulator::initialize_queues()
 {
-    message_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(

@@ -87,8 +87,8 @@ public:
      */
     Receiver(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
         int in_core_offset,
-        moodycamel::ConcurrentQueue<event_data_t>* in_queue_message,
-        moodycamel::ConcurrentQueue<event_data_t>* in_queue_task,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks);
     ~Receiver();
 
@@ -146,8 +146,8 @@ private:
 
     Table<double>* frame_start_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<event_data_t>* message_queue_;
-    moodycamel::ConcurrentQueue<event_data_t>* task_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
