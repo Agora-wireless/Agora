@@ -427,7 +427,8 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
 
 void* Sender::loopSend_main(int tid)
 {
-    pin_to_core_with_offset(Master_TX, core_offset, 0);
+    pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
+
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
@@ -622,8 +623,7 @@ void* Sender::loopSend_main(int tid)
 
 void* Sender::loopSend(int tid)
 {
-
-    pin_to_core_with_offset(Worker_TX, core_offset + 1, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;

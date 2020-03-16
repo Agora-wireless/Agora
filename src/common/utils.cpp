@@ -24,24 +24,25 @@ int pin_to_core(int core_id)
     return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
 }
 
-void pin_to_core_with_offset(thread_type thread, int core_offset, int thread_id)
+void pin_to_core_with_offset(
+    ThreadType thread_type, int core_offset, int thread_id)
 {
 #ifdef ENABLE_CPU_ATTACH
-    const char* THREAD_TYPE_STRING[]
-        = { "Master", "Worker", "Worker (FFT)", "Worker (ZF)", "Worker (Demul)",
-              "RX", "TX", "TXRX", "Master (RX)", "Master (TX)" };
     int actual_core_id = core_offset + thread_id;
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-    /* reserve core 0 for kernel threads */
-    if (actual_core_id >= num_cores)
-        actual_core_id = actual_core_id - num_cores + 1;
+
+    /* Reserve core 0 for kernel threads */
+    if (actual_core_id >= num_cores) {
+        actual_core_id = (actual_core_id % (num_cores - 1)) + 1;
+    }
+
     if (pin_to_core(actual_core_id) != 0) {
-        printf("%s thread %d: fail to pin to core %d\n",
-            THREAD_TYPE_STRING[thread], thread_id, actual_core_id);
+        printf("%s thread %d: failed to pin to core %d\n",
+            thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
         exit(0);
     } else {
-        printf("%s thread %d: pinned to core %d\n", THREAD_TYPE_STRING[thread],
-            thread_id, actual_core_id);
+        printf("%s thread %d: pinned to core %d\n",
+            thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
     }
 #endif
 }

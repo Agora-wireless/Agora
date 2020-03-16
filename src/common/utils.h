@@ -33,8 +33,12 @@
 #include <unistd.h>
 #include <vector>
 
+/* Pin this thread to core with global index = core_id */
 int pin_to_core(int core_id);
-void pin_to_core_with_offset(thread_type thread, int offset, int core_id);
+
+/* Pin this thread to core (base_core_offset + thread_id) */
+void pin_to_core_with_offset(
+    ThreadType thread, int base_core_offset, int thread_id);
 
 template <class T> struct EventHandlerContext {
     T* obj_ptr;

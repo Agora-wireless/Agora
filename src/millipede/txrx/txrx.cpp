@@ -116,7 +116,7 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
 
 void* PacketTXRX::loopTXRX(int tid)
 {
-    pin_to_core_with_offset(Worker_TXRX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
@@ -265,12 +265,13 @@ struct Packet* PacketTXRX::recv_enqueue(
     // move ptr & set status to full
     rx_buffer_status[rx_offset]
         = 1; // has data, after doing fft, it is set to 0
-    // push EVENT_PACKET_RECEIVED event into the queue
-    Event_data rx_message;
-    rx_message.event_type = EVENT_PACKET_RECEIVED;
+
+    // Push EVENT_PACKET_RECEIVED event into the queue.
     // data records the position of this packet in the rx_buffer & tid of this
     // socket (so that task thread could know which rx_buffer it should visit)
-    rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
+    Event_data rx_message(
+        EventType::kPacketRX, generateOffset2d_setbits(tid, rx_offset, 28));
+
     // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
     // if ( !message_queue_->enqueue(rx_message ) ) {
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
@@ -282,7 +283,8 @@ struct Packet* PacketTXRX::recv_enqueue(
 
 void* PacketTXRX::loopRecv(int tid)
 {
-    pin_to_core_with_offset(Worker_RX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerRX, core_id_, tid);
+
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = config_->bs_port + tid;
 #if USE_IPV4
@@ -353,7 +355,7 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    if (task_event.event_type != TASK_SEND) {
+    if (task_event.event_type != EventType::kPacketTX) {
         printf("Wrong event type!");
         exit(0);
     }
@@ -391,9 +393,8 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         perror("socket sendto failed");
         exit(0);
     }
-    Event_data tx_message;
-    tx_message.event_type = EVENT_PACKET_SENT;
-    tx_message.data = offset;
+
+    Event_data tx_message(EventType::kPacketTX, offset);
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     if (!message_queue_->enqueue(*local_ptok, tx_message)) {
         printf("socket message enqueue failed\n");
