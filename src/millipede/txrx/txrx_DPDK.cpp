@@ -112,8 +112,8 @@ PacketTXRX::PacketTXRX(
 
 PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
     int in_core_offset,
-    moodycamel::ConcurrentQueue<event_data_t>* in_queue_message,
-    moodycamel::ConcurrentQueue<event_data_t>* in_queue_task,
+    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+    moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
     : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
@@ -382,7 +382,7 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     int tid = ((PacketTXRXContext*)in_context)->tid;
     printf("packet receiver thread %d start\n", tid);
     // get pointer of message queue
-    moodycamel::ConcurrentQueue<event_data_t>* message_queue_
+    moodycamel::ConcurrentQueue<Event_data>* message_queue_
         = obj_ptr->message_queue_;
     Config* config_ = obj_ptr->config_;
     int core_id = config_->core_id_;
@@ -557,7 +557,7 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
                 + (cur_ptr_buffer - buffer + packet_length) % buffer_length;
 
             // Push packet received event into the queue
-            event_data_t packet_message(
+            Event_data packet_message(
                 EventType::kPacketRx, offset + tid * buffer_frame_num);
             if (!message_queue_->enqueue(*local_ptok, packet_message)) {
                 printf("socket message enqueue failed\n");
@@ -624,7 +624,7 @@ void* PacketTXRX::loopSend(int tid)
     moodycamel::ConsumerToken local_ctok(*task_queue_);
 
     while (true) {
-        event_data_t task_event;
+        Event_data task_event;
         // ret = task_queue_->try_dequeue(task_event);
         ret = task_queue_->try_dequeue_from_producer(
             *(tx_ptoks_[tid]), task_event);
@@ -677,7 +677,7 @@ void* PacketTXRX::loopSend(int tid)
 
         // data records the position of this packet in the buffer & tid of this
         // socket (so that task thread could know which buffer it should visit)
-        event_data_t packet_message(EventType::kPacketTX, offset);
+        Event_data packet_message(EventType::kPacketTX, offset);
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);

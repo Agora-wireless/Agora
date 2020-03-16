@@ -25,8 +25,8 @@ PacketTXRX::PacketTXRX(
 
 PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
     int in_core_offset,
-    moodycamel::ConcurrentQueue<event_data_t>* in_queue_message,
-    moodycamel::ConcurrentQueue<event_data_t>* in_queue_task,
+    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+    moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
     : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
@@ -167,7 +167,7 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
         // Push EVENT_RX_ENB event into the queue. data records the position of
         // this packet in the rx_buffer & tid of this socket (so that task
         // thread could know which rx_buffer it should visit)
-        event_data_t packet_message(EventType::kPacketRX,
+        Event_data packet_message(EventType::kPacketRX,
             generateOffset2d_setbits(tid, rx_offset + ch, 28));
 
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
@@ -268,7 +268,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
 
 int PacketTXRX::dequeue_send_Argos(int tid)
 {
-    event_data_t task_event;
+    Event_data task_event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
         return -1;
 
@@ -335,7 +335,7 @@ int PacketTXRX::dequeue_send_Argos(int tid)
 #endif
     // clock_gettime(CLOCK_MONOTONIC, &tv2);
 
-    event_data_t tx_message(EventType::kPacketTX, offset);
+    Event_data tx_message(EventType::kPacketTX, offset);
 
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     if (!message_queue_->enqueue(*local_ptok, tx_message)) {

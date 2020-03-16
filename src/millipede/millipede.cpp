@@ -173,7 +173,7 @@ void Millipede::start()
 
     int last_dequeue = 0;
     int ret = 0;
-    event_data_t events_list[dequeue_bulk_size];
+    Event_data events_list[dequeue_bulk_size];
     int miss_count = 0;
     int total_count = 0;
 
@@ -211,7 +211,7 @@ void Millipede::start()
         /* handle each event */
         int frame_count = 0;
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            event_data_t& event = events_list[bulk_count];
+            Event_data& event = events_list[bulk_count];
             switch (event.event_type) {
             case EventType::kPacketRX: {
                 int offset = event.data;
@@ -573,7 +573,7 @@ void Millipede::start()
                 for (int i = 0; i < delay_fft_queue_cnt[cur_frame_id]; i++) {
                     int offset = delay_fft_queue[cur_frame_id][i];
 
-                    event_data_t do_fft_task(EventType::kFFT, offset);
+                    Event_data do_fft_task(EventType::kFFT, offset);
                     do_fft_task.event_type = EventType::kFFT;
                     do_fft_task.data = offset;
 
@@ -1075,36 +1075,36 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id,
 void Millipede::initialize_queues()
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    message_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 
-    fft_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
-    zf_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 
-    rc_queue_ = moodycamel::ConcurrentQueue<event_data_t>(512 * 2 * 4);
+    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);
 
-    demul_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    decode_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 #endif
 
-    ifft_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
-    // modulate_queue_ = moodycamel::ConcurrentQueue<event_data_t>(512 *
+    // modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 *
     // data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    encode_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 #endif
-    precode_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
-    tx_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 
     int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;

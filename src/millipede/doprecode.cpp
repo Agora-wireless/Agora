@@ -9,7 +9,7 @@
 using namespace arma;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     Consumer& in_consumer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -207,7 +207,7 @@ void DoPrecode::launch(int offset)
 #endif
 
     /* Inform main thread */
-    event_data_t precode_finish_event(EventType::kPrecode, offset);
+    Event_data precode_finish_event(EventType::kPrecode, offset);
     consumer_.handle(precode_finish_event);
 
 #if DEBUG_PRINT_IN_TASK

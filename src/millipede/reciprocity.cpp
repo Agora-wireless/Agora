@@ -8,7 +8,7 @@
 
 using namespace arma;
 Reciprocity::Reciprocity(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
     Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
@@ -90,6 +90,6 @@ void Reciprocity::launch(int offset)
 #endif
 
     /* Inform main thread */
-    event_data_t RC_finish_event(EventType::kRC, offset);
+    Event_data RC_finish_event(EventType::kRC, offset);
     consumer_.handle(RC_finish_event);
 }

@@ -28,15 +28,15 @@ Phy_UE::Phy_UE(Config* config)
         non_null_sc_ind_.end(), pilot_sc_ind_.begin(), pilot_sc_ind_.end());
     std::sort(non_null_sc_ind_.begin(), non_null_sc_ind_.end());
 
-    task_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * rx_symbol_perframe * numAntennas * 36);
-    demul_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe * numAntennas * 36);
-    message_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * symbol_perframe * numAntennas * 36);
-    fft_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
-    tx_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
+    tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
 
     printf("initializing buffers...\n");
@@ -153,8 +153,8 @@ Phy_UE::~Phy_UE()
     ifft_buffer_.IFFT_inputs.free();
 }
 
-void Phy_UE::schedule_task(event_data_t do_task,
-    moodycamel::ConcurrentQueue<event_data_t>* in_queue,
+void Phy_UE::schedule_task(Event_data do_task,
+    moodycamel::ConcurrentQueue<Event_data>* in_queue,
     moodycamel::ProducerToken const& ptok)
 {
     if (!in_queue->try_enqueue(ptok, do_task)) {
@@ -223,7 +223,7 @@ void Phy_UE::start()
     int miss_count = 0;
     int total_count = 0;
 
-    event_data_t events_list[dequeue_bulk_size];
+    Event_data events_list[dequeue_bulk_size];
     int ret = 0;
     int l2_offset = 0;
     max_equaled_frame = 0;
@@ -249,7 +249,7 @@ void Phy_UE::start()
         }
         // handle each event
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            event_data_t& event = events_list[bulk_count];
+            Event_data& event = events_list[bulk_count];
 
             switch (event.event_type) {
 
@@ -300,7 +300,7 @@ void Phy_UE::start()
                             // printf("At frame %d (prev is %d) scheduling tx
                             // for frame %d with l2_offset %d\n", frame_id,
                             // prev_frame_id, tx_frame_id, l2_offset);
-                            event_data_t do_modul_task;
+                            Event_data do_modul_task;
                             do_modul_task.event_type = TASK_MODUL;
                             do_modul_task.data = l2_offset;
                             schedule_task(do_modul_task, &fft_queue_, ptok_fft);
@@ -313,7 +313,7 @@ void Phy_UE::start()
                 if (dl_data_symbol_perframe > 0
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
-                    event_data_t do_crop_task;
+                    Event_data do_crop_task;
                     do_crop_task.event_type = TASK_FFT;
                     do_crop_task.data = offset;
                     schedule_task(do_crop_task, &task_queue_, ptok);
@@ -371,7 +371,7 @@ void Phy_UE::start()
                 dl_symbol_id = dl_symbol_id_t;
                 // ant_id = ant_id_t;
 
-                event_data_t do_demul_task(EventType::kDemul, offset_eq);
+                Event_data do_demul_task(EventType::kDemul, offset_eq);
 
 #if DEBUG_PRINT_ENTER_QUEUE_DEMUL
                 printf("Main thread: created Demodulation task for frame: %d, "
@@ -569,7 +569,7 @@ void Phy_UE::taskThread(int tid)
 
     task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 
-    event_data_t event;
+    Event_data event;
     while (config_->running) {
         if (demul_queue_.try_dequeue(event))
             doDemul(tid, event.data);
@@ -674,7 +674,7 @@ void Phy_UE::doFFT(int tid, int offset)
     float* fft_buffer_ptr
         = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
-    event_data_t crop_finish_event;
+    Event_data crop_finish_event;
 
     // If it is pilot part, do CE
     if (config_->isPilot(frame_id, symbol_id)) {
@@ -794,7 +794,7 @@ void Phy_UE::doDemul(int tid, int offset)
     demod_16qam_hard_loop((float*)tar_ptr, (uint8_t*)demul_ptr, numAntennas);
 
     // Inform main thread
-    event_data_t demul_finish_event(EventType::kDemul, offset);
+    Event_data demul_finish_event(EventType::kDemul, offset);
 
     if (!message_queue_.enqueue(*task_ptok[tid], demul_finish_event)) {
         printf("Demuliplexing message enqueue failed\n");
@@ -917,7 +917,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 
     // l2_buffer_status_[offset] = 0; // now empty
 
-    event_data_t tx_finish_event(EventType::kIFFT, frame_id);
+    Event_data tx_finish_event(EventType::kIFFT, frame_id);
 
     if (!message_queue_.enqueue(*task_ptok[tid], tx_finish_event)) {
         printf("Muliplexing message enqueue failed\n");

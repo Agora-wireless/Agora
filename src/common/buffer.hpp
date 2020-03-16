@@ -24,18 +24,18 @@ struct complex_float {
 #endif
 
 // structure for event
-struct event_data_t {
+struct Event_data {
     EventType event_type;
     int data;
     // int more_data;
 
-    event_data_t(EventType event_type, int data)
+    Event_data(EventType event_type, int data)
         : event_type(event_type)
         , data(data)
     {
     }
 
-    event_data_t() {}
+    Event_data() {}
 };
 
 struct Packet {

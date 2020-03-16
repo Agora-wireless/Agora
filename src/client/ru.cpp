@@ -73,8 +73,8 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
 }
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config* config,
-    moodycamel::ConcurrentQueue<event_data_t>* in_message_queue,
-    moodycamel::ConcurrentQueue<event_data_t>* in_task_queue)
+    moodycamel::ConcurrentQueue<Event_data>* in_message_queue,
+    moodycamel::ConcurrentQueue<Event_data>* in_task_queue)
     : RU(n_rx_thread, n_tx_thread, config)
 {
     message_queue_ = in_message_queue;
@@ -223,7 +223,7 @@ void RU::sendThread(int tid)
     moodycamel::ProducerToken local_ptok(*message_queue_);
     while (config_->running) {
 
-        event_data_t task_event;
+        Event_data task_event;
         // ret = task_queue_.try_dequeue(task_event);
         ret = task_queue_->try_dequeue_from_producer(
             *task_ptok[tid], task_event);
@@ -344,7 +344,7 @@ void RU::sendThread(int tid)
         }
 #endif
 
-    event_data_t packet_message(EventType::kPacketTX, offset);
+    Event_data packet_message(EventType::kPacketTX, offset);
     // packet_message.more_data = frame_id;
 
     if (config_->running
@@ -478,7 +478,7 @@ void RU::taskThread(int tid)
         // Push EVENT_RX_ENB event into the queue. data records the position of
         // this packet in the buffer & tid of this socket (so that task thread
         // could know which buffer it should visit)
-        event_data_t packet_message(
+        Event_data packet_message(
             EventType::kRXSymbol, cursor + tid * buffer_frame_num_);
 
         if (!message_queue_->enqueue(local_ptok, packet_message)) {
@@ -489,7 +489,7 @@ void RU::taskThread(int tid)
         if (txSymbols.size() > 0
             && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
             // notify TXthread to start transmitting frame_id+offset
-            event_data_t do_tx_task(EventType::kPacketTX, ant_id);
+            Event_data do_tx_task(EventType::kPacketTX, ant_id);
             do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
 
             if (!task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
@@ -538,7 +538,7 @@ void RU::taskThread(int tid)
                 // Push EVENT_RX_ENB event into the queue. data records the
                 // position of this packet in the buffer & tid of this socket
                 // (so that task thread could know which buffer
-                event_data_t packet_message(
+                Event_data packet_message(
                     EventType::kPacketRX, cursor + tid * buffer_frame_num_);
 
                 if (!message_queue_->enqueue(local_ptok, packet_message)) {
@@ -553,7 +553,7 @@ void RU::taskThread(int tid)
             if (txSymbols.size() > 0
                 && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
                 //#ifdef SEPARATE_TX_THREAD
-                //                event_data_t do_tx_task;
+                //                Event_data do_tx_task;
                 //                do_tx_task.event_type = TASK_packet_SENT;
                 //                do_tx_task.data = ant_id; //tx_symbol_id *
                 //                config_->getNumAntennas() + ant_id;
