@@ -103,33 +103,42 @@ void Millipede::start()
     /* uplink */
     moodycamel::ProducerToken ptok_fft(fft_queue_);
     Consumer consumer_fft(
-        fft_queue_, ptok_fft, fft_stats_.max_task_count, TASK_FFT);
+        fft_queue_, ptok_fft, fft_stats_.max_task_count, EventType::kFFT);
+
     moodycamel::ProducerToken ptok_zf(zf_queue_);
-    Consumer consumer_zf(zf_queue_, ptok_zf, zf_stats_.max_task_count, TASK_ZF);
+    Consumer consumer_zf(
+        zf_queue_, ptok_zf, zf_stats_.max_task_count, EventType::kZF);
+
     moodycamel::ProducerToken ptok_demul(demul_queue_);
-    Consumer consumer_demul(
-        demul_queue_, ptok_demul, demul_stats_.max_task_count, TASK_DEMUL);
+    Consumer consumer_demul(demul_queue_, ptok_demul,
+        demul_stats_.max_task_count, EventType::kDemul);
+
 #ifdef USE_LDPC
     moodycamel::ProducerToken ptok_decode(decode_queue_);
-    Consumer consumer_decode(
-        decode_queue_, ptok_decode, decode_stats_.max_task_count, TASK_DECODE);
+    Consumer consumer_decode(decode_queue_, ptok_decode,
+        decode_stats_.max_task_count, EventType::kDecode);
 #endif
+
     /* downlink */
 #ifdef USE_LDPC
     moodycamel::ProducerToken ptok_encode(encode_queue_);
-    Consumer consumer_encode(
-        encode_queue_, ptok_encode, encode_stats_.max_task_count, TASK_ENCODE);
+    Consumer consumer_encode(encode_queue_, ptok_encode,
+        encode_stats_.max_task_count, EventType::kEncode);
 #endif
+
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
     Consumer consumer_ifft(
-        ifft_queue_, ptok_ifft, ifft_stats_.max_task_count, TASK_IFFT);
+        ifft_queue_, ptok_ifft, ifft_stats_.max_task_count, EventType::kIFFT);
+
     moodycamel::ProducerToken ptok_rc(rc_queue_);
-    Consumer consumer_rc(rc_queue_, ptok_rc, rc_stats_.max_task_count, TASK_RC);
+    Consumer consumer_rc(
+        rc_queue_, ptok_rc, rc_stats_.max_task_count, EventType::kRC);
+
     moodycamel::ProducerToken ptok_precode(precode_queue_);
     Consumer consumer_precode(precode_queue_, ptok_precode,
-        precode_stats_.max_task_count, TASK_PRECODE);
+        precode_stats_.max_task_count, EventType::kPrecode);
 
-    /* tokens used for dequeue */
+    /* Tokens used for dequeue */
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
@@ -164,7 +173,7 @@ void Millipede::start()
 
     int last_dequeue = 0;
     int ret = 0;
-    Event_data events_list[dequeue_bulk_size];
+    event_data_t events_list[dequeue_bulk_size];
     int miss_count = 0;
     int total_count = 0;
 
@@ -202,9 +211,9 @@ void Millipede::start()
         /* handle each event */
         int frame_count = 0;
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
+            event_data_t& event = events_list[bulk_count];
             switch (event.event_type) {
-            case EVENT_PACKET_RECEIVED: {
+            case EventType::kPacketRX: {
                 int offset = event.data;
                 int socket_thread_id, offset_in_current_buffer;
                 interpreteOffset2d_setbits(
@@ -229,10 +238,12 @@ void Millipede::start()
                 delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]++]
                     = offset;
             } break;
-            case EVENT_FFT: {
+
+            case EventType::kFFT: {
                 int offset = event.data;
                 int frame_id = offset / subframe_num_perframe;
                 int subframe_id = offset % subframe_num_perframe;
+
                 if (fft_stats_.last_task(frame_id, subframe_id)) {
                     if (config_->isPilot(frame_id, subframe_id)) {
                         print_per_subframe_done(PRINT_FFT_PILOTS,
@@ -271,17 +282,19 @@ void Millipede::start()
                     }
                 }
             } break;
-            case EVENT_RC: {
+
+            case EventType::kRC: {
                 int frame_id = event.data;
                 stats_manager_->update_rc_processed(rc_stats_.frame_count);
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
                 fft_stats_.symbol_cal_count[frame_id] = 0;
                 rc_stats_.update_frame_count();
             } break;
-            case EVENT_ZF: {
-                int offset = event.data;
 
+            case EventType::kZF: {
+                int offset = event.data;
                 int frame_id = offset / zf_stats_.max_symbol_count;
+
                 print_per_task_done(
                     PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
@@ -312,7 +325,7 @@ void Millipede::start()
                 }
             } break;
 
-            case EVENT_DEMUL: {
+            case EventType::kDemul: {
                 int offset = event.data;
                 int block_size = config_->demul_block_size;
                 int block_num = demul_stats_.max_task_count;
@@ -372,7 +385,7 @@ void Millipede::start()
             } break;
 
 #ifdef USE_LDPC
-            case EVENT_DECODE: {
+            case EventType::kDecode: {
                 int offset = event.data;
                 int num_code_blocks = decode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
@@ -380,6 +393,7 @@ void Millipede::start()
                     = total_data_subframe_id / ul_data_subframe_num_perframe;
                 int data_subframe_id
                     = total_data_subframe_id % ul_data_subframe_num_perframe;
+
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
                     print_per_subframe_done(PRINT_DECODE,
                         decode_stats_.frame_count, frame_id, data_subframe_id);
@@ -400,7 +414,7 @@ void Millipede::start()
                 }
             } break;
 
-            case EVENT_ENCODE: {
+            case EventType::kEncode: {
                 int offset = event.data;
                 int num_code_blocks = encode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
@@ -424,7 +438,7 @@ void Millipede::start()
             } break;
 #endif /* defined(USE_LDPC) */
 
-            case EVENT_PRECODE: {
+            case EventType::kPrecode: {
                 /* Precoding is done, schedule ifft */
                 int offset = event.data;
                 int block_size = config_->demul_block_size;
@@ -464,7 +478,8 @@ void Millipede::start()
                     }
                 }
             } break;
-            case EVENT_IFFT: {
+
+            case EventType::kIFFT: {
                 /* IFFT is done, schedule data transmission */
                 int offset = event.data;
                 int ant_id = offset % BS_ANT_NUM;
@@ -474,8 +489,10 @@ void Millipede::start()
                 int data_subframe_id
                     = total_data_subframe_id % data_subframe_num_perframe;
                 int ptok_id = ant_id % SOCKET_RX_THREAD_NUM;
+
                 Consumer consumer_tx(
-                    tx_queue_, *tx_ptoks_ptr[ptok_id], 1, TASK_SEND);
+                    tx_queue_, *tx_ptoks_ptr[ptok_id], 1, EventType::kPacketTX);
+
                 consumer_tx.schedule_task_set(offset);
                 print_per_task_done(
                     PRINT_IFFT, frame_id, data_subframe_id, ant_id);
@@ -492,7 +509,8 @@ void Millipede::start()
                     }
                 }
             } break;
-            case EVENT_PACKET_SENT: {
+
+            case EventType::kPacketTX: {
                 /* Data is sent */
                 int offset = event.data;
                 int ant_id = offset % BS_ANT_NUM;
@@ -550,12 +568,15 @@ void Millipede::start()
                 printf("Wrong event type in message queue!");
                 exit(0);
             } /* end of switch */
+
             if (delay_fft_queue_cnt[cur_frame_id] > 0) {
                 for (int i = 0; i < delay_fft_queue_cnt[cur_frame_id]; i++) {
                     int offset = delay_fft_queue[cur_frame_id][i];
-                    Event_data do_fft_task;
-                    do_fft_task.event_type = TASK_FFT;
+
+                    event_data_t do_fft_task(EventType::kFFT, offset);
+                    do_fft_task.event_type = EventType::kFFT;
                     do_fft_task.data = offset;
+
                     consumer_fft.try_handle(do_fft_task);
                     if (!config_->bigstation_mode) {
                         if (fft_created_count++ == 0) {
@@ -571,16 +592,19 @@ void Millipede::start()
             }
         } /* end of for */
     } /* end of while */
+
 finish:
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
     stats_manager_->print_summary(last_frame_id);
+
 #ifdef USE_LDPC
     save_decode_data_to_file(last_frame_id);
 #else
     save_demul_data_to_file(last_frame_id);
 #endif
+
     save_ifft_data_to_file(last_frame_id);
     this->stop();
     // exit(0);
@@ -1051,36 +1075,36 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id,
 void Millipede::initialize_queues()
 {
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    message_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    complete_task_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 
-    fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    fft_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
-    zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    zf_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 
-    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);
+    rc_queue_ = moodycamel::ConcurrentQueue<event_data_t>(512 * 2 * 4);
 
-    demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    demul_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    decode_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 #endif
 
-    ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    ifft_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
-    // modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 *
+    // modulate_queue_ = moodycamel::ConcurrentQueue<event_data_t>(512 *
     // data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    encode_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 #endif
-    precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    precode_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
-    tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    tx_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 
     int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;

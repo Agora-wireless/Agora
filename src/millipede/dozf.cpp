@@ -9,7 +9,7 @@
 
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
     Consumer& in_consumer, Table<complex_float>& in_csi_buffer,
     Table<complex_float>& in_recip_buffer,
     Table<complex_float>& in_ul_precoder_buffer,
@@ -46,9 +46,7 @@ void DoZF::launch(int offset)
 void DoZF::finish(int offset)
 {
     // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_ZF;
-    ZF_finish_event.data = offset;
+    event_data_t ZF_finish_event(EventType::kZF, offset);
     consumer_.handle(ZF_finish_event);
 }
 

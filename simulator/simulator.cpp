@@ -71,7 +71,7 @@ void Simulator::start()
     int frame_count_rx = 0;
 
     int ret = 0;
-    Event_data events_list[dequeue_bulk_size];
+    event_data_t events_list[dequeue_bulk_size];
     int miss_count = 0;
     int total_count = 0;
 
@@ -107,13 +107,14 @@ void Simulator::start()
 
         /* handle each event */
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
+            event_data_t& event = events_list[bulk_count];
             switch (event.event_type) {
-            case EVENT_PACKET_RECEIVED: {
+            case EventType::kPacketRX: {
                 int offset = event.data;
                 int socket_thread_id, offset_in_current_buffer;
                 interpreteOffset2d_setbits(
                     offset, &socket_thread_id, &offset_in_current_buffer, 28);
+
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
@@ -129,6 +130,7 @@ void Simulator::start()
                 update_rx_counters(
                     frame_id, frame_id_in_buffer, subframe_id, ant_id);
             } break;
+
             default:
                 printf("Wrong event type in message queue!");
                 exit(0);
@@ -222,9 +224,9 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
 
 void Simulator::initialize_queues()
 {
-    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    message_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    complete_task_queue_ = moodycamel::ConcurrentQueue<event_data_t>(
         512 * data_subframe_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(

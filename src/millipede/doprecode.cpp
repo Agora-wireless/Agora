@@ -9,7 +9,7 @@
 using namespace arma;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
     Consumer& in_consumer, Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -205,11 +205,11 @@ void DoPrecode::launch(int offset)
     Precode_task_count[tid * 16] = Precode_task_count[tid * 16] + max_sc_ite;
     Precode_task_duration[tid * 8][0] += get_time() - start_time;
 #endif
-    /* inform main thread */
-    Event_data precode_finish_event;
-    precode_finish_event.event_type = EVENT_PRECODE;
-    precode_finish_event.data = offset;
+
+    /* Inform main thread */
+    event_data_t precode_finish_event(EventType::kPrecode, offset);
     consumer_.handle(precode_finish_event);
+
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, "
            "subcarrier: %d , offset: %d\n",

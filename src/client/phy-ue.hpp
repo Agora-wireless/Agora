@@ -160,8 +160,8 @@ public:
     void taskThread(int tid);
 
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
+    void schedule_task(event_data_t do_task,
+        moodycamel::ConcurrentQueue<event_data_t>* in_queue,
         moodycamel::ProducerToken const& ptok);
 
     void initialize_vars_from_cfg(void);
@@ -318,22 +318,22 @@ private:
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
-    moodycamel::ConcurrentQueue<Event_data>
+    moodycamel::ConcurrentQueue<event_data_t>
         task_queue_; // =
-                     // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
+                     // moodycamel::ConcurrentQueue<event_data_t>(RX_BUFFER_FRAME_NUM
                      // * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for uplink demodulation */
-    moodycamel::ConcurrentQueue<Event_data>
+    moodycamel::ConcurrentQueue<event_data_t>
         demul_queue_; // =
-                      // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
+                      // moodycamel::ConcurrentQueue<event_data_t>(RX_BUFFER_FRAME_NUM
                       // * subframe_num_perframe * BS_ANT_NUM  * 36);
     /* main thread message queue */
-    moodycamel::ConcurrentQueue<Event_data>
+    moodycamel::ConcurrentQueue<event_data_t>
         message_queue_; // =
-                        // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
+                        // moodycamel::ConcurrentQueue<event_data_t>(RX_BUFFER_FRAME_NUM
                         // * subframe_num_perframe * BS_ANT_NUM  * 36);
-    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> tx_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> fft_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> tx_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
 

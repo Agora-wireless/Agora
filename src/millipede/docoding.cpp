@@ -46,7 +46,7 @@ static void adapt_bits_for_mod(
 }
 
 DoEncode::DoEncode(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
     Consumer& in_consumer, Table<int8_t>& in_raw_data_buffer,
     Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
@@ -167,16 +167,13 @@ void DoEncode::launch(int offset)
     }
 #endif
 
-    /* inform main thread */
-    Event_data Encode_finish_event;
-    Encode_finish_event.event_type = EVENT_ENCODE;
-    Encode_finish_event.data = offset;
-
-    consumer_.handle(Encode_finish_event);
+    /* Inform main thread */
+    event_data_t encode_finish_event(EventType::kEncode, offset);
+    consumer_.handle(encode_finish_event);
 }
 
 DoDecode::DoDecode(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
     Consumer& in_consumer, Table<int8_t>& in_demod_buffer,
     Table<uint8_t>& in_decoded_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
@@ -266,9 +263,8 @@ void DoDecode::launch(int offset)
         printf("Thread %d Decode takes %.2f\n", tid, duration);
     }
 #endif
-    /* inform main thread */
-    Event_data Decode_finish_event;
-    Decode_finish_event.event_type = EVENT_DECODE;
-    Decode_finish_event.data = offset;
-    consumer_.handle(Decode_finish_event);
+
+    /* Inform main thread */
+    event_data_t decode_finish_event(EventType::kDecode, offset);
+    consumer_.handle(decode_finish_event);
 }
