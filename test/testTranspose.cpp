@@ -257,7 +257,7 @@ int main(int argc, char** argv)
                 _mm256_store_pd((double*)(temp_buffer_ptr + c2 * 8), t_data);
 
                 //__m256d t_data = _mm256_i64gather_pd((double*)tar_ptr, index,
-                //8); _mm256_store_pd((double*)temp_buffer_ptr, t_data);
+                // 8); _mm256_store_pd((double*)temp_buffer_ptr, t_data);
             }
 
             cx_float* data_ptr = (cx_float*)(&temp_buffer[0]);
@@ -335,7 +335,7 @@ int main(int argc, char** argv)
                 _mm256_store_pd((double*)(temp_buffer_ptr + c2 * 8), t_data);
 
                 //__m256d t_data = _mm256_i64gather_pd((double*)tar_ptr, index,
-                //8); _mm256_store_pd((double*)temp_buffer_ptr, t_data);
+                // 8); _mm256_store_pd((double*)temp_buffer_ptr, t_data);
             }
 
             cx_float* data_ptr = (cx_float*)(&temp_buffer[0]);
