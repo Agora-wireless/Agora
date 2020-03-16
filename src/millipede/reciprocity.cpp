@@ -89,9 +89,7 @@ void Reciprocity::launch(int offset)
     }
 #endif
 
-    // inform main thread
-    Event_data RC_finish_event;
-    RC_finish_event.event_type = EVENT_RC;
-    RC_finish_event.data = offset;
+    /* Inform main thread */
+    Event_data RC_finish_event(EventType::kRC, offset);
     consumer_.handle(RC_finish_event);
 }

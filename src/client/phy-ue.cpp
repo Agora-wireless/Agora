@@ -252,8 +252,10 @@ void Phy_UE::start()
             Event_data& event = events_list[bulk_count];
 
             switch (event.event_type) {
-            // if EVENT_RX_SYMBOL, do crop
-            case EVENT_PACKET_RECEIVED: {
+
+                // if EVENT_RX_SYMBOL, do crop
+
+            case EventType::kPacketReceived: {
                 int offset = event.data;
 
                 int buffer_frame_num = rx_buffer_status_size;
@@ -328,7 +330,7 @@ void Phy_UE::start()
                 }
             } break;
 
-            case EVENT_FFT: {
+            case EventType::kFFT: {
                 int offset_csi = event.data;
                 interpretOffset2d(
                     numAntennas, offset_csi, &frame_id_t, &ant_id_t);
@@ -359,7 +361,7 @@ void Phy_UE::start()
 
             } break;
 
-            case EVENT_ZF: {
+            case EventType::kZF: {
                 int offset_eq = event.data;
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas,
                     offset_eq, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t,
@@ -369,8 +371,7 @@ void Phy_UE::start()
                 dl_symbol_id = dl_symbol_id_t;
                 // ant_id = ant_id_t;
 
-                Event_data do_demul_task;
-                do_demul_task.event_type = TASK_DEMUL;
+                Event_data do_demul_task(EventType::kDemul, offset_eq);
 
 #if DEBUG_PRINT_ENTER_QUEUE_DEMUL
                 printf("Main thread: created Demodulation task for frame: %d, "
@@ -380,7 +381,6 @@ void Phy_UE::start()
                 data_checker_[frame_id]++;
 
                 // schedule demodulation task for subcarrier blocks
-                do_demul_task.data = offset_eq;
                 schedule_task(do_demul_task, &demul_queue_, ptok_demul);
 
                 if (data_checker_[frame_id]
@@ -420,7 +420,7 @@ void Phy_UE::start()
                 }
             } break;
 
-            case EVENT_DEMUL: {
+            case EventType::kDemul: {
                 // do nothing
                 int offset_demul = event.data;
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas,
@@ -472,8 +472,8 @@ void Phy_UE::start()
                 }
             } break;
 
-            case EVENT_IFFT: {
-                // do nothing for now
+            case EventType::kIFFT: {
+                // Do nothing for now
 #if WRITE_MODUL
                 std::string filename = "bin/ul_modul.bin";
                 FILE* fp = fopen(filename.c_str(), "wb");
@@ -481,6 +481,7 @@ void Phy_UE::start()
                 // data_sc_len * nUEs * ul_data_symbol_perframe, fp);
                 fclose(fp);
 #endif
+
 #if WRITE_IFFT
                 std::string filename = "bin/ul_ifft.bin";
                 FILE* fp = fopen(filename.c_str(), "wb");
@@ -496,6 +497,7 @@ void Phy_UE::start()
                 }
                 fclose(fp);
 #endif
+
 #if WRITE_TX_BUFFER
                 std::string filename = "bin/ul_tx_buf.bin";
                 FILE* fp = fopen(filename.c_str(), "wb");
@@ -513,7 +515,7 @@ void Phy_UE::start()
 #endif
             } break;
 
-            case EVENT_PACKET_SENT: {
+            case EventType::kPacketTX: {
                 int offset = event.data;
                 interpretOffset3d(config_->ul_data_symbol_num_perframe,
                     config_->getNumAntennas(), offset, &frame_id_t,
@@ -671,8 +673,10 @@ void Phy_UE::doFFT(int tid, int offset)
     float* csi_buffer_ptr = (float*)(csi_buffer_[csi_offset].data());
     float* fft_buffer_ptr
         = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
+
     Event_data crop_finish_event;
-    // if it is pilot part, do CE
+
+    // If it is pilot part, do CE
     if (config_->isPilot(frame_id, symbol_id)) {
 
         int csi_fftshift_offset = 0;
@@ -705,12 +709,10 @@ void Phy_UE::doFFT(int tid, int offset)
                     /= (DL_PILOT_SYMS > 0 ? DL_PILOT_SYMS : 1);
             }
         }
-        crop_finish_event.event_type = EVENT_FFT;
+
+        crop_finish_event.event_type = EventType::kFFT;
         crop_finish_event.data = csi_offset;
-    }
-
-    else if (config_->isDownlink(frame_id, symbol_id)) {
-
+    } else if (config_->isDownlink(frame_id, symbol_id)) {
         int eq_buffer_offset
             = generateOffset3d(TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
                 numAntennas, frame_id, dl_symbol_id - DL_PILOT_SYMS,
@@ -722,6 +724,7 @@ void Phy_UE::doFFT(int tid, int offset)
         // int csi_fftshift_offset = 0;
         float csi_re = 1;
         float csi_im = 0;
+
         for (int j = 0; j < non_null_sc_len; j++) {
             // if (j < FFT_LEN / 2)
             //    csi_fftshift_offset = FFT_LEN/2;
@@ -742,11 +745,12 @@ void Phy_UE::doFFT(int tid, int offset)
                 / (csi_re * csi_re
                       + csi_im * csi_im); // fft_buffer_ptr[2*i+1] / csi_im;
         }
-        crop_finish_event.event_type = EVENT_ZF;
-        crop_finish_event.data
-            = eq_buffer_offset; // generateOffset3d(numAntennas,
-                                // dl_symbol_perframe, frame_id, dl_symbol_id,
-                                // ant_id);
+
+        crop_finish_event.event_type = EventType::kZF;
+        crop_finish_event.data = eq_buffer_offset;
+
+        // generateOffset3d(numAntennas, dl_symbol_perframe, frame_id,
+        // dl_symbol_id, ant_id);
     }
 
     // after finish
@@ -762,12 +766,13 @@ void Phy_UE::doFFT(int tid, int offset)
 void Phy_UE::doDemul(int tid, int offset)
 {
     cx_float tot_phase_err = 0;
-    for (int pilot_id = 0; pilot_id < pilot_sc_len; pilot_id++) {
 
+    for (int pilot_id = 0; pilot_id < pilot_sc_len; pilot_id++) {
         cx_float cur_pilot = pilot_sc_val_[pilot_id];
         cx_float* cur_sc = (cx_float*)&equal_buffer_[offset][pilot_id];
         tot_phase_err += (*cur_sc * cur_pilot);
     }
+
     tot_phase_err = tot_phase_err / (float)pilot_sc_len;
     cx_float* src_ptr = (cx_float*)&equal_buffer_[offset][0];
     cx_float* tar_ptr = (cx_float*)&equal_pc_buffer_[offset][0];
@@ -787,10 +792,9 @@ void Phy_UE::doDemul(int tid, int offset)
 
     // mat_demuled = demod_16qam(mat_equaled_pc);
     demod_16qam_hard_loop((float*)tar_ptr, (uint8_t*)demul_ptr, numAntennas);
-    // inform main thread
-    Event_data demul_finish_event;
-    demul_finish_event.event_type = EVENT_DEMUL;
-    demul_finish_event.data = offset;
+
+    // Inform main thread
+    Event_data demul_finish_event(EventType::kDemul, offset);
 
     if (!message_queue_.enqueue(*task_ptok[tid], demul_finish_event)) {
         printf("Demuliplexing message enqueue failed\n");
@@ -910,13 +914,10 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
                 CP_LEN * sizeof(std::complex<short>)); // add CP
         }
     }
-    //}
 
     // l2_buffer_status_[offset] = 0; // now empty
 
-    Event_data tx_finish_event;
-    tx_finish_event.event_type = EVENT_IFFT;
-    tx_finish_event.data = frame_id;
+    Event_data tx_finish_event(EventType::kIFFT, frame_id);
 
     if (!message_queue_.enqueue(*task_ptok[tid], tx_finish_event)) {
         printf("Muliplexing message enqueue failed\n");

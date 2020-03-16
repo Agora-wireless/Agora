@@ -146,28 +146,30 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
         samp[ch] = pkt[ch]->data;
     }
 
-    // this is probably a really bad implementation, and needs to be revamped
+    // TODO: this is probably a really bad implementation, and needs to be
+    // revamped
     long long frameTime;
     while (config_->running
-        && radioconfig_->radioRx(radio_id, samp, frameTime) <= 0)
-        ;
+        && radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
+        // Busy loop
+    }
+
     int frame_id = (int)(frameTime >> 32);
     int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
     int ant_id = radio_id * nChannels;
+
     for (int ch = 0; ch < nChannels; ++ch) {
         new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
         // move ptr & set status to full
         rx_buffer_status[rx_offset + ch]
             = 1; // has data, after it is read it should be set to 0
-        // push EVENT_RX_ENB event into the queue
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_RECEIVED;
-        // data records the position of this packet in the rx_buffer &
-        // tid of this socket (so that task thread could know which rx_buffer it
-        // should visit)
-        // packet_message.data = offset + tid * rx_buffer_frame_num; // Note:
-        // offset < rx_buffer_frame_num_
-        packet_message.data = generateOffset2d_setbits(tid, rx_offset + ch, 28);
+
+        // Push EVENT_RX_ENB event into the queue. data records the position of
+        // this packet in the rx_buffer & tid of this socket (so that task
+        // thread could know which rx_buffer it should visit)
+        Event_data packet_message(EventType::kPacketRX,
+            generateOffset2d_setbits(tid, rx_offset + ch, 28));
+
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);
@@ -184,7 +186,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     int nradio_cur_thread = radio_hi - radio_lo;
     // printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     // get pointer of message queue
-    pin_to_core_with_offset(Worker_RX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerRX, core_id_, tid);
 
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
@@ -271,7 +273,7 @@ int PacketTXRX::dequeue_send_Argos(int tid)
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    if (task_event.event_type != TASK_SEND) {
+    if (task_event.event_type != EventType::kPacketTX) {
         printf("Wrong event type!");
         exit(0);
     }
@@ -333,11 +335,8 @@ int PacketTXRX::dequeue_send_Argos(int tid)
 #endif
     // clock_gettime(CLOCK_MONOTONIC, &tv2);
 
-    //}
+    Event_data tx_message(EventType::kPacketTX, offset);
 
-    Event_data tx_message;
-    tx_message.event_type = EVENT_PACKET_SENT;
-    tx_message.data = offset;
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     if (!message_queue_->enqueue(*local_ptok, tx_message)) {
         printf("socket message enqueue failed\n");
@@ -348,7 +347,7 @@ int PacketTXRX::dequeue_send_Argos(int tid)
 
 void* PacketTXRX::loopSend_Argos(int tid)
 {
-    pin_to_core_with_offset(Worker_TX, tx_core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTX, tx_core_id_, tid);
 
     while (config_->running) {
         dequeue_send_Argos(tid);
