@@ -6,9 +6,8 @@
 
 #include "millipede.hpp"
 
-void read_from_file_ul(
-    std::string filename, Table<uint8_t>& data, int num_bytes_per_ue, 
-    Config* cfg)
+void read_from_file_ul(std::string filename, Table<uint8_t>& data,
+    int num_bytes_per_ue, Config* cfg)
 {
     int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
     size_t UE_NUM = cfg->UE_NUM;
@@ -20,8 +19,7 @@ void read_from_file_ul(
     int expect_num_bytes = num_bytes_per_ue * UE_NUM;
     // printf("read data of %d byptes\n", expect_num_bytes);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        int num_bytes = fread(data[i], sizeof(uint8_t), 
-            expect_num_bytes, fp);
+        int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
         // if (i == 0) {
         //     for(int j = 0; j < num_bytes; j++) {
         //         printf("%u ", data[i][j]);
@@ -29,7 +27,8 @@ void read_from_file_ul(
         //     printf("\n");
         // }
         if (expect_num_bytes != num_bytes) {
-            printf("read file failed: %s, symbol %d, expect: %d, actual: %d bytes\n", 
+            printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
+                   "bytes\n",
                 filename.c_str(), i, expect_num_bytes, num_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
@@ -64,27 +63,25 @@ void check_correctness_ul(Config* cfg)
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
-    std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string raw_data_filename = cur_directory
+        + "/data/LDPC_orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 #else
     std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant"
         + std::to_string(BS_ANT_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/demul_data.bin";
 #endif
-    
+
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
     raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
     output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
 
-    
-
     int num_bytes_per_ue;
 #ifdef USE_LDPC
     LDPCconfig LDPC_config = cfg->LDPC_config;
-    num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3 
-        * LDPC_config.nblocksInSymbol;
+    num_bytes_per_ue
+        = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
 #else
     num_bytes_per_ue = OFDM_DATA_NUM;
 #endif
@@ -139,7 +136,8 @@ void check_correctness_dl(Config* cfg)
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string raw_data_filename = cur_directory
-        + "/data/LDPC_dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+        + "/data/LDPC_dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
 #else
     std::string raw_data_filename = cur_directory
         + "/data/dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
@@ -163,18 +161,19 @@ void check_correctness_dl(Config* cfg)
                 // printf("symbol %d, antenna %d\n", i, ant);
                 sum_diff = 0;
                 total_count++;
-                for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) { 
+                for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) {
                     int offset = BS_ANT_NUM * i + ant;
-                    float diff = 
-                        fabs(raw_data[offset][sc] - ifft_data[offset][sc]);
+                    float diff
+                        = fabs(raw_data[offset][sc] - ifft_data[offset][sc]);
                     sum_diff += diff;
                     // if (i == 0)
-                        // printf("symbol %d ant %d sc %d, (%.3f, %.3f) diff: %.3f\n", 
-                        //     i, ant, sc / 2, raw_data[offset][sc], 
-                        //     ifft_data[offset][sc], diff);
+                    // printf("symbol %d ant %d sc %d, (%.3f, %.3f) diff:
+                    // %.3f\n",
+                    //     i, ant, sc / 2, raw_data[offset][sc],
+                    //     ifft_data[offset][sc], diff);
                 }
-                printf("symbol %d, ant %d, total diff %.3f\n", 
-                    i, ant, sum_diff);
+                printf(
+                    "symbol %d, ant %d, total diff %.3f\n", i, ant, sum_diff);
                 if (sum_diff > OFDM_CA_NUM * 10)
                     error_cnt++;
             }

@@ -1318,7 +1318,6 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
     printf("saving demul data...\n");
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int UE_NUM = config_->UE_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     LDPCconfig LDPC_config = config_->LDPC_config;
     size_t num_decoded_bytes
         = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
