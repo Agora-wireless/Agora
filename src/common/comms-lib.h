@@ -19,13 +19,13 @@
 #include "buffer.hpp"
 #include "mkl_dfti.h"
 #include <algorithm>
-#include <complex.h>
-#include <fstream> // std::ifstream
+#include <complex>
+#include <fstream>
 #include <iostream>
 #include <math.h>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <unistd.h>
 #include <vector>
 

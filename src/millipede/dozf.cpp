@@ -46,9 +46,7 @@ void DoZF::launch(int offset)
 void DoZF::finish(int offset)
 {
     // inform main thread
-    Event_data ZF_finish_event;
-    ZF_finish_event.event_type = EVENT_ZF;
-    ZF_finish_event.data = offset;
+    Event_data ZF_finish_event(EventType::kZF, offset);
     consumer_.handle(ZF_finish_event);
 }
 
