@@ -112,8 +112,8 @@ PacketTXRX::PacketTXRX(
 
 PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
     int in_core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+    moodycamel::ConcurrentQueue<event_data_t>* in_queue_message,
+    moodycamel::ConcurrentQueue<event_data_t>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
     : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
@@ -382,7 +382,7 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     int tid = ((PacketTXRXContext*)in_context)->tid;
     printf("packet receiver thread %d start\n", tid);
     // get pointer of message queue
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_
+    moodycamel::ConcurrentQueue<event_data_t>* message_queue_
         = obj_ptr->message_queue_;
     Config* config_ = obj_ptr->config_;
     int core_id = config_->core_id_;
@@ -555,16 +555,18 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
                 = buffer_status + (offset + 1) % buffer_frame_num;
             cur_ptr_buffer = buffer
                 + (cur_ptr_buffer - buffer + packet_length) % buffer_length;
-            // push EVENT_packet_RECEIVED event into the queue
-            Event_data packet_message;
-            packet_message.event_type = EVENT_PACKET_RECEIVED;
-            packet_message.data = offset + tid * buffer_frame_num;
+
+            // Push packet received event into the queue
+            event_data_t packet_message(
+                EventType::kPacketRx, offset + tid * buffer_frame_num);
             if (!message_queue_->enqueue(*local_ptok, packet_message)) {
                 printf("socket message enqueue failed\n");
                 exit(0);
             }
+
             packet_num++;
-            // print some information
+
+            // Print some information
             if (packet_num == BS_ANT_NUM * max_subframe_id * 1000) {
                 auto end = std::chrono::system_clock::now();
                 double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2
@@ -620,16 +622,17 @@ void* PacketTXRX::loopSend(int tid)
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     // moodycamel::ProducerToken local_ptok(*message_queue_);
     moodycamel::ConsumerToken local_ctok(*task_queue_);
-    while (true) {
 
-        Event_data task_event;
+    while (true) {
+        event_data_t task_event;
         // ret = task_queue_->try_dequeue(task_event);
         ret = task_queue_->try_dequeue_from_producer(
             *(tx_ptoks_[tid]), task_event);
         if (!ret)
             continue;
+
         // printf("tx queue length: %d\n", task_queue_->size_approx());
-        if (task_event.event_type != TASK_SEND) {
+        if (task_event.event_type != EventType::kPacketTX) {
             printf("Wrong event type!");
             exit(0);
         }
@@ -672,11 +675,9 @@ void* PacketTXRX::loopSend(int tid)
             message_queue_->size_approx());
 #endif
 
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_SENT;
         // data records the position of this packet in the buffer & tid of this
         // socket (so that task thread could know which buffer it should visit)
-        packet_message.data = offset;
+        event_data_t packet_message(EventType::kPacketTX, offset);
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);

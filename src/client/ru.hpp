@@ -38,8 +38,8 @@ public:
      * in_queue: message queue to communicate with main thread
      */
     RU(int n_rx_thread, int n_tx_thread, Config* cfg,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_task);
+        moodycamel::ConcurrentQueue<event_data_t>* in_queue,
+        moodycamel::ConcurrentQueue<event_data_t>* in_queue_task);
     ~RU();
 
     void calibrateRadios(std::vector<std::vector<std::complex<float>>>&,
@@ -98,8 +98,8 @@ private:
     int thread_num_;
     int tx_thread_num_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+    moodycamel::ConcurrentQueue<event_data_t>* message_queue_;
+    moodycamel::ConcurrentQueue<event_data_t>* task_queue_;
     std::vector<std::unique_ptr<moodycamel::ProducerToken>> task_ptok;
     // std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
     int core_id_;

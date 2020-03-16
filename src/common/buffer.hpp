@@ -7,6 +7,7 @@
 #ifndef BUFFER_HEAD
 #define BUFFER_HEAD
 
+#include "Symbols.hpp"
 #include "memory_manage.h"
 
 // boost is required for aligned memory allocation (for SIMD instructions)
@@ -23,10 +24,18 @@ struct complex_float {
 #endif
 
 // structure for event
-struct Event_data {
-    int event_type;
+struct event_data_t {
+    EventType event_type;
     int data;
     // int more_data;
+
+    event_data_t(EventType event_type, int data)
+        : event_type(event_type)
+        , data(data)
+    {
+    }
+
+    event_data_t() {}
 };
 
 struct Packet {

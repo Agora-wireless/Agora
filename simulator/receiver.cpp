@@ -36,8 +36,8 @@ Receiver::Receiver(
 
 Receiver::Receiver(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
     int in_core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+    moodycamel::ConcurrentQueue<event_data_t>* in_queue_message,
+    moodycamel::ConcurrentQueue<event_data_t>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks)
     : Receiver(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
 {
@@ -261,14 +261,13 @@ void* Receiver::loopRecv(int tid)
             = buffer_status_ptr + (offset + 1) % buffer_frame_num;
         cur_buffer_ptr = buffer_ptr
             + (cur_buffer_ptr - buffer_ptr + packet_length) % buffer_length;
-        // push EVENT_PACKET_RECEIVED event into the queue
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_RECEIVED;
-        // data records the position of this packet in the buffer & tid of this
-        // socket (so that task thread could know which buffer it should visit)
-        packet_message.data = generateOffset2d_setbits(tid, offset, 28);
-        // packet_message.data = offset + tid * buffer_frame_num;
-        // if ( !message_queue_->enqueue(packet_message ) ) {
+
+        // Push packet received event into the queue. data records the position
+        // of this packet in the buffer & tid of this socket (so that task
+        // thread could know which buffer it should visit)
+        event_data_t packet_message(
+            EventType::kPacketRX, generateOffset2d_setbits(tid, offset, 28));
+
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);

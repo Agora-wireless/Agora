@@ -9,7 +9,7 @@ class Doer {
 public:
     virtual bool try_launch(void)
     {
-        Event_data event;
+        event_data_t event;
         if (task_queue_.try_dequeue(event)) {
             launch(event.data);
             return true;
@@ -20,7 +20,7 @@ public:
 protected:
     virtual void launch(int offset) = 0;
     Doer(Config* in_config, int in_tid,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+        moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
         Consumer& in_consumer)
         : config_(in_config)
         , tid(in_tid)
@@ -31,7 +31,7 @@ protected:
 
     Config* config_;
     int tid;
-    moodycamel::ConcurrentQueue<Event_data>& task_queue_;
+    moodycamel::ConcurrentQueue<event_data_t>& task_queue_;
     Consumer& consumer_;
 };
 #endif /* DOER */

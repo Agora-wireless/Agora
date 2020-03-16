@@ -26,7 +26,7 @@
 class DoPrecode : public Doer {
 public:
     DoPrecode(Config* in_config, int in_tid,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+        moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
         Consumer& in_consumer, Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC

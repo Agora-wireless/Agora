@@ -32,32 +32,22 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
-enum EventType {
-    EVENT_PACKET_RECEIVED,
-    EVENT_FFT,
-    EVENT_ZF,
-    EVENT_DEMUL,
-    EVENT_PRED,
-    EVENT_MODUL,
-    EVENT_IFFT,
-    EVENT_PRECODE,
-    EVENT_PACKET_SENT,
-    EVENT_DECODE,
-    EVENT_ENCODE,
-    EVENT_RC,
+enum class EventType : int {
+    kPacketRX,
+    kFFT,
+    kZF,
+    kDemul,
+    kPred,
+    kModul,
+    kIFFT,
+    kPrecode,
+    kPacketTX,
+    kDecode,
+    kEncode,
+    kRC,
+    kRXSymbol,
+    kInvalid
 };
-
-#define TASK_FFT 0
-#define TASK_ZF 1
-#define TASK_DEMUL 2
-#define TASK_PRED 3
-#define TASK_PRECODE 4
-#define TASK_IFFT 5
-#define TASK_MODUL 6
-#define TASK_SEND 7
-#define TASK_DECODE 8
-#define TASK_ENCODE 9
-#define TASK_RC 10
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1

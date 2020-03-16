@@ -23,8 +23,8 @@ PacketTXRX::PacketTXRX(
 
 PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
     int in_core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+    moodycamel::ConcurrentQueue<event_data_t>* in_queue_message,
+    moodycamel::ConcurrentQueue<event_data_t>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
     : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
@@ -265,12 +265,13 @@ struct Packet* PacketTXRX::recv_enqueue(
     // move ptr & set status to full
     rx_buffer_status[rx_offset]
         = 1; // has data, after doing fft, it is set to 0
-    // push EVENT_PACKET_RECEIVED event into the queue
-    Event_data rx_message;
-    rx_message.event_type = EVENT_PACKET_RECEIVED;
+
+    // Push EVENT_PACKET_RECEIVED event into the queue.
     // data records the position of this packet in the rx_buffer & tid of this
     // socket (so that task thread could know which rx_buffer it should visit)
-    rx_message.data = generateOffset2d_setbits(tid, rx_offset, 28);
+    event_data_t rx_message(
+        EventType::kPacketRX, generateOffset2d_setbits(tid, rx_offset, 28));
+
     // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
     // if ( !message_queue_->enqueue(rx_message ) ) {
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
@@ -349,12 +350,12 @@ void* PacketTXRX::loopRecv(int tid)
 
 int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
 {
-    Event_data task_event;
+    event_data_t task_event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    if (task_event.event_type != TASK_SEND) {
+    if (task_event.event_type != EventType::kPacketTX) {
         printf("Wrong event type!");
         exit(0);
     }
@@ -392,9 +393,8 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         perror("socket sendto failed");
         exit(0);
     }
-    Event_data tx_message;
-    tx_message.event_type = EVENT_PACKET_SENT;
-    tx_message.data = offset;
+
+    event_data_t tx_message(EventType::kPacketTX, offset);
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     if (!message_queue_->enqueue(*local_ptok, tx_message)) {
         printf("socket message enqueue failed\n");

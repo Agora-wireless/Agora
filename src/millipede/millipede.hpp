@@ -248,26 +248,26 @@ private:
      * Concurrent queues
      *****************************************************/
     /* Uplink*/
-    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> zf_queue_;
-    moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> fft_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> zf_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> demul_queue_;
 #ifdef USE_LDPC
-    moodycamel::ConcurrentQueue<Event_data> decode_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> decode_queue_;
 #endif
     /* main thread message queue for data receiving */
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> message_queue_;
     /* main thread message queue for task completion*/
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> complete_task_queue_;
 
     /* Downlink*/
-    moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> rc_queue_;
-    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> ifft_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> rc_queue_;
+    // moodycamel::ConcurrentQueue<event_data_t> modulate_queue_;
 #ifdef USE_LDPC
-    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> encode_queue_;
 #endif
-    moodycamel::ConcurrentQueue<Event_data> precode_queue_;
-    moodycamel::ConcurrentQueue<Event_data> tx_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> precode_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> tx_queue_;
 
     /* Tokens */
     moodycamel::ProducerToken** rx_ptoks_ptr;

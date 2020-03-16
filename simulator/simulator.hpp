@@ -139,9 +139,9 @@ private:
      * Concurrent queues
      *****************************************************/
     /* main thread message queue for data receiving */
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> message_queue_;
     /* main thread message queue for task completion*/
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
+    moodycamel::ConcurrentQueue<event_data_t> complete_task_queue_;
 
     /* Tokens */
     moodycamel::ProducerToken** rx_ptoks_ptr;

@@ -8,7 +8,7 @@
 
 using namespace arma;
 DoDemul::DoDemul(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    moodycamel::ConcurrentQueue<event_data_t>& in_task_queue,
     Consumer& in_consumer, Table<complex_float>& in_data_buffer,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
@@ -219,10 +219,9 @@ void DoDemul::launch(int offset)
     if (duration > 500)
         printf("Thread %d Demul takes %.2f\n", tid, duration);
 #endif
-    /* inform main thread */
-    Event_data demul_finish_event;
-    demul_finish_event.event_type = EVENT_DEMUL;
-    demul_finish_event.data = offset;
+
+    /* Inform main thread */
+    event_data_t demul_finish_event(EventType::kDemul, offset);
     consumer_.handle(demul_finish_event);
 }
 
@@ -310,11 +309,11 @@ void DoDemul::DemulSingleSC(int offset)
     // inform main thread
     double duration3 = get_time() - start_time;
     Demul_task_duration[tid][1] += duration3;
-    Event_data demul_finish_event;
-    demul_finish_event.event_type = EVENT_DEMUL;
-    demul_finish_event.data = offset;
+
+    event_data_t demul_finish_event(EventType::kDemul, offset);
     Demul_task_count[tid] = Demul_task_count[tid] + 1;
     consumer_.handle(demul_finish_event);
+
     double duration = get_time() - start_time;
     Demul_task_duration[tid][0] += duration;
 }
