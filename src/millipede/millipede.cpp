@@ -351,7 +351,7 @@ void Millipede::start()
                          * fft tasks */
 #ifndef USE_LDPC
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
-                        frame_count = demul_stats_.frame_count;
+                        frame_count = demul_stats_.frame_count + 1;
                         stats_manager_->update_stats_in_functions_uplink(
                             demul_stats_.frame_count);
                         if (stats_manager_->last_frame_id
@@ -399,7 +399,7 @@ void Millipede::start()
                         decode_stats_.frame_count, frame_id, data_subframe_id);
                     if (decode_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
-                        frame_count = decode_stats_.frame_count;
+                        frame_count = decode_stats_.frame_count + 1;
                         stats_manager_->update_decode_processed(
                             decode_stats_.frame_count);
                         print_per_frame_done(
@@ -500,7 +500,7 @@ void Millipede::start()
                 if (ifft_stats_.last_task(frame_id, data_subframe_id)) {
                     if (ifft_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
-                        frame_count = ifft_stats_.frame_count;
+                        frame_count = ifft_stats_.frame_count + 1;
                         stats_manager_->update_ifft_processed(
                             ifft_stats_.frame_count);
                         print_per_frame_done(
@@ -574,9 +574,6 @@ void Millipede::start()
                     int offset = delay_fft_queue[cur_frame_id][i];
 
                     Event_data do_fft_task(EventType::kFFT, offset);
-                    do_fft_task.event_type = EventType::kFFT;
-                    do_fft_task.data = offset;
-
                     consumer_fft.try_handle(do_fft_task);
                     if (!config_->bigstation_mode) {
                         if (fft_created_count++ == 0) {
