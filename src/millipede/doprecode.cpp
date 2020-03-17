@@ -205,11 +205,11 @@ void DoPrecode::launch(int offset)
     Precode_task_count[tid * 16] = Precode_task_count[tid * 16] + max_sc_ite;
     Precode_task_duration[tid * 8][0] += get_time() - start_time;
 #endif
-    /* inform main thread */
-    Event_data precode_finish_event;
-    precode_finish_event.event_type = EVENT_PRECODE;
-    precode_finish_event.data = offset;
+
+    /* Inform main thread */
+    Event_data precode_finish_event(EventType::kPrecode, offset);
     consumer_.handle(precode_finish_event);
+
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, "
            "subcarrier: %d , offset: %d\n",

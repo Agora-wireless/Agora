@@ -2,14 +2,17 @@
 #define SYMBOLS
 
 #include <stdint.h>
+#include <string>
 
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
 //#define GENERATE_PILOT
+
 #ifdef USE_ARGOS
 #define GENERATE_DATA
 #endif
+
 #define SEPARATE_TX_RX 1
 
 #define MOD_ORDER 4
@@ -29,32 +32,22 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
-enum EventType {
-    EVENT_PACKET_RECEIVED,
-    EVENT_FFT,
-    EVENT_ZF,
-    EVENT_DEMUL,
-    EVENT_PRED,
-    EVENT_MODUL,
-    EVENT_IFFT,
-    EVENT_PRECODE,
-    EVENT_PACKET_SENT,
-    EVENT_DECODE,
-    EVENT_ENCODE,
-    EVENT_RC,
+enum class EventType : int {
+    kPacketRX,
+    kFFT,
+    kZF,
+    kDemul,
+    kPred,
+    kModul,
+    kIFFT,
+    kPrecode,
+    kPacketTX,
+    kDecode,
+    kEncode,
+    kRC,
+    kRXSymbol,
+    kInvalid
 };
-
-#define TASK_FFT 0
-#define TASK_ZF 1
-#define TASK_DEMUL 2
-#define TASK_PRED 3
-#define TASK_PRECODE 4
-#define TASK_IFFT 5
-#define TASK_MODUL 6
-#define TASK_SEND 7
-#define TASK_DECODE 8
-#define TASK_ENCODE 9
-#define TASK_RC 10
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1
@@ -121,20 +114,47 @@ enum EventType {
 #define SCH_MODE_REG 140
 #define TX_GAIN_CTRL 88
 
-typedef enum {
-    Master,
-    Worker,
-    Worker_FFT,
-    Worker_ZF,
-    Worker_Demul,
-    Worker_RX,
-    Worker_TX,
-    Worker_TXRX,
-    Master_RX,
-    Master_TX,
-} thread_type;
+enum class ThreadType {
+    kMaster,
+    kWorker,
+    kWorkerFFT,
+    kWorkerZF,
+    kWorkerDemul,
+    kWorkerRX,
+    kWorkerTX,
+    kWorkerTXRX,
+    kMasterRX,
+    kMasterTX,
+};
 
-typedef enum { UL, DL, PILOT, CAL_DL, CAL_UL, UNKNOWN } symbol_type;
+static inline std::string thread_type_str(ThreadType thread_type)
+{
+    switch (thread_type) {
+    case ThreadType::kMaster:
+        return "Master";
+    case ThreadType::kWorker:
+        return "Worker";
+    case ThreadType::kWorkerFFT:
+        return "Worker (FFT)";
+    case ThreadType::kWorkerZF:
+        return "Worker (ZF)";
+    case ThreadType::kWorkerDemul:
+        return "Worker (Demul)";
+    case ThreadType::kWorkerRX:
+        return "RX";
+    case ThreadType::kWorkerTX:
+        return "TX";
+    case ThreadType::kWorkerTXRX:
+        return "TXRX";
+    case ThreadType::kMasterRX:
+        return "Master (RX)";
+    case ThreadType::kMasterTX:
+        return "Master (TX)";
+    }
+    return "Invalid thread type";
+}
+
+enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
 struct LDPCconfig {
     uint16_t Bg;

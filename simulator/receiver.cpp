@@ -120,7 +120,7 @@ void* Receiver::loopRecv(int tid)
 {
 
     int core_offset = core_id_ + rx_thread_num_ + 2;
-    pin_to_core_with_offset(Worker_RX, core_offset, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
 #if USE_IPV4
     struct sockaddr_in servaddr_local;
@@ -261,14 +261,13 @@ void* Receiver::loopRecv(int tid)
             = buffer_status_ptr + (offset + 1) % buffer_frame_num;
         cur_buffer_ptr = buffer_ptr
             + (cur_buffer_ptr - buffer_ptr + packet_length) % buffer_length;
-        // push EVENT_PACKET_RECEIVED event into the queue
-        Event_data packet_message;
-        packet_message.event_type = EVENT_PACKET_RECEIVED;
-        // data records the position of this packet in the buffer & tid of this
-        // socket (so that task thread could know which buffer it should visit)
-        packet_message.data = generateOffset2d_setbits(tid, offset, 28);
-        // packet_message.data = offset + tid * buffer_frame_num;
-        // if ( !message_queue_->enqueue(packet_message ) ) {
+
+        // Push packet received event into the queue. data records the position
+        // of this packet in the buffer & tid of this socket (so that task
+        // thread could know which buffer it should visit)
+        Event_data packet_message(
+            EventType::kPacketRX, generateOffset2d_setbits(tid, offset, 28));
+
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);
