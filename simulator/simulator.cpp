@@ -23,7 +23,7 @@ Simulator::Simulator(Config* cfg, int in_task_thread_num, int in_socket_tx_num,
     this->config_ = cfg;
 
     initialize_vars_from_cfg(cfg);
-    pin_to_core_with_offset(Master, CORE_OFFSET, 0);
+    pin_to_core_with_offset(ThreadType::kMaster, CORE_OFFSET, 0);
 
     initialize_queues();
 
@@ -109,11 +109,12 @@ void Simulator::start()
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
             Event_data& event = events_list[bulk_count];
             switch (event.event_type) {
-            case EVENT_PACKET_RECEIVED: {
+            case EventType::kPacketRX: {
                 int offset = event.data;
                 int socket_thread_id, offset_in_current_buffer;
                 interpreteOffset2d_setbits(
                     offset, &socket_thread_id, &offset_in_current_buffer, 28);
+
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
@@ -129,6 +130,7 @@ void Simulator::start()
                 update_rx_counters(
                     frame_id, frame_id_in_buffer, subframe_id, ant_id);
             } break;
+
             default:
                 printf("Wrong event type in message queue!");
                 exit(0);

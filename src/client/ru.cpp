@@ -231,7 +231,7 @@ void RU::sendThread(int tid)
             continue;
 
         // printf("tx queue length: %d\n", task_queue_.size_approx());
-        if (task_event.event_type != TASK_SEND) {
+        if (task_event.event_type != EventType::kPacketTX) {
             printf("Wrong event type!");
             exit(0);
         }
@@ -344,10 +344,9 @@ void RU::sendThread(int tid)
         }
 #endif
 
-    Event_data packet_message;
-    packet_message.event_type = EVENT_PACKET_SENT;
-    packet_message.data = offset;
+    Event_data packet_message(EventType::kPacketTX, offset);
     // packet_message.more_data = frame_id;
+
     if (config_->running
         && !message_queue_->enqueue(local_ptok, packet_message)) {
         printf("socket message enqueue failed\n");
@@ -476,12 +475,12 @@ void RU::taskThread(int tid)
         cursor++;
         cursor %= buffer_frame_num_;
 
-        // push EVENT_RX_ENB event into the queue
-        Event_data packet_message;
-        packet_message.event_type = EVENT_RX_SYMBOL;
-        // data records the position of this packet in the buffer & tid of this
-        // socket (so that task thread could know which buffer it should visit)
-        packet_message.data = cursor + tid * buffer_frame_num_;
+        // Push EVENT_RX_ENB event into the queue. data records the position of
+        // this packet in the buffer & tid of this socket (so that task thread
+        // could know which buffer it should visit)
+        Event_data packet_message(
+            EventType::kRXSymbol, cursor + tid * buffer_frame_num_);
+
         if (!message_queue_->enqueue(local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);
@@ -490,10 +489,9 @@ void RU::taskThread(int tid)
         if (txSymbols.size() > 0
             && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
             // notify TXthread to start transmitting frame_id+offset
-            Event_data do_tx_task;
-            do_tx_task.event_type = TASK_SEND;
-            do_tx_task.data = ant_id;
+            Event_data do_tx_task(EventType::kPacketTX, ant_id);
             do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
+
             if (!task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
                 printf("task enqueue failed\n");
                 exit(0);
@@ -536,13 +534,13 @@ void RU::taskThread(int tid)
                     Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
                 buffer_status[cursor + ch]
                     = 1; // has data, after it is read it should be set to 0
-                // push EVENT_RX_ENB event into the queue
-                Event_data packet_message;
-                packet_message.event_type = EVENT_PACKET_RECEIVED;
-                // data records the position of this packet in the buffer & tid
-                // of this socket (so that task thread could know which buffer
-                // it should visit)
-                packet_message.data = cursor + tid * buffer_frame_num_;
+
+                // Push EVENT_RX_ENB event into the queue. data records the
+                // position of this packet in the buffer & tid of this socket
+                // (so that task thread could know which buffer
+                Event_data packet_message(
+                    EventType::kPacketRX, cursor + tid * buffer_frame_num_);
+
                 if (!message_queue_->enqueue(local_ptok, packet_message)) {
                     printf("socket message enqueue failed\n");
                     exit(0);
