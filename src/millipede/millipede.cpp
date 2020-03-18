@@ -88,18 +88,17 @@ void Millipede::stop()
 
 void Millipede::start()
 {
-    /* start uplink receiver */
-    if (!receiver_->startRecv(socket_buffer_, socket_buffer_status_,
+    /* start txrx receiver */
+    if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
             socket_buffer_status_size_, socket_buffer_size_,
-            stats_manager_->frame_start)) {
+            stats_manager_->frame_start, dl_socket_buffer_,
+            dl_socket_buffer_status_, dl_socket_buffer_status_size_,
+            dl_socket_buffer_size_)) {
 #ifdef USE_ARGOS
         this->stop();
         return;
 #endif
     }
-    /* start downlink transmitter */
-    receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
-        dl_socket_buffer_status_size_, dl_socket_buffer_size_);
 
     /* tokens used for enqueue */
     /* uplink */

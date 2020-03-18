@@ -223,7 +223,7 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
     return 0;
 }
 
-bool PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status,
+bool PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
     double** in_frame_start)
 {
@@ -235,67 +235,61 @@ bool PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status,
     buffer_ = in_buffer; // for save data
     buffer_status_ = in_buffer_status; // for save status
     frame_start_ = in_frame_start;
+    tx_buffer_ = in_tx_buffer; // for save data
+    tx_buffer_status_ = in_tx_buffer_status; // for save status
+    tx_buffer_frame_num_ = in_tx_buffer_frame_num;
+    // assert(in_tx_buffer_length == packet_length * buffer_frame_num_); //
+    // should be integer
+    tx_buffer_length_ = in_tx_buffer_length;
 
-    printf("create RX threads\n");
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     std::vector<pthread_t> created_threads;
 
-    if (config_->dl_data_symbol_num_perframe > 0)
-        return false;
-    unsigned int nb_lcores = rte_lcore_count();
-    printf("Number of DPDK cores: %d\n", nb_lcores);
-    unsigned int lcore_id;
-    int worker_id = 0;
-    // Launch specific task to cores
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
-    {
-        // launch communication and task thread onto specific core
-        if (worker_id < rx_thread_num_) {
-            rx_context[worker_id].obj_ptr = this;
-            rx_context[worker_id].id = worker_id;
-            rte_eal_remote_launch((lcore_function_t*)loopRecv_DPDK,
-                &rx_context[worker_id], lcore_id);
-            printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
-        }
-        worker_id++;
-    }
+    if (config_->dl_data_symbol_num_perframe == 0) {
+        printf("create RX threads\n");
 
+        unsigned int nb_lcores = rte_lcore_count();
+        printf("Number of DPDK cores: %d\n", nb_lcores);
+        unsigned int lcore_id;
+        int worker_id = 0;
+        // Launch specific task to cores
+        RTE_LCORE_FOREACH_SLAVE(lcore_id)
+        {
+            // launch communication and task thread onto specific core
+            if (worker_id < rx_thread_num_) {
+                rx_context[worker_id].obj_ptr = this;
+                rx_context[worker_id].id = worker_id;
+                rte_eal_remote_launch((lcore_function_t*)loopRecv_DPDK,
+                    &rx_context[worker_id], lcore_id);
+                printf(
+                    "RX: launched thread %d on core %d\n", worker_id, lcore_id);
+            }
+            worker_id++;
+        }
+    } else {
+        printf("create TX or TXRX threads\n");
+
+        unsigned int lcore_id;
+        int worker_id = 0;
+        int thread_id;
+        RTE_LCORE_FOREACH_SLAVE(lcore_id)
+        {
+            // launch communication and task thread onto specific core
+            if (worker_id >= rx_thread_num_) {
+                thread_id = worker_id - rx_thread_num_;
+                tx_context[thread_id].obj_ptr = this;
+                tx_context[thread_id].id = thread_id;
+                rte_eal_remote_launch((lcore_function_t*)loopSend,
+                    &tx_context[thread_id], lcore_id);
+                printf(
+                    "TX: launched thread %d on core %d\n", thread_id, lcore_id);
+            }
+            worker_id++;
+        }
+    }
     return true;
-}
-
-void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
-    int in_buffer_frame_num, int in_buffer_length)
-{
-    // check length
-    tx_buffer_frame_num_ = in_buffer_frame_num;
-    // assert(in_buffer_length == packet_length * buffer_frame_num_); // should
-    // be integer
-    tx_buffer_length_ = in_buffer_length;
-    tx_buffer_ = in_buffer; // for save data
-    tx_buffer_status_ = in_buffer_status; // for save status
-    if (config_->dl_data_symbol_num_perframe == 0)
-        return;
-
-    printf("create TX or TXRX threads\n");
-
-    unsigned int lcore_id;
-    int worker_id = 0;
-    int thread_id;
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
-    {
-        // launch communication and task thread onto specific core
-        if (worker_id >= rx_thread_num_) {
-            thread_id = worker_id - rx_thread_num_;
-            tx_context[thread_id].obj_ptr = this;
-            tx_context[thread_id].id = thread_id;
-            rte_eal_remote_launch(
-                (lcore_function_t*)loopSend, &tx_context[thread_id], lcore_id);
-            printf("TX: launched thread %d on core %d\n", thread_id, lcore_id);
-        }
-        worker_id++;
-    }
 }
 
 static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)

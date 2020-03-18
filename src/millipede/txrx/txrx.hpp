@@ -112,11 +112,11 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * RX_THREAD_NUM - 1}
      */
-    bool startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status,
+    bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         int in_buffer_frame_num, long long in_buffer_length,
-        Table<double>& in_frame_start);
-    void startTX(char* in_buffer, int* in_buffer_status,
-        int in_buffer_frame_num, int in_buffer_length);
+        Table<double>& in_frame_start, char* in_tx_buffer,
+        int* in_tx_buffer_status, int in_tx_buffer_frame_num,
+        int in_tx_buffer_length);
     /**
      * receive thread
      */
