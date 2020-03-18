@@ -89,15 +89,17 @@ void Millipede::stop()
 void Millipede::start()
 {
     /* start uplink receiver */
-    std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_,
-        socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_,
-        stats_manager_->frame_start);
+    if (!receiver_->startRecv(socket_buffer_, socket_buffer_status_,
+            socket_buffer_status_size_, socket_buffer_size_,
+            stats_manager_->frame_start)) {
 #ifdef USE_ARGOS
-    if (rx_threads.size() == 0) {
         this->stop();
         return;
-    }
 #endif
+    }
+    /* start downlink transmitter */
+    receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
+        dl_socket_buffer_status_size_, dl_socket_buffer_size_);
 
     /* tokens used for enqueue */
     /* uplink */
@@ -141,10 +143,6 @@ void Millipede::start()
     /* Tokens used for dequeue */
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
-
-    /* start downlink transmitter */
-    receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
-        dl_socket_buffer_status_size_, dl_socket_buffer_size_);
 
     int cur_frame_id = 0;
 
