@@ -41,9 +41,10 @@ PacketTXRX::~PacketTXRX()
     delete config_;
 }
 
-bool PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status,
+bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
-    Table<double>& in_frame_start)
+    Table<double>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
+    int in_tx_buffer_frame_num, int in_tx_buffer_length)
 {
     buffer_ = &in_buffer; // for save data
     buffer_status_ = &in_buffer_status; // for save status
@@ -54,57 +55,49 @@ bool PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should
     // be integer
     buffer_length_ = in_buffer_length;
-    printf("create RX threads\n");
+    tx_buffer_ = in_tx_buffer; // for save data
+    tx_buffer_status_ = in_tx_buffer_status; // for save status
+    tx_buffer_frame_num_ = in_tx_buffer_frame_num;
+    // assert(in_tx_buffer_length == packet_length * buffer_frame_num_); //
+    // should be integer
+    tx_buffer_length_ = in_tx_buffer_length;
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
-    if (config_->dl_data_symbol_num_perframe > 0)
-        return false;
-
-    for (int i = 0; i < rx_thread_num_; i++) {
-        pthread_t recv_thread_;
-        // record the thread id
-        auto context = new EventHandlerContext<PacketTXRX>;
-        context->obj_ptr = this;
-        context->id = i;
-        // start socket thread
-        if (pthread_create(&recv_thread_, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>, context)
-            != 0) {
-            perror("socket recv thread create failed");
-            exit(0);
+    if (config_->dl_data_symbol_num_perframe == 0) {
+        printf("create RX threads\n");
+        for (int i = 0; i < rx_thread_num_; i++) {
+            pthread_t recv_thread_;
+            // record the thread id
+            auto context = new EventHandlerContext<PacketTXRX>;
+            context->obj_ptr = this;
+            context->id = i;
+            // start socket thread
+            if (pthread_create(&recv_thread_, NULL,
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>,
+                    context)
+                != 0) {
+                perror("socket recv thread create failed");
+                exit(0);
+            }
+        }
+    } else {
+        printf("create TX or TXRX threads\n");
+        for (int i = 0; i < tx_thread_num_; i++) {
+            pthread_t send_thread_;
+            auto context = new EventHandlerContext<PacketTXRX>;
+            context->obj_ptr = this;
+            context->id = i;
+            if (pthread_create(&send_thread_, NULL,
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>,
+                    context)
+                != 0) {
+                perror("socket Transmit thread create failed");
+                exit(0);
+            }
         }
     }
     return true;
-}
-
-void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
-    int in_buffer_frame_num, int in_buffer_length)
-{
-    // check length
-    tx_buffer_frame_num_ = in_buffer_frame_num;
-    // assert(in_buffer_length == packet_length * buffer_frame_num_); // should
-    // be integer
-    tx_buffer_length_ = in_buffer_length;
-    tx_buffer_ = in_buffer; // for save data
-    tx_buffer_status_ = in_buffer_status; // for save status
-    if (config_->dl_data_symbol_num_perframe == 0)
-        return;
-
-    printf("create TX or TXRX threads\n");
-
-    for (int i = 0; i < tx_thread_num_; i++) {
-        pthread_t send_thread_;
-        auto context = new EventHandlerContext<PacketTXRX>;
-        context->obj_ptr = this;
-        context->id = i;
-        if (pthread_create(&send_thread_, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
-            != 0) {
-            perror("socket Transmit thread create failed");
-            exit(0);
-        }
-    }
 }
 
 void* PacketTXRX::loopTXRX(int tid)
