@@ -64,37 +64,17 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
-    if (config_->dl_data_symbol_num_perframe == 0) {
-        printf("create RX threads\n");
-        for (int i = 0; i < rx_thread_num_; i++) {
-            pthread_t recv_thread_;
-            // record the thread id
-            auto context = new EventHandlerContext<PacketTXRX>;
-            context->obj_ptr = this;
-            context->id = i;
-            // start socket thread
-            if (pthread_create(&recv_thread_, NULL,
-                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv>,
-                    context)
-                != 0) {
-                perror("socket recv thread create failed");
-                exit(0);
-            }
-        }
-    } else {
-        printf("create TX or TXRX threads\n");
-        for (int i = 0; i < tx_thread_num_; i++) {
-            pthread_t send_thread_;
-            auto context = new EventHandlerContext<PacketTXRX>;
-            context->obj_ptr = this;
-            context->id = i;
-            if (pthread_create(&send_thread_, NULL,
-                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>,
-                    context)
-                != 0) {
-                perror("socket Transmit thread create failed");
-                exit(0);
-            }
+    printf("create TX or TXRX threads\n");
+    for (int i = 0; i < tx_thread_num_; i++) {
+        pthread_t send_thread_;
+        auto context = new EventHandlerContext<PacketTXRX>;
+        context->obj_ptr = this;
+        context->id = i;
+        if (pthread_create(&send_thread_, NULL,
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
+            != 0) {
+            perror("socket Transmit thread create failed");
+            exit(0);
         }
     }
     return true;
@@ -264,73 +244,6 @@ struct Packet* PacketTXRX::recv_enqueue(
         exit(0);
     }
     return pkt;
-}
-
-void* PacketTXRX::loopRecv(int tid)
-{
-    pin_to_core_with_offset(ThreadType::kWorkerRX, core_id_, tid);
-
-    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    int local_port_id = config_->bs_port + tid;
-#if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-    // struct sockaddr_in local_addr;
-    // setup_sockaddr_local_ipv4(&local_addr, local_port_id);
-#else
-    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-    // struct sockaddr_in6 local_addr;
-    // setup_sockaddr_local_ipv6(&local_addr, local_port_id);
-#endif
-
-    // use token to speed up
-    // moodycamel::ProducerToken local_ptok(*message_queue_);
-    // moodycamel::ProducerToken *local_ptok = new
-    // moodycamel::ProducerToken(*message_queue_);
-    int rx_buffer_frame_num = buffer_frame_num_;
-    double* rx_frame_start = (*frame_start_)[tid];
-
-    // walk through all the pages
-#if 0
-    double temp;
-    for (int i = 0; i < 20; i++) {
-        temp = rx_frame_start[i * 512];
-    }
-#endif
-
-    // loop recv
-    // socklen_t addrlen = sizeof(obj_ptr->servaddr_[tid]);
-    int rx_offset = 0;
-    int prev_frame_id = -1;
-    // double start_time= get_time();
-
-    // printf("Rx thread %d: on core %d\n", tid, sched_getcpu());
-
-    while (true) {
-        struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
-#if MEASURE_TIME
-        // read information from received packet
-        int frame_id = pkt->frame_id;
-#if DEBUG_RECV
-        int symbol_id = pkt->symbol_id;
-        int ant_id = pkt->ant_id;
-        printf("RX thread %d received frame %d subframe %d, ant %d\n", tid,
-            frame_id, symbol_id, ant_id);
-#endif
-        if (frame_id > prev_frame_id) {
-            *(rx_frame_start + frame_id) = get_time();
-            prev_frame_id = frame_id;
-            if (frame_id % 512 == 200) {
-                _mm_prefetch(
-                    (char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
-                // double temp = rx_frame_start[frame_id+3];
-            }
-        }
-#endif
-        rx_offset++;
-        if (rx_offset == rx_buffer_frame_num)
-            rx_offset = 0;
-    }
-    return 0;
 }
 
 int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
