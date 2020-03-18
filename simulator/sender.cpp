@@ -138,18 +138,18 @@ void Sender::startTX()
     /* create send threads */
     std::vector<pthread_t> created_threads;
     for (size_t i = 0; i < thread_num; i++) {
-        pthread_t send_thread_;
-        EventHandlerContext<Sender>* context
-            = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+        auto* context = new EventHandlerContext<Sender>();
         context->obj_ptr = this;
         context->id = i;
-        if (pthread_create(&send_thread_, NULL,
+
+        pthread_t send_thread;
+        if (pthread_create(&send_thread, NULL,
                 pthread_fun_wrapper<Sender, &Sender::loopSend>, context)
             != 0) {
             perror("socket send thread create failed");
             exit(0);
         }
-        created_threads.push_back(send_thread_);
+        created_threads.push_back(send_thread);
     }
 
     /* give some time for all threads to lock */
@@ -350,12 +350,12 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     /* create send threads */
     std::vector<pthread_t> created_threads;
     for (size_t i = 0; i < thread_num; i++) {
-        pthread_t send_thread_;
-        EventHandlerContext<Sender>* context
-            = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+        auto* context = new EventHandlerContext<Sender>();
         context->obj_ptr = this;
         context->id = i;
-        if (pthread_create(&send_thread_, NULL,
+
+        pthread_t send_thread;
+        if (pthread_create(&send_thread, NULL,
                 pthread_fun_wrapper<Sender, &Sender::loopSend>, context)
             != 0) {
             // if(pthread_create( &send_thread_, NULL, Sender::loopSend, (void
@@ -363,7 +363,7 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
             perror("socket send thread create failed");
             exit(0);
         }
-        created_threads.push_back(send_thread_);
+        created_threads.push_back(send_thread);
     }
 
     /* give some time for all threads to lock */
@@ -371,12 +371,12 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     printf("Master: Now releasing the condition\n");
     pthread_cond_broadcast(&cond);
 
-    pthread_t main_send_thread_;
-    EventHandlerContext<Sender>* context
-        = (EventHandlerContext<Sender>*)malloc(sizeof(*context));
+    auto* context = new EventHandlerContext<Sender>();
     context->obj_ptr = this;
     context->id = thread_num;
-    if (pthread_create(&main_send_thread_, NULL,
+
+    pthread_t main_send_thread;
+    if (pthread_create(&main_send_thread, NULL,
             pthread_fun_wrapper<Sender, &Sender::loopSend_main>, context)
         != 0) {
         // if(pthread_create( &main_send_thread_, NULL, Sender::loopSend_main,
@@ -386,7 +386,7 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
         exit(0);
     }
     // printf("Created main tx thread\n");
-    created_threads.push_back(main_send_thread_);
+    created_threads.push_back(main_send_thread);
 }
 
 void* Sender::loopSend_main(int)

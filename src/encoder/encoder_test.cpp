@@ -11,8 +11,7 @@ char* read_binfile(std::string filename, int buffer_size)
     std::ifstream infile;
     infile.open(filename, std::ios::binary | std::ios::in);
 
-    char* x = (char*)malloc(buffer_size * sizeof(char));
-
+    auto* x = (char*)malloc(buffer_size * sizeof(char));
     infile.read((char*)x, buffer_size * sizeof(char));
     infile.close();
 

@@ -24,12 +24,14 @@ int main(int argc, char* argv[])
                "core offset, 3. frame duration, 4. config file)\n");
         printf("Arguments set to default: 4, 22, 5000, %s\n", confFile.c_str());
     }
+
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
-    Config* cfg = new Config(filename.c_str());
-    Sender* sender;
-    sender = new Sender(cfg, thread_num, core_offset, delay);
-    printf("start sender\n");
+    auto* cfg = new Config(filename.c_str());
+    auto* sender = new Sender(cfg, thread_num, core_offset, delay);
+
+    printf("Start sender\n");
     sender->startTX();
+
     return 0;
 }
