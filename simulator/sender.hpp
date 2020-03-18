@@ -9,9 +9,9 @@
 #include <arpa/inet.h>
 #include <iostream>
 #include <netinet/in.h>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <vector>
@@ -45,23 +45,25 @@ public:
     // static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     // int for: frame_id, subframe_id, cell_id, ant_id
     // unsigned int for: I/Q samples
+
 #ifdef USE_DPDK
-    static const int tx_buf_offset = 22;
+    static const size_t tx_buf_offset = 22;
 #else
-    static const int tx_buf_offset = 0;
+    static const size_t tx_buf_offset = 0;
 #endif
+
     // static const int buffer_length = tx_buf_offset + sizeof(int) * 16 +
     // sizeof(ushort) * OFDM_FRAME_LEN * 2; static const int data_offset =
     // sizeof(int) * 16;
-    //    static const int subframe_num_perframe = 40;
-    static const int BUFFER_FRAME_NUM = 40;
+    //    static const size_t subframe_num_perframe = 40;
+    static const size_t BUFFER_FRAME_NUM = 40;
 
-    // static const int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM :
+    // static const size_t max_subframe_id = ENABLE_DOWNLINK ? UE_NUM :
     // subframe_num_perframe;
 
 public:
-    Sender(Config* in_config, int in_thread_num, int in_core_offset = 30,
-        int in_delay = 0);
+    Sender(Config* in_config, size_t in_thread_num, size_t in_core_offset = 30,
+        size_t in_delay = 0);
     ~Sender();
 
     void startTX();
@@ -70,7 +72,7 @@ public:
     void* loopSend(int tid);
 
 private:
-    Config* config_;
+    Config* cfg;
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -89,48 +91,36 @@ private:
     // std::vector<std::vector<char,boost::alignment::aligned_allocator<char,
     // 64>>> trans_buffer_;
     Table<char> trans_buffer_;
-    int cur_ptr_;
-    int buffer_len_;
+    size_t cur_ptr_;
+    size_t buffer_len_;
     pthread_mutex_t lock_;
 
-    // moodycamel::ConcurrentQueue<int> task_queue_ =
-    // moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM *
-    // subframe_num_perframe
-    // * BS_ANT_NUM); moodycamel::ConcurrentQueue<int> message_queue_ =
-    // moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM *
-    // subframe_num_perframe
-    // * BS_ANT_NUM);
-    moodycamel::ConcurrentQueue<int> task_queue_
-        = moodycamel::ConcurrentQueue<int>(1024);
-    moodycamel::ConcurrentQueue<int> message_queue_
-        = moodycamel::ConcurrentQueue<int>(1024);
+    moodycamel::ConcurrentQueue<size_t> task_queue_
+        = moodycamel::ConcurrentQueue<size_t>(1024);
+    moodycamel::ConcurrentQueue<size_t> message_queue_
+        = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
-    // int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
-    // int max_length_ = max_subframe_id * BS_ANT_NUM;
 
-    int ant_id;
-    int frame_id;
-    int subframe_id;
+    size_t ant_id;
+    size_t frame_id;
+    size_t subframe_id;
 
     // First dimension: subframe_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
     Table<float> IQ_data;
     Table<ushort> IQ_data_coded;
 
-    int thread_num;
-    int socket_num;
+    size_t thread_num;
+    size_t socket_num;
 
-    int core_offset;
-    int delay;
-    EventHandlerContext<Sender>* context;
+    size_t core_offset;
+    size_t delay;
 
-    Table<int> packet_count_per_subframe;
-    int* packet_count_per_frame;
+    Table<size_t> packet_count_per_subframe;
+    size_t* packet_count_per_frame;
 
     double* frame_start;
     double* frame_end;
-    // int packet_count_per_subframe[BUFFER_FRAME_NUM][max_subframe_id];
-    // int packet_count_per_frame[BUFFER_FRAME_NUM];
 };
 
 #endif
