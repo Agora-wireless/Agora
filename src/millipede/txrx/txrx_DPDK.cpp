@@ -266,8 +266,8 @@ std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer,
     return created_threads;
 }
 
-std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
-    int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length)
+void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
+    int in_buffer_frame_num, int in_buffer_length)
 {
     // check length
     tx_buffer_frame_num_ = in_buffer_frame_num;
@@ -278,8 +278,6 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
     tx_buffer_status_ = in_buffer_status; // for save status
 
     printf("create TX or TXRX threads\n");
-    // create new threads
-    std::vector<pthread_t> created_threads;
 
     unsigned int lcore_id;
     int worker_id = 0;
@@ -297,7 +295,6 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
         }
         worker_id++;
     }
-    return created_threads;
 }
 
 static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)

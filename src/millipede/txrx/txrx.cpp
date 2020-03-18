@@ -81,8 +81,8 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer,
     return created_threads;
 }
 
-std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
-    int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length)
+void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
+    int in_buffer_frame_num, int in_buffer_length)
 {
     // check length
     tx_buffer_frame_num_ = in_buffer_frame_num;
@@ -93,8 +93,6 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
     tx_buffer_status_ = in_buffer_status; // for save status
 
     printf("create TX or TXRX threads\n");
-    // create new threads
-    std::vector<pthread_t> created_threads;
 
     for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t send_thread_;
@@ -107,11 +105,7 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
             perror("socket Transmit thread create failed");
             exit(0);
         }
-
-        created_threads.push_back(send_thread_);
     }
-
-    return created_threads;
 }
 
 void* PacketTXRX::loopTXRX(int tid)
