@@ -38,7 +38,6 @@ PacketTXRX::PacketTXRX(
     data_subframe_num_perframe = config_->data_symbol_num_perframe;
     ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
-    downlink_mode = config_->downlink_mode;
     packet_length = config_->packet_length;
 
     // frameID = new int[TASK_BUFFER_FRAME_NUM];
@@ -224,8 +223,8 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
     return 0;
 }
 
-std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer,
-    int** in_buffer_status, int in_buffer_frame_num, long long in_buffer_length,
+bool PacketTXRX::startRecv(char** in_buffer, int** in_buffer_status,
+    int in_buffer_frame_num, long long in_buffer_length,
     double** in_frame_start)
 {
     // check length
@@ -243,27 +242,27 @@ std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer,
 
     std::vector<pthread_t> created_threads;
 
-    if (!downlink_mode) {
-        unsigned int nb_lcores = rte_lcore_count();
-        printf("Number of DPDK cores: %d\n", nb_lcores);
-        unsigned int lcore_id;
-        int worker_id = 0;
-        // Launch specific task to cores
-        RTE_LCORE_FOREACH_SLAVE(lcore_id)
-        {
-            // launch communication and task thread onto specific core
-            if (worker_id < rx_thread_num_) {
-                rx_context[worker_id].obj_ptr = this;
-                rx_context[worker_id].id = worker_id;
-                rte_eal_remote_launch((lcore_function_t*)loopRecv_DPDK,
-                    &rx_context[worker_id], lcore_id);
-                printf(
-                    "RX: launched thread %d on core %d\n", worker_id, lcore_id);
-            }
-            worker_id++;
+    if (config_->dl_data_symbol_num_perframe > 0)
+        return false;
+    unsigned int nb_lcores = rte_lcore_count();
+    printf("Number of DPDK cores: %d\n", nb_lcores);
+    unsigned int lcore_id;
+    int worker_id = 0;
+    // Launch specific task to cores
+    RTE_LCORE_FOREACH_SLAVE(lcore_id)
+    {
+        // launch communication and task thread onto specific core
+        if (worker_id < rx_thread_num_) {
+            rx_context[worker_id].obj_ptr = this;
+            rx_context[worker_id].id = worker_id;
+            rte_eal_remote_launch((lcore_function_t*)loopRecv_DPDK,
+                &rx_context[worker_id], lcore_id);
+            printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
         }
+        worker_id++;
     }
-    return created_threads;
+
+    return true;
 }
 
 void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
@@ -393,7 +392,6 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     int data_subframe_num_perframe = config_->data_subframe_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_subframe_num_perframe;
-    bool downlink_mode = config_->downlink_mode;
     int packet_length = config_->packet_length;
 
     uint16_t nic;
@@ -432,7 +430,9 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     auto begin = std::chrono::system_clock::now();
 
     int ret = 0;
-    int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
+    int max_subframe_id = config_->dl_data_symbol_num_perframe > 0
+        ? UE_NUM
+        : subframe_num_perframe;
     int prev_frame_id = -1;
     int packet_num_per_frame = 0;
     double start_time = get_time();

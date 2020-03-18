@@ -41,9 +41,9 @@ PacketTXRX::~PacketTXRX()
     delete config_;
 }
 
-std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer,
-    Table<int>& in_buffer_status, int in_buffer_frame_num,
-    long long in_buffer_length, Table<double>& in_frame_start)
+bool PacketTXRX::startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status,
+    int in_buffer_frame_num, long long in_buffer_length,
+    Table<double>& in_frame_start)
 {
     buffer_ = &in_buffer; // for save data
     buffer_status_ = &in_buffer_status; // for save status
@@ -58,10 +58,8 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer,
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
-    std::vector<pthread_t> created_threads;
-
     if (config_->dl_data_symbol_num_perframe > 0)
-        return created_threads;
+        return false;
 
     for (int i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread_;
@@ -76,9 +74,8 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer,
             perror("socket recv thread create failed");
             exit(0);
         }
-        created_threads.push_back(recv_thread_);
     }
-    return created_threads;
+    return true;
 }
 
 void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
