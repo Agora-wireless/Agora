@@ -115,7 +115,7 @@ public:
     std::vector<pthread_t> startRecv(Table<char>& in_buffer,
         Table<int>& in_buffer_status, int in_buffer_frame_num,
         long long in_buffer_length, Table<double>& in_frame_start);
-    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status,
+    void startTX(char* in_buffer, int* in_buffer_status,
         int in_buffer_frame_num, int in_buffer_length);
     /**
      * receive thread
