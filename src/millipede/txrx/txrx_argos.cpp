@@ -100,6 +100,8 @@ void PacketTXRX::startTX(char* in_buffer, int* in_buffer_status,
     tx_buffer_length_ = in_buffer_length;
     tx_buffer_ = in_buffer; // for save data
     tx_buffer_status_ = in_buffer_status; // for save status
+    if (config_->dl_data_symbol_num_perframe == 0)
+        return;
 
     printf("create TX or TXRX threads\n");
     // create new threads
