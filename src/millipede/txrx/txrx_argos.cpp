@@ -71,8 +71,8 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     if (!radioconfig_->radioStart())
         return false;
 
-    printf("create RX threads\n");
-    for (int i = 0; i < rx_thread_num_; i++) {
+    printf("create TXRX threads\n");
+    for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t recv_thread_;
         // record the thread id
         auto context = new EventHandlerContext<PacketTXRX>;
@@ -80,7 +80,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         context->id = i;
         // start socket thread
         if (pthread_create(&recv_thread_, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopRecv_Argos>,
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX_Argos>,
                 context)
             != 0) {
             perror("socket recv thread create failed");
@@ -88,21 +88,6 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         }
     }
 
-    printf("create TX or TXRX threads\n");
-    // create new threads
-    for (int i = 0; i < tx_thread_num_; i++) {
-        pthread_t send_thread_;
-        auto context = new EventHandlerContext<PacketTXRX>;
-        context->obj_ptr = this;
-        context->id = i;
-        if (pthread_create(&send_thread_, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopSend_Argos>,
-                context)
-            != 0) {
-            perror("socket Transmit thread create failed");
-            exit(0);
-        }
-    }
     sleep(1);
     pthread_cond_broadcast(&cond);
     // sleep(1);
@@ -164,7 +149,7 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
     return pkt[0];
 }
 
-void* PacketTXRX::loopRecv_Argos(int tid)
+void* PacketTXRX::loopTXRX_Argos(int tid)
 {
     // printf("Recv thread: thread %d start\n", tid);
     int radio_lo = tid * config_->nRadios / rx_thread_num_;
@@ -172,7 +157,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
     int nradio_cur_thread = radio_hi - radio_lo;
     // printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     // get pointer of message queue
-    pin_to_core_with_offset(ThreadType::kWorkerRX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
 
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
@@ -204,6 +189,7 @@ void* PacketTXRX::loopRecv_Argos(int tid)
         // receive data
         for (int radio_id = radio_lo; radio_id < radio_hi;
              radio_id++) { // FIXME: this must be threaded
+            dequeue_send_Argos(tid);
             struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
             rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
             int frame_id = pkt->frame_id;
@@ -329,14 +315,4 @@ int PacketTXRX::dequeue_send_Argos(int tid)
         exit(0);
     }
     return offset;
-}
-
-void* PacketTXRX::loopSend_Argos(int tid)
-{
-    pin_to_core_with_offset(ThreadType::kWorkerTX, tx_core_id_, tid);
-
-    while (config_->running) {
-        dequeue_send_Argos(tid);
-    }
-    return 0;
 }
