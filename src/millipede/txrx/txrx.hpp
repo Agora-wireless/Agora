@@ -120,9 +120,7 @@ public:
     /**
      * receive thread
      */
-    void* loopRecv(int tid);
     void* loopTXRX(int tid);
-    void* loopSend(int tid);
 #if USE_IPV4
     typedef struct sockaddr_in sockaddr_t;
 #else
@@ -134,8 +132,7 @@ public:
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
-    void* loopRecv_Argos(int tid);
-    void* loopSend_Argos(int tid);
+    void* loopTXRX_Argos(int tid);
     int dequeue_send_Argos(int tid);
     struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
