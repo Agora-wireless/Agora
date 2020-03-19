@@ -42,22 +42,12 @@ typedef unsigned short ushort;
 
 class Sender {
 public:
-    // static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
-    // int for: frame_id, subframe_id, cell_id, ant_id
-    // unsigned int for: I/Q samples
 #ifdef USE_DPDK
-    static const int tx_buf_offset = 22;
+    static const int kTXBufOffset = 22;
 #else
-    static const int tx_buf_offset = 0;
+    static const int kTXBufOffset = 0;
 #endif
-    // static const int buffer_length = tx_buf_offset + sizeof(int) * 16 +
-    // sizeof(ushort) * OFDM_FRAME_LEN * 2; static const int data_offset =
-    // sizeof(int) * 16;
-    //    static const int subframe_num_perframe = 40;
     static const int BUFFER_FRAME_NUM = 40;
-
-    // static const int max_subframe_id = ENABLE_DOWNLINK ? UE_NUM :
-    // subframe_num_perframe;
 
 public:
     Sender(Config* in_config, int in_thread_num, int in_core_offset = 30,
@@ -66,8 +56,19 @@ public:
 
     void startTX();
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
-    void* loopSend_main(int tid);
+    void* loopMain(int tid);
     void* loopSend(int tid);
+    int dequeue_send(int tid);
+    void init_IQ_from_file();
+    int get_max_subframe_id();
+    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
+    void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+    void update_ids(int max_ant_id, int max_subframe_id);
+    void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
+    void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
+    void preload_tx_buffer();
+    void update_tx_buffer(int data_ptr);
+    void write_stats_to_file(size_t tx_frame_count);
 
 private:
     Config* config_;
@@ -82,31 +83,20 @@ private:
     struct sockaddr_in6 cliaddr_; /* server address */
 #endif
     int* socket_;
-    // int* socket_tcp_;
-
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
     // std::vector<std::vector<char,boost::alignment::aligned_allocator<char,
-    // 64>>> trans_buffer_;
-    Table<char> trans_buffer_;
-    int cur_ptr_;
+    // 64>>> tx_buffer_;
+    Table<char> tx_buffer_;
+    // int cur_ptr_;
     int buffer_len_;
     pthread_mutex_t lock_;
 
-    // moodycamel::ConcurrentQueue<int> task_queue_ =
-    // moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM *
-    // subframe_num_perframe
-    // * BS_ANT_NUM); moodycamel::ConcurrentQueue<int> message_queue_ =
-    // moodycamel::ConcurrentQueue<int>( BUFFER_FRAME_NUM *
-    // subframe_num_perframe
-    // * BS_ANT_NUM);
     moodycamel::ConcurrentQueue<int> task_queue_
         = moodycamel::ConcurrentQueue<int>(1024);
     moodycamel::ConcurrentQueue<int> message_queue_
         = moodycamel::ConcurrentQueue<int>(1024);
     moodycamel::ProducerToken** task_ptok;
-    // int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
-    // int max_length_ = max_subframe_id * BS_ANT_NUM;
 
     int ant_id;
     int frame_id;
@@ -129,8 +119,12 @@ private:
 
     double* frame_start;
     double* frame_end;
-    // int packet_count_per_subframe[BUFFER_FRAME_NUM][max_subframe_id];
-    // int packet_count_per_frame[BUFFER_FRAME_NUM];
+
+    uint64_t ticks_5 = (uint64_t)500000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_100 = (uint64_t)150000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_200 = (uint64_t)20000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_500 = (uint64_t)10000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_all;
 };
 
 #endif

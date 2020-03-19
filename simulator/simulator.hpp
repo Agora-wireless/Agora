@@ -7,47 +7,33 @@
 #ifndef SIMULATOR_HEAD
 #define SIMULATOR_HEAD
 
+#include "buffer.hpp"
+#include "concurrentqueue.h"
+#include "config.hpp"
+#include "gettime.h"
+#include "memory_manage.h"
+#include "offset.h"
+#include "receiver.hpp"
+#include "sender.hpp"
+#include "signalHandler.hpp"
+#include <algorithm>
+#include <emmintrin.h>
 #include <fcntl.h>
+#include <immintrin.h>
 #include <iostream>
+#include <math.h>
 #include <memory>
 #include <pthread.h>
 #include <queue>
-#include <system_error>
-#include <unistd.h>
-#include <vector>
-// #include <complex.h>
-#include <math.h>
-#include <tuple>
-// #include <armadillo>
-#include <algorithm>
-#include <emmintrin.h>
-#include <immintrin.h>
 #include <signal.h>
 #include <stdint.h>
-// #include <aff3ct.hpp>
-// #include "mkl_dfti.h"
-// #include <hpctoolkit.h>
-// #include <cblas.h>
-// #include <stdio.h>
-#include "buffer.hpp"
-#include "concurrentqueue.h"
-#include "gettime.h"
-#include "receiver.hpp"
-#include "sender.hpp"
-// #include "compute_common.hpp"
-#include "offset.h"
-// #include "dofft.hpp"
-// #include "dodemul.hpp"
-#include "config.hpp"
-#include "memory_manage.h"
-#include "signalHandler.hpp"
+#include <system_error>
+#include <tuple>
+#include <unistd.h>
+#include <vector>
 
 class Simulator {
 public:
-    // static const int TASK_THREAD_NUM = 10;
-    // static const int SOCKET_RX_THREAD_NUM = 4;
-    // static const int SOCKET_TX_THREAD_NUM = 4;
-    // static const int CORE_OFFSET = 21;
     /* optimization parameters for block transpose (see the slides for more
      * details) */
     static const int transpose_block_size = 8;
@@ -57,8 +43,8 @@ public:
     static const int dequeue_bulk_size = 32;
     static const int dequeue_bulk_size_single = 8;
 
-    Simulator(Config* cfg, int in_task_thread_num, int in_socket_tx_num,
-        int in_core_offset, int sender_delay);
+    Simulator(Config* cfg, int in_task_thread_num, int in_core_offset,
+        int sender_delay);
     ~Simulator();
 
     void start();
