@@ -680,7 +680,7 @@ void Stats::print_summary(UNUSED size_t last_frame_id)
     int Precode_total_count
         = compute_total_count(precode_stats_worker, task_thread_num);
     double csi_frames = (double)CSI_total_count / BS_ANT_NUM / PILOT_NUM;
-    double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
+    double zf_frames = (double)ZF_total_count / config_->zf_block_num;
     if (config_->downlink_mode) {
         double precode_frames = (double)Precode_total_count / OFDM_DATA_NUM
             / dl_data_subframe_num_perframe;
