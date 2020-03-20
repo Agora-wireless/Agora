@@ -20,9 +20,9 @@ Millipede::Millipede(Config* cfg)
 
     this->config_ = cfg;
 #if DEBUG_PRINT_PILOT
-    size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    size_t ofdm_ca_num = config_->ofdm_ca_num;
     cout << "Pilot data" << endl;
-    for (size_t i = 0; i < OFDM_CA_NUM; i++)
+    for (size_t i = 0; i < ofdm_ca_num; i++)
         cout << config_->pilots_[i] << ",";
     cout << endl;
 #endif
@@ -161,10 +161,10 @@ void Millipede::start()
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int subframe_num_perframe = config_->symbol_num_perframe;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int bs_ant_num = config_->bs_ant_num;
+    int ue_num = config_->ue_num;
     // int PILOT_NUM = config_->pilot_symbol_num_perframe;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int ofdm_data_num = config_->ofdm_data_num;
     int dl_data_subframe_start = config_->dl_data_symbol_start;
     int dl_data_subframe_end = config_->dl_data_symbol_end;
     // int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
@@ -369,14 +369,14 @@ void Millipede::start()
                     if (demul_count == demul_stats_.max_symbol_count * 9000) {
                         demul_count = 0;
                         double diff = get_time() - demul_begin;
-                        int samples_num_per_UE = OFDM_DATA_NUM
+                        int samples_num_per_UE = ofdm_data_num
                             * demul_stats_.max_symbol_count * 1000;
                         printf(
                             "Frame %d: Receive %d samples (per-client) from %d "
                             "clients in %f secs, throughtput %f bps per-client "
                             "(16QAM), current task queue length %zu\n",
                             demul_stats_.frame_count, samples_num_per_UE,
-                            UE_NUM, diff,
+                            ue_num, diff,
                             samples_num_per_UE * log2(16.0f) / diff,
                             fft_queue_.size_approx());
                         demul_begin = get_time();
@@ -482,8 +482,8 @@ void Millipede::start()
             case EventType::kIFFT: {
                 /* IFFT is done, schedule data transmission */
                 int offset = event.data;
-                int ant_id = offset % BS_ANT_NUM;
-                int total_data_subframe_id = offset / BS_ANT_NUM;
+                int ant_id = offset % bs_ant_num;
+                int total_data_subframe_id = offset / bs_ant_num;
                 int frame_id = total_data_subframe_id
                     / data_subframe_num_perframe % TASK_BUFFER_FRAME_NUM;
                 int data_subframe_id
@@ -513,8 +513,8 @@ void Millipede::start()
             case EventType::kPacketTX: {
                 /* Data is sent */
                 int offset = event.data;
-                int ant_id = offset % BS_ANT_NUM;
-                int total_data_subframe_id = offset / BS_ANT_NUM;
+                int ant_id = offset % bs_ant_num;
+                int total_data_subframe_id = offset / bs_ant_num;
                 int frame_id
                     = total_data_subframe_id / data_subframe_num_perframe;
                 int data_subframe_id
@@ -553,11 +553,11 @@ void Millipede::start()
                         tx_count = 0;
                         double diff = get_time() - tx_begin;
                         int samples_num_per_UE
-                            = OFDM_DATA_NUM * tx_stats_.max_symbol_count * 1000;
+                            = ofdm_data_num * tx_stats_.max_symbol_count * 1000;
                         printf("Transmit %d samples (per-client) to %d clients "
                                "in %f secs, throughtput %f bps per-client "
                                "(16QAM), current tx queue length %zu\n",
-                            samples_num_per_UE, UE_NUM, diff,
+                            samples_num_per_UE, ue_num, diff,
                             samples_num_per_UE * log2(16.0f) / diff,
                             tx_queue_.size_approx());
                         tx_begin = get_time();
@@ -749,7 +749,7 @@ void* Millipede::worker_demul(int tid)
         } else {
             // int ul_data_subframe_num_perframe =
             // config_->ul_data_symbol_num_perframe; int frame_id = event.data /
-            // (OFDM_CA_NUM * ul_data_subframe_num_perframe);
+            // (ofdm_ca_num * ul_data_subframe_num_perframe);
             // // check precoder status for the current frame
             // if (frame_id > cur_frame_id || frame_id == 0) {
             //     while (!precoder_status_[frame_id]);
@@ -1132,17 +1132,17 @@ void Millipede::initialize_uplink_buffers()
     // context = (EventHandlerContext *)malloc(TASK_THREAD_NUM *
     // sizeof(EventHandlerContext));
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int bs_ant_num = config_->bs_ant_num;
     int packet_length = config_->packet_length;
     int subframe_num_perframe = config_->symbol_num_perframe;
     int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int ofdm_data_num = config_->ofdm_data_num;
+    int ue_num = config_->ue_num;
     LDPCconfig LDPC_config = config_->LDPC_config;
 
     socket_buffer_status_size_
-        = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe;
+        = bs_ant_num * SOCKET_BUFFER_FRAME_NUM * subframe_num_perframe;
     socket_buffer_size_ = (long long)packet_length * socket_buffer_status_size_;
     printf("socket_buffer_size %lld, socket_buffer_status_size %d\n",
         socket_buffer_size_, socket_buffer_status_size_);
@@ -1151,32 +1151,32 @@ void Millipede::initialize_uplink_buffers()
         SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
 
     csi_buffer_.malloc(
-        PILOT_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
+        PILOT_NUM * TASK_BUFFER_FRAME_NUM, bs_ant_num * ofdm_data_num, 64);
     data_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, BS_ANT_NUM * OFDM_DATA_NUM, 64);
+        TASK_BUFFER_SUBFRAME_NUM, bs_ant_num * ofdm_data_num, 64);
     precoder_buffer_.malloc(
-        OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, BS_ANT_NUM * UE_NUM, 64);
+        ofdm_data_num * TASK_BUFFER_FRAME_NUM, bs_ant_num * ue_num, 64);
 
-    equal_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+    equal_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM, ofdm_data_num * ue_num, 64);
     demod_hard_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
+        TASK_BUFFER_SUBFRAME_NUM, ofdm_data_num * ue_num, 64);
     size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, mod_type * OFDM_DATA_NUM * UE_NUM, 64);
+        TASK_BUFFER_SUBFRAME_NUM, mod_type * ofdm_data_num * ue_num, 64);
     size_t num_decoded_bytes
         = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        TASK_BUFFER_SUBFRAME_NUM, num_decoded_bytes * UE_NUM, 64);
+        TASK_BUFFER_SUBFRAME_NUM, num_decoded_bytes * ue_num, 64);
 
     int max_packet_num_per_frame
-        = BS_ANT_NUM * (PILOT_NUM + ul_data_subframe_num_perframe);
+        = bs_ant_num * (PILOT_NUM + ul_data_subframe_num_perframe);
     rx_stats_.max_task_count = max_packet_num_per_frame;
-    rx_stats_.max_task_pilot_count = BS_ANT_NUM * PILOT_NUM;
+    rx_stats_.max_task_pilot_count = bs_ant_num * PILOT_NUM;
     alloc_buffer_1d(&(rx_stats_.task_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     alloc_buffer_1d(
         &(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_created_count = 0;
-    fft_stats_.init(BS_ANT_NUM, PILOT_NUM, TASK_BUFFER_FRAME_NUM,
+    fft_stats_.init(bs_ant_num, PILOT_NUM, TASK_BUFFER_FRAME_NUM,
         subframe_num_perframe, 64);
     fft_stats_.max_symbol_data_count = ul_data_subframe_num_perframe;
     alloc_buffer_1d(
@@ -1193,13 +1193,13 @@ void Millipede::initialize_uplink_buffers()
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
 #ifdef USE_LDPC
-    decode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM,
+    decode_stats_.init(config_->LDPC_config.nblocksInSymbol * ue_num,
         ul_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
         data_subframe_num_perframe, 64);
 #endif
 
     delay_fft_queue.calloc(
-        TASK_BUFFER_FRAME_NUM, subframe_num_perframe * BS_ANT_NUM, 32);
+        TASK_BUFFER_FRAME_NUM, subframe_num_perframe * bs_ant_num, 32);
     alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
 }
 
@@ -1209,40 +1209,40 @@ void Millipede::initialize_downlink_buffers()
     int TASK_BUFFER_SUBFRAME_NUM
         = data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int bs_ant_num = config_->bs_ant_num;
     int packet_length = config_->packet_length;
-    size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int UE_NUM = config_->UE_NUM;
+    size_t ofdm_ca_num = config_->ofdm_ca_num;
+    int ofdm_data_num = config_->ofdm_data_num;
+    int ue_num = config_->ue_num;
 
     dl_socket_buffer_status_size_
-        = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe;
+        = bs_ant_num * SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe;
     dl_socket_buffer_size_
         = (long long)packet_length * dl_socket_buffer_status_size_;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
     dl_ifft_buffer_.calloc(
-        BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, OFDM_CA_NUM, 64);
+        bs_ant_num * TASK_BUFFER_SUBFRAME_NUM, ofdm_ca_num, 64);
     dl_precoder_buffer_.malloc(
-        OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, UE_NUM * BS_ANT_NUM, 64);
+        ofdm_data_num * TASK_BUFFER_FRAME_NUM, ue_num * bs_ant_num, 64);
     dl_encoded_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, OFDM_DATA_NUM * UE_NUM, 64);
-    recip_buffer_.malloc(TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * BS_ANT_NUM, 64);
-    calib_buffer_.malloc(TASK_BUFFER_FRAME_NUM, OFDM_DATA_NUM * BS_ANT_NUM, 64);
+        TASK_BUFFER_SUBFRAME_NUM, ofdm_data_num * ue_num, 64);
+    recip_buffer_.malloc(TASK_BUFFER_FRAME_NUM, ofdm_data_num * bs_ant_num, 64);
+    calib_buffer_.malloc(TASK_BUFFER_FRAME_NUM, ofdm_data_num * bs_ant_num, 64);
 
 #ifdef USE_LDPC
-    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM,
+    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * ue_num,
         dl_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
         data_subframe_num_perframe, 64);
 #endif
     precode_stats_.init(config_->demul_block_num, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    ifft_stats_.init(BS_ANT_NUM, dl_data_subframe_num_perframe,
+    ifft_stats_.init(bs_ant_num, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 
-    tx_stats_.init(BS_ANT_NUM, dl_data_subframe_num_perframe,
+    tx_stats_.init(bs_ant_num, dl_data_subframe_num_perframe,
         TASK_BUFFER_FRAME_NUM, data_subframe_num_perframe, 64);
 }
 
@@ -1293,8 +1293,8 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 #ifdef WRITE_DEMUL
     printf("saving demul data...\n");
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    int UE_NUM = config_->UE_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int ue_num = config_->ue_num;
+    int ofdm_data_num = config_->ofdm_data_num;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/demul_data.bin";
     FILE* fp = fopen(filename.c_str(), "wb");
@@ -1302,10 +1302,10 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
         int total_data_subframe_id
             = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
             + i;
-        for (int sc = 0; sc < OFDM_DATA_NUM; sc++) {
+        for (int sc = 0; sc < ofdm_data_num; sc++) {
             uint8_t* ptr
-                = &demod_hard_buffer_[total_data_subframe_id][sc * UE_NUM];
-            fwrite(ptr, UE_NUM, sizeof(uint8_t), fp);
+                = &demod_hard_buffer_[total_data_subframe_id][sc * ue_num];
+            fwrite(ptr, ue_num, sizeof(uint8_t), fp);
         }
     }
     fclose(fp);
@@ -1317,7 +1317,7 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 #ifdef WRITE_DEMUL
     printf("saving demul data...\n");
     int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    int UE_NUM = config_->UE_NUM;
+    int ue_num = config_->ue_num;
     LDPCconfig LDPC_config = config_->LDPC_config;
     size_t num_decoded_bytes
         = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
@@ -1329,7 +1329,7 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
             = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
             + i;
         uint8_t* ptr = decoded_buffer_[total_data_subframe_id];
-        fwrite(ptr, UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
+        fwrite(ptr, ue_num * num_decoded_bytes, sizeof(uint8_t), fp);
     }
     fclose(fp);
 #endif
@@ -1341,8 +1341,8 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
     printf("saving ifft data...\n");
     int data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int dl_data_subframe_start = config_->dl_data_symbol_start;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int OFDM_CA_NUM = config_->OFDM_CA_NUM;
+    int bs_ant_num = config_->bs_ant_num;
+    int ofdm_ca_num = config_->ofdm_ca_num;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/ifft_data.bin";
     FILE* fp = fopen(filename.c_str(), "wb");
@@ -1351,10 +1351,10 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
         int total_data_subframe_id
             = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
             + i + dl_data_subframe_start;
-        for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
-            int offset = total_data_subframe_id * BS_ANT_NUM + ant_id;
+        for (int ant_id = 0; ant_id < bs_ant_num; ant_id++) {
+            int offset = total_data_subframe_id * bs_ant_num + ant_id;
             float* ptr = (float*)dl_ifft_buffer_[offset];
-            fwrite(ptr, OFDM_CA_NUM * 2, sizeof(float), fp);
+            fwrite(ptr, ofdm_ca_num * 2, sizeof(float), fp);
         }
     }
     fclose(fp);
@@ -1364,29 +1364,29 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
 void Millipede::getDemulData(int** ptr, int* size)
 {
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int UE_NUM = config_->UE_NUM;
+    size_t ofdm_data_num = config_->ofdm_data_num;
+    int ue_num = config_->ue_num;
     *ptr = (int*)&demod_hard_buffer_[max_equaled_frame
         * ul_data_subframe_num_perframe][0];
-    *size = UE_NUM * OFDM_DATA_NUM;
+    *size = ue_num * ofdm_data_num;
 }
 
 void Millipede::getEqualData(float** ptr, int* size)
 {
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int ofdm_data_num = config_->ofdm_data_num;
+    int ue_num = config_->ue_num;
     // max_equaled_frame = 0;
     *ptr = (float*)&equal_buffer_[max_equaled_frame
         * ul_data_subframe_num_perframe][0];
     // *ptr = equal_output;
-    *size = UE_NUM * OFDM_DATA_NUM * 2;
+    *size = ue_num * ofdm_data_num * 2;
 
     // printf("In getEqualData()\n");
-    // for(int ii = 0; ii < UE_NUM*OFDM_DATA_NUM; ii++)
+    // for(int ii = 0; ii < ue_num*ofdm_data_num; ii++)
     //{
     //    // printf("User %d: %d, ", ii,demul_ptr2(ii));
-    //    printf("[%.4f+j%.4f] ", *(*ptr+ii*UE_NUM*2), *(*ptr+ii*UE_NUM*2+1));
+    //    printf("[%.4f+j%.4f] ", *(*ptr+ii*ue_num*2), *(*ptr+ii*ue_num*2+1));
     //}
     // printf("\n");
     // printf("\n");

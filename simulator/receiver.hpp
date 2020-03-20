@@ -55,7 +55,7 @@
 #define TX_RING_SIZE 8192 * 4
 
 #define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2)
+#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * ofdm_frame_len * 2)
 #define MBUF_CACHE_SIZE 128
 #define BURST_SIZE 16
 
@@ -113,9 +113,9 @@ public:
     void* loopRecv(int tid);
 
 private:
-    size_t BS_ANT_NUM, UE_NUM;
-    size_t OFDM_CA_NUM;
-    size_t OFDM_DATA_NUM;
+    size_t bs_ant_num, ue_num;
+    size_t ofdm_ca_num;
+    size_t ofdm_data_num;
     size_t subframe_num_perframe, data_subframe_num_perframe;
     size_t ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     bool downlink_mode;

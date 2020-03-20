@@ -655,9 +655,9 @@ double Stats::compute_count_percentage(
 
 void Stats::print_summary(UNUSED int last_frame_id)
 {
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int bs_ant_num = config_->bs_ant_num;
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int ofdm_data_num = config_->ofdm_data_num;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int CSI_total_count
@@ -668,7 +668,7 @@ void Stats::print_summary(UNUSED int last_frame_id)
     int Demul_total_count
         = compute_total_count(demul_stats_worker, task_thread_num);
 #if USE_LDPC
-    int UE_NUM = config_->UE_NUM;
+    int ue_num = config_->ue_num;
     int Decode_total_count
         = compute_total_count(decode_stats_worker, task_thread_num);
     int Encode_total_count
@@ -679,19 +679,19 @@ void Stats::print_summary(UNUSED int last_frame_id)
         = compute_total_count(ifft_stats_worker, task_thread_num);
     int Precode_total_count
         = compute_total_count(precode_stats_worker, task_thread_num);
-    double csi_frames = (double)CSI_total_count / BS_ANT_NUM / PILOT_NUM;
-    double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
+    double csi_frames = (double)CSI_total_count / bs_ant_num / PILOT_NUM;
+    double zf_frames = (double)ZF_total_count / ofdm_data_num;
     if (config_->downlink_mode) {
-        double precode_frames = (double)Precode_total_count / OFDM_DATA_NUM
+        double precode_frames = (double)Precode_total_count / ofdm_data_num
             / dl_data_subframe_num_perframe;
-        double ifft_frames = (double)IFFT_total_count / BS_ANT_NUM
+        double ifft_frames = (double)IFFT_total_count / bs_ant_num
             / dl_data_subframe_num_perframe;
         printf("Downlink: total performed ");
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);
         printf("ZF: %d (%.2f frames), ", ZF_total_count, zf_frames);
 #if USE_LDPC
         double encode_frames = (double)Encode_total_count / nblocksInSymbol
-            / UE_NUM / dl_data_subframe_num_perframe;
+            / ue_num / dl_data_subframe_num_perframe;
         printf("Encode: %d (%.2f frames), ", Encode_total_count, encode_frames);
 #endif
         printf(
@@ -725,9 +725,9 @@ void Stats::print_summary(UNUSED int last_frame_id)
             printf("\n");
         }
     } else {
-        double fft_frames = (double)FFT_total_count / BS_ANT_NUM
+        double fft_frames = (double)FFT_total_count / bs_ant_num
             / ul_data_subframe_num_perframe;
-        double demul_frames = (double)Demul_total_count / OFDM_DATA_NUM
+        double demul_frames = (double)Demul_total_count / ofdm_data_num
             / ul_data_subframe_num_perframe;
         printf("Uplink: total performed ");
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);
@@ -736,7 +736,7 @@ void Stats::print_summary(UNUSED int last_frame_id)
         printf("Demul: %d (%.2f frames) ", Demul_total_count, demul_frames);
 #if USE_LDPC
         double decode_frames = (double)Decode_total_count / nblocksInSymbol
-            / UE_NUM / ul_data_subframe_num_perframe;
+            / ue_num / ul_data_subframe_num_perframe;
         printf("Decode: %d (%.2f frames)", Decode_total_count, decode_frames);
 #endif
         printf("\n");

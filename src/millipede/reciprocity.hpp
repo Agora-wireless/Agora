@@ -32,8 +32,8 @@ public:
 
 private:
     // XXX: Can we infer these from Doer::cfg?
-    int BS_ANT_NUM;
-    int OFDM_DATA_NUM;
+    int bs_ant_num;
+    int ofdm_data_num;
 
     Table<complex_float> calib_buffer_;
     Table<complex_float> recip_buffer_;
@@ -44,7 +44,7 @@ private:
     /**
      * Intermediate buffer to gather CSI
      * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
+     * Second dimension: bs_ant_num * ue_num */
     complex_float* calib_gather_buffer;
 };
 

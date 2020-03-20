@@ -93,7 +93,7 @@ private:
     /**
      * Intermediate buffer to gather CSI
      * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
+     * Second dimension: bs_ant_num * ue_num */
     complex_float* csi_gather_buffer;
 };
 

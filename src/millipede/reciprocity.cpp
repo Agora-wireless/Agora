@@ -17,11 +17,11 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
     , RC_task_duration(&in_stats_manager->rc_stats_worker.task_duration)
     , RC_task_count(in_stats_manager->rc_stats_worker.task_count)
 {
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    bs_ant_num = cfg->bs_ant_num;
+    ofdm_data_num = cfg->ofdm_data_num;
 
     calib_gather_buffer = (complex_float*)aligned_alloc(
-        64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
+        64, bs_ant_num * ofdm_data_num * sizeof(complex_float));
 }
 
 Reciprocity::~Reciprocity() { free(calib_gather_buffer); }
@@ -39,22 +39,22 @@ void Reciprocity::launch(int offset)
 #endif
 
     cx_float* ptr_in = (cx_float*)calib_buffer_[offset];
-    cx_fmat mat_input(ptr_in, OFDM_DATA_NUM, BS_ANT_NUM, false);
+    cx_fmat mat_input(ptr_in, ofdm_data_num, bs_ant_num, false);
     cx_fvec vec_calib_ref = mat_input.col(ref_ant);
     cx_float* ptr_out = (cx_float*)calib_gather_buffer;
-    cx_fmat mat_output(ptr_out, BS_ANT_NUM, OFDM_DATA_NUM, false);
+    cx_fmat mat_output(ptr_out, bs_ant_num, ofdm_data_num, false);
     complex_float* recip_buff = recip_buffer_[offset];
 
-    for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
+    for (int ant_id = 0; ant_id < bs_ant_num; ant_id++) {
         cx_fvec vec_calib = mat_input.col(ant_id);
         cx_fvec recipFactor = vec_calib_ref / vec_calib;
         mat_output.row(ant_id) = recipFactor;
-        for (int sc_id = ant_id; sc_id < OFDM_DATA_NUM; sc_id += BS_ANT_NUM) {
+        for (int sc_id = ant_id; sc_id < ofdm_data_num; sc_id += bs_ant_num) {
             // TODO: interpolate here
-            for (int i = 0; i < BS_ANT_NUM; i++) {
-                recip_buff[(sc_id + i) * BS_ANT_NUM + ant_id].re
+            for (int i = 0; i < bs_ant_num; i++) {
+                recip_buff[(sc_id + i) * bs_ant_num + ant_id].re
                     = mat_output.at(ant_id, sc_id).real();
-                recip_buff[(sc_id + i) * BS_ANT_NUM + ant_id].im
+                recip_buff[(sc_id + i) * bs_ant_num + ant_id].im
                     = mat_output.at(ant_id, sc_id).imag();
             }
         }

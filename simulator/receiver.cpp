@@ -16,10 +16,10 @@ Receiver::Receiver(
     socket_ = new int[rx_thread_num];
     tx_core_id_ = core_offset + rx_thread_num;
 
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    bs_ant_num = cfg->bs_ant_num;
+    ue_num = cfg->ue_num;
+    ofdm_ca_num = cfg->ofdm_ca_num;
+    ofdm_data_num = cfg->ofdm_data_num;
     subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;

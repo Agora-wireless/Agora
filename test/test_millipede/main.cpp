@@ -10,13 +10,13 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     int num_bytes_per_ue, Config* cfg)
 {
     int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
-    size_t UE_NUM = cfg->UE_NUM;
+    size_t ue_num = cfg->ue_num;
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    int expect_num_bytes = num_bytes_per_ue * UE_NUM;
+    int expect_num_bytes = num_bytes_per_ue * ue_num;
     // printf("read data of %d byptes\n", expect_num_bytes);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
@@ -39,13 +39,13 @@ void read_from_file_dl(
     std::string filename, Table<float>& data, int ofdm_size, Config* cfg)
 {
     int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
-    size_t BS_ANT_NUM = cfg->BS_ANT_NUM;
+    size_t bs_ant_num = cfg->bs_ant_num;
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    for (size_t i = 0; i < data_symbol_num_perframe * BS_ANT_NUM; i++) {
+    for (size_t i = 0; i < data_symbol_num_perframe * bs_ant_num; i++) {
         if ((unsigned)ofdm_size * 2
             != fread(data[i], sizeof(float), ofdm_size * 2, fp)) {
             printf("read file failed: %s\n", filename.c_str());
@@ -56,26 +56,26 @@ void read_from_file_dl(
 
 void check_correctness_ul(Config* cfg)
 {
-    int BS_ANT_NUM = cfg->BS_ANT_NUM;
-    int UE_NUM = cfg->UE_NUM;
+    int bs_ant_num = cfg->bs_ant_num;
+    int ue_num = cfg->ue_num;
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int ofdm_data_num = cfg->ofdm_data_num;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string raw_data_filename = cur_directory
-        + "/data/LDPC_orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+        + "/data/LDPC_orig_data_2048_ant" + std::to_string(bs_ant_num) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 #else
     std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+        + std::to_string(bs_ant_num) + ".bin";
     std::string output_data_filename = cur_directory + "/data/demul_data.bin";
 #endif
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
-    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
-    output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
+    raw_data.calloc(data_symbol_num_perframe, ofdm_data_num * ue_num, 64);
+    output_data.calloc(data_symbol_num_perframe, ofdm_data_num * ue_num, 64);
 
     int num_bytes_per_ue;
 #ifdef USE_LDPC
@@ -83,7 +83,7 @@ void check_correctness_ul(Config* cfg)
     num_bytes_per_ue
         = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
 #else
-    num_bytes_per_ue = OFDM_DATA_NUM;
+    num_bytes_per_ue = ofdm_data_num;
 #endif
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
@@ -92,17 +92,17 @@ void check_correctness_ul(Config* cfg)
     int total_count = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
 #ifdef USE_LDPC
-        for (int ue = 0; ue < UE_NUM; ue++) {
+        for (int ue = 0; ue < ue_num; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
                 total_count++;
                 int offset_in_raw = num_bytes_per_ue * ue + j;
                 int offset_in_output = num_bytes_per_ue * ue + j;
 #else
         for (int j = 0; j < num_bytes_per_ue; j++) {
-            for (int ue = 0; ue < UE_NUM; ue++) {
+            for (int ue = 0; ue < ue_num; ue++) {
                 total_count++;
                 int offset_in_raw = num_bytes_per_ue * ue + j;
-                int offset_in_output = UE_NUM * j + ue;
+                int offset_in_output = ue_num * j + ue;
 #endif
                 // if (i == 0)
                 //     printf("(%d, %u, %u) ", j, raw_data[i][offset_in_raw],
@@ -129,40 +129,40 @@ void check_correctness_ul(Config* cfg)
 
 void check_correctness_dl(Config* cfg)
 {
-    int BS_ANT_NUM = cfg->BS_ANT_NUM;
+    int bs_ant_num = cfg->bs_ant_num;
     int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
-    int OFDM_CA_NUM = cfg->OFDM_CA_NUM;
+    int ofdm_ca_num = cfg->ofdm_ca_num;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string raw_data_filename = cur_directory
-        + "/data/LDPC_dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM)
+        + "/data/LDPC_dl_ifft_data_2048_ant" + std::to_string(bs_ant_num)
         + ".bin";
 #else
     std::string raw_data_filename = cur_directory
-        + "/data/dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+        + "/data/dl_ifft_data_2048_ant" + std::to_string(bs_ant_num) + ".bin";
 #endif
     std::string ifft_data_filename = cur_directory + "/data/ifft_data.bin";
     Table<float> raw_data;
     Table<float> ifft_data;
-    raw_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, OFDM_CA_NUM * 2, 64);
+    raw_data.calloc(data_symbol_num_perframe * bs_ant_num, ofdm_ca_num * 2, 64);
     ifft_data.calloc(
-        data_symbol_num_perframe * BS_ANT_NUM, OFDM_CA_NUM * 2, 64);
+        data_symbol_num_perframe * bs_ant_num, ofdm_ca_num * 2, 64);
 
-    read_from_file_dl(raw_data_filename, raw_data, OFDM_CA_NUM, cfg);
-    read_from_file_dl(ifft_data_filename, ifft_data, OFDM_CA_NUM, cfg);
+    read_from_file_dl(raw_data_filename, raw_data, ofdm_ca_num, cfg);
+    read_from_file_dl(ifft_data_filename, ifft_data, ofdm_ca_num, cfg);
 
     int error_cnt = 0;
     int total_count = 0;
     float sum_diff = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         if (i != DL_PILOT_SYMS - 1) {
-            for (int ant = 0; ant < BS_ANT_NUM; ant++) {
+            for (int ant = 0; ant < bs_ant_num; ant++) {
                 // printf("symbol %d, antenna %d\n", i, ant);
                 sum_diff = 0;
                 total_count++;
-                for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) {
-                    int offset = BS_ANT_NUM * i + ant;
+                for (int sc = 0; sc < ofdm_ca_num * 2; sc++) {
+                    int offset = bs_ant_num * i + ant;
                     float diff
                         = fabs(raw_data[offset][sc] - ifft_data[offset][sc]);
                     sum_diff += diff;
@@ -174,7 +174,7 @@ void check_correctness_dl(Config* cfg)
                 }
                 printf(
                     "symbol %d, ant %d, total diff %.3f\n", i, ant, sum_diff);
-                if (sum_diff > OFDM_CA_NUM * 10)
+                if (sum_diff > ofdm_ca_num * 10)
                     error_cnt++;
             }
         }

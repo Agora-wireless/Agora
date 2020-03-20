@@ -61,7 +61,7 @@
 #define TX_RING_SIZE 8192 * 4
 
 #define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2)
+#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * ofdm_frame_len * 2)
 #define MBUF_CACHE_SIZE 128
 #define BURST_SIZE 16
 

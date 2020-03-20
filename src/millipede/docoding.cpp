@@ -55,8 +55,8 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     , Encode_task_duration(in_stats_manager->encode_stats_worker.task_duration)
     , Encode_task_count(in_stats_manager->encode_stats_worker.task_count)
 {
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
+    int ofdm_data_num = cfg->ofdm_data_num;
+    alloc_buffer_1d(&encoded_buffer_temp, ofdm_data_num * 16, 32, 1);
     LDPCconfig LDPC_config = cfg->LDPC_config;
     int Zc = LDPC_config.Zc;
     if ((Zc % 15) == 0)
@@ -101,9 +101,9 @@ void DoEncode::launch(int offset)
     LDPCconfig LDPC_config = cfg->LDPC_config;
     int nblocksInSymbol = LDPC_config.nblocksInSymbol;
     int cur_cb_id = offset % nblocksInSymbol;
-    int UE_NUM = cfg->UE_NUM;
-    int ue_id = (offset / nblocksInSymbol) % UE_NUM;
-    int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
+    int ue_num = cfg->ue_num;
+    int ue_id = (offset / nblocksInSymbol) % ue_num;
+    int symbol_offset = offset / (ue_num * LDPC_config.nblocksInSymbol);
     int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     int symbol_id = symbol_offset % data_subframe_num_perframe;
 #if DEBUG_PRINT_IN_TASK
@@ -116,7 +116,7 @@ void DoEncode::launch(int offset)
     double start_time = get_time();
 #endif
 
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int ofdm_data_num = cfg->ofdm_data_num;
     int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
     int input_offset
         = cbLenBytes * nblocksInSymbol * ue_id + cbLenBytes * cur_cb_id;
@@ -140,7 +140,7 @@ void DoEncode::launch(int offset)
     ldpc_adapter_func(
         output_ptr, internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
     int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
-    int output_offset = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
+    int output_offset = ofdm_data_num * ue_id + cbCodedBytes * cur_cb_id;
     int8_t* final_output_ptr
         = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
     adapt_bits_for_mod(output_ptr, final_output_ptr,
@@ -213,9 +213,9 @@ void DoDecode::launch(int offset)
     LDPCconfig LDPC_config = cfg->LDPC_config;
     int nblocksInSymbol = LDPC_config.nblocksInSymbol;
     int cur_cb_id = offset % nblocksInSymbol;
-    int UE_NUM = cfg->UE_NUM;
-    int ue_id = (offset / nblocksInSymbol) % UE_NUM;
-    int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
+    int ue_num = cfg->ue_num;
+    int ue_id = (offset / nblocksInSymbol) % ue_num;
+    int symbol_offset = offset / (ue_num * LDPC_config.nblocksInSymbol);
     int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
     int symbol_id = symbol_offset % data_subframe_num_perframe;
 #if DEBUG_PRINT_IN_TASK
@@ -228,9 +228,9 @@ void DoDecode::launch(int offset)
     double start_time = get_time();
 #endif
 
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int ofdm_data_num = cfg->ofdm_data_num;
     int input_offset
-        = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+        = ofdm_data_num * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
     int llr_buffer_offset = input_offset * cfg->mod_type;
     ldpc_decoder_5gnr_request.varNodes
         = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;

@@ -22,8 +22,8 @@ DoZF::DoZF(Config* in_config, int in_tid,
 {
     ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
-    alloc_buffer_1d(&pred_csi_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
-    alloc_buffer_1d(&csi_gather_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
+    alloc_buffer_1d(&pred_csi_buffer, cfg->bs_ant_num * cfg->ue_num, 64, 0);
+    alloc_buffer_1d(&csi_gather_buffer, cfg->bs_ant_num * cfg->ue_num, 64, 0);
 }
 
 DoZF::~DoZF()
@@ -54,18 +54,18 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
     auto& mat_input = *(cx_fmat*)mat_input_ptr;
 
     cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
-    cx_fmat mat_ul_precoder(ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+    cx_fmat mat_ul_precoder(ptr_ul_out, cfg->ue_num, cfg->bs_ant_num, false);
     pinv(mat_ul_precoder, mat_input, 1e-1, "dc");
 
     if (downlink_mode) {
         cx_float* ptr_dl_out = (cx_float*)dl_precoder_buffer_[offset];
         cx_fmat mat_dl_precoder(
-            ptr_dl_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            ptr_dl_out, cfg->ue_num, cfg->bs_ant_num, false);
         if (cfg->recipCalEn) {
             auto* calib = (cx_float*)(&recip_buffer_[frame_id]
-                                                    [sc_id * cfg->BS_ANT_NUM]);
-            cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
-            cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
+                                                    [sc_id * cfg->bs_ant_num]);
+            cx_fvec vec_calib(calib, cfg->bs_ant_num, false);
+            cx_fmat mat_calib(cfg->bs_ant_num, cfg->bs_ant_num);
             mat_calib = diagmat(vec_calib);
             mat_dl_precoder = inv(mat_calib) * mat_ul_precoder;
         } else
@@ -83,8 +83,8 @@ void DoZF::ZF_time_orthogonal(int offset)
         "In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
 #endif
 
-    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
-    int max_sc_ite = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - sc_id);
+    int offset_in_buffer = frame_id * cfg->ofdm_data_num + sc_id;
+    int max_sc_ite = std::min(cfg->zf_block_size, cfg->ofdm_data_num - sc_id);
 
     for (int i = 0; i < max_sc_ite; i++) {
 
@@ -101,13 +101,13 @@ void DoZF::ZF_time_orthogonal(int offset)
         int transpose_block_id = cur_sc_id / transpose_block_size;
         int sc_inblock_idx = cur_sc_id % transpose_block_size;
         int offset_in_csi_buffer
-            = transpose_block_id * cfg->BS_ANT_NUM * transpose_block_size
+            = transpose_block_id * cfg->bs_ant_num * transpose_block_size
             + sc_inblock_idx;
-        int subframe_offset = frame_id * cfg->UE_NUM;
+        int subframe_offset = frame_id * cfg->ue_num;
         float* tar_csi_ptr = (float*)csi_gather_buffer;
 
         // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid,
-        // frame_id, sc_id); int mat_elem = UE_NUM * BS_ANT_NUM; int
+        // frame_id, sc_id); int mat_elem = ue_num * bs_ant_num; int
         // cache_line_num = mat_elem / 8; for (int line_idx = 0; line_idx <
         // cache_line_num; line_idx ++) {
         //     _mm_prefetch((char *)precoder_buffer_.precoder[cur_offset + 8 *
@@ -117,10 +117,10 @@ void DoZF::ZF_time_orthogonal(int offset)
         // }
 
         /* gather csi matrix of all users and antennas */
-        for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+        for (size_t ue_idx = 0; ue_idx < cfg->ue_num; ue_idx++) {
             float* src_csi_ptr = (float*)csi_buffer_[subframe_offset + ue_idx]
                 + offset_in_csi_buffer * 2;
-            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+            for (size_t ant_idx = 0; ant_idx < cfg->bs_ant_num; ant_idx += 4) {
                 /* fetch 4 complex floats for 4 ants */
                 __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
                 _mm256_store_ps(tar_csi_ptr, t_csi);
@@ -140,7 +140,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         (*ZF_task_duration)[tid * 8][1] += duration1;
 #endif
         cx_float* ptr_in = (cx_float*)csi_gather_buffer;
-        cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        cx_fmat mat_input(ptr_in, cfg->bs_ant_num, cfg->ue_num, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
         precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
@@ -157,7 +157,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         double duration3 = get_time() - start_time2;
         (*ZF_task_duration)[tid * 8][3] += duration3;
 #endif
-        // // int mat_elem = UE_NUM * BS_ANT_NUM;
+        // // int mat_elem = ue_num * bs_ant_num;
         // // int cache_line_num = mat_elem / 8;
         // for (int line_idx = 0; line_idx < cache_line_num; line_idx++) {
         //     _mm256_stream_ps(tar_ptr, _mm256_load_ps(src_ptr));
@@ -183,15 +183,15 @@ void DoZF::ZF_freq_orthogonal(int offset)
     int sc_id = offset % cfg->zf_block_num * cfg->zf_block_size;
 #if DEBUG_PRINT_IN_TASK
     printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %d\n", tid,
-        frame_id, sc_id, sc_id / UE_NUM);
+        frame_id, sc_id, sc_id / ue_num);
 #endif
-    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
+    int offset_in_buffer = frame_id * cfg->ofdm_data_num + sc_id;
 
 #if DEBUG_UPDATE_STATS
     double start_time1 = get_time();
 #endif
 
-    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+    for (size_t i = 0; i < cfg->ue_num; i++) {
         int cur_sc_id = sc_id + i;
         __m256i index = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
             cfg->transpose_block_size * 2 + 1, cfg->transpose_block_size * 4,
@@ -201,15 +201,15 @@ void DoZF::ZF_freq_orthogonal(int offset)
         int transpose_block_id = cur_sc_id / cfg->transpose_block_size;
         int sc_inblock_idx = cur_sc_id % cfg->transpose_block_size;
         int offset_in_csi_buffer
-            = transpose_block_id * cfg->BS_ANT_NUM * cfg->transpose_block_size
+            = transpose_block_id * cfg->bs_ant_num * cfg->transpose_block_size
             + sc_inblock_idx;
         int subframe_offset = frame_id;
-        auto* tar_csi_ptr = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
+        auto* tar_csi_ptr = (float*)csi_gather_buffer + cfg->bs_ant_num * i * 2;
 
         auto* src_csi_ptr
             = (float*)csi_buffer_[subframe_offset] + offset_in_csi_buffer * 2;
 
-        for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+        for (size_t ant_idx = 0; ant_idx < cfg->bs_ant_num; ant_idx += 4) {
             // fetch 4 complex floats for 4 ants
             __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
             _mm256_store_ps(tar_csi_ptr, t_csi);
@@ -228,7 +228,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     (*ZF_task_duration)[tid * 8][1] += duration1;
 #endif
     cx_float* ptr_in = (cx_float*)csi_gather_buffer;
-    cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    cx_fmat mat_input(ptr_in, cfg->bs_ant_num, cfg->ue_num, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
     precoder(&mat_input, frame_id, sc_id, offset_in_buffer,
@@ -263,14 +263,14 @@ void DoZF::Predict(int offset)
 
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
-    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
+    int offset_in_buffer = frame_id * cfg->ofdm_data_num + sc_id;
     auto* ptr_in = (cx_float*)pred_csi_buffer;
 
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
-    cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        sizeof(cx_float) * cfg->bs_ant_num * cfg->ue_num);
+    cx_fmat mat_input(ptr_in, cfg->bs_ant_num, cfg->ue_num, false);
     int offset_next_frame
-        = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM + sc_id;
+        = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->ofdm_data_num + sc_id;
     precoder(&mat_input, frame_id, sc_id, offset_next_frame,
         cfg->dl_data_symbol_num_perframe > 0);
 

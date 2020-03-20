@@ -80,9 +80,9 @@ public:
     void free_uplink_buffers();
 
 private:
-    size_t BS_ANT_NUM, UE_NUM;
-    size_t OFDM_CA_NUM;
-    size_t OFDM_DATA_NUM;
+    size_t bs_ant_num, ue_num;
+    size_t ofdm_ca_num;
+    size_t ofdm_data_num;
     size_t subframe_num_perframe, data_subframe_num_perframe;
     size_t ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
     size_t dl_data_subframe_start, dl_data_subframe_end;
@@ -112,9 +112,9 @@ private:
      * received data
      * Frist dimension: SOCKET_THREAD_NUM
      * Second dimension of buffer (type: char): packet_length *
-     * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * subframe_num_perframe * bs_ant_num * SOCKET_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * ofdm_frame_len * 2;
+     * Second dimension of buffer_status: subframe_num_perframe * bs_ant_num *
      * SOCKET_BUFFER_FRAME_NUM
      */
 
@@ -125,7 +125,7 @@ private:
 
     /* Uplink status checkers used by master thread */
     /* used to check if RX for all antennas and all subframes in a frame is done
-     * (max: BS_ANT_NUM * subframe_num_perframe) */
+     * (max: bs_ant_num * subframe_num_perframe) */
     size_t* rx_counter_packets_;
 
     /*****************************************************

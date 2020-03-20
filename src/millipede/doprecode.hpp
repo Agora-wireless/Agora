@@ -69,7 +69,7 @@ private:
     /**
      * Modulated data
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
+     * second dimension: ue_num * ofdm_ca_num
      */
 
     Table<complex_float>& precoder_buffer_;
@@ -78,7 +78,7 @@ private:
      * Precoded data
      * First dimension: total subframe number in the buffer:
      * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
-     * BS_ANT_NUM * OFDM_CA_NUM
+     * bs_ant_num * ofdm_ca_num
      */
 
     Table<complex_float>& dl_ifft_buffer_;

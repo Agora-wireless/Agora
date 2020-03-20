@@ -23,13 +23,13 @@ DoDemul::DoDemul(Config* in_config, int in_tid,
 {
     Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
 
-    alloc_buffer_1d(&spm_buffer, 8 * cfg->BS_ANT_NUM, 64, 0);
+    alloc_buffer_1d(&spm_buffer, 8 * cfg->bs_ant_num, 64, 0);
     alloc_buffer_1d(
-        &equaled_buffer_temp, cfg->demul_block_size * cfg->UE_NUM, 64, 0);
+        &equaled_buffer_temp, cfg->demul_block_size * cfg->ue_num, 64, 0);
     alloc_buffer_1d(&equaled_buffer_temp_transposed,
-        cfg->demul_block_size * cfg->UE_NUM, 64, 0);
+        cfg->demul_block_size * cfg->ue_num, 64, 0);
 
-    ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
+    ue_num_simd256 = cfg->ue_num / double_num_in_simd256;
 }
 
 DoDemul::~DoDemul()
@@ -63,11 +63,11 @@ void DoDemul::launch(int offset)
         cfg->transpose_block_size * 4 + 1, cfg->transpose_block_size * 6,
         cfg->transpose_block_size * 6 + 1);
 
-    // int mat_elem = UE_NUM * BS_ANT_NUM;
+    // int mat_elem = ue_num * bs_ant_num;
     // int cache_line_num = mat_elem / 8;
-    // int ue_data_cache_line_num = UE_NUM/8;
+    // int ue_data_cache_line_num = ue_num/8;
     size_t max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - sc_id);
+        = std::min(cfg->demul_block_size, cfg->ofdm_data_num - sc_id);
     /* iterate through cache lines (each cache line has 8 subcarriers) */
     for (size_t i = 0; i < max_sc_ite / 8; i++) {
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -75,7 +75,7 @@ void DoDemul::launch(int offset)
 #endif
         // for (int j = 0; j < 1; j++) {
         //     int cur_sc_id = i * 8 + j + sc_id;
-        //     int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
+        //     int precoder_offset = frame_id * ofdm_data_num + cur_sc_id;
         //     cx_float* precoder_ptr = (cx_float
         //     *)precoder_buffer_[precoder_offset]; for (int line_idx = 0;
         //     line_idx < cache_line_num; line_idx ++) {
@@ -89,18 +89,18 @@ void DoDemul::launch(int offset)
         int cur_block_id = (sc_id + i * 8) / cfg->transpose_block_size;
         int sc_inblock_idx = (sc_id + i * 8) % cfg->transpose_block_size;
         int cur_sc_offset
-            = cur_block_id * cfg->transpose_block_size * cfg->BS_ANT_NUM
+            = cur_block_id * cfg->transpose_block_size * cfg->bs_ant_num
             + sc_inblock_idx;
         auto* src_data_ptr
             = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
         float* tar_data_ptr = (float*)spm_buffer;
 
-        for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+        for (size_t ant_idx = 0; ant_idx < cfg->bs_ant_num; ant_idx += 4) {
             for (size_t j = 0; j < 8; j++) {
                 __m256 data_rx
                     = _mm256_i32gather_ps(src_data_ptr + j * 2, index, 4);
                 _mm256_store_ps(
-                    tar_data_ptr + j * cfg->BS_ANT_NUM * 2, data_rx);
+                    tar_data_ptr + j * cfg->bs_ant_num * 2, data_rx);
             }
             src_data_ptr += gather_step_size;
             tar_data_ptr += 8;
@@ -114,18 +114,18 @@ void DoDemul::launch(int offset)
         /* computation for 8 subcarriers */
         for (size_t j = 0; j < 8; j++) {
             /* create input data matrix */
-            auto* data_ptr = (cx_float*)(spm_buffer + j * cfg->BS_ANT_NUM);
-            cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+            auto* data_ptr = (cx_float*)(spm_buffer + j * cfg->bs_ant_num);
+            cx_fmat mat_data(data_ptr, cfg->bs_ant_num, 1, false);
 
             /* create input precoder matrix */
             int cur_sc_id = i * 8 + j + sc_id;
-            int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
+            int precoder_offset = frame_id * cfg->ofdm_data_num + cur_sc_id;
             if (cfg->freq_orthogonal_pilot)
-                precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
+                precoder_offset = precoder_offset - cur_sc_id % cfg->ue_num;
 
             auto* precoder_ptr = (cx_float*)precoder_buffer_[precoder_offset];
             cx_fmat mat_precoder(
-                precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+                precoder_ptr, cfg->ue_num, cfg->bs_ant_num, false);
 
             // cout<<"Precoder: "<< mat_precoder<<endl;
             // cout << "Raw data: " << mat_data.st() <<endl;
@@ -133,14 +133,14 @@ void DoDemul::launch(int offset)
 #if EXPORT_CONSTELLATION
             auto* equal_ptr
                 = (cx_float*)(&equal_buffer_[total_data_subframe_id]
-                                            [cur_sc_id * cfg->UE_NUM]);
+                                            [cur_sc_id * cfg->ue_num]);
 #else
             auto* equal_ptr
                 = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - sc_id)
-                    * cfg->UE_NUM]);
+                    * cfg->ue_num]);
 #endif
             /* create output matrix for equalization */
-            cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+            cx_fmat mat_equaled(equal_ptr, cfg->ue_num, 1, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
             double start_time2 = get_time();
@@ -158,10 +158,10 @@ void DoDemul::launch(int offset)
 #ifndef USE_LDPC
             /* decode with hard decision */
             uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_subframe_id]
-                                                     [cur_sc_id * cfg->UE_NUM]);
-            demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, cfg->UE_NUM);
+                                                     [cur_sc_id * cfg->ue_num]);
+            demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, cfg->ue_num);
             // cout<< "Demuled data:";
-            // for (int ue_idx = 0; ue_idx < UE_NUM; ue_idx++)
+            // for (int ue_idx = 0; ue_idx < ue_num; ue_idx++)
             //     cout<<+*(demul_ptr+ue_idx)<<" ";
             // cout<<endl;
             // cout<<endl;
@@ -179,20 +179,20 @@ void DoDemul::launch(int offset)
     }
 
 #ifdef USE_LDPC
-    __m256i index2 = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1,
-        UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
+    __m256i index2 = _mm256_setr_epi32(0, 1, ue_num * 2, ue_num * 2 + 1,
+        ue_num * 4, ue_num * 4 + 1, ue_num * 6, ue_num * 6 + 1);
     auto* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
 
-    for (int i = 0; i < UE_NUM; i++) {
+    for (int i = 0; i < ue_num; i++) {
         auto* equal_ptr = (float*)(equaled_buffer_temp + i);
         int8_t* demul_ptr = (&demod_soft_buffer_[total_data_subframe_id]
-                                                [(OFDM_DATA_NUM * i + sc_id)
+                                                [(ofdm_data_num * i + sc_id)
                                                     * cfg->mod_type]);
         for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) {
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_T_ptr, equal_T_temp);
             equal_T_ptr += 8;
-            equal_ptr += UE_NUM * double_num_in_simd256 * 2;
+            equal_ptr += ue_num * double_num_in_simd256 * 2;
         }
         int num_sc_avx2 = (max_sc_ite / 16) * 16;
         int rest = max_sc_ite % 16;
@@ -238,7 +238,7 @@ void DoDemul::DemulSingleSC(int offset)
     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n",
         tid, frame_id, current_data_subframe_id, sc_id);
 #endif
-    // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM +
+    // int subframe_offset = subframe_num_perframe * frame_id + ue_num +
     // current_data_subframe_id;
 
     int gather_step_size = 8 * cfg->transpose_block_size;
@@ -251,54 +251,54 @@ void DoDemul::DemulSingleSC(int offset)
     int cur_block_id = sc_id / cfg->transpose_block_size;
     int sc_inblock_idx = sc_id % cfg->transpose_block_size;
     int cur_sc_offset
-        = cur_block_id * cfg->transpose_block_size * cfg->BS_ANT_NUM
+        = cur_block_id * cfg->transpose_block_size * cfg->bs_ant_num
         + sc_inblock_idx;
 
     auto* tar_data_ptr = (float*)spm_buffer;
     auto* src_data_ptr
         = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
 
-    for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+    for (size_t ant_idx = 0; ant_idx < cfg->bs_ant_num; ant_idx += 4) {
         __m256 data_rx = _mm256_i32gather_ps(src_data_ptr, index, 4);
         _mm256_store_ps(tar_data_ptr, data_rx);
         src_data_ptr += gather_step_size;
         tar_data_ptr += 8;
     }
 
-    // mat_data size: BS_ANT_NUM \times 1
+    // mat_data size: bs_ant_num \times 1
     cx_float* data_ptr = (cx_float*)(spm_buffer);
-    cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+    cx_fmat mat_data(data_ptr, cfg->bs_ant_num, 1, false);
     // cout<< "Raw data: " << mat_data.st()<<endl;
 
-    // mat_precoder size: UE_NUM \times BS_ANT_NUM
-    int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + sc_id;
+    // mat_precoder size: ue_num \times bs_ant_num
+    int precoder_offset = frame_id * cfg->ofdm_data_num + sc_id;
     cx_float* precoder_ptr = (cx_float*)precoder_buffer_[precoder_offset];
 
-    cx_fmat mat_precoder(precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+    cx_fmat mat_precoder(precoder_ptr, cfg->ue_num, cfg->bs_ant_num, false);
     // cout<<"Precoder: "<< mat_precoder<<endl;
 
-    // mat_demuled size: UE_NUM \times 1
+    // mat_demuled size: ue_num \times 1
     auto* equal_ptr = (cx_float*)(&equal_buffer_[total_data_subframe_id]
-                                                [sc_id * cfg->UE_NUM]);
-    cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+                                                [sc_id * cfg->ue_num]);
+    cx_fmat mat_equaled(equal_ptr, cfg->ue_num, 1, false);
 
     // Demodulation
     // sword* demul_ptr = (sword
-    // *)(&demod_hard_buffer_.data[total_data_subframe_id][sc_id * UE_NUM]);
-    // imat mat_demuled(demul_ptr, UE_NUM, 1, false);
+    // *)(&demod_hard_buffer_.data[total_data_subframe_id][sc_id * ue_num]);
+    // imat mat_demuled(demul_ptr, ue_num, 1, false);
     uint8_t* demul_ptr
-        = (&demod_hard_buffer_[total_data_subframe_id][sc_id * cfg->UE_NUM]);
+        = (&demod_hard_buffer_[total_data_subframe_id][sc_id * cfg->ue_num]);
 
     // Equalization
     mat_equaled = mat_precoder * mat_data;
     // cout << "Equaled data: "<<mat_equaled.st()<<endl;
 
     // Hard decision
-    demod_16qam_hard_loop((float*)equal_ptr, demul_ptr, cfg->UE_NUM);
+    demod_16qam_hard_loop((float*)equal_ptr, demul_ptr, cfg->ue_num);
     printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n",
         tid, frame_id, current_data_subframe_id, sc_id);
     cout << "Demuled data: ";
-    for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+    for (size_t ue_idx = 0; ue_idx < cfg->ue_num; ue_idx++) {
         cout << *(demul_ptr + ue_idx) << "  ";
     }
     cout << endl;

@@ -350,12 +350,12 @@ bool RadioConfig::radioStart()
             } else {
                 std::vector<std::complex<float>> recipCalDlPilot;
                 recipCalDlPilot = CommsLib::composeRefSymbol(
-                    _cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
+                    _cfg->pilotsF, 2 * i, this->_radioNum, _cfg->ofdm_ca_num);
                 baStn[i]->writeRegisters("TX_RAM_A", 0,
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
                     recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
-                        2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
+                        2 * i + 1, this->_radioNum, _cfg->ofdm_ca_num);
                     baStn[i]->writeRegisters("TX_RAM_B", 0,
                         Utils::cfloat32_to_uint32(
                             recipCalDlPilot, false, "QI"));

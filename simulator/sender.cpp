@@ -42,7 +42,7 @@ Sender::Sender(
     size_t max_subframe_id = cfg->downlink_mode ? cfg->pilot_symbol_num_perframe
                                                 : cfg->symbol_num_perframe;
 
-    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->bs_ant_num;
 
     packet_count_per_subframe.calloc(BUFFER_FRAME_NUM, max_subframe_id, 64);
     alloc_buffer_1d(&packet_count_per_frame, BUFFER_FRAME_NUM, 64, 1);
@@ -70,19 +70,19 @@ Sender::Sender(
 #endif
     }
 
-    size_t IQ_data_size = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
-    IQ_data.calloc(IQ_data_size, cfg->OFDM_FRAME_LEN * 2, 64);
-    IQ_data_coded.calloc(IQ_data_size, cfg->OFDM_FRAME_LEN * 2, 64);
+    size_t IQ_data_size = cfg->symbol_num_perframe * cfg->bs_ant_num;
+    IQ_data.calloc(IQ_data_size, cfg->ofdm_frame_len * 2, 64);
+    IQ_data_coded.calloc(IQ_data_size, cfg->ofdm_frame_len * 2, 64);
     trans_buffer_.calloc(max_length_, buffer_length, 64);
 
     /* read from file */
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
-        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
+        + std::to_string(cfg->bs_ant_num) + ".bin";
 #else
     std::string filename = cur_directory + "/data/rx_data_2048_ant"
-        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
+        + std::to_string(cfg->bs_ant_num) + ".bin";
 #endif
 
     FILE* fp = fopen(filename.c_str(), "rb");
@@ -91,8 +91,8 @@ Sender::Sender(
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
 
-    for (size_t i = 0; i < cfg->symbol_num_perframe * cfg->BS_ANT_NUM; i++) {
-        size_t expect_num_bytes = cfg->OFDM_FRAME_LEN * 2;
+    for (size_t i = 0; i < cfg->symbol_num_perframe * cfg->bs_ant_num; i++) {
+        size_t expect_num_bytes = cfg->ofdm_frame_len * 2;
         size_t actual_bytes
             = fread(IQ_data[i], sizeof(float), expect_num_bytes, fp);
 
@@ -103,7 +103,7 @@ Sender::Sender(
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
 
-        for (size_t j = 0; j < cfg->OFDM_FRAME_LEN * 2; j++) {
+        for (size_t j = 0; j < cfg->ofdm_frame_len * 2; j++) {
             IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 32768);
             // printf("i:%d, j:%d, Coded: %d, orignal:
             // %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
@@ -162,12 +162,12 @@ void Sender::startTX()
         ? cfg->pilot_symbol_num_perframe
         : cfg->pilot_symbol_num_perframe + cfg->data_symbol_num_perframe;
 
-    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->bs_ant_num;
     size_t cell_id = 0;
 
     for (size_t i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
-        size_t data_index = subframe_id * cfg->BS_ANT_NUM + ant_id;
+        size_t data_index = subframe_id * cfg->bs_ant_num + ant_id;
         auto* pkt = (struct Packet*)(trans_buffer_[cur_ptr_] + tx_buf_offset);
 
         pkt->frame_id = frame_id;
@@ -177,10 +177,10 @@ void Sender::startTX()
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-            sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
+            sizeof(ushort) * cfg->ofdm_frame_len * 2);
 
         ant_id++;
-        if (ant_id == cfg->BS_ANT_NUM) {
+        if (ant_id == cfg->bs_ant_num) {
             ant_id = 0;
             subframe_id++;
             if (subframe_id == max_subframe_id) {
@@ -203,7 +203,7 @@ void Sender::startTX()
     uint64_t ticks_all = (uint64_t)delay * CPU_FREQ / 1e6 / 70;
 
     // Push tasks of the first subframe into task queue
-    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+    for (size_t i = 0; i < cfg->bs_ant_num; i++) {
         size_t ptok_id = i % thread_num;
         if (!task_queue_.enqueue(*task_ptok[ptok_id], i)) {
             printf("send task enqueue failed\n");
@@ -221,8 +221,8 @@ void Sender::startTX()
         if (!ret)
             continue;
 
-        size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
-        size_t data_index = subframe_id * cfg->BS_ANT_NUM + tx_ant_id;
+        size_t tx_ant_id = data_ptr % cfg->bs_ant_num;
+        size_t data_index = subframe_id * cfg->bs_ant_num + tx_ant_id;
         auto pkt = (struct Packet*)(trans_buffer_[data_ptr] + tx_buf_offset);
 
         pkt->frame_id = frame_id;
@@ -233,9 +233,9 @@ void Sender::startTX()
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-            sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
+            sizeof(ushort) * cfg->ofdm_frame_len * 2);
 
-        size_t tx_total_subframe_id = data_ptr / cfg->BS_ANT_NUM;
+        size_t tx_total_subframe_id = data_ptr / cfg->bs_ant_num;
         size_t tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
         size_t tx_frame_id = tx_total_subframe_id / max_subframe_id;
         packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]++;
@@ -247,7 +247,7 @@ void Sender::startTX()
         //   tx_ant_id, max_subframe_id);
 
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]
-            == cfg->BS_ANT_NUM) {
+            == cfg->bs_ant_num) {
             packet_count_per_frame[tx_frame_id]++;
             // double cur_time = get_time();
             // printf("Finished transmit all antennas in frame: %d, subframe:
@@ -300,8 +300,8 @@ void Sender::startTX()
             }
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
             size_t next_subframe_ptr
-                = ((tx_total_subframe_id + 1) * cfg->BS_ANT_NUM) % max_length_;
-            for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+                = ((tx_total_subframe_id + 1) * cfg->bs_ant_num) % max_length_;
+            for (size_t i = 0; i < cfg->bs_ant_num; i++) {
                 size_t ptok_id = i % thread_num;
                 if (!task_queue_.enqueue(
                         *task_ptok[ptok_id], i + next_subframe_ptr)) {
@@ -312,7 +312,7 @@ void Sender::startTX()
         }
 
         ant_id++;
-        if (ant_id == cfg->BS_ANT_NUM) {
+        if (ant_id == cfg->bs_ant_num) {
             ant_id = 0;
             subframe_id++;
             if (subframe_id == max_subframe_id) {
@@ -396,7 +396,7 @@ void* Sender::loopSend_main(int)
     size_t max_subframe_id = cfg->downlink_mode
         ? cfg->pilot_symbol_num_perframe
         : cfg->pilot_symbol_num_perframe + cfg->data_symbol_num_perframe;
-    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->bs_ant_num;
 
     // double frame_start[10240] __attribute__( ( aligned (4096) ) );
     // double frame_end[10240] __attribute__( ( aligned (4096) ) ) ;
@@ -405,7 +405,7 @@ void* Sender::loopSend_main(int)
     size_t cell_id = 0;
     for (size_t i = 0; i < max_length_; i++) {
         cur_ptr_ = i;
-        size_t data_index = subframe_id * cfg->BS_ANT_NUM + ant_id;
+        size_t data_index = subframe_id * cfg->bs_ant_num + ant_id;
         auto* pkt = (struct Packet*)(trans_buffer_[cur_ptr_] + tx_buf_offset);
 
         pkt->frame_id = frame_id;
@@ -415,10 +415,10 @@ void* Sender::loopSend_main(int)
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-            sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
+            sizeof(ushort) * cfg->ofdm_frame_len * 2);
 
         ant_id++;
-        if (ant_id == cfg->BS_ANT_NUM) {
+        if (ant_id == cfg->bs_ant_num) {
             ant_id = 0;
             subframe_id++;
             if (subframe_id == max_subframe_id) {
@@ -439,7 +439,7 @@ void* Sender::loopSend_main(int)
     uint64_t ticks_all = (uint64_t)delay * CPU_FREQ / 1e6 / 70;
 
     // push tasks of the first subframe into task queue
-    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+    for (size_t i = 0; i < cfg->bs_ant_num; i++) {
         size_t ptok_id = i % thread_num;
         if (!task_queue_.enqueue(*task_ptok[ptok_id], i)) {
             printf("send task enqueue failed\n");
@@ -457,8 +457,8 @@ void* Sender::loopSend_main(int)
         ret = message_queue_.try_dequeue(data_ptr);
         if (!ret)
             continue;
-        size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
-        size_t data_index = subframe_id * cfg->BS_ANT_NUM + tx_ant_id;
+        size_t tx_ant_id = data_ptr % cfg->bs_ant_num;
+        size_t data_index = subframe_id * cfg->bs_ant_num + tx_ant_id;
         auto* pkt = (struct Packet*)(trans_buffer_[data_ptr] + tx_buf_offset);
 
         pkt->frame_id = frame_id;
@@ -468,9 +468,9 @@ void* Sender::loopSend_main(int)
         pkt->cell_id = cell_id;
         pkt->ant_id = ant_id;
         memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-            sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
+            sizeof(ushort) * cfg->ofdm_frame_len * 2);
 
-        size_t tx_total_subframe_id = data_ptr / cfg->BS_ANT_NUM;
+        size_t tx_total_subframe_id = data_ptr / cfg->bs_ant_num;
         size_t tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
         size_t tx_frame_id = tx_total_subframe_id / max_subframe_id;
         packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]++;
@@ -481,7 +481,7 @@ void* Sender::loopSend_main(int)
         //   tx_frame_id, tx_total_subframe_id, tx_current_subframe_id,
         //   tx_ant_id, max_subframe_id);
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]
-            == cfg->BS_ANT_NUM) {
+            == cfg->bs_ant_num) {
             packet_count_per_frame[tx_frame_id]++;
             // double cur_time = get_time();
             // printf("Finished transmit all antennas in frame: %d, subframe:
@@ -536,8 +536,8 @@ void* Sender::loopSend_main(int)
             }
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
             size_t next_subframe_ptr
-                = ((tx_total_subframe_id + 1) * cfg->BS_ANT_NUM) % max_length_;
-            for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+                = ((tx_total_subframe_id + 1) * cfg->bs_ant_num) % max_length_;
+            for (size_t i = 0; i < cfg->bs_ant_num; i++) {
                 size_t ptok_id = i % thread_num;
                 if (!task_queue_.enqueue(
                         *task_ptok[ptok_id], i + next_subframe_ptr)) {
@@ -548,7 +548,7 @@ void* Sender::loopSend_main(int)
         }
 
         ant_id++;
-        if (ant_id == cfg->BS_ANT_NUM) {
+        if (ant_id == cfg->bs_ant_num) {
             ant_id = 0;
             subframe_id++;
             if (subframe_id == max_subframe_id) {
@@ -603,16 +603,16 @@ void* Sender::loopSend(int tid)
     int ret;
 
     printf("Max_subframe_id: %zu\n", max_subframe_id);
-    size_t ant_num_this_thread = cfg->BS_ANT_NUM / thread_num
-        + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
+    size_t ant_num_this_thread = cfg->bs_ant_num / thread_num
+        + ((size_t)tid < cfg->bs_ant_num % thread_num ? 1 : 0);
 #if DEBUG_SENDER
     double start_time_send = get_time();
     double end_time_send = get_time();
     double end_time_prev = get_time();
 #endif
 
-    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, thread number: %zu\n",
-        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
+    printf("In thread %zu, %zu antennas, bs_ant_num: %zu, thread number: %zu\n",
+        (size_t)tid, ant_num_this_thread, cfg->bs_ant_num, thread_num);
 
     while (true) {
         size_t data_ptr;
@@ -670,7 +670,7 @@ void* Sender::loopSend(int tid)
             total_tx_packets = 0;
         if (packet_count == ant_num_this_thread * max_subframe_id * 1000) {
             double end = get_time();
-            // double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 *
+            // double byte_len = sizeof(ushort) * ofdm_frame_len * 2 *
             // ant_num_this_thread * max_subframe_id * 1000;
             double byte_len = buffer_length * ant_num_this_thread
                 * max_subframe_id * 1000.f;

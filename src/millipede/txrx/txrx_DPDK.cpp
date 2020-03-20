@@ -30,10 +30,10 @@ PacketTXRX::PacketTXRX(
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + RX_THREAD_NUM;
 
-    BS_ANT_NUM = config_->BS_ANT_NUM;
-    UE_NUM = config_->UE_NUM;
-    OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    bs_ant_num = config_->bs_ant_num;
+    ue_num = config_->ue_num;
+    ofdm_ca_num = config_->ofdm_ca_num;
+    ofdm_data_num = config_->ofdm_data_num;
     subframe_num_perframe = config_->symbol_num_perframe;
     data_subframe_num_perframe = config_->data_symbol_num_perframe;
     ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
@@ -386,10 +386,10 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
         = obj_ptr->message_queue_;
     Config* config_ = obj_ptr->config_;
     int core_id = config_->core_id_;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
-    int OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    int bs_ant_num = config_->bs_ant_num;
+    int ue_num = config_->ue_num;
+    int ofdm_ca_num = config_->ofdm_ca_num;
+    int ofdm_data_num = config_->ofdm_data_num;
     int subframe_num_perframe = config_->subframe_num_perframe;
     int data_subframe_num_perframe = config_->data_subframe_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
@@ -433,7 +433,7 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     auto begin = std::chrono::system_clock::now();
 
     int ret = 0;
-    int max_subframe_id = downlink_mode ? UE_NUM : subframe_num_perframe;
+    int max_subframe_id = downlink_mode ? ue_num : subframe_num_perframe;
     int prev_frame_id = -1;
     int packet_num_per_frame = 0;
     double start_time = get_time();
@@ -567,10 +567,10 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
             packet_num++;
 
             // Print some information
-            if (packet_num == BS_ANT_NUM * max_subframe_id * 1000) {
+            if (packet_num == bs_ant_num * max_subframe_id * 1000) {
                 auto end = std::chrono::system_clock::now();
-                double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2
-                    * BS_ANT_NUM * max_subframe_id * 1000;
+                double byte_len = sizeof(ushort) * ofdm_frame_len * 2
+                    * bs_ant_num * max_subframe_id * 1000;
                 std::chrono::duration<double> diff = end - begin;
                 // print network throughput & maximum message queue length
                 // during this period
@@ -640,11 +640,11 @@ void* PacketTXRX::loopSend(int tid)
         // printf("In transmitter\n");
 
         offset = task_event.data;
-        // ant_id = offset % BS_ANT_NUM;
-        // total_data_subframe_id = offset / BS_ANT_NUM;
+        // ant_id = offset % bs_ant_num;
+        // total_data_subframe_id = offset / bs_ant_num;
         // current_data_subframe_id = total_data_subframe_id %
         // data_subframe_num_perframe; subframe_id = current_data_subframe_id +
-        // UE_NUM; subframe_id =
+        // ue_num; subframe_id =
         // config_->DLSymbols[0][current_data_subframe_id]; frame_id =
         // total_data_subframe_id / data_subframe_num_perframe;
 
@@ -652,13 +652,13 @@ void* PacketTXRX::loopSend(int tid)
         // current_data_subframe_id;
         cur_buffer_ptr = dl_buffer + offset * packet_length;
         // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset *
-        // OFDM_CA_NUM * BS_ANT_NUM);
+        // ofdm_ca_num * bs_ant_num);
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-        pkt->frame_id = offset / (BS_ANT_NUM * data_subframe_num_perframe);
-        pkt->symbol_id = config_->DLSymbols[0][offset / BS_ANT_NUM
+        pkt->frame_id = offset / (bs_ant_num * data_subframe_num_perframe);
+        pkt->symbol_id = config_->DLSymbols[0][offset / bs_ant_num
             % data_subframe_num_perframe];
         pkt->cell_id = 0;
-        pkt->ant_id = offset % BS_ANT_NUM;
+        pkt->ant_id = offset % bs_ant_num;
 
         // send data (one OFDM symbol)
         if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0,
@@ -683,16 +683,16 @@ void* PacketTXRX::loopSend(int tid)
             exit(0);
         }
 
-        // if (packet_count % (BS_ANT_NUM) == 0)
+        // if (packet_count % (bs_ant_num) == 0)
         // {
         //     usleep(71);
         // }
 
-        // if(packet_count == BS_ANT_NUM * dl_data_subframe_num_perframe * 1000)
+        // if(packet_count == bs_ant_num * dl_data_subframe_num_perframe * 1000)
         // {
         //     auto end = std::chrono::system_clock::now();
-        //     double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2 *
-        //     BS_ANT_NUM * data_subframe_num_perframe * 1000;
+        //     double byte_len = sizeof(ushort) * ofdm_frame_len * 2 *
+        //     bs_ant_num * data_subframe_num_perframe * 1000;
         //     std::chrono::duration<double> diff = end - begin;
         //     // printf("TX thread %d send 1000 frames in %f secs, throughput
         //     %f MB/s, max Queue Length: message %d, tx task %d\n", tid,

@@ -64,8 +64,8 @@ void Simulator::start()
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
     buffer_frame_num
-        = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    max_packet_num_per_frame = BS_ANT_NUM * dl_data_subframe_num_perframe;
+        = subframe_num_perframe * bs_ant_num * SOCKET_BUFFER_FRAME_NUM;
+    max_packet_num_per_frame = bs_ant_num * dl_data_subframe_num_perframe;
 
     /* counters for printing summary */
     int frame_count_rx = 0;
@@ -197,10 +197,10 @@ void Simulator::print_per_frame_done(
 
 void Simulator::initialize_vars_from_cfg(Config* cfg)
 {
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    bs_ant_num = cfg->bs_ant_num;
+    ue_num = cfg->ue_num;
+    ofdm_ca_num = cfg->ofdm_ca_num;
+    ofdm_data_num = cfg->ofdm_data_num;
     subframe_num_perframe = cfg->symbol_num_perframe;
     data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
@@ -210,8 +210,8 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
     packet_length = cfg->packet_length;
 
     demul_block_size = cfg->demul_block_size;
-    demul_block_num = OFDM_DATA_NUM / demul_block_size
-        + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
+    demul_block_num = ofdm_data_num / demul_block_size
+        + (ofdm_data_num % demul_block_size == 0 ? 0 : 1);
 }
 
 void Simulator::initialize_queues()
@@ -238,9 +238,9 @@ void Simulator::initialize_uplink_buffers()
     alloc_buffer_1d(&context, TASK_THREAD_NUM, 64, 0);
 
     socket_buffer_size_ = (long long)packet_length * subframe_num_perframe
-        * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+        * bs_ant_num * SOCKET_BUFFER_FRAME_NUM;
     socket_buffer_status_size_
-        = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+        = subframe_num_perframe * bs_ant_num * SOCKET_BUFFER_FRAME_NUM;
     socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(
         SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);

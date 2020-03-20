@@ -52,7 +52,7 @@ public:
     // static const int TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     // buffer length of each socket thread
     // the actual length will be RX_BUFFER_FRAME_NUM
-    // * subframe_num_perframe * BS_ANT_NUM
+    // * subframe_num_perframe * bs_ant_num
     // static const int RX_BUFFER_FRAME_NUM = 80;
     // static const int TX_BUFFER_FRAME_NUM = 80;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
@@ -60,7 +60,7 @@ public:
     // optimization parameters for block transpose (see the slides for more
     // details)
     // do demul_block_size sub-carriers in each task
-    // static const int demul_block_size = OFDM_CA_NUM*2/transpose_block_size;
+    // static const int demul_block_size = ofdm_ca_num*2/transpose_block_size;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
     static const int dequeue_bulk_size = 5;
@@ -184,7 +184,7 @@ private:
     size_t
         ofdm_syms; // number of OFDM symbols in general symbol (i.e. subframe)
     size_t FFT_LEN;
-    size_t CP_LEN;
+    size_t cp_len;
     size_t nUEs;
     size_t numAntennas;
     size_t hdr_size;
@@ -218,10 +218,10 @@ private:
     /**
      * transmit data
      * Frist dimension: TX_THREAD_NUM
-     * Second dimension of buffer (type: uchar): packet_length * UE_NUM *
+     * Second dimension of buffer (type: uchar): packet_length * ue_num *
      * DL_SYM_PER_FRAME * TX_BUFFER_FRAME_NUM packet_length = sizeof(int) * 4 +
-     * sizeof(uchar) * OFDM_FRAME_LEN; Second dimension of buffer_status:
-     * DL_SYM_PER_FRAME * UE_NUM * TX_BUFFER_FRAME_NUM
+     * sizeof(uchar) * ofdm_frame_len; Second dimension of buffer_status:
+     * DL_SYM_PER_FRAME * ue_num * TX_BUFFER_FRAME_NUM
      */
     char* tx_buffer_;
     int* tx_buffer_status_;
@@ -230,9 +230,9 @@ private:
 
     /**
      * Data for IFFT, (prefix added)
-     * First dimension: IFFT_buffer_block_num = BS_ANT_NUM *
+     * First dimension: IFFT_buffer_block_num = bs_ant_num *
      * dl_data_symbol_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
-     * OFDM_CA_NUM
+     * ofdm_ca_num
      */
     IFFTBuffer ifft_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
@@ -240,7 +240,7 @@ private:
     /**
      * Data before modulation
      * First dimension: data_subframe_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * TASK_BUFFER_FRAME_NUM Second dimension: ofdm_ca_num * ue_num
      */
     std::vector<complex_float> l2_data_buffer_;
     std::vector<int> l2_buffer_status_;
@@ -248,7 +248,7 @@ private:
     /**
      * Data after modulation
      * First dimension: data_subframe_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * TASK_BUFFER_FRAME_NUM Second dimension: ofdm_ca_num * ue_num
      */
     std::vector<myVec> modul_buffer_;
 
@@ -262,9 +262,9 @@ private:
      * received data
      * Frist dimension: RX_THREAD_NUM
      * Second dimension of buffer (type: char): packet_length *
-     * subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM packet_length =
-     * sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2; Second dimension
-     * of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * subframe_num_perframe * bs_ant_num * RX_BUFFER_FRAME_NUM packet_length =
+     * sizeof(int) * 4 + sizeof(ushort) * ofdm_frame_len * 2; Second dimension
+     * of buffer_status: subframe_num_perframe * bs_ant_num *
      * RX_BUFFER_FRAME_NUM
      */
     Table<char> rx_buffer_;
@@ -274,16 +274,16 @@ private:
 
     /**
      * Data for FFT, after time sync (prefix removed)
-     * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
+     * First dimension: FFT_buffer_block_num = bs_ant_num *
      * subframe_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
-     * OFDM_CA_NUM
+     * ofdm_ca_num
      */
     FFTBuffer fft_buffer_;
 
     /**
      * Estimated CSI data
-     * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM
+     * First dimension: ofdm_ca_num * TASK_BUFFER_FRAME_NUM
+     * Second dimension: bs_ant_num * ue_num
      */
     std::vector<myVec> csi_buffer_;
 
@@ -291,7 +291,7 @@ private:
      * Data symbols after IFFT
      * First dimension: total subframe number in the buffer:
      * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
-     * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
+     * bs_ant_num * ofdm_ca_num second dimension data order: SC1-32 of ants,
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
      */
@@ -300,14 +300,14 @@ private:
     /**
      * Data after equalization
      * First dimension: data_subframe_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * TASK_BUFFER_FRAME_NUM Second dimension: ofdm_ca_num * ue_num
      */
     std::vector<myVec> equal_buffer_;
 
     /**
      * Data after phase correction
      * First dimension: data_subframe_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: DATA_CA_NUM * UE_NUM
+     * TASK_BUFFER_FRAME_NUM Second dimension: DATA_CA_NUM * ue_num
      */
     std::vector<myVec> equal_pc_buffer_;
 
@@ -321,17 +321,17 @@ private:
     moodycamel::ConcurrentQueue<Event_data>
         task_queue_; // =
                      // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                     // * subframe_num_perframe * BS_ANT_NUM  * 36);
+                     // * subframe_num_perframe * bs_ant_num  * 36);
     /* task queue for uplink demodulation */
     moodycamel::ConcurrentQueue<Event_data>
         demul_queue_; // =
                       // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                      // * subframe_num_perframe * BS_ANT_NUM  * 36);
+                      // * subframe_num_perframe * bs_ant_num  * 36);
     /* main thread message queue */
     moodycamel::ConcurrentQueue<Event_data>
         message_queue_; // =
                         // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                        // * subframe_num_perframe * BS_ANT_NUM  * 36);
+                        // * subframe_num_perframe * bs_ant_num  * 36);
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
@@ -350,7 +350,7 @@ private:
 
     // can possibly remove this checker
     // int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe -
-    // UE_NUM)];
+    // ue_num)];
     size_t* demul_checker_[TASK_BUFFER_FRAME_NUM];
     size_t demul_status_[TASK_BUFFER_FRAME_NUM];
 
@@ -370,7 +370,7 @@ private:
 
     // for python
     /**
-     * dimension: OFDM*UE_NUM
+     * dimension: OFDM*ue_num
      */
     int max_equaled_frame = 0;
     // long long* demul_output;

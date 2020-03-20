@@ -278,20 +278,20 @@ int PacketTXRX::dequeue_send_Argos(int tid)
         exit(0);
     }
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
+    int bs_ant_num = config_->bs_ant_num;
+    int ue_num = config_->ue_num;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int packet_length = config_->packet_length;
     int offset = task_event.data;
-    int ant_id = offset % BS_ANT_NUM;
-    int total_data_subframe_id = offset / BS_ANT_NUM;
+    int ant_id = offset % bs_ant_num;
+    int total_data_subframe_id = offset / bs_ant_num;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id
         = total_data_subframe_id % data_subframe_num_perframe;
-    int symbol_id = current_data_subframe_id + UE_NUM;
+    int symbol_id = current_data_subframe_id + ue_num;
 
     int socket_subframe_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
+        % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * bs_ant_num);
     struct Packet* pkt
         = (struct Packet*)&tx_buffer_[socket_subframe_offset * packet_length];
     char* tx_cur_buffer_ptr = (char*)pkt->data;

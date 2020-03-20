@@ -106,17 +106,17 @@ public:
     int zf_block_num;
 
     bool freq_orthogonal_pilot;
-    size_t BS_ANT_NUM;
-    size_t UE_NUM;
-    size_t UE_ANT_NUM;
-    size_t OFDM_CA_NUM;
-    size_t OFDM_DATA_NUM;
-    size_t OFDM_DATA_START;
-    size_t TX_PREFIX_LEN;
-    size_t CP_LEN;
-    size_t OFDM_PREFIX_LEN;
-    size_t OFDM_FRAME_LEN;
-    size_t OFDM_SYM_LEN;
+    size_t bs_ant_num;
+    size_t ue_num;
+    size_t ue_ant_num;
+    size_t ofdm_ca_num;
+    size_t ofdm_data_num;
+    size_t ofdm_data_start;
+    size_t tx_prefix_len;
+    size_t cp_len;
+    size_t ofdm_prefix_len;
+    size_t ofdm_frame_len;
+    size_t ofdm_sym_len;
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
         data_symbol_num_perframe;

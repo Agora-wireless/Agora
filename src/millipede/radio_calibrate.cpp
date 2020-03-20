@@ -513,7 +513,7 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
     bool good_csi = true;
 
     size_t seq_len = _cfg->pilot_cf32.size();
-    size_t fft_len = _cfg->OFDM_CA_NUM;
+    size_t fft_len = _cfg->ofdm_ca_num;
     std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len
               << std::endl;
     std::vector<std::complex<double>> pilot_cd64;
@@ -629,8 +629,8 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
 
         size_t peak_up = CommsLib::find_pilot_seq(up, pilot_cd64, seq_len);
         size_t peak_dn = CommsLib::find_pilot_seq(dn, pilot_cd64, seq_len);
-        start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
-        start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
+        start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->cp_len;
+        start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->cp_len;
         std::cout << "receive starting position from/to node " << i << ": "
                   << start_up[i] << "/" << start_dn[i] << std::endl;
         if (start_up[i] == 0 || start_dn[i] == 0)
@@ -696,8 +696,8 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
 //        std::vector<std::complex<float> > dn_f = CommsLib::FFT(dn_t, fft_len);
 //        std::vector<std::complex<float> > up_f = CommsLib::FFT(up_t, fft_len);
 //        for (size_t f = 0; f < fft_len; f++) {
-//            if (f < _cfg->OFDM_DATA_START || f >= _cfg->OFDM_DATA_START +
-//            _cfg->OFDM_DATA_NUM) {
+//            if (f < _cfg->ofdm_data_start || f >= _cfg->ofdm_data_start +
+//            _cfg->ofdm_data_num) {
 //    	    continue;
 //    	}
 //            float dre = dn_f[f].real();

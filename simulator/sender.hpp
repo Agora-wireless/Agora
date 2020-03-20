@@ -42,7 +42,7 @@ typedef unsigned short ushort;
 
 class Sender {
 public:
-    // static const int OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+    // static const int ofdm_frame_len = ofdm_ca_num + ofdm_prefix_len;
     // int for: frame_id, subframe_id, cell_id, ant_id
     // unsigned int for: I/Q samples
 
@@ -53,12 +53,12 @@ public:
 #endif
 
     // static const int buffer_length = tx_buf_offset + sizeof(int) * 16 +
-    // sizeof(ushort) * OFDM_FRAME_LEN * 2; static const int data_offset =
+    // sizeof(ushort) * ofdm_frame_len * 2; static const int data_offset =
     // sizeof(int) * 16;
     //    static const size_t subframe_num_perframe = 40;
     static const size_t BUFFER_FRAME_NUM = 40;
 
-    // static const size_t max_subframe_id = ENABLE_DOWNLINK ? UE_NUM :
+    // static const size_t max_subframe_id = ENABLE_DOWNLINK ? ue_num :
     // subframe_num_perframe;
 
 public:
@@ -86,7 +86,7 @@ private:
     int* socket_;
     // int* socket_tcp_;
 
-    // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
+    // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * bs_ant_num
     // Second dimension: buffer_length (real and imag)
     // std::vector<std::vector<char,boost::alignment::aligned_allocator<char,
     // 64>>> trans_buffer_;
@@ -105,8 +105,8 @@ private:
     size_t frame_id;
     size_t subframe_id;
 
-    // First dimension: subframe_num_perframe * BS_ANT_NUM
-    // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
+    // First dimension: subframe_num_perframe * bs_ant_num
+    // Second dimension: ofdm_frame_len * 2 (real and imag)
     Table<float> IQ_data;
     Table<ushort> IQ_data_coded;
 

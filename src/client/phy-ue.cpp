@@ -63,7 +63,7 @@ Phy_UE::Phy_UE(Config* config)
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
 #ifdef SIM
     // read pilot
-    int pilot_len = (FFT_LEN + CP_LEN);
+    int pilot_len = (FFT_LEN + cp_len);
     // ul_pilot_aligned = new char[packet_length];
     // memcpy((void*)&ul_pilot_aligned[prefix_len * sizeof(uint32_t) +
     // packet_header_offset * sizeof(int)], pilot_ci16.data(), pilot_len *
@@ -507,11 +507,11 @@ void Phy_UE::start()
                     * numAntennas * ul_data_symbol_perframe);
                 fwrite(&tx_buffer_[offset * frame_samp_size],
                     sizeof(complex_float),
-                    (CP_LEN + FFT_LEN + offsetof(Packet, data)) * numAntennas
+                    (cp_len + FFT_LEN + offsetof(Packet, data)) * numAntennas
                         * dl_data_symbol_perframe,
                     fp);
                 // fwrite(tx_buffer_.buffer[offset].data(),
-                // sizeof(std::complex<short>), (CP_LEN+FFT_LEN+4) * numAntennas
+                // sizeof(std::complex<short>), (cp_len+FFT_LEN+4) * numAntennas
                 // * dl_data_symbol_perframe, fp);
                 fclose(fp);
 #endif
@@ -649,7 +649,7 @@ void Phy_UE::doFFT(int tid, int offset)
     }
 
     // transfer ushort to float
-    size_t delay_offset = (dl_prefix_len + CP_LEN)
+    size_t delay_offset = (dl_prefix_len + cp_len)
         * 2; // GetFrameStart(pkt->data, prefix_len, postfix_len);
     // float *cur_radio_buffer = (float *)(cur_ptr_buffer + sizeof(int) *
     // packet_header_offset);
@@ -903,17 +903,17 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 
         short* cur_buffer;
         for (size_t i = 0; i < ofdm_syms; i++) {
-            size_t sym_offset = i * (FFT_LEN + CP_LEN);
+            size_t sym_offset = i * (FFT_LEN + cp_len);
             cur_buffer
                 = tx_buffer_ptr + (sym_offset * sizeof(std::complex<short>));
-            for (size_t j = CP_LEN; j < CP_LEN + FFT_LEN; j++) {
+            for (size_t j = cp_len; j < cp_len + FFT_LEN; j++) {
                 *(cur_buffer + 2 * j)
-                    = (short)(ifft_out_buffer[j - CP_LEN].real() * 32768);
+                    = (short)(ifft_out_buffer[j - cp_len].real() * 32768);
                 *(cur_buffer + 2 * j + 1)
-                    = (short)(ifft_out_buffer[j - CP_LEN].imag() * 32768);
+                    = (short)(ifft_out_buffer[j - cp_len].imag() * 32768);
             }
             memcpy((void*)cur_buffer, (void*)(cur_buffer + 2 * FFT_LEN),
-                CP_LEN * sizeof(std::complex<short>)); // add CP
+                cp_len * sizeof(std::complex<short>)); // add CP
         }
     }
 
@@ -933,7 +933,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
 
 #if DEBUG_PRINT_PILOT
     cout << "Pilot data" << endl;
-    for (size_t i = 0; i < config_->OFDM_CA_NUM; i++)
+    for (size_t i = 0; i < config_->ofdm_ca_num; i++)
         cout << pilots_[i] << ",";
     cout << endl;
 #endif
@@ -942,8 +942,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     // RX_THREAD_NUM = config_->socket_thread_num;
     // TX_THREAD_NUM = config_->socket_thread_num;
     // demul_block_size = config_->demul_block_size;
-    // //OFDM_CA_NUM*2/transpose_block_size; demul_block_num = OFDM_DATA_NUM /
-    // demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
+    // //ofdm_ca_num*2/transpose_block_size; demul_block_num = ofdm_data_num /
+    // demul_block_size + (ofdm_data_num % demul_block_size == 0 ? 0 : 1);
 
     // downlink_mode = config_->downlink_mode;
     // dl_data_subframe_start = config_->dl_data_symbol_start;
@@ -973,18 +973,18 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_prefix_len = config_->dl_prefix;
     postfix_len = config_->postfix;
     symbol_len = config_->sampsPerSymbol - prefix_len - postfix_len;
-    CP_LEN = config_->CP_LEN;
-    FFT_LEN = config_->OFDM_CA_NUM;
-    ofdm_syms = (int)(symbol_len / (FFT_LEN + CP_LEN));
-    data_sc_len = config_->OFDM_DATA_NUM;
-    data_sc_start = config_->OFDM_DATA_START;
-    nUEs = config_->UE_NUM;
+    cp_len = config_->cp_len;
+    FFT_LEN = config_->ofdm_ca_num;
+    ofdm_syms = (int)(symbol_len / (FFT_LEN + cp_len));
+    data_sc_len = config_->ofdm_data_num;
+    data_sc_start = config_->ofdm_data_start;
+    nUEs = config_->ue_num;
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM
         ? RX_THREAD_NUM
         : nUEs; // FIXME: read number of cores and assing accordingly
     core_offset = config_->core_offset;
-    numAntennas = config_->UE_ANT_NUM;
+    numAntennas = config_->ue_ant_num;
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data "
            "symbols, %zu DL data symbols\n",
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe,

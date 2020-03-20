@@ -117,7 +117,7 @@ std::vector<pthread_t> PacketTXRX::startTX(char* in_buffer,
 void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int bs_ant_num = config_->bs_ant_num;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
@@ -157,16 +157,16 @@ void* PacketTXRX::loopTXRX(int tid)
 
     // TX pointers
     // float *tx_data_buffer = tx_data_buffer_;
-    // buffer_frame_num: subframe_num_perframe * BS_ANT_NUM *
+    // buffer_frame_num: subframe_num_perframe * bs_ant_num *
     // SOCKET_BUFFER_FRAME_NUM float *tx_cur_ptr_data;
 
     int max_subframe_id = downlink_mode
         ? pilot_subframe_num_perframe
         : (pilot_subframe_num_perframe + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame
-        = max_subframe_id * BS_ANT_NUM / rx_thread_num_;
+        = max_subframe_id * bs_ant_num / rx_thread_num_;
     int max_tx_packet_num_per_frame
-        = dl_data_subframe_num_perframe * BS_ANT_NUM / tx_thread_num_;
+        = dl_data_subframe_num_perframe * bs_ant_num / tx_thread_num_;
     printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame,
         max_tx_packet_num_per_frame);
     int prev_frame_id = -1;
@@ -217,7 +217,7 @@ void* PacketTXRX::loopTXRX(int tid)
             int offset = dequeue_send(tid, socket_local, &remote_addr);
             if (offset == -1)
                 continue;
-            int frame_id_in_buffer = offset / BS_ANT_NUM
+            int frame_id_in_buffer = offset / bs_ant_num
                 / config_->data_symbol_num_perframe % SOCKET_BUFFER_FRAME_NUM;
             assert(SOCKET_BUFFER_FRAME_NUM < NUM_COUNTERS);
             tx_pkts_in_frame_count[frame_id_in_buffer]++;
@@ -360,13 +360,13 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         exit(0);
     }
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
+    int bs_ant_num = config_->bs_ant_num;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
     int packet_length = config_->packet_length;
     int offset = task_event.data;
-    int ant_id = offset % BS_ANT_NUM;
-    int total_data_subframe_id = offset / BS_ANT_NUM;
+    int ant_id = offset % bs_ant_num;
+    int total_data_subframe_id = offset / bs_ant_num;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id
         = total_data_subframe_id % data_subframe_num_perframe;
@@ -380,9 +380,9 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
 #endif
 
     char* cur_buffer_ptr = tx_buffer_
-        + (current_data_subframe_id * BS_ANT_NUM + ant_id) * packet_length;
-    // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * OFDM_CA_NUM *
-    // BS_ANT_NUM);
+        + (current_data_subframe_id * bs_ant_num + ant_id) * packet_length;
+    // cur_ptr_data = (dl_data_buffer + 2 * data_subframe_offset * ofdm_ca_num *
+    // bs_ant_num);
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 

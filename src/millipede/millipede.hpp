@@ -125,9 +125,9 @@ private:
      * received data
      * Frist dimension: SOCKET_THREAD_NUM
      * Second dimension of buffer (type: char): packet_length *
-     * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * subframe_num_perframe * bs_ant_num * SOCKET_BUFFER_FRAME_NUM
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * ofdm_frame_len * 2;
+     * Second dimension of buffer_status: subframe_num_perframe * bs_ant_num *
      * SOCKET_BUFFER_FRAME_NUM
      */
     Table<char> socket_buffer_;
@@ -137,10 +137,10 @@ private:
 
     /**
      * Estimated CSI data
-     * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM
-     * First dimension: UE_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: BS_ANT_NUM * OFDM_CA_NUM
+     * First dimension: ofdm_ca_num * TASK_BUFFER_FRAME_NUM
+     * Second dimension: bs_ant_num * ue_num
+     * First dimension: ue_num * TASK_BUFFER_FRAME_NUM
+     * Second dimension: bs_ant_num * ofdm_ca_num
      */
     Table<complex_float> csi_buffer_;
 
@@ -148,7 +148,7 @@ private:
      * Data symbols after IFFT
      * First dimension: total subframe number in the buffer:
      * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
-     * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
+     * bs_ant_num * ofdm_ca_num second dimension data order: SC1-32 of ants,
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
      */
@@ -156,22 +156,22 @@ private:
 
     /**
      * Calculated precoder
-     * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: UE_NUM * BS_ANT_NUM
+     * First dimension: ofdm_ca_num * TASK_BUFFER_FRAME_NUM
+     * Second dimension: ue_num * bs_ant_num
      */
     Table<complex_float> precoder_buffer_;
 
     /**
      * Data after equalization
      * First dimension: data_subframe_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * TASK_BUFFER_FRAME_NUM Second dimension: ofdm_ca_num * ue_num
      */
     Table<complex_float> equal_buffer_;
 
     /**
      * Data after demodulation
      * First dimension: data_subframe_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * TASK_BUFFER_FRAME_NUM Second dimension: ofdm_ca_num * ue_num
      */
     Table<uint8_t> demod_hard_buffer_;
 
@@ -197,30 +197,30 @@ private:
 
     /**
      * Raw data
-     * First dimension: data_subframe_num_perframe * UE_NUM
-     * Second dimension: OFDM_CA_NUM
+     * First dimension: data_subframe_num_perframe * ue_num
+     * Second dimension: ofdm_ca_num
      */
     Table<long long> dl_IQ_data_long;
 
     /**
      * Modulated data
-     * First dimension: subframe_num_perframe (40) * UE_NUM *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM
+     * First dimension: subframe_num_perframe (40) * ue_num *
+     * TASK_BUFFER_FRAME_NUM Second dimension: ofdm_ca_num
      */
     // RawDataBuffer dl_rawdata_buffer_;
 
     /**
      * Data for IFFT
-     * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
+     * First dimension: FFT_buffer_block_num = bs_ant_num *
      * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
-     * OFDM_CA_NUM
+     * ofdm_ca_num
      */
     Table<complex_float> dl_ifft_buffer_;
 
     /**
      * Data after IFFT
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
+     * second dimension: ue_num * ofdm_ca_num
      * second dimension data order: SC1-32 of UEs, SC33-64 of UEs, ...,
      * SC993-1024 of UEs (32 blocks each with 32 subcarriers)
      */
@@ -234,9 +234,9 @@ private:
     /**
      * Data for transmission
      * First dimension of buffer (type: char): subframe_num_perframe *
-     * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * BS_ANT_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * bs_ant_num
+     * packet_length = sizeof(int) * 4 + sizeof(ushort) * ofdm_frame_len * 2;
+     * First dimension of buffer_status: subframe_num_perframe * bs_ant_num *
      * SOCKET_BUFFER_FRAME_NUM
      */
     char* dl_socket_buffer_;

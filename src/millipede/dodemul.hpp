@@ -76,12 +76,12 @@ private:
     /**
      * Intermediate buffer to gather raw data
      * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM */
+     * Second dimension: bs_ant_num */
     complex_float* spm_buffer;
 
     /**
      * Intermediate buffers for equalized data
-     * dimension: UE_NUM * demul_block_size */
+     * dimension: ue_num * demul_block_size */
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
 

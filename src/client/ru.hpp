@@ -20,10 +20,10 @@ class RadioConfig;
 
 class RU {
 public:
-    // static const int OFDM_FRAME_LEN = SYMBOL_LEN; //OFDM_CA_NUM +
-    // OFDM_PREFIX_LEN + OFDM_POSTFIX_LEN; header 4 int for: frame_id,
+    // static const int ofdm_frame_len = SYMBOL_LEN; //ofdm_ca_num +
+    // ofdm_prefix_len + OFDM_POSTFIX_LEN; header 4 int for: frame_id,
     // subframe_id, cell_id, ant_id ushort for: I/Q samples static const int
-    // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
+    // package_length = sizeof(int) * 4 + sizeof(ushort) * ofdm_frame_len * 2;
     // use for create pthread
     struct RUContext {
         RU* ptr;
