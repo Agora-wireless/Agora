@@ -27,7 +27,7 @@ RadioConfig::RadioConfig(Config* cfg)
     std::atomic_int threadCount = ATOMIC_VAR_INIT((int)_radioNum);
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
-        RadioConfigContext* context = new RadioConfigContext;
+        auto* context = new RadioConfigContext;
         context->brs = this;
         context->threadCount = &threadCount;
         context->tid = i;
@@ -56,7 +56,7 @@ RadioConfig::RadioConfig(Config* cfg)
     threadCount = (int)_radioNum;
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
-        RadioConfigContext* context = new RadioConfigContext;
+        auto* context = new RadioConfigContext;
         context->brs = this;
         context->threadCount = &threadCount;
         context->tid = i;

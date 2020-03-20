@@ -9,14 +9,14 @@ int main(int argc, char const* argv[])
         std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
         filename = cur_directory + "/data/userconfig_512.json";
     }
-    Config* config = new Config(filename.c_str());
+    auto* config = new Config(filename.c_str());
     int ret;
     try {
         SignalHandler signalHandler;
 
         // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
-        Phy_UE* phy = new Phy_UE(config);
+        auto* phy = new Phy_UE(config);
         phy->start();
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {

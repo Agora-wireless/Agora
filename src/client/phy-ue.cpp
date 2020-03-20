@@ -131,11 +131,13 @@ Phy_UE::Phy_UE(Config* config)
                 demul_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
         }
     }
+
     // create task thread
     for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
-        EventHandlerContext* context = new EventHandlerContext;
+        auto* context = new EventHandlerContext();
         context->obj_ptr = this;
         context->id = i;
+
         // printf("create thread %d\n", i);
         if (pthread_create(&task_threads[i], NULL, taskThread_launch, context)
             != 0) {
@@ -1022,8 +1024,7 @@ void Phy_UE::getEqualData(float** ptr, int* size, int ue_id)
 extern "C" {
 EXPORT Phy_UE* Phy_UE_new(Config* cfg)
 {
-    Phy_UE* usr = new Phy_UE(cfg);
-
+    auto* usr = new Phy_UE(cfg);
     return usr;
 }
 EXPORT void Phy_UE_start(Phy_UE* usr) { usr->start(); }
