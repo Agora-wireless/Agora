@@ -31,6 +31,7 @@ public:
     void launch(int offset);
 
 private:
+    // XXX: Can we infer these from Doer::cfg?
     int BS_ANT_NUM;
     int OFDM_DATA_NUM;
 

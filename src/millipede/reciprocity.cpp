@@ -17,8 +17,8 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
     , RC_task_duration(&in_stats_manager->rc_stats_worker.task_duration)
     , RC_task_count(in_stats_manager->rc_stats_worker.task_count)
 {
-    BS_ANT_NUM = config_->BS_ANT_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
 
     calib_gather_buffer = (complex_float*)aligned_alloc(
         64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
@@ -28,7 +28,7 @@ Reciprocity::~Reciprocity() { free(calib_gather_buffer); }
 
 void Reciprocity::launch(int offset)
 {
-    int ref_ant = config_->ref_ant;
+    int ref_ant = cfg->ref_ant;
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doRecip thread %d: frame: %d, \n", tid, offset);
