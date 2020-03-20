@@ -82,8 +82,3 @@ To compile test_matrix.cpp:
 To compile test_mufft.c:
 
 	gcc -o test_mufft ../test_mufft.c /usr/local/lib/libmufft.a -lm -Wl,-no-undefined
-
-
-## Instruction for Developers:
-* Source code is formatted in a style derived from the "WebKit" style, and enforced by clang-format.  Running "clang-format -i $file" for a newly modified file will format it to match proper code style.
-* Before commit new changes, make sure (1) source code compiles without warnings; (2) apply "clang-format -i $file" to modified files.
