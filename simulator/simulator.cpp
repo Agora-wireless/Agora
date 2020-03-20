@@ -5,8 +5,8 @@
  */
 #include "simulator.hpp"
 
-Simulator::Simulator(Config* cfg, int in_task_thread_num, int in_socket_tx_num,
-    int in_core_offset, int sender_delay)
+Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
+    size_t in_socket_tx_num, size_t in_core_offset, size_t sender_delay)
     : TASK_THREAD_NUM(in_task_thread_num)
     , SOCKET_RX_THREAD_NUM(in_socket_tx_num)
     , SOCKET_TX_THREAD_NUM(in_socket_tx_num)
@@ -71,7 +71,7 @@ void Simulator::start()
     int frame_count_rx = 0;
 
     int ret = 0;
-    Event_data events_list[dequeue_bulk_size];
+    Event_data events_list[kDequeueBulkSize];
     int miss_count = 0;
     int total_count = 0;
 
@@ -82,17 +82,9 @@ void Simulator::start()
         // if (last_dequeue == 0) {
         ret = 0;
         ret = message_queue_.try_dequeue_bulk(
-            ctok, events_list, dequeue_bulk_size_single);
-        // for (int rx_itr = 0; rx_itr < SOCKET_RX_THREAD_NUM; rx_itr ++)
-        // ret +=
-        // message_queue_.try_dequeue_bulk_from_producer(*(rx_ptoks_ptr[rx_itr]),
-        // events_list + ret, dequeue_bulk_size_single);
-        // last_dequeue = 1;
-        // }
-        // else {
-        //     ret = complete_task_queue_.try_dequeue_bulk(ctok_complete,
-        //     events_list, dequeue_bulk_size_single); last_dequeue = 0;
-        // }
+            ctok, events_list, kDequeueBulkSizeSingle);
+
+        // XXX: Is the check against 1e9 needed with size_t?
         total_count++;
         if (total_count == 1e9) {
             // printf("message dequeue miss rate %f\n", (float)miss_count /
@@ -162,16 +154,16 @@ inline void Simulator::update_frame_count(int* frame_count)
         *frame_count = 0;
 }
 
-void Simulator::update_rx_counters(
-    int frame_id, int frame_id_in_buffer, int subframe_id, int ant_id)
+void Simulator::update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
+    size_t subframe_id, size_t ant_id)
 {
     rx_counter_packets_[frame_id_in_buffer]++;
     if (rx_counter_packets_[frame_id_in_buffer] == 1) {
         frame_start_receive[frame_id] = get_time();
 #if DEBUG_PRINT_PER_FRAME_START
         printf(
-            "Main thread: data received from frame %d, subframe %d, ant %d, in "
-            "%.2f since tx, in %.2f us since last frame\n",
+            "Main thread: data received from frame %zu, subframe %zu, ant %zu, "
+            "in %.2f since tx, in %.2f us since last frame\n",
             frame_id, subframe_id, ant_id,
             frame_start_receive[frame_id] - frame_start_tx[frame_id],
             frame_start_receive[frame_id] - frame_start_receive[frame_id - 1]);
@@ -185,13 +177,13 @@ void Simulator::update_rx_counters(
 }
 
 void Simulator::print_per_frame_done(
-    int task_type, int frame_id, int frame_id_in_buffer)
+    size_t task_type, size_t frame_id, size_t frame_id_in_buffer)
 {
 #if DEBUG_PRINT_PER_FRAME_DONE
     switch (task_type) {
     case (PRINT_RX): {
         printf(
-            "Main thread: received all packets in frame: %d, in %.2f us since "
+            "Main thread: received all packets in frame: %zu, in %.2f us since "
             "tx, in %.2f us since rx, tx duration: %.2f us\n",
             frame_id, frame_end_receive[frame_id] - frame_start_tx[frame_id],
             frame_end_receive[frame_id] - frame_start_receive[frame_id],
@@ -231,12 +223,12 @@ void Simulator::initialize_queues()
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
-    for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++)
+    for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++)
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
 
     task_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, TASK_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
-    for (int i = 0; i < TASK_THREAD_NUM; i++)
+    for (size_t i = 0; i < TASK_THREAD_NUM; i++)
         task_ptoks_ptr[i] = new moodycamel::ProducerToken(complete_task_queue_);
 }
 

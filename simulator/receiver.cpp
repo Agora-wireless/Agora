@@ -7,15 +7,14 @@
 #include "receiver.hpp"
 
 Receiver::Receiver(
-    Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+    Config* cfg, size_t rx_thread_num, size_t tx_thread_num, size_t core_offset)
+    : rx_thread_num_(rx_thread_num)
+    , tx_thread_num_(tx_thread_num)
+    , core_id_(core_offset)
+    , config_(cfg)
 {
-    socket_ = new int[RX_THREAD_NUM];
-    config_ = cfg;
-    rx_thread_num_ = RX_THREAD_NUM;
-    tx_thread_num_ = TX_THREAD_NUM;
-
-    core_id_ = in_core_offset;
-    tx_core_id_ = in_core_offset + RX_THREAD_NUM;
+    socket_ = new int[rx_thread_num];
+    tx_core_id_ = core_offset + rx_thread_num;
 
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     UE_NUM = cfg->UE_NUM;
@@ -34,12 +33,12 @@ Receiver::Receiver(
     tx_context = new ReceiverContext[tx_thread_num_];
 }
 
-Receiver::Receiver(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
-    int in_core_offset,
+Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t tx_thread_num,
+    size_t core_offset,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks)
-    : Receiver(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+    : Receiver(cfg, rx_thread_num, tx_thread_num, core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
@@ -56,8 +55,8 @@ Receiver::~Receiver()
 }
 
 std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
-    Table<int>& in_buffer_status, int in_buffer_frame_num,
-    long long in_buffer_length, Table<double>& in_frame_start)
+    Table<int>& in_buffer_status, size_t in_buffer_frame_num,
+    size_t in_buffer_length, Table<double>& in_frame_start)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
@@ -95,19 +94,18 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     }
 #else
 
-    for (int i = 0; i < rx_thread_num_; i++) {
-        pthread_t recv_thread_;
-        // record the thread id
+    for (size_t i = 0; i < rx_thread_num_; i++) {
+        // Record the thread id
         rx_context[i].ptr = this;
         rx_context[i].tid = i;
-        // start socket thread
+
+        pthread_t recv_thread_;
+        // Start socket thread
         if (pthread_create(&recv_thread_, NULL,
                 pthread_fun_wrapper<Receiver, &Receiver::loopRecv>,
                 &rx_context[i])
             != 0) {
-            // if(pthread_create( &recv_thread_, NULL, Receiver::loopRecv, (void
-            // *)(&rx_context[i])) != 0) {
-            perror("socket recv thread create failed");
+            perror("Socket recv thread create failed");
             exit(0);
         }
         created_threads.push_back(recv_thread_);
@@ -118,8 +116,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
 
 void* Receiver::loopRecv(int tid)
 {
-
-    int core_offset = core_id_ + rx_thread_num_ + 2;
+    size_t core_offset = core_id_ + rx_thread_num_ + 2;
     pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
 #if USE_IPV4
@@ -207,7 +204,7 @@ void* Receiver::loopRecv(int tid)
     int* cur_buffer_status_ptr = buffer_status_ptr;
     // loop recv
     socklen_t addrlen = sizeof(servaddr_local);
-    int offset = 0;
+    size_t offset = 0;
     int prev_frame_id = -1;
     // double start_time= get_time();
 
@@ -215,9 +212,10 @@ void* Receiver::loopRecv(int tid)
     while (true) {
         // if buffer is full, exit
         if (cur_buffer_status_ptr[0] == 1) {
-            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
+            printf("Receive thread %d buffer full, offset: %zu\n", tid, offset);
             exit(0);
         }
+
         int recvlen = -1;
         // start_time= get_time();
         // if ((recvlen = recvfrom(socket_[tid], (char*)cur_ptr_buffer,
