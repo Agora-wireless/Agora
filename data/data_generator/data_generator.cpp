@@ -128,8 +128,9 @@ int main(int argc, char* argv[])
         confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
+
     printf("default config file: %s\n", filename.c_str());
-    Config* config_ = new Config(filename.c_str());
+    auto* config_ = new Config(filename.c_str());
 
 #ifdef USE_LDPC
     printf("LDPC enabled\n");

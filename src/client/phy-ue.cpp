@@ -131,11 +131,13 @@ Phy_UE::Phy_UE(Config* config)
                 demul_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
         }
     }
+
     // create task thread
     for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
-        EventHandlerContext* context = new EventHandlerContext;
+        auto* context = new EventHandlerContext();
         context->obj_ptr = this;
         context->id = i;
+
         // printf("create thread %d\n", i);
         if (pthread_create(&task_threads[i], NULL, taskThread_launch, context)
             != 0) {
@@ -255,7 +257,7 @@ void Phy_UE::start()
 
                 // if EVENT_RX_SYMBOL, do crop
 
-            case EventType::kPacketReceived: {
+            case EventType::kPacketRX: {
                 int offset = event.data;
 
                 int buffer_frame_num = rx_buffer_status_size;
@@ -301,7 +303,7 @@ void Phy_UE::start()
                             // for frame %d with l2_offset %d\n", frame_id,
                             // prev_frame_id, tx_frame_id, l2_offset);
                             Event_data do_modul_task;
-                            do_modul_task.event_type = TASK_MODUL;
+                            do_modul_task.event_type = EventType::kIFFT;
                             do_modul_task.data = l2_offset;
                             schedule_task(do_modul_task, &fft_queue_, ptok_fft);
                         }
@@ -314,7 +316,7 @@ void Phy_UE::start()
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
                     Event_data do_crop_task;
-                    do_crop_task.event_type = TASK_FFT;
+                    do_crop_task.event_type = EventType::kFFT;
                     do_crop_task.data = offset;
                     schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT
@@ -1022,8 +1024,7 @@ void Phy_UE::getEqualData(float** ptr, int* size, int ue_id)
 extern "C" {
 EXPORT Phy_UE* Phy_UE_new(Config* cfg)
 {
-    Phy_UE* usr = new Phy_UE(cfg);
-
+    auto* usr = new Phy_UE(cfg);
     return usr;
 }
 EXPORT void Phy_UE_start(Phy_UE* usr) { usr->start(); }

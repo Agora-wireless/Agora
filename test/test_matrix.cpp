@@ -20,15 +20,16 @@ static double test_get_time(void)
     return tv.tv_sec + tv.tv_nsec / 1000000000.0;
 }
 
-int flushCache()
+void flushCache()
 {
     const size_t bigger_than_cachesize = 100 * 1024 * 1024;
-    long* p = new long[bigger_than_cachesize];
+    auto* p = new long[bigger_than_cachesize];
     // When you want to "flush" cache.
     for (int i = 0; i < bigger_than_cachesize; i++) {
         p[i] = rand();
     }
-    delete p;
+
+    delete[] p;
 }
 
 static double bench_ZF_warmup(unsigned Nx, unsigned Ny, unsigned iterations)
