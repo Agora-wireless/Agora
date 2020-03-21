@@ -35,11 +35,7 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
     tx_ptoks_ = in_tx_ptoks;
 }
 
-PacketTXRX::~PacketTXRX()
-{
-    delete[] socket_;
-    delete config_;
-}
+PacketTXRX::~PacketTXRX() { delete[] socket_; }
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
