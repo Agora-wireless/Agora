@@ -21,8 +21,10 @@ void delay_ticks(uint64_t start, uint64_t ticks)
     // printf("duration: %.5f\n", get_time() - start_time);
 }
 
-Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
-    : ant_id(0)
+Sender::Sender(
+    Config* cfg, size_t in_thread_num, size_t in_core_offset, size_t in_delay)
+    : cfg(cfg)
+    , ant_id(0)
     , frame_id(0)
     , subframe_id(0)
     , thread_num(in_thread_num)
@@ -33,13 +35,10 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
     printf("TX constructer: on core %d\n", sched_getcpu());
 
     ticks_all = (uint64_t)delay * CPU_FREQ / 1e6 / 70;
-    config_ = cfg;
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int packet_length = config_->packet_length;
-    int buffer_length = kTXBufOffset + packet_length;
-    int max_subframe_id = get_max_subframe_id();
-    printf("max_subframe_id: %d\n", max_subframe_id);
-    int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
+    size_t buffer_length = kTXBufOffset + cfg->packet_length;
+    size_t max_subframe_id = get_max_subframe_id();
+    printf("max_subframe_id: %zu\n", max_subframe_id);
+    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
 
     packet_count_per_subframe.calloc(BUFFER_FRAME_NUM, max_subframe_id, 64);
     alloc_buffer_1d(&packet_count_per_frame, BUFFER_FRAME_NUM, 64, 1);
@@ -51,19 +50,19 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
         64, thread_num * sizeof(moodycamel::ProducerToken*));
-    for (int i = 0; i < thread_num; i++)
+    for (size_t i = 0; i < thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(task_queue_);
 
     socket_ = new int[socket_num];
-    for (int i = 0; i < socket_num; i++) {
+    for (size_t i = 0; i < socket_num; i++) {
 #if USE_IPV4
-        socket_[i] = setup_socket_ipv4(config_->ue_tx_port + i, false, 0);
+        socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
         setup_sockaddr_remote_ipv4(
-            &servaddr_[i], config_->bs_port + i, config_->rx_addr.c_str());
+            &servaddr_[i], cfg->bs_port + i, cfg->rx_addr.c_str());
 #else
-        socket_[i] = setup_socket_ipv6(config_->ue_tx_port + i, false, 0);
+        socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
         setup_sockaddr_remote_ipv6(
-            &servaddr_[i], config_->bs_port + i, "fe80::f436:d735:b04a:864a");
+            &servaddr_[i], cfg->bs_port + i, "fe80::f436:d735:b04a:864a");
 #endif
 
 #if !defined(USE_DPDK) && CONNECT_UDP
@@ -72,7 +71,7 @@ Sender::Sender(Config* cfg, int in_thread_num, int in_core_offset, int in_delay)
             != 0)
             perror("UDP socket connect failed");
         else
-            printf("UDP socket %d connected\n", i);
+            printf("UDP socket %zu connected\n", i);
 #endif
     }
 }
@@ -86,7 +85,7 @@ Sender::~Sender()
     free_buffer_1d(&packet_count_per_frame);
 
     delete[] socket_;
-    delete config_;
+    delete cfg;
     pthread_mutex_destroy(&lock_);
 }
 
@@ -132,12 +131,11 @@ void* Sender::loopMain(int tid)
 {
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int max_subframe_id = get_max_subframe_id();
-    int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * BS_ANT_NUM;
+    size_t max_subframe_id = get_max_subframe_id();
+    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
 
     /* push tasks of the first subframe into task queue */
-    for (int i = 0; i < BS_ANT_NUM; i++) {
+    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         int ptok_id = i % thread_num;
         if (!task_queue_.enqueue(*task_ptok[ptok_id], i)) {
             printf("send task enqueue failed\n");
@@ -154,22 +152,23 @@ void* Sender::loopMain(int tid)
     double start_time = get_time();
 #endif
     while (keep_running) {
-        int data_ptr;
+        size_t data_ptr;
         ret = message_queue_.try_dequeue(data_ptr);
         if (!ret)
             continue;
         update_tx_buffer(data_ptr);
-        int tx_total_subframe_id = data_ptr / BS_ANT_NUM;
-        int tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
-        int tx_frame_id = tx_total_subframe_id / max_subframe_id;
+        size_t tx_total_subframe_id = data_ptr / cfg->BS_ANT_NUM;
+        size_t tx_current_subframe_id = tx_total_subframe_id % max_subframe_id;
+        size_t tx_frame_id = tx_total_subframe_id / max_subframe_id;
         packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]++;
         if (packet_count_per_subframe[tx_frame_id][tx_current_subframe_id]
-            == BS_ANT_NUM) {
-            // double cur_time = get_time();
-            // printf("Finished transmit all antennas in frame: %d, subframe:
-            // %d, at
-            // %.5f in %.5f us\n", tx_frame_id, tx_current_subframe_id,
-            // cur_time,cur_time-start_time);
+            == cfg->BS_ANT_NUM) {
+#if DEBUG_SENDER
+            double cur_time = get_time();
+            printf("Finished transmit all antennas in frame: %zu, symbol: %zu,"
+                   " in %.5f us\n ",
+                tx_frame_id, tx_current_subframe_id, cur_time - start_time);
+#endif
             packet_count_per_frame[tx_frame_id]++;
             delay_for_symbol(tx_frame_count, tick_start);
             tick_start = RDTSC();
@@ -177,15 +176,16 @@ void* Sender::loopMain(int tid)
             if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
                 frame_end[tx_frame_count] = get_time();
                 packet_count_per_frame[tx_frame_id] = 0;
+
                 delay_for_frame(tx_frame_count, tick_start);
 #if DEBUG_SENDER
-                printf("Finished transmit all antennas in frame: %d, "
-                       "next scheduled: %d, in %.5f us\n",
+                printf("Finished transmit all antennas in frame: %zu, "
+                       "next scheduled: %zu, in %.5f us\n",
                     tx_frame_count, frame_id, get_time() - start_time);
                 start_time = get_time();
 #endif
                 tx_frame_count++;
-                if (tx_frame_count == config_->tx_frame_num)
+                if (tx_frame_count == (size_t)cfg->tx_frame_num)
                     break;
                 frame_start[tx_frame_count] = get_time();
                 tick_start = RDTSC();
@@ -194,10 +194,10 @@ void* Sender::loopMain(int tid)
                 // frame_start[tx_frame_count-1]);
             }
             packet_count_per_subframe[tx_frame_id][tx_current_subframe_id] = 0;
-            int next_subframe_ptr
-                = ((tx_total_subframe_id + 1) * BS_ANT_NUM) % max_length_;
-            for (int i = 0; i < BS_ANT_NUM; i++) {
-                int ptok_id = i % thread_num;
+            size_t next_subframe_ptr
+                = ((tx_total_subframe_id + 1) * cfg->BS_ANT_NUM) % max_length_;
+            for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+                size_t ptok_id = i % thread_num;
                 if (!task_queue_.enqueue(
                         *task_ptok[ptok_id], i + next_subframe_ptr)) {
                     printf("send task enqueue failed\n");
@@ -205,9 +205,8 @@ void* Sender::loopMain(int tid)
                 }
             }
         }
-        update_ids(BS_ANT_NUM, max_subframe_id);
+        update_ids(cfg->BS_ANT_NUM, max_subframe_id);
     }
-
     write_stats_to_file(tx_frame_count);
     exit(0);
 }
@@ -215,24 +214,24 @@ void* Sender::loopMain(int tid)
 void* Sender::loopSend(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
-    int buffer_length = kTXBufOffset + config_->packet_length;
+
+    size_t buffer_length = kTXBufOffset + cfg->packet_length;
     /* Use mutex to sychronize data receiving across threads */
     pthread_mutex_lock(&mutex);
-    printf("Thread %d: waiting for release\n", tid);
+    printf("Thread %zu: waiting for release\n", (size_t)tid);
 
     pthread_cond_wait(&cond, &mutex);
     /* unlock all other threads */
     pthread_mutex_unlock(&mutex);
 
     double begin = get_time();
-    int packet_count = 0;
-    int total_tx_packets = 0;
-    int max_subframe_id = get_max_subframe_id();
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int ant_num_this_thread
-        = BS_ANT_NUM / thread_num + (tid < BS_ANT_NUM % thread_num ? 1 : 0);
-    printf("In thread %d, %d antennas, BS_ANT_NUM: %d, thread number: %d\n",
-        tid, ant_num_this_thread, BS_ANT_NUM, thread_num);
+    size_t packet_count = 0;
+    size_t total_tx_packets = 0;
+    size_t max_subframe_id = get_max_subframe_id();
+    size_t ant_num_this_thread = cfg->BS_ANT_NUM / thread_num
+        + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
+    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, thread number: %zu\n",
+        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     while (true) {
         int data_ptr = dequeue_send(tid);
         if (data_ptr == -1)
@@ -246,8 +245,10 @@ void* Sender::loopSend(int tid)
             double byte_len = buffer_length * ant_num_this_thread
                 * max_subframe_id * 1000.f;
             double diff = end - begin;
-            printf("thread %d send %d frames in %f secs, throughput %f Mbps\n",
-                tid, total_tx_packets / (ant_num_this_thread * max_subframe_id),
+            printf(
+                "Thread %zu send %zu frames in %f secs, throughput %f Mbps\n",
+                (size_t)tid,
+                total_tx_packets / (ant_num_this_thread * max_subframe_id),
                 diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
             begin = get_time();
             packet_count = 0;
@@ -257,11 +258,11 @@ void* Sender::loopSend(int tid)
 
 int Sender::dequeue_send(int tid)
 {
-    int data_ptr;
+    size_t data_ptr;
     if (!task_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
         return -1;
 
-    int buffer_length = kTXBufOffset + config_->packet_length;
+    size_t buffer_length = kTXBufOffset + cfg->packet_length;
 #if DEBUG_SENDER
     double start_time_send = get_time();
 #endif
@@ -275,53 +276,46 @@ int Sender::dequeue_send(int tid)
     ret = send(socket_[tid], tx_buffer_[data_ptr], buffer_length, 0);
 #endif
     if (ret < 0) {
-        perror("socket sendto failed");
+        perror("Socket sendto failed");
         exit(0);
     }
 
 #if DEBUG_SENDER
-    double end_time_send = get_time();
+    double tx_duration = get_time() - start_time_send;
     struct Packet* pkt = (struct Packet*)tx_buffer_[data_ptr];
-    printf("Thread %d transmit frame %d, subframe %d, ant %d, total: %d, "
-           "tx time: %.3f\n",
-        tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, total_tx_packets,
-        end_time_send - start_time_send);
+    printf("Thread %d transmit frame %d, subframe %d, ant %d, data_ptr: %zu,"
+        " tx time: %.3f\n", tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, 
+        data_ptr, tx_duration);
 #endif
 
     if (!message_queue_.enqueue(data_ptr)) {
-        printf("send message enqueue failed\n");
+        printf("Send message enqueue failed\n");
         exit(0);
     }
     return data_ptr;
 }
 
-int Sender::get_max_subframe_id()
+size_t Sender::get_max_subframe_id()
 {
-    int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int downlink_mode = config_->downlink_mode;
-    int max_subframe_id = downlink_mode
-        ? pilot_subframe_num_perframe
-        : pilot_subframe_num_perframe + data_subframe_num_perframe;
+    size_t max_subframe_id = cfg->downlink_mode
+        ? cfg->pilot_symbol_num_perframe
+        : cfg->pilot_symbol_num_perframe + cfg->data_symbol_num_perframe;
     return max_subframe_id;
 }
 
 void Sender::init_IQ_from_file()
 {
-    size_t BS_ANT_NUM = config_->BS_ANT_NUM;
-    size_t subframe_num_perframe = config_->symbol_num_perframe;
-    size_t OFDM_FRAME_LEN = config_->OFDM_FRAME_LEN;
-    size_t IQ_data_size = subframe_num_perframe * BS_ANT_NUM;
+    size_t IQ_data_size = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
 
-    IQ_data.calloc(IQ_data_size, OFDM_FRAME_LEN * 2, 64);
-    IQ_data_coded.calloc(IQ_data_size, OFDM_FRAME_LEN * 2, 64);
+    IQ_data.calloc(IQ_data_size, cfg->OFDM_FRAME_LEN * 2, 64);
+    IQ_data_coded.calloc(IQ_data_size, cfg->OFDM_FRAME_LEN * 2, 64);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
 #else
     std::string filename = cur_directory + "/data/rx_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
 #endif
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
@@ -329,7 +323,7 @@ void Sender::init_IQ_from_file()
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < IQ_data_size; i++) {
-        size_t expect_bytes = OFDM_FRAME_LEN * 2;
+        size_t expect_bytes = cfg->OFDM_FRAME_LEN * 2;
         size_t actual_bytes
             = fread(IQ_data[i], sizeof(float), expect_bytes, fp);
         if (expect_bytes != actual_bytes) {
@@ -338,7 +332,7 @@ void Sender::init_IQ_from_file()
                 actual_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
-        for (size_t j = 0; j < OFDM_FRAME_LEN * 2; j++) {
+        for (size_t j = 0; j < cfg->OFDM_FRAME_LEN * 2; j++) {
             IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 32768);
             // printf("i:%d, j:%d, Coded: %d, orignal:
             // %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
@@ -347,7 +341,7 @@ void Sender::init_IQ_from_file()
     fclose(fp);
 }
 
-void Sender::update_ids(int max_ant_id, int max_subframe_id)
+void Sender::update_ids(size_t max_ant_id, size_t max_subframe_id)
 {
     ant_id++;
     if (ant_id == max_ant_id) {
@@ -379,41 +373,37 @@ void Sender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
 
 void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
 {
-    if (config_->downlink_mode) {
+    if (cfg->downlink_mode) {
         if (tx_frame_count < 500) {
             delay_ticks(
-                tick_start, 2 * config_->data_symbol_num_perframe * ticks_all);
+                tick_start, 2 * cfg->data_symbol_num_perframe * ticks_all);
         } else {
-            delay_ticks(
-                tick_start, config_->data_symbol_num_perframe * ticks_all);
+            delay_ticks(tick_start, cfg->data_symbol_num_perframe * ticks_all);
         }
     }
 }
 
 void Sender::preload_tx_buffer()
 {
-    int max_subframe_id = get_max_subframe_id();
-    int max_length_ = BUFFER_FRAME_NUM * max_subframe_id * config_->BS_ANT_NUM;
-    for (int i = 0; i < max_length_; i++) {
+    size_t max_subframe_id = get_max_subframe_id();
+    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    for (size_t i = 0; i < max_length_; i++) {
         update_tx_buffer(i);
-        update_ids(config_->BS_ANT_NUM, max_subframe_id);
+        update_ids(cfg->BS_ANT_NUM, max_subframe_id);
     }
 }
 
-void Sender::update_tx_buffer(int data_ptr)
+void Sender::update_tx_buffer(size_t data_ptr)
 {
-    int tx_ant_id = data_ptr % config_->BS_ANT_NUM;
-    int data_index = subframe_id * config_->BS_ANT_NUM + tx_ant_id;
+    int tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
+    int data_index = subframe_id * cfg->BS_ANT_NUM + tx_ant_id;
     struct Packet* pkt = (struct Packet*)(tx_buffer_[data_ptr] + kTXBufOffset);
     pkt->frame_id = frame_id;
-    pkt->symbol_id = config_->getSymbolId(subframe_id);
+    pkt->symbol_id = cfg->getSymbolId(subframe_id);
     pkt->cell_id = 0;
     pkt->ant_id = ant_id;
     memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-        sizeof(ushort) * config_->OFDM_FRAME_LEN * 2);
-    // fastMemcpy(tx_buffer_[data_ptr] + kTXBufOffset + data_offset,
-    // (char
-    // *)IQ_data_coded[data_index], sizeof(ushort) * OFDM_FRAME_LEN * 2);
+        sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
 }
 
 void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)

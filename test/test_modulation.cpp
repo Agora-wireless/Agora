@@ -12,12 +12,12 @@
 void flushCache()
 {
     const size_t bigger_than_cachesize = 2 * 1024; // 100 * 1024 * 1024;
-    long* p = new long[bigger_than_cachesize];
+    auto* p = new long[bigger_than_cachesize];
     // When you want to "flush" cache.
     for (size_t i = 0; i < bigger_than_cachesize; i++) {
         p[i] = rand();
     }
-    delete p;
+    delete[] p;
 }
 
 static double bench_mod_16qam(unsigned iterations, unsigned mode)

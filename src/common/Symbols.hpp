@@ -10,7 +10,9 @@
 //#define GENERATE_PILOT
 
 #ifdef USE_ARGOS
+#ifndef GENERATE_DATA
 #define GENERATE_DATA
+#endif
 #endif
 
 #define SEPARATE_TX_RX 1
