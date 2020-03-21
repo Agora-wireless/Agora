@@ -42,7 +42,6 @@ PacketTXRX::~PacketTXRX()
     delete[] socket_;
     radioconfig_->radioStop();
     delete radioconfig_;
-    delete config_;
 }
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,

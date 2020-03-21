@@ -128,7 +128,6 @@ PacketTXRX::~PacketTXRX()
     delete[] socket_;
     delete[] tx_context;
     delete[] rx_context;
-    delete config_;
 }
 
 int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
