@@ -591,8 +591,7 @@ extern "C" {
 __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
 
-    Config* cfg = new Config(filename);
-
+    auto* cfg = new Config(filename);
     return cfg;
 }
 }

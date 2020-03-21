@@ -6,29 +6,27 @@
 
 #include "receiver.hpp"
 
-Receiver::Receiver(Config* cfg, int RX_THREAD_NUM, int in_core_offset)
+Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)
+    : rx_thread_num_(rx_thread_num)
+    , core_id_(core_offset)
+    , cfg(cfg)
 {
-    config_ = cfg;
-    rx_thread_num_ = RX_THREAD_NUM;
-
-    core_id_ = in_core_offset;
-    packet_length = cfg->packet_length;
 }
 
-Receiver::Receiver(Config* cfg, int RX_THREAD_NUM, int in_core_offset,
+Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
     moodycamel::ProducerToken** in_rx_ptoks)
-    : Receiver(cfg, RX_THREAD_NUM, in_core_offset)
+    : Receiver(cfg, rx_thread_num, core_offset)
 {
     message_queue_ = in_queue_message;
     rx_ptoks_ = in_rx_ptoks;
 }
 
-Receiver::~Receiver() { delete config_; }
+Receiver::~Receiver() { delete cfg; }
 
 std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
-    Table<int>& in_buffer_status, int in_buffer_frame_num,
-    long long in_buffer_length, Table<double>& in_frame_start)
+    Table<int>& in_buffer_status, size_t in_buffer_frame_num,
+    size_t in_buffer_length, Table<double>& in_frame_start)
 {
     buffer_frame_num_ = in_buffer_frame_num;
     buffer_length_ = in_buffer_length;
@@ -59,7 +57,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
         worker_id++;
     }
 #else
-    for (int i = 0; i < rx_thread_num_; i++) {
+    for (size_t i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread_;
         auto context = new EventHandlerContext<Receiver>;
         context->obj_ptr = this;
@@ -67,7 +65,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
         if (pthread_create(&recv_thread_, NULL,
                 pthread_fun_wrapper<Receiver, &Receiver::loopRecv>, context)
             != 0) {
-            perror("socket recv thread create failed");
+            perror("Socket recv thread create failed");
             exit(0);
         }
         created_threads.push_back(recv_thread_);
@@ -78,21 +76,21 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
 
 void* Receiver::loopRecv(int tid)
 {
-    int core_offset = core_id_ + rx_thread_num_ + 2;
+    size_t core_offset = core_id_ + rx_thread_num_ + 2;
     pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
 #if USE_IPV4
     struct sockaddr_in remote_addr;
     int socket_local
-        = setup_socket_ipv4(config_->ue_rx_port + tid, true, sock_buf_size);
+        = setup_socket_ipv4(cfg->ue_rx_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv4(
-        &remote_addr, config_->bs_port + tid, config_->rx_addr.c_str());
+        &remote_addr, cfg->bs_port + tid, cfg->rx_addr.c_str());
 #else
     int socket_local
-        = setup_socket_ipv6(config_->ue_rx_port + tid, true, sock_buf_size);
+        = setup_socket_ipv6(cfg->ue_rx_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv6(
-        &remote_addr, config_->bs_port + tid, "fe80::f436:d735:b04a:864a");
+        &remote_addr, cfg->bs_port + tid, "fe80::f436:d735:b04a:864a");
 #endif
 
     /* use token to speed up */
@@ -117,19 +115,21 @@ void* Receiver::loopRecv(int tid)
     int* cur_buffer_status_ptr = buffer_status_ptr;
     // loop recv
     socklen_t addrlen = sizeof(remote_addr);
-    int offset = 0;
+    size_t offset = 0;
     int prev_frame_id = -1;
     while (true) {
         /* if buffer is full, exit */
         if (cur_buffer_status_ptr[0] == 1) {
-            printf("Receive thread %d buffer full, offset: %d\n", tid, offset);
+            printf("Receive thread %d buffer full, offset: %zu\n", tid, offset);
             exit(0);
         }
+
         int recvlen = -1;
         // if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr,
         // packet_length, 0))<0) {
         if ((recvlen = recvfrom(socket_local, (char*)cur_buffer_ptr,
-                 packet_length, 0, (struct sockaddr*)&remote_addr, &addrlen))
+                 cfg->packet_length, 0, (struct sockaddr*)&remote_addr,
+                 &addrlen))
             < 0) {
             perror("recv failed");
             exit(0);
@@ -159,7 +159,8 @@ void* Receiver::loopRecv(int tid)
         cur_buffer_status_ptr
             = buffer_status_ptr + (offset + 1) % buffer_frame_num;
         cur_buffer_ptr = buffer_ptr
-            + (cur_buffer_ptr - buffer_ptr + packet_length) % buffer_length;
+            + (cur_buffer_ptr - buffer_ptr + cfg->packet_length)
+                % buffer_length;
 
         /* Push packet received event into the queue. data records the position
          * of this packet in the buffer & tid of this socket (so that task

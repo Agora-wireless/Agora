@@ -9,9 +9,9 @@
 #include <arpa/inet.h>
 #include <iostream>
 #include <netinet/in.h>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <vector>
@@ -43,15 +43,15 @@ typedef unsigned short ushort;
 class Sender {
 public:
 #ifdef USE_DPDK
-    static const int kTXBufOffset = 22;
+    static const size_t kTXBufOffset = 22;
 #else
-    static const int kTXBufOffset = 0;
+    static const size_t kTXBufOffset = 0;
 #endif
-    static const int BUFFER_FRAME_NUM = 40;
+    static const size_t BUFFER_FRAME_NUM = 40;
 
 public:
-    Sender(Config* in_config, int in_thread_num, int in_core_offset = 30,
-        int in_delay = 0);
+    Sender(Config* in_config, size_t in_thread_num, size_t in_core_offset = 30,
+        size_t in_delay = 0);
     ~Sender();
 
     void startTX();
@@ -60,18 +60,18 @@ public:
     void* loopSend(int tid);
     int dequeue_send(int tid);
     void init_IQ_from_file();
-    int get_max_subframe_id();
+    size_t get_max_subframe_id();
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
-    void update_ids(int max_ant_id, int max_subframe_id);
+    void update_ids(size_t max_ant_id, size_t max_subframe_id);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void preload_tx_buffer();
-    void update_tx_buffer(int data_ptr);
+    void update_tx_buffer(size_t data_ptr);
     void write_stats_to_file(size_t tx_frame_count);
 
 private:
-    Config* config_;
+    Config* cfg;
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -85,37 +85,33 @@ private:
     int* socket_;
     // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
-    // std::vector<std::vector<char,boost::alignment::aligned_allocator<char,
-    // 64>>> tx_buffer_;
     Table<char> tx_buffer_;
-    // int cur_ptr_;
-    int buffer_len_;
+    size_t buffer_len_;
     pthread_mutex_t lock_;
 
-    moodycamel::ConcurrentQueue<int> task_queue_
-        = moodycamel::ConcurrentQueue<int>(1024);
-    moodycamel::ConcurrentQueue<int> message_queue_
-        = moodycamel::ConcurrentQueue<int>(1024);
+    moodycamel::ConcurrentQueue<size_t> task_queue_
+        = moodycamel::ConcurrentQueue<size_t>(1024);
+    moodycamel::ConcurrentQueue<size_t> message_queue_
+        = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
-    int ant_id;
-    int frame_id;
-    int subframe_id;
+    size_t ant_id;
+    size_t frame_id;
+    size_t subframe_id;
 
     // First dimension: subframe_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
     Table<float> IQ_data;
     Table<ushort> IQ_data_coded;
 
-    int thread_num;
-    int socket_num;
+    size_t thread_num;
+    size_t socket_num;
 
-    int core_offset;
-    int delay;
-    EventHandlerContext<Sender>* context;
+    size_t core_offset;
+    size_t delay;
 
-    Table<int> packet_count_per_subframe;
-    int* packet_count_per_frame;
+    Table<size_t> packet_count_per_subframe;
+    size_t* packet_count_per_frame;
 
     double* frame_start;
     double* frame_end;

@@ -1393,7 +1393,7 @@ extern "C" {
 EXPORT Millipede* Millipede_new(Config* cfg)
 {
     // printf("Size of Millipede: %d\n",sizeof(Millipede *));
-    Millipede* millipede = new Millipede(cfg);
+    auto* millipede = new Millipede(cfg);
 
     return millipede;
 }
