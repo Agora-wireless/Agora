@@ -7,40 +7,30 @@
 #ifndef SIMULATOR_HEAD
 #define SIMULATOR_HEAD
 
+#include "buffer.hpp"
+#include "concurrentqueue.h"
+#include "config.hpp"
+#include "gettime.h"
+#include "memory_manage.h"
+#include "offset.h"
+#include "receiver.hpp"
+#include "sender.hpp"
+#include "signalHandler.hpp"
+#include <algorithm>
+#include <emmintrin.h>
 #include <fcntl.h>
+#include <immintrin.h>
 #include <iostream>
+#include <math.h>
 #include <memory>
 #include <pthread.h>
 #include <queue>
-#include <system_error>
-#include <unistd.h>
-#include <vector>
-// #include <complex.h>
-#include <math.h>
-#include <tuple>
-// #include <armadillo>
-#include <algorithm>
-#include <emmintrin.h>
-#include <immintrin.h>
 #include <signal.h>
 #include <stdint.h>
-// #include <aff3ct.hpp>
-// #include "mkl_dfti.h"
-// #include <hpctoolkit.h>
-// #include <cblas.h>
-// #include <stdio.h>
-#include "buffer.hpp"
-#include "concurrentqueue.h"
-#include "gettime.h"
-#include "receiver.hpp"
-#include "sender.hpp"
-// #include "compute_common.hpp"
-#include "offset.h"
-// #include "dofft.hpp"
-// #include "dodemul.hpp"
-#include "config.hpp"
-#include "memory_manage.h"
-#include "signalHandler.hpp"
+#include <system_error>
+#include <tuple>
+#include <unistd.h>
+#include <vector>
 
 class Simulator {
 public:
@@ -53,8 +43,9 @@ public:
     static constexpr size_t kDequeueBulkSize = 32;
     static constexpr size_t kDequeueBulkSizeSingle = 8;
 
-    Simulator(Config* cfg, size_t task_thread_num, size_t socket_tx_num,
-        size_t core_offset, size_t sender_delay);
+    Simulator(Config* cfg, size_t task_thread_num, size_t core_offset,
+        size_t sender_delay);
+
     ~Simulator();
 
     void start();

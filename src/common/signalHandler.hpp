@@ -1,7 +1,7 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
 #ifndef __SIGNALHANDLER_H__
-#define __SIGNALHANDLER_H_
+#define __SIGNALHANDLER_H__
 #include <stdexcept>
 using std::runtime_error;
 

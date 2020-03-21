@@ -134,7 +134,7 @@ public:
     int ue_tx_port;
 
     /* used in sender to control how many frames to send*/
-    int tx_frame_num;
+    size_t tx_frame_num;
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;
@@ -146,6 +146,7 @@ public:
     std::atomic<bool> running;
 
     size_t getNumAntennas() { return nRadios * nChannels; }
+    int getSymbolId(size_t symbol_id);
     int getDlSFIndex(size_t, size_t);
     int getUlSFIndex(size_t, size_t);
     int getDownlinkPilotId(size_t, size_t);
