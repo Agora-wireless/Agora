@@ -445,6 +445,13 @@ Config::~Config()
     ul_IQ_modul.free();
 }
 
+int Config::getSymbolId(size_t symbol_id)
+{
+    return (symbol_id < pilot_symbol_num_perframe
+            ? pilotSymbols[0][symbol_id]
+            : ULSymbols[0][symbol_id - pilot_symbol_num_perframe]);
+}
+
 int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
@@ -584,8 +591,7 @@ extern "C" {
 __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
 
-    Config* cfg = new Config(filename);
-
+    auto* cfg = new Config(filename);
     return cfg;
 }
 }

@@ -242,7 +242,7 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
     printf("sum: %.3f\n", sum_time_this_frame);
 #endif
 #endif
-    last_frame_id = frame_id;
+    last_frame_id = (size_t)frame_id;
 }
 
 void Stats::update_stats_in_functions_downlink(int frame_id)
@@ -285,7 +285,7 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
     printf("sum: %.3f\n", sum_time_this_frame);
 #endif
 #endif
-    last_frame_id = frame_id;
+    last_frame_id = (size_t)frame_id;
 }
 
 void Stats::update_stats_in_dofft(
@@ -546,10 +546,10 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
         &encode_stats_per_frame, task_thread_num, break_down_num);
 }
 
-void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
+void Stats::save_to_file(size_t last_frame_id, int socket_rx_thread_num)
 {
     printf("saving timestamps to file.........\n");
-    printf("Total processed frames %d \n", last_frame_id + 1);
+    printf("Total processed frames %zu \n", last_frame_id + 1);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
@@ -559,7 +559,7 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
         exit(0);
     }
     if (config_->downlink_mode) {
-        for (int ii = 0; ii < last_frame_id; ii++) {
+        for (size_t ii = 0; ii < last_frame_id; ii++) {
             if (socket_rx_thread_num == 1) {
                 fprintf(fp_debug,
                     "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
@@ -584,7 +584,7 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
             }
         }
     } else {
-        for (int ii = 0; ii < last_frame_id; ii++) {
+        for (size_t ii = 0; ii < last_frame_id; ii++) {
             if (socket_rx_thread_num == 1) {
                 fprintf(fp_debug,
                     "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
@@ -618,7 +618,7 @@ void Stats::save_to_file(int last_frame_id, int socket_rx_thread_num)
             exit(0);
         }
 
-        for (int ii = 0; ii < last_frame_id; ii++) {
+        for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug_detailed,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
                 fft_time_in_function_details[0][ii],
@@ -653,7 +653,7 @@ double Stats::compute_count_percentage(
     return percentage;
 }
 
-void Stats::print_summary(UNUSED int last_frame_id)
+void Stats::print_summary(UNUSED size_t last_frame_id)
 {
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
@@ -680,7 +680,7 @@ void Stats::print_summary(UNUSED int last_frame_id)
     int Precode_total_count
         = compute_total_count(precode_stats_worker, task_thread_num);
     double csi_frames = (double)CSI_total_count / BS_ANT_NUM / PILOT_NUM;
-    double zf_frames = (double)ZF_total_count / OFDM_DATA_NUM;
+    double zf_frames = (double)ZF_total_count / config_->zf_block_num;
     if (config_->downlink_mode) {
         double precode_frames = (double)Precode_total_count / OFDM_DATA_NUM
             / dl_data_subframe_num_perframe;

@@ -18,6 +18,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
     rxStreams.resize(_radioNum);
     context = new ClientRadioConfigContext[_radioNum];
     remainingJobs = _radioNum;
+
     for (size_t i = 0; i < this->_radioNum; i++) {
         context[i].ptr = this;
         context[i].tid = i;

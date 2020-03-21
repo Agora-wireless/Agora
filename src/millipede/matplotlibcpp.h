@@ -1392,7 +1392,7 @@ inline double* xlim()
     PyObject* left = PyTuple_GetItem(res, 0);
     PyObject* right = PyTuple_GetItem(res, 1);
 
-    double* arr = new double[2];
+    auto* arr = new double[2];
     arr[0] = PyFloat_AsDouble(left);
     arr[1] = PyFloat_AsDouble(right);
 
@@ -1411,7 +1411,7 @@ inline double* ylim()
     PyObject* left = PyTuple_GetItem(res, 0);
     PyObject* right = PyTuple_GetItem(res, 1);
 
-    double* arr = new double[2];
+    auto* arr = new double[2];
     arr[0] = PyFloat_AsDouble(left);
     arr[1] = PyFloat_AsDouble(right);
 

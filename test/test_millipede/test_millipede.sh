@@ -2,7 +2,7 @@
 num_iters=1
 
 # Check if the user supplied a number-of-iterations argument
-if [ "$#" -eq 2 ]; then
+if [ "$#" -eq 1 ]; then
   num_iters=$1
 fi
 

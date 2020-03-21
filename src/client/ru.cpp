@@ -121,7 +121,7 @@ std::vector<pthread_t> RU::startProc(Table<char>& in_buffer,
     for (int i = 0; i < thread_num_; i++) {
         pthread_t proc_thread_;
         // record the thread id
-        RUContext* context = new RUContext;
+        auto* context = new RUContext;
         context->ptr = this;
         context->tid = i;
         // start socket thread
@@ -159,16 +159,17 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer,
 #ifdef SEPARATE_TX_THREAD
     printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
-        pthread_t send_thread_;
-        RUContext* context = new RUContext;
+        auto* context = new RUContext;
         context->ptr = this;
         context->tid = i;
-        if (pthread_create(&send_thread_, NULL, sendThread_launch, context)
+
+        pthread_t send_thread;
+        if (pthread_create(&send_thread, NULL, sendThread_launch, context)
             != 0) {
             perror("socket Transmit thread create failed");
             exit(0);
         }
-        created_threads.push_back(send_thread_);
+        created_threads.push_back(send_thread);
     }
 
 #endif
@@ -243,7 +244,7 @@ void RU::sendThread(int tid)
         // first sending pilots in sim mode
         // for (int p_id = 0; p_id < cfg->pilotSymsPerFrame; p_id++)
         {
-            struct Packet* pkt = (struct Packet*)pilot_buffer_;
+            auto* pkt = (struct Packet*)pilot_buffer_;
             new (pkt)
                 Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
             // ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(),
@@ -268,8 +269,7 @@ void RU::sendThread(int tid)
             offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(),
                 config_->getNumAntennas(), frame_id, symbol_id, ant_id);
             // send data (one OFDM symbol)
-            struct Packet* pkt
-                = (struct Packet*)(tx_buffer_ + offset * packet_length);
+            auto* pkt = (struct Packet*)(tx_buffer_ + offset * packet_length);
             new (pkt) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
 
             if (sendto(tx_socket_[tid], (char*)pkt, packet_length, 0,
