@@ -107,7 +107,7 @@ public:
 private:
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
-    Config* config_;
+    Config *cfg, *config_; // XXX: Change all uses of config_ to cfg
     int fft_created_count;
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
