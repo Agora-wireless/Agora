@@ -58,15 +58,15 @@ public:
     void update_stats_in_functions_downlink(int frame_id);
     void update_stats_in_functions_downlink_bigstation(int frame_id);
     void update_stats_in_functions_downlink_millipede(int frame_id);
-    void save_to_file(int last_frame_id, int socket_rx_thread_num);
-    void save_to_file_details(int last_frame_id);
+    void save_to_file(size_t last_frame_id, int socket_rx_thread_num);
+    void save_to_file_details(size_t last_frame_id);
 
     int compute_total_count(Stats_worker stats_in_worker, int thread_num);
     double compute_count_percentage(
         Stats_worker stats_in_worker, int total_count, int thread_id);
-    void print_summary(int last_frame_id);
+    void print_summary(size_t last_frame_id);
 
-    int last_frame_id;
+    size_t last_frame_id;
 
     /* stats for the master thread */
     void update_pilot_received(int frame_id)

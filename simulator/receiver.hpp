@@ -12,6 +12,7 @@
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "gettime.h"
+#include "net.hpp"
 #include "offset.h"
 #include <algorithm>
 #include <arpa/inet.h>
@@ -68,28 +69,25 @@
 
 typedef unsigned short ushort;
 class Receiver {
-public:
-    // use for create pthread
-    struct ReceiverContext {
-        Receiver* ptr;
-        int tid;
-#ifdef USE_ARGOS
-        int radios;
-#endif
-    };
+    // public:
+    //     // use for create pthread
+    //     struct ReceiverContext {
+    //         Receiver* ptr;
+    //         int tid;
+    // #ifdef USE_ARGOS
+    //         int radios;
+    // #endif
+    //     };
 
 public:
-    Receiver(Config* cfg, size_t rx_thread_num = 1, size_t tx_thread_num = 1,
-        size_t core_offset = 1);
+    Receiver(Config* cfg, size_t rx_thread_num = 1, size_t core_offset = 1);
 
     /**
-     * rx_thread_num: socket thread number
+     * rx_thread_num: RX thread number
      * in_queue: message queue to communicate with main thread
      */
-    Receiver(Config* cfg, size_t rx_thread_num, size_t tx_thread_num,
-        size_t core_offset,
+    Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks);
     ~Receiver();
 
@@ -113,21 +111,6 @@ public:
     void* loopRecv(int tid);
 
 private:
-    size_t BS_ANT_NUM, UE_NUM;
-    size_t OFDM_CA_NUM;
-    size_t OFDM_DATA_NUM;
-    size_t subframe_num_perframe, data_subframe_num_perframe;
-    size_t ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
-    bool downlink_mode;
-    size_t packet_length;
-
-#if USE_IPV4
-    struct sockaddr_in servaddr_[10]; /* server address */
-#else
-    struct sockaddr_in6 servaddr_[10]; /* server address */
-#endif
-    int* socket_;
-
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
@@ -140,25 +123,16 @@ private:
     int* tx_buffer_status_;
     long long tx_buffer_length_;
     int tx_buffer_frame_num_;
-    // float *tx_data_buffer_;
 
     size_t rx_thread_num_;
     size_t tx_thread_num_;
 
     Table<double>* frame_start_;
-    // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
-    moodycamel::ProducerToken** tx_ptoks_;
     size_t core_id_;
-    size_t tx_core_id_;
-
-    ReceiverContext* tx_context;
-    ReceiverContext* rx_context;
-
-    Config* config_;
-    int radios_per_thread;
+    Config* cfg;
+    // int radios_per_thread;
 };
 
 #endif

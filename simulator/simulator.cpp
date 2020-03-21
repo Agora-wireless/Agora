@@ -6,10 +6,10 @@
 #include "simulator.hpp"
 
 Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
-    size_t in_socket_tx_num, size_t in_core_offset, size_t sender_delay)
+    size_t in_core_offset, size_t sender_delay)
     : TASK_THREAD_NUM(in_task_thread_num)
-    , SOCKET_RX_THREAD_NUM(in_socket_tx_num)
-    , SOCKET_TX_THREAD_NUM(in_socket_tx_num)
+    , SOCKET_RX_THREAD_NUM(in_task_thread_num)
+    , SOCKET_TX_THREAD_NUM(in_task_thread_num)
     , CORE_OFFSET(in_core_offset)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
@@ -35,9 +35,8 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
         config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay));
 
     printf("new Receiver\n");
-    receiver_.reset(
-        new Receiver(config_, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM,
-            CORE_OFFSET, &message_queue_, &complete_task_queue_, rx_ptoks_ptr));
+    receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
+        &message_queue_, rx_ptoks_ptr));
 }
 
 Simulator::~Simulator() { free_uplink_buffers(); }
@@ -72,30 +71,17 @@ void Simulator::start()
 
     int ret = 0;
     Event_data events_list[kDequeueBulkSize];
-    int miss_count = 0;
-    int total_count = 0;
 
     /* start transmitter */
     sender_->startTXfromMain(frame_start_tx, frame_end_tx);
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* get a bulk of events */
-        // if (last_dequeue == 0) {
         ret = 0;
         ret = message_queue_.try_dequeue_bulk(
             ctok, events_list, kDequeueBulkSizeSingle);
 
-        // XXX: Is the check against 1e9 needed with size_t?
-        total_count++;
-        if (total_count == 1e9) {
-            // printf("message dequeue miss rate %f\n", (float)miss_count /
-            // total_count);
-            total_count = 0;
-            miss_count = 0;
-        }
-        if (ret == 0) {
-            miss_count++;
+        if (ret == 0)
             continue;
-        }
 
         /* handle each event */
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
@@ -103,21 +89,23 @@ void Simulator::start()
             switch (event.event_type) {
             case EventType::kPacketRX: {
                 int offset = event.data;
-                int socket_thread_id, offset_in_current_buffer;
+                int socket_thread_id, buf_offset;
                 interpreteOffset2d_setbits(
-                    offset, &socket_thread_id, &offset_in_current_buffer, 28);
+                    offset, &socket_thread_id, &buf_offset, 28);
 
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
-                    + (long long)offset_in_current_buffer * packet_length;
+                    + (long long)buf_offset * packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
                 int frame_id = pkt->frame_id % 10000;
                 int subframe_id = pkt->symbol_id;
                 int ant_id = pkt->ant_id;
                 int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
-                // int prev_frame_id = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
+                socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
-                // printf("In main: received from frame %d %d, subframe %d, ant
-                // %d\n", frame_id, frame_id_in_buffer, subframe_id, ant_id);
+                // printf(
+                //     "In main: received from frame %d %d, subframe %d, ant
+                //     %d\n", frame_id, frame_id_in_buffer, subframe_id,
+                //     ant_id);
 
                 update_rx_counters(
                     frame_id, frame_id_in_buffer, subframe_id, ant_id);
