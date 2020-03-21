@@ -42,7 +42,7 @@ find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
-set(USE_LDPC True CACHE STRING "USE_LDPC defaulting to 'False'")
+set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
