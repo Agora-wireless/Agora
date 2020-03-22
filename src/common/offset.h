@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 #ifndef OFFSET_H
 #define OFFSET_H

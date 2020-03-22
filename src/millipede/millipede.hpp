@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 
 #ifndef MILLIPEDE_HEAD
@@ -53,9 +53,11 @@
 
 class Millipede {
 public:
-    /* optimization parameters for block transpose (see the slides for more details) */
+    /* optimization parameters for block transpose (see the slides for more
+     * details) */
     static const int transpose_block_num = 256;
-    /* dequeue bulk size, used to reduce the overhead of dequeue in main thread */
+    /* dequeue bulk size, used to reduce the overhead of dequeue in main thread
+     */
     static const int dequeue_bulk_size = 32;
     static const int dequeue_bulk_size_single = 8;
 
@@ -69,6 +71,8 @@ public:
     void* worker_zf(int tid);
     void* worker_demul(int tid);
     void* worker(int tid);
+
+    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
     // struct EventHandlerContext
@@ -78,12 +82,15 @@ public:
     // };
 
     /* Add tasks into task queue based on event type */
-    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id, Consumer const& consumer);
+    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id,
+        Consumer const& consumer);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
-    void print_per_subframe_done(int task_type, int frame_count, int frame_id, int subframe_id);
-    void print_per_task_done(int task_type, int frame_id, int subframe_id, int ant_or_sc_id);
+    void print_per_subframe_done(
+        int task_type, int frame_count, int frame_id, int subframe_id);
+    void print_per_task_done(
+        int task_type, int frame_id, int subframe_id, int ant_or_sc_id);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -92,6 +99,7 @@ public:
     void free_downlink_buffers();
 
     void save_demul_data_to_file(int frame_id);
+    void save_decode_data_to_file(int frame_id);
     void save_ifft_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
@@ -113,20 +121,22 @@ private:
      * Buffers
      *****************************************************/
     /* Uplink */
-    /** 
-     * received data 
+    /**
+     * received data
      * Frist dimension: SOCKET_THREAD_NUM
-     * Second dimension of buffer (type: char): packet_length * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * Second dimension of buffer (type: char): packet_length *
+     * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * SOCKET_BUFFER_FRAME_NUM
      */
     Table<char> socket_buffer_;
     Table<int> socket_buffer_status_;
     long long socket_buffer_size_;
     int socket_buffer_status_size_;
 
-    /** 
-     * Estimated CSI data 
+    /**
+     * Estimated CSI data
      * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM
      * First dimension: UE_NUM * TASK_BUFFER_FRAME_NUM
@@ -134,11 +144,13 @@ private:
      */
     Table<complex_float> csi_buffer_;
 
-    /** 
+    /**
      * Data symbols after IFFT
-     * First dimension: total subframe number in the buffer: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: BS_ANT_NUM * OFDM_CA_NUM
-     * second dimension data order: SC1-32 of ants, SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32 subcarriers)
+     * First dimension: total subframe number in the buffer:
+     * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
+     * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
+     * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
+     * subcarriers)
      */
     Table<complex_float> data_buffer_;
 
@@ -151,15 +163,15 @@ private:
 
     /**
      * Data after equalization
-     * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
-     * Second dimension: OFDM_CA_NUM * UE_NUM
+     * First dimension: data_subframe_num_perframe (40-4) *
+     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     Table<complex_float> equal_buffer_;
 
     /**
      * Data after demodulation
-     * First dimension: data_subframe_num_perframe (40-4) * TASK_BUFFER_FRAME_NUM
-     * Second dimension: OFDM_CA_NUM * UE_NUM
+     * First dimension: data_subframe_num_perframe (40-4) *
+     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     Table<uint8_t> demod_hard_buffer_;
 
@@ -183,24 +195,25 @@ private:
     Table<int> delay_fft_queue;
     int* delay_fft_queue_cnt;
 
-    /** 
+    /**
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
     Table<long long> dl_IQ_data_long;
 
-    /** 
+    /**
      * Modulated data
-     * First dimension: subframe_num_perframe (40) * UE_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: OFDM_CA_NUM
+     * First dimension: subframe_num_perframe (40) * UE_NUM *
+     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM
      */
     // RawDataBuffer dl_rawdata_buffer_;
 
     /**
      * Data for IFFT
-     * First dimension: FFT_buffer_block_num = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
-     * Second dimension: OFDM_CA_NUM
+     * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
+     * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
+     * OFDM_CA_NUM
      */
     Table<complex_float> dl_ifft_buffer_;
 
@@ -208,7 +221,8 @@ private:
      * Data after IFFT
      * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
      * second dimension: UE_NUM * OFDM_CA_NUM
-     * second dimension data order: SC1-32 of UEs, SC33-64 of UEs, ..., SC993-1024 of UEs (32 blocks each with 32 subcarriers)
+     * second dimension data order: SC1-32 of UEs, SC33-64 of UEs, ...,
+     * SC993-1024 of UEs (32 blocks each with 32 subcarriers)
      */
     // DataBuffer dl_iffted_data_buffer_;
 
@@ -219,10 +233,11 @@ private:
 
     /**
      * Data for transmission
-     * First dimension of buffer (type: char): subframe_num_perframe * SOCKET_BUFFER_FRAME_NUM
-     * Second dimension: packet_length * BS_ANT_NUM
+     * First dimension of buffer (type: char): subframe_num_perframe *
+     * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * BS_ANT_NUM
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * SOCKET_BUFFER_FRAME_NUM
      */
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
@@ -230,7 +245,7 @@ private:
     int dl_socket_buffer_status_size_;
 
     /*****************************************************
-     * Concurrent queues 
+     * Concurrent queues
      *****************************************************/
     /* Uplink*/
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;

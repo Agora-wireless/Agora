@@ -1,16 +1,16 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 #include "reciprocity.hpp"
 #include "Consumer.hpp"
 
 using namespace arma;
 Reciprocity::Reciprocity(Config* in_config, int in_tid,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-    Table<complex_float>& in_calib_buffer, Table<complex_float>& in_recip_buffer,
-    Stats* in_stats_manager)
+    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+    Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , calib_buffer_(in_calib_buffer)
     , recip_buffer_(in_recip_buffer)
@@ -20,13 +20,11 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
     BS_ANT_NUM = config_->BS_ANT_NUM;
     OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
 
-    calib_gather_buffer = (complex_float*)aligned_alloc(64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
+    calib_gather_buffer = (complex_float*)aligned_alloc(
+        64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
 }
 
-Reciprocity::~Reciprocity()
-{
-    free(calib_gather_buffer);
-}
+Reciprocity::~Reciprocity() { free(calib_gather_buffer); }
 
 void Reciprocity::launch(int offset)
 {
@@ -54,8 +52,10 @@ void Reciprocity::launch(int offset)
         for (int sc_id = ant_id; sc_id < OFDM_DATA_NUM; sc_id += BS_ANT_NUM) {
             // TODO: interpolate here
             for (int i = 0; i < BS_ANT_NUM; i++) {
-                recip_buff[(sc_id + i) * BS_ANT_NUM + ant_id].re = mat_output.at(ant_id, sc_id).real();
-                recip_buff[(sc_id + i) * BS_ANT_NUM + ant_id].im = mat_output.at(ant_id, sc_id).imag();
+                recip_buff[(sc_id + i) * BS_ANT_NUM + ant_id].re
+                    = mat_output.at(ant_id, sc_id).real();
+                recip_buff[(sc_id + i) * BS_ANT_NUM + ant_id].im
+                    = mat_output.at(ant_id, sc_id).imag();
             }
         }
     }
@@ -89,9 +89,7 @@ void Reciprocity::launch(int offset)
     }
 #endif
 
-    // inform main thread
-    Event_data RC_finish_event;
-    RC_finish_event.event_type = EVENT_RC;
-    RC_finish_event.data = offset;
+    /* Inform main thread */
+    Event_data RC_finish_event(EventType::kRC, offset);
     consumer_.handle(RC_finish_event);
 }

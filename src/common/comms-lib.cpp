@@ -3,16 +3,16 @@
  Generate training sequence for pilots and preambles.
 
  Supports:
- STS - 802.11 Short training sequence. Generates one symbol, 16 complex I/Q samples.
- LTS - 802.11 Long training sequence. Generates 2.5 symbols, cp length of 32 samples, 
-       for a total of 160 complex I/Q samples.
- LTE Zadoff Chu - Generates the 25th root length-63 Zadoff-Chu sequence.
-       Total of 63-long complex IQ samples.
- Gold IFFT - Total of 128-long complex IQ samples including a 32-sample cyclic prefix
- Hadamard - Real valued sequence. Possible lenghts: {2, 4, 8, 16, 32, 64}
+ STS - 802.11 Short training sequence. Generates one symbol, 16 complex I/Q
+samples. LTS - 802.11 Long training sequence. Generates 2.5 symbols, cp length
+of 32 samples, for a total of 160 complex I/Q samples. LTE Zadoff Chu -
+Generates the 25th root length-63 Zadoff-Chu sequence. Total of 63-long complex
+IQ samples. Gold IFFT - Total of 128-long complex IQ samples including a
+32-sample cyclic prefix Hadamard - Real valued sequence. Possible lenghts: {2,
+4, 8, 16, 32, 64}
 
 ---------------------------------------------------------------------
- Copyright (c) 2018-2019, Rice University 
+ Copyright (c) 2018-2019, Rice University
  RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
  Author(s): Oscar Bejarano: obejarano@rice.edu
             Rahman Doost-Mohamamdy: doost@rice.edu
@@ -21,7 +21,8 @@
 
 #include "comms-lib.h"
 
-size_t CommsLib::find_pilot_seq(std::vector<std::complex<double>> iq, std::vector<std::complex<double>> pilot, size_t seq_len)
+size_t CommsLib::find_pilot_seq(std::vector<std::complex<double>> iq,
+    std::vector<std::complex<double>> pilot, size_t seq_len)
 {
 
     size_t best_peak = 0;
@@ -74,7 +75,8 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     for (int i = 0; i < 64; i++) {
         // lts_seq is a 2x160 matrix (real/imag by seqLen=160 elements)
         // grab one symbol and flip around
-        lts_sym.push_back(std::complex<double>(lts_seq[0][seqLen - 1 - i], lts_seq[1][seqLen - 1 - i]));
+        lts_sym.push_back(std::complex<double>(
+            lts_seq[0][seqLen - 1 - i], lts_seq[1][seqLen - 1 - i]));
         // conjugate
         lts_sym_conj.push_back(std::conj(lts_sym[i]));
     }
@@ -88,7 +90,9 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     // Find all peaks
     std::vector<int> peaks;
     for (size_t i = 0; i < lts_corr.size(); i++) {
-        if (lts_corr[i] > (lts_thresh * *std::max_element(lts_corr.begin(), lts_corr.end()))) {
+        if (lts_corr[i]
+            > (lts_thresh
+                  * *std::max_element(lts_corr.begin(), lts_corr.end()))) {
             // Index of valid peaks
             peaks.push_back(i);
         }
@@ -118,32 +122,37 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     return best_peak;
 }
 
-void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in, std::vector<std::vector<int>>& x, std::vector<std::vector<int>>& y)
+void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
+    std::vector<std::vector<int>>& x, std::vector<std::vector<int>>& y)
 {
     /*
-     * Simplified version of numpy's meshgrid function. Input vectors must be of same length.
-     * Returns coordinate matrices from coordinate vectors.
+     * Simplified version of numpy's meshgrid function. Input vectors must be of
+     * same length. Returns coordinate matrices from coordinate vectors.
      */
     int nx = x_in.size();
     int ny = y_in.size();
 
     if (nx != ny) {
-        throw std::invalid_argument(" Input vectors to meshgrid function must have same length. ");
+        throw std::invalid_argument(
+            " Input vectors to meshgrid function must have same length. ");
     }
     for (int i = 0; i < nx; i++) {
         for (int j = 0; j < ny; j++) {
             x[i].push_back(x_in[j]);
             y[i].push_back(y_in[i]);
-            //std::cout << "XXXX x[" << i << "][" << j << "]: " << x[i][j] << std::endl;
-            //std::cout << "YYYY y[" << i << "][" << j << "]: " << y[i][j] << std::endl;
+            // std::cout << "XXXX x[" << i << "][" << j << "]: " << x[i][j] <<
+            // std::endl; std::cout << "YYYY y[" << i << "][" << j << "]: " <<
+            // y[i][j] << std::endl;
         }
     }
 }
 
-std::vector<std::complex<double>> CommsLib::csign(std::vector<std::complex<double>> iq)
+std::vector<std::complex<double>> CommsLib::csign(
+    std::vector<std::complex<double>> iq)
 {
     /*
-     * Return element-wise indication of the sign of a number (for complex vector).
+     * Return element-wise indication of the sign of a number (for complex
+     * vector).
      *
      * For complex-valued inputs:
      *     sign(x.real) + 0j if x.real != 0 else sign(x.imag) + 0j
@@ -164,7 +173,9 @@ std::vector<std::complex<double>> CommsLib::csign(std::vector<std::complex<doubl
     return iq_sign;
 }
 
-std::vector<double> CommsLib::convolve(std::vector<std::complex<double>> const& f, std::vector<std::complex<double>> const& g)
+std::vector<double> CommsLib::convolve(
+    std::vector<std::complex<double>> const& f,
+    std::vector<std::complex<double>> const& g)
 {
     /* Convolution of two vectors
      * Source:
@@ -186,7 +197,9 @@ std::vector<double> CommsLib::convolve(std::vector<std::complex<double>> const& 
     return out;
 }
 
-std::vector<float> CommsLib::magnitudeFFT(std::vector<std::complex<float>> const& samps, std::vector<float> const& win, size_t fftSize)
+std::vector<float> CommsLib::magnitudeFFT(
+    std::vector<std::complex<float>> const& samps,
+    std::vector<float> const& win, size_t fftSize)
 {
     std::vector<std::complex<float>> preFFT(samps.size());
 
@@ -205,7 +218,9 @@ std::vector<float> CommsLib::magnitudeFFT(std::vector<std::complex<float>> const
     for (size_t n = 0; n < fftSize / 2; n++) {
         fftMag.push_back(std::norm(fftSamps[n]));
     }
-    std::reverse(fftMag.begin(), fftMag.end()); // not sure why we need reverse here, but this seems to give the right spectrum
+    std::reverse(
+        fftMag.begin(), fftMag.end()); // not sure why we need reverse here, but
+                                       // this seems to give the right spectrum
     return fftMag;
 }
 
@@ -239,15 +254,19 @@ double CommsLib::windowFunctionPower(std::vector<float> const& win)
     return 20 * std::log10(N * windowPower);
 }
 
-float CommsLib::findTone(std::vector<float> const& magnitude, double winGain, double fftBin, size_t fftSize, const size_t delta)
+float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
+    double fftBin, size_t fftSize, const size_t delta)
 {
     /*
      * Find the tone level at a specific interval in the input Power Spectrum
-     * fftBins assumed interval is [-0.5, 0.5] which is coverted to [0, fftSize-1]
+     * fftBins assumed interval is [-0.5, 0.5] which is coverted to [0,
+     * fftSize-1]
      */
     // make sure we don't exceed array bounds
-    size_t first = std::max<size_t>(0, std::lround((fftBin + 0.5) * fftSize) - delta);
-    size_t last = std::min<size_t>(fftSize - 1, std::lround((fftBin + 0.5) * fftSize) + delta);
+    size_t first
+        = std::max<size_t>(0, std::lround((fftBin + 0.5) * fftSize) - delta);
+    size_t last = std::min<size_t>(
+        fftSize - 1, std::lround((fftBin + 0.5) * fftSize) + delta);
     float refLevel = magnitude[last];
     for (size_t n = first; n < last; n++) {
         if (magnitude[n] > refLevel)
@@ -256,18 +275,21 @@ float CommsLib::findTone(std::vector<float> const& magnitude, double winGain, do
     return 10 * std::max(std::log10(refLevel), (float)(-20.0)) - (float)winGain;
 }
 
-float CommsLib::measureTone(std::vector<std::complex<float>> const& samps, std::vector<float> const& win, double winGain, double fftBin, size_t fftSize, const size_t delta)
+float CommsLib::measureTone(std::vector<std::complex<float>> const& samps,
+    std::vector<float> const& win, double winGain, double fftBin,
+    size_t fftSize, const size_t delta)
 {
-    return findTone(magnitudeFFT(samps, win, fftSize), winGain, fftBin, fftSize, delta);
+    return findTone(
+        magnitudeFFT(samps, win, fftSize), winGain, fftBin, fftSize, delta);
 }
 
 std::vector<int> CommsLib::getDataSc(int fftSize)
 {
     std::vector<int> data_sc;
     if (fftSize == 64) {
-        int sc_ind[48] = { 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-            22, 23, 24, 25, 26, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50,
-            51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63 };
+        int sc_ind[48] = { 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+            17, 18, 19, 20, 22, 23, 24, 25, 26, 38, 39, 40, 41, 42, 44, 45, 46,
+            47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63 };
         data_sc.assign(sc_ind, sc_ind + 48);
     } else
         for (int i = 0; i < fftSize; i++)
@@ -305,52 +327,79 @@ std::vector<std::complex<float>> CommsLib::getPilotSc(int fftSize)
     return pilot_sc;
 }
 
-std::vector<std::complex<float>> CommsLib::IFFT(std::vector<std::complex<float>> in, int fftsize, bool normalize)
+std::vector<std::complex<float>> CommsLib::IFFT(
+    std::vector<std::complex<float>> in, int fftsize, bool normalize)
 {
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
     (void)DftiCommitDescriptor(mkl_handle);
-    Table<std::complex<float>> IFFT_inputs;
-    IFFT_inputs.calloc(1, fftsize, 64);
-    memcpy(IFFT_inputs[0], in.data(), fftsize * sizeof(std::complex<float>));
-    DftiComputeBackward(mkl_handle, IFFT_inputs[0]);
+    DftiComputeBackward(mkl_handle, in.data());
     DftiFreeDescriptor(&mkl_handle);
-    memcpy(in.data(), IFFT_inputs[0], fftsize * sizeof(std::complex<float>));
     if (normalize) {
-        //for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
+        // for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
         float max_val = 0;
-        //int max_ind = 0;
+        // int max_ind = 0;
         float scale = 0.5;
         for (int i = 0; i < fftsize; i++) {
             if (std::abs(in[i]) > max_val) {
                 max_val = std::abs(in[i]);
-                //max_ind = i;
+                // max_ind = i;
             }
         }
-        std::cout << "IFFT output is normalized with " << std::to_string(max_val) << std::endl;
-        //std::cout << "max sample is " << std::to_string(out[max_ind].real()) << "+1j*" << std::to_string(out[max_ind].imag()) << std::endl;
+        std::cout << "IFFT output is normalized with "
+                  << std::to_string(max_val) << std::endl;
+        // std::cout << "max sample is " << std::to_string(out[max_ind].real())
+        // << "+1j*" << std::to_string(out[max_ind].imag()) << std::endl;
         for (int i = 0; i < fftsize; i++)
             in[i] /= (max_val / scale);
     }
     return in;
 }
 
-std::vector<std::complex<float>> CommsLib::FFT(std::vector<std::complex<float>> in, int fftsize)
+std::vector<std::complex<float>> CommsLib::FFT(
+    std::vector<std::complex<float>> in, int fftsize)
 {
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
     (void)DftiCommitDescriptor(mkl_handle);
-    Table<std::complex<float>> FFT_inputs;
-    FFT_inputs.calloc(1, fftsize, 64);
-    memcpy(FFT_inputs[0], in.data(), fftsize * sizeof(std::complex<float>));
     /* compute FFT */
-    DftiComputeForward(mkl_handle, FFT_inputs[0]);
-    memcpy(in.data(), FFT_inputs[0], fftsize * sizeof(std::complex<float>));
+    DftiComputeForward(mkl_handle, in.data());
     DftiFreeDescriptor(&mkl_handle);
     return in;
 }
 
-std::vector<std::complex<float>> CommsLib::composeRefSymbol(std::vector<std::complex<float>> pilot, size_t offset, size_t period, size_t fftSize, bool timeDomain)
+void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize)
+{
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    (void)DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCommitDescriptor(mkl_handle);
+    DftiComputeBackward(mkl_handle, in);
+    DftiFreeDescriptor(&mkl_handle);
+    if (normalize) {
+        for (int i = 0; i < fftsize; i++) {
+            in[i].re /= fftsize;
+            in[i].im /= fftsize;
+        }
+    }
+}
+
+void CommsLib::FFT(complex_float* in, int fftsize)
+{
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    (void)DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+    (void)DftiCommitDescriptor(mkl_handle);
+    /* compute FFT */
+    DftiComputeForward(mkl_handle, in);
+    DftiFreeDescriptor(&mkl_handle);
+}
+
+std::vector<std::complex<float>> CommsLib::composeRefSymbol(
+    std::vector<std::complex<float>> pilot, size_t offset, size_t period,
+    size_t fftSize, bool timeDomain)
 {
     std::vector<std::complex<float>> fft_in(fftSize, 0);
     size_t pilotNum = fftSize / period;
@@ -364,7 +413,8 @@ std::vector<std::complex<float>> CommsLib::composeRefSymbol(std::vector<std::com
         return fft_in;
 }
 
-std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int type)
+std::vector<std::complex<float>> CommsLib::modulate(
+    std::vector<int8_t> in, int type)
 {
     std::vector<std::complex<float>> out(in.size());
     if (type == QPSK) {
@@ -377,7 +427,8 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int 
         }
         for (size_t i = 0; i < in.size(); i++) {
             if (in[i] >= 0 and in[i] < 4)
-                out[i] = std::complex<float>(qpsk_table[0][in[i]], qpsk_table[1][in[i]]);
+                out[i] = std::complex<float>(
+                    qpsk_table[0][in[i]], qpsk_table[1][in[i]]);
             else {
                 std::cout << "Error: No compatible input vector!" << std::endl;
                 break;
@@ -393,7 +444,8 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int 
         }
         for (size_t i = 0; i < in.size(); i++) {
             if (in[i] >= 0 and in[i] < 16)
-                out[i] = std::complex<float>(qam16_table[0][in[i]], qam16_table[1][in[i]]);
+                out[i] = std::complex<float>(
+                    qam16_table[0][in[i]], qam16_table[1][in[i]]);
             else {
                 std::cout << "Error: No compatible input vector!" << std::endl;
                 break;
@@ -402,14 +454,16 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int 
     } else if (type == QAM64) {
         float qam64_table[2][64]; // = init_qam64();
         float scale = 1 / sqrt(42);
-        float mod_64qam[8] = { -7 * scale, -5 * scale, -3 * scale, -1 * scale, scale, 3 * scale, 5 * scale, 7 * scale };
+        float mod_64qam[8] = { -7 * scale, -5 * scale, -3 * scale, -1 * scale,
+            scale, 3 * scale, 5 * scale, 7 * scale };
         for (int i = 0; i < 64; i++) {
             qam64_table[0][i] = mod_64qam[i / 8];
             qam64_table[1][i] = mod_64qam[i % 8];
         }
         for (size_t i = 0; i < in.size(); i++) {
             if (in[i] >= 0 and in[i] < 64)
-                out[i] = std::complex<float>(qam64_table[0][in[i]], qam64_table[1][in[i]]);
+                out[i] = std::complex<float>(
+                    qam64_table[0][in[i]], qam64_table[1][in[i]]);
             else {
                 std::cout << "Error: No compatible input vector!" << std::endl;
                 break;
@@ -417,7 +471,8 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in, int 
         }
     } else {
         // Not Supported
-        std::cout << "Modulation Type " << type << " not supported!" << std::endl;
+        std::cout << "Modulation Type " << type << " not supported!"
+                  << std::endl;
     }
     return out;
 }
@@ -430,13 +485,15 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
         // STS - 802.11 Short training sequence (one symbol)
         matrix.resize(2);
 
-        double sts_re[16] = { 0.04599876, -0.13244371, -0.01347272, 0.1427553, 0.09199751,
-            0.1427553, -0.01347272, -0.13244371, 0.04599876, 0.00233959,
-            -0.07852478, -0.01265117, 0, -0.01265117, -0.07852478, 0.00233959 };
+        double sts_re[16] = { 0.04599876, -0.13244371, -0.01347272, 0.1427553,
+            0.09199751, 0.1427553, -0.01347272, -0.13244371, 0.04599876,
+            0.00233959, -0.07852478, -0.01265117, 0, -0.01265117, -0.07852478,
+            0.00233959 };
 
-        double sts_im[16] = { 0.04599876, 0.00233959, -0.07852478, -0.01265117, 0.0,
-            -0.01265117, -0.07852478, 0.00233959, 0.04599876, -0.13244371,
-            -0.01347272, 0.1427553, 0.09199751, 0.1427553, -0.01347272, -0.13244371 };
+        double sts_im[16] = { 0.04599876, 0.00233959, -0.07852478, -0.01265117,
+            0.0, -0.01265117, -0.07852478, 0.00233959, 0.04599876, -0.13244371,
+            -0.01347272, 0.1427553, 0.09199751, 0.1427553, -0.01347272,
+            -0.13244371 };
 
         for (int j = 0; j < 2; j++) {
             std::vector<double> a;
@@ -451,79 +508,126 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
         }
     } else if (type == LTS_F_SEQ) {
         matrix.resize(1);
-        std::vector<double> lts_f = { 0, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, -1, -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1 };
+        std::vector<double> lts_f = { 0, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, -1,
+            -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1, 1, 1,
+            -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1 };
         matrix[0] = (lts_f);
     } else if (type == LTS_SEQ) {
-        // LTS - 802.11 Long training sequence (2.5 symbols, cp length of 32 samples)
+        // LTS - 802.11 Long training sequence (2.5 symbols, cp length of 32
+        // samples)
         matrix.resize(2);
 
-        double lts_re[160] = { -0.15625, 0.012284590458567165, 0.09171654912240956, -0.09188755526278, -0.002805944173488664,
-            0.07507369706822604, -0.12732435990770957, -0.12188700906074086, -0.03504126073623884, -0.056455128448539,
-            -0.060310100316213804, 0.06955684740689412, 0.08221832230305733, -0.1312626089753594, -0.05720634587149917,
-            0.03691794200106715, 0.0625, 0.1192390885103326, -0.022483206307774027, 0.05866876712873733,
-            0.0244758515211019, -0.13680487681585982, 0.0009889797089880949, 0.05333773437415131, 0.09754126073623881,
-            -0.03831596747441851, -0.11513121478170157, 0.05982384485901423, 0.021111770349329442, 0.09683188459112747,
-            0.0397496983535005, -0.005121250360419827, 0.15625, -0.005121250360419823, 0.0397496983535005,
-            0.09683188459112749, 0.02111177034932945, 0.05982384485901426, -0.11513121478170157, -0.0383159674744185,
-            0.09754126073623884, 0.05333773437415131, 0.0009889797089880983, -0.1368048768158598, 0.024475851521101908,
-            0.05866876712873735, -0.02248320630777403, 0.1192390885103326, 0.0625, 0.03691794200106713,
-            -0.05720634587149916, -0.1312626089753594, 0.08221832230305731, 0.06955684740689413, -0.0603101003162138,
-            -0.05645512844853901, -0.03504126073623881, -0.12188700906074088, -0.12732435990770957, 0.07507369706822604,
-            -0.002805944173488671, -0.09188755526278002, 0.09171654912240956, 0.01228459045856714, -0.15625,
-            0.012284590458567165, 0.09171654912240956, -0.09188755526278, -0.002805944173488664, 0.07507369706822604,
-            -0.12732435990770957, -0.12188700906074086, -0.03504126073623884, -0.056455128448539, -0.060310100316213804,
-            0.06955684740689412, 0.08221832230305733, -0.1312626089753594, -0.05720634587149917, 0.03691794200106715,
-            0.0625, 0.1192390885103326, -0.022483206307774027, 0.05866876712873733, 0.0244758515211019,
-            -0.13680487681585982, 0.0009889797089880949, 0.05333773437415131, 0.09754126073623881, -0.03831596747441851,
-            -0.11513121478170157, 0.05982384485901423, 0.021111770349329442, 0.09683188459112747, 0.0397496983535005,
-            -0.005121250360419827, 0.15625, -0.005121250360419823, 0.0397496983535005, 0.09683188459112749,
-            0.02111177034932945, 0.05982384485901426, -0.11513121478170157, -0.0383159674744185, 0.09754126073623884,
-            0.05333773437415131, 0.0009889797089880983, -0.1368048768158598, 0.024475851521101908, 0.05866876712873735,
-            -0.02248320630777403, 0.1192390885103326, 0.0625, 0.03691794200106713, -0.05720634587149916,
-            -0.1312626089753594, 0.08221832230305731, 0.06955684740689413, -0.0603101003162138, -0.05645512844853901,
-            -0.03504126073623881, -0.12188700906074088, -0.12732435990770957, 0.07507369706822604, -0.002805944173488671,
-            -0.09188755526278002, 0.09171654912240956, 0.01228459045856714, -0.15625, 0.012284590458567165,
-            0.09171654912240956, -0.09188755526278, -0.002805944173488664, 0.07507369706822604, -0.12732435990770957,
-            -0.12188700906074086, -0.03504126073623884, -0.056455128448539, -0.060310100316213804, 0.06955684740689412,
-            0.08221832230305733, -0.1312626089753594, -0.05720634587149917, 0.03691794200106715, 0.0625,
-            0.1192390885103326, -0.022483206307774027, 0.05866876712873733, 0.0244758515211019, -0.13680487681585982,
-            0.0009889797089880949, 0.05333773437415131, 0.09754126073623881, -0.03831596747441851, -0.11513121478170157,
-            0.05982384485901423, 0.021111770349329442, 0.09683188459112747, 0.0397496983535005, -0.005121250360419827 };
+        double lts_re[160] = { -0.15625, 0.012284590458567165,
+            0.09171654912240956, -0.09188755526278, -0.002805944173488664,
+            0.07507369706822604, -0.12732435990770957, -0.12188700906074086,
+            -0.03504126073623884, -0.056455128448539, -0.060310100316213804,
+            0.06955684740689412, 0.08221832230305733, -0.1312626089753594,
+            -0.05720634587149917, 0.03691794200106715, 0.0625,
+            0.1192390885103326, -0.022483206307774027, 0.05866876712873733,
+            0.0244758515211019, -0.13680487681585982, 0.0009889797089880949,
+            0.05333773437415131, 0.09754126073623881, -0.03831596747441851,
+            -0.11513121478170157, 0.05982384485901423, 0.021111770349329442,
+            0.09683188459112747, 0.0397496983535005, -0.005121250360419827,
+            0.15625, -0.005121250360419823, 0.0397496983535005,
+            0.09683188459112749, 0.02111177034932945, 0.05982384485901426,
+            -0.11513121478170157, -0.0383159674744185, 0.09754126073623884,
+            0.05333773437415131, 0.0009889797089880983, -0.1368048768158598,
+            0.024475851521101908, 0.05866876712873735, -0.02248320630777403,
+            0.1192390885103326, 0.0625, 0.03691794200106713,
+            -0.05720634587149916, -0.1312626089753594, 0.08221832230305731,
+            0.06955684740689413, -0.0603101003162138, -0.05645512844853901,
+            -0.03504126073623881, -0.12188700906074088, -0.12732435990770957,
+            0.07507369706822604, -0.002805944173488671, -0.09188755526278002,
+            0.09171654912240956, 0.01228459045856714, -0.15625,
+            0.012284590458567165, 0.09171654912240956, -0.09188755526278,
+            -0.002805944173488664, 0.07507369706822604, -0.12732435990770957,
+            -0.12188700906074086, -0.03504126073623884, -0.056455128448539,
+            -0.060310100316213804, 0.06955684740689412, 0.08221832230305733,
+            -0.1312626089753594, -0.05720634587149917, 0.03691794200106715,
+            0.0625, 0.1192390885103326, -0.022483206307774027,
+            0.05866876712873733, 0.0244758515211019, -0.13680487681585982,
+            0.0009889797089880949, 0.05333773437415131, 0.09754126073623881,
+            -0.03831596747441851, -0.11513121478170157, 0.05982384485901423,
+            0.021111770349329442, 0.09683188459112747, 0.0397496983535005,
+            -0.005121250360419827, 0.15625, -0.005121250360419823,
+            0.0397496983535005, 0.09683188459112749, 0.02111177034932945,
+            0.05982384485901426, -0.11513121478170157, -0.0383159674744185,
+            0.09754126073623884, 0.05333773437415131, 0.0009889797089880983,
+            -0.1368048768158598, 0.024475851521101908, 0.05866876712873735,
+            -0.02248320630777403, 0.1192390885103326, 0.0625,
+            0.03691794200106713, -0.05720634587149916, -0.1312626089753594,
+            0.08221832230305731, 0.06955684740689413, -0.0603101003162138,
+            -0.05645512844853901, -0.03504126073623881, -0.12188700906074088,
+            -0.12732435990770957, 0.07507369706822604, -0.002805944173488671,
+            -0.09188755526278002, 0.09171654912240956, 0.01228459045856714,
+            -0.15625, 0.012284590458567165, 0.09171654912240956,
+            -0.09188755526278, -0.002805944173488664, 0.07507369706822604,
+            -0.12732435990770957, -0.12188700906074086, -0.03504126073623884,
+            -0.056455128448539, -0.060310100316213804, 0.06955684740689412,
+            0.08221832230305733, -0.1312626089753594, -0.05720634587149917,
+            0.03691794200106715, 0.0625, 0.1192390885103326,
+            -0.022483206307774027, 0.05866876712873733, 0.0244758515211019,
+            -0.13680487681585982, 0.0009889797089880949, 0.05333773437415131,
+            0.09754126073623881, -0.03831596747441851, -0.11513121478170157,
+            0.05982384485901423, 0.021111770349329442, 0.09683188459112747,
+            0.0397496983535005, -0.005121250360419827 };
 
-        double lts_im[160] = { 0.0, -0.09759955359207202, -0.10587165981863113, -0.11512870891096853, -0.053774266476545984,
-            0.07404041892509948, 0.020501379986300285, 0.01656621813913718, 0.15088834764831843, 0.021803920607437133,
-            -0.08128612411572139, -0.014121958590578302, -0.09235655195372787, -0.06522722901814465, -0.039298588174111096,
-            -0.0983441502870872, 0.0625, 0.004095594414801514, -0.1606573329526341, 0.01493899945069943,
-            0.05853179569459056, 0.04737981136568012, 0.11500464362403023, -0.0040763264805083466, 0.025888347648318433,
-            0.10617091261510256, 0.05518049537437035, 0.08770675983572167, -0.027885918828227545, -0.08279790948776067,
-            0.11115794305116433, 0.12032513267372755, 0.0, -0.1203251326737275, -0.11115794305116432,
-            0.08279790948776065, 0.027885918828227538, -0.0877067598357217, -0.05518049537437036, -0.10617091261510254,
-            -0.025888347648318433, 0.00407632648050834, -0.11500464362403023, -0.04737981136568013, -0.05853179569459056,
-            -0.014938999450699438, 0.16065733295263412, -0.0040955944148015275, -0.0625, 0.09834415028708718,
-            0.0392985881741111, 0.06522722901814465, 0.09235655195372787, 0.014121958590578316, 0.08128612411572139,
-            -0.021803920607437126, -0.15088834764831843, -0.01656621813913719, -0.02050137998630029, -0.07404041892509945,
-            0.05377426647654598, 0.11512870891096855, 0.10587165981863114, 0.09759955359207204, 0.0,
-            -0.09759955359207202, -0.10587165981863113, -0.11512870891096853, -0.053774266476545984, 0.07404041892509948,
-            0.020501379986300285, 0.01656621813913718, 0.15088834764831843, 0.021803920607437133, -0.08128612411572139,
-            -0.014121958590578302, -0.09235655195372787, -0.06522722901814465, -0.039298588174111096, -0.0983441502870872,
-            0.0625, 0.004095594414801514, -0.1606573329526341, 0.01493899945069943, 0.05853179569459056,
-            0.04737981136568012, 0.11500464362403023, -0.0040763264805083466, 0.025888347648318433, 0.10617091261510256,
-            0.05518049537437035, 0.08770675983572167, -0.027885918828227545, -0.08279790948776067, 0.11115794305116433,
-            0.12032513267372755, 0.0, -0.1203251326737275, -0.11115794305116432, 0.08279790948776065,
-            0.027885918828227538, -0.0877067598357217, -0.05518049537437036, -0.10617091261510254, -0.025888347648318433,
-            0.00407632648050834, -0.11500464362403023, -0.04737981136568013, -0.05853179569459056, -0.014938999450699438,
-            0.16065733295263412, -0.0040955944148015275, -0.0625, 0.09834415028708718, 0.0392985881741111,
-            0.06522722901814465, 0.09235655195372787, 0.014121958590578316, 0.08128612411572139, -0.021803920607437126,
-            -0.15088834764831843, -0.01656621813913719, -0.02050137998630029, -0.07404041892509945, 0.05377426647654598,
-            0.11512870891096855, 0.10587165981863114, 0.09759955359207204, 0.0, -0.09759955359207202,
-            -0.10587165981863113, -0.11512870891096853, -0.053774266476545984, 0.07404041892509948, 0.020501379986300285,
-            0.01656621813913718, 0.15088834764831843, 0.021803920607437133, -0.08128612411572139, -0.014121958590578302,
-            -0.09235655195372787, -0.06522722901814465, -0.039298588174111096, -0.0983441502870872, 0.0625,
-            0.004095594414801514, -0.1606573329526341, 0.01493899945069943, 0.05853179569459056, 0.04737981136568012,
-            0.11500464362403023, -0.0040763264805083466, 0.025888347648318433, 0.10617091261510256, 0.05518049537437035,
-            0.08770675983572167, -0.027885918828227545, -0.08279790948776067, 0.11115794305116433, 0.12032513267372755 };
+        double lts_im[160] = { 0.0, -0.09759955359207202, -0.10587165981863113,
+            -0.11512870891096853, -0.053774266476545984, 0.07404041892509948,
+            0.020501379986300285, 0.01656621813913718, 0.15088834764831843,
+            0.021803920607437133, -0.08128612411572139, -0.014121958590578302,
+            -0.09235655195372787, -0.06522722901814465, -0.039298588174111096,
+            -0.0983441502870872, 0.0625, 0.004095594414801514,
+            -0.1606573329526341, 0.01493899945069943, 0.05853179569459056,
+            0.04737981136568012, 0.11500464362403023, -0.0040763264805083466,
+            0.025888347648318433, 0.10617091261510256, 0.05518049537437035,
+            0.08770675983572167, -0.027885918828227545, -0.08279790948776067,
+            0.11115794305116433, 0.12032513267372755, 0.0, -0.1203251326737275,
+            -0.11115794305116432, 0.08279790948776065, 0.027885918828227538,
+            -0.0877067598357217, -0.05518049537437036, -0.10617091261510254,
+            -0.025888347648318433, 0.00407632648050834, -0.11500464362403023,
+            -0.04737981136568013, -0.05853179569459056, -0.014938999450699438,
+            0.16065733295263412, -0.0040955944148015275, -0.0625,
+            0.09834415028708718, 0.0392985881741111, 0.06522722901814465,
+            0.09235655195372787, 0.014121958590578316, 0.08128612411572139,
+            -0.021803920607437126, -0.15088834764831843, -0.01656621813913719,
+            -0.02050137998630029, -0.07404041892509945, 0.05377426647654598,
+            0.11512870891096855, 0.10587165981863114, 0.09759955359207204, 0.0,
+            -0.09759955359207202, -0.10587165981863113, -0.11512870891096853,
+            -0.053774266476545984, 0.07404041892509948, 0.020501379986300285,
+            0.01656621813913718, 0.15088834764831843, 0.021803920607437133,
+            -0.08128612411572139, -0.014121958590578302, -0.09235655195372787,
+            -0.06522722901814465, -0.039298588174111096, -0.0983441502870872,
+            0.0625, 0.004095594414801514, -0.1606573329526341,
+            0.01493899945069943, 0.05853179569459056, 0.04737981136568012,
+            0.11500464362403023, -0.0040763264805083466, 0.025888347648318433,
+            0.10617091261510256, 0.05518049537437035, 0.08770675983572167,
+            -0.027885918828227545, -0.08279790948776067, 0.11115794305116433,
+            0.12032513267372755, 0.0, -0.1203251326737275, -0.11115794305116432,
+            0.08279790948776065, 0.027885918828227538, -0.0877067598357217,
+            -0.05518049537437036, -0.10617091261510254, -0.025888347648318433,
+            0.00407632648050834, -0.11500464362403023, -0.04737981136568013,
+            -0.05853179569459056, -0.014938999450699438, 0.16065733295263412,
+            -0.0040955944148015275, -0.0625, 0.09834415028708718,
+            0.0392985881741111, 0.06522722901814465, 0.09235655195372787,
+            0.014121958590578316, 0.08128612411572139, -0.021803920607437126,
+            -0.15088834764831843, -0.01656621813913719, -0.02050137998630029,
+            -0.07404041892509945, 0.05377426647654598, 0.11512870891096855,
+            0.10587165981863114, 0.09759955359207204, 0.0, -0.09759955359207202,
+            -0.10587165981863113, -0.11512870891096853, -0.053774266476545984,
+            0.07404041892509948, 0.020501379986300285, 0.01656621813913718,
+            0.15088834764831843, 0.021803920607437133, -0.08128612411572139,
+            -0.014121958590578302, -0.09235655195372787, -0.06522722901814465,
+            -0.039298588174111096, -0.0983441502870872, 0.0625,
+            0.004095594414801514, -0.1606573329526341, 0.01493899945069943,
+            0.05853179569459056, 0.04737981136568012, 0.11500464362403023,
+            -0.0040763264805083466, 0.025888347648318433, 0.10617091261510256,
+            0.05518049537437035, 0.08770675983572167, -0.027885918828227545,
+            -0.08279790948776067, 0.11115794305116433, 0.12032513267372755 };
 
-        // Grab the last N samples (sequence length specified, provide more flexibility)
+        // Grab the last N samples (sequence length specified, provide more
+        // flexibility)
         int startIdx = 160 - N;
         for (int j = 0; j < 2; j++) {
             std::vector<double> a;
@@ -537,35 +641,51 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
             matrix[j] = a;
         }
     } else if (type == LTE_ZADOFF_CHU) {
-        // LTE Zadoff Chu Sequence: Generate the 25th root length-63 Zadoff-Chu sequence
+        // LTE Zadoff Chu Sequence: Generate the 25th root length-63 Zadoff-Chu
+        // sequence
         matrix.resize(2);
 
-        double lts_re[63] = { 1.0, -0.7971325072229225, 0.3653410243663958, -0.7330518718298251, 0.9801724878485435,
-            0.955572805786141, -0.49999999999999617, 0.7660444431189757, -0.222520933956311, 0.6234898018587135,
-            0.4562106573531701, 0.3653410243663966, 0.9555728057861371, 0.7660444431189751, -0.49999999999995753,
-            -0.7330518718298601, 0.9801724878485425, -0.22252093395630812, 0.6234898018586816, -0.7971325072229237,
-            -0.5000000000000849, -0.5000000000000051, -0.7971325072228729, -0.9888308262251311, 0.9555728057861521,
-            0.9801724878485374, -0.22252093395631578, 1.0, 0.7660444431189537, -0.7330518718300307,
-            -0.9888308262251518, 0.4562106573531763, -0.9888308262251305, -0.733051871829836, 0.76604444311897,
-            1.0, -0.22252093395601577, 0.9801724878485049, 0.9555728057861584, -0.988830826225147,
-            -0.797132507222964, -0.4999999999997504, -0.4999999999996758, -0.7971325072227249, 0.6234898018583583,
-            -0.2225209339562393, 0.9801724878485397, -0.7330518718300426, -0.5000000000003123, 0.7660444431190734,
-            0.9555728057861007, 0.3653410243666958, 0.4562106573529356, 0.6234898018587859, -0.22252093395649927,
-            0.7660444431189057, -0.5000000000002512, 0.9555728057860857, 0.9801724878483727, -0.7330518718292615,
-            0.3653410243664768, -0.797132507222648, 1.0 };
+        double lts_re[63] = { 1.0, -0.7971325072229225, 0.3653410243663958,
+            -0.7330518718298251, 0.9801724878485435, 0.955572805786141,
+            -0.49999999999999617, 0.7660444431189757, -0.222520933956311,
+            0.6234898018587135, 0.4562106573531701, 0.3653410243663966,
+            0.9555728057861371, 0.7660444431189751, -0.49999999999995753,
+            -0.7330518718298601, 0.9801724878485425, -0.22252093395630812,
+            0.6234898018586816, -0.7971325072229237, -0.5000000000000849,
+            -0.5000000000000051, -0.7971325072228729, -0.9888308262251311,
+            0.9555728057861521, 0.9801724878485374, -0.22252093395631578, 1.0,
+            0.7660444431189537, -0.7330518718300307, -0.9888308262251518,
+            0.4562106573531763, -0.9888308262251305, -0.733051871829836,
+            0.76604444311897, 1.0, -0.22252093395601577, 0.9801724878485049,
+            0.9555728057861584, -0.988830826225147, -0.797132507222964,
+            -0.4999999999997504, -0.4999999999996758, -0.7971325072227249,
+            0.6234898018583583, -0.2225209339562393, 0.9801724878485397,
+            -0.7330518718300426, -0.5000000000003123, 0.7660444431190734,
+            0.9555728057861007, 0.3653410243666958, 0.4562106573529356,
+            0.6234898018587859, -0.22252093395649927, 0.7660444431189057,
+            -0.5000000000002512, 0.9555728057860857, 0.9801724878483727,
+            -0.7330518718292615, 0.3653410243664768, -0.797132507222648, 1.0 };
 
-        double lts_im[63] = { 0.0, -0.6038044103254774, -0.9308737486442039, -0.6801727377709207, 0.1981461431993993,
-            0.2947551744109033, -0.8660254037844408, -0.642787609686542, -0.9749279121818244, 0.7818314824680458,
-            0.8898718088114649, -0.9308737486442037, 0.294755174410916, -0.6427876096865428, 0.8660254037844631,
-            0.680172737770883, 0.19814614319940435, 0.9749279121818251, 0.7818314824680712, -0.6038044103254757,
-            -0.8660254037843896, 0.8660254037844357, -0.6038044103255429, 0.1490422661761573, -0.2947551744108673,
-            0.19814614319942933, -0.9749279121818233, -6.273657903199343e-14, -0.6427876096865683, 0.6801727377706992,
-            0.14904226617601968, 0.8898718088114618, 0.14904226617616118, 0.6801727377709089, -0.6427876096865488,
-            -6.666535247945037e-14, -0.9749279121818918, 0.1981461431995907, -0.2947551744108467, 0.14904226617605265,
-            -0.6038044103254225, 0.8660254037845827, -0.8660254037846258, -0.6038044103257382, 0.781831482468329,
-            0.9749279121818407, 0.19814614319941776, 0.6801727377706862, 0.8660254037842583, -0.6427876096864258,
-            0.29475517441103394, -0.9308737486440862, 0.8898718088115852, 0.7818314824679881, -0.9749279121817814,
-            -0.6427876096866254, -0.8660254037842936, 0.2947551744110826, 0.19814614320024387, -0.6801727377715282,
+        double lts_im[63] = { 0.0, -0.6038044103254774, -0.9308737486442039,
+            -0.6801727377709207, 0.1981461431993993, 0.2947551744109033,
+            -0.8660254037844408, -0.642787609686542, -0.9749279121818244,
+            0.7818314824680458, 0.8898718088114649, -0.9308737486442037,
+            0.294755174410916, -0.6427876096865428, 0.8660254037844631,
+            0.680172737770883, 0.19814614319940435, 0.9749279121818251,
+            0.7818314824680712, -0.6038044103254757, -0.8660254037843896,
+            0.8660254037844357, -0.6038044103255429, 0.1490422661761573,
+            -0.2947551744108673, 0.19814614319942933, -0.9749279121818233,
+            -6.273657903199343e-14, -0.6427876096865683, 0.6801727377706992,
+            0.14904226617601968, 0.8898718088114618, 0.14904226617616118,
+            0.6801727377709089, -0.6427876096865488, -6.666535247945037e-14,
+            -0.9749279121818918, 0.1981461431995907, -0.2947551744108467,
+            0.14904226617605265, -0.6038044103254225, 0.8660254037845827,
+            -0.8660254037846258, -0.6038044103257382, 0.781831482468329,
+            0.9749279121818407, 0.19814614319941776, 0.6801727377706862,
+            0.8660254037842583, -0.6427876096864258, 0.29475517441103394,
+            -0.9308737486440862, 0.8898718088115852, 0.7818314824679881,
+            -0.9749279121817814, -0.6427876096866254, -0.8660254037842936,
+            0.2947551744110826, 0.19814614320024387, -0.6801727377715282,
             -0.9308737486441722, -0.6038044103258398, 1.021155254707157e-12 };
 
         for (int j = 0; j < 2; j++) {
@@ -583,59 +703,59 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
         // Gold IFFT Sequence - seq_length=128, cp=32, upsample=1
         matrix.resize(2);
 
-        double lts_re[128] = { -0.5646359, 0.4669951, 0.8769358, 0.5407985, -0.48144832,
-            -0.88476783, 0.33639774, -0.43609348, -0.26278743, 0.6910331,
-            -0.25535262, 0.11774132, 0.46892625, 0.77644444, -0.14834122,
-            -0.13464923, -0.26617187, 0.1341292, 0.133574, 0.15594807,
-            -0.057847068, 0.3967621, 0.047606125, 0.01414329, 0.41560003,
-            0.12632199, -0.33603117, -0.5669182, -0.2004348, 0.55602646,
-            0.24340886, -0.16611233, 0.7904902, -0.42025912, -0.38651145,
-            -0.14808364, -0.27662534, -0.74715126, 0.5908927, -0.75451213,
-            -0.33933204, 0.36646086, -0.57852495, 0.10015667, -0.34719938,
-            0.35134, 0.7383081, -0.3743101, -0.53234375, -0.33714586,
-            0.012157675, -0.399321, -0.3871609, 0.27705255, 0.4469853,
-            -0.16857521, 0.60894567, -0.04652265, 0.21421923, 0.014229958,
-            0.87569416, -0.28046992, 0.64841086, 0.06317055, -0.037642393,
-            -0.7303067, 0.6826409, -0.091142215, -0.080362685, 0.1991867,
-            0.3268059, 0.6429179, 0.26278743, -0.088880904, 0.25250778,
-            0.2633651, -0.7295981, -0.15740044, -0.44250035, -0.0022179564,
-            0.26617187, -0.33556038, -0.38437498, -0.8211783, 0.641319,
-            0.3527957, -0.062620886, 0.4227164, -0.23919682, 0.18401834,
-            -0.14366682, 0.016121548, -0.25830117, 0.82918876, 0.92221844,
-            0.31633607, -0.18821196, -0.9082796, 0.11038142, 0.008659021,
-            -0.18971694, -0.40438867, -0.12019706, -0.6811534, 0.33933204,
-            -0.40837204, 0.22615194, 0.38991654, 0.18199626, -0.1321399,
-            0.19951832, 0.7384663, 0.53234375, 0.030798966, 0.40922493,
-            0.4283689, -0.37271422, 0.22344504, 0.24096492, 0.1736422,
-            0.4192076, -0.42793053, 0.37122476, -0.008662291, 0.008916863,
-            0.34757638, -0.35418823, 0.3462311 };
+        double lts_re[128] = { -0.5646359, 0.4669951, 0.8769358, 0.5407985,
+            -0.48144832, -0.88476783, 0.33639774, -0.43609348, -0.26278743,
+            0.6910331, -0.25535262, 0.11774132, 0.46892625, 0.77644444,
+            -0.14834122, -0.13464923, -0.26617187, 0.1341292, 0.133574,
+            0.15594807, -0.057847068, 0.3967621, 0.047606125, 0.01414329,
+            0.41560003, 0.12632199, -0.33603117, -0.5669182, -0.2004348,
+            0.55602646, 0.24340886, -0.16611233, 0.7904902, -0.42025912,
+            -0.38651145, -0.14808364, -0.27662534, -0.74715126, 0.5908927,
+            -0.75451213, -0.33933204, 0.36646086, -0.57852495, 0.10015667,
+            -0.34719938, 0.35134, 0.7383081, -0.3743101, -0.53234375,
+            -0.33714586, 0.012157675, -0.399321, -0.3871609, 0.27705255,
+            0.4469853, -0.16857521, 0.60894567, -0.04652265, 0.21421923,
+            0.014229958, 0.87569416, -0.28046992, 0.64841086, 0.06317055,
+            -0.037642393, -0.7303067, 0.6826409, -0.091142215, -0.080362685,
+            0.1991867, 0.3268059, 0.6429179, 0.26278743, -0.088880904,
+            0.25250778, 0.2633651, -0.7295981, -0.15740044, -0.44250035,
+            -0.0022179564, 0.26617187, -0.33556038, -0.38437498, -0.8211783,
+            0.641319, 0.3527957, -0.062620886, 0.4227164, -0.23919682,
+            0.18401834, -0.14366682, 0.016121548, -0.25830117, 0.82918876,
+            0.92221844, 0.31633607, -0.18821196, -0.9082796, 0.11038142,
+            0.008659021, -0.18971694, -0.40438867, -0.12019706, -0.6811534,
+            0.33933204, -0.40837204, 0.22615194, 0.38991654, 0.18199626,
+            -0.1321399, 0.19951832, 0.7384663, 0.53234375, 0.030798966,
+            0.40922493, 0.4283689, -0.37271422, 0.22344504, 0.24096492,
+            0.1736422, 0.4192076, -0.42793053, 0.37122476, -0.008662291,
+            0.008916863, 0.34757638, -0.35418823, 0.3462311 };
 
-        double lts_im[128] = { -0.5646359, 0.3462311, -0.35418823, 0.34757638, 0.008916863,
-            -0.008662291, 0.37122476, -0.42793053, 0.4192076, 0.1736422,
-            0.24096492, 0.22344504, -0.37271422, 0.4283689, 0.40922493,
-            0.030798966, 0.53234375, 0.7384663, 0.19951832, -0.1321399,
-            0.18199626, 0.38991654, 0.22615194, -0.40837204, 0.33933204,
-            -0.6811534, -0.12019706, -0.40438867, -0.18971694, 0.008659021,
-            0.11038142, -0.9082796, -0.18821196, 0.31633607, 0.92221844,
-            0.82918876, -0.25830117, 0.016121548, -0.14366682, 0.18401834,
-            -0.23919682, 0.4227164, -0.062620886, 0.3527957, 0.641319,
-            -0.8211783, -0.38437498, -0.33556038, 0.26617187, -0.0022179564,
-            -0.44250035, -0.15740044, -0.7295981, 0.2633651, 0.25250778,
-            -0.088880904, 0.26278743, 0.6429179, 0.3268059, 0.1991867,
-            -0.080362685, -0.091142215, 0.6826409, -0.7303067, -0.037642393,
-            0.06317055, 0.64841086, -0.28046992, 0.87569416, 0.014229958,
-            0.21421923, -0.04652265, 0.60894567, -0.16857521, 0.4469853,
-            0.27705255, -0.3871609, -0.399321, 0.012157675, -0.33714586,
-            -0.53234375, -0.3743101, 0.7383081, 0.35134, -0.34719938,
-            0.10015667, -0.57852495, 0.36646086, -0.33933204, -0.75451213,
-            0.5908927, -0.74715126, -0.27662534, -0.14808364, -0.38651145,
-            -0.42025912, 0.7904902, -0.16611233, 0.24340886, 0.55602646,
-            -0.2004348, -0.5669182, -0.33603117, 0.12632199, 0.41560003,
-            0.01414329, 0.047606125, 0.3967621, -0.057847068, 0.15594807,
-            0.133574, 0.1341292, -0.26617187, -0.13464923, -0.14834122,
-            0.77644444, 0.46892625, 0.11774132, -0.25535262, 0.6910331,
-            -0.26278743, -0.43609348, 0.33639774, -0.88476783, -0.48144832,
-            0.5407985, 0.8769358, 0.4669951 };
+        double lts_im[128] = { -0.5646359, 0.3462311, -0.35418823, 0.34757638,
+            0.008916863, -0.008662291, 0.37122476, -0.42793053, 0.4192076,
+            0.1736422, 0.24096492, 0.22344504, -0.37271422, 0.4283689,
+            0.40922493, 0.030798966, 0.53234375, 0.7384663, 0.19951832,
+            -0.1321399, 0.18199626, 0.38991654, 0.22615194, -0.40837204,
+            0.33933204, -0.6811534, -0.12019706, -0.40438867, -0.18971694,
+            0.008659021, 0.11038142, -0.9082796, -0.18821196, 0.31633607,
+            0.92221844, 0.82918876, -0.25830117, 0.016121548, -0.14366682,
+            0.18401834, -0.23919682, 0.4227164, -0.062620886, 0.3527957,
+            0.641319, -0.8211783, -0.38437498, -0.33556038, 0.26617187,
+            -0.0022179564, -0.44250035, -0.15740044, -0.7295981, 0.2633651,
+            0.25250778, -0.088880904, 0.26278743, 0.6429179, 0.3268059,
+            0.1991867, -0.080362685, -0.091142215, 0.6826409, -0.7303067,
+            -0.037642393, 0.06317055, 0.64841086, -0.28046992, 0.87569416,
+            0.014229958, 0.21421923, -0.04652265, 0.60894567, -0.16857521,
+            0.4469853, 0.27705255, -0.3871609, -0.399321, 0.012157675,
+            -0.33714586, -0.53234375, -0.3743101, 0.7383081, 0.35134,
+            -0.34719938, 0.10015667, -0.57852495, 0.36646086, -0.33933204,
+            -0.75451213, 0.5908927, -0.74715126, -0.27662534, -0.14808364,
+            -0.38651145, -0.42025912, 0.7904902, -0.16611233, 0.24340886,
+            0.55602646, -0.2004348, -0.5669182, -0.33603117, 0.12632199,
+            0.41560003, 0.01414329, 0.047606125, 0.3967621, -0.057847068,
+            0.15594807, 0.133574, 0.1341292, -0.26617187, -0.13464923,
+            -0.14834122, 0.77644444, 0.46892625, 0.11774132, -0.25535262,
+            0.6910331, -0.26278743, -0.43609348, 0.33639774, -0.88476783,
+            -0.48144832, 0.5407985, 0.8769358, 0.4669951 };
 
         for (int j = 0; j < 2; j++) {
             std::vector<double> a;
@@ -664,7 +784,8 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
               << "   Number of rows: " << matrix.size() << std::endl;
     for (int i = 0; i < matrix.size(); i++) {
         for (int j = 0; j < matrix[i].size(); j++) {
-            std::cout << "Values[" << i << "][" << j << "]: \t " << matrix[i][j] << std::endl;
+            std::cout << "Values[" << i << "][" << j << "]: \t " << matrix[i][j]
+                      << std::endl;
         }
     }
 #endif
@@ -676,8 +797,7 @@ int main(int argc, char *argv[])
 {
     std::vector<std::vector<double> > sequence;
     int type = atoi(argv[1]);
-    int N = atoi(argv[2]); 	// If Hadamard, possible N: {2, 4, 8, 16, 32, 64}
-    sequence = SequenceGen::getSequence(N, type);
-    return 0;
+    int N = atoi(argv[2]); 	// If Hadamard, possible N: {2, 4, 8, 16, 32,
+64} sequence = SequenceGen::getSequence(N, type); return 0;
 }
 */

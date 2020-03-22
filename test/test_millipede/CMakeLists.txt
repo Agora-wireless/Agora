@@ -17,7 +17,7 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
+  include(${SOURCE_DIR}/cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -mavx2 -mavx -march=broadwell -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
@@ -48,6 +48,10 @@ find_package(Armadillo)
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+
+message(STATUS "USE_DPDK: ${USE_DPDK}")
+message(STATUS "USE_ARGOS: ${USE_ARGOS}")
+message(STATUS "USE_LDPC: ${USE_LDPC}")
 
 
 set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx.cpp)
@@ -87,6 +91,10 @@ target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY
 
 # LDPC support
 if(${USE_LDPC})
+  if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
+    message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
+    message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
+  endif()
   add_definitions(-DUSE_LDPC)
   # set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
   set(SDK_DIR /home/argos/Jian/5gnr_ldpc/intel_library)
@@ -157,6 +165,12 @@ set(SIMULATOR_SOURCES
 
 add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim -lpthread ${MKL_LIBS})
+
+add_executable(data_generator 
+  ${SOURCE_DIR}/data/data_generator/data_generator.cpp 
+  ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
+target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
+target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 
 
