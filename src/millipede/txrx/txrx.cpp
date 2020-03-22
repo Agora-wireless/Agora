@@ -60,16 +60,16 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
-    printf("create TX or TXRX threads\n");
+    printf("create TXRX threads\n");
     for (int i = 0; i < tx_thread_num_; i++) {
-        pthread_t send_thread_;
+        pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
         context->id = i;
-        if (pthread_create(&send_thread_, NULL,
+        if (pthread_create(&txrx_thread, NULL,
                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
             != 0) {
-            perror("socket Transmit thread create failed");
+            perror("socket communication thread create failed");
             exit(0);
         }
     }
@@ -103,14 +103,6 @@ void* PacketTXRX::loopTXRX(int tid)
     double* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
     int frame_id;
-
-#if 0
-    // walk through all the pages
-    double temp;
-    for (int i = 0; i < 20; i++) {
-        temp = rx_frame_start[i * 512];
-    }
-#endif
 
     // TX pointers
     // float *tx_data_buffer = tx_data_buffer_;
@@ -221,16 +213,13 @@ struct Packet* PacketTXRX::recv_enqueue(
     // get the position in rx_buffer
     // move ptr & set status to full
     rx_buffer_status[rx_offset]
-        = 1; // has data, after doing fft, it is set to 0
+        = 1; // has data, after it is read, it is set to 0
 
-    // Push EVENT_PACKET_RECEIVED event into the queue.
+    // Push kPacketRX event into the queue.
     // data records the position of this packet in the rx_buffer & tid of this
     // socket (so that task thread could know which rx_buffer it should visit)
     Event_data rx_message(
         EventType::kPacketRX, generateOffset2d_setbits(tid, rx_offset, 28));
-
-    // rx_message.data = rx_offset + tid * rx_buffer_frame_num;
-    // if ( !message_queue_->enqueue(rx_message ) ) {
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
         printf("socket message enqueue failed\n");
         exit(0);
