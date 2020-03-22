@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 #ifndef DORECIP
 #define DORECIP
@@ -24,9 +24,9 @@
 class Reciprocity : public Doer {
 public:
     Reciprocity(Config* cfg, int in_tid,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue, Consumer& in_consumer,
-        Table<complex_float>& in_calib_buffer, Table<complex_float>& in_recip_buffer,
-        Stats* in_stats_manager);
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+        Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+        Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~Reciprocity();
     void launch(int offset);
 
@@ -40,7 +40,7 @@ private:
     Table<double>* RC_task_duration;
     int* RC_task_count;
 
-    /** 
+    /**
      * Intermediate buffer to gather CSI
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM */

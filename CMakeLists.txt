@@ -123,6 +123,10 @@ set(MILLIPEDE_SOURCES
 
 # LDPC support
 if(${USE_LDPC})
+  if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
+    message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
+    message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
+  endif()
   add_definitions(-DUSE_LDPC)
   # set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
   set(SDK_DIR /home/argos/Jian/5gnr_ldpc/intel_library)
@@ -167,6 +171,12 @@ target_link_libraries(millipede -larmadillo
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+
+add_executable(data_generator 
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
+  ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
+target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
+target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 if(${USE_ARGOS})
   add_executable(user 

@@ -6,7 +6,7 @@ RadioConfig::RadioConfig(Config* cfg)
 {
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
-    //load channels
+    // load channels
     auto channels = Utils::strToChannels(_cfg->channel);
 
     this->_radioNum = _cfg->nRadios;
@@ -27,12 +27,13 @@ RadioConfig::RadioConfig(Config* cfg)
     std::atomic_int threadCount = ATOMIC_VAR_INIT((int)_radioNum);
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
-        RadioConfigContext* context = new RadioConfigContext;
+        auto* context = new RadioConfigContext;
         context->brs = this;
         context->threadCount = &threadCount;
         context->tid = i;
         pthread_t init_thread_;
-        if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context) != 0) {
+        if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context)
+            != 0) {
             perror("init thread create failed");
             exit(0);
         }
@@ -55,12 +56,14 @@ RadioConfig::RadioConfig(Config* cfg)
     threadCount = (int)_radioNum;
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
-        RadioConfigContext* context = new RadioConfigContext;
+        auto* context = new RadioConfigContext;
         context->brs = this;
         context->threadCount = &threadCount;
         context->tid = i;
         pthread_t configure_thread_;
-        if (pthread_create(&configure_thread_, NULL, RadioConfig::configureBSRadio_launch, context) != 0) {
+        if (pthread_create(&configure_thread_, NULL,
+                RadioConfig::configureBSRadio_launch, context)
+            != 0) {
             perror("init thread create failed");
             exit(0);
         }
@@ -73,40 +76,63 @@ RadioConfig::RadioConfig(Config* cfg)
         ;
 
     for (size_t i = 0; i < this->_radioNum; i++) {
-        std::cout << _cfg->radio_ids.at(i) << ": Front end " << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
+        std::cout << _cfg->radio_ids.at(i) << ": Front end "
+                  << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
         for (size_t c = 0; c < _cfg->nChannels; c++) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_RX)) {
                 printf("RX Channel %zu\n", c);
-                printf("Actual RX sample rate: %fMSps...\n", (baStn[i]->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
-                printf("Actual RX frequency: %fGHz...\n", (baStn[i]->getFrequency(SOAPY_SDR_RX, c) / 1e9));
-                printf("Actual RX gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_RX, c)));
-                printf("Actual RX LNA gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA")));
-                printf("Actual RX PGA gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
-                printf("Actual RX TIA gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
-                if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS") == 0) {
-                    printf("Actual RX LNA1 gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
-                    printf("Actual RX LNA2 gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA2")));
+                printf("Actual RX sample rate: %fMSps...\n",
+                    (baStn[i]->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
+                printf("Actual RX frequency: %fGHz...\n",
+                    (baStn[i]->getFrequency(SOAPY_SDR_RX, c) / 1e9));
+                printf("Actual RX gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_RX, c)));
+                printf("Actual RX LNA gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA")));
+                printf("Actual RX PGA gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
+                printf("Actual RX TIA gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
+                if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
+                    == 0) {
+                    printf("Actual RX LNA1 gain: %f...\n",
+                        (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
+                    printf("Actual RX LNA2 gain: %f...\n",
+                        (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA2")));
                 }
-                printf("Actual RX bandwidth: %fM...\n", (baStn[i]->getBandwidth(SOAPY_SDR_RX, c) / 1e6));
-                printf("Actual RX antenna: %s...\n", (baStn[i]->getAntenna(SOAPY_SDR_RX, c).c_str()));
+                printf("Actual RX bandwidth: %fM...\n",
+                    (baStn[i]->getBandwidth(SOAPY_SDR_RX, c) / 1e6));
+                printf("Actual RX antenna: %s...\n",
+                    (baStn[i]->getAntenna(SOAPY_SDR_RX, c).c_str()));
             }
         }
 
         for (size_t c = 0; c < _cfg->nChannels; c++) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_TX)) {
                 printf("TX Channel %zu\n", c);
-                printf("Actual TX sample rate: %fMSps...\n", (baStn[i]->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
-                printf("Actual TX frequency: %fGHz...\n", (baStn[i]->getFrequency(SOAPY_SDR_TX, c) / 1e9));
-                printf("Actual TX gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_TX, c)));
-                printf("Actual TX PAD gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
-                printf("Actual TX IAMP gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
-                if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS") == 0) {
-                    printf("Actual TX PA1 gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
-                    printf("Actual TX PA2 gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA2")));
-                    printf("Actual TX PA3 gain: %f...\n", (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA3")));
+                printf("Actual TX sample rate: %fMSps...\n",
+                    (baStn[i]->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
+                printf("Actual TX frequency: %fGHz...\n",
+                    (baStn[i]->getFrequency(SOAPY_SDR_TX, c) / 1e9));
+                printf("Actual TX gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_TX, c)));
+                printf("Actual TX PAD gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
+                printf("Actual TX IAMP gain: %f...\n",
+                    (baStn[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
+                if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
+                    == 0) {
+                    printf("Actual TX PA1 gain: %f...\n",
+                        (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
+                    printf("Actual TX PA2 gain: %f...\n",
+                        (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA2")));
+                    printf("Actual TX PA3 gain: %f...\n",
+                        (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA3")));
                 }
-                printf("Actual TX bandwidth: %fM...\n", (baStn[i]->getBandwidth(SOAPY_SDR_TX, c) / 1e6));
-                printf("Actual TX antenna: %s...\n", (baStn[i]->getAntenna(SOAPY_SDR_TX, c).c_str()));
+                printf("Actual TX bandwidth: %fM...\n",
+                    (baStn[i]->getBandwidth(SOAPY_SDR_TX, c) / 1e6));
+                printf("Actual TX antenna: %s...\n",
+                    (baStn[i]->getAntenna(SOAPY_SDR_TX, c).c_str()));
             }
         }
         std::cout << std::endl;
@@ -145,8 +171,10 @@ void RadioConfig::initBSRadio(RadioConfigContext* context)
         baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, _cfg->rate);
         baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, _cfg->rate);
     }
-    rxStreams[i] = baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
-    txStreams[i] = baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
+    rxStreams[i]
+        = baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+    txStreams[i]
+        = baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
 
     (*threadCount)--;
 }
@@ -165,13 +193,13 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
     std::atomic_int* threadCount = context->threadCount;
     delete context;
 
-    //load channels
+    // load channels
     auto channels = Utils::strToChannels(_cfg->channel);
 
     // resets the DATA_clk domain logic.
     baStn[i]->writeSetting("RESET_DATA_LOGIC", "");
 
-    //use the TRX antenna port for both tx and rx
+    // use the TRX antenna port for both tx and rx
     for (auto ch : channels)
         baStn[i]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
 
@@ -180,8 +208,8 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, _cfg->bwFilter);
         baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, _cfg->bwFilter);
 
-        //baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
-        //baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
+        // baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
+        // baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
 
         baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", _cfg->radioRfFreq);
         baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", _cfg->nco);
@@ -198,7 +226,8 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
             baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
         }
 
-        baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA", ch ? _cfg->rxgainB : _cfg->rxgainA); //[0,30]
+        baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
+            ch ? _cfg->rxgainB : _cfg->rxgainA); //[0,30]
         baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
         baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
 
@@ -207,7 +236,8 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
             baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
         }
         baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
-        baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD", ch ? _cfg->txgainB : _cfg->txgainA); //[0,30]
+        baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
+            ch ? _cfg->txgainB : _cfg->txgainA); //[0,30]
     }
 
     for (auto ch : channels) {
@@ -235,7 +265,9 @@ bool RadioConfig::radioStart()
             good_calib = correctSampleOffset(ref_ant, _cfg->sampleCalEn);
             iter++;
             if (iter == max_iter && !good_calib) {
-                std::cout << "attempted " << max_iter << " unsucessful calibration, stopping ..." << std::endl;
+                std::cout << "attempted " << max_iter
+                          << " unsucessful calibration, stopping ..."
+                          << std::endl;
                 break;
             }
         }
@@ -264,7 +296,8 @@ bool RadioConfig::radioStart()
     size_t ndx = 0;
     for (size_t i = 0; i < this->_radioNum; i++) {
         bool isRefAnt = (i == _cfg->ref_ant);
-        baStn[i]->writeSetting("TX_SW_DELAY", "30"); // experimentally good value for dev front-end
+        baStn[i]->writeSetting(
+            "TX_SW_DELAY", "30"); // experimentally good value for dev front-end
         baStn[i]->writeSetting("TDD_MODE", "true");
         std::vector<std::string> tddSched;
         for (size_t f = 0; f < _cfg->framePeriod; f++) {
@@ -295,7 +328,8 @@ bool RadioConfig::radioStart()
         baStn[i]->writeRegisters("BEACON_RAM", 0, beacon);
         for (char const& c : _cfg->channel) {
             bool isBeaconAntenna = !_cfg->beamsweep && ndx == _cfg->beacon_ant;
-            std::vector<unsigned> beacon_weights(_cfg->nAntennas, isBeaconAntenna ? 1 : 0);
+            std::vector<unsigned> beacon_weights(
+                _cfg->nAntennas, isBeaconAntenna ? 1 : 0);
             std::string tx_ram_wgt = "BEACON_RAM_WGT_";
             if (_cfg->beamsweep) {
                 for (size_t j = 0; j < _cfg->nAntennas; j++)
@@ -315,11 +349,16 @@ bool RadioConfig::radioStart()
                 // exclude reference board from beamforming
             } else {
                 std::vector<std::complex<float>> recipCalDlPilot;
-                recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
-                baStn[i]->writeRegisters("TX_RAM_A", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
+                recipCalDlPilot = CommsLib::composeRefSymbol(
+                    _cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
+                baStn[i]->writeRegisters("TX_RAM_A", 0,
+                    Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
-                    recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF, 2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
-                    baStn[i]->writeRegisters("TX_RAM_B", 0, Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
+                    recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
+                        2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
+                    baStn[i]->writeRegisters("TX_RAM_B", 0,
+                        Utils::cfloat32_to_uint32(
+                            recipCalDlPilot, false, "QI"));
                 }
             }
         }
@@ -336,10 +375,10 @@ bool RadioConfig::radioStart()
 void RadioConfig::go()
 {
     if (hubs.size() == 0) {
-        //std::cout << "triggering first Iris ..." << std::endl;
+        // std::cout << "triggering first Iris ..." << std::endl;
         baStn[0]->writeSetting("TRIGGER_GEN", "");
     } else {
-        //std::cout << "triggering Hub ..." << std::endl;
+        // std::cout << "triggering Hub ..." << std::endl;
         hubs[0]->writeSetting("TRIGGER_GEN", "");
     }
 }
@@ -349,25 +388,30 @@ void RadioConfig::radioTx(void** buffs)
     int flags = 0;
     long long frameTime(0);
     for (size_t i = 0; i < this->_radioNum; i++) {
-        baStn[i]->writeStream(this->txStreams[i], buffs, _cfg->sampsPerSymbol, flags, frameTime, 1000000);
+        baStn[i]->writeStream(this->txStreams[i], buffs, _cfg->sampsPerSymbol,
+            flags, frameTime, 1000000);
     }
 }
 
-int RadioConfig::radioTx(size_t r /*radio id*/, void** buffs, int flags, long long& frameTime)
+int RadioConfig::radioTx(
+    size_t r /*radio id*/, void** buffs, int flags, long long& frameTime)
 {
     int txFlags = 0;
     if (flags == 1)
         txFlags = SOAPY_SDR_HAS_TIME;
     else if (flags == 2)
         txFlags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
-    //long long frameTime(0);
-    int w = baStn[r]->writeStream(this->txStreams[r], buffs, _cfg->sampsPerSymbol, txFlags, frameTime, 1000000);
+    // long long frameTime(0);
+    int w = baStn[r]->writeStream(this->txStreams[r], buffs,
+        _cfg->sampsPerSymbol, txFlags, frameTime, 1000000);
 #if DEBUG_RADIO_TX
     size_t chanMask;
     long timeoutUs(0);
     int statusFlag = 0;
-    int s = baStn[r]->readStreamStatus(this->txStreams[r], chanMask, statusFlag, frameTime, timeoutUs);
-    std::cout << "radio " << r << " tx returned " << w << " and status " << s << " when flags was " << flags << std::endl;
+    int s = baStn[r]->readStreamStatus(
+        this->txStreams[r], chanMask, statusFlag, frameTime, timeoutUs);
+    std::cout << "radio " << r << " tx returned " << w << " and status " << s
+              << " when flags was " << flags << std::endl;
 #endif
     return w;
 }
@@ -378,19 +422,23 @@ void RadioConfig::radioRx(void** buffs)
     long long frameTime(0);
     for (size_t i = 0; i < this->_radioNum; i++) {
         void** buff = buffs + (i * 2);
-        baStn[i]->readStream(this->rxStreams[i], buff, _cfg->sampsPerSymbol, flags, frameTime, 1000000);
+        baStn[i]->readStream(this->rxStreams[i], buff, _cfg->sampsPerSymbol,
+            flags, frameTime, 1000000);
     }
 }
 
-int RadioConfig::radioRx(size_t r /*radio id*/, void** buffs, long long& frameTime)
+int RadioConfig::radioRx(
+    size_t r /*radio id*/, void** buffs, long long& frameTime)
 {
     int flags = 0;
     if (r < this->_radioNum) {
         long long frameTimeNs = 0;
-        int ret = baStn[r]->readStream(this->rxStreams[r], buffs, _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
-        frameTime = frameTimeNs; //SoapySDR::timeNsToTicks(frameTimeNs, _rate);
+        int ret = baStn[r]->readStream(this->rxStreams[r], buffs,
+            _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
+        frameTime = frameTimeNs; // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
         if (ret != (int)_cfg->sampsPerSymbol)
-            std::cout << "invalid return " << ret << " from radio " << r << std::endl;
+            std::cout << "invalid return " << ret << " from radio " << r
+                      << std::endl;
 #if DEBUG_RADIO_RX
         else
             std::cout << "radio " << r << "received " << ret << std::endl;
@@ -409,20 +457,23 @@ void RadioConfig::drain_buffers()
     dummybuffs[0] = dummyBuff0.data();
     dummybuffs[1] = dummyBuff1.data();
     for (size_t i = 0; i < _cfg->nRadios; i++) {
-        RadioConfig::drain_rx_buffer(baStn[i], rxStreams[i], dummybuffs, _cfg->sampsPerSymbol);
+        RadioConfig::drain_rx_buffer(
+            baStn[i], rxStreams[i], dummybuffs, _cfg->sampsPerSymbol);
     }
 }
 
-void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs, SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp)
+void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs,
+    SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp)
 {
     long long frameTime = 0;
     int flags = 0, r = 0, i = 0;
     long timeoutUs(0);
     while (r != -1) {
-        r = ibsSdrs->readStream(istream, buffs.data(), symSamp, flags, frameTime, timeoutUs);
+        r = ibsSdrs->readStream(
+            istream, buffs.data(), symSamp, flags, frameTime, timeoutUs);
         i++;
     }
-    //std::cout << "Number of reads needed to drain: " << i << std::endl;
+    // std::cout << "Number of reads needed to drain: " << i << std::endl;
 }
 
 void RadioConfig::adjustDelays(std::vector<int> offset, size_t ref_ant)
@@ -431,7 +482,8 @@ void RadioConfig::adjustDelays(std::vector<int> offset, size_t ref_ant)
     size_t R = _cfg->nRadios;
     for (size_t i = 0; i < R; i++) {
         int delta = offset[ref_offset] - offset[i];
-        std::cout << "sample_adjusting delay of node " << i << " by " << delta << std::endl;
+        std::cout << "sample_adjusting delay of node " << i << " by " << delta
+                  << std::endl;
         int iter = delta < 0 ? -delta : delta;
         for (int j = 0; j < iter; j++) {
             if (delta < 0)
@@ -446,13 +498,20 @@ void RadioConfig::readSensors()
 {
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << "TEMPs on Iris " << i << std::endl;
-        std::cout << "ZYNQ_TEMP: " << baStn[i]->readSensor("ZYNQ_TEMP") << std::endl;
-        std::cout << "LMS7_TEMP  : " << baStn[i]->readSensor("LMS7_TEMP") << std::endl;
-        std::cout << "FE_TEMP  : " << baStn[i]->readSensor("FE_TEMP") << std::endl;
-        std::cout << "TX0 TEMP  : " << baStn[i]->readSensor(SOAPY_SDR_TX, 0, "TEMP") << std::endl;
-        std::cout << "TX1 TEMP  : " << baStn[i]->readSensor(SOAPY_SDR_TX, 1, "TEMP") << std::endl;
-        std::cout << "RX0 TEMP  : " << baStn[i]->readSensor(SOAPY_SDR_RX, 0, "TEMP") << std::endl;
-        std::cout << "RX1 TEMP  : " << baStn[i]->readSensor(SOAPY_SDR_RX, 1, "TEMP") << std::endl;
+        std::cout << "ZYNQ_TEMP: " << baStn[i]->readSensor("ZYNQ_TEMP")
+                  << std::endl;
+        std::cout << "LMS7_TEMP  : " << baStn[i]->readSensor("LMS7_TEMP")
+                  << std::endl;
+        std::cout << "FE_TEMP  : " << baStn[i]->readSensor("FE_TEMP")
+                  << std::endl;
+        std::cout << "TX0 TEMP  : "
+                  << baStn[i]->readSensor(SOAPY_SDR_TX, 0, "TEMP") << std::endl;
+        std::cout << "TX1 TEMP  : "
+                  << baStn[i]->readSensor(SOAPY_SDR_TX, 1, "TEMP") << std::endl;
+        std::cout << "RX0 TEMP  : "
+                  << baStn[i]->readSensor(SOAPY_SDR_RX, 0, "TEMP") << std::endl;
+        std::cout << "RX1 TEMP  : "
+                  << baStn[i]->readSensor(SOAPY_SDR_RX, 1, "TEMP") << std::endl;
         std::cout << std::endl;
     }
 }

@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 
 #include "millipede.hpp"
@@ -15,8 +15,9 @@ int main(int argc, char* argv[])
         confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
-    Config* cfg = new Config(filename.c_str());
+    auto* cfg = new Config(filename.c_str());
     Millipede* millipede_cli;
+
     int ret;
     try {
         SignalHandler signalHandler;

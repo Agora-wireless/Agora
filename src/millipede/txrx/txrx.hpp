@@ -1,7 +1,7 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- * 
+ *
  */
 
 #ifndef PACKETTXRX
@@ -68,7 +68,7 @@
 #define ETH_HDRLEN 14
 #define IP4_HDRLEN 20
 #define UDP_HDRLEN 8
-#define MAX_JUMBO_FRAME_SIZE 9600 //9600
+#define MAX_JUMBO_FRAME_SIZE 9600 // 9600
 #define EMPTY_MASK 0x0
 #define FULL_MASK 0xffffffff
 
@@ -83,44 +83,61 @@ public:
     //     };
 
 public:
-    PacketTXRX(Config* cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1, int in_core_offset = 1);
+    PacketTXRX(Config* cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1,
+        int in_core_offset = 1);
     /**
      * RX_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
-    */
-    PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_message, moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
-        moodycamel::ProducerToken** in_rx_ptoks, moodycamel::ProducerToken** in_tx_ptoks);
+     */
+    PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
+        int in_core_offset,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+        moodycamel::ProducerToken** in_rx_ptoks,
+        moodycamel::ProducerToken** in_tx_ptoks);
     ~PacketTXRX();
 
 #ifdef USE_DPDK
     int nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool);
-    int process_arp(struct rte_mbuf* mbuf, struct ether_hdr* eth_h, int len, int tid);
+    int process_arp(
+        struct rte_mbuf* mbuf, struct ether_hdr* eth_h, int len, int tid);
 #endif
 
     /**
      * called in main threads to start the socket threads
      * in_buffer: ring buffer to save packets
-     * in_buffer_status: record the status of each memory block (0: empty, 1: full)
-     * in_buffer_frame_num: number of packets the ring buffer could hold
+     * in_buffer_status: record the status of each memory block (0: empty, 1:
+     * full) in_buffer_frame_num: number of packets the ring buffer could hold
      * in_buffer_length: size of ring buffer
-     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id + RX_THREAD_NUM - 1}
-    */
-    std::vector<pthread_t> startRecv(Table<char>& in_buffer, Table<int>& in_buffer_status, int in_buffer_frame_num, long long in_buffer_length,
-        Table<double>& in_frame_start);
-    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length);
+     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
+     * RX_THREAD_NUM - 1}
+     */
+    std::vector<pthread_t> startRecv(Table<char>& in_buffer,
+        Table<int>& in_buffer_status, int in_buffer_frame_num,
+        long long in_buffer_length, Table<double>& in_frame_start);
+    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status,
+        int in_buffer_frame_num, int in_buffer_length);
     /**
      * receive thread
-    */
+     */
     void* loopRecv(int tid);
     void* loopTXRX(int tid);
     void* loopSend(int tid);
+#if USE_IPV4
+    typedef struct sockaddr_in sockaddr_t;
+#else
+    typedef struct sockaddr_in6 sockaddr_t;
+#endif
+    int dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr);
+    struct Packet* recv_enqueue(int tid, int socket_local, int rx_offset);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
     void* loopRecv_Argos(int tid);
     void* loopSend_Argos(int tid);
+    int dequeue_send_Argos(int tid);
+    struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
 
 private:
