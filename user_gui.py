@@ -99,6 +99,7 @@ if __name__ == '__main__':
     nusers = 4
     data_len = 52
     mode = ''
+    isDownlink = True
     if len(sys.argv) > 1:
         filename = sys.argv[1]
     with open(filename) as json_file:
@@ -106,10 +107,14 @@ if __name__ == '__main__':
         if 'ue_num' not in data:
             sched = data['frames']
             nusers = sched[0].count('P')
+            isDownlink = sched[0].count('D') > 2
         else:
             nusers = data['ue_num']
         data_len = int(data['ofdm_data_num'])
     print('nusers %d, data_len %d' %(nusers, data_len))
+    if not isDownlink:
+        print('No downlink symbols. Exiting...')
+        sys.exit(0)
     ue = UserClass(filename)
     app = QtGui.QApplication(sys.argv)
     w = MainWindow(userClass=ue, userNum=nusers, FFT_len=data_len, mode=mode, update_interval=1000)
