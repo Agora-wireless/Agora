@@ -268,8 +268,7 @@ Config::Config(std::string jsonfile)
     }
 
     dl_IQ_data.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
-    dl_IQ_modul.malloc(data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64); // used for debug
-    dl_IQ_symbol.malloc(data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
+    dl_IQ_symbol.malloc(dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
     ul_IQ_data.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ul_IQ_modul.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
 
@@ -287,12 +286,8 @@ Config::Config(std::string jsonfile)
             std::vector<std::complex<float>> ifft_in_data;
             for (size_t j = 0; j < OFDM_CA_NUM; j++) {
                 if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].re = 0;
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].im = 0;
                     ifft_in_data.push_back(0);
                 } else {
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].re = modul_data[j - OFDM_DATA_START].real();
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].im = modul_data[j - OFDM_DATA_START].imag();
                     ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
                 }
             }
@@ -336,26 +331,6 @@ Config::Config(std::string jsonfile)
             printf("bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
     fclose(fd);
-
-#ifdef USE_ARGOS
-    // read uplink
-    std::string filename2 = cur_directory1 + "/data/tx_ul_data_" + std::to_string(BS_ANT_NUM) + "x" + std::to_string(UE_ANT_NUM) + ".bin";
-    fp = fopen(filename2.c_str(), "rb");
-    if (fp == NULL) {
-        std::cerr << "Openning File " << filename2 << " fails. Error: " << strerror(errno) << std::endl;
-    }
-    size_t total_sc = OFDM_DATA_NUM * UE_ANT_NUM * ul_data_symbol_num_perframe; // coding is not considered yet
-    L2_data = new mac_dtype[total_sc];
-    r = fread(L2_data, sizeof(mac_dtype), total_sc, fp);
-    if (r < total_sc)
-        printf("bad read from file %s \n", filename2.c_str());
-    fclose(fp);
-    for (size_t i = 0; i < total_sc; i++) {
-        size_t sid = i / (data_sc_len * UE_ANT_NUM);
-        size_t cid = i % (data_sc_len * UE_ANT_NUM) + OFDM_DATA_START;
-        ul_IQ_modul[sid][cid] = L2_data[i];
-    }
-#endif
 #endif
 
     running = true;
@@ -377,10 +352,11 @@ Config::~Config()
 {
     free_buffer_1d(&pilots_);
     dl_IQ_data.free();
-    dl_IQ_modul.free();
+#ifdef GENERATE_DATA
     dl_IQ_symbol.free();
     ul_IQ_data.free();
     ul_IQ_modul.free();
+#endif
 }
 
 int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
@@ -441,12 +417,12 @@ int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
 
 bool Config::isPilot(size_t frame_id, size_t symbol_id)
 {
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
     if (symbol_id > symbol_num_perframe) {
         printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
         return false;
     }
+    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
     printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -465,6 +441,10 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
 {
+    if (symbol_id > symbol_num_perframe) {
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
+        return false;
+    }
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
     if (isUE) {
@@ -475,6 +455,10 @@ bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
 {
+    if (symbol_id > symbol_num_perframe) {
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
+        return false;
+    }
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
     if (isUE) {
@@ -485,12 +469,12 @@ bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isUplink(size_t frame_id, size_t symbol_id)
 {
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
     if (symbol_id > symbol_num_perframe) {
         printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
         return false;
     }
+    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
     printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -500,6 +484,10 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
 
 bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 {
+    if (symbol_id > symbol_num_perframe) {
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame %zu\x1B[0m\n", symbol_id, frame_id);
+        return false;
+    }
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
