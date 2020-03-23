@@ -222,7 +222,7 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
     return 0;
 }
 
-bool PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
+void PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
     double** in_frame_start)
 {
@@ -288,7 +288,6 @@ bool PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
             worker_id++;
         }
     }
-    return true;
 }
 
 static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
