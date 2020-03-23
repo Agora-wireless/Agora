@@ -44,7 +44,7 @@ PacketTXRX::~PacketTXRX()
     delete radioconfig_;
 }
 
-bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+void PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
     Table<double>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
     int in_tx_buffer_frame_num, int in_tx_buffer_length)
@@ -68,7 +68,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     if (config_->nRadios == 0 || !radioconfig_->radioStart())
-        return false;
+        return;
 
     printf("create TXRX threads\n");
     for (int i = 0; i < tx_thread_num_; i++) {
@@ -89,7 +89,6 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     pthread_cond_broadcast(&cond);
     // sleep(1);
     radioconfig_->go();
-    return true;
 }
 
 void* PacketTXRX::loopTXRX_Argos(int tid)
