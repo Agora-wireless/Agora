@@ -94,10 +94,8 @@ void Millipede::start()
             stats_manager_->frame_start, dl_socket_buffer_,
             dl_socket_buffer_status_, dl_socket_buffer_status_size_,
             dl_socket_buffer_size_)) {
-#ifdef USE_ARGOS
         this->stop();
         return;
-#endif
     }
 
     /* tokens used for enqueue */
