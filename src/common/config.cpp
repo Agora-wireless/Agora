@@ -42,6 +42,7 @@ Config::Config(std::string jsonfile)
         exit(0);
     }
 #endif
+
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
     txgainA = tddConf.value("txgainA", 20);
