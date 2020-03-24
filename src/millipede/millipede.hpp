@@ -272,6 +272,7 @@ private:
     /* Tokens */
     moodycamel::ProducerToken** rx_ptoks_ptr;
     moodycamel::ProducerToken** tx_ptoks_ptr;
+    moodycamel::ProducerToken** worker_ptoks_ptr;
 };
 
 #endif
