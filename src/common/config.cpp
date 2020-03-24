@@ -36,6 +36,13 @@ Config::Config(std::string jsonfile)
         }
     }
 
+#ifdef USE_ARGOS
+    if (nRadios == 0) {
+        printf("Error: no radio exists in Argos mode!\n");
+        exit(0);
+    }
+#endif
+
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
     txgainA = tddConf.value("txgainA", 20);
@@ -244,7 +251,6 @@ Config::Config(std::string jsonfile)
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    size_t r = 0;
 #ifdef GENERATE_PILOT
     for (size_t i = 0; i < OFDM_CA_NUM; i++) {
         if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
@@ -261,8 +267,8 @@ Config::Config(std::string jsonfile)
         printf("open file %s faild.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    r = fread(pilots_, sizeof(float), 2048, fp);
-    if (r < 2048)
+    size_t r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    if (r < OFDM_CA_NUM)
         printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
 #endif
@@ -325,13 +331,13 @@ Config::Config(std::string jsonfile)
             for (size_t j = 0; j < OFDM_CA_NUM; j++) {
                 if (j < OFDM_DATA_START
                     || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].re = 0;
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].im = 0;
+                    dl_IQ_modul[i * UE_ANT_NUM + ue_id][j].re = 0;
+                    dl_IQ_modul[i * UE_ANT_NUM + ue_id][j].im = 0;
                     ifft_in_data.push_back(0);
                 } else {
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].re
+                    dl_IQ_modul[i * UE_ANT_NUM + ue_id][j].re
                         = modul_data[j - OFDM_DATA_START].real();
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].im
+                    dl_IQ_modul[i * UE_ANT_NUM + ue_id][j].im
                         = modul_data[j - OFDM_DATA_START].imag();
                     ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
                 }
