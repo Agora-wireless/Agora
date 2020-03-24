@@ -67,7 +67,7 @@ void PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
-    if (config_->nRadios == 0 || !radioconfig_->radioStart())
+    if (!radioconfig_->radioStart())
         return;
 
     printf("create TXRX threads\n");
