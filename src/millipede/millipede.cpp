@@ -89,11 +89,16 @@ void Millipede::stop()
 void Millipede::start()
 {
     /* start txrx receiver */
-    receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
-        socket_buffer_status_size_, socket_buffer_size_,
-        stats_manager_->frame_start, dl_socket_buffer_,
-        dl_socket_buffer_status_, dl_socket_buffer_status_size_,
-        dl_socket_buffer_size_);
+    if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
+            socket_buffer_status_size_, socket_buffer_size_,
+            stats_manager_->frame_start, dl_socket_buffer_,
+            dl_socket_buffer_status_, dl_socket_buffer_status_size_,
+            dl_socket_buffer_size_)) {
+#ifdef USE_ARGOS
+        this->stop();
+        return;
+#endif
+    }
 
     /* tokens used for enqueue */
     /* uplink */

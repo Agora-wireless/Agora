@@ -37,7 +37,7 @@ PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
 
 PacketTXRX::~PacketTXRX() { delete[] socket_; }
 
-void PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
     Table<double>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
     int in_tx_buffer_frame_num, int in_tx_buffer_length)
@@ -73,6 +73,7 @@ void PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
             exit(0);
         }
     }
+    return true;
 }
 
 void* PacketTXRX::loopTXRX(int tid)
