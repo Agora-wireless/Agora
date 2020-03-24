@@ -33,7 +33,7 @@ void pin_to_core_with_offset(
 
     /* Reserve core 0 for kernel threads */
     if (actual_core_id >= num_cores) {
-        actual_core_id = (actual_core_id % (num_cores - 1)) + 1;
+        actual_core_id = (actual_core_id % num_cores) + 1;
     }
 
     if (pin_to_core(actual_core_id) != 0) {
