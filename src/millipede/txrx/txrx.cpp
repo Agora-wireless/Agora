@@ -61,7 +61,7 @@ void PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     printf("create TXRX threads\n");
-    for (int i = 0; i < tx_thread_num_; i++) {
+    for (int i = 0; i < rx_thread_num_ + tx_thread_num_; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
