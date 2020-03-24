@@ -171,18 +171,17 @@ void Millipede::start()
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* get a bulk of events */
         if (last_dequeue == 0) {
-            // #ifdef USE_ARGOS
-            //             ret = message_queue_.try_dequeue_bulk(ctok,
-            //             events_list, dequeue_bulk_size_single);
-            // #else
             ret = 0;
-            for (int rx_itr = 0; rx_itr < SOCKET_RX_THREAD_NUM; rx_itr++)
+            for (size_t i = 0; i < config_->socket_thread_num; i++)
                 ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(rx_ptoks_ptr[rx_itr]), events_list + ret,
+                    *(rx_ptoks_ptr[i]), events_list + ret,
                     dequeue_bulk_size_single);
-            // #endif
             last_dequeue = 1;
         } else {
+            // ret = 0;
+            // for (size_t i = 0; i < config_->worker_thread_num; i++)
+            //     ret += message_queue_.try_dequeue_bulk_from_producer(
+            //         *(worker_ptoks_ptr[i]), events_list + ret, 4);
             ret = complete_task_queue_.try_dequeue_bulk(
                 ctok_complete, events_list, dequeue_bulk_size_single);
             last_dequeue = 0;
@@ -584,7 +583,7 @@ void Millipede::start()
 finish:
     printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
-    stats_manager_->save_to_file(last_frame_id, SOCKET_RX_THREAD_NUM);
+    stats_manager_->save_to_file(last_frame_id);
     stats_manager_->print_summary(last_frame_id);
 
 #ifdef USE_LDPC
@@ -608,8 +607,9 @@ static void pin_worker(ThreadType thread_type, int tid, Config* config_)
 void* Millipede::worker(int tid)
 {
     pin_worker(ThreadType::kWorker, tid, config_);
-    moodycamel::ProducerToken ptok_complete(complete_task_queue_);
-    Consumer consumer(complete_task_queue_, ptok_complete);
+    // moodycamel::ProducerToken ptok_complete(complete_task_queue_);
+    // Consumer consumer(complete_task_queue_, ptok_complete);
+    Consumer consumer(complete_task_queue_, *worker_ptoks_ptr[tid]);
 
     /* initialize operators */
     auto computeFFT = new DoFFT(config_, tid, fft_queue_, consumer,
@@ -1095,16 +1095,21 @@ void Millipede::initialize_queues()
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_subframe_num_perframe * 4);
 
-    int SOCKET_RX_THREAD_NUM = config_->socket_thread_num;
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
-        64, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
-    for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++)
+        64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
+    for (size_t i = 0; i < config_->socket_thread_num; i++)
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
 
     tx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
-        64, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
-    for (int i = 0; i < SOCKET_RX_THREAD_NUM; i++)
+        64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
+    for (size_t i = 0; i < config_->socket_thread_num; i++)
         tx_ptoks_ptr[i] = new moodycamel::ProducerToken(tx_queue_);
+
+    worker_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
+        64, config_->worker_thread_num * sizeof(moodycamel::ProducerToken*));
+    for (size_t i = 0; i < config_->worker_thread_num; i++)
+        worker_ptoks_ptr[i]
+            = new moodycamel::ProducerToken(complete_task_queue_);
 }
 
 void Millipede::initialize_uplink_buffers()
