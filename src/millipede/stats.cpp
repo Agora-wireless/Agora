@@ -546,7 +546,7 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
         &encode_stats_per_frame, task_thread_num, break_down_num);
 }
 
-void Stats::save_to_file(size_t last_frame_id, int socket_rx_thread_num)
+void Stats::save_to_file(size_t last_frame_id)
 {
     printf("saving timestamps to file.........\n");
     printf("Total processed frames %zu \n", last_frame_id + 1);
@@ -560,52 +560,32 @@ void Stats::save_to_file(size_t last_frame_id, int socket_rx_thread_num)
     }
     if (config_->downlink_mode) {
         for (size_t ii = 0; ii < last_frame_id; ii++) {
-            if (socket_rx_thread_num == 1) {
-                fprintf(fp_debug,
-                    "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-                    "%.3f %.3f %.3f\n",
-                    pilot_received[ii], rx_processed[ii], fft_processed[ii],
-                    zf_processed[ii], precode_processed[ii], ifft_processed[ii],
-                    tx_processed[ii], tx_processed_first[ii],
-                    csi_time_in_function[ii], zf_time_in_function[ii],
-                    precode_time_in_function[ii], ifft_time_in_function[ii],
-                    processing_started[ii], frame_start[0][ii]);
-            } else {
-                fprintf(fp_debug,
-                    "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-                    "%.3f %.3f %.3f %.3f\n",
-                    pilot_received[ii], rx_processed[ii], fft_processed[ii],
-                    zf_processed[ii], precode_processed[ii], ifft_processed[ii],
-                    tx_processed[ii], tx_processed_first[ii],
-                    csi_time_in_function[ii], zf_time_in_function[ii],
-                    precode_time_in_function[ii], ifft_time_in_function[ii],
-                    processing_started[ii], frame_start[0][ii],
-                    frame_start[1][ii]);
-            }
+            fprintf(fp_debug,
+                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
+                "%.3f %.3f %.3f",
+                pilot_received[ii], rx_processed[ii], fft_processed[ii],
+                zf_processed[ii], precode_processed[ii], ifft_processed[ii],
+                tx_processed[ii], tx_processed_first[ii],
+                csi_time_in_function[ii], zf_time_in_function[ii],
+                precode_time_in_function[ii], ifft_time_in_function[ii],
+                processing_started[ii], frame_start[0][ii]);
+
+            if (config_->socket_thread_num > 1)
+                fprintf(fp_debug, " %.3f", frame_start[1][ii]);
+            fprintf(fp_debug, "\n");
         }
     } else {
         for (size_t ii = 0; ii < last_frame_id; ii++) {
-            if (socket_rx_thread_num == 1) {
-                fprintf(fp_debug,
-                    "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-                    "%.3f\n",
-                    pilot_received[ii], rx_processed[ii], fft_processed[ii],
-                    zf_processed[ii], demul_processed[ii],
-                    csi_time_in_function[ii], fft_time_in_function[ii],
-                    zf_time_in_function[ii], demul_time_in_function[ii],
-                    processing_started[ii], frame_start[0][ii],
-                    pilot_all_received[ii]);
-            } else {
-                fprintf(fp_debug,
-                    "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-                    "%.3f %.3f\n",
-                    pilot_received[ii], rx_processed[ii], fft_processed[ii],
-                    zf_processed[ii], demul_processed[ii],
-                    csi_time_in_function[ii], fft_time_in_function[ii],
-                    zf_time_in_function[ii], demul_time_in_function[ii],
-                    processing_started[ii], frame_start[0][ii],
-                    frame_start[1][ii], pilot_all_received[ii]);
-            }
+            fprintf(fp_debug,
+                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",
+                pilot_received[ii], rx_processed[ii], fft_processed[ii],
+                zf_processed[ii], demul_processed[ii], csi_time_in_function[ii],
+                fft_time_in_function[ii], zf_time_in_function[ii],
+                demul_time_in_function[ii], processing_started[ii],
+                frame_start[0][ii]);
+            if (config_->socket_thread_num > 1)
+                fprintf(fp_debug, " %.3f", frame_start[1][ii]);
+            fprintf(fp_debug, " %.3f\n", pilot_all_received[ii]);
         }
 #if DEBUG_UPDATE_STATS_DETAILED
         printf("printing detailed results to file.........\n");
