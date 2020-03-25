@@ -588,14 +588,13 @@ void Phy_UE::taskThread(int tid)
 
 void Phy_UE::doFFT(int tid, int offset)
 {
-    int buffer_subframe_num
-        = rx_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM;
-    int rx_thread_id = offset / buffer_subframe_num;
-    offset = offset - rx_thread_id * buffer_subframe_num;
+    int buffer_frame_num = rx_buffer_status_size;
+    int rx_thread_id = offset / buffer_frame_num;
+    int offset_in_current_buffer = offset % buffer_frame_num;
 
     // read info of one frame
-    char* cur_ptr_buffer = rx_buffer_[rx_thread_id] + offset * packet_length;
-    struct Packet* pkt = (struct Packet*)cur_ptr_buffer;
+    struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id]
+        + offset_in_current_buffer * packet_length);
     int frame_id = pkt->frame_id;
     int symbol_id = pkt->symbol_id;
     // int cell_id = pkt->cell_id;
@@ -756,7 +755,7 @@ void Phy_UE::doFFT(int tid, int offset)
     }
 
     // after finish
-    rx_buffer_status_[rx_thread_id][offset] = 0; // now empty
+    rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty
     // printf("In doCrop: emptied socket buffer frame: %d, symbol: %d, ant: %d,
     // offset: %d\n",frame_id, symbol_id, ant_id, offset); inform main thread
     if (!message_queue_.enqueue(*task_ptok[tid], crop_finish_event)) {
