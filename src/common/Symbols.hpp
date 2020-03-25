@@ -7,12 +7,12 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-//#define GENERATE_PILOT
 
 #ifdef USE_ARGOS
 #ifndef GENERATE_DATA
 #define GENERATE_DATA
 #endif
+#define GENERATE_PILOT
 #endif
 
 #define SEPARATE_TX_RX 1
