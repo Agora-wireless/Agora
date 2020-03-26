@@ -457,7 +457,7 @@ void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num)
 
         result = _mm256_shuffle_epi8(result, shuffle_16_to_8);
         result = _mm256_permute4x64_epi64(result, 0xd8);
-        _mm_store_si128(resultPtr, _mm256_extracti128_si256(result, 0));
+        _mm_storeu_si128(resultPtr, _mm256_extracti128_si256(result, 0));
         resultPtr++;
     }
     // Demodulate last symbols
