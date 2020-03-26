@@ -156,6 +156,7 @@ public:
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
     Config(std::string);
+    void genData();
     ~Config();
 };
 #endif

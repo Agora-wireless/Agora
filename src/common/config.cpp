@@ -213,6 +213,24 @@ Config::Config(std::string jsonfile)
     // packet_length = offsetof(Packet, data) + sizeof(short) * OFDM_FRAME_LEN *
     // 2;
 
+    running = true;
+    std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
+    std::cout << "UE_ANT_NUM " << UE_ANT_NUM << std::endl;
+    std::cout << "PILOT SYM NUM " << pilot_symbol_num_perframe << std::endl;
+    std::cout << "UL SYM NUM " << ul_data_symbol_num_perframe << std::endl;
+    std::cout << "DL SYM NUM " << dl_data_symbol_num_perframe << std::endl;
+    std::cout << "OFDM_CA_NUM " << OFDM_CA_NUM << std::endl;
+    std::cout << "OFDM_DATA_NUM " << OFDM_DATA_NUM << std::endl;
+    std::cout << "Packet length " << packet_length << std::endl;
+    if (packet_length >= 9000)
+        std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
+                     "frame size (9000)! "
+                  << "Packets will be fragmented.\033[0m" << std::endl;
+    std::cout << "Config Done!" << std::endl;
+}
+
+void Config::genData()
+{
 #ifdef USE_ARGOS
     std::vector<std::vector<double>> gold_ifft
         = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
@@ -251,17 +269,10 @@ Config::Config(std::string jsonfile)
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-#ifdef GENERATE_PILOT
-    for (size_t i = 0; i < OFDM_CA_NUM; i++) {
-        if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
-            pilots_[i] = 0;
-        else
-            pilots_[i] = 1 - 2 * (rand() % 2);
-    }
-#else
     // read pilots from file
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/pilot_f_2048.bin";
+    std::string filename = cur_directory + "/data/pilot_f_"
+        + std::to_string(OFDM_CA_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file %s faild.\n", filename.c_str());
@@ -271,7 +282,6 @@ Config::Config(std::string jsonfile)
     if (r < OFDM_CA_NUM)
         printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
-#endif
 
     pilotsF.resize(OFDM_CA_NUM);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
@@ -390,21 +400,6 @@ Config::Config(std::string jsonfile)
     }
     fclose(fd);
 #endif
-
-    running = true;
-    std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
-    std::cout << "UE_ANT_NUM " << UE_ANT_NUM << std::endl;
-    std::cout << "PILOT SYM NUM " << pilot_symbol_num_perframe << std::endl;
-    std::cout << "UL SYM NUM " << ul_data_symbol_num_perframe << std::endl;
-    std::cout << "DL SYM NUM " << dl_data_symbol_num_perframe << std::endl;
-    std::cout << "OFDM_CA_NUM " << OFDM_CA_NUM << std::endl;
-    std::cout << "OFDM_DATA_NUM " << OFDM_DATA_NUM << std::endl;
-    std::cout << "Packet length " << packet_length << std::endl;
-    if (packet_length >= 9000)
-        std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
-                     "frame size (9000)! "
-                  << "Packets will be fragmented.\033[0m" << std::endl;
-    std::cout << "Config Done!" << std::endl;
 }
 
 Config::~Config()
@@ -583,6 +578,7 @@ __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
 
     auto* cfg = new Config(filename);
+    cfg->genData();
     return cfg;
 }
 }
