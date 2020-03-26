@@ -6,13 +6,19 @@ void set_socket_buf_size(int socket_local, int sock_buf_size)
     // simultaneously, though the load is not balance
     int optval = 1;
     setsockopt(socket_local, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+    socklen_t optlen;
+    // int sock_buf_size;
+    optlen = sizeof(sock_buf_size);
 
     // sock_buf_size = 1024*1024*64*8-1;
     if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size,
             sizeof(sock_buf_size))
         < 0) {
         printf("Error setting buffer size to %d\n", sock_buf_size);
-        exit(-1);
+    } else {
+        getsockopt(
+            socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, &optlen);
+        printf("Set socket buffer size to %d\n", sock_buf_size);
     }
 }
 
@@ -27,8 +33,9 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
     if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
         printf("ERROR: cannot create IPV4 socket\n");
         exit(0);
+    } else {
+        printf("Created IPV4 socket on port %d\n", port_id);
     }
-
     if (set_sock_size)
         set_socket_buf_size(socket_local, sock_buf_size);
 

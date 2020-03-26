@@ -11,6 +11,7 @@ Stats::Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
     int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num)
     : config_(cfg)
 {
+    printf("Initialize stats manager....\n");
     task_thread_num = in_task_thread_num;
     fft_thread_num = in_fft_thread_num;
     zf_thread_num = in_zf_thread_num;
@@ -170,7 +171,7 @@ void Stats::compute_avg_over_threads(
 
 void Stats::print_per_thread_per_task(Stats_worker_per_frame stats_per_frame)
 {
-    printf(" %d tasks %.1f (%.1f, %.1f, %.1f), ",
+    printf(" %d tasks %.3f (%.3f, %.3f, %.3f), ",
         stats_per_frame.count_this_thread,
         stats_per_frame.duration_this_thread_per_task[0],
         stats_per_frame.duration_this_thread_per_task[1],
@@ -180,7 +181,7 @@ void Stats::print_per_thread_per_task(Stats_worker_per_frame stats_per_frame)
 
 void Stats::print_per_frame(Stats_worker_per_frame stats_per_frame)
 {
-    printf("%d tasks %.1f (%.1f, %.1f, %.1f), ",
+    printf(" %d tasks %.3f (%.3f, %.3f, %.3f), ",
         stats_per_frame.count_all_threads,
         stats_per_frame.duration_avg_threads[0],
         stats_per_frame.duration_avg_threads[1],
@@ -224,25 +225,23 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
             = demul_stats_per_frame.duration_avg_threads[i];
     }
 #endif
-
 #if DEBUG_PRINT_PER_FRAME_DONE
-    printf("In frame %d (us): ", frame_id);
-    printf("CSI: ");
+    printf("In frame %d, \t", frame_id);
+    printf("csi: ");
     print_per_frame(csi_stats_per_frame);
-    printf("FFT: ");
+    printf("fft: ");
     print_per_frame(fft_stats_per_frame);
-    printf("ZF: ");
+    printf("zf: ");
     print_per_frame(zf_stats_per_frame);
-    printf("Demul: ");
+    printf("demul: ");
     print_per_frame(demul_stats_per_frame);
 #if USE_LDPC
-    printf("Decode: ");
+    printf("decode: ");
     print_per_frame(decode_stats_per_frame);
 #endif
-    printf("Total: %.1f\n", sum_time_this_frame);
+    printf("sum: %.3f\n", sum_time_this_frame);
 #endif
 #endif
-
     last_frame_id = (size_t)frame_id;
 }
 
@@ -269,25 +268,23 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
         = precode_stats_per_frame.duration_avg_threads[0];
     encode_time_in_function[frame_id]
         = encode_stats_per_frame.duration_avg_threads[0];
-
 #if DEBUG_PRINT_PER_FRAME_DONE
-    printf("In frame %d (us)", frame_id);
-    printf("CSI: ");
+    printf("In frame %d, \t", frame_id);
+    printf("csi: ");
     print_per_frame(csi_stats_per_frame);
-    printf("IFFT: ");
+    printf("ifft: ");
     print_per_frame(ifft_stats_per_frame);
-    printf("ZF: ");
+    printf("zf: ");
     print_per_frame(zf_stats_per_frame);
-    printf("Precode: ");
+    printf("precode: ");
     print_per_frame(precode_stats_per_frame);
 #if USE_LDPC
-    printf("Encode: ");
+    printf("encode: ");
     print_per_frame(encode_stats_per_frame);
 #endif
-    printf("Total: %.1f\n", sum_time_this_frame);
+    printf("sum: %.3f\n", sum_time_this_frame);
 #endif
 #endif
-
     last_frame_id = (size_t)frame_id;
 }
 
@@ -551,6 +548,8 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
 
 void Stats::save_to_file(size_t last_frame_id)
 {
+    printf("saving timestamps to file.........\n");
+    printf("Total processed frames %zu \n", last_frame_id + 1);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
@@ -559,11 +558,6 @@ void Stats::save_to_file(size_t last_frame_id)
         std::cerr << "Error: " << strerror(errno) << std::endl;
         exit(0);
     }
-
-    printf("Stats: saving timestamps to data/timeresult.txt. Total processed "
-           "frames %zu\n",
-        last_frame_id - 1);
-
     if (config_->downlink_mode) {
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug,
@@ -593,10 +587,8 @@ void Stats::save_to_file(size_t last_frame_id)
                 fprintf(fp_debug, " %.3f", frame_start[1][ii]);
             fprintf(fp_debug, " %.3f\n", pilot_all_received[ii]);
         }
-
 #if DEBUG_UPDATE_STATS_DETAILED
-        printf("Printing detailed results to data/timeresult_detail.txt\n");
-
+        printf("printing detailed results to file.........\n");
         std::string filename_detailed
             = cur_directory + "/data/timeresult_detail.txt";
         FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
@@ -674,7 +666,7 @@ void Stats::print_summary(UNUSED size_t last_frame_id)
             / dl_data_subframe_num_perframe;
         double ifft_frames = (double)IFFT_total_count / BS_ANT_NUM
             / dl_data_subframe_num_perframe;
-        printf("Downlink totals: ");
+        printf("Downlink: total performed ");
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);
         printf("ZF: %d (%.2f frames), ", ZF_total_count, zf_frames);
 #if USE_LDPC
@@ -717,7 +709,7 @@ void Stats::print_summary(UNUSED size_t last_frame_id)
             / ul_data_subframe_num_perframe;
         double demul_frames = (double)Demul_total_count / OFDM_DATA_NUM
             / ul_data_subframe_num_perframe;
-        printf("Uplink totals: ");
+        printf("Uplink: total performed ");
         printf("CSI %d (%.2f frames), ", CSI_total_count, csi_frames);
         printf("ZF: %d (%.2f frames), ", ZF_total_count, zf_frames);
         printf("FFT: %d (%.2f frames), ", FFT_total_count, fft_frames);
@@ -733,24 +725,24 @@ void Stats::print_summary(UNUSED size_t last_frame_id)
                 csi_stats_worker, CSI_total_count, i);
             double percent_FFT = compute_count_percentage(
                 fft_stats_worker, FFT_total_count, i);
+            ;
             double percent_ZF
                 = compute_count_percentage(zf_stats_worker, ZF_total_count, i);
             double percent_Demul = compute_count_percentage(
                 demul_stats_worker, Demul_total_count, i);
-
-            printf("Thread %d performed: ", i);
-            printf("CSI: %d (%.1f%%), ", csi_stats_worker.task_count[i * 16],
+            printf("thread %d performed ", i);
+            printf("CSI: %d (%.2f%%), ", csi_stats_worker.task_count[i * 16],
                 percent_CSI);
-            printf("ZF: %d (%.1f%%), ", zf_stats_worker.task_count[i * 16],
+            printf("ZF: %d (%.2f%%), ", zf_stats_worker.task_count[i * 16],
                 percent_ZF);
-            printf("FFT: %d (%.1f%%), ", fft_stats_worker.task_count[i * 16],
+            printf("FFT: %d (%.2f%%), ", fft_stats_worker.task_count[i * 16],
                 percent_FFT);
-            printf("Demul: %d (%.1f%%) ", demul_stats_worker.task_count[i * 16],
+            printf("Demul: %d (%.2f%%) ", demul_stats_worker.task_count[i * 16],
                 percent_Demul);
 #if USE_LDPC
             double percent_Decode = compute_count_percentage(
                 decode_stats_worker, Decode_total_count, i);
-            printf("Decode: %d (%.1f%%) ",
+            printf("Decode: %d (%.2f%%) ",
                 decode_stats_worker.task_count[i * 16], percent_Decode);
 #endif
             printf("\n");
