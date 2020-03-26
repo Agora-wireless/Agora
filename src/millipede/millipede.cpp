@@ -1069,38 +1069,28 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id,
 
 void Millipede::initialize_queues()
 {
+    using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
+
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    message_queue_ = mt_queue_t(512 * data_subframe_num_perframe);
+    complete_task_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 
-    fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
-    zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    fft_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    zf_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 
-    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);
+    rc_queue_ = mt_queue_t(512 * 2 * 4);
 
-    demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    demul_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    decode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #endif
 
-    ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
-    // modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 *
-    // data_subframe_num_perframe * 4);
+    ifft_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    encode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #endif
-    precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
-    tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    precode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    tx_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
