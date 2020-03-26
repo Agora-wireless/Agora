@@ -175,6 +175,7 @@ Config::Config(std::string jsonfile)
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     zf_block_size = tddConf.value("zf_block_size", 1);
+    fft_block_size = tddConf.value("fft_block_size", 4);
     if (freq_orthogonal_pilot)
         zf_block_size = UE_ANT_NUM;
     demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
