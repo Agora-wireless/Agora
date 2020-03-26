@@ -34,13 +34,15 @@ DoZF::~DoZF()
     free_buffer_1d(&pred_csi_buffer);
 }
 
-void DoZF::launch(int offset)
+Event_data DoZF::launch(int offset)
 {
     if (config_->freq_orthogonal_pilot)
         ZF_freq_orthogonal(offset);
     else
         ZF_time_orthogonal(offset);
-    finish(offset);
+    // finish(offset);
+    Event_data ZF_finish_event(EventType::kZF, offset);
+    return ZF_finish_event;
 }
 
 void DoZF::finish(int offset)

@@ -62,7 +62,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     Table<char>& socket_buffer_;
@@ -109,7 +109,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;
