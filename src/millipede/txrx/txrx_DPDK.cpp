@@ -237,7 +237,6 @@ std::vector<pthread_t> PacketTXRX::startRecv(char** in_buffer,
     buffer_status_ = in_buffer_status; // for save status
     frame_start_ = in_frame_start;
 
-    printf("create RX threads\n");
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 

@@ -122,7 +122,7 @@ Config::Config(std::string jsonfile)
         }
         frames.push_back(sched);
         framePeriod = 1;
-        printf("frame schedule %s\n", sched.c_str());
+        printf("Frame schedule %s\n", sched.c_str());
     } else {
         json jframes = tddConf.value("frames", json::array());
         framePeriod = jframes.size();
@@ -184,7 +184,7 @@ Config::Config(std::string jsonfile)
     mod_type = modulation == "64QAM"
         ? CommsLib::QAM64
         : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
-    printf("modulation: %s\n", modulation.c_str());
+    printf("Modulation: %s\n", modulation.c_str());
     mod_order = (size_t)pow(2, mod_type);
 
     /* LDPC Coding configurations */
@@ -426,19 +426,21 @@ Config::Config(std::string jsonfile)
 #endif
 
     running = true;
-    std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
-    std::cout << "UE_ANT_NUM " << UE_ANT_NUM << std::endl;
-    std::cout << "PILOT SYM NUM " << pilot_symbol_num_perframe << std::endl;
-    std::cout << "UL SYM NUM " << ul_data_symbol_num_perframe << std::endl;
-    std::cout << "DL SYM NUM " << dl_data_symbol_num_perframe << std::endl;
-    std::cout << "OFDM_CA_NUM " << OFDM_CA_NUM << std::endl;
-    std::cout << "OFDM_DATA_NUM " << OFDM_DATA_NUM << std::endl;
-    std::cout << "Packet length " << packet_length << std::endl;
-    if (packet_length >= 9000)
+    std::cout << "Config: "
+              << "BS_ANT_NUM " << BS_ANT_NUM << ", UE_ANT_NUM " << UE_ANT_NUM
+              << ", PILOT SYM NUM " << pilot_symbol_num_perframe
+              << ", UL SYM NUM " << ul_data_symbol_num_perframe
+              << ", DL SYM NUM " << dl_data_symbol_num_perframe
+              << ", OFDM_CA_NUM " << OFDM_CA_NUM << ", OFDM_DATA_NUM "
+              << OFDM_DATA_NUM << ", packet length " << packet_length
+              << std::endl;
+
+    if (packet_length >= 9000) {
         std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
                      "frame size (9000)! "
                   << "Packets will be fragmented.\033[0m" << std::endl;
-    std::cout << "Config Done!" << std::endl;
+    }
+    std::cout << "Config done!" << std::endl;
 }
 
 Config::~Config()
