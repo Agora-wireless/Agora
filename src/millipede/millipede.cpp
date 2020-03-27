@@ -127,14 +127,6 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    std::vector<pthread_t> tx_threads;
-    if (config_->dl_data_symbol_num_perframe > 0) {
-        /* Start downlink transmitter */
-        tx_threads
-            = receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
-                dl_socket_buffer_status_size_, dl_socket_buffer_size_);
-    }
-
     int cur_frame_id = 0;
 
     /* Counters for printing summary */
