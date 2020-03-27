@@ -61,7 +61,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     printf("create TXRX threads\n");
-    for (int i = 0; i < rx_thread_num_ + tx_thread_num_; i++) {
+    for (int i = 0; i < tx_thread_num_; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
@@ -255,7 +255,9 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
         message_queue_->size_approx());
 #endif
 
-    char* cur_buffer_ptr = tx_buffer_ + offset * packet_length;
+    int socket_subframe_offset = offset
+        % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
+    char* cur_buffer_ptr = tx_buffer_ + socket_subframe_offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
