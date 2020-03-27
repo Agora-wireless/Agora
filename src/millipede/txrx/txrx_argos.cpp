@@ -241,7 +241,9 @@ int PacketTXRX::dequeue_send_Argos(int tid)
         message_queue_->size_approx());
 #endif
 
-    char* cur_buffer_ptr = tx_buffer_ + offset * packet_length;
+    int socket_subframe_offset = offset
+        % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
+    char* cur_buffer_ptr = tx_buffer_ + socket_subframe_offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     char* tx_cur_buffer_ptr = (char*)pkt->data;
     frame_id += TX_FRAME_DELTA;
