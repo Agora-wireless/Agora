@@ -58,8 +58,8 @@ public:
     static const int transpose_block_num = 256;
     /* dequeue bulk size, used to reduce the overhead of dequeue in main thread
      */
-    static const int dequeue_bulk_size = 32;
-    static const int dequeue_bulk_size_single = 8;
+    static const int kDequeueBulkSizeTXRX = 8;
+    static const int kDequeueBulkSizeWorker = 4;
 
     Millipede(Config*);
     ~Millipede();
@@ -75,11 +75,8 @@ public:
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
-    // struct EventHandlerContext
-    // {
-    //     Millipede *obj_ptr;
-    //     int id;
-    // };
+    void handle_event_fft(int offset, Consumer& consumer_zf,
+        Consumer& consumer_demul, Consumer& consumer_rc);
 
     /* Add tasks into task queue based on event type */
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id,
@@ -193,7 +190,7 @@ private:
     Data_stats tx_stats_;
 
     Table<int> delay_fft_queue;
-    int* delay_fft_queue_cnt;
+    size_t* delay_fft_queue_cnt;
 
     /**
      * Raw data
