@@ -133,6 +133,8 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
         for (int radio_id = radio_lo; radio_id < radio_hi;
              radio_id++) { // FIXME: this must be threaded
             dequeue_send_Argos(tid);
+            dequeue_send_Argos(tid);
+            dequeue_send_Argos(tid);
             struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
             rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
             int frame_id = pkt->frame_id;
