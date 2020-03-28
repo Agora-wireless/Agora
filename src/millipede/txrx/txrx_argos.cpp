@@ -127,34 +127,36 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
     // this is assuming buffer_frame_num_ is at least 2
     int prev_frame_id = -1;
     int nChannels = config_->nChannels;
-
+    int radio_id = radio_lo;
     while (config_->running) {
         // receive data
-        for (int radio_id = radio_lo; radio_id < radio_hi;
-             radio_id++) { // FIXME: this must be threaded
-            while (-1 != dequeue_send_Argos(tid))
-                ;
-            struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
-            rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
-            int frame_id = pkt->frame_id;
+        if (-1 != dequeue_send_Argos(tid))
+            continue;
+        rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
+        struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
+        if (pkt == NULL)
+            continue;
+        int frame_id = pkt->frame_id;
 #if MEASURE_TIME
-            // read information from received packet
-            // frame_id = *((int *)cur_ptr_buffer);
-            if (frame_id > prev_frame_id) {
-                *(rx_frame_start + frame_id) = get_time();
-                prev_frame_id = frame_id;
-                if (frame_id % 512 == 200) {
-                    _mm_prefetch(
-                        (char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
-                }
+        // read information from received packet
+        // frame_id = *((int *)cur_ptr_buffer);
+        if (frame_id > prev_frame_id) {
+            *(rx_frame_start + frame_id) = get_time();
+            prev_frame_id = frame_id;
+            if (frame_id % 512 == 200) {
+                _mm_prefetch(
+                    (char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
             }
+        }
 #endif
 #if DEBUG_RECV
-            printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id "
-                   "%d, offset %d\n",
-                tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, rx_offset);
+        printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id "
+               "%d, offset %d\n",
+            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, rx_offset);
 #endif
-        }
+
+        if (++radio_id == radio_hi)
+            radio_id = radio_lo;
     }
     return 0;
 }
@@ -184,9 +186,9 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
     // TODO: this is probably a really bad implementation, and needs to be
     // revamped
     long long frameTime;
-    while (config_->running
-        && radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
-        // Busy loop
+    if (!config_->running
+        || radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
+        return NULL;
     }
 
     int frame_id = (int)(frameTime >> 32);
