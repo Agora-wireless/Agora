@@ -6,16 +6,14 @@
 
 #include "txrx.hpp"
 
-PacketTXRX::PacketTXRX(
-    Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
-    socket_ = new int[RX_THREAD_NUM];
+    socket_ = new int[COMM_THREAD_NUM];
     config_ = cfg;
-    rx_thread_num_ = RX_THREAD_NUM;
-    tx_thread_num_ = TX_THREAD_NUM;
+    comm_thread_num_ = COMM_THREAD_NUM;
 
     core_id_ = in_core_offset;
-    tx_core_id_ = in_core_offset + RX_THREAD_NUM;
+    tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
 
     /* initialize random seed: */
     srand(time(NULL));
@@ -23,13 +21,12 @@ PacketTXRX::PacketTXRX(
     radioconfig_ = new RadioConfig(config_);
 }
 
-PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
-    int in_core_offset,
+PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
-    : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+    : PacketTXRX(cfg, COMM_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
@@ -71,7 +68,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         return false;
 
     printf("create TXRX threads\n");
-    for (int i = 0; i < tx_thread_num_; i++) {
+    for (int i = 0; i < comm_thread_num_; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
@@ -96,8 +93,8 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     // printf("Recv thread: thread %d start\n", tid);
-    int radio_lo = tid * config_->nRadios / rx_thread_num_;
-    int radio_hi = (tid + 1) * config_->nRadios / rx_thread_num_;
+    int radio_lo = tid * config_->nRadios / comm_thread_num_;
+    int radio_hi = (tid + 1) * config_->nRadios / comm_thread_num_;
     int nradio_cur_thread = radio_hi - radio_lo;
     // printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
     // get pointer of message queue

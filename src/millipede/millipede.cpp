@@ -36,9 +36,9 @@ Millipede::Millipede(Config* cfg)
         cfg->fft_thread_num, cfg->zf_thread_num, cfg->demul_thread_num);
 
     /* Initialize TXRX threads*/
-    receiver_.reset(new PacketTXRX(config_, cfg->socket_thread_num /* RX */,
-        cfg->socket_thread_num /* TX */, cfg->core_offset + 1, &message_queue_,
-        &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
+    receiver_.reset(
+        new PacketTXRX(config_, cfg->socket_thread_num, cfg->core_offset + 1,
+            &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
