@@ -6,28 +6,25 @@
 
 #include "txrx.hpp"
 
-PacketTXRX::PacketTXRX(
-    Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
-    socket_ = new int[RX_THREAD_NUM];
+    socket_ = new int[COMM_THREAD_NUM];
     config_ = cfg;
-    rx_thread_num_ = RX_THREAD_NUM;
-    tx_thread_num_ = TX_THREAD_NUM;
+    comm_thread_num_ = COMM_THREAD_NUM;
 
     core_id_ = in_core_offset;
-    tx_core_id_ = in_core_offset + RX_THREAD_NUM;
+    tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
 
     /* initialize random seed: */
     srand(time(NULL));
 }
 
-PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
-    int in_core_offset,
+PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
-    : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+    : PacketTXRX(cfg, COMM_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
@@ -61,7 +58,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // pin_to_core_with_offset(RX, core_id_, 0);
 
     printf("create TXRX threads\n");
-    for (int i = 0; i < tx_thread_num_; i++) {
+    for (int i = 0; i < comm_thread_num_; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
@@ -113,9 +110,9 @@ void* PacketTXRX::loopTXRX(int tid)
         ? pilot_subframe_num_perframe
         : (pilot_subframe_num_perframe + ul_data_subframe_num_perframe);
     int max_rx_packet_num_per_frame
-        = max_subframe_id * BS_ANT_NUM / rx_thread_num_;
+        = max_subframe_id * BS_ANT_NUM / comm_thread_num_;
     int max_tx_packet_num_per_frame
-        = dl_data_subframe_num_perframe * BS_ANT_NUM / tx_thread_num_;
+        = dl_data_subframe_num_perframe * BS_ANT_NUM / comm_thread_num_;
     printf("Maximum RX pkts: %d, TX pkts: %d\n", max_rx_packet_num_per_frame,
         max_tx_packet_num_per_frame);
     int prev_frame_id = -1;

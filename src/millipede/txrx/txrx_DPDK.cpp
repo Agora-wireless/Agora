@@ -19,16 +19,14 @@ static struct rte_flow* generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
     uint16_t src_port, uint16_t src_port_mask, uint16_t dst_port,
     uint16_t dst_port_mask, struct rte_flow_error* error);
 
-PacketTXRX::PacketTXRX(
-    Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM, int in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
-    socket_ = new int[RX_THREAD_NUM];
+    socket_ = new int[COMM_THREAD_NUM];
     config_ = cfg;
-    rx_thread_num_ = RX_THREAD_NUM;
-    tx_thread_num_ = TX_THREAD_NUM;
+    comm_thread_num_ = COMM_THREAD_NUM;
 
     core_id_ = in_core_offset;
-    tx_core_id_ = in_core_offset + RX_THREAD_NUM;
+    tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
 
     BS_ANT_NUM = config_->BS_ANT_NUM;
     UE_NUM = config_->UE_NUM;
@@ -43,11 +41,11 @@ PacketTXRX::PacketTXRX(
     // frameID = new int[TASK_BUFFER_FRAME_NUM];
     /* initialize random seed: */
     srand(time(NULL));
-    rx_context = new EventHandlerContext<PacketTXRX>[rx_thread_num_];
-    tx_context = new EventHandlerContext<PacketTXRX>[tx_thread_num_];
+    rx_context = new EventHandlerContext<PacketTXRX>[comm_thread_num_];
+    tx_context = new EventHandlerContext<PacketTXRX>[comm_thread_num_];
 
     std::string core_list = std::to_string(core_id_) + "-"
-        + std::to_string(core_id_ + rx_thread_num_ + tx_thread_num_);
+        + std::to_string(core_id_ + comm_thread_num_ + comm_thread_num_);
     int argc = 5;
     char* argv[] = { (char*)"txrx", (char*)"-l", &core_list[0u], (char*)"-n",
         (char*)"8", NULL };
@@ -94,7 +92,7 @@ PacketTXRX::PacketTXRX(
     struct rte_flow_error error;
     struct rte_flow* flow;
     /* create flow for send packet with */
-    for (int i = 0; i < rx_thread_num_; i++) {
+    for (int i = 0; i < comm_thread_num_; i++) {
         uint16_t src_port = rte_cpu_to_be_16(src_port_start + i);
         uint16_t dst_port = rte_cpu_to_be_16(dst_port_start + i);
         flow = generate_ipv4_flow(0, i, src_addr, FULL_MASK, dst_addr,
@@ -109,13 +107,12 @@ PacketTXRX::PacketTXRX(
     }
 }
 
-PacketTXRX::PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
-    int in_core_offset,
+PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
     moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
-    : PacketTXRX(cfg, RX_THREAD_NUM, TX_THREAD_NUM, in_core_offset)
+    : PacketTXRX(cfg, COMM_THREAD_NUM, in_core_offset)
 {
     message_queue_ = in_queue_message;
     task_queue_ = in_queue_task;
@@ -133,8 +130,7 @@ PacketTXRX::~PacketTXRX()
 int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
 {
     struct rte_eth_conf port_conf = port_conf_default();
-    const uint16_t rxRings = rx_thread_num_,
-                   txRings = tx_thread_num_ + rx_thread_num_;
+    const uint16_t rxRings = comm_thread_num_, txRings = 2 * comm_thread_num_;
     int retval;
     uint16_t q;
     uint16_t nb_rxd = RX_RING_SIZE;
@@ -257,7 +253,7 @@ bool PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
         RTE_LCORE_FOREACH_SLAVE(lcore_id)
         {
             // launch communication and task thread onto specific core
-            if (worker_id < rx_thread_num_) {
+            if (worker_id < comm_thread_num_) {
                 rx_context[worker_id].obj_ptr = this;
                 rx_context[worker_id].id = worker_id;
                 rte_eal_remote_launch((lcore_function_t*)loopRecv_DPDK,
@@ -276,8 +272,8 @@ bool PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
         RTE_LCORE_FOREACH_SLAVE(lcore_id)
         {
             // launch communication and task thread onto specific core
-            if (worker_id >= rx_thread_num_) {
-                thread_id = worker_id - rx_thread_num_;
+            if (worker_id >= comm_thread_num_) {
+                thread_id = worker_id - comm_thread_num_;
                 tx_context[thread_id].obj_ptr = this;
                 tx_context[thread_id].id = thread_id;
                 rte_eal_remote_launch((lcore_function_t*)loopSend,

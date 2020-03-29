@@ -83,14 +83,12 @@ public:
     //     };
 
 public:
-    PacketTXRX(Config* cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1,
-        int in_core_offset = 1);
+    PacketTXRX(Config* cfg, int COMM_THREAD_NUM = 1, int in_core_offset = 1);
     /**
-     * RX_THREAD_NUM: socket thread number
+     * COMM_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
      */
-    PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
-        int in_core_offset,
+    PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks,
@@ -110,7 +108,7 @@ public:
      * full) in_buffer_frame_num: number of packets the ring buffer could hold
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
-     * RX_THREAD_NUM - 1}
+     * COMM_THREAD_NUM - 1}
      */
     bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         int in_buffer_frame_num, long long in_buffer_length,
@@ -167,8 +165,7 @@ private:
     int tx_buffer_frame_num_;
     // float *tx_data_buffer_;
 
-    int rx_thread_num_;
-    int tx_thread_num_;
+    int comm_thread_num_;
 
     Table<double>* frame_start_;
     // pointer of message_queue_
