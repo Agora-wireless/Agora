@@ -104,6 +104,7 @@ public:
     int demul_block_num;
     size_t zf_block_size;
     int zf_block_num;
+    size_t fft_block_size;
 
     bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;

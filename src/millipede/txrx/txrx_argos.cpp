@@ -58,7 +58,6 @@ std::vector<pthread_t> PacketTXRX::startRecv(Table<char>& in_buffer,
     // assert(in_buffer_length == packet_length * buffer_frame_num_); // should
     // be integer
     buffer_length_ = in_buffer_length;
-    printf("create RX threads\n");
     // new thread
     // pin_to_core_with_offset(RX, core_id_, 0);
 
