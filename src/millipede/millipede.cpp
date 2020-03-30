@@ -136,7 +136,7 @@ void Millipede::start()
                 dl_socket_buffer_status_size_, dl_socket_buffer_size_);
     }
 
-    int cur_frame_id = 0;
+    size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
     int demul_count = 0;
@@ -196,7 +196,7 @@ void Millipede::start()
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
                 frame_count = pkt->frame_id % 10000;
-                int frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
+                size_t frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
                 int subframe_id = pkt->symbol_id;
 
                 update_rx_counters(frame_count, frame_id, subframe_id);
@@ -207,8 +207,8 @@ void Millipede::start()
                         cur_frame_id = frame_id;
                     }
                 }
-                delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]++]
-                    = offset;
+
+                fft_queues[frame_id].push(offset);
             } break;
 
             case EventType::kFFT: {
@@ -511,19 +511,20 @@ void Millipede::start()
             } /* End of switch */
 
             /* Schedule multiple fft tasks as one event */
-            if (delay_fft_queue_cnt[cur_frame_id] >= config_->fft_block_size) {
-                size_t fft_block_num = delay_fft_queue_cnt[cur_frame_id]
-                    / config_->fft_block_size;
-                size_t remainder = delay_fft_queue_cnt[cur_frame_id]
-                    % config_->fft_block_size;
+            if (fft_queues[cur_frame_id].size() >= config_->fft_block_size) {
+                size_t fft_block_num
+                    = fft_queues[cur_frame_id].size() / config_->fft_block_size;
+
                 for (size_t i = 0; i < fft_block_num; i++) {
                     Event_data do_fft_task;
                     do_fft_task.num_offsets = config_->fft_block_size;
                     do_fft_task.event_type = EventType::kFFT;
+
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
-                        size_t qid = i * config_->fft_block_size + j;
                         do_fft_task.offsets[j]
-                            = delay_fft_queue[cur_frame_id][qid];
+                            = fft_queues[cur_frame_id].front();
+                        fft_queues[cur_frame_id].pop();
+
                         if (!config_->bigstation_mode) {
                             if (fft_created_count++ == 0) {
                                 stats_manager_->update_processing_started(
@@ -536,12 +537,6 @@ void Millipede::start()
                     }
                     consumer_fft.try_handle(do_fft_task);
                 }
-                for (size_t i = 0; i < remainder; i++) {
-                    size_t orig_qid = fft_block_num * config_->fft_block_size;
-                    delay_fft_queue[cur_frame_id][i]
-                        = delay_fft_queue[cur_frame_id][orig_qid + i];
-                }
-                delay_fft_queue_cnt[cur_frame_id] = remainder;
             }
         } /* End of for */
     } /* End of while */
