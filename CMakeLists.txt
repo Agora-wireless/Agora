@@ -88,7 +88,7 @@ if(${USE_ARGOS})
   set(CLIENT_SOURCES
     src/common/modulation.cpp
     src/client/client_radio.cpp
-    src/client/ru.cpp
+    src/client/ru_argos.cpp
     src/client/phy-ue.cpp)
   set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
   add_definitions(-DTHREADED_INIT)
@@ -182,8 +182,7 @@ if(${USE_ARGOS})
   add_executable(user 
        src/client/user-main.cpp
        ${CLIENT_SOURCES}
-       ${COMMON_SOURCES}
-       ${ARGOS_SOURCES})
+       ${COMMON_SOURCES})
   target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
   add_library(ue_phy MODULE 

@@ -1,62 +1,12 @@
 
 #include "ru.hpp"
 #include "config.hpp"
+//#include "radio_lib.hpp"
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
 {
     config_ = cfg;
-    rx_socket_ = new int[n_rx_thread];
-
-    for (int i = 0; i < n_rx_thread; i++) {
-        /* Create sockets at different port numbers */
-        servaddr_[i].sin_family = AF_INET;
-        servaddr_[i].sin_port = htons(config_->bs_port + i);
-        servaddr_[i].sin_addr.s_addr = INADDR_ANY;
-        memset(servaddr_[i].sin_zero, 0, sizeof(servaddr_[i].sin_zero));
-
-        /* RX UDP socket */
-        if ((rx_socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-            printf("cannot create socket %d\n", i);
-            exit(0);
-        }
-
-        /* use SO_REUSEPORT option, so that multiple sockets could receive
-         * packets simultaneously, though the load is not balance */
-        int optval = 1;
-        setsockopt(
-            rx_socket_[i], SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-
-        int sock_buf_size = 1024 * 1024 * 64 * 8;
-        if (setsockopt(rx_socket_[i], SOL_SOCKET, SO_RCVBUF,
-                (void*)&sock_buf_size, sizeof(sock_buf_size))
-            < 0) {
-            printf("Error setting buffer size to %d\n", sock_buf_size);
-        }
-
-        if (bind(rx_socket_[i], (struct sockaddr*)&servaddr_[i],
-                sizeof(servaddr_[i]))
-            != 0) {
-            printf("rx socket %d bind failed\n", i);
-            exit(0);
-        } else
-            printf("rx socket %d bind to port %d successful\n", i,
-                config_->bs_port + i);
-    }
-
-    tx_socket_ = new int[n_tx_thread];
-
-    for (int i = 0; i < n_tx_thread; i++) {
-
-        cliaddr_[i].sin_family = AF_INET;
-        cliaddr_[i].sin_port = htons(config_->ue_tx_port + i);
-        cliaddr_[i].sin_addr.s_addr = inet_addr(config_->tx_addr.c_str());
-        // cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
-        memset(cliaddr_[i].sin_zero, 0, sizeof(cliaddr_[i].sin_zero));
-        if ((tx_socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-            printf("cannot create socket %d\n", i);
-            exit(0);
-        }
-    }
+    radioconfig_ = new ClientRadioConfig(config_);
 
     thread_num_ = n_rx_thread;
     tx_thread_num_ = n_tx_thread;
@@ -78,9 +28,16 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* config,
 
 RU::~RU()
 {
-    delete[] rx_socket_;
-    delete[] tx_socket_;
+    radioconfig_->radioStop();
+    delete radioconfig_;
     delete config_;
+}
+
+void RU::startRadios()
+{
+#ifndef SIM
+    radioconfig_->radioStart();
+#endif
 }
 
 std::vector<pthread_t> RU::startRXTX(Table<char>& in_buffer,
@@ -136,7 +93,7 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer,
     // create new threads
     std::vector<pthread_t> created_threads;
     tx_core_id_ = in_core_id;
-#if SEPARATE_TX_RX_CLIENT
+#if SEPARATE_TX_RX_UE
     printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
         auto* context = new RUContext;
@@ -184,6 +141,8 @@ void RU::sendThread(int tid)
 #endif
 
     int packet_length = config_->packet_length;
+    ClientRadioConfig* radio = radioconfig_;
+    packet_length -= offsetof(Packet, data);
 
     int ret;
     size_t ant_id, symbol_id;
@@ -216,51 +175,59 @@ void RU::sendThread(int tid)
         ant_id = task_event.data; //% config_->getNumAntennas();
         // frame_id = task_event.more_data;
 
-        // first sending pilots in sim mode
-        // for (int p_id = 0; p_id < cfg->pilotSymsPerFrame; p_id++)
-        {
-            auto* pkt = (struct Packet*)pilot_buffer_;
-            new (pkt)
-                Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
-            // ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(),
-            // frame_id, cfg->pilotSymbols[0][p_id], p_id);
-            if (sendto(tx_socket_[tid], (char*)pilot_buffer_,
-                    packet_length, 0, (struct sockaddr*)&cliaddr_[tid],
-                    sizeof(cliaddr_[tid]))
-                < 0) {
-                perror("loopSend: socket sendto failed");
-                exit(0);
-            }
-        }
+        // symbol_id = task_event.data / config_->getNumAntennas();
         for (symbol_id = 0; symbol_id < txSymbols.size(); symbol_id++) {
+            int tx_frame_id = frame_id;
+            size_t tx_symbol_id = txSymbols[symbol_id];
             offset = generateOffset3d(TASK_BUFFER_FRAME_NUM, txSymbols.size(),
                 config_->getNumAntennas(), frame_id, symbol_id, ant_id);
-            // send data (one OFDM symbol)
-            auto* pkt = (struct Packet*)(tx_buffer_ + offset * packet_length);
-            new (pkt) Packet(frame_id, txSymbols[symbol_id], cell_id, ant_id);
-
-            if (sendto(tx_socket_[tid], (char*)pkt, packet_length, 0,
-                    (struct sockaddr*)&cliaddr_[tid], sizeof(cliaddr_[tid]))
-                < 0) {
-                perror("loopSend: socket sendto failed");
-                exit(0);
+            void* txbuf[2];
+            long long frameTime
+                = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+            int flags = 1; // HAS_TIME
+            if (tx_symbol_id == txSymbols.back())
+                flags = 2; // HAS_TIME & END_BURST, fixme
+            for (size_t ch = 0; ch < config_->nChannels; ++ch) {
+                txbuf[ch] = tx_buffer_
+                    + (offset + ch) * packet_length; //   pilot_buffer_; //
+                tx_buffer_status_[offset + ch] = 0;
             }
-        }
-#if DEBUG_SEND
-        printf("TX thread %d: finished TX pilot for frame %d at symbol %d on "
-               "ant %d\n",
-            tid, frame_id, config_->pilotSymbols[0][ant_id], ant_id);
+            clock_gettime(CLOCK_MONOTONIC, &tv);
+            radio->radioTx(
+                ant_id / config_->nChannels, txbuf, flags, frameTime);
+            clock_gettime(CLOCK_MONOTONIC, &tv2);
+#if TX_TIME_MEASURE
+            double diff = (tv2.tv_sec * 1e9 + tv2.tv_nsec - tv.tv_sec * 1e9
+                - tv.tv_nsec);
+            time_avg += diff;
+            time_count++;
+            if (time_count
+                == config_->getNumAntennas()
+                    * config_->dl_data_symbol_num_perframe) {
+                printf("In TX thread %d: Transmitted 100 frames with average "
+                       "tx time %f\n",
+                    tid, time_avg / time_count / 1e3);
+                time_count = 0;
+                time_avg = 0;
+            }
 #endif
+
+#if DEBUG_SEND
+            printf(
+                "TX thread %d: finished TX for frame %d, symbol %d, ant %d\n",
+                tid, frame_id, symbol_id, ant_id);
+#endif
+        }
+
         Event_data packet_message(EventType::kPacketTX, offset);
         // packet_message.more_data = frame_id;
-
+    
         if (config_->running
             && !message_queue_->enqueue(local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
             exit(0);
         }
     }
-
 }
 
 /*****  Receive threads   *****/
@@ -305,79 +272,134 @@ void RU::taskThread(int tid)
     // moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
     const std::vector<size_t>& txSymbols = config_->ULSymbols[0];
-    int n_ant = config_->getNumAntennas();
+    int tx_packet_length
+        = config_->packet_length - offsetof(Packet, data);
+    int frame_samp_size
+        = tx_packet_length * config_->getNumAntennas() * txSymbols.size();
 
     char* buffer = (*buffer_)[tid];
     int* buffer_status = (*buffer_status_)[tid];
 
-    // loop recv
-    socklen_t addrlen = sizeof(servaddr_[tid]);
+    int num_radios = config_->nRadios;
+    int radio_start = tid * num_radios / thread_num_;
+    int radio_end = (tid + 1) * num_radios / thread_num_;
+    printf("receiver thread %d has radios %d to %d (%d)\n", tid, radio_start, radio_end - 1, radio_end - radio_start);
+    ClientRadioConfig* radio = radioconfig_;
     int packet_num = 0;
     long long frameTime;
 
-    int all_trigs = 0;
+    std::vector<int> all_trigs(radio_end - radio_start, 0);
     struct timespec tv, tv2;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
 
     int maxQueueLength = 0;
     int cursor = 0;
     while (config_->running) {
+        clock_gettime(CLOCK_MONOTONIC, &tv2);
+        double diff
+            = ((tv2.tv_sec - tv.tv_sec) * 1e9 + (tv2.tv_nsec - tv.tv_nsec))
+            / 1e9;
+        if (diff > 2) {
+            for (int it = radio_start; it < radio_end;
+                 it++)
+            {
+                int total_trigs = radio->triggers(it);
+                std::cout << "radio: " << it << ", new triggers: " << total_trigs - all_trigs[it - radio_start]
+                          << ", total: " << total_trigs << std::endl;
+                all_trigs[it - radio_start] = total_trigs;
+            }
+            tv = tv2;
+        }
         // if buffer is full, exit
         if (buffer_status[cursor] == 1) {
             printf("RX thread %d at cursor %d buffer full\n", tid, cursor);
             // exit(0);
+            for (int i = 0; i < buffer_frame_num_; i++)
+                printf("%d ", buffer_status[cursor]);
+            printf("\n");
             config_->running = false;
             break;
         }
         // receive data
-        struct Packet* pkt
-            = (struct Packet*)&buffer[cursor * config_->packet_length];
-        if (recvfrom(rx_socket_[tid], (char*)pkt,
-                (size_t)config_->packet_length, 0,
-                (struct sockaddr*)&servaddr_[tid], &addrlen)
-            < 0) {
-            perror("recv failed");
-            exit(0);
-        }
-        // read information from received packet
-        int frame_id = pkt->frame_id;
-        int symbol_id = pkt->symbol_id;
-        // int cell_id = pkt->cell_id;
-        int ant_id = pkt->ant_id;
-
-        // move ptr & set status to full
-        buffer_status[cursor] = 1; // has data, after doing fft, it is set to 0
-        cursor++;
-        cursor %= buffer_frame_num_;
-
-        // Push EVENT_RX_ENB event into the queue. data records the position of
-        // this packet in the buffer & tid of this socket (so that task thread
-        // could know which buffer it should visit)
-        Event_data packet_message(
-            EventType::kRXSymbol, cursor + tid * buffer_frame_num_);
-
-        if (!message_queue_->enqueue(local_ptok, packet_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
-
-#if SEPARATE_TX_RX_CLIENT
-        if (txSymbols.size() > 0
-            && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
-            // notify TXthread to start transmitting frame_id+offset
-            Event_data do_tx_task(EventType::kPacketTX, ant_id);
-            do_tx_task.more_data = frame_id + TX_FRAME_DELTA;
-
-            if (!task_queue_->enqueue(*task_ptok[tid], do_tx_task)) {
-                printf("task enqueue failed\n");
-                exit(0);
+        for (int it = radio_start; it < radio_end;
+             it++)
+        {
+            // this is probably a really bad implementation, and needs to be
+            // revamped
+            struct Packet* pkt[config_->nChannels];
+            void* samp[config_->nChannels];
+            for (size_t ch = 0; ch < config_->nChannels; ++ch) {
+                pkt[ch] = (struct Packet*)&buffer[(cursor + ch)
+                    * config_->packet_length];
+                samp[ch] = pkt[ch]->data;
             }
-        }
+            while (config_->running
+                && radio->radioRx(it, samp, frameTime)
+                    < (int)config_->sampsPerSymbol)
+                ;
+            int frame_id = (int)(frameTime >> 32);
+            int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
+            int ant_id = it * config_->nChannels;
+#if DEBUG_RECV
+            printf("receive thread %d: frame_id %d, symbol_id %d, ant_id %d "
+                   "frametime %llx\n",
+                tid, frame_id, symbol_id, ant_id, frameTime);
 #endif
-        // printf("enqueue offset %d\n", offset);
-        int cur_queue_len = message_queue_->size_approx();
-        maxQueueLength
-            = maxQueueLength > cur_queue_len ? maxQueueLength : cur_queue_len;
+            for (size_t ch = 0; ch < config_->nChannels; ++ch) {
+                new (pkt[ch])
+                    Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
+                //buffer_status[cursor + ch]
+                //    = 1; // has data, after it is read it should be set to 0
 
-        packet_num++;
+                // Push EVENT_RX_ENB event into the queue. data records the
+                // position of this packet in the buffer & tid of this socket
+                // (so that task thread could know which buffer
+                Event_data packet_message(
+                    EventType::kPacketRX, cursor + tid * buffer_frame_num_);
+
+                if (!message_queue_->enqueue(local_ptok, packet_message)) {
+                    printf("socket message enqueue failed\n");
+                    exit(0);
+                }
+                cursor++;
+                cursor %= buffer_frame_num_;
+            }
+
+#if !SEPARATE_TX_RX_UE
+            if (txSymbols.size() > 0
+                && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
+                for (size_t tx_symbol_id = 0; tx_symbol_id < txSymbols.size();
+                     tx_symbol_id++) {
+                    int tx_frame_id = frame_id + TX_FRAME_DELTA;
+                    int tx_symbol = txSymbols[tx_symbol_id];
+                    int tx_ant_offset = tx_symbol_id * config_->getNumAntennas() + ant_id;
+                    void* txbuf[2];
+#if DEBUG_UPLINK
+                    for (size_t ch = 0; ch < config_->nChannels; ++ch)
+                        txbuf[ch] = (void *)config_->ul_IQ_symbol[tx_ant_offset + ch];
+#else
+                    int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
+                    int tx_offset = tx_frame_offset * frame_samp_size
+                        + tx_packet_length * (tx_ant_offset);
+                    for (size_t ch = 0; ch < config_->nChannels; ++ch)
+                        txbuf[ch] = (void*)(tx_buffer_ + tx_offset
+                            + ch * tx_packet_length);
+#endif
+                    long long frameTime
+                        = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
+                    int flags = (tx_symbol == txSymbols.back()) ? 
+                        2: // HAS_TIME & END_BURST
+                        1; // HAS_TIME
+                    radio->radioTx(it, txbuf, flags, frameTime);
+                }
+            }
+#endif
+            // printf("enqueue offset %d\n", offset);
+            int cur_queue_len = message_queue_->size_approx();
+            maxQueueLength = maxQueueLength > cur_queue_len ? maxQueueLength
+                                                            : cur_queue_len;
+
+            packet_num++;
+        }
     }
 }
