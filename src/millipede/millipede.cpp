@@ -146,7 +146,7 @@ void Millipede::start()
 
     int last_dequeue = 0;
     int ret = 0;
-    Event_data events_list[dequeue_bulk_size];
+    Event_data events_list[kDequeueBulkSizeWorker * cfg->worker_thread_num];
     int miss_count = 0;
     int total_count = 0;
 
@@ -157,15 +157,16 @@ void Millipede::start()
             for (size_t i = 0; i < config_->socket_thread_num; i++)
                 ret += message_queue_.try_dequeue_bulk_from_producer(
                     *(rx_ptoks_ptr[i]), events_list + ret,
-                    dequeue_bulk_size_single);
+                    kDequeueBulkSizeTXRX);
             last_dequeue = 1;
         } else {
-            // ret = 0;
-            // for (size_t i = 0; i < config_->worker_thread_num; i++)
-            //     ret += message_queue_.try_dequeue_bulk_from_producer(
-            //         *(worker_ptoks_ptr[i]), events_list + ret, 4);
-            ret = complete_task_queue_.try_dequeue_bulk(
-                ctok_complete, events_list, dequeue_bulk_size_single);
+            ret = 0;
+            for (size_t i = 0; i < config_->worker_thread_num; i++)
+                ret += message_queue_.try_dequeue_bulk_from_producer(
+                    *(worker_ptoks_ptr[i]), events_list + ret,
+                    kDequeueBulkSizeWorker);
+            // ret = complete_task_queue_.try_dequeue_bulk(
+            //     ctok_complete, events_list, dequeue_bulk_size_single);
             last_dequeue = 0;
         }
         total_count++;
@@ -211,45 +212,13 @@ void Millipede::start()
             } break;
 
             case EventType::kFFT: {
-                int offset = event.data;
-                int frame_id = offset / cfg->symbol_num_perframe;
-                int subframe_id = offset % cfg->symbol_num_perframe;
-
-                if (fft_stats_.last_task(frame_id, subframe_id)) {
-                    if (config_->isPilot(frame_id, subframe_id)) {
-                        print_per_subframe_done(PRINT_FFT_PILOTS,
-                            fft_stats_.frame_count, frame_id, subframe_id);
-
-                        /* If CSI of all UEs is ready, schedule ZF/prediction */
-                        if (fft_stats_.last_symbol(frame_id)) {
-                            stats_manager_->update_fft_processed(
-                                fft_stats_.frame_count);
-                            print_per_frame_done(PRINT_FFT_PILOTS,
-                                fft_stats_.frame_count, frame_id);
-                            fft_stats_.update_frame_count();
-                            consumer_zf.schedule_task_set(frame_id);
-                        }
-                    } else if (config_->isUplink(frame_id, subframe_id)) {
-                        int data_subframe_id
-                            = config_->getUlSFIndex(frame_id, subframe_id);
-                        fft_stats_.cur_frame_for_symbol[data_subframe_id]
-                            = frame_id;
-                        print_per_subframe_done(PRINT_FFT_DATA,
-                            fft_stats_.frame_count - 1, frame_id, subframe_id);
-                        /* If precoder exist, schedule demodulation */
-                        if (zf_stats_.coded_frame == frame_id)
-                            schedule_demul_task(frame_id, data_subframe_id,
-                                data_subframe_id + 1, consumer_demul);
-                    } else if (config_->isCalDlPilot(frame_id, subframe_id)
-                        || config_->isCalUlPilot(frame_id, subframe_id)) {
-                        print_per_subframe_done(PRINT_FFT_CAL,
-                            fft_stats_.frame_count - 1, frame_id, subframe_id);
-                        if (++fft_stats_.symbol_cal_count[frame_id]
-                            == fft_stats_.max_symbol_cal_count) {
-                            print_per_frame_done(PRINT_FFT_CAL,
-                                fft_stats_.frame_count - 1, frame_id);
-                            consumer_rc.schedule_task_set(frame_id);
-                        }
+                if (event.num_offsets == 0) {
+                    handle_event_fft(
+                        event.data, consumer_zf, consumer_demul, consumer_rc);
+                } else {
+                    for (int i = 0; i < event.num_offsets; i++) {
+                        handle_event_fft(event.offsets[i], consumer_zf,
+                            consumer_demul, consumer_rc);
                     }
                 }
             } break;
@@ -541,23 +510,38 @@ void Millipede::start()
                 exit(0);
             } /* End of switch */
 
-            if (delay_fft_queue_cnt[cur_frame_id] > 0) {
-                for (int i = 0; i < delay_fft_queue_cnt[cur_frame_id]; i++) {
-                    int offset = delay_fft_queue[cur_frame_id][i];
-
-                    Event_data do_fft_task(EventType::kFFT, offset);
-                    consumer_fft.try_handle(do_fft_task);
-                    if (!config_->bigstation_mode) {
-                        if (fft_created_count++ == 0) {
-                            stats_manager_->update_processing_started(
-                                frame_count);
-                        } else if (fft_created_count
-                            == rx_stats_.max_task_count) {
-                            fft_created_count = 0;
+            /* Schedule multiple fft tasks as one event */
+            if (delay_fft_queue_cnt[cur_frame_id] >= config_->fft_block_size) {
+                size_t fft_block_num = delay_fft_queue_cnt[cur_frame_id]
+                    / config_->fft_block_size;
+                size_t remainder = delay_fft_queue_cnt[cur_frame_id]
+                    % config_->fft_block_size;
+                for (size_t i = 0; i < fft_block_num; i++) {
+                    Event_data do_fft_task;
+                    do_fft_task.num_offsets = config_->fft_block_size;
+                    do_fft_task.event_type = EventType::kFFT;
+                    for (size_t j = 0; j < config_->fft_block_size; j++) {
+                        size_t qid = i * config_->fft_block_size + j;
+                        do_fft_task.offsets[j]
+                            = delay_fft_queue[cur_frame_id][qid];
+                        if (!config_->bigstation_mode) {
+                            if (fft_created_count++ == 0) {
+                                stats_manager_->update_processing_started(
+                                    frame_count);
+                            } else if (fft_created_count
+                                == rx_stats_.max_task_count) {
+                                fft_created_count = 0;
+                            }
                         }
                     }
+                    consumer_fft.try_handle(do_fft_task);
                 }
-                delay_fft_queue_cnt[cur_frame_id] = 0;
+                for (size_t i = 0; i < remainder; i++) {
+                    size_t orig_qid = fft_block_num * config_->fft_block_size;
+                    delay_fft_queue[cur_frame_id][i]
+                        = delay_fft_queue[cur_frame_id][orig_qid + i];
+                }
+                delay_fft_queue_cnt[cur_frame_id] = remainder;
             }
         } /* End of for */
     } /* End of while */
@@ -579,6 +563,47 @@ finish:
     save_ifft_data_to_file(last_frame_id);
     this->stop();
     // exit(0);
+}
+
+void Millipede::handle_event_fft(int offset, Consumer& consumer_zf,
+    Consumer& consumer_demul, Consumer& consumer_rc)
+{
+    int frame_id = offset / config_->symbol_num_perframe;
+    int subframe_id = offset % config_->symbol_num_perframe;
+
+    if (fft_stats_.last_task(frame_id, subframe_id)) {
+        if (config_->isPilot(frame_id, subframe_id)) {
+            print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count,
+                frame_id, subframe_id);
+            /* If CSI of all UEs is ready, schedule ZF/prediction */
+            if (fft_stats_.last_symbol(frame_id)) {
+                stats_manager_->update_fft_processed(fft_stats_.frame_count);
+                print_per_frame_done(
+                    PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
+                fft_stats_.update_frame_count();
+                consumer_zf.schedule_task_set(frame_id);
+            }
+        } else if (config_->isUplink(frame_id, subframe_id)) {
+            int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
+            fft_stats_.cur_frame_for_symbol[data_subframe_id] = frame_id;
+            print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1,
+                frame_id, subframe_id);
+            /* If precoder exist, schedule demodulation */
+            if (zf_stats_.coded_frame == frame_id)
+                schedule_demul_task(frame_id, data_subframe_id,
+                    data_subframe_id + 1, consumer_demul);
+        } else if (config_->isCalDlPilot(frame_id, subframe_id)
+            || config_->isCalUlPilot(frame_id, subframe_id)) {
+            print_per_subframe_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1,
+                frame_id, subframe_id);
+            if (++fft_stats_.symbol_cal_count[frame_id]
+                == fft_stats_.max_symbol_cal_count) {
+                print_per_frame_done(
+                    PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id);
+                consumer_rc.schedule_task_set(frame_id);
+            }
+        }
+    }
 }
 
 static void pin_worker(ThreadType thread_type, int tid, Config* config_)
@@ -750,9 +775,12 @@ void Millipede::schedule_demul_task(int frame_id, int start_subframe_id,
                 = frame_id * data_subframe_num_perframe + data_subframe_id;
             consumer.schedule_task_set(total_data_subframe_id);
 #if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
-            printf("Main thread: created Demodulation task for frame: %d,, "
-                   "start subframe: %d, current subframe: %d\n",
-                frame_id, start_subframe_id, data_subframe_id);
+            printf("Main thread: created Demodulation task for frame: %d, "
+                   "start subframe: %d, current subframe: %d, in %.2f\n",
+                frame_id, start_subframe_id, data_subframe_id,
+                get_time()
+                    - stats_manager_->get_pilot_received(
+                          demul_stats_.frame_count));
 #endif
         }
     }
@@ -835,12 +863,13 @@ void Millipede::print_per_frame_done(
         break;
     case (PRINT_ZF):
         printf("Main thread: ZF done frame: %d, %d in %.2f us since pilot FFT "
-               "done, total: %.2f us\n",
+               "done, total: %.2f us, FFT queue %zu\n",
             frame_count, frame_id,
             stats_manager_->get_zf_processed(frame_count)
                 - stats_manager_->get_fft_processed(frame_count),
             stats_manager_->get_zf_processed(frame_count)
-                - stats_manager_->get_pilot_received(frame_count));
+                - stats_manager_->get_pilot_received(frame_count),
+            fft_queue_.size_approx());
         break;
     case (PRINT_DEMUL):
         printf("Main thread: Demodulation done frame: %d, %d (%d UL subframes) "
@@ -927,14 +956,15 @@ void Millipede::print_per_subframe_done(UNUSED int task_type,
     switch (task_type) {
     case (PRINT_FFT_PILOTS):
         printf("Main thread: pilot FFT done frame: %d, %d, subframe: %d, num "
-               "sumbframes done: %d\n",
+               "subframes done: %d\n",
             frame_count, frame_id, subframe_id,
             fft_stats_.symbol_count[frame_id]);
         break;
     case (PRINT_FFT_DATA):
-        printf("Main thread: data FFT done frame %d, %d, subframe %d, precoder "
-               "status: %d, fft queue: %d, zf queue: %d, demul queue: %d, in "
-               "%.2f\n",
+        printf(
+            "Main thread: data FFT done frame %d, %d, subframe %d, precoder "
+            "status: %d, fft queue: %zu, zf queue: %zu, demul queue: %zu, in "
+            "%.2f\n",
             frame_count, frame_id, subframe_id,
             zf_stats_.coded_frame == frame_id, fft_queue_.size_approx(),
             zf_queue_.size_approx(), demul_queue_.size_approx(),
@@ -942,26 +972,27 @@ void Millipede::print_per_subframe_done(UNUSED int task_type,
         break;
     case (PRINT_RC):
         printf("Main thread: cal symbol FFT done frame: %d, %d, subframe: %d, "
-               "num sumbframes done: %d\n",
+               "num subframes done: %d\n",
             frame_count, frame_id, subframe_id,
             fft_stats_.symbol_cal_count[frame_id]);
         break;
     case (PRINT_DEMUL):
         printf("Main thread: Demodulation done frame %d %d, subframe: %d, num "
-               "sumbframes done: %d\n",
+               "subframes done: %d in %.2f\n",
             frame_count, frame_id, subframe_id,
-            demul_stats_.symbol_count[frame_id]);
+            demul_stats_.symbol_count[frame_id],
+            get_time() - stats_manager_->get_pilot_received(frame_count));
         break;
 #ifdef USE_LDPC
     case (PRINT_DECODE):
         printf("Main thread: Decoding done frame %d %d, subframe: %d, num "
-               "sumbframes done: %d\n",
+               "subframes done: %d\n",
             frame_count, frame_id, subframe_id,
             decode_stats_.symbol_count[frame_id]);
         break;
     case (PRINT_ENCODE):
         printf("Main thread: Encoding done frame %d %d, subframe: %d, num "
-               "sumbframes done: %d\n",
+               "subframes done: %d\n",
             frame_count, frame_id, subframe_id,
             encode_stats_.symbol_count[frame_id]);
         break;
@@ -1037,38 +1068,28 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id,
 
 void Millipede::initialize_queues()
 {
+    using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
+
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    message_queue_ = mt_queue_t(512 * data_subframe_num_perframe);
+    complete_task_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 
-    fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
-    zf_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    fft_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    zf_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 
-    rc_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 * 2 * 4);
+    rc_queue_ = mt_queue_t(512 * 2 * 4);
 
-    demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    demul_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    decode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #endif
 
-    ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
-    // modulate_queue_ = moodycamel::ConcurrentQueue<Event_data>(512 *
-    // data_subframe_num_perframe * 4);
+    ifft_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #ifdef USE_LDPC
-    encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    encode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 #endif
-    precode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
-    tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+    precode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    tx_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
