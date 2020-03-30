@@ -189,6 +189,8 @@ private:
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
+    std::array<std::queue<int>, TASK_BUFFER_FRAME_NUM> fft_queues;
+
     Table<int> delay_fft_queue;
     size_t* delay_fft_queue_cnt;
 

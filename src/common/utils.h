@@ -12,6 +12,9 @@
 #define UTILS_HEADER
 
 #define UNUSED __attribute__((unused))
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 #include "Symbols.hpp"
 #include <atomic>
 #include <chrono>
@@ -83,4 +86,38 @@ public:
     static void writeBinaryFile(
         std::string name, size_t elem_size, size_t buffer_size, void* buff);
 };
+
+/// Check a condition at runtime. If the condition is false, throw exception.
+/// This is faster than rt_assert(cond, std::string) as it avoids string
+/// construction.
+static inline void rt_assert(bool condition, const char* throw_str)
+{
+    if (unlikely(!condition))
+        throw std::runtime_error(throw_str);
+}
+
+/// Check a condition at runtime. If the condition is false, throw exception.
+/// This is faster than rt_assert(cond, std::string) as it avoids string
+/// construction.
+static inline void rt_assert(bool condition)
+{
+    if (unlikely(!condition))
+        throw std::runtime_error("Error");
+}
+
+/// Check a condition at runtime. If the condition is false, throw exception.
+static inline void rt_assert(bool condition, std::string throw_str)
+{
+    if (unlikely(!condition))
+        throw std::runtime_error(throw_str);
+}
+
+/// Check a condition at runtime. If the condition is false, throw exception.
+static inline void rt_assert(bool condition, std::string throw_str, char* s)
+{
+    if (unlikely(!condition)) {
+        throw std::runtime_error(throw_str + std::string(s));
+    }
+}
+
 #endif
