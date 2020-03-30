@@ -144,27 +144,21 @@ void Millipede::start()
     double demul_begin = get_time();
     double tx_begin = get_time();
 
-    // If last_dequeue is 0, then master thread dequeues from TX/RX threads.
-    // Else, master thread dequeues from worker threads.
-    int last_dequeue = 0;
-
-    int ret = 0; // Number of events dequeued from worker/TX/RX threads
+    bool dequeue_from_io = true; // False => dequeue from worker threads
 
     Event_data events_list[kDequeueBulkSizeWorker * cfg->worker_thread_num];
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
-        /* Get a bulk of events */
-        if (last_dequeue == 0) {
-            ret = 0;
+        int ret = 0; // Number of events dequeued from worker/TX/RX threads
 
-            // Dequeue from TX/RX threads
-            for (size_t i = 0; i < config_->socket_thread_num; i++)
+        /* Get a batch of events */
+        if (dequeue_from_io) {
+            for (size_t i = 0; i < config_->socket_thread_num; i++) {
                 ret += message_queue_.try_dequeue_bulk_from_producer(
                     *(rx_ptoks_ptr[i]), events_list + ret,
                     kDequeueBulkSizeTXRX);
-            last_dequeue = 1;
+            }
         } else {
-            ret = 0;
             for (size_t i = 0; i < config_->worker_thread_num; i++) {
                 // XXX: Should it be complete_task_queue_?
                 ret += message_queue_.try_dequeue_bulk_from_producer(
@@ -173,8 +167,9 @@ void Millipede::start()
             }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
-            last_dequeue = 0;
         }
+
+        dequeue_from_io = !dequeue_from_io;
 
         /* Handle each event */
 
