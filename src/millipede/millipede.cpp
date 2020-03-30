@@ -139,7 +139,7 @@ void Millipede::start()
     int cur_frame_id = 0;
 
     /* Counters for printing summary */
-    size_t demul_count = 0, tx_count = 0;
+    int demul_count = 0, tx_count = 0;
     double demul_begin = get_time();
     double tx_begin = get_time();
 
