@@ -371,7 +371,7 @@ void RU::taskThread(int tid)
                 for (size_t tx_symbol_id = 0; tx_symbol_id < txSymbols.size();
                      tx_symbol_id++) {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
-                    int tx_symbol = txSymbols[tx_symbol_id];
+                    size_t tx_symbol = txSymbols[tx_symbol_id];
                     int tx_ant_offset = tx_symbol_id * config_->getNumAntennas() + ant_id;
                     void* txbuf[2];
 #if DEBUG_UPLINK
@@ -386,7 +386,7 @@ void RU::taskThread(int tid)
                             + ch * tx_packet_length);
 #endif
                     long long frameTime
-                        = ((long long)tx_frame_id << 32) | (tx_symbol << 16);
+                        = ((long long)tx_frame_id << 32) | ((long long)tx_symbol << 16);
                     int flags = (tx_symbol == txSymbols.back()) ? 
                         2: // HAS_TIME & END_BURST
                         1; // HAS_TIME
