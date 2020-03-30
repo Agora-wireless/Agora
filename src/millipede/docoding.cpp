@@ -96,7 +96,7 @@ DoEncode::~DoEncode()
     free_buffer_1d(&ldpc_decoder_5gnr_response.varNodes);
 }
 
-void DoEncode::launch(int offset)
+Event_data DoEncode::launch(int offset)
 {
     LDPCconfig LDPC_config = config_->LDPC_config;
     int nblocksInSymbol = LDPC_config.nblocksInSymbol;
@@ -169,7 +169,8 @@ void DoEncode::launch(int offset)
 
     /* Inform main thread */
     Event_data encode_finish_event(EventType::kEncode, offset);
-    consumer_.handle(encode_finish_event);
+    // consumer_.handle(encode_finish_event);
+    return encode_finish_event;
 }
 
 DoDecode::DoDecode(Config* in_config, int in_tid,
@@ -208,7 +209,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 
 DoDecode::~DoDecode() {}
 
-void DoDecode::launch(int offset)
+Event_data DoDecode::launch(int offset)
 {
     LDPCconfig LDPC_config = config_->LDPC_config;
     int nblocksInSymbol = LDPC_config.nblocksInSymbol;
@@ -266,5 +267,6 @@ void DoDecode::launch(int offset)
 
     /* Inform main thread */
     Event_data decode_finish_event(EventType::kDecode, offset);
-    consumer_.handle(decode_finish_event);
+    // consumer_.handle(decode_finish_event);
+    return decode_finish_event;
 }
