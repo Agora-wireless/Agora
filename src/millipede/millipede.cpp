@@ -146,7 +146,12 @@ void Millipede::start()
 
     int last_dequeue = 0;
     int ret = 0;
-    Event_data events_list[kDequeueBulkSizeWorker * cfg->worker_thread_num];
+
+    const size_t max_events_needed
+        = std::max(kDequeueBulkSizeWorker * cfg->socket_thread_num,
+            kDequeueBulkSizeTXRX * cfg->worker_thread_num);
+    Event_data events_list[max_events_needed];
+
     int miss_count = 0;
     int total_count = 0;
 
