@@ -152,7 +152,7 @@ Config::Config(std::string jsonfile)
         : 0;
 
     if (isUE and !freq_orthogonal_pilot
-        and nRadios != pilot_symbol_num_perframe) {
+        and UE_ANT_NUM != pilot_symbol_num_perframe) {
         std::cerr << "Number of Pilot Symbols don't match number of Clients!"
                   << std::endl;
         exit(0);
@@ -322,6 +322,8 @@ void Config::genData()
         ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ul_IQ_modul.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
+    ul_IQ_symbol.malloc(
+        ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
@@ -345,7 +347,6 @@ void Config::genData()
             }
         }
 
-        // size_t c = i / UE_ANT_NUM;
         std::vector<std::complex<float>> ifft_dl_data
             = CommsLib::IFFT(ifft_in_data, OFDM_CA_NUM);
         ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN,
@@ -367,12 +368,31 @@ void Config::genData()
         std::vector<std::complex<float>> modul_data = CommsLib::modulate(
             std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM),
             mod_type);
+        std::vector<std::complex<float>> ifft_ul_data_in;
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM)
-                continue;
-            size_t k = j - OFDM_DATA_START;
-            ul_IQ_modul[i][j].re = modul_data[k].real();
-            ul_IQ_modul[i][j].im = modul_data[k].imag();
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+                // continue;
+                ifft_ul_data_in.push_back(0);
+            } else {
+                size_t k = j - OFDM_DATA_START;
+                ul_IQ_modul[i][j].re = modul_data[k].real();
+                ul_IQ_modul[i][j].im = modul_data[k].imag();
+                ifft_ul_data_in.push_back(modul_data[k]);
+            }
+        }
+
+        std::vector<std::complex<float>> ifft_ul_data
+            = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
+        ifft_ul_data.insert(ifft_ul_data.begin(), ifft_ul_data.end() - CP_LEN,
+            ifft_ul_data.end());
+        for (size_t j = 0; j < sampsPerSymbol; j++) {
+            if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                ul_IQ_symbol[i][j] = 0;
+            } else {
+                ul_IQ_symbol[i][j]
+                    = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
+                          (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
+            }
         }
     }
 #else
