@@ -139,8 +139,7 @@ void Millipede::start()
     int cur_frame_id = 0;
 
     /* Counters for printing summary */
-    int demul_count = 0;
-    int tx_count = 0;
+    size_t demul_count = 0, tx_count = 0;
     double demul_begin = get_time();
     double tx_begin = get_time();
 
@@ -300,6 +299,7 @@ void Millipede::start()
 
                         demul_stats_.update_frame_count();
                     }
+
                     demul_count++;
                     if (demul_count == demul_stats_.max_symbol_count * 9000) {
                         demul_count = 0;
@@ -483,6 +483,7 @@ void Millipede::start()
                             goto finish;
                         tx_stats_.update_frame_count();
                     }
+
                     tx_count++;
                     if (tx_count == tx_stats_.max_symbol_count * 9000) {
                         tx_count = 0;
