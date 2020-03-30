@@ -40,7 +40,7 @@ void RU::startRadios()
 #endif
 }
 
-std::vector<pthread_t> RU::startRXTX(Table<char>& in_buffer,
+std::vector<pthread_t> RU::startTXRX(Table<char>& in_buffer,
     Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length,
     int in_core_id)
 {
