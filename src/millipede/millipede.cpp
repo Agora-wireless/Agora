@@ -208,7 +208,7 @@ void Millipede::start()
                     }
                 }
 
-                fft_queues[frame_id].push(offset);
+                fft_queue_arr[frame_id].push(offset);
             } break;
 
             case EventType::kFFT: {
@@ -511,9 +511,9 @@ void Millipede::start()
             } /* End of switch */
 
             /* Schedule multiple fft tasks as one event */
-            if (fft_queues[cur_frame_id].size() >= config_->fft_block_size) {
-                size_t fft_block_num
-                    = fft_queues[cur_frame_id].size() / config_->fft_block_size;
+            if (fft_queue_arr[cur_frame_id].size() >= config_->fft_block_size) {
+                size_t fft_block_num = fft_queue_arr[cur_frame_id].size()
+                    / config_->fft_block_size;
 
                 for (size_t i = 0; i < fft_block_num; i++) {
                     Event_data do_fft_task;
@@ -522,8 +522,8 @@ void Millipede::start()
 
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
                         do_fft_task.offsets[j]
-                            = fft_queues[cur_frame_id].front();
-                        fft_queues[cur_frame_id].pop();
+                            = fft_queue_arr[cur_frame_id].front();
+                        fft_queue_arr[cur_frame_id].pop();
 
                         if (!config_->bigstation_mode) {
                             if (fft_created_count++ == 0) {
@@ -1175,10 +1175,6 @@ void Millipede::initialize_uplink_buffers()
         ul_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
         data_subframe_num_perframe, 64);
 #endif
-
-    delay_fft_queue.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->symbol_num_perframe * cfg->BS_ANT_NUM, 32);
-    alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
 }
 
 void Millipede::initialize_downlink_buffers()
@@ -1243,9 +1239,6 @@ void Millipede::free_uplink_buffers()
 #ifdef USE_LDPC
     decode_stats_.fini();
 #endif
-
-    delay_fft_queue.free();
-    free_buffer_1d(&delay_fft_queue_cnt);
 }
 
 void Millipede::free_downlink_buffers()
