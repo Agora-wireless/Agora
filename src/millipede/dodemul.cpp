@@ -41,7 +41,7 @@ DoDemul::~DoDemul()
     free_buffer_1d(&equaled_buffer_temp_transposed);
 }
 
-void DoDemul::launch(int offset)
+Event_data DoDemul::launch(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int demul_block_size = config_->demul_block_size;
@@ -222,7 +222,8 @@ void DoDemul::launch(int offset)
 
     /* Inform main thread */
     Event_data demul_finish_event(EventType::kDemul, offset);
-    consumer_.handle(demul_finish_event);
+    // consumer_.handle(demul_finish_event);
+    return demul_finish_event;
 }
 
 void DoDemul::DemulSingleSC(int offset)
