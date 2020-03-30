@@ -26,7 +26,7 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
 
 Reciprocity::~Reciprocity() { free(calib_gather_buffer); }
 
-void Reciprocity::launch(int offset)
+Event_data Reciprocity::launch(int offset)
 {
     int ref_ant = config_->ref_ant;
 
@@ -91,5 +91,6 @@ void Reciprocity::launch(int offset)
 
     /* Inform main thread */
     Event_data RC_finish_event(EventType::kRC, offset);
-    consumer_.handle(RC_finish_event);
+    // consumer_.handle(RC_finish_event);
+    return RC_finish_event;
 }

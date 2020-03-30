@@ -49,7 +49,7 @@ DoPrecode::~DoPrecode()
     free_buffer_1d(&precoded_buffer_temp);
 }
 
-void DoPrecode::launch(int offset)
+Event_data DoPrecode::launch(int offset)
 {
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int demul_block_size = config_->demul_block_size;
@@ -208,11 +208,12 @@ void DoPrecode::launch(int offset)
 
     /* Inform main thread */
     Event_data precode_finish_event(EventType::kPrecode, offset);
-    consumer_.handle(precode_finish_event);
+    // consumer_.handle(precode_finish_event);
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, "
            "subcarrier: %d , offset: %d\n",
         tid, frame_id, current_data_subframe_id, sc_id, offset);
 #endif
+    return precode_finish_event;
 }

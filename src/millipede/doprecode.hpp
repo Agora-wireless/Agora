@@ -63,7 +63,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     /**
