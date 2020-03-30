@@ -18,9 +18,8 @@ Millipede::Millipede(Config* cfg)
     this->config_ = cfg;
 #if DEBUG_PRINT_PILOT
     cout << "Millipede: Pilot data: " << endl;
-    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
         cout << config_->pilots_[i] << ",";
-    }
     cout << endl;
 #endif
 
@@ -148,29 +147,34 @@ void Millipede::start()
     int last_dequeue = 0;
     int ret = 0;
     Event_data events_list[dequeue_bulk_size];
-    size_t miss_count = 0;
-    size_t total_count = 0;
+    int miss_count = 0;
+    int total_count = 0;
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* Get a bulk of events */
         if (last_dequeue == 0) {
             ret = 0;
-            for (size_t i = 0; i < config_->socket_thread_num; i++) {
+            for (size_t i = 0; i < config_->socket_thread_num; i++)
                 ret += message_queue_.try_dequeue_bulk_from_producer(
                     *(rx_ptoks_ptr[i]), events_list + ret,
                     dequeue_bulk_size_single);
-            }
-
             last_dequeue = 1;
         } else {
+            // ret = 0;
+            // for (size_t i = 0; i < config_->worker_thread_num; i++)
+            //     ret += message_queue_.try_dequeue_bulk_from_producer(
+            //         *(worker_ptoks_ptr[i]), events_list + ret, 4);
             ret = complete_task_queue_.try_dequeue_bulk(
                 ctok_complete, events_list, dequeue_bulk_size_single);
-
             last_dequeue = 0;
         }
-
         total_count++;
-
+        if (total_count == 1e9) {
+            // printf("message dequeue miss rate %f\n", (float)miss_count /
+            // total_count);
+            total_count = 0;
+            miss_count = 0;
+        }
         if (ret == 0) {
             miss_count++;
             continue;
@@ -181,7 +185,6 @@ void Millipede::start()
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
             Event_data& event = events_list[bulk_count];
             switch (event.event_type) {
-
             case EventType::kPacketRX: {
                 int offset = event.data;
                 int socket_thread_id, offset_in_current_buffer;
@@ -189,7 +192,7 @@ void Millipede::start()
                     offset, &socket_thread_id, &offset_in_current_buffer, 28);
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * cfg->packet_length;
-                auto* pkt = (struct Packet*)socket_buffer_ptr;
+                struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
                 frame_count = pkt->frame_id % 10000;
                 int frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
@@ -562,7 +565,7 @@ void Millipede::start()
 finish:
 
     printf("Millipede: printing stats\n");
-    printf("Total dequeue trials: %zu, missed %zu\n", total_count, miss_count);
+    printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id);
     stats_manager_->print_summary(last_frame_id);
@@ -1069,22 +1072,19 @@ void Millipede::initialize_queues()
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
-    for (size_t i = 0; i < config_->socket_thread_num; i++) {
+    for (size_t i = 0; i < config_->socket_thread_num; i++)
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
-    }
 
     tx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
-    for (size_t i = 0; i < config_->socket_thread_num; i++) {
+    for (size_t i = 0; i < config_->socket_thread_num; i++)
         tx_ptoks_ptr[i] = new moodycamel::ProducerToken(tx_queue_);
-    }
 
     worker_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, config_->worker_thread_num * sizeof(moodycamel::ProducerToken*));
-    for (size_t i = 0; i < config_->worker_thread_num; i++) {
+    for (size_t i = 0; i < config_->worker_thread_num; i++)
         worker_ptoks_ptr[i]
             = new moodycamel::ProducerToken(complete_task_queue_);
-    }
 }
 
 void Millipede::initialize_uplink_buffers()
@@ -1145,9 +1145,8 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.max_symbol_cal_count = 2;
     alloc_buffer_1d(&fft_stats_.cur_frame_for_symbol,
         cfg->ul_data_symbol_num_perframe, 64, 0);
-    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; ++i) {
+    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; ++i)
         fft_stats_.cur_frame_for_symbol[i] = -1;
-    }
 
     zf_stats_.init(config_->zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
 
