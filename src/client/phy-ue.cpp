@@ -61,7 +61,7 @@ Phy_UE::Phy_UE(Config* config)
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
-#ifdef SIM
+#ifndef USE_ARGOS
     // read pilot
     int pilot_len = (FFT_LEN + CP_LEN);
     // ul_pilot_aligned = new char[packet_length];
@@ -76,7 +76,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize rx buffer
     rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
-    rx_buffer_status_.malloc(rx_thread_num, rx_buffer_status_size, 64);
+    rx_buffer_status_.calloc(rx_thread_num, rx_buffer_status_size, 64);
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num
@@ -113,7 +113,7 @@ Phy_UE::Phy_UE(Config* config)
     }
 
     ru_.reset(new RU(
-        rx_thread_num, rx_thread_num, config_, &message_queue_, &tx_queue_));
+        rx_thread_num, tx_thread_num, config_, &message_queue_, &tx_queue_));
 
     // initilize all kinds of checkers
     cropper_checker_ = new size_t[dl_symbol_perframe * TASK_BUFFER_FRAME_NUM];
@@ -133,7 +133,7 @@ Phy_UE::Phy_UE(Config* config)
     }
 
     // create task thread
-    for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
+    for (size_t i = 0; i < worker_thread_num; i++) {
         auto* context = new EventHandlerContext();
         context->obj_ptr = this;
         context->id = i;
@@ -197,7 +197,7 @@ void Phy_UE::start()
     ru_->startRadios();
 
     std::vector<pthread_t> rx_threads
-        = ru_->startProc(rx_buffer_, rx_buffer_status_, rx_buffer_status_size,
+        = ru_->startTXRX(rx_buffer_, rx_buffer_status_, rx_buffer_status_size,
             rx_buffer_size, core_offset + 1);
 
     std::vector<pthread_t> tx_threads = ru_->startTX(tx_buffer_,
@@ -555,7 +555,7 @@ void Phy_UE::taskThread(int tid)
     // attach task threads to specific cores
     // Note: cores 0-17, 36-53 are on the same socket
 #ifdef ENABLE_CPU_ATTACH
-    size_t offset_id = core_offset + rx_thread_num * 2 + 1;
+    size_t offset_id = core_offset + rx_thread_num + tx_thread_num + 1;
     size_t tar_core_id = tid + offset_id;
     if (tar_core_id >= nCPUs) // FIXME: read the number of cores
         tar_core_id = (tar_core_id - nCPUs) + 2 * nCPUs;
@@ -824,7 +824,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // for (int ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
     // ul_symbol_id++)
     //{
-#ifdef SIM
+#ifndef USE_ARGOS
     int frame_period_id = frame_id % config_->framePeriod;
     int symbol_id = config_->ULSymbols[frame_period_id][ul_symbol_id];
 #endif
@@ -874,7 +874,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 
         size_t tx_offset = txbuf_offset + ant_id * tx_packet_length;
         char* cur_tx_buffer = &tx_buffer_[tx_offset];
-#ifdef SIM
+#ifndef USE_ARGOS
         // complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer +
         // prefix_len*sizeof(complex_float) + config_->packet_header_offset);
         struct Packet* pkt = (struct Packet*)cur_tx_buffer;
@@ -937,9 +937,6 @@ void Phy_UE::initialize_vars_from_cfg(void)
     cout << endl;
 #endif
 
-    // TASK_THREAD_NUM = config_->worker_thread_num;
-    // RX_THREAD_NUM = config_->socket_thread_num;
-    // TX_THREAD_NUM = config_->socket_thread_num;
     // demul_block_size = config_->demul_block_size;
     // //OFDM_CA_NUM*2/transpose_block_size; demul_block_num = OFDM_DATA_NUM /
     // demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
@@ -948,7 +945,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
     // dl_data_subframe_start = config_->dl_data_symbol_start;
     // dl_data_subframe_end = config_->dl_data_symbol_end;
     packet_length = config_->packet_length;
-#ifdef SIM
+#ifndef USE_ARGOS
     tx_packet_length = config_->packet_length;
 #else
     tx_packet_length = packet_length - offsetof(Packet, data);
@@ -962,7 +959,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_data_symbol_perframe
         = config_->dl_data_symbol_num_perframe - dl_pilot_symbol_perframe;
     rx_symbol_perframe = dl_symbol_perframe;
-#ifdef SIM
+#ifndef USE_ARGOS
     tx_symbol_perframe = ul_pilot_symbol_perframe + ul_data_symbol_perframe;
 #else
     tx_symbol_perframe
@@ -979,10 +976,20 @@ void Phy_UE::initialize_vars_from_cfg(void)
     data_sc_start = config_->OFDM_DATA_START;
     nUEs = config_->UE_NUM;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM
-        ? RX_THREAD_NUM
-        : nUEs; // FIXME: read number of cores and assing accordingly
+    rx_thread_num = config_->socket_thread_num;
+        //nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM
+        //? RX_THREAD_NUM
+        //: nUEs;
+    tx_thread_num = SEPARATE_TX_RX_UE ? config_->socket_thread_num : 0;
+    worker_thread_num = config_->worker_thread_num;
     core_offset = config_->core_offset;
+#ifdef ENABLE_CPU_ATTACH
+    size_t max_core = 1 + rx_thread_num + tx_thread_num + worker_thread_num + core_offset;
+    if (max_core >= nCPUs) {
+        printf("Cannot allocate cores: max_core %zu, available cores %zu\n", max_core, nCPUs);
+        exit(1);
+    }
+#endif
     numAntennas = config_->UE_ANT_NUM;
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data "
            "symbols, %zu DL data symbols\n",

@@ -52,7 +52,7 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * N_THREAD - 1}
      */
-    std::vector<pthread_t> startRXTX(Table<char>& in_buffer,
+    std::vector<pthread_t> startTXRX(Table<char>& in_buffer,
         Table<int>& in_buffer_status, int in_buffer_frame_num,
         int in_buffer_length, int in_core_id = 0);
     std::vector<pthread_t> startTX(char* in_buffer, char* in_pilot_buffer,
