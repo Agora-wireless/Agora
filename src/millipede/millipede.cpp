@@ -144,16 +144,20 @@ void Millipede::start()
     double demul_begin = get_time();
     double tx_begin = get_time();
 
+    // If last_dequeue is 0, then master thread dequeues from TX/RX threads.
+    // Else, master thread dequeues from worker threads.
     int last_dequeue = 0;
-    int ret = 0;
+
+    int ret = 0; // Number of events dequeued from worker/TX/RX threads
+
     Event_data events_list[kDequeueBulkSizeWorker * cfg->worker_thread_num];
-    int miss_count = 0;
-    int total_count = 0;
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* Get a bulk of events */
         if (last_dequeue == 0) {
             ret = 0;
+
+            // Dequeue from TX/RX threads
             for (size_t i = 0; i < config_->socket_thread_num; i++)
                 ret += message_queue_.try_dequeue_bulk_from_producer(
                     *(rx_ptoks_ptr[i]), events_list + ret,
@@ -161,31 +165,27 @@ void Millipede::start()
             last_dequeue = 1;
         } else {
             ret = 0;
-            for (size_t i = 0; i < config_->worker_thread_num; i++)
+            for (size_t i = 0; i < config_->worker_thread_num; i++) {
+                // XXX: Should it be complete_task_queue_?
                 ret += message_queue_.try_dequeue_bulk_from_producer(
                     *(worker_ptoks_ptr[i]), events_list + ret,
                     kDequeueBulkSizeWorker);
+            }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
             last_dequeue = 0;
         }
-        total_count++;
-        if (total_count == 1e9) {
-            // printf("message dequeue miss rate %f\n", (float)miss_count /
-            // total_count);
-            total_count = 0;
-            miss_count = 0;
-        }
-        if (ret == 0) {
-            miss_count++;
-            continue;
-        }
 
         /* Handle each event */
+
         int frame_count = 0;
-        for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
+
+        for (int ev_i = 0; ev_i < ret; ev_i++) {
+            Event_data& event = events_list[ev_i];
+
+            // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
+
             case EventType::kPacketRX: {
                 int offset = event.data;
                 int socket_thread_id, offset_in_current_buffer;
@@ -549,7 +549,6 @@ void Millipede::start()
 finish:
 
     printf("Millipede: printing stats\n");
-    printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id);
     stats_manager_->print_summary(last_frame_id);

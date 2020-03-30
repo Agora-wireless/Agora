@@ -22,14 +22,17 @@ struct complex_float {
 #endif
 
 /**
- * structure for event
- * size: 64 bytes (one cache line)
- * data is used for event with only a single offset
- * num_offsets and offsets are used for event with multiple offsets
+ * An event is a message sent between the master thread, and worker or TX/RX
+ * threads
+ *
+ * @data is used for events with only a single offset
+ *
+ * num_offsets and offsets are used for events with multiple offsets
  *     num_offsets: number of offsets in an event
- *     offsets: store values of offsets
+ *     offsets: the values of offsets
  */
 struct Event_data {
+    // XXX: @data can be removed and replaced with num_offsets and offsets
     EventType event_type;
     int data;
     int num_offsets;
@@ -44,15 +47,16 @@ struct Event_data {
 
     Event_data() { num_offsets = 0; }
 };
+static_assert(sizeof(Event_data) == 64, "");
 
 struct Packet {
     uint32_t frame_id;
     uint32_t symbol_id;
     uint32_t cell_id;
     uint32_t ant_id;
-    uint32_t fill[12];
-    short data[];
-    Packet(int f, int s, int c, int a)
+    uint32_t fill[12]; // Padding for 64-byte alignment needed for SIMD
+    short data[]; // Elements sent by antennae are two bytes (I/Q)
+    Packet(int f, int s, int c, int a) // XXX: Should be unsigned integer
         : frame_id(f)
         , symbol_id(s)
         , cell_id(c)

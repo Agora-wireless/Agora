@@ -61,9 +61,15 @@ public:
     static const int kDequeueBulkSizeTXRX = 8;
     static const int kDequeueBulkSizeWorker = 4;
 
+    /**
+     * @brief Create a Millipede object and start the worker threads
+     */
     Millipede(Config*);
     ~Millipede();
 
+    /**
+     * @brief The main Millipede event loop
+     */
     void start();
     void stop();
 
@@ -189,7 +195,13 @@ private:
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
+    // XXX: Could use an array of std::queue instead of delay_fft_queue?
+
+    // Per-frame queues of delayed FFT tasks. The queue contains offsets into
+    // TX/RX buffers.
     Table<int> delay_fft_queue;
+
+    // Number of events per-frame in delayed_fft_queue
     size_t* delay_fft_queue_cnt;
 
     /**
