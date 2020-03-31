@@ -36,9 +36,9 @@ Millipede::Millipede(Config* cfg)
         cfg->fft_thread_num, cfg->zf_thread_num, cfg->demul_thread_num);
 
     /* Initialize TXRX threads*/
-    receiver_.reset(new PacketTXRX(config_, cfg->socket_thread_num /* RX */,
-        cfg->socket_thread_num /* TX */, cfg->core_offset + 1, &message_queue_,
-        &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
+    receiver_.reset(
+        new PacketTXRX(config_, cfg->socket_thread_num, cfg->core_offset + 1,
+            &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -74,16 +74,15 @@ void Millipede::start()
 {
     auto& cfg = config_;
 
-    /* Start uplink receiver */
-    std::vector<pthread_t> rx_threads = receiver_->startRecv(socket_buffer_,
-        socket_buffer_status_, socket_buffer_status_size_, socket_buffer_size_,
-        stats_manager_->frame_start);
-#ifdef USE_ARGOS
-    if (rx_threads.size() == 0) {
+    /* start txrx receiver */
+    if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
+            socket_buffer_status_size_, socket_buffer_size_,
+            stats_manager_->frame_start, dl_socket_buffer_,
+            dl_socket_buffer_status_, dl_socket_buffer_status_size_,
+            dl_socket_buffer_size_)) {
         this->stop();
         return;
     }
-#endif
 
     /* Tokens used for enqueue */
     /* Uplink */
@@ -127,14 +126,6 @@ void Millipede::start()
     /* Tokens used for dequeue */
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
-
-    std::vector<pthread_t> tx_threads;
-    if (config_->dl_data_symbol_num_perframe > 0) {
-        /* Start downlink transmitter */
-        tx_threads
-            = receiver_->startTX(dl_socket_buffer_, dl_socket_buffer_status_,
-                dl_socket_buffer_status_size_, dl_socket_buffer_size_);
-    }
 
     int cur_frame_id = 0;
 
