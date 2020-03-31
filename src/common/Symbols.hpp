@@ -15,7 +15,6 @@
 #define GENERATE_PILOT
 #endif
 
-#define SEPARATE_TX_RX 1
 #define SEPARATE_TX_RX_UE 0
 
 #define MOD_ORDER 4
