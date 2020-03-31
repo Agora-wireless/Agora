@@ -89,6 +89,8 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
+    double* rx_frame_start = (*frame_start_)[tid];
+    int rx_offset = 0;
     // printf("Recv thread: thread %d start\n", tid);
     int radio_lo = tid * config_->nRadios / comm_thread_num_;
     int radio_hi = (tid + 1) * config_->nRadios / comm_thread_num_;
@@ -102,9 +104,6 @@ void* PacketTXRX::loopTXRX(int tid)
 
     pthread_cond_wait(&cond, &mutex);
     pthread_mutex_unlock(&mutex); // unlocking for all other threads
-
-    double* rx_frame_start = (*frame_start_)[tid];
-    int rx_offset = 0;
 
     // downlink socket buffer
     // char *tx_buffer_ptr = tx_buffer_;
