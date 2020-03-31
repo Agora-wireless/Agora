@@ -8,7 +8,6 @@
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
-    socket_ = new int[COMM_THREAD_NUM];
     config_ = cfg;
     comm_thread_num_ = COMM_THREAD_NUM;
 
@@ -36,7 +35,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
 
 PacketTXRX::~PacketTXRX()
 {
-    delete[] socket_;
     radioconfig_->radioStop();
     delete radioconfig_;
 }
@@ -74,8 +72,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         context->obj_ptr = this;
         context->id = i;
         if (pthread_create(&txrx_thread, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX_Argos>,
-                context)
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
             != 0) {
             perror("socket communication thread create failed");
             exit(0);
@@ -89,9 +86,11 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     return true;
 }
 
-void* PacketTXRX::loopTXRX_Argos(int tid)
+void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
+    double* rx_frame_start = (*frame_start_)[tid];
+    int rx_offset = 0;
     // printf("Recv thread: thread %d start\n", tid);
     int radio_lo = tid * config_->nRadios / comm_thread_num_;
     int radio_hi = (tid + 1) * config_->nRadios / comm_thread_num_;
@@ -105,9 +104,6 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
 
     pthread_cond_wait(&cond, &mutex);
     pthread_mutex_unlock(&mutex); // unlocking for all other threads
-
-    double* rx_frame_start = (*frame_start_)[tid];
-    int rx_offset = 0;
 
     // downlink socket buffer
     // char *tx_buffer_ptr = tx_buffer_;
@@ -127,10 +123,10 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
     int radio_id = radio_lo;
     while (config_->running) {
         // receive data
-        if (-1 != dequeue_send_Argos(tid))
+        if (-1 != dequeue_send(tid))
             continue;
         rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
-        struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
+        struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
         int frame_id = pkt->frame_id;
@@ -158,8 +154,7 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue_Argos(
-    int tid, int radio_id, int rx_offset)
+struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
@@ -213,7 +208,7 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
     return pkt[0];
 }
 
-int PacketTXRX::dequeue_send_Argos(int tid)
+int PacketTXRX::dequeue_send(int tid)
 {
     Event_data task_event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
