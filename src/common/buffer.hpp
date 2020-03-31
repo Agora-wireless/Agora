@@ -21,6 +21,25 @@ struct complex_float {
 };
 #endif
 
+// Event data tag for RX events
+union rx_tag_t {
+    struct {
+        uint32_t tid : 4;
+        uint32_t offset : 28;
+    };
+    int _tag;
+
+    rx_tag_t(uint32_t tid, uint32_t offset)
+        : tid(tid)
+        , offset(offset)
+    {
+    }
+    rx_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+
 /**
  * Millipede uses these event messages for communication between threads
  *
@@ -32,6 +51,8 @@ struct complex_float {
  */
 struct Event_data {
     // TODO: @data can be removed and replaced with num_offsets and offsets
+    // TODO: offsets should be called "data" or "tags" to avoid confusing with
+    // offsets into memory buffers
     EventType event_type;
     int data;
     int num_offsets;

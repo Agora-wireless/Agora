@@ -199,11 +199,8 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
             = 1; // has data, after it is read, it is set to 0
 
         // Push kPacketRX event into the queue.
-        // data records the position of this packet in the rx_buffer & tid of
-        // this socket (so that task thread could know which rx_buffer it should
-        // visit)
-        Event_data rx_message(EventType::kPacketRX,
-            generateOffset2d_setbits(tid, rx_offset + ch, 28));
+        Event_data rx_message(
+            EventType::kPacketRX, rx_tag_t(tid, rx_offset + ch)._tag);
 
         if (!message_queue_->enqueue(*local_ptok, rx_message)) {
             printf("socket message enqueue failed\n");

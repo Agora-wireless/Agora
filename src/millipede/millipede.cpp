@@ -127,7 +127,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    int cur_frame_id = 0;
+    size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
     int demul_count = 0;
@@ -170,10 +170,9 @@ void Millipede::start()
             // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int offset = event.data;
-                int socket_thread_id, offset_in_current_buffer;
-                interpreteOffset2d_setbits(
-                    offset, &socket_thread_id, &offset_in_current_buffer, 28);
+                int offset_in_current_buffer = rx_tag_t(event.data).offset;
+                int socket_thread_id = rx_tag_t(event.data).tid;
+
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
@@ -191,7 +190,7 @@ void Millipede::start()
                     }
                 }
 
-                fft_queue_arr[frame_id].push(offset);
+                fft_queue_arr[frame_id].push(event.data);
             } break;
 
             case EventType::kFFT: {
