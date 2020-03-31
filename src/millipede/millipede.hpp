@@ -37,7 +37,6 @@
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "reciprocity.hpp"
 #include "txrx.hpp"
 
@@ -81,7 +80,7 @@ public:
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
-    void handle_event_fft(int offset, Consumer& consumer_zf,
+    void handle_event_fft(int tag, Consumer& consumer_zf,
         Consumer& consumer_demul, Consumer& consumer_rc);
 
     /* Add tasks into task queue based on event type */
@@ -197,8 +196,8 @@ private:
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
-    std::array<std::queue<int>, TASK_BUFFER_FRAME_NUM> fft_queue_arr;
-  
+    std::array<std::queue<fft_req_tag_t>, TASK_BUFFER_FRAME_NUM> fft_queue_arr;
+
     /**
      * Raw data
      * First dimension: data_subframe_num_perframe * UE_NUM

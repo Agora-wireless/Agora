@@ -190,7 +190,7 @@ void Millipede::start()
                     }
                 }
 
-                fft_queue_arr[frame_id].push(event.data);
+                fft_queue_arr[frame_id].push(fft_req_tag_t(event.data));
             } break;
 
             case EventType::kFFT: {
@@ -506,7 +506,7 @@ void Millipede::start()
 
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
                         do_fft_task.offsets[j]
-                            = fft_queue_arr[cur_frame_id].front();
+                            = fft_queue_arr[cur_frame_id].front()._tag;
                         fft_queue_arr[cur_frame_id].pop();
 
                         if (!config_->bigstation_mode) {
@@ -543,11 +543,11 @@ finish:
     // exit(0);
 }
 
-void Millipede::handle_event_fft(int offset, Consumer& consumer_zf,
+void Millipede::handle_event_fft(int tag, Consumer& consumer_zf,
     Consumer& consumer_demul, Consumer& consumer_rc)
 {
-    int frame_id = offset / config_->symbol_num_perframe;
-    int subframe_id = offset % config_->symbol_num_perframe;
+    int frame_id = fft_resp_tag_t(tag).frame_id;
+    int subframe_id = fft_resp_tag_t(tag).subframe_id;
 
     if (fft_stats_.last_task(frame_id, subframe_id)) {
         if (config_->isPilot(frame_id, subframe_id)) {
