@@ -74,8 +74,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         context->obj_ptr = this;
         context->id = i;
         if (pthread_create(&txrx_thread, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX_Argos>,
-                context)
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
             != 0) {
             perror("socket communication thread create failed");
             exit(0);
@@ -89,7 +88,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     return true;
 }
 
-void* PacketTXRX::loopTXRX_Argos(int tid)
+void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     // printf("Recv thread: thread %d start\n", tid);

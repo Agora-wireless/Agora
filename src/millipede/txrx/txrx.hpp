@@ -130,7 +130,6 @@ public:
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
-    void* loopTXRX_Argos(int tid);
     int dequeue_send_Argos(int tid);
     struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
