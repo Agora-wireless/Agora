@@ -125,7 +125,7 @@ public:
     typedef struct sockaddr_in6 sockaddr_t;
 #endif
     int dequeue_send(int tid);
-    struct Packet* recv_enqueue(int tid, int comm_id, int rx_offset);
+    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
