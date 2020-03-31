@@ -139,47 +139,41 @@ void Millipede::start()
     int cur_frame_id = 0;
 
     /* Counters for printing summary */
-    int demul_count = 0, tx_count = 0;
+    int demul_count = 0;
+    int tx_count = 0;
     double demul_begin = get_time();
     double tx_begin = get_time();
-
-    bool dequeue_from_io = true; // False => dequeue from worker threads
-
+    bool is_turn_to_dequeue_from_io = true;
     Event_data events_list[kDequeueBulkSizeWorker * cfg->worker_thread_num];
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
-        int ret = 0; // Number of events dequeued from worker/TX/RX threads
-
         /* Get a batch of events */
-        if (dequeue_from_io) {
+        int num_events = 0;
+        if (is_turn_to_dequeue_from_io) {
             for (size_t i = 0; i < config_->socket_thread_num; i++) {
-                ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(rx_ptoks_ptr[i]), events_list + ret,
+                num_events += message_queue_.try_dequeue_bulk_from_producer(
+                    *(rx_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeTXRX);
             }
         } else {
             for (size_t i = 0; i < config_->worker_thread_num; i++) {
-                // XXX: Should it be complete_task_queue_?
-                ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(worker_ptoks_ptr[i]), events_list + ret,
+                // TODOs: Should it be complete_task_queue_?
+                num_events += message_queue_.try_dequeue_bulk_from_producer(
+                    *(worker_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeWorker);
             }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
         }
-
-        dequeue_from_io = !dequeue_from_io;
+        is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
         /* Handle each event */
-
         int frame_count = 0;
-
-        for (int ev_i = 0; ev_i < ret; ev_i++) {
+        for (int ev_i = 0; ev_i < num_events; ev_i++) {
             Event_data& event = events_list[ev_i];
 
             // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
-
             case EventType::kPacketRX: {
                 int offset = event.data;
                 int socket_thread_id, offset_in_current_buffer;

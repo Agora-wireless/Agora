@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// XXX: An offset structure that might be used instead of manually-coded bit
+// TODO: An offset structure that might be used instead of manually-coded bit
 // math
 struct offset_t {
     uint32_t offset : 28;
