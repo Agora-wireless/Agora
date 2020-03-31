@@ -27,6 +27,7 @@ int main(int argc, char const* argv[])
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
     auto* cfg = new Config(filename.c_str());
+    cfg->genData();
     Simulator* simulator;
     int ret;
     try {

@@ -2,19 +2,20 @@
 #ifndef RU_HEADER
 #define RU_HEADER
 
-#ifdef SIM
+#ifdef USE_ARGOS
+class RadioConfig;
+#include "client_radio.hpp"
+#else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#else
-class RadioConfig;
 #endif
+
 #include <complex>
 #include <pthread.h>
 #include <vector>
 
-#include "client_radio.hpp"
 #include "concurrentqueue.h"
 #include <fstream> // std::ifstream
 
@@ -42,9 +43,6 @@ public:
         moodycamel::ConcurrentQueue<Event_data>* in_queue_task);
     ~RU();
 
-    void calibrateRadios(std::vector<std::vector<std::complex<float>>>&,
-        std::vector<std::vector<std::complex<float>>>&, int);
-    void startRadios();
     /**
      * called in main threads to start the socket threads
      * in_buffer: ring buffer to save packets
@@ -54,7 +52,7 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * N_THREAD - 1}
      */
-    std::vector<pthread_t> startProc(Table<char>& in_buffer,
+    std::vector<pthread_t> startTXRX(Table<char>& in_buffer,
         Table<int>& in_buffer_status, int in_buffer_frame_num,
         int in_buffer_length, int in_core_id = 0);
     std::vector<pthread_t> startTX(char* in_buffer, char* in_pilot_buffer,
@@ -68,20 +66,22 @@ public:
     void sendThread(int tid);
     static void* taskThread_launch(void* context);
     void taskThread(int tid);
+#ifdef USE_ARGOS
+    void startRadios();
+#endif
 
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     Config* config_;
-#ifdef SIM
+#ifdef USE_ARGOS
+    ClientRadioConfig* radioconfig_;
+#else
     struct sockaddr_in servaddr_[10]; /* server address */
     struct sockaddr_in servaddr_tx_[10]; /* server address for tx*/
     struct sockaddr_in cliaddr_[10]; /* client address */
     int* rx_socket_;
     int* tx_socket_;
-#else
-
-    ClientRadioConfig* radioconfig_;
 #endif
 
     Table<char>* buffer_;
