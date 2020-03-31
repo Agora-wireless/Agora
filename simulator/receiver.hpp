@@ -74,9 +74,6 @@ class Receiver {
     //     struct ReceiverContext {
     //         Receiver* ptr;
     //         int tid;
-    // #ifdef USE_ARGOS
-    //         int radios;
-    // #endif
     //     };
 
 public:

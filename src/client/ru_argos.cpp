@@ -380,9 +380,12 @@ void RU::taskThread(int tid)
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
                     int tx_offset = tx_frame_offset * frame_samp_size
                         + tx_packet_length * (tx_ant_offset);
+                    char* cur_buffer_ = (tx_buffer_ + tx_offset
+                        + tx_packet_length);
+                    struct Packet* pkt = (struct Packet*)cur_buffer_;
+                    char* tx_cur_buffer_ = (char*)pkt->data;
                     for (size_t ch = 0; ch < config_->nChannels; ++ch)
-                        txbuf[ch] = (void*)(tx_buffer_ + tx_offset
-                            + ch * tx_packet_length);
+                        txbuf[ch] = (void*)tx_cur_buffer_;
 #endif
                     long long frameTime = ((long long)tx_frame_id << 32)
                         | ((long long)tx_symbol << 16);
