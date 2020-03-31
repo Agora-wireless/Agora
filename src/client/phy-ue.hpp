@@ -37,7 +37,7 @@ public:
     static const int RX_THREAD_NUM = 1;
     static const int TASK_THREAD_NUM = 8;
 #else
-    static const int RX_THREAD_NUM = 2; // Set this RADIO_NUM
+    static const int RX_THREAD_NUM = 2;
     static const int TASK_THREAD_NUM = 12;
 #endif
     static const int TX_THREAD_NUM = 1;
@@ -190,7 +190,9 @@ private:
     size_t hdr_size;
     size_t nCPUs;
     size_t core_offset;
+    size_t worker_thread_num;
     size_t rx_thread_num;
+    size_t tx_thread_num;
     size_t packet_length;
     size_t tx_packet_length;
     FILE *fp, *fd;
