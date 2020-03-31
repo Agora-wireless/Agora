@@ -43,7 +43,7 @@ DoFFT::~DoFFT()
     fft_buffer_.FFT_outputs.free();
 }
 
-void DoFFT::launch(int offset)
+Event_data DoFFT::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -304,8 +304,8 @@ void DoFFT::launch(int offset)
     fft_finish_event.data
         = frame_id % TASK_BUFFER_FRAME_NUM * subframe_num_perframe
         + subframe_id;
-
-    consumer_.handle(fft_finish_event);
+    // consumer_.handle(fft_finish_event);
+    return fft_finish_event;
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
@@ -325,7 +325,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
-void DoIFFT::launch(int offset)
+Event_data DoIFFT::launch(int offset)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
@@ -431,5 +431,6 @@ void DoIFFT::launch(int offset)
 
     /* Inform main thread */
     Event_data ifft_finish_event(EventType::kIFFT, offset);
-    consumer_.handle(ifft_finish_event);
+    // consumer_.handle(ifft_finish_event);
+    return ifft_finish_event;
 }
