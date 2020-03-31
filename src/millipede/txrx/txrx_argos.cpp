@@ -259,13 +259,14 @@ int PacketTXRX::dequeue_send_Argos(int tid)
     else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
         txbuf[ch] = config_->pilot_ci16.data();
     else
-        txbuf[ch] = (void*)config_->dl_IQ_symbol[offset / BS_ANT_NUM
-            % data_subframe_num_perframe];
+        txbuf[ch]
+            = (void*)config_
+                  ->dl_IQ_symbol[config_->getDlSFIndex(frame_id, symbol_id)
+                      - DL_PILOT_SYMS];
 #else
     txbuf[ch] = tx_cur_buffer_ptr + ch * packet_length;
 #endif
-    int last = config_->isUE ? config_->ULSymbols[0].back()
-                             : config_->DLSymbols[0].back();
+    int last = config_->DLSymbols[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
