@@ -83,14 +83,12 @@ public:
     //     };
 
 public:
-    PacketTXRX(Config* cfg, int RX_THREAD_NUM = 1, int TX_THREAD_NUM = 1,
-        int in_core_offset = 1);
+    PacketTXRX(Config* cfg, int COMM_THREAD_NUM = 1, int in_core_offset = 1);
     /**
-     * RX_THREAD_NUM: socket thread number
+     * COMM_THREAD_NUM: socket thread number
      * in_queue: message queue to communicate with main thread
      */
-    PacketTXRX(Config* cfg, int RX_THREAD_NUM, int TX_THREAD_NUM,
-        int in_core_offset,
+    PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks,
@@ -110,19 +108,17 @@ public:
      * full) in_buffer_frame_num: number of packets the ring buffer could hold
      * in_buffer_length: size of ring buffer
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
-     * RX_THREAD_NUM - 1}
+     * COMM_THREAD_NUM - 1}
      */
-    std::vector<pthread_t> startRecv(Table<char>& in_buffer,
-        Table<int>& in_buffer_status, int in_buffer_frame_num,
-        long long in_buffer_length, Table<double>& in_frame_start);
-    std::vector<pthread_t> startTX(char* in_buffer, int* in_buffer_status,
-        int in_buffer_frame_num, int in_buffer_length);
+    bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+        int in_buffer_frame_num, long long in_buffer_length,
+        Table<double>& in_frame_start, char* in_tx_buffer,
+        int* in_tx_buffer_status, int in_tx_buffer_frame_num,
+        int in_tx_buffer_length);
     /**
      * receive thread
      */
-    void* loopRecv(int tid);
     void* loopTXRX(int tid);
-    void* loopSend(int tid);
 #if USE_IPV4
     typedef struct sockaddr_in sockaddr_t;
 #else
@@ -134,8 +130,7 @@ public:
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
-    void* loopRecv_Argos(int tid);
-    void* loopSend_Argos(int tid);
+    void* loopTXRX_Argos(int tid);
     int dequeue_send_Argos(int tid);
     struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
@@ -170,8 +165,7 @@ private:
     int tx_buffer_frame_num_;
     // float *tx_data_buffer_;
 
-    int rx_thread_num_;
-    int tx_thread_num_;
+    int comm_thread_num_;
 
     Table<double>* frame_start_;
     // pointer of message_queue_
