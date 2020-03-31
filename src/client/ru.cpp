@@ -224,9 +224,8 @@ void RU::sendThread(int tid)
                 Packet(frame_id, config_->pilotSymbols[0][ant_id], 0, ant_id);
             // ru_->send((void *)ul_pilot_aligned, cfg->getTxPackageLength(),
             // frame_id, cfg->pilotSymbols[0][p_id], p_id);
-            if (sendto(tx_socket_[tid], (char*)pilot_buffer_,
-                    packet_length, 0, (struct sockaddr*)&cliaddr_[tid],
-                    sizeof(cliaddr_[tid]))
+            if (sendto(tx_socket_[tid], (char*)pilot_buffer_, packet_length, 0,
+                    (struct sockaddr*)&cliaddr_[tid], sizeof(cliaddr_[tid]))
                 < 0) {
                 perror("loopSend: socket sendto failed");
                 exit(0);
@@ -260,7 +259,6 @@ void RU::sendThread(int tid)
             exit(0);
         }
     }
-
 }
 
 /*****  Receive threads   *****/

@@ -1,6 +1,6 @@
 
-#include "ru.hpp"
 #include "config.hpp"
+#include "ru.hpp"
 //#include "radio_lib.hpp"
 
 RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
@@ -221,7 +221,7 @@ void RU::sendThread(int tid)
 
         Event_data packet_message(EventType::kPacketTX, offset);
         // packet_message.more_data = frame_id;
-    
+
         if (config_->running
             && !message_queue_->enqueue(local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");
@@ -272,8 +272,7 @@ void RU::taskThread(int tid)
     // moodycamel::ProducerToken *local_ctok = (task_ptok[tid]);
 
     const std::vector<size_t>& txSymbols = config_->ULSymbols[0];
-    int tx_packet_length
-        = config_->packet_length - offsetof(Packet, data);
+    int tx_packet_length = config_->packet_length - offsetof(Packet, data);
     int frame_samp_size
         = tx_packet_length * config_->getNumAntennas() * txSymbols.size();
 
@@ -283,7 +282,8 @@ void RU::taskThread(int tid)
     int num_radios = config_->nRadios;
     int radio_start = tid * num_radios / thread_num_;
     int radio_end = (tid + 1) * num_radios / thread_num_;
-    printf("receiver thread %d has radios %d to %d (%d)\n", tid, radio_start, radio_end - 1, radio_end - radio_start);
+    printf("receiver thread %d has radios %d to %d (%d)\n", tid, radio_start,
+        radio_end - 1, radio_end - radio_start);
     ClientRadioConfig* radio = radioconfig_;
     int packet_num = 0;
     long long frameTime;
@@ -300,11 +300,10 @@ void RU::taskThread(int tid)
             = ((tv2.tv_sec - tv.tv_sec) * 1e9 + (tv2.tv_nsec - tv.tv_nsec))
             / 1e9;
         if (diff > 2) {
-            for (int it = radio_start; it < radio_end;
-                 it++)
-            {
+            for (int it = radio_start; it < radio_end; it++) {
                 int total_trigs = radio->triggers(it);
-                std::cout << "radio: " << it << ", new triggers: " << total_trigs - all_trigs[it - radio_start]
+                std::cout << "radio: " << it << ", new triggers: "
+                          << total_trigs - all_trigs[it - radio_start]
                           << ", total: " << total_trigs << std::endl;
                 all_trigs[it - radio_start] = total_trigs;
             }
@@ -321,9 +320,7 @@ void RU::taskThread(int tid)
             break;
         }
         // receive data
-        for (int it = radio_start; it < radio_end;
-             it++)
-        {
+        for (int it = radio_start; it < radio_end; it++) {
             // this is probably a really bad implementation, and needs to be
             // revamped
             struct Packet* pkt[config_->nChannels];
@@ -348,7 +345,7 @@ void RU::taskThread(int tid)
             for (size_t ch = 0; ch < config_->nChannels; ++ch) {
                 new (pkt[ch])
                     Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
-                //buffer_status[cursor + ch]
+                // buffer_status[cursor + ch]
                 //    = 1; // has data, after it is read it should be set to 0
 
                 // Push EVENT_RX_ENB event into the queue. data records the
@@ -372,11 +369,13 @@ void RU::taskThread(int tid)
                      tx_symbol_id++) {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
                     size_t tx_symbol = txSymbols[tx_symbol_id];
-                    int tx_ant_offset = tx_symbol_id * config_->getNumAntennas() + ant_id;
+                    int tx_ant_offset
+                        = tx_symbol_id * config_->getNumAntennas() + ant_id;
                     void* txbuf[2];
 #if DEBUG_UPLINK
                     for (size_t ch = 0; ch < config_->nChannels; ++ch)
-                        txbuf[ch] = (void *)config_->ul_IQ_symbol[tx_ant_offset + ch];
+                        txbuf[ch]
+                            = (void*)config_->ul_IQ_symbol[tx_ant_offset + ch];
 #else
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
                     int tx_offset = tx_frame_offset * frame_samp_size
@@ -385,10 +384,11 @@ void RU::taskThread(int tid)
                         txbuf[ch] = (void*)(tx_buffer_ + tx_offset
                             + ch * tx_packet_length);
 #endif
-                    long long frameTime
-                        = ((long long)tx_frame_id << 32) | ((long long)tx_symbol << 16);
-                    int flags = (tx_symbol == txSymbols.back()) ? 
-                        2: // HAS_TIME & END_BURST
+                    long long frameTime = ((long long)tx_frame_id << 32)
+                        | ((long long)tx_symbol << 16);
+                    int flags = (tx_symbol == txSymbols.back())
+                        ? 2
+                        : // HAS_TIME & END_BURST
                         1; // HAS_TIME
                     radio->radioTx(it, txbuf, flags, frameTime);
                 }
