@@ -135,52 +135,39 @@ void Millipede::start()
     double demul_begin = get_time();
     double tx_begin = get_time();
 
-    int last_dequeue = 0;
-    int ret = 0;
-
+    bool is_turn_to_dequeue_from_io = true;
     const size_t max_events_needed
         = std::max(kDequeueBulkSizeWorker * cfg->socket_thread_num,
             kDequeueBulkSizeTXRX * cfg->worker_thread_num);
     Event_data events_list[max_events_needed];
 
-    int miss_count = 0;
-    int total_count = 0;
-
     while (config_->running && !SignalHandler::gotExitSignal()) {
-        /* Get a bulk of events */
-        if (last_dequeue == 0) {
-            ret = 0;
-            for (size_t i = 0; i < config_->socket_thread_num; i++)
-                ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(rx_ptoks_ptr[i]), events_list + ret,
+        /* Get a batch of events */
+        int num_events = 0;
+        if (is_turn_to_dequeue_from_io) {
+            for (size_t i = 0; i < config_->socket_thread_num; i++) {
+                num_events += message_queue_.try_dequeue_bulk_from_producer(
+                    *(rx_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeTXRX);
-            last_dequeue = 1;
+            }
         } else {
-            ret = 0;
-            for (size_t i = 0; i < config_->worker_thread_num; i++)
-                ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(worker_ptoks_ptr[i]), events_list + ret,
+            for (size_t i = 0; i < config_->worker_thread_num; i++) {
+                // TODOs: Should it be complete_task_queue_?
+                num_events += message_queue_.try_dequeue_bulk_from_producer(
+                    *(worker_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeWorker);
+            }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
-            last_dequeue = 0;
         }
-        total_count++;
-        if (total_count == 1e9) {
-            // printf("message dequeue miss rate %f\n", (float)miss_count /
-            // total_count);
-            total_count = 0;
-            miss_count = 0;
-        }
-        if (ret == 0) {
-            miss_count++;
-            continue;
-        }
+        is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
         /* Handle each event */
         int frame_count = 0;
-        for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
+        for (int ev_i = 0; ev_i < num_events; ev_i++) {
+            Event_data& event = events_list[ev_i];
+
+            // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
                 int offset = event.data;
@@ -301,6 +288,7 @@ void Millipede::start()
 
                         demul_stats_.update_frame_count();
                     }
+
                     demul_count++;
                     if (demul_count == demul_stats_.max_symbol_count * 9000) {
                         demul_count = 0;
@@ -484,6 +472,7 @@ void Millipede::start()
                             goto finish;
                         tx_stats_.update_frame_count();
                     }
+
                     tx_count++;
                     if (tx_count == tx_stats_.max_symbol_count * 9000) {
                         tx_count = 0;
@@ -540,7 +529,6 @@ void Millipede::start()
 finish:
 
     printf("Millipede: printing stats\n");
-    printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id);
     stats_manager_->print_summary(last_frame_id);

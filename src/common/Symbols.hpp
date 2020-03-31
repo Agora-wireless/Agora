@@ -28,8 +28,13 @@
 #define NUM_CODE_BLOCK 36
 #define NUM_BITS 4
 #define MAX_CODED_SC 1152
+
+// Number of frames received that we allocate space for in worker threads
 #define TASK_BUFFER_FRAME_NUM 40
+
+// Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
+
 #define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1

@@ -40,6 +40,7 @@ flags = [
     '-x',
     'c++',
     '-I' + str(home_dir) + '/Millipede/src/common',
+    '-I' + str(home_dir) + '/Millipede/src/millipede/txrx',
     '-Wall -Wsign-compare',
     '-std=c++11',
 ]
