@@ -15,6 +15,8 @@
 #define GENERATE_PILOT
 #endif
 
+#define SEPARATE_TX_RX 1
+
 #define MOD_ORDER 4
 
 #define STRINGIFY(x) #x

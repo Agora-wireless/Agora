@@ -239,6 +239,28 @@ void* PacketTXRX::loopRecv_Argos(int tid)
                    "%d, offset %d\n",
                 tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, rx_offset);
 #endif
+#if DEBUG_DOWNLINK && !SEPARATE_TX_RX
+            if (rx_symbol_id > 0)
+                continue;
+            for (size_t sym_id = 0; sym_id < txSymsPerFrame; sym_id++) {
+                symbol_id = txSymbols[sym_id];
+                int tx_frame_id = frame_id + TX_FRAME_DELTA;
+                void* txbuf[2];
+                long long frameTime
+                    = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+                int flags = 1; // HAS_TIME
+                if (symbol_id == (int)txSymbols.back())
+                    flags = 2; // HAS_TIME & END_BURST, fixme
+                if (ant_id != (int)config_->ref_ant)
+                    txbuf[0] = zeros.data();
+                else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+                    txbuf[0] = config_->pilot_ci16.data();
+                else
+                    txbuf[0] = (void*)config_->dl_IQ_symbol[sym_id];
+                radioconfig_->radioTx(
+                    ant_id / nChannels, txbuf, flags, frameTime);
+            }
+#endif
         }
     }
     return 0;
@@ -280,10 +302,12 @@ int PacketTXRX::dequeue_send_Argos(int tid)
     //{
     UNUSED void* txbuf[2];
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
+#if SEPARATE_TX_RX
     int last = config_->isUE ? config_->ULSymbols[0].back()
                              : config_->DLSymbols[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
+#endif
     int nChannels = config_->nChannels;
     int ch = ant_id % nChannels;
 #if DEBUG_DOWNLINK
@@ -306,7 +330,9 @@ int PacketTXRX::dequeue_send_Argos(int tid)
 #endif
 
     // clock_gettime(CLOCK_MONOTONIC, &tv);
+#if SEPARATE_TX_RX
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
+#endif
     // clock_gettime(CLOCK_MONOTONIC, &tv2);
 
     Event_data tx_message(EventType::kPacketTX, offset);
