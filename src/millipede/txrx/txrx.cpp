@@ -135,7 +135,7 @@ void* PacketTXRX::loopTXRX(int tid)
 
     while (true) {
         if (!do_tx) {
-            struct Packet* pkt = recv_enqueue(tid, rx_offset);
+            struct Packet* pkt = recv_enqueue(tid, socket_[tid], rx_offset);
             frame_id = pkt->frame_id;
 
 #if MEASURE_TIME
@@ -193,7 +193,7 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(int tid, int rx_offset)
+struct Packet* PacketTXRX::recv_enqueue(int tid, int comm_id, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
