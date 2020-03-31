@@ -154,7 +154,7 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(int tid, int comm_id, int rx_offset)
+struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
@@ -179,13 +179,13 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int comm_id, int rx_offset)
     // revamped
     long long frameTime;
     if (!config_->running
-        || radioconfig_->radioRx(comm_id, samp, frameTime) <= 0) {
+        || radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
         return NULL;
     }
 
     int frame_id = (int)(frameTime >> 32);
     int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
-    int ant_id = comm_id * nChannels;
+    int ant_id = radio_id * nChannels;
 
     for (int ch = 0; ch < nChannels; ++ch) {
         new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
