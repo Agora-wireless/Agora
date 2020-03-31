@@ -195,8 +195,7 @@ private:
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
-    // XXX: Could use an array of std::queue instead of delay_fft_queue?
-
+    // TODO: Could we use an array of std::queue instead of delay_fft_queue?
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
     Table<int> delay_fft_queue;

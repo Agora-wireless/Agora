@@ -22,8 +22,7 @@ struct complex_float {
 #endif
 
 /**
- * An event is a message sent between the master thread, and worker or TX/RX
- * threads
+ * Millipede uses these event messages for communication between threads
  *
  * @data is used for events with only a single offset
  *
@@ -32,7 +31,7 @@ struct complex_float {
  *     offsets: the values of offsets
  */
 struct Event_data {
-    // XXX: @data can be removed and replaced with num_offsets and offsets
+    // TODO: @data can be removed and replaced with num_offsets and offsets
     EventType event_type;
     int data;
     int num_offsets;
@@ -55,8 +54,8 @@ struct Packet {
     uint32_t cell_id;
     uint32_t ant_id;
     uint32_t fill[12]; // Padding for 64-byte alignment needed for SIMD
-    short data[]; // Elements sent by antennae are two bytes (I/Q)
-    Packet(int f, int s, int c, int a) // XXX: Should be unsigned integer
+    short data[]; // Elements sent by antennae are two bytes (I/Q samples)
+    Packet(int f, int s, int c, int a) // TODO: Should be unsigned integers
         : frame_id(f)
         , symbol_id(s)
         , cell_id(c)
