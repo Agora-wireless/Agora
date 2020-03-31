@@ -977,16 +977,18 @@ void Phy_UE::initialize_vars_from_cfg(void)
     nUEs = config_->UE_NUM;
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = config_->socket_thread_num;
-        //nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM
-        //? RX_THREAD_NUM
-        //: nUEs;
+    // nCPUs >= 2 * RX_THREAD_NUM and nUEs >= RX_THREAD_NUM
+    //? RX_THREAD_NUM
+    //: nUEs;
     tx_thread_num = SEPARATE_TX_RX_UE ? config_->socket_thread_num : 0;
     worker_thread_num = config_->worker_thread_num;
     core_offset = config_->core_offset;
 #ifdef ENABLE_CPU_ATTACH
-    size_t max_core = 1 + rx_thread_num + tx_thread_num + worker_thread_num + core_offset;
+    size_t max_core
+        = 1 + rx_thread_num + tx_thread_num + worker_thread_num + core_offset;
     if (max_core >= nCPUs) {
-        printf("Cannot allocate cores: max_core %zu, available cores %zu\n", max_core, nCPUs);
+        printf("Cannot allocate cores: max_core %zu, available cores %zu\n",
+            max_core, nCPUs);
         exit(1);
     }
 #endif
