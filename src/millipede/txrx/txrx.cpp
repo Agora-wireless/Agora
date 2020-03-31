@@ -86,6 +86,8 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
+    double* rx_frame_start = (*frame_start_)[tid];
+    int rx_offset = 0;
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int pilot_subframe_num_perframe = config_->pilot_symbol_num_perframe;
     int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
@@ -104,8 +106,6 @@ void* PacketTXRX::loopTXRX(int tid)
 
     // RX  pointers
     int rx_buffer_frame_num = buffer_frame_num_;
-    double* rx_frame_start = (*frame_start_)[tid];
-    int rx_offset = 0;
     int frame_id;
 
     // TX pointers
