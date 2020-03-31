@@ -8,7 +8,6 @@
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
-    socket_ = new int[COMM_THREAD_NUM];
     config_ = cfg;
     comm_thread_num_ = COMM_THREAD_NUM;
 
@@ -17,6 +16,13 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 
     /* initialize random seed: */
     srand(time(NULL));
+
+    socket_ = new int[COMM_THREAD_NUM];
+#if USE_IPV4
+    servaddr_ = new struct sockaddr_in[COMM_THREAD_NUM];
+#else
+    servaddr_ = new struct sockaddr_in6[COMM_THREAD_NUM];
+#endif
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
@@ -32,7 +38,11 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
     tx_ptoks_ = in_tx_ptoks;
 }
 
-PacketTXRX::~PacketTXRX() { delete[] socket_; }
+PacketTXRX::~PacketTXRX()
+{
+    delete[] socket_;
+    delete[] servaddr_;
+}
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
@@ -82,17 +92,14 @@ void* PacketTXRX::loopTXRX(int tid)
     int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     int local_port_id = config_->bs_port + tid;
-    int remote_port_id = config_->ue_rx_port + tid;
 #if USE_IPV4
-    int socket_local = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-    struct sockaddr_in remote_addr;
+    socket_[tid] = setup_socket_ipv4(local_port_id, true, sock_buf_size);
     setup_sockaddr_remote_ipv4(
-        &remote_addr, remote_port_id, config_->tx_addr.c_str());
+        &servaddr_[tid], config_->ue_rx_port + tid, config_->tx_addr.c_str());
 #else
-    int socket_local = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-    struct sockaddr_in6 remote_addr;
+    socket_[tid] = setup_socket_ipv6(local_port_id, true, sock_buf_size);
     setup_sockaddr_remote_ipv6(
-        &remote_addr, remote_port_id, config_->tx_addr.c_str());
+        &servaddr_[tid], config_->ue_rx_port + tid, config_->tx_addr.c_str());
 #endif
 
     // RX  pointers
@@ -128,7 +135,7 @@ void* PacketTXRX::loopTXRX(int tid)
 
     while (true) {
         if (!do_tx) {
-            struct Packet* pkt = recv_enqueue(tid, socket_local, rx_offset);
+            struct Packet* pkt = recv_enqueue(tid, rx_offset);
             frame_id = pkt->frame_id;
 
 #if MEASURE_TIME
@@ -160,7 +167,7 @@ void* PacketTXRX::loopTXRX(int tid)
                 // last_finished_frame_id++;
             }
         } else {
-            int offset = dequeue_send(tid, socket_local, &remote_addr);
+            int offset = dequeue_send(tid);
             if (offset == -1)
                 continue;
             int frame_id_in_buffer = offset / BS_ANT_NUM
@@ -186,8 +193,7 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(
-    int tid, int socket_local, int rx_offset)
+struct Packet* PacketTXRX::recv_enqueue(int tid, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
@@ -201,7 +207,7 @@ struct Packet* PacketTXRX::recv_enqueue(
         exit(0);
     }
     struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
-    int recvlen = recv(socket_local, (char*)pkt, packet_length, 0);
+    int recvlen = recv(socket_[tid], (char*)pkt, packet_length, 0);
     if (recvlen < 0) {
         perror("recv failed");
         exit(0);
@@ -224,7 +230,7 @@ struct Packet* PacketTXRX::recv_enqueue(
     return pkt;
 }
 
-int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
+int PacketTXRX::dequeue_send(int tid)
 {
     Event_data task_event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
@@ -259,8 +265,8 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     // send data (one OFDM symbol)
-    if (sendto(socket_local, (char*)cur_buffer_ptr, packet_length, 0,
-            (struct sockaddr*)remote_addr, sizeof(*remote_addr))
+    if (sendto(socket_[tid], (char*)cur_buffer_ptr, packet_length, 0,
+            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]))
         < 0) {
         perror("socket sendto failed");
         exit(0);
