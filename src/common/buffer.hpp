@@ -34,7 +34,31 @@ union rx_tag_t {
         , offset(offset)
     {
     }
+
     rx_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+
+// Event data tag for FFT task requests
+using fft_req_tag_t = rx_tag_t;
+
+// Event data tag for FFT responses responses
+union fft_resp_tag_t {
+    struct {
+        uint32_t frame_id : 16;
+        uint32_t subframe_id : 16;
+    };
+    int _tag;
+
+    fft_resp_tag_t(uint32_t frame_id, uint32_t subframe_id)
+        : frame_id(frame_id)
+        , subframe_id(subframe_id)
+    {
+    }
+
+    fft_resp_tag_t(int _tag)
         : _tag(_tag)
     {
     }
