@@ -6,6 +6,23 @@
 #ifndef OFFSET_H
 #define OFFSET_H
 
+#include <stdint.h>
+#include <stdlib.h>
+
+// TODO: An offset structure that might be used instead of manually-coded bit
+// math
+struct offset_t {
+    uint32_t offset : 28;
+    uint32_t thread_id : 4;
+
+    offset_t(size_t offset, size_t thread_id)
+        : offset(offset)
+        , thread_id(thread_id)
+    {
+    }
+};
+static_assert(sizeof(offset_t) == sizeof(uint32_t), "");
+
 /* v1: 16 bits, v2: 16bits */
 inline int generateOffset2d(int v1, int v2)
 {
