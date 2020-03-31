@@ -65,8 +65,8 @@ public:
     Table<int8_t> dl_IQ_data;
     Table<int8_t> ul_IQ_data;
     Table<complex_float> ul_IQ_modul;
-    Table<complex_float> dl_IQ_modul;
     Table<std::complex<int16_t>> dl_IQ_symbol;
+    Table<std::complex<int16_t>> ul_IQ_symbol;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
@@ -158,6 +158,7 @@ public:
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
     Config(std::string);
+    void genData();
     ~Config();
 };
 #endif
