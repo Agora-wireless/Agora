@@ -10,10 +10,8 @@
 #include "Symbols.hpp"
 #include "memory_manage.h"
 
-// boost is required for aligned memory allocation (for SIMD instructions)
+/* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>
-
-// size: 8 bytes
 #ifdef USE_LDPC
 #include "common_typedef_sdk.h"
 #else
@@ -23,19 +21,28 @@ struct complex_float {
 };
 #endif
 
-// structure for event
+/**
+ * structure for event
+ * size: 64 bytes (one cache line)
+ * data is used for event with only a single offset
+ * num_offsets and offsets are used for event with multiple offsets
+ *     num_offsets: number of offsets in an event
+ *     offsets: store values of offsets
+ */
 struct Event_data {
     EventType event_type;
     int data;
-    // int more_data;
+    int num_offsets;
+    int offsets[13];
 
     Event_data(EventType event_type, int data)
         : event_type(event_type)
         , data(data)
+        , num_offsets(0)
     {
     }
 
-    Event_data() {}
+    Event_data() { num_offsets = 0; }
 };
 
 struct Packet {
