@@ -193,7 +193,7 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(int tid, int comm_id, int rx_offset)
+struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
@@ -207,7 +207,7 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int comm_id, int rx_offset)
         exit(0);
     }
     struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
-    int recvlen = recv(socket_[tid], (char*)pkt, packet_length, 0);
+    int recvlen = recv(radio_id, (char*)pkt, packet_length, 0);
     if (recvlen < 0) {
         perror("recv failed");
         exit(0);
@@ -265,7 +265,7 @@ int PacketTXRX::dequeue_send(int tid)
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     // send data (one OFDM symbol)
-    if (sendto(socket_[tid], (char*)cur_buffer_ptr, packet_length, 0,
+    if (sendto(radio_id, (char*)cur_buffer_ptr, packet_length, 0,
             (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]))
         < 0) {
         perror("socket sendto failed");
