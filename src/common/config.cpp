@@ -10,7 +10,6 @@ Config::Config(std::string jsonfile)
 
     /* antenna configurations */
     hub_file = tddConf.value("hubs", "");
-    Utils::loadDevices(hub_file, hub_ids);
     serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
@@ -211,8 +210,6 @@ Config::Config(std::string jsonfile)
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
-    // packet_length = offsetof(Packet, data) + sizeof(short) * OFDM_FRAME_LEN *
-    // 2;
 
     running = true;
     std::cout << "Config: "

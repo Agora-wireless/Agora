@@ -61,14 +61,6 @@ Phy_UE::Phy_UE(Config* config)
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
-#ifndef USE_ARGOS
-    // read pilot
-    int pilot_len = (FFT_LEN + CP_LEN);
-    // ul_pilot_aligned = new char[packet_length];
-    // memcpy((void*)&ul_pilot_aligned[prefix_len * sizeof(uint32_t) +
-    // packet_header_offset * sizeof(int)], pilot_ci16.data(), pilot_len *
-    // sizeof(uint32_t));
-#endif
 
     ////////////////////////////////////////
     //////// downlink buffers init (rx) ////
@@ -824,10 +816,9 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // for (int ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
     // ul_symbol_id++)
     //{
-#ifndef USE_ARGOS
     int frame_period_id = frame_id % config_->framePeriod;
     int symbol_id = config_->ULSymbols[frame_period_id][ul_symbol_id];
-#endif
+
     // int modulbuf_offset = (data_sc_len * numAntennas * ul_symbol_id);
     size_t txbuf_offset = frame_offset * frame_samp_size
         + (tx_packet_length * numAntennas * ul_symbol_id);
@@ -874,7 +865,6 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 
         size_t tx_offset = txbuf_offset + ant_id * tx_packet_length;
         char* cur_tx_buffer = &tx_buffer_[tx_offset];
-#ifndef USE_ARGOS
         // complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer +
         // prefix_len*sizeof(complex_float) + config_->packet_header_offset);
         struct Packet* pkt = (struct Packet*)cur_tx_buffer;
@@ -883,11 +873,6 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         pkt->cell_id = 0;
         pkt->ant_id = ant_id;
         short* tx_buffer_ptr = &pkt->data[2 * prefix_len];
-#else
-        // complex_float* tx_buffer_ptr = (complex_float*)((char*)cur_tx_buffer
-        // + config_->prefix*sizeof(complex_float));
-        short* tx_buffer_ptr = (short*)cur_tx_buffer + 2 * prefix_len;
-#endif
         // fft shift
         // for(int j = 0; j < (FFT_LEN); j++) {
         //    if (j < FFT_LEN / 2)
@@ -945,11 +930,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
     // dl_data_subframe_start = config_->dl_data_symbol_start;
     // dl_data_subframe_end = config_->dl_data_symbol_end;
     packet_length = config_->packet_length;
-#ifndef USE_ARGOS
     tx_packet_length = config_->packet_length;
-#else
-    tx_packet_length = packet_length - offsetof(Packet, data);
-#endif
 
     symbol_perframe = config_->symbol_num_perframe;
     dl_pilot_symbol_perframe = DL_PILOT_SYMS;
@@ -959,12 +940,6 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_data_symbol_perframe
         = config_->dl_data_symbol_num_perframe - dl_pilot_symbol_perframe;
     rx_symbol_perframe = dl_symbol_perframe;
-#ifndef USE_ARGOS
-    tx_symbol_perframe = ul_pilot_symbol_perframe + ul_data_symbol_perframe;
-#else
-    tx_symbol_perframe
-        = ul_data_symbol_perframe; // pilots are preloaded into radio hw buffers
-#endif
     prefix_len = config_->prefix;
     dl_prefix_len = config_->dl_prefix;
     postfix_len = config_->postfix;

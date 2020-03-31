@@ -129,7 +129,7 @@ public:
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
-#if USE_ARGOS
+#ifdef USE_ARGOS
     void* loopTXRX_Argos(int tid);
     int dequeue_send_Argos(int tid);
     struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
@@ -180,7 +180,7 @@ private:
     // PacketTXRXContext* rx_context;
 
     Config* config_;
-#if USE_ARGOS
+#ifdef USE_ARGOS
     RadioConfig* radioconfig_;
 #endif
 };
