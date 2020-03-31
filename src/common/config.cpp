@@ -74,7 +74,7 @@ Config::Config(std::string jsonfile)
     postfix = tddConf.value("postfix", 0);
     TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 0);
     CP_LEN = tddConf.value("cp_len", 0);
-    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0 + CP_LEN);
+    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     OFDM_DATA_START
