@@ -109,15 +109,6 @@ void* PacketTXRX::loopTXRX_Argos(int tid)
     double* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
 
-    // downlink socket buffer
-    // char *tx_buffer_ptr = tx_buffer_;
-    // char *tx_cur_buffer_ptr;
-#if DEBUG_DOWNLINK
-    size_t txSymsPerFrame = config_->dl_data_symbol_num_perframe;
-    std::vector<size_t> txSymbols = config_->DLSymbols[0];
-    std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
-#endif
-
     printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
 
     // to handle second channel at each radio
@@ -227,29 +218,16 @@ int PacketTXRX::dequeue_send_Argos(int tid)
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    int packet_length = config_->packet_length;
+
     int offset = task_event.data;
     int ant_id = offset % BS_ANT_NUM;
     int symbol_id = offset / BS_ANT_NUM % data_subframe_num_perframe;
-    symbol_id += config_->UE_NUM;
     int frame_id = offset / (BS_ANT_NUM * data_subframe_num_perframe);
 
-#if DEBUG_BS_SENDER
-    printf("In TX thread %d: Transmitted frame %d, subframe %d, "
-           "ant %d, offset: %d, msg_queue_length: %zu\n",
-        tid, frame_id, symbol_id, ant_id, offset,
-        message_queue_->size_approx());
-#endif
-
-    int socket_subframe_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe * BS_ANT_NUM);
-    char* cur_buffer_ptr = tx_buffer_ + socket_subframe_offset * packet_length;
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    char* tx_cur_buffer_ptr = (char*)pkt->data;
+    symbol_id += config_->UE_ANT_NUM;
     frame_id += TX_FRAME_DELTA;
 
     void* txbuf[2];
-    long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     int nChannels = config_->nChannels;
     int ch = ant_id % nChannels;
 #if DEBUG_DOWNLINK
@@ -264,12 +242,23 @@ int PacketTXRX::dequeue_send_Argos(int tid)
                   ->dl_IQ_symbol[config_->getDlSFIndex(frame_id, symbol_id)
                       - DL_PILOT_SYMS];
 #else
-    txbuf[ch] = tx_cur_buffer_ptr + ch * packet_length;
+    int data_offset = (offset % tx_buffer_frame_num_) * config_->packet_length;
+    char* cur_buffer_ptr = tx_buffer_ + data_offset;
+    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+    txbuf[ch] = (void*)pkt->data;
 #endif
     int last = config_->DLSymbols[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
+    long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
+
+#if DEBUG_BS_SENDER
+    printf("In TX thread %d: Transmitted frame %d, subframe %d, "
+           "ant %d, offset: %d, msg_queue_length: %zu\n",
+        tid, frame_id, symbol_id, ant_id, offset,
+        message_queue_->size_approx());
+#endif
 
     Event_data tx_message(EventType::kPacketTX, offset);
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
