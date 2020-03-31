@@ -49,12 +49,8 @@ Event_data DoFFT::launch(int offset)
     double start_time = get_time();
 #endif
 
-    int socket_thread_id, cur_offset;
-    interpreteOffset2d_setbits(offset, &socket_thread_id, &cur_offset, 28);
-    offset = cur_offset;
-    // int socket_thread_id = offset / buffer_subframe_num_;
-    // offset = offset - socket_thread_id * buffer_subframe_num;
-    // offset = offset % buffer_subframe_num_;
+    int socket_thread_id = rx_tag_t(offset).tid;
+    offset = rx_tag_t(offset).offset;
     /* read info of one frame */
     int packet_length = config_->packet_length;
     char* cur_buffer_ptr

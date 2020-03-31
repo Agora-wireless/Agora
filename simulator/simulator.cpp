@@ -88,10 +88,8 @@ void Simulator::start()
             Event_data& event = events_list[bulk_count];
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int offset = event.data;
-                int socket_thread_id, buf_offset;
-                interpreteOffset2d_setbits(
-                    offset, &socket_thread_id, &buf_offset, 28);
+                int socket_thread_id = rx_tag_t(event.data).tid;
+                int buf_offset = rx_tag_t(event.data).offset;
 
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)buf_offset * packet_length;
