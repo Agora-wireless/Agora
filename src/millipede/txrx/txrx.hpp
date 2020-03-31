@@ -124,21 +124,20 @@ public:
 #else
     typedef struct sockaddr_in6 sockaddr_t;
 #endif
-    int dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr);
-    struct Packet* recv_enqueue(int tid, int socket_local, int rx_offset);
+    int dequeue_send(int tid);
+    struct Packet* recv_enqueue(int tid, int rx_offset);
 #ifdef USE_DPDK
     static void* loopRecv_DPDK(void* context);
 #endif
 #if USE_ARGOS
-    int dequeue_send_Argos(int tid);
     struct Packet* recv_enqueue_Argos(int tid, int radio_id, int rx_offset);
 #endif
 
 private:
 #if USE_IPV4
-    struct sockaddr_in servaddr_[10]; /* server address */
+    struct sockaddr_in* servaddr_; /* server address */
 #else
-    struct sockaddr_in6 servaddr_[10]; /* server address */
+    struct sockaddr_in6* servaddr_; /* server address */
 #endif
     int* socket_;
 

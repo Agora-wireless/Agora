@@ -8,7 +8,6 @@
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
-    socket_ = new int[COMM_THREAD_NUM];
     config_ = cfg;
     comm_thread_num_ = COMM_THREAD_NUM;
 
@@ -36,7 +35,6 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
 
 PacketTXRX::~PacketTXRX()
 {
-    delete[] socket_;
     radioconfig_->radioStop();
     delete radioconfig_;
 }
@@ -126,7 +124,7 @@ void* PacketTXRX::loopTXRX(int tid)
     int radio_id = radio_lo;
     while (config_->running) {
         // receive data
-        if (-1 != dequeue_send_Argos(tid))
+        if (-1 != dequeue_send(tid))
             continue;
         rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
         struct Packet* pkt = recv_enqueue_Argos(tid, radio_id, rx_offset);
@@ -212,7 +210,7 @@ struct Packet* PacketTXRX::recv_enqueue_Argos(
     return pkt[0];
 }
 
-int PacketTXRX::dequeue_send_Argos(int tid)
+int PacketTXRX::dequeue_send(int tid)
 {
     Event_data task_event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
