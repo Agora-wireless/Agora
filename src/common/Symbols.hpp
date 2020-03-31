@@ -15,6 +15,8 @@
 #define GENERATE_PILOT
 #endif
 
+#define SEPARATE_TX_RX_UE 0
+
 #define MOD_ORDER 4
 
 #define STRINGIFY(x) #x
@@ -102,6 +104,7 @@ enum class EventType : int {
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
+#define DEBUG_UPLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import json
 
 
-lib = cdll.LoadLibrary('./libue_phy.so')
+lib = cdll.LoadLibrary('./build/libue_phy.so')
 
 
 class Config(object):
