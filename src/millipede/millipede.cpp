@@ -127,7 +127,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    int cur_frame_id = 0;
+    size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
     int demul_count = 0;
@@ -152,10 +152,10 @@ void Millipede::start()
             }
         } else {
             for (size_t i = 0; i < config_->worker_thread_num; i++) {
-                // TODOs: Should it be complete_task_queue_?
-                num_events += message_queue_.try_dequeue_bulk_from_producer(
-                    *(worker_ptoks_ptr[i]), events_list + num_events,
-                    kDequeueBulkSizeWorker);
+                num_events
+                    += complete_task_queue_.try_dequeue_bulk_from_producer(
+                        *(worker_ptoks_ptr[i]), events_list + num_events,
+                        kDequeueBulkSizeWorker);
             }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
@@ -170,10 +170,9 @@ void Millipede::start()
             // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int offset = event.data;
-                int socket_thread_id, offset_in_current_buffer;
-                interpreteOffset2d_setbits(
-                    offset, &socket_thread_id, &offset_in_current_buffer, 28);
+                int offset_in_current_buffer = rx_tag_t(event.data).offset;
+                int socket_thread_id = rx_tag_t(event.data).tid;
+
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
@@ -191,7 +190,7 @@ void Millipede::start()
                     }
                 }
 
-                fft_queue_arr[frame_id].push(offset);
+                fft_queue_arr[frame_id].push(fft_req_tag_t(event.data));
             } break;
 
             case EventType::kFFT: {
@@ -314,9 +313,9 @@ void Millipede::start()
                 int num_code_blocks = decode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / ul_data_subframe_num_perframe;
+                    = total_data_subframe_id / cfg->ul_data_symbol_num_perframe;
                 int data_subframe_id
-                    = total_data_subframe_id % ul_data_subframe_num_perframe;
+                    = total_data_subframe_id % cfg->ul_data_symbol_num_perframe;
 
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
                     print_per_subframe_done(PRINT_DECODE,
@@ -343,9 +342,9 @@ void Millipede::start()
                 int num_code_blocks = encode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / data_subframe_num_perframe;
+                    = total_data_subframe_id / cfg->data_symbol_num_perframe;
                 int data_subframe_id
-                    = total_data_subframe_id % data_subframe_num_perframe;
+                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
 
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
                     consumer_precode.schedule_task_set(total_data_subframe_id);
@@ -507,7 +506,7 @@ void Millipede::start()
 
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
                         do_fft_task.offsets[j]
-                            = fft_queue_arr[cur_frame_id].front();
+                            = fft_queue_arr[cur_frame_id].front()._tag;
                         fft_queue_arr[cur_frame_id].pop();
 
                         if (!config_->bigstation_mode) {
@@ -544,11 +543,11 @@ finish:
     // exit(0);
 }
 
-void Millipede::handle_event_fft(int offset, Consumer& consumer_zf,
+void Millipede::handle_event_fft(int tag, Consumer& consumer_zf,
     Consumer& consumer_demul, Consumer& consumer_rc)
 {
-    int frame_id = offset / config_->symbol_num_perframe;
-    int subframe_id = offset % config_->symbol_num_perframe;
+    int frame_id = fft_resp_tag_t(tag).frame_id;
+    int subframe_id = fft_resp_tag_t(tag).subframe_id;
 
     if (fft_stats_.last_task(frame_id, subframe_id)) {
         if (config_->isPilot(frame_id, subframe_id)) {
@@ -1156,8 +1155,8 @@ void Millipede::initialize_uplink_buffers()
 
 #ifdef USE_LDPC
     decode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        ul_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
-        data_subframe_num_perframe, 64);
+        cfg->ul_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
+        cfg->data_symbol_num_perframe, 64);
 #endif
 }
 
@@ -1186,9 +1185,9 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
 #ifdef USE_LDPC
-    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM,
-        dl_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
-        data_subframe_num_perframe, 64);
+    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
+        cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
+        cfg->data_symbol_num_perframe, 64);
 #endif
     precode_stats_.init(config_->demul_block_num,
         cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,

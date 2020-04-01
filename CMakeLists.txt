@@ -9,15 +9,16 @@ endif()
 message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
+set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -mavx2 -march=broadwell -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -mavx2 -mavx -march=broadwell -m64")
+  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -mavx2 -mavx -march=broadwell -mkl=sequential")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   set(CMAKE_CXX_STANDARD 14)
 else()
@@ -128,22 +129,19 @@ if(${USE_LDPC})
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  # set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
-  set(SDK_DIR /home/argos/Jian/5gnr_ldpc/intel_library)
+  set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
   set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
-
-  set(LDPC_LIBS
-    ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-    ${SDK_DIR}/decoder/src/common/libutility.a
-    ${SDK_DIR}/decoder/src/lib_common/libcommon.a)
+  set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+                ${LIB_DIR}/test/phy/common/utility.a
+                ${LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   include_directories(
-    ${SDK_DIR}/decoder/src/common
-    ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr
-    ${SDK_DIR}/decoder/src/lib_common
-    src/encoder)
+    ${SDK_DIR}/test/phy/common
+    ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+    ${SDK_DIR}/source/phy/lib_common
+    ${SOURCE_DIR}/src/encoder)
 
-  set(HEADER_FILES ${SDK_DIR}/decoder/src/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
+  set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
 
   set(LDPC_SOURCES
     src/encoder/cyclic_shift.cpp
