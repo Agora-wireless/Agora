@@ -14,7 +14,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "offset.h"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
@@ -63,7 +62,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     /**

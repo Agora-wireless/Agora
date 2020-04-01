@@ -13,7 +13,6 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "mkl_dfti.h"
-#include "offset.h"
 #include "stats.hpp"
 #include <iostream>
 #include <stdio.h> /* for fprintf */
@@ -33,8 +32,9 @@ public:
 
     /**
      * Do FFT task for one OFDM symbol
-     * @param tid: task thread index, used for selecting muplans and task ptok
-     * @param offset: offset of the OFDM symbol in socket_buffer_
+     *
+     * @param tag is an event data tag of type fft_req_tag_t
+     *
      * Buffers: socket_buffer_, fft_buffer_, csi_buffer_, data_buffer_
      *     Input buffer: socket_buffer_
      *     Output buffer: csi_buffer_ if subframe is pilot
@@ -62,7 +62,10 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(int offset);
+    Event_data launch(int tag);
+
+    void simd_store_to_buf(
+        float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type);
 
 private:
     Table<char>& socket_buffer_;
@@ -109,7 +112,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;

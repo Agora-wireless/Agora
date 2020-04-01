@@ -7,15 +7,17 @@
 #define EXPORT __attribute__((visibility("default")))
 
 #define ENABLE_CPU_ATTACH
-//#define GENERATE_PILOT
 
 #ifdef USE_ARGOS
 #ifndef GENERATE_DATA
 #define GENERATE_DATA
 #endif
+#define GENERATE_PILOT
 #endif
 
-#define SEPARATE_TX_RX 1
+#define ARMA_ALLOW_FAKE_GCC
+
+#define SEPARATE_TX_RX_UE 0
 
 #define MOD_ORDER 4
 
@@ -28,8 +30,13 @@
 #define NUM_CODE_BLOCK 36
 #define NUM_BITS 4
 #define MAX_CODED_SC 1152
-#define TASK_BUFFER_FRAME_NUM 60
-#define SOCKET_BUFFER_FRAME_NUM 100
+
+// Number of frames received that we allocate space for in worker threads
+#define TASK_BUFFER_FRAME_NUM 40
+
+// Number of frames received that we allocate space for in TX/RX threads
+#define SOCKET_BUFFER_FRAME_NUM 40
+
 #define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
@@ -104,6 +111,7 @@ enum class EventType : int {
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
+#define DEBUG_UPLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4
