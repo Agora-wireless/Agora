@@ -76,10 +76,10 @@ private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 #if USE_IPV4
-    struct sockaddr_in servaddr_[10]; /* server address */
+    struct sockaddr_in* servaddr_; /* server address */
     struct sockaddr_in cliaddr_; /* server address */
 #else
-    struct sockaddr_in6 servaddr_[10]; /* server address */
+    struct sockaddr_in6* servaddr_; /* server address */
     struct sockaddr_in6 cliaddr_; /* server address */
 #endif
     int* socket_;

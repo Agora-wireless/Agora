@@ -28,7 +28,7 @@ Sender::Sender(
     , frame_id(0)
     , subframe_id(0)
     , thread_num(in_thread_num)
-    , socket_num(in_thread_num)
+    , socket_num(cfg->nRadios)
     , core_offset(in_core_offset)
     , delay(in_delay)
 {
@@ -54,6 +54,12 @@ Sender::Sender(
         task_ptok[i] = new moodycamel::ProducerToken(task_queue_);
 
     socket_ = new int[socket_num];
+#if USE_IPV4
+    servaddr_ = new struct sockaddr_in[socket_num];
+#else
+    servaddr_ = new struct sockaddr_in6[socket_num];
+#endif
+
     for (size_t i = 0; i < socket_num; i++) {
 #if USE_IPV4
         socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -84,6 +90,7 @@ Sender::~Sender()
     packet_count_per_subframe.free();
     free_buffer_1d(&packet_count_per_frame);
 
+    delete[] servaddr_;
     delete[] socket_;
     delete cfg;
     pthread_mutex_destroy(&lock_);
