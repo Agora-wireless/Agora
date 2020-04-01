@@ -127,7 +127,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    int cur_frame_id = 0;
+    size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
     int demul_count = 0;
@@ -170,10 +170,9 @@ void Millipede::start()
             // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int offset = event.data;
-                int socket_thread_id, offset_in_current_buffer;
-                interpreteOffset2d_setbits(
-                    offset, &socket_thread_id, &offset_in_current_buffer, 28);
+                int offset_in_current_buffer = rx_tag_t(event.data).offset;
+                int socket_thread_id = rx_tag_t(event.data).tid;
+
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
@@ -191,7 +190,7 @@ void Millipede::start()
                     }
                 }
 
-                fft_queue_arr[frame_id].push(offset);
+                fft_queue_arr[frame_id].push(fft_req_tag_t(event.data));
             } break;
 
             case EventType::kFFT: {
@@ -507,7 +506,7 @@ void Millipede::start()
 
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
                         do_fft_task.offsets[j]
-                            = fft_queue_arr[cur_frame_id].front();
+                            = fft_queue_arr[cur_frame_id].front()._tag;
                         fft_queue_arr[cur_frame_id].pop();
 
                         if (!config_->bigstation_mode) {
@@ -544,11 +543,11 @@ finish:
     // exit(0);
 }
 
-void Millipede::handle_event_fft(int offset, Consumer& consumer_zf,
+void Millipede::handle_event_fft(int tag, Consumer& consumer_zf,
     Consumer& consumer_demul, Consumer& consumer_rc)
 {
-    int frame_id = offset / config_->symbol_num_perframe;
-    int subframe_id = offset % config_->symbol_num_perframe;
+    int frame_id = fft_resp_tag_t(tag).frame_id;
+    int subframe_id = fft_resp_tag_t(tag).subframe_id;
 
     if (fft_stats_.last_task(frame_id, subframe_id)) {
         if (config_->isPilot(frame_id, subframe_id)) {
