@@ -127,7 +127,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    int cur_frame_id = 0;
+    size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
     int demul_count = 0;
