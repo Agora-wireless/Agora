@@ -152,10 +152,10 @@ void Millipede::start()
             }
         } else {
             for (size_t i = 0; i < config_->worker_thread_num; i++) {
-                // TODOs: Should it be complete_task_queue_?
-                num_events += message_queue_.try_dequeue_bulk_from_producer(
-                    *(worker_ptoks_ptr[i]), events_list + num_events,
-                    kDequeueBulkSizeWorker);
+                num_events
+                    += complete_task_queue_.try_dequeue_bulk_from_producer(
+                        *(worker_ptoks_ptr[i]), events_list + num_events,
+                        kDequeueBulkSizeWorker);
             }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
@@ -313,9 +313,9 @@ void Millipede::start()
                 int num_code_blocks = decode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / ul_data_subframe_num_perframe;
+                    = total_data_subframe_id / cfg->ul_data_symbol_num_perframe;
                 int data_subframe_id
-                    = total_data_subframe_id % ul_data_subframe_num_perframe;
+                    = total_data_subframe_id % cfg->ul_data_symbol_num_perframe;
 
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
                     print_per_subframe_done(PRINT_DECODE,
@@ -342,9 +342,9 @@ void Millipede::start()
                 int num_code_blocks = encode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / data_subframe_num_perframe;
+                    = total_data_subframe_id / cfg->data_symbol_num_perframe;
                 int data_subframe_id
-                    = total_data_subframe_id % data_subframe_num_perframe;
+                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
 
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
                     consumer_precode.schedule_task_set(total_data_subframe_id);
@@ -490,7 +490,8 @@ void Millipede::start()
                 }
             } break;
             default:
-                printf("Wrong event type in message queue!");
+                printf("Wrong event type (%d) in message queue!",
+                    event.event_type);
                 exit(0);
             } /* End of switch */
 
@@ -1155,8 +1156,8 @@ void Millipede::initialize_uplink_buffers()
 
 #ifdef USE_LDPC
     decode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        ul_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
-        data_subframe_num_perframe, 64);
+        cfg->ul_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
+        cfg->data_symbol_num_perframe, 64);
 #endif
 }
 
@@ -1185,9 +1186,9 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
 #ifdef USE_LDPC
-    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM,
-        dl_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
-        data_subframe_num_perframe, 64);
+    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
+        cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
+        cfg->data_symbol_num_perframe, 64);
 #endif
     precode_stats_.init(config_->demul_block_num,
         cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
