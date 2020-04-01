@@ -13,7 +13,6 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
-#include "offset.h"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cassert>

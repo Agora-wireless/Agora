@@ -41,22 +41,19 @@ DoFFT::~DoFFT()
     fft_buffer_.FFT_outputs.free();
 }
 
-Event_data DoFFT::launch(int offset)
+Event_data DoFFT::launch(int tag)
 {
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
 
-    int socket_thread_id, cur_offset;
-    interpreteOffset2d_setbits(offset, &socket_thread_id, &cur_offset, 28);
-    offset = cur_offset;
-    // int socket_thread_id = offset / buffer_subframe_num_;
-    // offset = offset - socket_thread_id * buffer_subframe_num;
-    // offset = offset % buffer_subframe_num_;
+    int socket_thread_id = fft_req_tag_t(tag).tid;
+    size_t buf_offset = fft_req_tag_t(tag).offset;
+
     /* read info of one frame */
     int packet_length = cfg->packet_length;
     char* cur_buffer_ptr
-        = socket_buffer_[socket_thread_id] + (long long)offset * packet_length;
+        = socket_buffer_[socket_thread_id] + buf_offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     size_t frame_id = pkt->frame_id % 10000;
     size_t subframe_id = pkt->symbol_id;
@@ -278,7 +275,7 @@ Event_data DoFFT::launch(int offset)
 #endif
 
     /* After finish, reset socket buffer status */
-    socket_buffer_status_[socket_thread_id][offset] = 0;
+    socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
@@ -292,14 +289,8 @@ Event_data DoFFT::launch(int offset)
 #endif
 
     /* Inform main thread */
-    Event_data fft_finish_event;
-    fft_finish_event.event_type = EventType::kFFT;
-    int subframe_num_perframe = cfg->symbol_num_perframe;
-    fft_finish_event.data
-        = frame_id % TASK_BUFFER_FRAME_NUM * subframe_num_perframe
-        + subframe_id;
-    // consumer_.handle(fft_finish_event);
-    return fft_finish_event;
+    return Event_data(EventType::kFFT,
+        fft_resp_tag_t(frame_id % TASK_BUFFER_FRAME_NUM, subframe_id)._tag);
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
