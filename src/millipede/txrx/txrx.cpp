@@ -262,7 +262,7 @@ int PacketTXRX::dequeue_send(int tid)
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     // send data (one OFDM symbol)
-    if (sendto(radio_id, (char*)cur_buffer_ptr, packet_length, 0,
+    if (sendto(socket_[tid], (char*)cur_buffer_ptr, packet_length, 0,
             (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]))
         < 0) {
         perror("socket sendto failed");
