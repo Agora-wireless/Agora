@@ -64,6 +64,9 @@ public:
      */
     Event_data launch(int tag);
 
+    void simd_store_to_buf(
+        float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type);
+
 private:
     Table<char>& socket_buffer_;
     Table<int>& socket_buffer_status_;

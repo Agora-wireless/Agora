@@ -6,6 +6,58 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
+/**
+ * Use SIMD to vectorize data type conversion from short to float
+ * reference:
+ * https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
+ * 0x4380'8000
+ */
+void cvtShortToFloatSIMD(short*& in_buf, float*& out_buf, size_t length)
+{
+#ifdef __AVX512F__
+    const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+    const __m512i magic_i = _mm512_castps_si512(magic);
+    for (size_t i = 0; i < length; i += 16) {
+        /* get input */
+        __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
+        /* interleave with 0x0000 */
+        __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
+        /* convert by xor-ing and subtracting magic value:
+         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
+        __m512i val_f_int
+            = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
+        __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
+        __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
+        _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
+    }
+#else
+    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+    const __m256i magic_i = _mm256_castps_si256(magic);
+    for (size_t i = 0; i < length; i += 16) {
+        /* get input */
+        __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
+
+        __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
+        /* interleave with 0x0000 */
+        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
+        /* convert by xor-ing and subtracting magic value:
+         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
+        __m256i val_f_int
+            = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
+        __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
+        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
+        _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
+
+        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
+        __m256i val_f_int1
+            = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
+        __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
+        __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
+        _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
+    }
+#endif
+}
+
 DoFFT::DoFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     Consumer& in_consumer, Table<char>& in_socket_buffer,
@@ -59,9 +111,21 @@ Event_data DoFFT::launch(int tag)
     size_t subframe_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
-    /* transfer ushort to float */
     short* cur_buffer_ptr_ushort = &pkt->data[2 * cfg->OFDM_PREFIX_LEN];
-    float* cur_fft_buffer_float = (float*)(fft_buffer_.FFT_inputs[0]);
+    float* fft_buf_ptr = (float*)(fft_buffer_.FFT_inputs[0]);
+
+    /* transfer ushort to float */
+    cvtShortToFloatSIMD(
+        cur_buffer_ptr_ushort, fft_buf_ptr, cfg->OFDM_CA_NUM * 2);
+
+    // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
+    //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+    // printf("FFT input\n");
+    // for (int i = 0; i < cfg->OFDM_CA_NUM; i++) {
+    //     printf("%.4f+%.4fi ", *(fft_buf_ptr + i * 2),
+    //         *(fft_buf_ptr + i * 2 + 1));
+    // }
+    // printf("\n");
 
     auto cur_symbol_type = SymbolType::kUnknown;
     if (cfg->isUplink(frame_id, subframe_id))
@@ -72,47 +136,6 @@ Event_data DoFFT::launch(int tag)
         cur_symbol_type = SymbolType::kCalDL;
     else if (cfg->isCalUlPilot(frame_id, subframe_id))
         cur_symbol_type = SymbolType::kCalUL;
-
-    /* Use SIMD
-     * reference:
-     * https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
-     * 0x4380'8000 */
-    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m256i magic_i = _mm256_castps_si256(magic);
-    for (size_t i = 0; i < cfg->OFDM_CA_NUM * 2; i += 16) {
-        /* get input */
-        __m128i val
-            = _mm_load_si128((__m128i*)(cur_buffer_ptr_ushort + i)); // port 2,3
-
-        __m128i val1
-            = _mm_load_si128((__m128i*)(cur_buffer_ptr_ushort + i + 8));
-        /* interleave with 0x0000 */
-        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m256i val_f_int
-            = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
-        __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
-        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
-        _mm256_store_ps(cur_fft_buffer_float + i, converted); // port 2,3,4,7
-
-        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
-        __m256i val_f_int1
-            = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
-        __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
-        __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
-        _mm256_store_ps(
-            cur_fft_buffer_float + i + 8, converted1); // port 2,3,4,7
-    }
-
-    // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-    //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-    // printf("FFT input\n");
-    // for (int i = 0; i < OFDM_CA_NUM; i++) {
-    //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2),
-    //         *(cur_fft_buffer_float + i * 2 + 1));
-    // }
-    // printf("\n");
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time1 = get_time();
@@ -140,9 +163,9 @@ Event_data DoFFT::launch(int tag)
     } else if (cur_symbol_type == SymbolType::kPilot) {
         (*CSI_task_duration)[tid * 8][2] += duration2;
     }
-
     // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
     //    RC_task_duration[tid * 8][2] += duration2;
+    double start_time_part3 = get_time();
 #endif
 
 #if DEBUG_PRINT_IN_TASK
@@ -150,116 +173,31 @@ Event_data DoFFT::launch(int tag)
         frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 #endif
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time_part3 = get_time();
-#endif
-
-    size_t BS_ANT_NUM = cfg->BS_ANT_NUM;
-    int transpose_block_size = cfg->transpose_block_size;
-
     if (cur_symbol_type == SymbolType::kPilot) {
         int pilot_id = cfg->getPilotSFIndex(frame_id, subframe_id);
         int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * cfg->pilot_symbol_num_perframe
             + pilot_id;
-        int sc_idx = cfg->OFDM_DATA_START;
-        float* cur_fft_buffer_float_output
-            = (float*)(fft_buffer_.FFT_inputs[0]);
         float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
-
-        int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-        int block_num = OFDM_DATA_NUM / transpose_block_size;
-        float* pilots_ = cfg->pilots_;
-        _mm_prefetch((char*)pilots_, _MM_HINT_T0);
-        for (int block_idx = 0; block_idx < block_num; block_idx++) {
-            for (int sc_inblock_idx = 0; sc_inblock_idx < transpose_block_size;
-                 sc_inblock_idx += 8) {
-                /* load 8 floats (4 bytes) / 4 complex floats */
-                float* src_ptr_cur = cur_fft_buffer_float_output + sc_idx * 2;
-                // _mm_prefetch((char*)(src_ptr_cur + 16), _MM_HINT_T0);
-                // _mm_prefetch((char*)(pilots_ + sc_idx * 2 + 16),
-                // _MM_HINT_T0);
-                __m256 pilot_rx = _mm256_load_ps(src_ptr_cur);
-                __m256 pilot_tx = _mm256_set_ps(pilots_[sc_idx + 3],
-                    pilots_[sc_idx + 3], pilots_[sc_idx + 2],
-                    pilots_[sc_idx + 2], pilots_[sc_idx + 1],
-                    pilots_[sc_idx + 1], pilots_[sc_idx], pilots_[sc_idx]);
-                __m256 csi_est = _mm256_mul_ps(pilot_rx, pilot_tx);
-
-                __m256 pilot_rx1 = _mm256_load_ps(src_ptr_cur + 8);
-                __m256 pilot_tx1
-                    = _mm256_set_ps(pilots_[sc_idx + 7], pilots_[sc_idx + 7],
-                        pilots_[sc_idx + 6], pilots_[sc_idx + 6],
-                        pilots_[sc_idx + 5], pilots_[sc_idx + 5],
-                        pilots_[sc_idx + 4], pilots_[sc_idx + 4]);
-                __m256 csi_est1 = _mm256_mul_ps(pilot_rx1, pilot_tx1);
-
-                float* tar_ptr_cur = csi_buffer_ptr
-                    + (block_idx * BS_ANT_NUM + ant_id) * transpose_block_size
-                        * 2
-                    + sc_inblock_idx * 2;
-                _mm256_stream_ps(tar_ptr_cur, csi_est);
-                _mm256_stream_ps(tar_ptr_cur + 8, csi_est1);
-                sc_idx += 8;
-            }
-        }
-        // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-        //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-        // printf("FFT output\n");
-        // for (int i = 0; i < OFDM_CA_NUM; i++) {
-        //     printf("%.4f+%.4fi ", *(cur_fft_buffer_float + i * 2),
-        //         *(cur_fft_buffer_float + i * 2 + 1));
-        // }
-        // printf("\n");
+        simd_store_to_buf(
+            fft_buf_ptr, csi_buffer_ptr, ant_id, SymbolType::kPilot);
     } else if (cur_symbol_type == SymbolType::kUL) {
         int data_subframe_id = cfg->getUlSFIndex(frame_id, subframe_id);
         int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
         int subframe_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
             + data_subframe_id;
-        float* src_ptr
-            = (float*)fft_buffer_.FFT_inputs[0] + cfg->OFDM_DATA_START * 2;
-        float* tar_ptr = (float*)&data_buffer_[subframe_offset][0];
-
-        /* copy data from fft_outputs to data_buffer */
-        int cache_line_num = transpose_block_size / 8;
-        int block_num = cfg->OFDM_DATA_NUM / transpose_block_size;
-        for (int c2 = 0; c2 < block_num; c2++) {
-            for (int c3 = 0; c3 < cache_line_num; c3++) {
-                /* 256 bits = 32 bytes = 8 float values = 4 subcarriers */
-                /* prefetch a cache line */
-                // _mm_prefetch((char*)(src_ptr + 16), _MM_HINT_T0);
-                float* tar_ptr_cur = tar_ptr
-                    + (c2 * BS_ANT_NUM + ant_id) * transpose_block_size * 2
-                    + c3 * 16;
-                _mm256_stream_ps(tar_ptr_cur, _mm256_load_ps(src_ptr));
-                _mm256_stream_ps(tar_ptr_cur + 8, _mm256_load_ps(src_ptr + 8));
-                // printf("In doFFT thread %d: frame %d, subframe %d, subcarrier
-                // %d %d, address offset: %d\n", tid, frame_id, subframe_id, c2,
-                // c3, tar_ptr_cur - src_ptr);
-                src_ptr += 16;
-            }
-        }
+        float* data_buf_ptr = (float*)&data_buffer_[subframe_offset][0];
+        simd_store_to_buf(fft_buf_ptr, data_buf_ptr, ant_id, SymbolType::kUL);
     } else if (((cur_symbol_type == SymbolType::kCalDL)
                    && (ant_id == cfg->ref_ant))
         || ((cur_symbol_type == SymbolType::kCalUL)
                && (ant_id != cfg->ref_ant))) {
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM);
         int ant_offset = ant_id * cfg->OFDM_DATA_NUM;
-        float* src_ptr
-            = (float*)fft_buffer_.FFT_inputs[0] + cfg->OFDM_DATA_START * 2;
-        float* tar_ptr = (float*)&calib_buffer_[frame_offset][ant_offset];
-        int cache_line_num = transpose_block_size / 8;
-        int block_num = cfg->OFDM_DATA_NUM / transpose_block_size;
-        for (int c2 = 0; c2 < block_num; c2++) {
-            for (int c3 = 0; c3 < cache_line_num; c3++) {
-                float* tar_ptr_cur
-                    = tar_ptr + c2 * transpose_block_size * 2 + c3 * 16;
-                _mm256_stream_ps(tar_ptr_cur, _mm256_load_ps(src_ptr));
-                _mm256_stream_ps(tar_ptr_cur + 8, _mm256_load_ps(src_ptr + 8));
-                src_ptr += 16;
-            }
-        }
+        float* calib_buf_ptr = (float*)&calib_buffer_[frame_offset][ant_offset];
+        simd_store_to_buf(
+            fft_buf_ptr, calib_buf_ptr, ant_id, SymbolType::kCalUL);
     } else {
         printf("unkown or unsupported symbol type.\n");
     }
@@ -270,7 +208,7 @@ Event_data DoFFT::launch(int tag)
     if (cur_symbol_type == SymbolType::kUL) {
         (*FFT_task_duration)[tid * 8][3] += duration3;
     } else {
-        (*CSI_task_duration)[tid * 8][3] += duration2;
+        (*CSI_task_duration)[tid * 8][3] += duration3;
     }
 #endif
 
@@ -291,6 +229,67 @@ Event_data DoFFT::launch(int tag)
     /* Inform main thread */
     return Event_data(EventType::kFFT,
         fft_resp_tag_t(frame_id % TASK_BUFFER_FRAME_NUM, subframe_id)._tag);
+}
+
+void DoFFT::simd_store_to_buf(
+    float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type)
+{
+    size_t block_num = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
+    size_t sc_idx = cfg->OFDM_DATA_START;
+
+    for (size_t block_idx = 0; block_idx < block_num; block_idx++) {
+        for (size_t sc_inblock_idx = 0;
+             sc_inblock_idx < cfg->transpose_block_size; sc_inblock_idx += 8) {
+
+            float* src_ptr_cur = fft_buf + sc_idx * 2;
+            float* tar_ptr_cur = out_buf + sc_inblock_idx * 2;
+            if (symbol_type == SymbolType::kCalUL) {
+                tar_ptr_cur += block_idx * cfg->transpose_block_size * 2;
+            } else {
+                tar_ptr_cur += (block_idx * cfg->BS_ANT_NUM + ant_id)
+                    * cfg->transpose_block_size * 2;
+            }
+#ifdef __AVX512F__
+            /* load 256 bits = 32 bytes = 8 float values = 4 subcarriers */
+            __m512 fft_result = _mm512_load_ps(src_ptr_cur);
+            if (symbol_type == SymbolType::kPilot) {
+                __m512 pilot_tx = _mm512_set_ps(cfg->pilots_[sc_idx + 7],
+                    cfg->pilots_[sc_idx + 7], cfg->pilots_[sc_idx + 6],
+                    cfg->pilots_[sc_idx + 6], cfg->pilots_[sc_idx + 5],
+                    cfg->pilots_[sc_idx + 5], cfg->pilots_[sc_idx + 4],
+                    cfg->pilots_[sc_idx + 4], cfg->pilots_[sc_idx + 3],
+                    cfg->pilots_[sc_idx + 3], cfg->pilots_[sc_idx + 2],
+                    cfg->pilots_[sc_idx + 2], cfg->pilots_[sc_idx + 1],
+                    cfg->pilots_[sc_idx + 1], cfg->pilots_[sc_idx],
+                    cfg->pilots_[sc_idx]);
+                fft_result = _mm512_mul_ps(fft_result, pilot_tx);
+            }
+            _mm512_stream_ps(tar_ptr_cur, fft_result);
+#else
+            /* load 256 bits = 32 bytes = 8 float values = 4 subcarriers */
+            __m256 fft_result = _mm256_load_ps(src_ptr_cur);
+            __m256 fft_result1 = _mm256_load_ps(src_ptr_cur + 8);
+            if (symbol_type == SymbolType::kPilot) {
+                __m256 pilot_tx = _mm256_set_ps(cfg->pilots_[sc_idx + 3],
+                    cfg->pilots_[sc_idx + 3], cfg->pilots_[sc_idx + 2],
+                    cfg->pilots_[sc_idx + 2], cfg->pilots_[sc_idx + 1],
+                    cfg->pilots_[sc_idx + 1], cfg->pilots_[sc_idx],
+                    cfg->pilots_[sc_idx]);
+                fft_result = _mm256_mul_ps(fft_result, pilot_tx);
+
+                __m256 pilot_tx1 = _mm256_set_ps(cfg->pilots_[sc_idx + 7],
+                    cfg->pilots_[sc_idx + 7], cfg->pilots_[sc_idx + 6],
+                    cfg->pilots_[sc_idx + 6], cfg->pilots_[sc_idx + 5],
+                    cfg->pilots_[sc_idx + 5], cfg->pilots_[sc_idx + 4],
+                    cfg->pilots_[sc_idx + 4]);
+                fft_result1 = _mm256_mul_ps(fft_result1, pilot_tx1);
+            }
+            _mm256_stream_ps(tar_ptr_cur, fft_result);
+            _mm256_stream_ps(tar_ptr_cur + 8, fft_result1);
+#endif
+            sc_idx += 8;
+        }
+    }
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
