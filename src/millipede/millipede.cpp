@@ -490,8 +490,7 @@ void Millipede::start()
                 }
             } break;
             default:
-                printf("Wrong event type (%d) in message queue!",
-                    event.event_type);
+                printf("Wrong event type in message queue!");
                 exit(0);
             } /* End of switch */
 

@@ -160,9 +160,9 @@ void DoZF::ZF_time_orthogonal(int offset)
         ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
         double duration = get_time() - start_time1;
         (*ZF_task_duration)[tid * 8][0] += duration;
-        if (duration > 500) {
-            printf("Thread %d ZF takes %.2f\n", tid, duration);
-        }
+        // if (duration > 500) {
+        //     printf("Thread %d ZF takes %.2f\n", tid, duration);
+        // }
 #endif
     }
 }
@@ -239,9 +239,9 @@ void DoZF::ZF_freq_orthogonal(int offset)
     ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
     double duration = get_time() - start_time1;
     (*ZF_task_duration)[tid * 8][0] += duration;
-    if (duration > 500) {
-        printf("Thread %d ZF takes %.2f\n", tid, duration);
-    }
+    // if (duration > 500) {
+    //     printf("Thread %d ZF takes %.2f\n", tid, duration);
+    // }
 #endif
 }
 

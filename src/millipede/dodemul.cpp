@@ -163,19 +163,21 @@ Event_data DoDemul::launch(int offset)
     }
 
 #ifdef USE_LDPC
-    __m256i index2 = _mm256_setr_epi32(0, 1, UE_NUM * 2, UE_NUM * 2 + 1,
-        UE_NUM * 4, UE_NUM * 4 + 1, UE_NUM * 6, UE_NUM * 6 + 1);
+    __m256i index2 = _mm256_setr_epi32(0, 1, cfg->UE_NUM * 2,
+        cfg->UE_NUM * 2 + 1, cfg->UE_NUM * 4, cfg->UE_NUM * 4 + 1,
+        cfg->UE_NUM * 6, cfg->UE_NUM * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-    for (int i = 0; i < UE_NUM; i++) {
+    for (int i = 0; i < cfg->UE_NUM; i++) {
         float* equal_ptr = (float*)(equaled_buffer_temp + i);
-        int8_t* demul_ptr = (&demod_soft_buffer_[total_data_subframe_id]
-                                                [(OFDM_DATA_NUM * i + sc_id)
-                                                    * config_->mod_type]);
+        int8_t* demul_ptr
+            = (&demod_soft_buffer_[total_data_subframe_id]
+                                  [(cfg->OFDM_DATA_NUM * i + sc_id)
+                                      * cfg->mod_type]);
         for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) {
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_T_ptr, equal_T_temp);
             equal_T_ptr += 8;
-            equal_ptr += UE_NUM * double_num_in_simd256 * 2;
+            equal_ptr += cfg->UE_NUM * double_num_in_simd256 * 2;
         }
         int num_sc_avx2 = (max_sc_ite / 16) * 16;
         int rest = max_sc_ite % 16;
@@ -186,11 +188,11 @@ Event_data DoDemul::launch(int offset)
         if (rest > 0)
             demod_16qam_soft_sse(
                 (equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2),
-                demul_ptr + config_->mod_type * num_sc_avx2, rest);
+                demul_ptr + cfg->mod_type * num_sc_avx2, rest);
         // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n",
         // tid, frame_id, current_data_subframe_id, sc_id); cout<< "Demuled
         // data: \n"; cout<<"UE "<<i<<": "; for (int k = 0; k < max_sc_ite *
-        // config_->mod_order; k++)
+        // cfg->mod_order; k++)
         //     printf("%i ", demul_ptr[k]);
         // cout<<endl;
     }
@@ -199,8 +201,8 @@ Event_data DoDemul::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double duration = get_time() - start_time;
     Demul_task_duration[tid * 8][0] += duration;
-    if (duration > 500)
-        printf("Thread %d Demul takes %.2f\n", tid, duration);
+    // if (duration > 500)
+    //     printf("Thread %d Demul takes %.2f\n", tid, duration);
 #endif
 
     /* Inform main thread */

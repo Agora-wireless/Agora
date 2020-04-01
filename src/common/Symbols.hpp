@@ -15,6 +15,8 @@
 #define GENERATE_PILOT
 #endif
 
+#define ARMA_ALLOW_FAKE_GCC
+
 #define SEPARATE_TX_RX_UE 0
 
 #define MOD_ORDER 4
