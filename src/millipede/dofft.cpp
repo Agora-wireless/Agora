@@ -24,16 +24,14 @@ DoFFT::DoFFT(Config* in_config, int in_tid,
     , CSI_task_count(in_stats_manager->csi_stats_worker.task_count)
 {
     (void)DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, config_->OFDM_CA_NUM);
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     // auto mkl_status = DftiSetValue(mkl_handle, DFTI_PLACEMENT,
     // DFTI_NOT_INPLACE);
     (void)DftiCommitDescriptor(mkl_handle);
 
     int FFT_buffer_block_num = 1;
-    fft_buffer_.FFT_inputs.calloc(
-        FFT_buffer_block_num, config_->OFDM_CA_NUM, 64);
-    fft_buffer_.FFT_outputs.calloc(
-        FFT_buffer_block_num, config_->OFDM_CA_NUM, 64);
+    fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num, cfg->OFDM_CA_NUM, 64);
+    fft_buffer_.FFT_outputs.calloc(FFT_buffer_block_num, cfg->OFDM_CA_NUM, 64);
 }
 
 DoFFT::~DoFFT()
@@ -53,7 +51,7 @@ Event_data DoFFT::launch(int tag)
     size_t buf_offset = fft_req_tag_t(tag).offset;
 
     /* read info of one frame */
-    int packet_length = config_->packet_length;
+    int packet_length = cfg->packet_length;
     char* cur_buffer_ptr
         = socket_buffer_[socket_thread_id] + buf_offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -62,21 +60,17 @@ Event_data DoFFT::launch(int tag)
     size_t ant_id = pkt->ant_id;
 
     /* transfer ushort to float */
-    size_t OFDM_PREFIX_LEN = config_->OFDM_PREFIX_LEN;
-    size_t OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    size_t OFDM_DATA_START = config_->OFDM_DATA_START;
-    short* cur_buffer_ptr_ushort = &pkt->data[2 * OFDM_PREFIX_LEN];
+    short* cur_buffer_ptr_ushort = &pkt->data[2 * cfg->OFDM_PREFIX_LEN];
     float* cur_fft_buffer_float = (float*)(fft_buffer_.FFT_inputs[0]);
 
     auto cur_symbol_type = SymbolType::kUnknown;
-    if (config_->isUplink(frame_id, subframe_id))
+    if (cfg->isUplink(frame_id, subframe_id))
         cur_symbol_type = SymbolType::kUL;
-    else if (config_->isPilot(frame_id, subframe_id))
+    else if (cfg->isPilot(frame_id, subframe_id))
         cur_symbol_type = SymbolType::kPilot;
-    else if (config_->isCalDlPilot(frame_id, subframe_id))
+    else if (cfg->isCalDlPilot(frame_id, subframe_id))
         cur_symbol_type = SymbolType::kCalDL;
-    else if (config_->isCalUlPilot(frame_id, subframe_id))
+    else if (cfg->isCalUlPilot(frame_id, subframe_id))
         cur_symbol_type = SymbolType::kCalUL;
 
     /* Use SIMD
@@ -85,7 +79,7 @@ Event_data DoFFT::launch(int tag)
      * 0x4380'8000 */
     const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
     const __m256i magic_i = _mm256_castps_si256(magic);
-    for (size_t i = 0; i < OFDM_CA_NUM * 2; i += 16) {
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM * 2; i += 16) {
         /* get input */
         __m128i val
             = _mm_load_si128((__m128i*)(cur_buffer_ptr_ushort + i)); // port 2,3
@@ -152,7 +146,7 @@ Event_data DoFFT::launch(int tag)
 #endif
 
 #if DEBUG_PRINT_IN_TASK
-    printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
+    printf("In doFFT thread %d: frame: %zu, subframe: %zu, ant: %zu\n", tid,
         frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 #endif
 
@@ -160,22 +154,22 @@ Event_data DoFFT::launch(int tag)
     double start_time_part3 = get_time();
 #endif
 
-    size_t BS_ANT_NUM = config_->BS_ANT_NUM;
-    int transpose_block_size = config_->transpose_block_size;
+    size_t BS_ANT_NUM = cfg->BS_ANT_NUM;
+    int transpose_block_size = cfg->transpose_block_size;
 
     if (cur_symbol_type == SymbolType::kPilot) {
-        int pilot_id = config_->getPilotSFIndex(frame_id, subframe_id);
+        int pilot_id = cfg->getPilotSFIndex(frame_id, subframe_id);
         int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * config_->pilot_symbol_num_perframe
+                * cfg->pilot_symbol_num_perframe
             + pilot_id;
-        int sc_idx = config_->OFDM_DATA_START;
+        int sc_idx = cfg->OFDM_DATA_START;
         float* cur_fft_buffer_float_output
             = (float*)(fft_buffer_.FFT_inputs[0]);
         float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
 
-        int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+        int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
         int block_num = OFDM_DATA_NUM / transpose_block_size;
-        float* pilots_ = config_->pilots_;
+        float* pilots_ = cfg->pilots_;
         _mm_prefetch((char*)pilots_, _MM_HINT_T0);
         for (int block_idx = 0; block_idx < block_num; block_idx++) {
             for (int sc_inblock_idx = 0; sc_inblock_idx < transpose_block_size;
@@ -218,18 +212,18 @@ Event_data DoFFT::launch(int tag)
         // }
         // printf("\n");
     } else if (cur_symbol_type == SymbolType::kUL) {
-        int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
-        int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
+        int data_subframe_id = cfg->getUlSFIndex(frame_id, subframe_id);
+        int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
         int subframe_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
             + data_subframe_id;
         float* src_ptr
-            = (float*)fft_buffer_.FFT_inputs[0] + config_->OFDM_DATA_START * 2;
+            = (float*)fft_buffer_.FFT_inputs[0] + cfg->OFDM_DATA_START * 2;
         float* tar_ptr = (float*)&data_buffer_[subframe_offset][0];
 
         /* copy data from fft_outputs to data_buffer */
         int cache_line_num = transpose_block_size / 8;
-        int block_num = config_->OFDM_DATA_NUM / transpose_block_size;
+        int block_num = cfg->OFDM_DATA_NUM / transpose_block_size;
         for (int c2 = 0; c2 < block_num; c2++) {
             for (int c3 = 0; c3 < cache_line_num; c3++) {
                 /* 256 bits = 32 bytes = 8 float values = 4 subcarriers */
@@ -247,16 +241,16 @@ Event_data DoFFT::launch(int tag)
             }
         }
     } else if (((cur_symbol_type == SymbolType::kCalDL)
-                   && (ant_id == config_->ref_ant))
+                   && (ant_id == cfg->ref_ant))
         || ((cur_symbol_type == SymbolType::kCalUL)
-               && (ant_id != config_->ref_ant))) {
+               && (ant_id != cfg->ref_ant))) {
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM);
-        int ant_offset = ant_id * OFDM_DATA_NUM;
+        int ant_offset = ant_id * cfg->OFDM_DATA_NUM;
         float* src_ptr
-            = (float*)fft_buffer_.FFT_inputs[0] + OFDM_DATA_START * 2;
+            = (float*)fft_buffer_.FFT_inputs[0] + cfg->OFDM_DATA_START * 2;
         float* tar_ptr = (float*)&calib_buffer_[frame_offset][ant_offset];
         int cache_line_num = transpose_block_size / 8;
-        int block_num = OFDM_DATA_NUM / transpose_block_size;
+        int block_num = cfg->OFDM_DATA_NUM / transpose_block_size;
         for (int c2 = 0; c2 < block_num; c2++) {
             for (int c3 = 0; c3 < cache_line_num; c3++) {
                 float* tar_ptr_cur
@@ -310,7 +304,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
     , task_count(in_stats_manager->ifft_stats_worker.task_count)
 {
     (void)DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, config_->OFDM_CA_NUM);
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     (void)DftiCommitDescriptor(mkl_handle);
 }
 
@@ -321,15 +315,11 @@ Event_data DoIFFT::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int TX_PREFIX_LEN = config_->TX_PREFIX_LEN;
-    int OFDM_CA_NUM = config_->OFDM_CA_NUM;
-    int CP_LEN = config_->CP_LEN;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
 
-    int ant_id = offset % BS_ANT_NUM;
+    int ant_id = offset % cfg->BS_ANT_NUM;
 #if DEBUG_PRINT_IN_TASK
-    int total_data_subframe_id = offset / BS_ANT_NUM;
+    int total_data_subframe_id = offset / cfg->BS_ANT_NUM;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id
         = total_data_subframe_id % data_subframe_num_perframe;
@@ -338,7 +328,7 @@ Event_data DoIFFT::launch(int offset)
 #endif
 
     int dl_ifft_buffer_size
-        = BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+        = cfg->BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
     int buffer_subframe_offset = offset % dl_ifft_buffer_size;
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -368,20 +358,20 @@ Event_data DoIFFT::launch(int offset)
 
     float* ifft_output_ptr
         = (float*)(&dl_ifft_buffer_[buffer_subframe_offset][0]);
-    int dl_socket_buffer_status_size
-        = BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * data_subframe_num_perframe;
+    int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+        * data_subframe_num_perframe;
     int socket_subframe_offset = offset % dl_socket_buffer_status_size;
-    int packet_length = config_->packet_length;
+    int packet_length = cfg->packet_length;
     struct Packet* pkt
         = (struct Packet*)(&dl_socket_buffer_[socket_subframe_offset
                                * packet_length]
             + ant_id * packet_length);
     // int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
-    short* socket_ptr = &pkt->data[2 * TX_PREFIX_LEN];
+    short* socket_ptr = &pkt->data[2 * cfg->TX_PREFIX_LEN];
 
-    for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id += 8) {
+    for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
         /* ifft scaled results by OFDM_CA_NUM */
-        __m256 scale_factor = _mm256_set1_ps(32768.0 / OFDM_CA_NUM);
+        __m256 scale_factor = _mm256_set1_ps(32768.0 / cfg->OFDM_CA_NUM);
         __m256 ifft1 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id);
         __m256 ifft2 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id + 8);
         __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
@@ -392,10 +382,10 @@ Event_data DoIFFT::launch(int offset)
         integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
         //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
         _mm256_stream_si256(
-            (__m256i*)&socket_ptr[2 * sc_id + CP_LEN], integer1);
-        if (sc_id >= OFDM_CA_NUM - CP_LEN) // add CP
-            _mm256_stream_si256(
-                (__m256i*)&socket_ptr[2 * (sc_id + CP_LEN - OFDM_CA_NUM)],
+            (__m256i*)&socket_ptr[2 * sc_id + cfg->CP_LEN], integer1);
+        if (sc_id >= cfg->OFDM_CA_NUM - cfg->CP_LEN) // add CP
+            _mm256_stream_si256((__m256i*)&socket_ptr[2
+                                    * (sc_id + cfg->CP_LEN - cfg->OFDM_CA_NUM)],
                 integer1);
     }
 
