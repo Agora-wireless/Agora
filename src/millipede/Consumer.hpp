@@ -10,9 +10,6 @@ public:
         moodycamel::ProducerToken& out_token, int task_count = 0,
         EventType task_type = EventType::kInvalid);
     void handle(const Event_data& event) const;
-    void handle_bulk(const Event_data* event_list, int count) const;
-    void try_handle(const Event_data& event) const;
-    void try_handle_bulk(const Event_data* event_list, int count) const;
     void schedule_task_set(int task_setid) const;
 
 private:
@@ -39,31 +36,6 @@ inline void Consumer::handle(const Event_data& event) const
     }
 }
 
-inline void Consumer::handle_bulk(const Event_data* event_list, int count) const
-{
-    if (!out_queue_.enqueue_bulk(out_token_, event_list, count)) {
-        printf("message bulk enqueue failed\n");
-        exit(0);
-    }
-}
-
-inline void Consumer::try_handle(const Event_data& event) const
-{
-    if (!out_queue_.try_enqueue(out_token_, event)) {
-        printf("need more memory\n");
-        handle(event);
-    }
-}
-
-inline void Consumer::try_handle_bulk(
-    const Event_data* event_list, int count) const
-{
-    if (!out_queue_.try_enqueue_bulk(out_token_, event_list, count)) {
-        printf("need more memory\n");
-        handle_bulk(event_list, count);
-    }
-}
-
 inline void Consumer::schedule_task_set(int task_setid) const
 {
     Event_data event_list[task_count];
@@ -71,7 +43,11 @@ inline void Consumer::schedule_task_set(int task_setid) const
         event_list[i].event_type = task_type;
         event_list[i].data = task_setid * task_count + i;
     }
-    try_handle_bulk(event_list, task_count);
+
+    if (!out_queue_.enqueue_bulk(out_token_, event_list, task_count)) {
+        printf("message bulk enqueue failed\n");
+        exit(0);
+    }
 }
 
 #endif /* CONSUMER */
