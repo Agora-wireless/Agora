@@ -30,7 +30,7 @@ typedef unsigned short ushort;
 
 class Config {
 public:
-    int transpose_block_size;
+    size_t transpose_block_size;
     size_t sampsPerSymbol;
     size_t dl_prefix;
     size_t prefix;
@@ -65,8 +65,8 @@ public:
     Table<int8_t> dl_IQ_data;
     Table<int8_t> ul_IQ_data;
     Table<complex_float> ul_IQ_modul;
-    Table<complex_float> dl_IQ_modul;
     Table<std::complex<int16_t>> dl_IQ_symbol;
+    Table<std::complex<int16_t>> ul_IQ_symbol;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
@@ -104,6 +104,7 @@ public:
     int demul_block_num;
     size_t zf_block_size;
     int zf_block_num;
+    size_t fft_block_size;
 
     bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
@@ -157,6 +158,7 @@ public:
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
     Config(std::string);
+    void genData();
     ~Config();
 };
 #endif

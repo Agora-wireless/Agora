@@ -9,20 +9,23 @@ fi
 echo "Running tests for $num_iters iterations"
 
 for i in `seq 1 $num_iters`; do
-  echo "Generating data for correctness test"
+  echo "==========================================="
+  echo "Generating data for correctness test $i......"
+  echo -e "===========================================\n"
   ./data_generator data/tddconfig-correctness-test-ul.json
+  
   echo -e "-------------------------------------------------------\n\n\n"
-  echo "==================================="
-  echo "Running uplink correctness test......"
-  echo -e "===================================\n"
+  echo "======================================"
+  echo "Running uplink correctness test $i......"
+  echo -e "======================================\n"
   ./millipede data/tddconfig-correctness-test-ul.json &
   ./sender 4 10 5000 data/tddconfig-correctness-test-ul.json
 
   echo -e "-------------------------------------------------------\n\n\n"
-  echo "==================================="
-  echo "Running downlink correctness test......"
-  echo -e "===================================\n"
+  echo "======================================"
+  echo "Running downlink correctness test $i......"
+  echo -e "======================================\n"
   ./millipede data/tddconfig-correctness-test-dl.json &
   ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
-
+  echo -e "-------------------------------------------------------\n\n\n"
 done

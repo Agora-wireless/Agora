@@ -36,6 +36,13 @@ Config::Config(std::string jsonfile)
         }
     }
 
+#ifdef USE_ARGOS
+    if (nRadios == 0) {
+        printf("Error: no radio exists in Argos mode!\n");
+        exit(0);
+    }
+#endif
+
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
     txgainA = tddConf.value("txgainA", 20);
@@ -67,7 +74,7 @@ Config::Config(std::string jsonfile)
     postfix = tddConf.value("postfix", 0);
     TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 0);
     CP_LEN = tddConf.value("cp_len", 0);
-    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0 + CP_LEN);
+    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     OFDM_DATA_START
@@ -115,7 +122,7 @@ Config::Config(std::string jsonfile)
         }
         frames.push_back(sched);
         framePeriod = 1;
-        printf("frame schedule %s\n", sched.c_str());
+        printf("Frame schedule %s\n", sched.c_str());
     } else {
         json jframes = tddConf.value("frames", json::array());
         framePeriod = jframes.size();
@@ -145,7 +152,7 @@ Config::Config(std::string jsonfile)
         : 0;
 
     if (isUE and !freq_orthogonal_pilot
-        and nRadios != pilot_symbol_num_perframe) {
+        and UE_ANT_NUM != pilot_symbol_num_perframe) {
         std::cerr << "Number of Pilot Symbols don't match number of Clients!"
                   << std::endl;
         exit(0);
@@ -168,6 +175,7 @@ Config::Config(std::string jsonfile)
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     zf_block_size = tddConf.value("zf_block_size", 1);
+    fft_block_size = tddConf.value("fft_block_size", 4);
     if (freq_orthogonal_pilot)
         zf_block_size = UE_ANT_NUM;
     demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
@@ -177,7 +185,7 @@ Config::Config(std::string jsonfile)
     mod_type = modulation == "64QAM"
         ? CommsLib::QAM64
         : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
-    printf("modulation: %s\n", modulation.c_str());
+    printf("Modulation: %s\n", modulation.c_str());
     mod_order = (size_t)pow(2, mod_type);
 
     /* LDPC Coding configurations */
@@ -206,6 +214,26 @@ Config::Config(std::string jsonfile)
     // packet_length = offsetof(Packet, data) + sizeof(short) * OFDM_FRAME_LEN *
     // 2;
 
+    running = true;
+    std::cout << "Config: "
+              << "BS_ANT_NUM " << BS_ANT_NUM << ", UE_ANT_NUM " << UE_ANT_NUM
+              << ", PILOT SYM NUM " << pilot_symbol_num_perframe
+              << ", UL SYM NUM " << ul_data_symbol_num_perframe
+              << ", DL SYM NUM " << dl_data_symbol_num_perframe
+              << ", OFDM_CA_NUM " << OFDM_CA_NUM << ", OFDM_DATA_NUM "
+              << OFDM_DATA_NUM << ", packet length " << packet_length
+              << std::endl;
+
+    if (packet_length >= 9000) {
+        std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
+                     "frame size (9000)! "
+                  << "Packets will be fragmented.\033[0m" << std::endl;
+    }
+    std::cout << "Config done!" << std::endl;
+}
+
+void Config::genData()
+{
 #ifdef USE_ARGOS
     std::vector<std::vector<double>> gold_ifft
         = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
@@ -244,28 +272,19 @@ Config::Config(std::string jsonfile)
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    size_t r = 0;
-#ifdef GENERATE_PILOT
-    for (size_t i = 0; i < OFDM_CA_NUM; i++) {
-        if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
-            pilots_[i] = 0;
-        else
-            pilots_[i] = 1 - 2 * (rand() % 2);
-    }
-#else
     // read pilots from file
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/pilot_f_2048.bin";
+    std::string filename = cur_directory + "/data/pilot_f_"
+        + std::to_string(OFDM_CA_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file %s faild.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    r = fread(pilots_, sizeof(float), 2048, fp);
-    if (r < 2048)
+    size_t r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
+    if (r < OFDM_CA_NUM)
         printf("bad read from file %s \n", filename.c_str());
     fclose(fp);
-#endif
 
     pilotsF.resize(OFDM_CA_NUM);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
@@ -300,57 +319,48 @@ Config::Config(std::string jsonfile)
 
     dl_IQ_data.malloc(
         dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
-    dl_IQ_modul.malloc(data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM,
-        64); // used for debug
     dl_IQ_symbol.malloc(
-        data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
+        dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
     ul_IQ_data.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ul_IQ_modul.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
+    ul_IQ_symbol.malloc(
+        ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        std::vector<int8_t> in_modul;
         for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
-            std::vector<int8_t> in_modul;
             for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
                 int cur_offset = j * UE_ANT_NUM + ue_id;
                 dl_IQ_data[i][cur_offset] = rand() % mod_order;
-                in_modul.push_back(dl_IQ_data[i][cur_offset]);
+                if (ue_id == 0)
+                    in_modul.push_back(dl_IQ_data[i][cur_offset]);
             }
-
-            std::vector<std::complex<float>> modul_data
-                = CommsLib::modulate(in_modul, mod_type);
-            std::vector<std::complex<float>> ifft_in_data;
-            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-                if (j < OFDM_DATA_START
-                    || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].re = 0;
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].im = 0;
-                    ifft_in_data.push_back(0);
-                } else {
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].re
-                        = modul_data[j - OFDM_DATA_START].real();
-                    dl_IQ_modul[i * data_symbol_num_perframe + ue_id][j].im
-                        = modul_data[j - OFDM_DATA_START].imag();
-                    ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
-                }
+        }
+        std::vector<std::complex<float>> modul_data
+            = CommsLib::modulate(in_modul, mod_type);
+        std::vector<std::complex<float>> ifft_in_data;
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+                ifft_in_data.push_back(0);
+            } else {
+                ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
             }
+        }
 
-            // size_t c = i / UE_ANT_NUM;
-            std::vector<std::complex<float>> ifft_dl_data
-                = CommsLib::IFFT(ifft_in_data, OFDM_CA_NUM);
-            ifft_dl_data.insert(ifft_dl_data.begin(),
-                ifft_dl_data.end() - CP_LEN, ifft_dl_data.end());
-            for (size_t j = 0; j < sampsPerSymbol; j++) {
-                if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                    dl_IQ_symbol[i][j] = 0;
-                } else {
-                    dl_IQ_symbol[i][j] = {
-                        (int16_t)(ifft_dl_data[j - prefix].real() * 32768),
-                        (int16_t)(ifft_dl_data[j - prefix].imag() * 32768)
-                    };
-                }
+        std::vector<std::complex<float>> ifft_dl_data
+            = CommsLib::IFFT(ifft_in_data, OFDM_CA_NUM);
+        ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN,
+            ifft_dl_data.end());
+        for (size_t j = 0; j < sampsPerSymbol; j++) {
+            if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                dl_IQ_symbol[i][j] = 0;
+            } else {
+                dl_IQ_symbol[i][j]
+                    = { (int16_t)(ifft_dl_data[j - prefix].real() * 32768),
+                          (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
             }
         }
     }
@@ -361,12 +371,31 @@ Config::Config(std::string jsonfile)
         std::vector<std::complex<float>> modul_data = CommsLib::modulate(
             std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM),
             mod_type);
+        std::vector<std::complex<float>> ifft_ul_data_in;
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM)
-                continue;
-            size_t k = j - OFDM_DATA_START;
-            ul_IQ_modul[i][j].re = modul_data[k].real();
-            ul_IQ_modul[i][j].im = modul_data[k].imag();
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+                // continue;
+                ifft_ul_data_in.push_back(0);
+            } else {
+                size_t k = j - OFDM_DATA_START;
+                ul_IQ_modul[i][j].re = modul_data[k].real();
+                ul_IQ_modul[i][j].im = modul_data[k].imag();
+                ifft_ul_data_in.push_back(modul_data[k]);
+            }
+        }
+
+        std::vector<std::complex<float>> ifft_ul_data
+            = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
+        ifft_ul_data.insert(ifft_ul_data.begin(), ifft_ul_data.end() - CP_LEN,
+            ifft_ul_data.end());
+        for (size_t j = 0; j < sampsPerSymbol; j++) {
+            if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                ul_IQ_symbol[i][j] = 0;
+            } else {
+                ul_IQ_symbol[i][j]
+                    = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
+                          (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
+            }
         }
     }
 #else
@@ -393,56 +422,18 @@ Config::Config(std::string jsonfile)
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
     fclose(fd);
-
-#ifdef USE_ARGOS
-    // read uplink
-    std::string filename2 = cur_directory1 + "/data/tx_ul_data_"
-        + std::to_string(BS_ANT_NUM) + "x" + std::to_string(UE_ANT_NUM)
-        + ".bin";
-    fp = fopen(filename2.c_str(), "rb");
-    if (fp == NULL) {
-        std::cerr << "Openning File " << filename2
-                  << " fails. Error: " << strerror(errno) << std::endl;
-    }
-    size_t total_sc = OFDM_DATA_NUM * UE_ANT_NUM
-        * ul_data_symbol_num_perframe; // coding is not considered yet
-    L2_data = new mac_dtype[total_sc];
-    r = fread(L2_data, sizeof(mac_dtype), total_sc, fp);
-    if (r < total_sc)
-        printf("bad read from file %s \n", filename2.c_str());
-    fclose(fp);
-    for (size_t i = 0; i < total_sc; i++) {
-        size_t sid = i / (data_sc_len * UE_ANT_NUM);
-        size_t cid = i % (data_sc_len * UE_ANT_NUM) + OFDM_DATA_START;
-        ul_IQ_modul[sid][cid] = L2_data[i];
-    }
 #endif
-#endif
-
-    running = true;
-    std::cout << "BS_ANT_NUM " << BS_ANT_NUM << std::endl;
-    std::cout << "UE_ANT_NUM " << UE_ANT_NUM << std::endl;
-    std::cout << "PILOT SYM NUM " << pilot_symbol_num_perframe << std::endl;
-    std::cout << "UL SYM NUM " << ul_data_symbol_num_perframe << std::endl;
-    std::cout << "DL SYM NUM " << dl_data_symbol_num_perframe << std::endl;
-    std::cout << "OFDM_CA_NUM " << OFDM_CA_NUM << std::endl;
-    std::cout << "OFDM_DATA_NUM " << OFDM_DATA_NUM << std::endl;
-    std::cout << "Packet length " << packet_length << std::endl;
-    if (packet_length >= 9000)
-        std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
-                     "frame size (9000)! "
-                  << "Packets will be fragmented.\033[0m" << std::endl;
-    std::cout << "Config Done!" << std::endl;
 }
 
 Config::~Config()
 {
     free_buffer_1d(&pilots_);
     dl_IQ_data.free();
-    dl_IQ_modul.free();
+#ifdef GENERATE_DATA
     dl_IQ_symbol.free();
     ul_IQ_data.free();
     ul_IQ_modul.free();
+#endif
 }
 
 int Config::getSymbolId(size_t symbol_id)
@@ -513,14 +504,14 @@ int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
 
 bool Config::isPilot(size_t frame_id, size_t symbol_id)
 {
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
     if (symbol_id > symbol_num_perframe) {
         printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
                "%zu\x1B[0m\n",
             symbol_id, frame_id);
         return false;
     }
+    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
     printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -539,6 +530,12 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
 {
+    if (symbol_id > symbol_num_perframe) {
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
+               "%zu\x1B[0m\n",
+            symbol_id, frame_id);
+        return false;
+    }
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
     if (isUE) {
@@ -549,6 +546,12 @@ bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
 {
+    if (symbol_id > symbol_num_perframe) {
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
+               "%zu\x1B[0m\n",
+            symbol_id, frame_id);
+        return false;
+    }
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
     if (isUE) {
@@ -559,14 +562,14 @@ bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isUplink(size_t frame_id, size_t symbol_id)
 {
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
     if (symbol_id > symbol_num_perframe) {
         printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
                "%zu\x1B[0m\n",
             symbol_id, frame_id);
         return false;
     }
+    size_t fid = frame_id % framePeriod;
+    char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
     printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -576,6 +579,12 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
 
 bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 {
+    if (symbol_id > symbol_num_perframe) {
+        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
+               "%zu\x1B[0m\n",
+            symbol_id, frame_id);
+        return false;
+    }
     size_t fid = frame_id % framePeriod;
     char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
@@ -592,6 +601,7 @@ __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
 
     auto* cfg = new Config(filename);
+    cfg->genData();
     return cfg;
 }
 }

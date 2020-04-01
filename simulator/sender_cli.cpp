@@ -28,6 +28,7 @@ int main(int argc, char* argv[])
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + confFile;
     auto* cfg = new Config(filename.c_str());
+    cfg->genData();
     auto* sender = new Sender(cfg, thread_num, core_offset, delay);
 
     printf("Start sender\n");

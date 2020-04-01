@@ -17,8 +17,8 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
     , RC_task_duration(&in_stats_manager->rc_stats_worker.task_duration)
     , RC_task_count(in_stats_manager->rc_stats_worker.task_count)
 {
-    BS_ANT_NUM = config_->BS_ANT_NUM;
-    OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
+    BS_ANT_NUM = cfg->BS_ANT_NUM;
+    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
 
     calib_gather_buffer = (complex_float*)aligned_alloc(
         64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
@@ -26,10 +26,8 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
 
 Reciprocity::~Reciprocity() { free(calib_gather_buffer); }
 
-void Reciprocity::launch(int offset)
+Event_data Reciprocity::launch(int offset)
 {
-    int ref_ant = config_->ref_ant;
-
 #if DEBUG_PRINT_IN_TASK
     printf("In doRecip thread %d: frame: %d, \n", tid, offset);
 #endif
@@ -40,7 +38,7 @@ void Reciprocity::launch(int offset)
 
     cx_float* ptr_in = (cx_float*)calib_buffer_[offset];
     cx_fmat mat_input(ptr_in, OFDM_DATA_NUM, BS_ANT_NUM, false);
-    cx_fvec vec_calib_ref = mat_input.col(ref_ant);
+    cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant);
     cx_float* ptr_out = (cx_float*)calib_gather_buffer;
     cx_fmat mat_output(ptr_out, BS_ANT_NUM, OFDM_DATA_NUM, false);
     complex_float* recip_buff = recip_buffer_[offset];
@@ -91,5 +89,6 @@ void Reciprocity::launch(int offset)
 
     /* Inform main thread */
     Event_data RC_finish_event(EventType::kRC, offset);
-    consumer_.handle(RC_finish_event);
+    // consumer_.handle(RC_finish_event);
+    return RC_finish_event;
 }

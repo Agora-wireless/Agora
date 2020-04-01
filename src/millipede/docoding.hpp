@@ -14,7 +14,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "offset.h"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
@@ -39,7 +38,7 @@ public:
     /**
      * Do Encode task for one code block
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -79,7 +78,7 @@ public:
     /**
      * Do Decode task for one code block
      */
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     Table<int8_t>& llr_buffer_;

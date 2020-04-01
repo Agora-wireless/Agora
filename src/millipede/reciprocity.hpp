@@ -12,7 +12,6 @@
 #include "config.hpp"
 #include "doer.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
@@ -28,7 +27,7 @@ public:
         Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
         Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~Reciprocity();
-    void launch(int offset);
+    Event_data launch(int offset);
 
 private:
     int BS_ANT_NUM;
