@@ -12,7 +12,6 @@
 #include "config.hpp"
 #include "doer.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
