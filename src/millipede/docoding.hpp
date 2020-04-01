@@ -14,7 +14,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "offset.h"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
