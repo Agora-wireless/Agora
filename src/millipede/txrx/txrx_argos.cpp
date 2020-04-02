@@ -113,8 +113,8 @@ void* PacketTXRX::loopTXRX(int tid)
         if (pkt == NULL)
             continue;
         rx_offset = (rx_offset + config_->nChannels) % buffer_frame_num_;
-        int frame_id = pkt->frame_id;
 #if MEASURE_TIME
+        int frame_id = pkt->frame_id;
         if (frame_id > prev_frame_id) {
             *(rx_frame_start + frame_id) = get_time();
             prev_frame_id = frame_id;
