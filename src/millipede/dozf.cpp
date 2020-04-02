@@ -38,8 +38,16 @@ Event_data DoZF::launch(int offset)
         ZF_freq_orthogonal(offset);
     else
         ZF_time_orthogonal(offset);
+    // finish(offset);
     Event_data ZF_finish_event(EventType::kZF, offset);
     return ZF_finish_event;
+}
+
+void DoZF::finish(int offset)
+{
+    // inform main thread
+    Event_data ZF_finish_event(EventType::kZF, offset);
+    consumer_.handle(ZF_finish_event);
 }
 
 void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
@@ -253,4 +261,7 @@ void DoZF::Predict(int offset)
         = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM + sc_id;
     precoder(&mat_input, frame_id, sc_id, offset_next_frame,
         cfg->dl_data_symbol_num_perframe > 0);
+
+    // inform main thread
+    finish(offset_next_frame);
 }
