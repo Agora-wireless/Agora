@@ -207,7 +207,6 @@ Event_data DoDemul::launch(int offset)
 
     /* Inform main thread */
     Event_data demul_finish_event(EventType::kDemul, offset);
-    // consumer_.handle(demul_finish_event);
     return demul_finish_event;
 }
 
