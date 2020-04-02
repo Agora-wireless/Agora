@@ -210,7 +210,7 @@ Event_data DoDemul::launch(int offset)
     return demul_finish_event;
 }
 
-void DoDemul::DemulSingleSC(int offset)
+Event_data DoDemul::DemulSingleSC(int offset)
 {
     double start_time = get_time();
 
@@ -288,10 +288,9 @@ void DoDemul::DemulSingleSC(int offset)
     double duration3 = get_time() - start_time;
     Demul_task_duration[tid][1] += duration3;
 
-    Event_data demul_finish_event(EventType::kDemul, offset);
-    Demul_task_count[tid] = Demul_task_count[tid] + 1;
-    consumer_.handle(demul_finish_event);
-
     double duration = get_time() - start_time;
     Demul_task_duration[tid][0] += duration;
+    Demul_task_count[tid] = Demul_task_count[tid] + 1;
+
+    return Event_data(EventType::kDemul, offset);
 }

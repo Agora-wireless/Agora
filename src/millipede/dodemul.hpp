@@ -60,7 +60,7 @@ public:
      */
     Event_data launch(int offset);
 
-    void DemulSingleSC(int offset);
+    Event_data DemulSingleSC(int offset);
 
 private:
     Table<complex_float>& data_buffer_;
