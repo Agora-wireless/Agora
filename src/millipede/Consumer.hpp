@@ -9,14 +9,13 @@ public:
     Consumer(moodycamel::ConcurrentQueue<Event_data>& out_queue,
         moodycamel::ProducerToken& out_token, int task_count = 0,
         EventType task_type = EventType::kInvalid);
+    void handle(const Event_data& event) const;
+    void handle_bulk(const Event_data* event_list, int count) const;
     void try_handle(const Event_data& event) const;
+    void try_handle_bulk(const Event_data* event_list, int count) const;
     void schedule_task_set(int task_setid) const;
 
 private:
-    void handle(const Event_data& event) const;
-    void try_handle_bulk(const Event_data* event_list, int count) const;
-    void handle_bulk(const Event_data* event_list, int count) const;
-
     moodycamel::ConcurrentQueue<Event_data>& out_queue_;
     moodycamel::ProducerToken& out_token_;
     int task_count;
