@@ -28,7 +28,7 @@ Sender::Sender(
     , frame_id(0)
     , subframe_id(0)
     , thread_num(in_thread_num)
-    , socket_num(cfg->nRadios)
+    , socket_num(std::max(in_thread_num, cfg->nRadios))
     , core_offset(in_core_offset)
     , delay(in_delay)
 {

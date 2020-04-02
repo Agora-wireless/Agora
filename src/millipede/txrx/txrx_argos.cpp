@@ -101,16 +101,18 @@ void* PacketTXRX::loopTXRX(int tid)
     pthread_cond_wait(&cond, &mutex);
     pthread_mutex_unlock(&mutex); // unlocking for all other threads
 
+#if MEASURE_TIME
     int prev_frame_id = -1;
+#endif
     int radio_id = radio_lo;
     while (config_->running) {
         if (-1 != dequeue_send(tid))
             continue;
         // receive data
-        rx_offset = (rx_offset + config_->nChannels) % buffer_frame_num_;
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
+        rx_offset = (rx_offset + config_->nChannels) % buffer_frame_num_;
         int frame_id = pkt->frame_id;
 #if MEASURE_TIME
         if (frame_id > prev_frame_id) {
