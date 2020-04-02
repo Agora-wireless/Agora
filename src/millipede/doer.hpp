@@ -14,7 +14,7 @@ public:
         if (task_queue_.try_dequeue(event)) {
             if (event.num_offsets == 0) {
                 Event_data finish_event = launch(event.data);
-                consumer_.try_handle(finish_event);
+                consumer_.handle(finish_event);
             } else {
                 Event_data finish_event;
                 Event_data temp_event;
@@ -24,7 +24,7 @@ public:
                     finish_event.offsets[i] = temp_event.data;
                 }
                 finish_event.event_type = temp_event.event_type;
-                consumer_.try_handle(finish_event);
+                consumer_.handle(finish_event);
             }
             return true;
         }
