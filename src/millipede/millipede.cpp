@@ -519,7 +519,7 @@ void Millipede::start()
                             }
                         }
                     }
-                    consumer_fft.handle(do_fft_task);
+                    consumer_fft.try_handle(do_fft_task);
                 }
             }
         } /* End of for */
