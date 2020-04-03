@@ -25,7 +25,8 @@ class DoDemul : public Doer {
 public:
     DoDemul(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_data_buffer,
+        ConcurrentQueueWrapper& complete_task_queue_wrapper,
+        Table<complex_float>& in_data_buffer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_equal_buffer,
         Table<uint8_t>& in_demul_hard_buffer,

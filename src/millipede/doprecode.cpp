@@ -4,13 +4,14 @@
  *
  */
 #include "doprecode.hpp"
-#include "Consumer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_precoder_buffer,
+    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
     Table<int8_t>& in_dl_encoded_data,
@@ -18,7 +19,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
     Table<int8_t>& in_dl_raw_data,
 #endif
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
     , precoder_buffer_(in_precoder_buffer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
 #ifdef USE_LDPC

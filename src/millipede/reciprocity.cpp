@@ -4,14 +4,15 @@
  *
  */
 #include "reciprocity.hpp"
-#include "Consumer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
 Reciprocity::Reciprocity(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    Table<complex_float>& in_calib_buffer,
     Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
     , calib_buffer_(in_calib_buffer)
     , recip_buffer_(in_recip_buffer)
     , RC_task_duration(&in_stats_manager->rc_stats_worker.task_duration)

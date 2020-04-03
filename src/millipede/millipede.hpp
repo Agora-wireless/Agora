@@ -31,6 +31,7 @@
 // #include <stdio.h>
 // #include "cpu_attach.hpp"
 #include "buffer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "dodemul.hpp"
 #include "dofft.hpp"
@@ -80,12 +81,13 @@ public:
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
-    void handle_event_fft(int tag, Consumer& consumer_zf,
-        Consumer& consumer_demul, Consumer& consumer_rc);
+    void handle_event_fft(int tag, ConcurrentQueueWrapper& zf_queue_wrapper,
+        ConcurrentQueueWrapper& demul_queue_wrapper,
+        ConcurrentQueueWrapper& consumer_rc);
 
     /* Add tasks into task queue based on event type */
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id,
-        Consumer const& consumer);
+        ConcurrentQueueWrapper const& demul_queue_wrapper);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
