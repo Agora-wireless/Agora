@@ -4,7 +4,7 @@
  *
  */
 #include "dofft.hpp"
-#include "Consumer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 
 /**
  * Use SIMD to vectorize data type conversion from short to float
@@ -60,11 +60,11 @@ void cvtShortToFloatSIMD(short*& in_buf, float*& out_buf, size_t length)
 
 DoFFT::DoFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<char>& in_socket_buffer,
-    Table<int>& in_socket_buffer_status, Table<complex_float>& in_data_buffer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_calib_buffer,
-    Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
+    Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
+    Table<complex_float>& in_calib_buffer, Stats* in_stats_manager)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
     , socket_buffer_(in_socket_buffer)
     , socket_buffer_status_(in_socket_buffer_status)
     , data_buffer_(in_data_buffer)
@@ -294,9 +294,10 @@ void DoFFT::simd_store_to_buf(
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_dl_ifft_buffer,
-    char* in_dl_socket_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
+    Stats* in_stats_manager)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
     , task_duration(&in_stats_manager->ifft_stats_worker.task_duration)
