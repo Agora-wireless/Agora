@@ -67,7 +67,7 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
             cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
             cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = diagmat(vec_calib);
-            mat_dl_precoder = inv(mat_calib) * mat_ul_precoder;
+            mat_dl_precoder = mat_ul_precoder * inv(mat_calib);
         } else
             mat_dl_precoder = mat_ul_precoder;
     }
@@ -133,8 +133,8 @@ void DoZF::ZF_time_orthogonal(int offset)
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
-            cfg->dl_data_symbol_num_perframe > 0);
+        precoder(
+            &mat_input, frame_id, cur_sc_id, cur_offset, cfg->downlink_mode);
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double start_time2 = get_time();
