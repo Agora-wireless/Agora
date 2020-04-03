@@ -12,7 +12,6 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "offset.h"
 #include "receiver.hpp"
 #include "sender.hpp"
 #include "signalHandler.hpp"

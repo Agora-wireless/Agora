@@ -32,15 +32,11 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
 
     Precode_task_count = in_stats_manager->precode_stats_worker.task_count;
 
-    size_t mod_type = config_->mod_type;
-    init_modulation_table(qam_table, mod_type);
+    init_modulation_table(qam_table, cfg->mod_type);
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
-    int demul_block_size = config_->demul_block_size;
-    alloc_buffer_1d(&modulated_buffer_temp, UE_NUM, 64, 0);
+    alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
-        &precoded_buffer_temp, demul_block_size * BS_ANT_NUM, 64, 0);
+        &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
 }
 
 DoPrecode::~DoPrecode()
@@ -51,18 +47,13 @@ DoPrecode::~DoPrecode()
 
 Event_data DoPrecode::launch(int offset)
 {
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int demul_block_size = config_->demul_block_size;
-    int sc_id = offset % config_->demul_block_num * demul_block_size;
-    int total_data_subframe_id = offset / config_->demul_block_num;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
+    int total_data_subframe_id = offset / cfg->demul_block_num;
+    int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
     int current_data_subframe_id
         = total_data_subframe_id % data_subframe_num_perframe;
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int UE_NUM = config_->UE_NUM;
-    int OFDM_DATA_START = config_->OFDM_DATA_START;
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
@@ -71,10 +62,10 @@ Event_data DoPrecode::launch(int offset)
         tid, frame_id, current_data_subframe_id, sc_id);
 #endif
 
-    __m256i index
-        = _mm256_setr_epi64x(0, BS_ANT_NUM, BS_ANT_NUM * 2, BS_ANT_NUM * 3);
-    // int precoder_cache_line_num = UE_NUM * BS_ANT_NUM * sizeof(double) / 64;
-    int max_sc_ite = std::min(demul_block_size, OFDM_DATA_NUM - sc_id);
+    __m256i index = _mm256_setr_epi64x(
+        0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
+    int max_sc_ite
+        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - sc_id);
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -85,60 +76,28 @@ Event_data DoPrecode::launch(int offset)
             double start_time2 = get_time();
 #endif
             int cur_sc_id = sc_id + i + j;
-            int precoder_offset = frame_id * OFDM_DATA_NUM + cur_sc_id;
-            if (config_->freq_orthogonal_pilot)
-                precoder_offset = precoder_offset - cur_sc_id % UE_NUM;
-
-            // for (int line_idx = 0; line_idx < precoder_cache_line_num;
-            //      line_idx++) {
-            //     _mm_prefetch(
-            //         (char*)(precoder_buffer_[precoder_offset] + line_idx *
-            //         8), _MM_HINT_T0);
-            // }
+            int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
+            if (cfg->freq_orthogonal_pilot)
+                precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
 
             complex_float* data_ptr = modulated_buffer_temp;
             if ((unsigned)current_data_subframe_id
-                == config_->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
-                for (int user_id = 0; user_id < UE_NUM; user_id++)
-                    data_ptr[user_id] = { config_->pilots_[cur_sc_id], 0 };
+                == cfg->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
+                for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
+                    data_ptr[user_id] = { cfg->pilots_[cur_sc_id], 0 };
             } else {
                 int subframe_id_in_buffer
-                    = current_data_subframe_id - config_->dl_data_symbol_start;
-                // _mm_prefetch(
-                //     (char*)(dl_raw_data[subframe_id_in_buffer] + cur_sc_id),
-                //     _MM_HINT_T0);
-                // printf("In doPrecode thread %d: frame: %d, subframe: %d,
-                // subcarrier: %d\n", tid, frame_id, current_data_subframe_id,
-                // cur_sc_id); printf("raw data: \n");
-                // for (int user_id = 0; user_id < UE_NUM - 1; user_id++) {
-                //     int8_t* raw_data_ptr
-                //         = &dl_raw_data[subframe_id_in_buffer]
-                //                      [cur_sc_id + OFDM_DATA_NUM * user_id];
-                //     int8_t* next_raw_data_ptr
-                //         = &dl_raw_data[subframe_id_in_buffer][cur_sc_id
-                //             + OFDM_DATA_NUM * (user_id + 1)];
-                //     _mm_prefetch((char*)next_raw_data_ptr, _MM_HINT_T0);
-                //     // printf("%u ", *raw_data_ptr);
-                //     data_ptr[user_id] = mod_single_uint8(
-                //         (uint8_t) * (raw_data_ptr), qam_table);
-                // }
-                // printf("\n");
+                    = current_data_subframe_id - cfg->dl_data_symbol_start;
 
-                // int8_t* raw_data_ptr
-                //     = &dl_raw_data[subframe_id_in_buffer]
-                //                  [cur_sc_id + OFDM_DATA_NUM * (UE_NUM - 1)];
-                // data_ptr[UE_NUM - 1]
-                //     = mod_single_uint8((uint8_t) * (raw_data_ptr),
-                //     qam_table);
-                for (int user_id = 0; user_id < UE_NUM; user_id++) {
+                for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
 #ifdef USE_LDPC
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[total_data_subframe_id]
-                                      [cur_sc_id + OFDM_DATA_NUM * user_id];
+                        = &dl_raw_data[total_data_subframe_id][cur_sc_id
+                            + cfg->OFDM_DATA_NUM * user_id];
 #else
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[subframe_id_in_buffer]
-                                      [cur_sc_id + OFDM_DATA_NUM * user_id];
+                        = &dl_raw_data[subframe_id_in_buffer][cur_sc_id
+                            + cfg->OFDM_DATA_NUM * user_id];
 #endif
                     data_ptr[user_id] = mod_single_uint8(
                         (uint8_t) * (raw_data_ptr), qam_table);
@@ -147,31 +106,25 @@ Event_data DoPrecode::launch(int offset)
 
             cx_float* precoder_ptr
                 = (cx_float*)precoder_buffer_[precoder_offset];
-            cx_fmat mat_precoder(precoder_ptr, UE_NUM, BS_ANT_NUM, false);
-            cx_fmat mat_data((cx_float*)data_ptr, 1, UE_NUM, false);
+            cx_fmat mat_precoder(
+                precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
             cx_float* precoded_ptr
-                = (cx_float*)precoded_buffer_temp + (i + j) * BS_ANT_NUM;
-            cx_fmat mat_precoded(precoded_ptr, 1, BS_ANT_NUM, false);
+                = (cx_float*)precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM;
+            cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
             double duration1 = get_time() - start_time2;
             Precode_task_duration[tid * 8][1] += duration1;
 #endif
             mat_precoded = mat_data * mat_precoder;
-            // printf("In doPrecode thread %d: frame: %d, subframe: %d,
-            // subcarrier: %d\n",
+
+            // printf("In doPrecode thread %d: frame: %d, subframe: %d, "
+            //        "subcarrier: % d\n ",
             //     tid, frame_id, current_data_subframe_id, sc_id);
-            // cout<<"Precoder: \n"<<mat_precoder<<endl;
-            // cout<<"Data: \n"<<mat_data<<endl;
-            // cout <<"Precoded data: \n" << mat_precoded<<endl;
-            // printf("In doPrecode thread %d: frame: %d, subframe: %d,
-            // subcarrier: %d\n", tid, frame_id, current_data_subframe_id,
-            // cur_sc_id); cout << "Precoded data:" ; for (int j = 0; j <
-            // BS_ANT_NUM; j++) {
-            //     cout <<*((float *)(precoded_ptr+j)) << "+j"<<*((float
-            //     *)(precoded_ptr+j)+1)<<",   ";
-            // }
-            // cout<<endl;
+            // cout << "Precoder: \n" << mat_precoder << endl;
+            // cout << "Data: \n" << mat_data << endl;
+            // cout << "Precoded data: \n" << mat_precoded << endl;
         }
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration2 = get_time() - start_time1;
@@ -184,13 +137,14 @@ Event_data DoPrecode::launch(int offset)
 #endif
 
     float* precoded_ptr = (float*)precoded_buffer_temp;
-    for (int ant_id = 0; ant_id < BS_ANT_NUM; ant_id++) {
-        int ifft_buffer_offset = ant_id + BS_ANT_NUM * total_data_subframe_id;
-        float* ifft_ptr = (float*)&dl_ifft_buffer_[ifft_buffer_offset]
-                                                  [sc_id + OFDM_DATA_START];
-        for (int i = 0; i < demul_block_size / 4; i++) {
+    for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
+        int ifft_buffer_offset
+            = ant_id + cfg->BS_ANT_NUM * total_data_subframe_id;
+        float* ifft_ptr = (float*)&dl_ifft_buffer_[ifft_buffer_offset][sc_id
+            + cfg->OFDM_DATA_START];
+        for (size_t i = 0; i < cfg->demul_block_size / 4; i++) {
             float* input_shifted_ptr
-                = precoded_ptr + 4 * i * 2 * BS_ANT_NUM + ant_id * 2;
+                = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
             __m256d t_data
                 = _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
             _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);

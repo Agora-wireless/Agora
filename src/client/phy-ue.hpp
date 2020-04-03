@@ -9,7 +9,6 @@
 #include "config.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
-#include "offset.h"
 #include "signalHandler.hpp"
 #include <algorithm>
 #include <armadillo>

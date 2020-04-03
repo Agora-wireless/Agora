@@ -127,7 +127,7 @@ void Millipede::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    int cur_frame_id = 0;
+    size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
     int demul_count = 0;
@@ -135,59 +135,50 @@ void Millipede::start()
     double demul_begin = get_time();
     double tx_begin = get_time();
 
-    int last_dequeue = 0;
-    int ret = 0;
-    Event_data events_list[kDequeueBulkSizeWorker * cfg->worker_thread_num];
-    int miss_count = 0;
-    int total_count = 0;
+    bool is_turn_to_dequeue_from_io = true;
+    const size_t max_events_needed
+        = std::max(kDequeueBulkSizeWorker * cfg->socket_thread_num,
+            kDequeueBulkSizeTXRX * cfg->worker_thread_num);
+    Event_data events_list[max_events_needed];
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
-        /* Get a bulk of events */
-        if (last_dequeue == 0) {
-            ret = 0;
-            for (size_t i = 0; i < config_->socket_thread_num; i++)
-                ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(rx_ptoks_ptr[i]), events_list + ret,
+        /* Get a batch of events */
+        int num_events = 0;
+        if (is_turn_to_dequeue_from_io) {
+            for (size_t i = 0; i < config_->socket_thread_num; i++) {
+                num_events += message_queue_.try_dequeue_bulk_from_producer(
+                    *(rx_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeTXRX);
-            last_dequeue = 1;
+            }
         } else {
-            ret = 0;
-            for (size_t i = 0; i < config_->worker_thread_num; i++)
-                ret += message_queue_.try_dequeue_bulk_from_producer(
-                    *(worker_ptoks_ptr[i]), events_list + ret,
-                    kDequeueBulkSizeWorker);
+            for (size_t i = 0; i < config_->worker_thread_num; i++) {
+                num_events
+                    += complete_task_queue_.try_dequeue_bulk_from_producer(
+                        *(worker_ptoks_ptr[i]), events_list + num_events,
+                        kDequeueBulkSizeWorker);
+            }
             // ret = complete_task_queue_.try_dequeue_bulk(
             //     ctok_complete, events_list, dequeue_bulk_size_single);
-            last_dequeue = 0;
         }
-        total_count++;
-        if (total_count == 1e9) {
-            // printf("message dequeue miss rate %f\n", (float)miss_count /
-            // total_count);
-            total_count = 0;
-            miss_count = 0;
-        }
-        if (ret == 0) {
-            miss_count++;
-            continue;
-        }
+        is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
         /* Handle each event */
         int frame_count = 0;
-        for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
+        for (int ev_i = 0; ev_i < num_events; ev_i++) {
+            Event_data& event = events_list[ev_i];
+
+            // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int offset = event.data;
-                int socket_thread_id, offset_in_current_buffer;
-                interpreteOffset2d_setbits(
-                    offset, &socket_thread_id, &offset_in_current_buffer, 28);
+                int offset_in_current_buffer = rx_tag_t(event.data).offset;
+                int socket_thread_id = rx_tag_t(event.data).tid;
+
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
                 frame_count = pkt->frame_id % 10000;
-                int frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
+                size_t frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
                 int subframe_id = pkt->symbol_id;
 
                 update_rx_counters(frame_count, frame_id, subframe_id);
@@ -198,8 +189,8 @@ void Millipede::start()
                         cur_frame_id = frame_id;
                     }
                 }
-                delay_fft_queue[frame_id][delay_fft_queue_cnt[frame_id]++]
-                    = offset;
+
+                fft_queue_arr[frame_id].push(fft_req_tag_t(event.data));
             } break;
 
             case EventType::kFFT: {
@@ -296,6 +287,7 @@ void Millipede::start()
 
                         demul_stats_.update_frame_count();
                     }
+
                     demul_count++;
                     if (demul_count == demul_stats_.max_symbol_count * 9000) {
                         demul_count = 0;
@@ -321,9 +313,9 @@ void Millipede::start()
                 int num_code_blocks = decode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / ul_data_subframe_num_perframe;
+                    = total_data_subframe_id / cfg->ul_data_symbol_num_perframe;
                 int data_subframe_id
-                    = total_data_subframe_id % ul_data_subframe_num_perframe;
+                    = total_data_subframe_id % cfg->ul_data_symbol_num_perframe;
 
                 if (decode_stats_.last_task(frame_id, data_subframe_id)) {
                     print_per_subframe_done(PRINT_DECODE,
@@ -350,9 +342,9 @@ void Millipede::start()
                 int num_code_blocks = encode_stats_.max_task_count;
                 int total_data_subframe_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / data_subframe_num_perframe;
+                    = total_data_subframe_id / cfg->data_symbol_num_perframe;
                 int data_subframe_id
-                    = total_data_subframe_id % data_subframe_num_perframe;
+                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
 
                 if (encode_stats_.last_task(frame_id, data_subframe_id)) {
                     consumer_precode.schedule_task_set(total_data_subframe_id);
@@ -479,6 +471,7 @@ void Millipede::start()
                             goto finish;
                         tx_stats_.update_frame_count();
                     }
+
                     tx_count++;
                     if (tx_count == tx_stats_.max_symbol_count * 9000) {
                         tx_count = 0;
@@ -502,19 +495,20 @@ void Millipede::start()
             } /* End of switch */
 
             /* Schedule multiple fft tasks as one event */
-            if (delay_fft_queue_cnt[cur_frame_id] >= config_->fft_block_size) {
-                size_t fft_block_num = delay_fft_queue_cnt[cur_frame_id]
+            if (fft_queue_arr[cur_frame_id].size() >= config_->fft_block_size) {
+                size_t fft_block_num = fft_queue_arr[cur_frame_id].size()
                     / config_->fft_block_size;
-                size_t remainder = delay_fft_queue_cnt[cur_frame_id]
-                    % config_->fft_block_size;
+
                 for (size_t i = 0; i < fft_block_num; i++) {
                     Event_data do_fft_task;
                     do_fft_task.num_offsets = config_->fft_block_size;
                     do_fft_task.event_type = EventType::kFFT;
+
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
-                        size_t qid = i * config_->fft_block_size + j;
                         do_fft_task.offsets[j]
-                            = delay_fft_queue[cur_frame_id][qid];
+                            = fft_queue_arr[cur_frame_id].front()._tag;
+                        fft_queue_arr[cur_frame_id].pop();
+
                         if (!config_->bigstation_mode) {
                             if (fft_created_count++ == 0) {
                                 stats_manager_->update_processing_started(
@@ -527,12 +521,6 @@ void Millipede::start()
                     }
                     consumer_fft.try_handle(do_fft_task);
                 }
-                for (size_t i = 0; i < remainder; i++) {
-                    size_t orig_qid = fft_block_num * config_->fft_block_size;
-                    delay_fft_queue[cur_frame_id][i]
-                        = delay_fft_queue[cur_frame_id][orig_qid + i];
-                }
-                delay_fft_queue_cnt[cur_frame_id] = remainder;
             }
         } /* End of for */
     } /* End of while */
@@ -540,7 +528,6 @@ void Millipede::start()
 finish:
 
     printf("Millipede: printing stats\n");
-    printf("Total dequeue trials: %d, missed %d\n", total_count, miss_count);
     int last_frame_id = stats_manager_->last_frame_id;
     stats_manager_->save_to_file(last_frame_id);
     stats_manager_->print_summary(last_frame_id);
@@ -556,11 +543,11 @@ finish:
     // exit(0);
 }
 
-void Millipede::handle_event_fft(int offset, Consumer& consumer_zf,
+void Millipede::handle_event_fft(int tag, Consumer& consumer_zf,
     Consumer& consumer_demul, Consumer& consumer_rc)
 {
-    int frame_id = offset / config_->symbol_num_perframe;
-    int subframe_id = offset % config_->symbol_num_perframe;
+    int frame_id = fft_resp_tag_t(tag).frame_id;
+    int subframe_id = fft_resp_tag_t(tag).subframe_id;
 
     if (fft_stats_.last_task(frame_id, subframe_id)) {
         if (config_->isPilot(frame_id, subframe_id)) {
@@ -1168,13 +1155,9 @@ void Millipede::initialize_uplink_buffers()
 
 #ifdef USE_LDPC
     decode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        ul_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
-        data_subframe_num_perframe, 64);
+        cfg->ul_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
+        cfg->data_symbol_num_perframe, 64);
 #endif
-
-    delay_fft_queue.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->symbol_num_perframe * cfg->BS_ANT_NUM, 32);
-    alloc_buffer_1d(&delay_fft_queue_cnt, TASK_BUFFER_FRAME_NUM, 32, 1);
 }
 
 void Millipede::initialize_downlink_buffers()
@@ -1202,9 +1185,9 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
 #ifdef USE_LDPC
-    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * UE_NUM,
-        dl_data_subframe_num_perframe, TASK_BUFFER_FRAME_NUM,
-        data_subframe_num_perframe, 64);
+    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
+        cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
+        cfg->data_symbol_num_perframe, 64);
 #endif
     precode_stats_.init(config_->demul_block_num,
         cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
@@ -1239,9 +1222,6 @@ void Millipede::free_uplink_buffers()
 #ifdef USE_LDPC
     decode_stats_.fini();
 #endif
-
-    delay_fft_queue.free();
-    free_buffer_1d(&delay_fft_queue_cnt);
 }
 
 void Millipede::free_downlink_buffers()
@@ -1318,8 +1298,8 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * cfg->dl_data_symbol_num_perframe
+        int total_data_subframe_id
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->data_symbol_num_perframe
             + i + cfg->dl_data_symbol_start;
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
