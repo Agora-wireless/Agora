@@ -319,20 +319,18 @@ Event_data DoIFFT::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time = get_time();
 #endif
-    int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-
-    int ant_id = offset % cfg->BS_ANT_NUM;
 #if DEBUG_PRINT_IN_TASK
+    int ant_id = offset % cfg->BS_ANT_NUM;
     int total_data_subframe_id = offset / cfg->BS_ANT_NUM;
-    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    int frame_id = total_data_subframe_id / cfg->data_symbol_num_perframe;
     int current_data_subframe_id
-        = total_data_subframe_id % data_subframe_num_perframe;
+        = total_data_subframe_id % cfg->data_symbol_num_perframe;
     printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid,
         frame_id, current_data_subframe_id, ant_id);
 #endif
 
-    int dl_ifft_buffer_size
-        = cfg->BS_ANT_NUM * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM;
+    int dl_ifft_buffer_size = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
+        * TASK_BUFFER_FRAME_NUM;
     int buffer_subframe_offset = offset % dl_ifft_buffer_size;
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -340,18 +338,17 @@ Event_data DoIFFT::launch(int offset)
     double duration1 = start_time1 - start_time;
     (*task_duration)[tid * 8][1] += duration1;
 #endif
-    // printf("data before ifft\n");
-    // for (int i = 0; i < OFDM_CA_NUM; i++)
-    //     printf("%.3f+j%.3f ", dl_ifft_buffer_[buffer_subframe_offset][i].re,
-    //     dl_ifft_buffer_[buffer_subframe_offset][i].im);
-    // printf("\n");
 
-    DftiComputeBackward(mkl_handle, dl_ifft_buffer_[buffer_subframe_offset]);
+    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[buffer_subframe_offset];
+    memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
+    memset(ifft_buf_ptr + (cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM) * 2, 0,
+        sizeof(float) * cfg->OFDM_DATA_START * 2);
 
+    DftiComputeBackward(mkl_handle, ifft_buf_ptr);
     // printf("data after ifft\n");
-    // for (int i = 0; i < OFDM_CA_NUM; i++)
-    //     printf("%.3f+j%.3f ", dl_ifft_buffer_[buffer_subframe_offset][i].re,
-    //     dl_ifft_buffer_[buffer_subframe_offset][i].im);
+    // for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
+    //     printf("%.1f+%.1fj ", dl_ifft_buffer_[buffer_subframe_offset][i].re,
+    //         dl_ifft_buffer_[buffer_subframe_offset][i].im);
     // printf("\n");
 
 #if DEBUG_UPDATE_STATS_DETAILED
@@ -360,24 +357,20 @@ Event_data DoIFFT::launch(int offset)
     (*task_duration)[tid * 8][2] += duration2;
 #endif
 
-    float* ifft_output_ptr
-        = (float*)(&dl_ifft_buffer_[buffer_subframe_offset][0]);
     int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-        * data_subframe_num_perframe;
+        * cfg->data_symbol_num_perframe;
     int socket_subframe_offset = offset % dl_socket_buffer_status_size;
     int packet_length = cfg->packet_length;
     struct Packet* pkt
-        = (struct Packet*)(&dl_socket_buffer_[socket_subframe_offset
-                               * packet_length]
-            + ant_id * packet_length);
-    // int socket_offset = sizeof(int) * 16 + ant_id * packet_length;
+        = (struct Packet*)&dl_socket_buffer_[socket_subframe_offset
+            * packet_length];
     short* socket_ptr = &pkt->data[2 * cfg->TX_PREFIX_LEN];
 
     for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
         /* ifft scaled results by OFDM_CA_NUM */
         __m256 scale_factor = _mm256_set1_ps(32768.0 / cfg->OFDM_CA_NUM);
-        __m256 ifft1 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id);
-        __m256 ifft2 = _mm256_load_ps(ifft_output_ptr + 2 * sc_id + 8);
+        __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
+        __m256 ifft2 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id + 8);
         __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
         __m256 scaled_ifft2 = _mm256_mul_ps(ifft2, scale_factor);
         __m256i integer1 = _mm256_cvtps_epi32(scaled_ifft1);

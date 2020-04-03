@@ -92,10 +92,6 @@ Event_data DoPrecode::launch(int offset)
                 int subframe_id_in_buffer
                     = current_data_subframe_id - cfg->dl_data_symbol_start;
 
-                // printf("In doPrecode thread %d: frame: %d, subframe: %d,
-                // subcarrier: %d\n", tid, frame_id, current_data_subframe_id,
-                // cur_sc_id); printf("raw data: \n");
-
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
 #ifdef USE_LDPC
                     int8_t* raw_data_ptr
@@ -125,20 +121,13 @@ Event_data DoPrecode::launch(int offset)
             Precode_task_duration[tid * 8][1] += duration1;
 #endif
             mat_precoded = mat_data * mat_precoder;
-            // printf("In doPrecode thread %d: frame: %d, subframe: %d,
-            // subcarrier: %d\n",
+
+            // printf("In doPrecode thread %d: frame: %d, subframe: %d, "
+            //        "subcarrier: % d\n ",
             //     tid, frame_id, current_data_subframe_id, sc_id);
-            // cout<<"Precoder: \n"<<mat_precoder<<endl;
-            // cout<<"Data: \n"<<mat_data<<endl;
-            // cout <<"Precoded data: \n" << mat_precoded<<endl;
-            // printf("In doPrecode thread %d: frame: %d, subframe: %d,
-            // subcarrier: %d\n", tid, frame_id, current_data_subframe_id,
-            // cur_sc_id); cout << "Precoded data:" ; for (int j = 0; j <
-            // BS_ANT_NUM; j++) {
-            //     cout <<*((float *)(precoded_ptr+j)) << "+j"<<*((float
-            //     *)(precoded_ptr+j)+1)<<",   ";
-            // }
-            // cout<<endl;
+            // cout << "Precoder: \n" << mat_precoder << endl;
+            // cout << "Data: \n" << mat_data << endl;
+            // cout << "Precoded data: \n" << mat_precoded << endl;
         }
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration2 = get_time() - start_time1;
