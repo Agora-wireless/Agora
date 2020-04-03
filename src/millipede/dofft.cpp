@@ -374,7 +374,7 @@ Event_data DoIFFT::launch(int offset)
         integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
         //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
         _mm256_stream_si256(
-            (__m256i*)&socket_ptr[2 * sc_id + cfg->CP_LEN], integer1);
+            (__m256i*)&socket_ptr[2 * (sc_id + cfg->CP_LEN)], integer1);
         if (sc_id >= cfg->OFDM_CA_NUM - cfg->CP_LEN) // add CP
             _mm256_stream_si256((__m256i*)&socket_ptr[2
                                     * (sc_id + cfg->CP_LEN - cfg->OFDM_CA_NUM)],
