@@ -60,11 +60,13 @@ void cvtShortToFloatSIMD(short*& in_buf, float*& out_buf, size_t length)
 
 DoFFT::DoFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
     Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
     Table<complex_float>& in_calib_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , socket_buffer_(in_socket_buffer)
     , socket_buffer_status_(in_socket_buffer_status)
     , data_buffer_(in_data_buffer)
@@ -294,10 +296,12 @@ void DoFFT::simd_store_to_buf(
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
     , task_duration(&in_stats_manager->ifft_stats_worker.task_duration)

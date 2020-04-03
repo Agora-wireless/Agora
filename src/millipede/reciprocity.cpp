@@ -9,10 +9,12 @@
 using namespace arma;
 Reciprocity::Reciprocity(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_calib_buffer,
     Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , calib_buffer_(in_calib_buffer)
     , recip_buffer_(in_recip_buffer)
     , RC_task_duration(&in_stats_manager->rc_stats_worker.task_duration)
