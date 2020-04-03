@@ -88,32 +88,32 @@ void Millipede::start()
     /* Uplink */
     moodycamel::ProducerToken ptok_fft(fft_queue_);
     ConcurrentQueueWrapper fft_queue_wrapper(
-        fft_queue_, ptok_fft, fft_stats_.max_task_count, EventType::kFFT);
+        fft_queue_, ptok_fft, cfg->BS_ANT_NUM, EventType::kFFT);
 
     moodycamel::ProducerToken ptok_zf(zf_queue_);
     ConcurrentQueueWrapper zf_queue_wrapper(
-        zf_queue_, ptok_zf, zf_stats_.max_task_count, EventType::kZF);
+        zf_queue_, ptok_zf, cfg->zf_block_num, EventType::kZF);
 
     moodycamel::ProducerToken ptok_demul(demul_queue_);
-    ConcurrentQueueWrapper demul_queue_wrapper(demul_queue_, ptok_demul,
-        demul_stats_.max_task_count, EventType::kDemul);
+    ConcurrentQueueWrapper demul_queue_wrapper(
+        demul_queue_, ptok_demul, cfg->demul_block_num, EventType::kDemul);
 
 #ifdef USE_LDPC
     moodycamel::ProducerToken ptok_decode(decode_queue_);
     ConcurrentQueueWrapper decode_queue_wrapper(decode_queue_, ptok_decode,
-        decode_stats_.max_task_count, EventType::kDecode);
+        cfg->LDPC_config.nblocksInSymbol * cfg->UE_NUM, EventType::kDecode);
 #endif
 
     /* Downlink */
 #ifdef USE_LDPC
     moodycamel::ProducerToken ptok_encode(encode_queue_);
     ConcurrentQueueWrapper encode_queue_wrapper(encode_queue_, ptok_encode,
-        encode_stats_.max_task_count, EventType::kEncode);
+        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM, EventType::kEncode);
 #endif
 
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
     ConcurrentQueueWrapper ifft_queue_wrapper(
-        ifft_queue_, ptok_ifft, ifft_stats_.max_task_count, EventType::kIFFT);
+        ifft_queue_, ptok_ifft, cfg->BS_ANT_NUM, EventType::kIFFT);
 
     moodycamel::ProducerToken ptok_rc(rc_queue_);
     ConcurrentQueueWrapper rc_queue_wrapper(
@@ -121,7 +121,7 @@ void Millipede::start()
 
     moodycamel::ProducerToken ptok_precode(precode_queue_);
     ConcurrentQueueWrapper precode_queue_wrapper(precode_queue_, ptok_precode,
-        precode_stats_.max_task_count, EventType::kPrecode);
+        cfg->demul_block_num, EventType::kPrecode);
 
     /* Tokens used for dequeue */
     moodycamel::ConsumerToken ctok(message_queue_);
