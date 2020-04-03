@@ -58,7 +58,7 @@ public:
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
     void* loopMain(int tid);
     void* loopSend(int tid);
-    int dequeue_send(int tid);
+    int dequeue_send(int tid, int radio_id);
     void init_IQ_from_file();
     size_t get_max_subframe_id();
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
