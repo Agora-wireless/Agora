@@ -10,11 +10,13 @@
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
     Table<complex_float>& in_ul_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , csi_buffer_(in_csi_buffer)
     , recip_buffer_(in_recip_buffer)
     , ul_precoder_buffer_(in_ul_precoder_buffer)

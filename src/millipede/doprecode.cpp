@@ -10,7 +10,8 @@ using namespace arma;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    ConcurrentQueueWrapper& complete_task_queue_wrapper,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
 #ifdef USE_LDPC
@@ -19,7 +20,8 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
     Table<int8_t>& in_dl_raw_data,
 #endif
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue_wrapper)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , precoder_buffer_(in_precoder_buffer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
 #ifdef USE_LDPC
