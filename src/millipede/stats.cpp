@@ -549,7 +549,7 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
         &encode_stats_per_frame, task_thread_num, break_down_num);
 }
 
-void Stats::save_to_file(size_t last_frame_id)
+void Stats::save_to_file()
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
@@ -560,9 +560,7 @@ void Stats::save_to_file(size_t last_frame_id)
         exit(0);
     }
 
-    printf("Stats: saving timestamps to data/timeresult.txt. Total processed "
-           "frames %zu\n",
-        last_frame_id - 1);
+    printf("Saving timestamps to data/timeresult.txt\n");
 
     if (config_->downlink_mode) {
         for (size_t ii = 0; ii < last_frame_id; ii++) {
@@ -641,8 +639,9 @@ double Stats::compute_count_percentage(
     return percentage;
 }
 
-void Stats::print_summary(UNUSED size_t last_frame_id)
+void Stats::print_summary()
 {
+    printf("Stats: total processed frames %zu\n", last_frame_id + 1);
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
