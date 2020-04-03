@@ -1298,8 +1298,8 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * cfg->dl_data_symbol_num_perframe
+        int total_data_subframe_id
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->data_symbol_num_perframe
             + i + cfg->dl_data_symbol_start;
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
