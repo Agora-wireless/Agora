@@ -285,8 +285,8 @@ void Phy_UE::start()
                     // frame=frame_id+TX_RX_FRAME_OFFSET
                     int tx_frame_id = (frame_id + TX_RX_FRAME_OFFSET);
                     for (size_t i = 0; i < ul_data_symbol_perframe; i++) {
-                        l2_offset = generateOffset2d(
-                            tx_frame_id % TASK_BUFFER_FRAME_NUM, i);
+                        l2_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, 
+					ul_data_symbol_perframe, tx_frame_id , i);
                         // if (l2_buffer_status_[l2_offset] == 0)
                         {
                             // modul_buffer_[l2_offset] = ul_IQ_modul[i];
@@ -804,9 +804,8 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // int buffer_symbol_num = TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe ;
     // int l2_thread_id = 0; //offset / buffer_symbol_num;
     // offset = offset - l2_thread_id * buffer_symbol_num;
-    int frame_offset = 0; // offset / TASK_BUFFER_FRAME_NUM;
-    int ul_symbol_id = 0; // offset % TASK_BUFFER_FRAME_NUM;
-    interpreteOffset2d(offset, &frame_offset, &ul_symbol_id);
+    int frame_offset = offset / TASK_BUFFER_FRAME_NUM;
+    int ul_symbol_id = offset % TASK_BUFFER_FRAME_NUM;
 
     size_t frame_id = frame;
 
