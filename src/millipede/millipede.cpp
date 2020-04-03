@@ -507,17 +507,15 @@ void Millipede::start()
 finish:
 
     printf("Millipede: printing stats\n");
-    int last_frame_id = stats_manager_->last_frame_id;
-    stats_manager_->save_to_file(last_frame_id);
-    stats_manager_->print_summary(last_frame_id);
-
+    stats_manager_->print_summary();
+    stats_manager_->save_to_file();
 #ifdef USE_LDPC
-    save_decode_data_to_file(last_frame_id);
+    save_decode_data_to_file(stats_manager_->last_frame_id);
 #else
-    save_demul_data_to_file(last_frame_id);
+    save_demul_data_to_file(stats_manager_->last_frame_id);
 #endif
 
-    save_ifft_data_to_file(last_frame_id);
+    save_ifft_data_to_file(stats_manager_->last_frame_id);
     this->stop();
     // exit(0);
 }
@@ -1289,8 +1287,8 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * cfg->dl_data_symbol_num_perframe
+        int total_data_subframe_id
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->data_symbol_num_perframe
             + i + cfg->dl_data_symbol_start;
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {

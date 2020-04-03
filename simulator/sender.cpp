@@ -38,10 +38,12 @@ Sender::Sender(
     size_t buffer_length = kTXBufOffset + cfg->packet_length;
     size_t max_subframe_id = get_max_subframe_id();
     printf("max_subframe_id: %zu\n", max_subframe_id);
-    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    size_t max_length_
+        = SOCKET_BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
 
-    packet_count_per_subframe.calloc(BUFFER_FRAME_NUM, max_subframe_id, 64);
-    alloc_buffer_1d(&packet_count_per_frame, BUFFER_FRAME_NUM, 64, 1);
+    packet_count_per_subframe.calloc(
+        SOCKET_BUFFER_FRAME_NUM, max_subframe_id, 64);
+    alloc_buffer_1d(&packet_count_per_frame, SOCKET_BUFFER_FRAME_NUM, 64, 1);
 
     tx_buffer_.calloc(max_length_, buffer_length, 64);
     init_IQ_from_file();
@@ -132,7 +134,8 @@ void* Sender::loopMain(int tid)
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
 
     size_t max_subframe_id = get_max_subframe_id();
-    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    size_t max_length_
+        = SOCKET_BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
 
     /* push tasks of the first subframe into task queue */
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
@@ -205,7 +208,6 @@ void* Sender::loopMain(int tid)
                 }
             }
         }
-        update_ids(cfg->BS_ANT_NUM, max_subframe_id);
     }
     write_stats_to_file(tx_frame_count);
     exit(0);
@@ -386,24 +388,25 @@ void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
 void Sender::preload_tx_buffer()
 {
     size_t max_subframe_id = get_max_subframe_id();
-    size_t max_length_ = BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
+    size_t max_length_
+        = SOCKET_BUFFER_FRAME_NUM * max_subframe_id * cfg->BS_ANT_NUM;
     for (size_t i = 0; i < max_length_; i++) {
         update_tx_buffer(i);
-        update_ids(cfg->BS_ANT_NUM, max_subframe_id);
     }
 }
 
 void Sender::update_tx_buffer(size_t data_ptr)
 {
-    int tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
-    int data_index = subframe_id * cfg->BS_ANT_NUM + tx_ant_id;
+    size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
+    size_t data_index = subframe_id * cfg->BS_ANT_NUM + tx_ant_id;
     struct Packet* pkt = (struct Packet*)(tx_buffer_[data_ptr] + kTXBufOffset);
     pkt->frame_id = frame_id;
     pkt->symbol_id = cfg->getSymbolId(subframe_id);
     pkt->cell_id = 0;
-    pkt->ant_id = ant_id;
+    pkt->ant_id = tx_ant_id;
     memcpy(pkt->data, (char*)IQ_data_coded[data_index],
         sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
+    update_ids(cfg->BS_ANT_NUM, get_max_subframe_id());
 }
 
 void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
