@@ -162,11 +162,9 @@ void* Receiver::loopRecv(int tid)
             + (cur_buffer_ptr - buffer_ptr + cfg->packet_length)
                 % buffer_length;
 
-        /* Push packet received event into the queue. data records the position
-         * of this packet in the buffer & tid of this socket (so that task
-         * thread could know which buffer it should visit) */
+        /* Push packet received event into the queue */
         Event_data packet_message(
-            EventType::kPacketRX, generateOffset2d_setbits(tid, offset, 28));
+            EventType::kPacketRX, rx_tag_t(tid, offset)._tag);
 
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             printf("socket message enqueue failed\n");

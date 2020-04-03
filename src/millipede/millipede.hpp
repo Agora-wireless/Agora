@@ -37,7 +37,6 @@
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
-#include "offset.h"
 #include "reciprocity.hpp"
 #include "txrx.hpp"
 
@@ -61,9 +60,15 @@ public:
     static const int kDequeueBulkSizeTXRX = 8;
     static const int kDequeueBulkSizeWorker = 4;
 
+    /**
+     * @brief Create a Millipede object and start the worker threads
+     */
     Millipede(Config*);
     ~Millipede();
 
+    /**
+     * @brief The main Millipede event loop
+     */
     void start();
     void stop();
 
@@ -75,7 +80,7 @@ public:
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
-    void handle_event_fft(int offset, Consumer& consumer_zf,
+    void handle_event_fft(int tag, Consumer& consumer_zf,
         Consumer& consumer_demul, Consumer& consumer_rc);
 
     /* Add tasks into task queue based on event type */
@@ -189,8 +194,9 @@ private:
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
 
-    Table<int> delay_fft_queue;
-    size_t* delay_fft_queue_cnt;
+    // Per-frame queues of delayed FFT tasks. The queue contains offsets into
+    // TX/RX buffers.
+    std::array<std::queue<fft_req_tag_t>, TASK_BUFFER_FRAME_NUM> fft_queue_arr;
 
     /**
      * Raw data

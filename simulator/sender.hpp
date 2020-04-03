@@ -47,7 +47,6 @@ public:
 #else
     static const size_t kTXBufOffset = 0;
 #endif
-    static const size_t BUFFER_FRAME_NUM = 40;
 
 public:
     Sender(Config* in_config, size_t in_thread_num, size_t in_core_offset = 30,
