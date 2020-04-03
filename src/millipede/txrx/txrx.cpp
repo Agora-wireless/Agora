@@ -17,14 +17,11 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     /* initialize random seed: */
     srand(time(NULL));
 
-    int nRadios = config_->nRadios;
-    if (nRadios < comm_thread_num_)
-        nRadios = comm_thread_num_;
-    socket_ = new int[nRadios];
+    socket_ = new int[config_->nRadios];
 #if USE_IPV4
-    servaddr_ = new struct sockaddr_in[nRadios];
+    servaddr_ = new struct sockaddr_in[config_->nRadios];
 #else
-    servaddr_ = new struct sockaddr_in6[nRadios];
+    servaddr_ = new struct sockaddr_in6[config_->nRadios];
 #endif
 }
 
@@ -91,11 +88,8 @@ void* PacketTXRX::loopTXRX(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     double* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
-    int nRadios = config_->nRadios;
-    if (nRadios < comm_thread_num_)
-        nRadios = comm_thread_num_;
-    int radio_lo = tid * nRadios / comm_thread_num_;
-    int radio_hi = (tid + 1) * nRadios / comm_thread_num_;
+    int radio_lo = tid * config_->nRadios / comm_thread_num_;
+    int radio_hi = (tid + 1) * config_->nRadios / comm_thread_num_;
     printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
