@@ -117,7 +117,7 @@ Event_data DoDemul::launch(int offset)
 #if EXPORT_CONSTELLATION
             cx_float* equal_ptr
                 = (cx_float*)(&equal_buffer_[total_data_subframe_id]
-                                            [cur_sc_id * UE_NUM]);
+                                            [cur_sc_id * cfg->UE_NUM]);
 #else
             cx_float* equal_ptr
                 = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - sc_id)
