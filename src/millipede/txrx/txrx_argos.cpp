@@ -91,39 +91,30 @@ void* PacketTXRX::loopTXRX(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     double* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
-    // printf("Recv thread: thread %d start\n", tid);
     int radio_lo = tid * config_->nRadios / comm_thread_num_;
     int radio_hi = (tid + 1) * config_->nRadios / comm_thread_num_;
-    int nradio_cur_thread = radio_hi - radio_lo;
-    // printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-    // get pointer of message queue
+    printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     //// Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
-
     pthread_cond_wait(&cond, &mutex);
     pthread_mutex_unlock(&mutex); // unlocking for all other threads
 
-    printf("receiver thread %d has %d radios\n", tid, nradio_cur_thread);
-
-    // to handle second channel at each radio
-    // this is assuming buffer_frame_num_ is at least 2
+#if MEASURE_TIME
     int prev_frame_id = -1;
-    int nChannels = config_->nChannels;
+#endif
     int radio_id = radio_lo;
     while (config_->running) {
-        // receive data
         if (-1 != dequeue_send(tid))
             continue;
-        rx_offset = (rx_offset + nChannels) % buffer_frame_num_;
+        // receive data
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
-        int frame_id = pkt->frame_id;
+        rx_offset = (rx_offset + config_->nChannels) % buffer_frame_num_;
 #if MEASURE_TIME
-        // read information from received packet
-        // frame_id = *((int *)cur_ptr_buffer);
+        int frame_id = pkt->frame_id;
         if (frame_id > prev_frame_id) {
             *(rx_frame_start + frame_id) = get_time();
             prev_frame_id = frame_id;
@@ -132,11 +123,6 @@ void* PacketTXRX::loopTXRX(int tid)
                     (char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
             }
         }
-#endif
-#if DEBUG_RECV
-        printf("PacketTXRX %d: receive frame_id %d, symbol_id %d, ant_id "
-               "%d, offset %d\n",
-            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, rx_offset);
 #endif
 
         if (++radio_id == radio_hi)
@@ -151,6 +137,8 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     char* rx_buffer = (*buffer_)[tid];
     int* rx_buffer_status = (*buffer_status_)[tid];
     int packet_length = config_->packet_length;
+
+    // if rx_buffer is full, exit
     int nChannels = config_->nChannels;
     struct Packet* pkt[nChannels];
     void* samp[nChannels];
@@ -166,8 +154,6 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
         samp[ch] = pkt[ch]->data;
     }
 
-    // TODO: this is probably a really bad implementation, and needs to be
-    // revamped
     long long frameTime;
     if (!config_->running
         || radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
@@ -177,7 +163,6 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     int frame_id = (int)(frameTime >> 32);
     int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
     int ant_id = radio_id * nChannels;
-
     for (int ch = 0; ch < nChannels; ++ch) {
         new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
         // move ptr & set status to full
