@@ -133,8 +133,8 @@ void DoZF::ZF_time_orthogonal(int offset)
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        precoder(
-            &mat_input, frame_id, cur_sc_id, cur_offset, cfg->downlink_mode);
+        precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
+            cfg->dl_data_symbol_num_perframe > 0);
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double start_time2 = get_time();
