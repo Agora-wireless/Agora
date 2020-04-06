@@ -13,6 +13,7 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "stats.hpp"
+#include "utils.h"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h> /* for fprintf */
@@ -24,7 +25,7 @@ class DoZF : public Doer {
 public:
     DoZF(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_csi_buffer,
+        Consumer& in_consumer, Table<complex_short>& in_csi_buffer,
         Table<complex_float>& in_recip_buffer,
         Table<complex_float>& in_ul_precoder_buffer,
         Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager);
@@ -80,7 +81,7 @@ private:
      */
     void Predict(int offset);
 
-    Table<complex_float> csi_buffer_;
+    Table<complex_short> csi_buffer_;
     complex_float* pred_csi_buffer;
     Table<complex_float> recip_buffer_;
     Table<complex_float> ul_precoder_buffer_;
@@ -94,6 +95,8 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM * UE_NUM */
     complex_float* csi_gather_buffer;
+
+    complex_short* csi_gather_buffer_short;
 };
 
 #endif

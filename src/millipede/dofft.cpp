@@ -6,63 +6,64 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
-/**
- * Use SIMD to vectorize data type conversion from short to float
- * reference:
- * https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
- * 0x4380'8000
- */
-void cvtShortToFloatSIMD(short*& in_buf, float*& out_buf, size_t length)
-{
-#ifdef __AVX512F__
-    const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m512i magic_i = _mm512_castps_si512(magic);
-    for (size_t i = 0; i < length; i += 16) {
-        /* get input */
-        __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
-        /* interleave with 0x0000 */
-        __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m512i val_f_int
-            = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
-        __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
-        __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
-        _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
-    }
-#else
-    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m256i magic_i = _mm256_castps_si256(magic);
-    for (size_t i = 0; i < length; i += 16) {
-        /* get input */
-        __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
+// /**
+//  * Use SIMD to vectorize data type conversion from short to float
+//  * reference:
+//  *
+//  https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
+//  * 0x4380'8000
+//  */
+// void cvtShortToFloatSIMD(short* in_buf, float*& out_buf, size_t length)
+// {
+// #ifdef __AVX512F__
+//     const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) /
+//     32768.f); const __m512i magic_i = _mm512_castps_si512(magic); for (size_t
+//     i = 0; i < length; i += 16) {
+//         /* get input */
+//         __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
+//         /* interleave with 0x0000 */
+//         __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
+//         /* convert by xor-ing and subtracting magic value:
+//          * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
+//         __m512i val_f_int
+//             = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
+//         __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
+//         __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
+//         _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
+//     }
+// #else
+//     const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) /
+//     32768.f); const __m256i magic_i = _mm256_castps_si256(magic); for (size_t
+//     i = 0; i < length; i += 16) {
+//         /* get input */
+//         __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
 
-        __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
-        /* interleave with 0x0000 */
-        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m256i val_f_int
-            = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
-        __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
-        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
-        _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
+//         __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
+//         /* interleave with 0x0000 */
+//         __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
+//         /* convert by xor-ing and subtracting magic value:
+//          * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
+//         __m256i val_f_int
+//             = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
+//         __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
+//         __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
+//         _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
 
-        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
-        __m256i val_f_int1
-            = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
-        __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
-        __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
-        _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
-    }
-#endif
-}
+//         __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
+//         __m256i val_f_int1
+//             = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
+//         __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
+//         __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
+//         _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
+//     }
+// #endif
+// }
 
 DoFFT::DoFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     Consumer& in_consumer, Table<char>& in_socket_buffer,
-    Table<int>& in_socket_buffer_status, Table<complex_float>& in_data_buffer,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_calib_buffer,
+    Table<int>& in_socket_buffer_status, Table<complex_short>& in_data_buffer,
+    Table<complex_short>& in_csi_buffer, Table<complex_short>& in_calib_buffer,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , socket_buffer_(in_socket_buffer)
@@ -84,6 +85,7 @@ DoFFT::DoFFT(Config* in_config, int in_tid,
     int FFT_buffer_block_num = 1;
     fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num, cfg->OFDM_CA_NUM, 64);
     fft_buffer_.FFT_outputs.calloc(FFT_buffer_block_num, cfg->OFDM_CA_NUM, 64);
+    alloc_buffer_1d(&fft_buf_temp, cfg->OFDM_CA_NUM * 2, 64, 1);
 }
 
 DoFFT::~DoFFT()
@@ -112,11 +114,11 @@ Event_data DoFFT::launch(int tag)
     size_t ant_id = pkt->ant_id;
 
     short* cur_buffer_ptr_ushort = &pkt->data[2 * cfg->OFDM_PREFIX_LEN];
-    float* fft_buf_ptr = (float*)(fft_buffer_.FFT_inputs[0]);
-
+    // float* fft_buf_ptr = (float*)(fft_buffer_.FFT_inputs[0]);
+    run_fft((vcs*)cur_buffer_ptr_ushort, (vcs*)fft_buf_temp, cfg->OFDM_CA_NUM);
     /* transfer ushort to float */
-    cvtShortToFloatSIMD(
-        cur_buffer_ptr_ushort, fft_buf_ptr, cfg->OFDM_CA_NUM * 2);
+    // cvtShortToFloatSIMD(
+    //     cur_buffer_ptr_ushort, fft_buf_ptr, cfg->OFDM_CA_NUM * 2);
 
     // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
     //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
@@ -145,13 +147,15 @@ Event_data DoFFT::launch(int tag)
     } else if (cur_symbol_type == SymbolType::kPilot) {
         (*CSI_task_duration)[tid * 8][1] += duration1;
     }
-
     // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
     //    (*RC_task_duration)[tid * 8][1] += duration1;
 #endif
+    /* transfer ushort to float */
+    // cvtShortToFloatSIMD(
+    //     (short*)fft_buf_temp, fft_buf_ptr, cfg->OFDM_CA_NUM * 2);
 
     /* compute FFT */
-    DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]);
+    // DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]);
     // DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0],
     // fft_buffer_.FFT_outputs[0]);
 
@@ -172,14 +176,15 @@ Event_data DoFFT::launch(int tag)
     printf("In doFFT thread %d: frame: %zu, subframe: %zu, ant: %zu\n", tid,
         frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
 #endif
-
+    short* fft_buf_ptr = fft_buf_temp;
     if (cur_symbol_type == SymbolType::kPilot) {
         int pilot_id = cfg->getPilotSFIndex(frame_id, subframe_id);
         int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * cfg->pilot_symbol_num_perframe
             + pilot_id;
-        float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
-        simd_store_to_buf(
+        // float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
+        short* csi_buffer_ptr = (short*)(csi_buffer_[subframe_offset]);
+        simd_store_to_buf_short(
             fft_buf_ptr, csi_buffer_ptr, ant_id, SymbolType::kPilot);
     } else if (cur_symbol_type == SymbolType::kUL) {
         int data_subframe_id = cfg->getUlSFIndex(frame_id, subframe_id);
@@ -187,16 +192,17 @@ Event_data DoFFT::launch(int tag)
         int subframe_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
             + data_subframe_id;
-        float* data_buf_ptr = (float*)&data_buffer_[subframe_offset][0];
-        simd_store_to_buf(fft_buf_ptr, data_buf_ptr, ant_id, SymbolType::kUL);
+        short* data_buf_ptr = (short*)&data_buffer_[subframe_offset][0];
+        simd_store_to_buf_short(
+            fft_buf_ptr, data_buf_ptr, ant_id, SymbolType::kUL);
     } else if (((cur_symbol_type == SymbolType::kCalDL)
                    && (ant_id == cfg->ref_ant))
         || ((cur_symbol_type == SymbolType::kCalUL)
                && (ant_id != cfg->ref_ant))) {
         int frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM);
         int ant_offset = ant_id * cfg->OFDM_DATA_NUM;
-        float* calib_buf_ptr = (float*)&calib_buffer_[frame_offset][ant_offset];
-        simd_store_to_buf(
+        short* calib_buf_ptr = (short*)&calib_buffer_[frame_offset][ant_offset];
+        simd_store_to_buf_short(
             fft_buf_ptr, calib_buf_ptr, ant_id, SymbolType::kCalUL);
     } else {
         printf("unkown or unsupported symbol type.\n");
@@ -288,6 +294,114 @@ void DoFFT::simd_store_to_buf(
             _mm256_stream_ps(tar_ptr_cur + 8, fft_result1);
 #endif
             sc_idx += 8;
+        }
+    }
+}
+
+void DoFFT::simd_store_to_buf_short(
+    short* fft_buf, short*& out_buf, size_t ant_id, SymbolType symbol_type)
+{
+    size_t block_num = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
+    size_t sc_idx = cfg->OFDM_DATA_START;
+
+    for (size_t block_idx = 0; block_idx < block_num; block_idx++) {
+        for (size_t sc_inblock_idx = 0;
+             sc_inblock_idx < cfg->transpose_block_size; sc_inblock_idx += 16) {
+
+            short* src_ptr_cur = fft_buf + sc_idx * 2;
+            short* tar_ptr_cur = out_buf + sc_inblock_idx * 2;
+            if (symbol_type == SymbolType::kCalUL) {
+                tar_ptr_cur += block_idx * cfg->transpose_block_size * 2;
+            } else {
+                tar_ptr_cur += (block_idx * cfg->BS_ANT_NUM + ant_id)
+                    * cfg->transpose_block_size * 2;
+            }
+#ifdef __AVX512F__
+            /* load 512 bits = 64 bytes = 32 short values = 16 subcarriers */
+            __m512i fft_result = _mm512_load_epi32(src_ptr_cur);
+            if (symbol_type == SymbolType::kPilot) {
+                __m512i pilot_tx
+                    = _mm512_set_epi16(cfg->pilots_short[sc_idx + 15],
+                        cfg->pilots_short[sc_idx + 15],
+                        cfg->pilots_short[sc_idx + 14],
+                        cfg->pilots_short[sc_idx + 14],
+                        cfg->pilots_short[sc_idx + 13],
+                        cfg->pilots_short[sc_idx + 13],
+                        cfg->pilots_short[sc_idx + 12],
+                        cfg->pilots_short[sc_idx + 12],
+                        cfg->pilots_short[sc_idx + 11],
+                        cfg->pilots_short[sc_idx + 11],
+                        cfg->pilots_short[sc_idx + 10],
+                        cfg->pilots_short[sc_idx + 10],
+                        cfg->pilots_short[sc_idx + 9],
+                        cfg->pilots_short[sc_idx + 9],
+                        cfg->pilots_short[sc_idx + 8],
+                        cfg->pilots_short[sc_idx + 8],
+                        cfg->pilots_short[sc_idx + 7],
+                        cfg->pilots_short[sc_idx + 7],
+                        cfg->pilots_short[sc_idx + 6],
+                        cfg->pilots_short[sc_idx + 6],
+                        cfg->pilots_short[sc_idx + 5],
+                        cfg->pilots_short[sc_idx + 5],
+                        cfg->pilots_short[sc_idx + 4],
+                        cfg->pilots_short[sc_idx + 4],
+                        cfg->pilots_short[sc_idx + 3],
+                        cfg->pilots_short[sc_idx + 3],
+                        cfg->pilots_short[sc_idx + 2],
+                        cfg->pilots_short[sc_idx + 2],
+                        cfg->pilots_short[sc_idx + 1],
+                        cfg->pilots_short[sc_idx + 1],
+                        cfg->pilots_short[sc_idx], cfg->pilots_short[sc_idx]);
+                fft_result = _mm512_mullo_epi16(fft_result, pilot_tx);
+            }
+            _mm512_stream_si512((void*)tar_ptr_cur, fft_result);
+#else
+            /* load 256 bits = 32 bytes = 16 short values = 8 subcarriers */
+            __m256i fft_result = _mm256_load_si256((__m256i*)src_ptr_cur);
+            __m256i fft_result1
+                = _mm256_load_si256((__m256i*)(src_ptr_cur + 16));
+            if (symbol_type == SymbolType::kPilot) {
+                __m256i pilot_tx
+                    = _mm256_set_epi16(cfg->pilots_short[sc_idx + 7],
+                        cfg->pilots_short[sc_idx + 7],
+                        cfg->pilots_short[sc_idx + 6],
+                        cfg->pilots_short[sc_idx + 6],
+                        cfg->pilots_short[sc_idx + 5],
+                        cfg->pilots_short[sc_idx + 5],
+                        cfg->pilots_short[sc_idx + 4],
+                        cfg->pilots_short[sc_idx + 4],
+                        cfg->pilots_short[sc_idx + 3],
+                        cfg->pilots_short[sc_idx + 3],
+                        cfg->pilots_short[sc_idx + 2],
+                        cfg->pilots_short[sc_idx + 2],
+                        cfg->pilots_short[sc_idx + 1],
+                        cfg->pilots_short[sc_idx + 1],
+                        cfg->pilots_short[sc_idx], cfg->pilots_short[sc_idx]);
+                fft_result = _mm256_mullo_epi16(fft_result, pilot_tx);
+
+                __m256i pilot_tx1
+                    = _mm256_set_epi16(cfg->pilots_short[sc_idx + 15],
+                        cfg->pilots_short[sc_idx + 15],
+                        cfg->pilots_short[sc_idx + 14],
+                        cfg->pilots_short[sc_idx + 14],
+                        cfg->pilots_short[sc_idx + 13],
+                        cfg->pilots_short[sc_idx + 13],
+                        cfg->pilots_short[sc_idx + 12],
+                        cfg->pilots_short[sc_idx + 12],
+                        cfg->pilots_short[sc_idx + 11],
+                        cfg->pilots_short[sc_idx + 11],
+                        cfg->pilots_short[sc_idx + 10],
+                        cfg->pilots_short[sc_idx + 10],
+                        cfg->pilots_short[sc_idx + 9],
+                        cfg->pilots_short[sc_idx + 9],
+                        cfg->pilots_short[sc_idx + 8],
+                        cfg->pilots_short[sc_idx + 8]);
+                fft_result1 = _mm256_mullo_epi16(fft_result1, pilot_tx1);
+            }
+            _mm256_stream_si256((__m256i*)tar_ptr_cur, fft_result);
+            _mm256_stream_si256((__m256i*)tar_ptr_cur + 8, fft_result1);
+#endif
+            sc_idx += 16;
         }
     }
 }

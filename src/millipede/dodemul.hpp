@@ -14,6 +14,7 @@
 #include "gettime.h"
 #include "modulation.hpp"
 #include "stats.hpp"
+#include "utils.h"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h> /* for fprintf */
@@ -25,7 +26,7 @@ class DoDemul : public Doer {
 public:
     DoDemul(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_data_buffer,
+        Consumer& in_consumer, Table<complex_short>& in_data_buffer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_equal_buffer,
         Table<uint8_t>& in_demul_hard_buffer,
@@ -63,7 +64,7 @@ public:
     void DemulSingleSC(int offset);
 
 private:
-    Table<complex_float>& data_buffer_;
+    Table<complex_short>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
@@ -77,6 +78,8 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM */
     complex_float* spm_buffer;
+
+    complex_short* spm_buffer_short;
 
     /**
      * Intermediate buffers for equalized data

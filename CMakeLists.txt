@@ -11,8 +11,8 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
+  set(CMAKE_C_FLAGS "-std=c99 -Wall -fpermissive -g -march=native -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -fpermissive -g -march=native -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
@@ -103,7 +103,8 @@ include_directories(
 	src/common/
   src/millipede/
   src/millipede/txrx/
-  src/client/)
+  src/client/
+  ../FFT/FFT_256_new/src)
 
 set(COMMON_SOURCES
   src/common/config.cpp

@@ -9,7 +9,7 @@
 using namespace arma;
 Reciprocity::Reciprocity(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+    Consumer& in_consumer, Table<complex_short>& in_calib_buffer,
     Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, in_task_queue, in_consumer)
     , calib_buffer_(in_calib_buffer)
@@ -21,6 +21,8 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
 
     calib_gather_buffer = (complex_float*)aligned_alloc(
+        64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
+    calib_buffer_float = (complex_float*)aligned_alloc(
         64, BS_ANT_NUM * OFDM_DATA_NUM * sizeof(complex_float));
 }
 
@@ -35,8 +37,11 @@ Event_data Reciprocity::launch(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time1 = get_time();
 #endif
-
-    cx_float* ptr_in = (cx_float*)calib_buffer_[offset];
+    float* calib_buffer_ptr = (float*)calib_buffer_float;
+    Utils::cvtShortToFloatSIMD((short*)(calib_buffer_[offset]),
+        calib_buffer_ptr, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM * 2);
+    cx_float* ptr_in = (cx_float*)calib_buffer_float;
+    // cx_float* ptr_in = (cx_float*)calib_buffer_[offset];
     cx_fmat mat_input(ptr_in, OFDM_DATA_NUM, BS_ANT_NUM, false);
     cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant);
     cx_float* ptr_out = (cx_float*)calib_gather_buffer;

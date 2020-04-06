@@ -144,7 +144,7 @@ private:
      * First dimension: UE_NUM * TASK_BUFFER_FRAME_NUM
      * Second dimension: BS_ANT_NUM * OFDM_CA_NUM
      */
-    Table<complex_float> csi_buffer_;
+    Table<complex_short> csi_buffer_;
 
     /**
      * Data symbols after IFFT
@@ -154,7 +154,7 @@ private:
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
      */
-    Table<complex_float> data_buffer_;
+    Table<complex_short> data_buffer_;
 
     /**
      * Calculated precoder
@@ -231,7 +231,7 @@ private:
 
     Table<complex_float> dl_precoder_buffer_;
     Table<complex_float> recip_buffer_;
-    Table<complex_float> calib_buffer_;
+    Table<complex_short> calib_buffer_;
     Table<int8_t> dl_encoded_buffer_;
 
     /**

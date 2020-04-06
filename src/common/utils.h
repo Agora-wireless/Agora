@@ -24,7 +24,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <emmintrin.h>
 #include <fstream> // std::ifstream
+#include <immintrin.h>
 #include <iostream>
 #include <mutex>
 #include <pthread.h>
@@ -62,7 +64,8 @@ class Utils {
 public:
     Utils();
     ~Utils();
-
+    static void cvtShortToFloatSIMD(
+        short* in_buf, float*& out_buf, size_t length);
     static std::vector<size_t> strToChannels(const std::string& channel);
     static std::vector<std::complex<int16_t>> double_to_cint16(
         std::vector<std::vector<double>> in);

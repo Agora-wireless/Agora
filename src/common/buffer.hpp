@@ -21,6 +21,11 @@ struct complex_float {
 };
 #endif
 
+struct complex_short {
+    short re;
+    short im;
+};
+
 // Event data tag for RX events
 union rx_tag_t {
     struct {

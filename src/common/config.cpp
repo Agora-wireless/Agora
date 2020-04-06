@@ -270,6 +270,7 @@ void Config::genData()
 #endif
 
     pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
+    pilots_short = (short*)aligned_alloc(64, OFDM_CA_NUM * sizeof(short));
     // read pilots from file
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/pilot_f_"
@@ -285,8 +286,10 @@ void Config::genData()
     fclose(fp);
 
     pilotsF.resize(OFDM_CA_NUM);
-    for (size_t i = 0; i < OFDM_CA_NUM; i++)
+    for (size_t i = 0; i < OFDM_CA_NUM; i++) {
         pilotsF[i] = pilots_[i];
+        pilots_short[i] = (short)pilots_[i];
+    }
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP

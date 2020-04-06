@@ -11,9 +11,11 @@
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "doer.hpp"
+#include "fft.h"
 #include "gettime.h"
 #include "mkl_dfti.h"
 #include "stats.hpp"
+#include "utils.h"
 #include <iostream>
 #include <stdio.h> /* for fprintf */
 #include <string.h> /* for memcpy */
@@ -25,9 +27,9 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         Consumer& in_consumer, Table<char>& in_socket_buffer,
         Table<int>& in_socket_buffer_status,
-        Table<complex_float>& in_data_buffer,
-        Table<complex_float>& in_csi_buffer,
-        Table<complex_float>& in_calib_buffer, Stats* in_stats_manager);
+        Table<complex_short>& in_data_buffer,
+        Table<complex_short>& in_csi_buffer,
+        Table<complex_short>& in_calib_buffer, Stats* in_stats_manager);
     ~DoFFT();
 
     /**
@@ -66,19 +68,22 @@ public:
 
     void simd_store_to_buf(
         float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type);
+    void simd_store_to_buf_short(
+        short* fft_buf, short*& out_buf, size_t ant_id, SymbolType symbol_type);
 
 private:
     Table<char>& socket_buffer_;
     Table<int>& socket_buffer_status_;
-    Table<complex_float>& data_buffer_;
-    Table<complex_float>& csi_buffer_;
-    Table<complex_float>& calib_buffer_;
+    Table<complex_short>& data_buffer_;
+    Table<complex_short>& csi_buffer_;
+    Table<complex_short>& calib_buffer_;
     Table<double>* FFT_task_duration;
     int* FFT_task_count;
     Table<double>* CSI_task_duration;
     int* CSI_task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     FFTBuffer fft_buffer_;
+    short* fft_buf_temp;
 };
 
 class DoIFFT : public Doer {
@@ -117,7 +122,6 @@ public:
 private:
     Table<complex_float>& dl_ifft_buffer_;
     char* dl_socket_buffer_;
-    ;
     Table<double>* task_duration;
     int* task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;

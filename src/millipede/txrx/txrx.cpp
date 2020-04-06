@@ -106,7 +106,7 @@ void* PacketTXRX::loopTXRX(int tid)
         setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
             config_->ue_rx_port + radio_id, config_->tx_addr.c_str());
 #endif
-        fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
+        // fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
 #if MEASURE_TIME
@@ -114,8 +114,8 @@ void* PacketTXRX::loopTXRX(int tid)
 #endif
     int radio_id = radio_lo;
     while (config_->running) {
-        if (-1 != dequeue_send(tid))
-            continue;
+        // if (-1 != dequeue_send(tid))
+        //     continue;
         // receive data
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)

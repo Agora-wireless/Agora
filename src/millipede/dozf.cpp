@@ -10,7 +10,7 @@
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_csi_buffer,
+    Consumer& in_consumer, Table<complex_short>& in_csi_buffer,
     Table<complex_float>& in_recip_buffer,
     Table<complex_float>& in_ul_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
@@ -24,6 +24,8 @@ DoZF::DoZF(Config* in_config, int in_tid,
     ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
     alloc_buffer_1d(&pred_csi_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(&csi_gather_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
+    alloc_buffer_1d(
+        &csi_gather_buffer_short, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
 }
 
 DoZF::~DoZF()
@@ -91,39 +93,60 @@ void DoZF::ZF_time_orthogonal(int offset)
         int cur_sc_id = sc_id + i;
         int cur_offset = offset_in_buffer + i;
         int transpose_block_size = cfg->transpose_block_size;
-        __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
-            transpose_block_size * 2 + 1, transpose_block_size * 4,
-            transpose_block_size * 4 + 1, transpose_block_size * 6,
-            transpose_block_size * 6 + 1);
+        // __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
+        //     transpose_block_size * 2 + 1, transpose_block_size * 4,
+        //     transpose_block_size * 4 + 1, transpose_block_size * 6,
+        //     transpose_block_size * 6 + 1);
+        __m256i index = _mm256_setr_epi32(0, transpose_block_size,
+            transpose_block_size * 2, transpose_block_size * 3,
+            transpose_block_size * 4, transpose_block_size * 5,
+            transpose_block_size * 6, transpose_block_size * 7);
         int transpose_block_id = cur_sc_id / transpose_block_size;
         int sc_inblock_idx = cur_sc_id % transpose_block_size;
         int offset_in_csi_buffer
             = transpose_block_id * cfg->BS_ANT_NUM * transpose_block_size
             + sc_inblock_idx;
         int subframe_offset = frame_id * cfg->UE_NUM;
-        float* tar_csi_ptr = (float*)csi_gather_buffer;
-
-        // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid,
-        // frame_id, sc_id);
-
-        /* Gather csi matrix of all users and antennas */
+        // float* tar_csi_ptr = (float*)csi_gather_buffer;
+        // /* Gather csi matrix of all users and antennas */
+        // for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+        //     float* src_csi_ptr = (float*)csi_buffer_[subframe_offset +
+        //     ue_idx]
+        //         + offset_in_csi_buffer * 2;
+        //     for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4)
+        //     {
+        //         /* Fetch 4 complex floats for 4 ants */
+        //         __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
+        //         _mm256_store_ps(tar_csi_ptr, t_csi);
+        //         // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f,
+        //         // %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr),
+        //         *((float
+        //         // *)tar_csi_ptr+1),
+        //         //         *((float *)tar_csi_ptr+2), *((float
+        //         *)tar_csi_ptr+3),
+        //         //         *((float *)tar_csi_ptr+4), *((float
+        //         //         *)tar_csi_ptr+5));
+        //         src_csi_ptr += 8 * cfg->transpose_block_size;
+        //         tar_csi_ptr += 8;
+        //     }
+        // }
+        short* tar_csi_ptr = (short*)csi_gather_buffer_short;
         for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-            float* src_csi_ptr = (float*)csi_buffer_[subframe_offset + ue_idx]
+            short* src_csi_ptr = (short*)csi_buffer_[subframe_offset + ue_idx]
                 + offset_in_csi_buffer * 2;
-            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-                /* Fetch 4 complex floats for 4 ants */
-                __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-                _mm256_store_ps(tar_csi_ptr, t_csi);
-                // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f,
-                // %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float
-                // *)tar_csi_ptr+1),
-                //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),
-                //         *((float *)tar_csi_ptr+4), *((float
-                //         *)tar_csi_ptr+5));
-                src_csi_ptr += 8 * cfg->transpose_block_size;
-                tar_csi_ptr += 8;
+            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 8) {
+                /* Fetch 8 complex shorts for 8 ants */
+                __m256i t_csi
+                    = _mm256_i32gather_epi32((int*)src_csi_ptr, index, 4);
+                _mm256_store_si256((__m256i*)tar_csi_ptr, t_csi);
+                src_csi_ptr += 16 * cfg->transpose_block_size;
+                tar_csi_ptr += 16;
             }
         }
+
+        float* csi_buffer_ptr = (float*)csi_gather_buffer;
+        Utils::cvtShortToFloatSIMD((short*)csi_gather_buffer_short,
+            csi_buffer_ptr, cfg->UE_NUM * cfg->BS_ANT_NUM * 2);
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration1 = get_time() - start_time1;
@@ -180,37 +203,56 @@ void DoZF::ZF_freq_orthogonal(int offset)
 #if DEBUG_UPDATE_STATS
     double start_time1 = get_time();
 #endif
+    // __m256i index = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
+    //     cfg->transpose_block_size * 2 + 1, cfg->transpose_block_size * 4,
+    //     cfg->transpose_block_size * 4 + 1, cfg->transpose_block_size * 6,
+    //     cfg->transpose_block_size * 6 + 1);
+    __m256i index = _mm256_setr_epi32(0, cfg->transpose_block_size,
+        cfg->transpose_block_size * 2, cfg->transpose_block_size * 3,
+        cfg->transpose_block_size * 4, cfg->transpose_block_size * 5,
+        cfg->transpose_block_size * 6, cfg->transpose_block_size * 7);
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
-        __m256i index = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
-            cfg->transpose_block_size * 2 + 1, cfg->transpose_block_size * 4,
-            cfg->transpose_block_size * 4 + 1, cfg->transpose_block_size * 6,
-            cfg->transpose_block_size * 6 + 1);
-
         int transpose_block_id = cur_sc_id / cfg->transpose_block_size;
         int sc_inblock_idx = cur_sc_id % cfg->transpose_block_size;
         int offset_in_csi_buffer
             = transpose_block_id * cfg->BS_ANT_NUM * cfg->transpose_block_size
             + sc_inblock_idx;
         int subframe_offset = frame_id;
-        float* tar_csi_ptr
-            = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
+        // float* tar_csi_ptr
+        //     = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
 
-        float* src_csi_ptr
-            = (float*)csi_buffer_[subframe_offset] + offset_in_csi_buffer * 2;
-        for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-            // fetch 4 complex floats for 4 ants
-            __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-            _mm256_store_ps(tar_csi_ptr, t_csi);
-            // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f,
-            // %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float
-            // *)tar_csi_ptr+1),
-            //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),
-            //         *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-            src_csi_ptr += 8 * cfg->transpose_block_size;
-            tar_csi_ptr += 8;
+        // float* src_csi_ptr
+        //     = (float*)csi_buffer_[subframe_offset] + offset_in_csi_buffer *
+        //     2;
+        // for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+        //     // fetch 4 complex floats for 4 ants
+        //     __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
+        //     _mm256_store_ps(tar_csi_ptr, t_csi);
+        //     // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f,
+        //     // %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float
+        //     // *)tar_csi_ptr+1),
+        //     //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),
+        //     //         *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
+        //     src_csi_ptr += 8 * cfg->transpose_block_size;
+        //     tar_csi_ptr += 8;
+        // }
+        short* tar_csi_ptr
+            = (short*)csi_gather_buffer_short + cfg->BS_ANT_NUM * i * 2;
+
+        short* src_csi_ptr
+            = (short*)csi_buffer_[subframe_offset] + offset_in_csi_buffer * 2;
+        for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 8) {
+            // fetch 8 complex floats for 8 ants
+            __m256i t_csi = _mm256_i32gather_epi32((int*)src_csi_ptr, index, 4);
+            _mm256_store_si256((__m256i*)tar_csi_ptr, t_csi);
+            src_csi_ptr += 16 * cfg->transpose_block_size;
+            tar_csi_ptr += 16;
         }
     }
+    float* csi_buffer_ptr = (float*)csi_gather_buffer;
+    Utils::cvtShortToFloatSIMD((short*)csi_gather_buffer_short, csi_buffer_ptr,
+        cfg->UE_NUM * cfg->BS_ANT_NUM * 2);
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double duration1 = get_time() - start_time1;

@@ -13,6 +13,7 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "stats.hpp"
+#include "utils.h"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h> /* for fprintf */
@@ -24,7 +25,7 @@ class Reciprocity : public Doer {
 public:
     Reciprocity(Config* cfg, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+        Consumer& in_consumer, Table<complex_short>& in_calib_buffer,
         Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~Reciprocity();
     Event_data launch(int offset);
@@ -33,7 +34,8 @@ private:
     int BS_ANT_NUM;
     int OFDM_DATA_NUM;
 
-    Table<complex_float> calib_buffer_;
+    Table<complex_short> calib_buffer_;
+    complex_float* calib_buffer_float;
     Table<complex_float> recip_buffer_;
 
     Table<double>* RC_task_duration;

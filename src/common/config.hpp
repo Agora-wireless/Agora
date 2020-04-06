@@ -62,6 +62,7 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float* pilots_;
+    short* pilots_short;
     Table<int8_t> dl_IQ_data;
     Table<int8_t> ul_IQ_data;
     Table<complex_float> ul_IQ_modul;
