@@ -38,12 +38,6 @@ private:
 
     Table<double>* RC_task_duration;
     int* RC_task_count;
-
-    /**
-     * Intermediate buffer to gather CSI
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
-    complex_float* calib_gather_buffer;
 };
 
 #endif
