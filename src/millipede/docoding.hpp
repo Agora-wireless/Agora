@@ -31,8 +31,10 @@ class DoEncode : public Doer {
 public:
     DoEncode(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<int8_t>& in_raw_data_buffer,
-        Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Stats* in_stats_manager);
     ~DoEncode();
 
     /**
@@ -71,8 +73,10 @@ class DoDecode : public Doer {
 public:
     DoDecode(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<int8_t>& in_demod_buffer,
-        Table<uint8_t>& in_decoded_buffer, Stats* in_stats_manager);
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Stats* in_stats_manager);
     ~DoDecode();
 
     /**
