@@ -177,7 +177,7 @@ void Millipede::start()
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
-                frame_count = pkt->frame_id % 10000;
+                frame_count = pkt->frame_id % kNumStatsFrames;
                 size_t frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
                 int subframe_id = pkt->symbol_id;
 
