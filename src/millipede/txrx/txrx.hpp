@@ -174,7 +174,7 @@ private:
     // PacketTXRXContext* rx_context;
 
     Config* config_;
-#if USE_ARGOS
+#ifdef USE_ARGOS
     RadioConfig* radioconfig_;
 #endif
 };
