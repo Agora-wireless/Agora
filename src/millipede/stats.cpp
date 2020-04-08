@@ -52,13 +52,17 @@ Stats::Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
     init_stats_worker_per_frame(&rc_stats_per_frame, break_down_num);
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    csi_time_in_function_details.calloc(break_down_num - 1, 10000, 4096);
-    fft_time_in_function_details.calloc(break_down_num - 1, 10000, 4096);
-    zf_time_in_function_details.calloc(break_down_num - 1, 10000, 4096);
-    demul_time_in_function_details.calloc(break_down_num - 1, 10000, 4096);
+    csi_time_in_function_details.calloc(
+        break_down_num - 1, kNumStatsFrames, 4096);
+    fft_time_in_function_details.calloc(
+        break_down_num - 1, kNumStatsFrames, 4096);
+    zf_time_in_function_details.calloc(
+        break_down_num - 1, kNumStatsFrames, 4096);
+    demul_time_in_function_details.calloc(
+        break_down_num - 1, kNumStatsFrames, 4096);
 #endif
 
-    frame_start.calloc(config_->socket_thread_num, 10240, 64);
+    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, 64);
 }
 
 Stats::~Stats()

@@ -234,11 +234,11 @@ void Simulator::initialize_uplink_buffers()
     /* initilize all uplink status checkers */
     alloc_buffer_1d(&rx_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
 
-    frame_start.calloc(SOCKET_RX_THREAD_NUM, 10240, 4096);
-    alloc_buffer_1d(&frame_start_receive, 10240, 4096, 1);
-    alloc_buffer_1d(&frame_end_receive, 10240, 4096, 1);
-    alloc_buffer_1d(&frame_start_tx, 10240, 4096, 1);
-    alloc_buffer_1d(&frame_end_tx, 10240, 4096, 1);
+    frame_start.calloc(SOCKET_RX_THREAD_NUM, kNumStatsFrames, 4096);
+    alloc_buffer_1d(&frame_start_receive, kNumStatsFrames, 4096, 1);
+    alloc_buffer_1d(&frame_end_receive, kNumStatsFrames, 4096, 1);
+    alloc_buffer_1d(&frame_start_tx, kNumStatsFrames, 4096, 1);
+    alloc_buffer_1d(&frame_end_tx, kNumStatsFrames, 4096, 1);
 }
 
 void Simulator::free_uplink_buffers()
