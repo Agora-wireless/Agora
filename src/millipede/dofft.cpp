@@ -109,7 +109,7 @@ Event_data DoFFT::launch(int tag)
     char* cur_buffer_ptr
         = socket_buffer_[socket_thread_id] + buf_offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    size_t frame_id = pkt->frame_id % 10000;
+    size_t frame_id = pkt->frame_id % kNumStatsFrames;
     size_t subframe_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 

@@ -101,8 +101,8 @@ Sender::~Sender()
 void Sender::startTX()
 {
     printf("start sender\n");
-    alloc_buffer_1d(&frame_start, 10240, 4096, 1);
-    alloc_buffer_1d(&frame_end, 10240, 4096, 1);
+    alloc_buffer_1d(&frame_start, kNumStatsFrames, 4096, 1);
+    alloc_buffer_1d(&frame_end, kNumStatsFrames, 4096, 1);
     /* create tx threads */
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::loopSend>, 0, thread_num);
@@ -364,7 +364,7 @@ void Sender::update_ids(size_t max_ant_id, size_t max_subframe_id)
         if (subframe_id == max_subframe_id) {
             subframe_id = 0;
             frame_id++;
-            if (frame_id == MAX_FRAME_ID)
+            if (frame_id == kNumStatsFrames)
                 frame_id = 0;
         }
     }
