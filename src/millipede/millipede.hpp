@@ -31,6 +31,7 @@
 // #include <stdio.h>
 // #include "cpu_attach.hpp"
 #include "buffer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "dodemul.hpp"
 #include "dofft.hpp"
@@ -80,12 +81,10 @@ public:
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
-    void handle_event_fft(int tag, Consumer& consumer_zf,
-        Consumer& consumer_demul, Consumer& consumer_rc);
+    void handle_event_fft(int tag);
 
     /* Add tasks into task queue based on event type */
-    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id,
-        Consumer const& consumer);
+    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id);
 
     void update_rx_counters(int frame_count, int frame_id, int subframe_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
@@ -273,6 +272,17 @@ private:
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     /* Tokens */
+    moodycamel::ProducerToken* ptok_fft;
+    moodycamel::ProducerToken* ptok_zf;
+    moodycamel::ProducerToken* ptok_demul;
+#ifdef USE_LDPC
+    moodycamel::ProducerToken* ptok_decode;
+    moodycamel::ProducerToken* ptok_encode;
+#endif
+    moodycamel::ProducerToken* ptok_ifft;
+    moodycamel::ProducerToken* ptok_rc;
+    moodycamel::ProducerToken* ptok_precode;
+
     moodycamel::ProducerToken** rx_ptoks_ptr;
     moodycamel::ProducerToken** tx_ptoks_ptr;
     moodycamel::ProducerToken** worker_ptoks_ptr;

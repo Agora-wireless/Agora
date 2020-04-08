@@ -4,16 +4,19 @@
  *
  */
 #include "dodemul.hpp"
-#include "Consumer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
 DoDemul::DoDemul(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_data_buffer,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
+    Table<complex_float>& in_data_buffer,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
     , equal_buffer_(in_equal_buffer)
@@ -211,7 +214,7 @@ Event_data DoDemul::launch(int offset)
     return demul_finish_event;
 }
 
-void DoDemul::DemulSingleSC(int offset)
+Event_data DoDemul::DemulSingleSC(int offset)
 {
     double start_time = get_time();
 
@@ -289,10 +292,9 @@ void DoDemul::DemulSingleSC(int offset)
     double duration3 = get_time() - start_time;
     Demul_task_duration[tid][1] += duration3;
 
-    Event_data demul_finish_event(EventType::kDemul, offset);
     Demul_task_count[tid] = Demul_task_count[tid] + 1;
-    consumer_.handle(demul_finish_event);
-
     double duration = get_time() - start_time;
     Demul_task_duration[tid][0] += duration;
+
+    return Event_data(EventType::kDemul, offset);
 }
