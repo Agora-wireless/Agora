@@ -10,7 +10,6 @@ Config::Config(std::string jsonfile)
 
     /* antenna configurations */
     hub_file = tddConf.value("hubs", "");
-    Utils::loadDevices(hub_file, hub_ids);
     serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
@@ -34,7 +33,8 @@ Config::Config(std::string jsonfile)
             if (BS_ANT_NUM != nAntennas)
                 BS_ANT_NUM = nAntennas;
         }
-    }
+    } else
+        nRadios = tddConf.value("radio_num", BS_ANT_NUM);
 
 #ifdef USE_ARGOS
     if (nRadios == 0) {
@@ -211,8 +211,6 @@ Config::Config(std::string jsonfile)
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
-    // packet_length = offsetof(Packet, data) + sizeof(short) * OFDM_FRAME_LEN *
-    // 2;
 
     running = true;
     std::cout << "Config: "
@@ -278,7 +276,7 @@ void Config::genData()
         + std::to_string(OFDM_CA_NUM) + ".bin";
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
-        printf("open file %s faild.\n", filename.c_str());
+        printf("open pilots file %s failed.\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     size_t r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
@@ -411,7 +409,7 @@ void Config::genData()
 #endif
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
-        printf("open file %s faild.\n", filename1.c_str());
+        printf("open antenna file %s failed.\n", filename1.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {

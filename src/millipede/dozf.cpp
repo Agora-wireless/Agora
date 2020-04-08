@@ -61,7 +61,7 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
             cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
             cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = diagmat(vec_calib);
-            mat_dl_precoder = inv(mat_calib) * mat_ul_precoder;
+            mat_dl_precoder = mat_ul_precoder * inv(mat_calib);
         } else
             mat_dl_precoder = mat_ul_precoder;
     }
