@@ -50,7 +50,7 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
     cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
     cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
     cx_fmat mat_ul_precoder(ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-    pinv(mat_ul_precoder, mat_input, 1e-1, "dc");
+    pinv(mat_ul_precoder, mat_input, 1e-2, "dc");
     if (downlink_mode) {
         cx_float* ptr_dl_out = (cx_float*)dl_precoder_buffer_[offset];
         cx_fmat mat_dl_precoder(
