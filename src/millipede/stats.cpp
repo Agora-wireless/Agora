@@ -62,7 +62,7 @@ Stats::Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
         break_down_num - 1, kNumStatsFrames, 4096);
 #endif
 
-    frame_start.calloc(config_->socket_thread_num, 10240, 64);
+    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, 64);
 }
 
 Stats::~Stats()
