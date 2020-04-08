@@ -15,9 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// Number of cellular frames tracked by statistics
-static constexpr size_t kNumStatsFrames = 10000;
-
 struct Stats_worker {
     /* accumulated task duration for all frames in each worker thread*/
     Table<double> task_duration;
