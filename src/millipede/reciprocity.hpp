@@ -24,7 +24,9 @@ class Reciprocity : public Doer {
 public:
     Reciprocity(Config* cfg, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<complex_float>& in_calib_buffer,
         Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~Reciprocity();
     Event_data launch(int offset);

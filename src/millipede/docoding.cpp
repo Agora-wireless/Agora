@@ -4,7 +4,7 @@
  *
  */
 #include "docoding.hpp"
-#include "Consumer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
 
@@ -47,9 +47,12 @@ static void adapt_bits_for_mod(
 
 DoEncode::DoEncode(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<int8_t>& in_raw_data_buffer,
-    Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
+    Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+    Stats* in_stats_manager)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
     , Encode_task_duration(in_stats_manager->encode_stats_worker.task_duration)
@@ -175,9 +178,12 @@ Event_data DoEncode::launch(int offset)
 
 DoDecode::DoDecode(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<int8_t>& in_demod_buffer,
-    Table<uint8_t>& in_decoded_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
+    Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+    Stats* in_stats_manager)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , llr_buffer_(in_demod_buffer)
     , decoded_buffer_(in_decoded_buffer)
     , Decode_task_duration(in_stats_manager->decode_stats_worker.task_duration)
