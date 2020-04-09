@@ -147,6 +147,8 @@ private:
     int demul_thread_num;
     int break_down_num;
 
+    /// Timestamps taken by the master thread at different points in a frame's
+    /// processing
     double master_timestamps[kNumTimestampTypes][kNumStatsFrames];
 
     double csi_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
