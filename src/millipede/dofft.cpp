@@ -6,59 +6,6 @@
 #include "dofft.hpp"
 #include "Consumer.hpp"
 
-// /**
-//  * Use SIMD to vectorize data type conversion from short to float
-//  * reference:
-//  *
-//  https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
-//  * 0x4380'8000
-//  */
-// void cvtShortToFloatSIMD(short* in_buf, float*& out_buf, size_t length)
-// {
-// #ifdef __AVX512F__
-//     const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) /
-//     32768.f); const __m512i magic_i = _mm512_castps_si512(magic); for (size_t
-//     i = 0; i < length; i += 16) {
-//         /* get input */
-//         __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
-//         /* interleave with 0x0000 */
-//         __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
-//         /* convert by xor-ing and subtracting magic value:
-//          * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-//         __m512i val_f_int
-//             = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
-//         __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
-//         __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
-//         _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
-//     }
-// #else
-//     const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) /
-//     32768.f); const __m256i magic_i = _mm256_castps_si256(magic); for (size_t
-//     i = 0; i < length; i += 16) {
-//         /* get input */
-//         __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
-
-//         __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
-//         /* interleave with 0x0000 */
-//         __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
-//         /* convert by xor-ing and subtracting magic value:
-//          * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-//         __m256i val_f_int
-//             = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
-//         __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
-//         __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
-//         _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
-
-//         __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
-//         __m256i val_f_int1
-//             = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
-//         __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
-//         __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
-//         _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
-//     }
-// #endif
-// }
-
 DoFFT::DoFFT(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     Consumer& in_consumer, Table<char>& in_socket_buffer,
@@ -114,18 +61,13 @@ Event_data DoFFT::launch(int tag)
     size_t ant_id = pkt->ant_id;
 
     short* cur_buffer_ptr_ushort = &pkt->data[2 * cfg->OFDM_PREFIX_LEN];
-    // float* fft_buf_ptr = (float*)(fft_buffer_.FFT_inputs[0]);
     run_fft((vcs*)cur_buffer_ptr_ushort, (vcs*)fft_buf_temp, cfg->OFDM_CA_NUM);
-    /* transfer ushort to float */
-    // cvtShortToFloatSIMD(
-    //     cur_buffer_ptr_ushort, fft_buf_ptr, cfg->OFDM_CA_NUM * 2);
 
     // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
     //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
-    // printf("FFT input\n");
+    // printf("FFT output\n");
     // for (int i = 0; i < cfg->OFDM_CA_NUM; i++) {
-    //     printf("%.4f+%.4fi ", *(fft_buf_ptr + i * 2),
-    //         *(fft_buf_ptr + i * 2 + 1));
+    //     printf("%d+%dj ", *(fft_buf_temp + i * 2), *(fft_buf_temp + i * 2 + 1));
     // }
     // printf("\n");
 
@@ -399,7 +341,7 @@ void DoFFT::simd_store_to_buf_short(
                 fft_result1 = _mm256_mullo_epi16(fft_result1, pilot_tx1);
             }
             _mm256_stream_si256((__m256i*)tar_ptr_cur, fft_result);
-            _mm256_stream_si256((__m256i*)tar_ptr_cur + 8, fft_result1);
+            _mm256_stream_si256((__m256i*)(tar_ptr_cur + 16), fft_result1);
 #endif
             sc_idx += 16;
         }
