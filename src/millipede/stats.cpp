@@ -7,16 +7,17 @@
 
 #include <typeinfo>
 
-Stats::Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
-    int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num)
+Stats::Stats(Config* cfg, int break_down_num, int task_thread_num,
+    int fft_thread_num, int zf_thread_num, int demul_thread_num)
     : config_(cfg)
+    , task_thread_num(task_thread_num)
+    , fft_thread_num(fft_thread_num)
+    , zf_thread_num(zf_thread_num)
+    , demul_thread_num(demul_thread_num)
+    , break_down_num(break_down_num)
 {
-    task_thread_num = in_task_thread_num;
-    fft_thread_num = in_fft_thread_num;
-    zf_thread_num = in_zf_thread_num;
-    demul_thread_num = in_demul_thread_num;
-
-    break_down_num = in_break_down_num;
+    rt_assert(break_down_num <= (int)kMaxStatBreakdown,
+        "Statistics breakdown too high");
 
     init_stats_worker(&csi_stats_worker, task_thread_num, break_down_num);
     init_stats_worker(&fft_stats_worker, task_thread_num, break_down_num);
@@ -40,16 +41,6 @@ Stats::Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
     init_stats_worker(
         &precode_stats_worker_old, task_thread_num, break_down_num);
     init_stats_worker(&rc_stats_worker_old, task_thread_num, break_down_num);
-
-    init_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&fft_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&zf_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&demul_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&decode_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&encode_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&ifft_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&precode_stats_per_frame, break_down_num);
-    init_stats_worker_per_frame(&rc_stats_per_frame, break_down_num);
 
 #if DEBUG_UPDATE_STATS_DETAILED
     csi_time_in_function_details.calloc(
@@ -86,16 +77,6 @@ Stats::~Stats()
     free_stats_worker(&ifft_stats_worker_old, task_thread_num);
     free_stats_worker(&precode_stats_worker_old, task_thread_num);
     free_stats_worker(&rc_stats_worker_old, task_thread_num);
-
-    free_stats_worker_per_frame(&csi_stats_per_frame);
-    free_stats_worker_per_frame(&fft_stats_per_frame);
-    free_stats_worker_per_frame(&zf_stats_per_frame);
-    free_stats_worker_per_frame(&demul_stats_per_frame);
-    free_stats_worker_per_frame(&decode_stats_per_frame);
-    free_stats_worker_per_frame(&encode_stats_per_frame);
-    free_stats_worker_per_frame(&ifft_stats_per_frame);
-    free_stats_worker_per_frame(&precode_stats_per_frame);
-    free_stats_worker_per_frame(&rc_stats_per_frame);
 }
 
 void Stats::init_stats_worker(
@@ -105,37 +86,11 @@ void Stats::init_stats_worker(
     alloc_buffer_1d(&stats_in_worker->task_count, thread_num * 16, 32, 1);
 }
 
-void Stats::init_stats_worker_per_frame(
-    Stats_worker_per_frame* stats_in_worker, int break_down_num)
-{
-    alloc_buffer_1d(
-        &(stats_in_worker->duration_this_thread), break_down_num, 32, 1);
-    alloc_buffer_1d(&(stats_in_worker->duration_this_thread_per_task),
-        break_down_num, 32, 1);
-    alloc_buffer_1d(
-        &(stats_in_worker->duration_avg_threads), break_down_num, 32, 1);
-}
-
 void Stats::free_stats_worker(
     Stats_worker* stats_in_worker, UNUSED int thread_num)
 {
     stats_in_worker->task_duration.free();
     free_buffer_1d(&stats_in_worker->task_count);
-}
-
-void Stats::free_stats_worker_per_frame(Stats_worker_per_frame* stats_in_worker)
-{
-    free_buffer_1d(&(stats_in_worker->duration_this_thread));
-    free_buffer_1d(&(stats_in_worker->duration_this_thread_per_task));
-    free_buffer_1d(&(stats_in_worker->duration_avg_threads));
-}
-
-void Stats::reset_stats_worker_per_frame(
-    Stats_worker_per_frame* stats_in_worker, int break_down_num)
-{
-    stats_in_worker->count_all_threads = 0;
-    memset(stats_in_worker->duration_avg_threads, 0,
-        sizeof(double) * break_down_num);
 }
 
 void Stats::update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
@@ -298,8 +253,9 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
 void Stats::update_stats_in_dofft(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    reset_stats_worker_per_frame(&fft_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
+    fft_stats_per_frame.reset();
+    csi_stats_per_frame.reset();
+
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for FFT */
         update_stats_for_breakdowns(&fft_stats_per_frame, fft_stats_worker,
@@ -327,7 +283,7 @@ void Stats::update_stats_in_dofft(
 void Stats::update_stats_in_dozf(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    reset_stats_worker_per_frame(&zf_stats_per_frame, break_down_num);
+    zf_stats_per_frame.reset();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for ZF */
         update_stats_for_breakdowns(&zf_stats_per_frame, zf_stats_worker,
@@ -348,7 +304,7 @@ void Stats::update_stats_in_dozf(
 void Stats::update_stats_in_dodemul(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    reset_stats_worker_per_frame(&demul_stats_per_frame, break_down_num);
+    demul_stats_per_frame.reset();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for Demul */
         update_stats_for_breakdowns(&demul_stats_per_frame, demul_stats_worker,
@@ -370,8 +326,8 @@ void Stats::update_stats_in_dodemul(
 void Stats::update_stats_in_doifft(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    reset_stats_worker_per_frame(&ifft_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
+    ifft_stats_per_frame.reset();
+    csi_stats_per_frame.reset();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for IFFT */
         update_stats_for_breakdowns(&fft_stats_per_frame, fft_stats_worker,
@@ -399,7 +355,7 @@ void Stats::update_stats_in_doifft(
 void Stats::update_stats_in_doprecode(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    reset_stats_worker_per_frame(&precode_stats_per_frame, break_down_num);
+    precode_stats_per_frame.reset();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for Precode */
         update_stats_for_breakdowns(&precode_stats_per_frame,
@@ -436,11 +392,12 @@ void Stats::update_stats_in_functions_downlink_bigstation(int frame_id)
 
 void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id)
 {
-    reset_stats_worker_per_frame(&fft_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&zf_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&demul_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&decode_stats_per_frame, break_down_num);
+    fft_stats_per_frame.reset();
+    csi_stats_per_frame.reset();
+    zf_stats_per_frame.reset();
+    demul_stats_per_frame.reset();
+    decode_stats_per_frame.reset();
+
     for (int i = 0; i < task_thread_num; i++) {
         /* compute stats for FFT */
         update_stats_for_breakdowns(&fft_stats_per_frame, fft_stats_worker,
@@ -495,11 +452,11 @@ void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id)
 
 void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
 {
-    reset_stats_worker_per_frame(&ifft_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&csi_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&zf_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&precode_stats_per_frame, break_down_num);
-    reset_stats_worker_per_frame(&encode_stats_per_frame, break_down_num);
+    ifft_stats_per_frame.reset();
+    csi_stats_per_frame.reset();
+    zf_stats_per_frame.reset();
+    precode_stats_per_frame.reset();
+    encode_stats_per_frame.reset();
 
     for (int i = 0; i < task_thread_num; i++) {
         /* compute stats for IFFT */
