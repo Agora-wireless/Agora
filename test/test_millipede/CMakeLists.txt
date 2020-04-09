@@ -66,6 +66,7 @@ include_directories(
   ${SOURCE_DIR}/src/millipede/
   ${SOURCE_DIR}/src/millipede/txrx/
   ${SOURCE_DIR}/src/client/
+  ${SOURCE_DIR}/../FFT/FFT_256_new/src
 	)
 
 set(COMMON_SOURCES 
