@@ -15,19 +15,24 @@
 #include <stdio.h>
 #include <string.h>
 
+static constexpr size_t kMaxStatBreakdown = 4;
+
 struct Stats_worker {
     /* accumulated task duration for all frames in each worker thread*/
-    Table<double> task_duration;
+    Table<double> task_duration; // (thread_num * 8) x break_down_num
     /* accumulated task count for all frames in each worker thread*/
-    int* task_count;
+    int* task_count; // thead_num  * 16
 };
 
 struct Stats_worker_per_frame {
-    double* duration_this_thread;
-    double* duration_this_thread_per_task;
+    double duration_this_thread[kMaxStatBreakdown];
+    double duration_this_thread_per_task[kMaxStatBreakdown];
     int count_this_thread = 0;
-    double* duration_avg_threads;
+    double duration_avg_threads[kMaxStatBreakdown];
     int count_all_threads = 0;
+
+    void reset() { memset(this, 0, sizeof(Stats_worker_per_frame)); }
+    Stats_worker_per_frame() { reset(); }
 };
 
 // Type of timestamps recorded
@@ -53,18 +58,13 @@ static constexpr size_t kNumTimestampTypes
 
 class Stats {
 public:
-    Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
-        int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num);
+    Stats(Config* cfg, int break_down_num, int task_thread_num,
+        int fft_thread_num, int zf_thread_num, int demul_thread_num);
     ~Stats();
 
     void init_stats_worker(
         Stats_worker* stats_in_worker, int thread_num, int break_down_num);
-    void init_stats_worker_per_frame(
-        Stats_worker_per_frame* stats_in_worker, int break_down_num);
     void free_stats_worker(Stats_worker* stats_in_worker, int thread_num);
-    void free_stats_worker_per_frame(Stats_worker_per_frame* stats_in_worker);
-    void reset_stats_worker_per_frame(
-        Stats_worker_per_frame* stats_in_worker, int break_down_num);
     void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
         Stats_worker stats_in_worker, Stats_worker* stats_in_worker_old,
         int thread_id, int break_down_num);
