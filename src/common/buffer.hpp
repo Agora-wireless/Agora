@@ -194,9 +194,11 @@ struct FFT_stats : public Data_stats {
 struct RC_stats {
     int frame_count;
     int max_task_count;
+    int last_frame;
     RC_stats(void)
         : frame_count(0)
         , max_task_count(1)
+	, last_frame (-1)
     {
     }
     void update_frame_count(void)

@@ -211,6 +211,7 @@ void Millipede::start()
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
                 fft_stats_.symbol_cal_count[frame_id] = 0;
                 rc_stats_.update_frame_count();
+                rc_stats_.last_frame = frame_id;
             } break;
 
             case EventType::kZF: {
@@ -553,13 +554,19 @@ void Millipede::handle_event_fft(int tag, Consumer& consumer_zf,
         if (config_->isPilot(frame_id, subframe_id)) {
             print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count,
                 frame_id, subframe_id);
-            /* If CSI of all UEs is ready, schedule ZF/prediction */
-            if (fft_stats_.last_symbol(frame_id)) {
-                stats_manager_->update_fft_processed(fft_stats_.frame_count);
-                print_per_frame_done(
-                    PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
-                fft_stats_.update_frame_count();
-                consumer_zf.schedule_task_set(frame_id);
+            if (!config_->downlink_mode
+                || (config_->downlink_mode && !config_->recipCalEn)
+                || (config_->downlink_mode && config_->recipCalEn
+                       && rc_stats_.last_frame == frame_id)) {
+                /* If CSI of all UEs is ready, schedule ZF/prediction */
+                if (fft_stats_.last_symbol(frame_id)) {
+                    stats_manager_->update_fft_processed(
+                        fft_stats_.frame_count);
+                    print_per_frame_done(
+                        PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
+                    fft_stats_.update_frame_count();
+                    consumer_zf.schedule_task_set(frame_id);
+                }
             }
         } else if (config_->isUplink(frame_id, subframe_id)) {
             int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
@@ -1177,14 +1184,14 @@ void Millipede::initialize_downlink_buffers()
         cfg->BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
-    dl_encoded_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     recip_buffer_.malloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.malloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-
 #ifdef USE_LDPC
+    dl_encoded_buffer_.malloc(
+        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
         cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
         cfg->data_symbol_num_perframe, 64);
@@ -1230,6 +1237,10 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
+    recip_buffer_.free();
+    calib_buffer_.free();
+    dl_precoder_buffer_.free();
+    dl_encoded_buffer_.free();
 
 #ifdef USE_LDPC
     encode_stats_.fini();
