@@ -74,11 +74,7 @@ public:
     void print_per_frame(Stats_worker_per_frame stats_per_frame);
 
     void update_stats_in_functions_uplink(int frame_id);
-    void update_stats_in_functions_uplink_bigstation(int frame_id);
-    void update_stats_in_functions_uplink_millipede(int frame_id);
     void update_stats_in_functions_downlink(int frame_id);
-    void update_stats_in_functions_downlink_bigstation(int frame_id);
-    void update_stats_in_functions_downlink_millipede(int frame_id);
     void save_to_file();
 
     int compute_total_count(Stats_worker stats_in_worker, int thread_num);
@@ -110,21 +106,6 @@ public:
                                [frame_id % kNumStatsFrames];
     }
 
-    /* stats for the worker threads */
-    void update_stats_in_dofft(
-        int frame_id, int thread_num, int thread_num_offset);
-
-    void update_stats_in_dozf(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_dodemul(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_doifft(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_doprecode(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_rc(
-        int frame_id, int thread_num, int thread_num_offset);
-
     /* accumulated task duration for all frames in each worker thread*/
     Stats_worker csi_stats_worker;
     Stats_worker fft_stats_worker;
@@ -138,6 +119,26 @@ public:
     Table<double> frame_start;
 
 private:
+    /* stats for the worker threads */
+    void update_stats_in_dofft(
+        int frame_id, int thread_num, int thread_num_offset);
+    void update_stats_in_dozf(
+        int frame_id, int thread_num, int thread_num_offset);
+    void update_stats_in_dodemul(
+        int frame_id, int thread_num, int thread_num_offset);
+    void update_stats_in_doifft(
+        int frame_id, int thread_num, int thread_num_offset);
+    void update_stats_in_doprecode(
+        int frame_id, int thread_num, int thread_num_offset);
+    void update_stats_in_rc(
+        int frame_id, int thread_num, int thread_num_offset);
+
+    void update_stats_in_functions_uplink_bigstation(int frame_id);
+    void update_stats_in_functions_uplink_millipede(int frame_id);
+
+    void update_stats_in_functions_downlink_bigstation(int frame_id);
+    void update_stats_in_functions_downlink_millipede(int frame_id);
+
     Config* config_;
 
     int task_thread_num;
