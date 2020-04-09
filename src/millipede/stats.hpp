@@ -113,51 +113,17 @@ public:
     /* stats for the worker threads */
     void update_stats_in_dofft(
         int frame_id, int thread_num, int thread_num_offset);
-    double get_csi_time_in_dofft(int frame_id)
-    {
-        return csi_time_in_function[frame_id % kNumStatsFrames];
-    };
-
-    // void update_fft_in_function(int frame_id);
-    double get_fft_time_in_dofft(int frame_id)
-    {
-        return fft_time_in_function[frame_id % kNumStatsFrames];
-    };
 
     void update_stats_in_dozf(
         int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_dozf(int frame_id)
-    {
-        return zf_time_in_function[frame_id % kNumStatsFrames];
-    };
-
     void update_stats_in_dodemul(
         int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_dodemul(int frame_id)
-    {
-        return demul_time_in_function[frame_id % kNumStatsFrames];
-    };
-
     void update_stats_in_doifft(
         int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_doifft(int frame_id)
-    {
-        return ifft_time_in_function[frame_id % kNumStatsFrames];
-    };
-
     void update_stats_in_doprecode(
         int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_doprecode(int frame_id)
-    {
-        return precode_time_in_function[frame_id % kNumStatsFrames];
-    };
-
     void update_stats_in_rc(
         int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_rc(int frame_id)
-    {
-        return zf_time_in_function[frame_id % kNumStatsFrames];
-    };
 
     /* accumulated task duration for all frames in each worker thread*/
     Stats_worker csi_stats_worker;
