@@ -31,8 +31,16 @@ struct Stats_worker_per_frame {
     double duration_avg_threads[kMaxStatBreakdown];
     int count_all_threads = 0;
 
-    void reset() { memset(this, 0, sizeof(Stats_worker_per_frame)); }
-    Stats_worker_per_frame() { reset(); }
+    void reset_averages()
+    {
+        count_all_threads = 0;
+        memset(duration_avg_threads, 0, kMaxStatBreakdown * sizeof(double));
+    }
+
+    Stats_worker_per_frame()
+    {
+        memset(this, 0, sizeof(Stats_worker_per_frame));
+    }
 };
 
 // Type of timestamps recorded

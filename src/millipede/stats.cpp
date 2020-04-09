@@ -253,8 +253,8 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
 void Stats::update_stats_in_dofft(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    fft_stats_per_frame.reset();
-    csi_stats_per_frame.reset();
+    fft_stats_per_frame.reset_averages();
+    csi_stats_per_frame.reset_averages();
 
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for FFT */
@@ -283,7 +283,7 @@ void Stats::update_stats_in_dofft(
 void Stats::update_stats_in_dozf(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    zf_stats_per_frame.reset();
+    zf_stats_per_frame.reset_averages();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for ZF */
         update_stats_for_breakdowns(&zf_stats_per_frame, zf_stats_worker,
@@ -304,7 +304,7 @@ void Stats::update_stats_in_dozf(
 void Stats::update_stats_in_dodemul(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    demul_stats_per_frame.reset();
+    demul_stats_per_frame.reset_averages();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for Demul */
         update_stats_for_breakdowns(&demul_stats_per_frame, demul_stats_worker,
@@ -326,8 +326,8 @@ void Stats::update_stats_in_dodemul(
 void Stats::update_stats_in_doifft(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    ifft_stats_per_frame.reset();
-    csi_stats_per_frame.reset();
+    ifft_stats_per_frame.reset_averages();
+    csi_stats_per_frame.reset_averages();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for IFFT */
         update_stats_for_breakdowns(&fft_stats_per_frame, fft_stats_worker,
@@ -355,7 +355,7 @@ void Stats::update_stats_in_doifft(
 void Stats::update_stats_in_doprecode(
     UNUSED int frame_id, int thread_num, int thread_num_offset)
 {
-    precode_stats_per_frame.reset();
+    precode_stats_per_frame.reset_averages();
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         /* compute stats for Precode */
         update_stats_for_breakdowns(&precode_stats_per_frame,
@@ -392,11 +392,11 @@ void Stats::update_stats_in_functions_downlink_bigstation(int frame_id)
 
 void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id)
 {
-    fft_stats_per_frame.reset();
-    csi_stats_per_frame.reset();
-    zf_stats_per_frame.reset();
-    demul_stats_per_frame.reset();
-    decode_stats_per_frame.reset();
+    fft_stats_per_frame.reset_averages();
+    csi_stats_per_frame.reset_averages();
+    zf_stats_per_frame.reset_averages();
+    demul_stats_per_frame.reset_averages();
+    decode_stats_per_frame.reset_averages();
 
     for (int i = 0; i < task_thread_num; i++) {
         /* compute stats for FFT */
@@ -452,11 +452,11 @@ void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id)
 
 void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id)
 {
-    ifft_stats_per_frame.reset();
-    csi_stats_per_frame.reset();
-    zf_stats_per_frame.reset();
-    precode_stats_per_frame.reset();
-    encode_stats_per_frame.reset();
+    ifft_stats_per_frame.reset_averages();
+    csi_stats_per_frame.reset_averages();
+    zf_stats_per_frame.reset_averages();
+    precode_stats_per_frame.reset_averages();
+    encode_stats_per_frame.reset_averages();
 
     for (int i = 0; i < task_thread_num; i++) {
         /* compute stats for IFFT */
