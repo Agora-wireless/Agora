@@ -151,20 +151,15 @@ private:
     /// processing
     double master_timestamps[kNumTimestampTypes][kNumStatsFrames];
 
-    double csi_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
-    double fft_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
-    double zf_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
-    double demul_time_in_function[kNumStatsFrames]
-        __attribute__((aligned(4096)));
-    double ifft_time_in_function[kNumStatsFrames]
-        __attribute__((aligned(4096)));
-    double precode_time_in_function[kNumStatsFrames]
-        __attribute__((aligned(4096)));
-    double decode_time_in_function[kNumStatsFrames]
-        __attribute__((aligned(4096)));
-    double encode_time_in_function[kNumStatsFrames]
-        __attribute__((aligned(4096)));
-    double rc_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
+    double csi_time_in_function[kNumStatsFrames];
+    double fft_time_in_function[kNumStatsFrames];
+    double zf_time_in_function[kNumStatsFrames];
+    double demul_time_in_function[kNumStatsFrames];
+    double ifft_time_in_function[kNumStatsFrames];
+    double precode_time_in_function[kNumStatsFrames];
+    double decode_time_in_function[kNumStatsFrames];
+    double encode_time_in_function[kNumStatsFrames];
+    double rc_time_in_function[kNumStatsFrames];
 
 #if DEBUG_UPDATE_STATS_DETAILED
     Table<double> csi_time_in_function_details;
