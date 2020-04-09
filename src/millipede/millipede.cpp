@@ -740,8 +740,8 @@ void Millipede::schedule_demul_task(
                    "start subframe: %d, current subframe: %d, in %.2f\n",
                 frame_id, start_subframe_id, data_subframe_id,
                 get_time()
-                    - stats_manager_->get_pilot_received(
-                          demul_stats_.frame_count));
+                    - stats_manager_->master_get_timestamp(
+                          TsType::kPilotRX, demul_stats_.frame_count));
 #endif
         }
     }
@@ -935,7 +935,9 @@ void Millipede::print_per_subframe_done(UNUSED int task_type,
             frame_count, frame_id, subframe_id,
             zf_stats_.coded_frame == frame_id, fft_queue_.size_approx(),
             zf_queue_.size_approx(), demul_queue_.size_approx(),
-            get_time() - stats_manager_->get_pilot_received(frame_count));
+            get_time()
+                - stats_manager_->master_get_timestamp(
+                      TsType::kPilotRX, frame_count));
         break;
     case (PRINT_RC):
         printf("Main thread: cal symbol FFT done frame: %d, %d, subframe: %d, "
@@ -948,7 +950,9 @@ void Millipede::print_per_subframe_done(UNUSED int task_type,
                "subframes done: %d in %.2f\n",
             frame_count, frame_id, subframe_id,
             demul_stats_.symbol_count[frame_id],
-            get_time() - stats_manager_->get_pilot_received(frame_count));
+            get_time()
+                - stats_manager_->master_get_timestamp(
+                      TsType::kPilotRX, frame_count));
         break;
 #ifdef USE_LDPC
     case (PRINT_DECODE):
@@ -968,12 +972,16 @@ void Millipede::print_per_subframe_done(UNUSED int task_type,
         printf("Main thread: Precoding done frame: %d %d, subframe: %d in %.2f "
                "us\n",
             frame_count, frame_id, subframe_id,
-            get_time() - stats_manager_->get_pilot_received(frame_count));
+            get_time()
+                - stats_manager_->master_get_timestamp(
+                      TsType::kPilotRX, frame_count));
         break;
     case (PRINT_TX):
         printf("Main thread: TX done frame: %d %d, subframe: %d in %.2f us\n",
             frame_count, frame_id, subframe_id,
-            get_time() - stats_manager_->get_pilot_received(frame_count));
+            get_time()
+                - stats_manager_->master_get_timestamp(
+                      TsType::kPilotRX, frame_count));
         break;
     default:
         printf("Wrong task type in frame done print!");
