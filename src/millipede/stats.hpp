@@ -31,12 +31,6 @@ struct Stats_worker_per_frame {
     double duration_avg_threads[kMaxStatBreakdown];
     int count_all_threads = 0;
 
-    void reset_averages()
-    {
-        count_all_threads = 0;
-        memset(duration_avg_threads, 0, kMaxStatBreakdown * sizeof(double));
-    }
-
     Stats_worker_per_frame()
     {
         memset(this, 0, sizeof(Stats_worker_per_frame));
@@ -128,24 +122,46 @@ public:
 
 private:
     /* stats for the worker threads */
-    void update_stats_in_dofft(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_dozf(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_dodemul(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_doifft(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_doprecode(
-        int frame_id, int thread_num, int thread_num_offset);
-    void update_stats_in_rc(
-        int frame_id, int thread_num, int thread_num_offset);
+    void update_stats_in_dofft_bigstation(int frame_id, int thread_num,
+        int thread_num_offset, Stats_worker_per_frame* fft_stats_per_frame,
+        Stats_worker_per_frame* csi_stats_per_frame);
+    void update_stats_in_dozf_bigstation(int frame_id, int thread_num,
+        int thread_num_offset, Stats_worker_per_frame* zf_stats_per_frame);
+    void update_stats_in_dodemul_bigstation(int frame_id, int thread_num,
+        int thread_num_offset, Stats_worker_per_frame* demul_stats_per_frame);
+    void update_stats_in_doifft_bigstation(int frame_id, int thread_num,
+        int thread_num_offset, Stats_worker_per_frame* ifft_stats_per_frame,
+        Stats_worker_per_frame* csi_stats_per_frame);
+    void update_stats_in_doprecode_bigstation(int frame_id, int thread_num,
+        int thread_num_offset, Stats_worker_per_frame* precode_stats_per_frame);
 
-    void update_stats_in_functions_uplink_bigstation(int frame_id);
-    void update_stats_in_functions_uplink_millipede(int frame_id);
+    void update_stats_in_functions_uplink_bigstation(int frame_id,
+        Stats_worker_per_frame* fft_stats_per_frame,
+        Stats_worker_per_frame* csi_stats_per_frame,
+        Stats_worker_per_frame* zf_stats_per_frame,
+        Stats_worker_per_frame* demul_stats_per_frame,
+        Stats_worker_per_frame* decode_stats_per_frame);
 
-    void update_stats_in_functions_downlink_bigstation(int frame_id);
-    void update_stats_in_functions_downlink_millipede(int frame_id);
+    void update_stats_in_functions_uplink_millipede(int frame_id,
+        Stats_worker_per_frame* fft_stats_per_frame,
+        Stats_worker_per_frame* csi_stats_per_frame,
+        Stats_worker_per_frame* zf_stats_per_frame,
+        Stats_worker_per_frame* demul_stats_per_frame,
+        Stats_worker_per_frame* decode_stats_per_frame);
+
+    void update_stats_in_functions_downlink_bigstation(int frame_id,
+        Stats_worker_per_frame* ifft_stats_per_frame,
+        Stats_worker_per_frame* csi_stats_per_frame,
+        Stats_worker_per_frame* zf_stats_per_frame,
+        Stats_worker_per_frame* precode_stats_per_frame,
+        Stats_worker_per_frame* encode_stats_per_frame);
+
+    void update_stats_in_functions_downlink_millipede(int frame_id,
+        Stats_worker_per_frame* ifft_stats_per_frame,
+        Stats_worker_per_frame* csi_stats_per_frame,
+        Stats_worker_per_frame* zf_stats_per_frame,
+        Stats_worker_per_frame* precode_stats_per_frame,
+        Stats_worker_per_frame* encode_stats_per_frame);
 
     Config* config_;
 
@@ -185,16 +201,6 @@ private:
     Stats_worker ifft_stats_worker_old;
     Stats_worker precode_stats_worker_old;
     Stats_worker rc_stats_worker_old;
-
-    Stats_worker_per_frame csi_stats_per_frame;
-    Stats_worker_per_frame fft_stats_per_frame;
-    Stats_worker_per_frame zf_stats_per_frame;
-    Stats_worker_per_frame demul_stats_per_frame;
-    Stats_worker_per_frame decode_stats_per_frame;
-    Stats_worker_per_frame encode_stats_per_frame;
-    Stats_worker_per_frame ifft_stats_per_frame;
-    Stats_worker_per_frame precode_stats_per_frame;
-    Stats_worker_per_frame rc_stats_per_frame;
 };
 
 #endif
