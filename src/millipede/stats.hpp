@@ -30,6 +30,27 @@ struct Stats_worker_per_frame {
     int count_all_threads = 0;
 };
 
+// Type of timestamps recorded
+// TODO: Add definitions of what each event means
+enum class TsType : size_t {
+    kPilotRX,
+    kPilotAllRX,
+    kProcessingStarted,
+    kRXDone,
+    kFFTDone,
+    kDemulDone,
+    kZFDone,
+    kRCDone,
+    kEncodeDone,
+    kDecodeDone,
+    kPrecodeDone,
+    kIFFTDone,
+    kTXProcessedFirst,
+    kTXDone,
+};
+static constexpr size_t kNumTimestampTypes
+    = static_cast<size_t>(TsType::kTXDone) + 1;
+
 class Stats {
 public:
     Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
@@ -67,132 +88,27 @@ public:
 
     size_t last_frame_id;
 
-    /* stats for the master thread */
-    void update_pilot_received(int frame_id)
+    void master_set_timestamp(TsType timestamp_type, int frame_id)
     {
-        pilot_received[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_pilot_received(int frame_id)
-    {
-        return pilot_received[frame_id % kNumStatsFrames];
-    };
+        master_timestamps[static_cast<size_t>(timestamp_type)]
+                         [frame_id % kNumStatsFrames]
+            = get_time();
+    }
 
-    void update_pilot_all_received(int frame_id)
+    double master_get_timestamp(TsType timestamp_type, int frame_id)
     {
-        pilot_all_received[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_pilot_all_received(int frame_id)
-    {
-        return pilot_all_received[frame_id % kNumStatsFrames];
-    };
+        return master_timestamps[static_cast<size_t>(timestamp_type)]
+                                [frame_id % kNumStatsFrames];
+    }
 
-    void update_processing_started(int frame_id)
+    double master_get_timestamp_delta(
+        TsType timestamp_type_1, TsType timestamp_type_2, int frame_id)
     {
-        processing_started[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_processing_started(int frame_id)
-    {
-        return processing_started[frame_id % kNumStatsFrames];
-    };
-
-    void update_rx_processed(int frame_id)
-    {
-        rx_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_rx_processed(int frame_id)
-    {
-        return rx_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_fft_processed(int frame_id)
-    {
-        fft_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_fft_processed(int frame_id)
-    {
-        return fft_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_demul_processed(int frame_id)
-    {
-        demul_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_demul_processed(int frame_id)
-    {
-        return demul_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_zf_processed(int frame_id)
-    {
-        zf_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_zf_processed(int frame_id)
-    {
-        return zf_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_rc_processed(int frame_id)
-    {
-        rc_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_rc_processed(int frame_id)
-    {
-        return rc_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_decode_processed(int frame_id)
-    {
-        decode_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_decode_processed(int frame_id)
-    {
-        return decode_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_encode_processed(int frame_id)
-    {
-        encode_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_encode_processed(int frame_id)
-    {
-        return encode_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_precode_processed(int frame_id)
-    {
-        precode_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_precode_processed(int frame_id)
-    {
-        return precode_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_ifft_processed(int frame_id)
-    {
-        ifft_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_ifft_processed(int frame_id)
-    {
-        return ifft_processed[frame_id % kNumStatsFrames];
-    };
-
-    void update_tx_processed_first(int frame_id)
-    {
-        tx_processed_first[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_tx_processed_first(int frame_id)
-    {
-        return tx_processed_first[frame_id % kNumStatsFrames];
-    };
-
-    void update_tx_processed(int frame_id)
-    {
-        tx_processed[frame_id % kNumStatsFrames] = get_time();
-    };
-    double get_tx_processed(int frame_id)
-    {
-        return tx_processed[frame_id % kNumStatsFrames];
-    };
+        return master_timestamps[static_cast<size_t>(timestamp_type_1)]
+                                [frame_id % kNumStatsFrames]
+            - master_timestamps[static_cast<size_t>(timestamp_type_2)]
+                               [frame_id % kNumStatsFrames];
+    }
 
     /* stats for the worker threads */
     void update_stats_in_dofft(
@@ -264,21 +180,7 @@ private:
     int demul_thread_num;
     int break_down_num;
 
-    double pilot_received[kNumStatsFrames] __attribute__((aligned(4096)));
-    double pilot_all_received[kNumStatsFrames] __attribute__((aligned(4096)));
-    double processing_started[kNumStatsFrames] __attribute__((aligned(4096)));
-    double rx_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double fft_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double demul_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double zf_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double decode_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-
-    double encode_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double precode_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double ifft_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double tx_processed_first[kNumStatsFrames] __attribute__((aligned(4096)));
-    double tx_processed[kNumStatsFrames] __attribute__((aligned(4096)));
-    double rc_processed[kNumStatsFrames] __attribute__((aligned(4096)));
+    double master_timestamps[kNumTimestampTypes][kNumStatsFrames];
 
     double csi_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
     double fft_time_in_function[kNumStatsFrames] __attribute__((aligned(4096)));
