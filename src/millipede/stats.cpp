@@ -571,12 +571,18 @@ void Stats::save_to_file()
             fprintf(fp_debug,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
                 "%.3f %.3f %.3f",
-                pilot_received[ii], rx_processed[ii], fft_processed[ii],
-                zf_processed[ii], precode_processed[ii], ifft_processed[ii],
-                tx_processed[ii], tx_processed_first[ii],
+                master_get_timestamp(TsType::kPilotRX, ii),
+                master_get_timestamp(TsType::kRXDone, ii),
+                master_get_timestamp(TsType::kFFTDone, ii),
+                master_get_timestamp(TsType::kZFDone, ii),
+                master_get_timestamp(TsType::kPrecodeDone, ii),
+                master_get_timestamp(TsType::kIFFTDone, ii),
+                master_get_timestamp(TsType::kTXDone, ii),
+                master_get_timestamp(TsType::kTXProcessedFirst, ii),
                 csi_time_in_function[ii], zf_time_in_function[ii],
                 precode_time_in_function[ii], ifft_time_in_function[ii],
-                processing_started[ii], frame_start[0][ii]);
+                master_get_timestamp(TsType::kProcessingStarted, ii),
+                frame_start[0][ii]);
 
             if (config_->socket_thread_num > 1)
                 fprintf(fp_debug, " %.3f", frame_start[1][ii]);
@@ -586,14 +592,19 @@ void Stats::save_to_file()
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",
-                pilot_received[ii], rx_processed[ii], fft_processed[ii],
-                zf_processed[ii], demul_processed[ii], csi_time_in_function[ii],
-                fft_time_in_function[ii], zf_time_in_function[ii],
-                demul_time_in_function[ii], processing_started[ii],
+                master_get_timestamp(TsType::kPilotRX, ii),
+                master_get_timestamp(TsType::kRXDone, ii),
+                master_get_timestamp(TsType::kFFTDone, ii),
+                master_get_timestamp(TsType::kZFDone, ii),
+                master_get_timestamp(TsType::kDemulDone, ii),
+                csi_time_in_function[ii], fft_time_in_function[ii],
+                zf_time_in_function[ii], demul_time_in_function[ii],
+                master_get_timestamp(TsType::kProcessingStarted, ii),
                 frame_start[0][ii]);
             if (config_->socket_thread_num > 1)
                 fprintf(fp_debug, " %.3f", frame_start[1][ii]);
-            fprintf(fp_debug, " %.3f\n", pilot_all_received[ii]);
+            fprintf(fp_debug, " %.3f\n",
+                master_get_timestamp(TsType::kPilotAllRX, ii));
         }
 
 #if DEBUG_UPDATE_STATS_DETAILED
