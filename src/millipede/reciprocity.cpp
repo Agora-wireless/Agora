@@ -17,9 +17,8 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid,
           worker_producer_token)
     , calib_buffer_(in_calib_buffer)
     , recip_buffer_(in_recip_buffer)
-    , RC_task_duration(&in_stats_manager->rc_stats_worker.task_duration)
-    , RC_task_count(in_stats_manager->rc_stats_worker.task_count)
 {
+    duration_stat = in_stats_manager->get_duration_stat(DoerType::kRC, in_tid);
     BS_ANT_NUM = cfg->BS_ANT_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
 
@@ -62,36 +61,27 @@ Event_data Reciprocity::launch(int offset)
     }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration1 = get_time() - start_time1;
-    (*RC_task_duration)[tid * 8][1] += duration1;
-    // double start_time2 = get_time();
+    duration_stat->task_duration[1] += get_time() - start_time1;
 #endif
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
-    double duration2 = start_time2 - start_time1;
-    (*RC_task_duration)[tid * 8][2] += duration2;
-    // double start_time2 = get_time();
+    duration_stat->task_duration[2] += start_time2 - start_time1;
 #endif
 
     // cout<<"Precoder:" <<mat_output<<endl;
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration3 = get_time() - start_time2;
-    (*RC_task_duration)[tid * 8][3] += duration3;
-    // double start_time3 = get_time();
+    duration_stat->task_duration[3] += get_time() - start_time2;
 #endif
 
 #if DEBUG_UPDATE_STATS
-    RC_task_count[tid * 16] = RC_task_count[tid * 16] + 1;
     double duration = get_time() - start_time1;
-    (*RC_task_duration)[tid * 8][0] += duration;
+    duration_stat->task_duration[0] += duration;
     if (duration > 500) {
         printf("Thread %d RC takes %.2f\n", tid, duration);
     }
+    duration_stat->task_count++;
 #endif
 
-    /* Inform main thread */
-    Event_data RC_finish_event(EventType::kRC, offset);
-    // consumer_.handle(RC_finish_event);
-    return RC_finish_event;
+    return Event_data(EventType::kRC, offset);
 }

@@ -5,6 +5,7 @@ class Config;
 #include "buffer.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
+#include "stats.hpp"
 
 class Doer {
 public:
