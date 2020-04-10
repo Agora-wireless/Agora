@@ -537,7 +537,7 @@ finish:
     save_demul_data_to_file(stats_manager_->last_frame_id);
 #endif
 
-    save_ifft_data_to_file(stats_manager_->last_frame_id);
+    save_tx_data_to_file(stats_manager_->last_frame_id);
     this->stop();
     // exit(0);
 }
@@ -1296,14 +1296,14 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 #endif
 }
 
-void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
+void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_IFFT
+#ifdef WRITE_TX
     auto& cfg = config_;
-    printf("Saving IFFT data to data/ifft_data.bin\n");
+    printf("Saving TX data to data/tx_data.bin\n");
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/ifft_data.bin";
+    std::string filename = cur_directory + "/data/tx_data.bin";
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
@@ -1313,8 +1313,11 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             int offset = total_data_subframe_id * cfg->BS_ANT_NUM + ant_id;
-            float* ptr = (float*)dl_ifft_buffer_[offset];
-            fwrite(ptr, cfg->OFDM_CA_NUM * 2, sizeof(float), fp);
+            int packet_length = config_->packet_length;
+            struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[offset
+                * packet_length]);
+            short* socket_ptr = pkt->data;
+            fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
     fclose(fp);
