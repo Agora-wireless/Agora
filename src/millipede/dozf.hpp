@@ -86,9 +86,7 @@ private:
     Table<complex_float> recip_buffer_;
     Table<complex_float> ul_precoder_buffer_;
     Table<complex_float> dl_precoder_buffer_;
-
-    Table<double>* ZF_task_duration;
-    int* ZF_task_count;
+    DurationStat* duration_stat;
 
     /**
      * Intermediate buffer to gather CSI

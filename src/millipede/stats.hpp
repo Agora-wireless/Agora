@@ -17,11 +17,11 @@
 
 static constexpr size_t kMaxStatBreakdown = 4;
 
-struct Stats_worker {
-    /* accumulated task duration for all frames in each worker thread*/
-    Table<double> task_duration; // (thread_num * 8) x break_down_num
-    /* accumulated task count for all frames in each worker thread*/
-    int* task_count; // thead_num  * 16
+/* Accumulated task duration for all frames in each worker thread */
+struct DurationStat {
+    double task_duration[kMaxStatBreakdown];
+    size_t task_count;
+    DurationStat() { memset(this, 0, sizeof(DurationStat)); }
 };
 
 struct Stats_worker_per_frame {
@@ -30,7 +30,6 @@ struct Stats_worker_per_frame {
     int count_this_thread = 0;
     double duration_avg_threads[kMaxStatBreakdown];
     int count_all_threads = 0;
-
     Stats_worker_per_frame()
     {
         memset(this, 0, sizeof(Stats_worker_per_frame));
@@ -58,18 +57,30 @@ enum class TsType : size_t {
 static constexpr size_t kNumTimestampTypes
     = static_cast<size_t>(TsType::kTXDone) + 1;
 
+// Types of Millipede Doers
+enum class DoerType : size_t {
+    kFFT,
+    kCSI,
+    kZF,
+    kDemul,
+    kDecode,
+    kEncode,
+    kIFFT,
+    kPrecode,
+    kRC
+};
+static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
+
 class Stats {
 public:
     Stats(Config* cfg, int break_down_num, int task_thread_num,
         int fft_thread_num, int zf_thread_num, int demul_thread_num);
     ~Stats();
 
-    void init_stats_worker(
-        Stats_worker* stats_in_worker, int thread_num, int break_down_num);
-    void free_stats_worker(Stats_worker* stats_in_worker, int thread_num);
     void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
-        Stats_worker stats_in_worker, Stats_worker* stats_in_worker_old,
-        int thread_id, int break_down_num);
+        const DurationStat* duration_stat, DurationStat* stats_in_worker_old,
+        int break_down_num);
+
     void compute_avg_over_threads(Stats_worker_per_frame* stats_per_frame,
         int thread_num, int break_down_num);
     void print_per_thread_per_task(Stats_worker_per_frame stats_per_frame);
@@ -79,9 +90,7 @@ public:
     void update_stats_in_functions_downlink(int frame_id);
     void save_to_file();
 
-    int compute_total_count(Stats_worker stats_in_worker, int thread_num);
-    double compute_count_percentage(
-        Stats_worker stats_in_worker, int total_count, int thread_id);
+    int get_total_task_count(DoerType doer_type, int thread_num);
     void print_summary();
 
     size_t last_frame_id;
@@ -108,16 +117,23 @@ public:
                                [frame_id % kNumStatsFrames];
     }
 
-    /* accumulated task duration for all frames in each worker thread*/
-    Stats_worker csi_stats_worker;
-    Stats_worker fft_stats_worker;
-    Stats_worker zf_stats_worker;
-    Stats_worker demul_stats_worker;
-    Stats_worker decode_stats_worker;
-    Stats_worker encode_stats_worker;
-    Stats_worker ifft_stats_worker;
-    Stats_worker precode_stats_worker;
-    Stats_worker rc_stats_worker;
+    /// Get the DurationStat object used by thread thread_id for DoerType
+    /// doer_type
+    DurationStat* get_duration_stat(DoerType doer_type, size_t thread_id)
+    {
+        return &worker_durations[thread_id]
+                    .duration_stat[static_cast<size_t>(doer_type)];
+    }
+
+    /// The master thread uses a stale copy of DurationStats to compute
+    /// differences. This gets the DurationStat object for thread thread_id
+    /// for DoerType doer_type.
+    DurationStat* get_duration_stat_old(DoerType doer_type, size_t thread_id)
+    {
+        return &worker_durations_old[thread_id]
+                    .duration_stat[static_cast<size_t>(doer_type)];
+    }
+
     Table<double> frame_start;
 
 private:
@@ -175,6 +191,14 @@ private:
     /// processing
     double master_timestamps[kNumTimestampTypes][kNumStatsFrames];
 
+    /// Running time duration statistics. Each worker thread has one
+    /// DurationStat object for every Doer type. The master thread keeps stale
+    /// ("old") copies of all DurationStat objects.
+    struct {
+        DurationStat duration_stat[kNumDoerTypes];
+        uint8_t false_sharing_padding[64];
+    } worker_durations[kMaxThreads], worker_durations_old[kMaxThreads];
+
     double csi_time_in_function[kNumStatsFrames];
     double fft_time_in_function[kNumStatsFrames];
     double zf_time_in_function[kNumStatsFrames];
@@ -191,16 +215,6 @@ private:
     Table<double> zf_time_in_function_details;
     Table<double> demul_time_in_function_details;
 #endif
-
-    Stats_worker csi_stats_worker_old;
-    Stats_worker fft_stats_worker_old;
-    Stats_worker zf_stats_worker_old;
-    Stats_worker demul_stats_worker_old;
-    Stats_worker decode_stats_worker_old;
-    Stats_worker encode_stats_worker_old;
-    Stats_worker ifft_stats_worker_old;
-    Stats_worker precode_stats_worker_old;
-    Stats_worker rc_stats_worker_old;
 };
 
 #endif
