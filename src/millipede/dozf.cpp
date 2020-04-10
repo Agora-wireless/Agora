@@ -22,8 +22,7 @@ DoZF::DoZF(Config* in_config, int in_tid,
     , ul_precoder_buffer_(in_ul_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
-    ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
-    ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
+    duration_stat = in_stats_manager->get_duration_stat(DoerType::kZF, in_tid);
     alloc_buffer_1d(&pred_csi_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(&csi_gather_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
 }
@@ -120,8 +119,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-        double duration1 = get_time() - start_time1;
-        (*ZF_task_duration)[tid * 8][1] += duration1;
+        duration_stat->task_duration[1] += get_time() - start_time1;
 #endif
         cx_float* ptr_in = (cx_float*)csi_gather_buffer;
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
@@ -132,14 +130,13 @@ void DoZF::ZF_time_orthogonal(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double start_time2 = get_time();
-        double duration2 = start_time2 - start_time1;
-        (*ZF_task_duration)[tid * 8][2] += duration2;
+        duration_stat->task_duration[2] += start_time2 - start_time1;
 #endif
 
         // cout<<"Precoder:" <<mat_output<<endl;
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration3 = get_time() - start_time2;
-        (*ZF_task_duration)[tid * 8][3] += duration3;
+        duration_stat->task_duration[3] += duration3;
 #endif
         // // int mat_elem = UE_NUM * BS_ANT_NUM;
         // // int cache_line_num = mat_elem / 8;
@@ -151,9 +148,8 @@ void DoZF::ZF_time_orthogonal(int offset)
         // }
 
 #if DEBUG_UPDATE_STATS
-        ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
-        double duration = get_time() - start_time1;
-        (*ZF_task_duration)[tid * 8][0] += duration;
+        duration_stat->task_count++;
+        duration_stat->task_duration[0] += get_time() - start_time1;
         // if (duration > 500) {
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
@@ -207,8 +203,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration1 = get_time() - start_time1;
-    (*ZF_task_duration)[tid * 8][1] += duration1;
+    duration_stat->task_duration[1] += get_time() - start_time1;
 #endif
     cx_float* ptr_in = (cx_float*)csi_gather_buffer;
     cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
@@ -219,20 +214,17 @@ void DoZF::ZF_freq_orthogonal(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
-    double duration2 = start_time2 - start_time1;
-    (*ZF_task_duration)[tid * 8][2] += duration2;
+    duration_stat->task_duration[2] += start_time2 - start_time1;
 #endif
 
     // cout<<"Precoder:" <<mat_output<<endl;
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration3 = get_time() - start_time2;
-    (*ZF_task_duration)[tid * 8][3] += duration3;
+    duration_stat->task_duration[3] += get_time() - start_time2;
 #endif
 
 #if DEBUG_UPDATE_STATS
-    ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
-    double duration = get_time() - start_time1;
-    (*ZF_task_duration)[tid * 8][0] += duration;
+    duration_stat->task_count++;
+    duration_stat->task_duration[0] += get_time() - start_time1;
     // if (duration > 500) {
     //     printf("Thread %d ZF takes %.2f\n", tid, duration);
     // }

@@ -70,9 +70,7 @@ private:
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
-
-    Table<double>& Demul_task_duration;
-    int* Demul_task_count;
+    DurationStat* duration_stat;
 
     /**
      * Intermediate buffer to gather raw data

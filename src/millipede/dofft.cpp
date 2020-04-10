@@ -72,11 +72,11 @@ DoFFT::DoFFT(Config* in_config, int in_tid,
     , data_buffer_(in_data_buffer)
     , csi_buffer_(in_csi_buffer)
     , calib_buffer_(in_calib_buffer)
-    , FFT_task_duration(&in_stats_manager->fft_stats_worker.task_duration)
-    , FFT_task_count(in_stats_manager->fft_stats_worker.task_count)
-    , CSI_task_duration(&in_stats_manager->csi_stats_worker.task_duration)
-    , CSI_task_count(in_stats_manager->csi_stats_worker.task_count)
 {
+    duration_stat_fft
+        = in_stats_manager->get_duration_stat(DoerType::kFFT, in_tid);
+    duration_stat_csi
+        = in_stats_manager->get_duration_stat(DoerType::kCSI, in_tid);
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     // auto mkl_status = DftiSetValue(mkl_handle, DFTI_PLACEMENT,
@@ -141,15 +141,11 @@ Event_data DoFFT::launch(int tag)
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time1 = get_time();
-    double duration1 = start_time1 - start_time;
     if (cur_symbol_type == SymbolType::kUL) {
-        (*FFT_task_duration)[tid * 8][1] += duration1;
+        duration_stat_fft->task_duration[1] += start_time1 - start_time;
     } else if (cur_symbol_type == SymbolType::kPilot) {
-        (*CSI_task_duration)[tid * 8][1] += duration1;
+        duration_stat_csi->task_duration[1] += start_time1 - start_time;
     }
-
-    // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
-    //    (*RC_task_duration)[tid * 8][1] += duration1;
 #endif
 
     /* compute FFT */
@@ -159,14 +155,11 @@ Event_data DoFFT::launch(int tag)
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
-    double duration2 = start_time2 - start_time1;
     if (cur_symbol_type == SymbolType::kUL) {
-        (*FFT_task_duration)[tid * 8][2] += duration2;
+        duration_stat_fft->task_duration[2] += start_time2 - start_time1;
     } else if (cur_symbol_type == SymbolType::kPilot) {
-        (*CSI_task_duration)[tid * 8][2] += duration2;
+        duration_stat_csi->task_duration[2] += start_time2 - start_time1;
     }
-    // else if (cur_symbol_type == CAL_DL || cur_symbol_type == CAL_UL)
-    //    RC_task_duration[tid * 8][2] += duration2;
     double start_time_part3 = get_time();
 #endif
 
@@ -205,12 +198,10 @@ Event_data DoFFT::launch(int tag)
     }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    double end_time = get_time();
-    double duration3 = end_time - start_time_part3;
     if (cur_symbol_type == SymbolType::kUL) {
-        (*FFT_task_duration)[tid * 8][3] += duration3;
+        duration_stat_fft->task_duration[3] += get_time() - start_time_part3;
     } else {
-        (*CSI_task_duration)[tid * 8][3] += duration3;
+        duration_stat_csi->task_duration[3] += get_time() - start_time_part3;
     }
 #endif
 
@@ -218,13 +209,12 @@ Event_data DoFFT::launch(int tag)
     socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
 #if DEBUG_UPDATE_STATS
-    double duration = get_time() - start_time;
     if (cur_symbol_type == SymbolType::kUL) {
-        FFT_task_count[tid * 16] = FFT_task_count[tid * 16] + 1;
-        (*FFT_task_duration)[tid * 8][0] += duration;
+        duration_stat_fft->task_count++;
+        duration_stat_fft->task_duration[0] += get_time() - start_time;
     } else {
-        CSI_task_count[tid * 16] = CSI_task_count[tid * 16] + 1;
-        (*CSI_task_duration)[tid * 8][0] += duration;
+        duration_stat_csi->task_count++;
+        duration_stat_csi->task_duration[0] += get_time() - start_time;
     }
 #endif
 
@@ -304,9 +294,9 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
           worker_producer_token)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
-    , task_duration(&in_stats_manager->ifft_stats_worker.task_duration)
-    , task_count(in_stats_manager->ifft_stats_worker.task_count)
 {
+    duration_stat
+        = in_stats_manager->get_duration_stat(DoerType::kIFFT, in_tid);
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     (void)DftiCommitDescriptor(mkl_handle);
@@ -335,8 +325,7 @@ Event_data DoIFFT::launch(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time1 = get_time();
-    double duration1 = start_time1 - start_time;
-    (*task_duration)[tid * 8][1] += duration1;
+    duration_stat->task_duration[1] += start_time1 - start_time;
 #endif
 
     float* ifft_buf_ptr = (float*)dl_ifft_buffer_[buffer_subframe_offset];
@@ -353,8 +342,7 @@ Event_data DoIFFT::launch(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
-    double duration2 = start_time2 - start_time1;
-    (*task_duration)[tid * 8][2] += duration2;
+    duration_stat->task_duration[2] += start_time2 - start_time1;
 #endif
 
     int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
@@ -387,9 +375,7 @@ Event_data DoIFFT::launch(int offset)
     }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    double start_time3 = get_time();
-    double duration3 = start_time3 - start_time2;
-    (*task_duration)[tid * 8][3] += duration3;
+    duration_stat->task_duration[2] += get_time() - start_time2;
 #endif
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<<
@@ -403,8 +389,8 @@ Event_data DoIFFT::launch(int offset)
     // cout<<"\n\n"<<endl;
 
 #if DEBUG_UPDATE_STATS
-    task_count[tid * 16] = task_count[tid * 16] + 1;
-    (*task_duration)[tid * 8][0] += get_time() - start_time;
+    duration_stat->task_count++;
+    duration_stat->task_duration[0] += get_time() - start_time;
 #endif
 
     /* Inform main thread */

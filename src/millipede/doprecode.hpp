@@ -85,10 +85,7 @@ private:
     Table<complex_float>& dl_ifft_buffer_;
     Table<int8_t>& dl_raw_data;
     Table<float> qam_table;
-
-    Table<double>& Precode_task_duration;
-    int* Precode_task_count;
-
+    DurationStat* duration_stat;
     complex_float* modulated_buffer_temp;
     complex_float* precoded_buffer_temp;
 };

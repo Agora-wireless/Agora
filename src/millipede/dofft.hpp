@@ -74,12 +74,10 @@ private:
     Table<complex_float>& data_buffer_;
     Table<complex_float>& csi_buffer_;
     Table<complex_float>& calib_buffer_;
-    Table<double>* FFT_task_duration;
-    int* FFT_task_count;
-    Table<double>* CSI_task_duration;
-    int* CSI_task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     FFTBuffer fft_buffer_;
+    DurationStat* duration_stat_fft;
+    DurationStat* duration_stat_csi;
 };
 
 class DoIFFT : public Doer {
@@ -120,9 +118,7 @@ public:
 private:
     Table<complex_float>& dl_ifft_buffer_;
     char* dl_socket_buffer_;
-    ;
-    Table<double>* task_duration;
-    int* task_count;
+    DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 };
 
