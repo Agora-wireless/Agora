@@ -173,9 +173,10 @@ void check_correctness_dl(Config* cfg)
                     //     i, ant, sc / 2, raw_data[offset][sc],
                     //     ifft_data[offset][sc], diff);
                 }
+		float avg_diff = sum_diff / sampsPerSymbol;
                 printf(
-                    "symbol %d, ant %d, total diff %.3f\n", i, ant, sum_diff);
-                if (sum_diff > 0.01 * sampsPerSymbol)
+                    "symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant, avg_diff );
+                if (avg_diff > 0.01)
                     error_cnt++;
             }
         //}
