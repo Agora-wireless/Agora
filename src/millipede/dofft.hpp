@@ -24,8 +24,9 @@ class DoFFT : public Doer {
 public:
     DoFFT(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<char>& in_socket_buffer,
-        Table<int>& in_socket_buffer_status,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
         Table<complex_float>& in_data_buffer,
         Table<complex_float>& in_csi_buffer,
         Table<complex_float>& in_calib_buffer, Stats* in_stats_manager);
@@ -74,20 +75,20 @@ private:
     Table<complex_float>& data_buffer_;
     Table<complex_float>& csi_buffer_;
     Table<complex_float>& calib_buffer_;
-    Table<double>* FFT_task_duration;
-    int* FFT_task_count;
-    Table<double>* CSI_task_duration;
-    int* CSI_task_count;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     FFTBuffer fft_buffer_;
+    DurationStat* duration_stat_fft;
+    DurationStat* duration_stat_csi;
 };
 
 class DoIFFT : public Doer {
 public:
     DoIFFT(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_dl_ifft_buffer,
-        char* in_dl_socket_buffer, Stats* in_stats_manager);
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
+        Stats* in_stats_manager);
     ~DoIFFT();
 
     /**
@@ -118,9 +119,7 @@ public:
 private:
     Table<complex_float>& dl_ifft_buffer_;
     char* dl_socket_buffer_;
-    ;
-    Table<double>* task_duration;
-    int* task_count;
+    DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 };
 

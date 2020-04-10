@@ -24,7 +24,9 @@ class DoZF : public Doer {
 public:
     DoZF(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_csi_buffer,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<complex_float>& in_csi_buffer,
         Table<complex_float>& in_recip_buffer,
         Table<complex_float>& in_ul_precoder_buffer,
         Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager);
@@ -49,7 +51,6 @@ public:
     Event_data launch(int offset);
 
 private:
-    void finish(int offset);
     void ZF_time_orthogonal(int offset);
     void precoder(void* mat_input, int frame_id, int sc_id, int offset,
         bool downlink_mode);
@@ -85,9 +86,7 @@ private:
     Table<complex_float> recip_buffer_;
     Table<complex_float> ul_precoder_buffer_;
     Table<complex_float> dl_precoder_buffer_;
-
-    Table<double>* ZF_task_duration;
-    int* ZF_task_count;
+    DurationStat* duration_stat;
 
     /**
      * Intermediate buffer to gather CSI

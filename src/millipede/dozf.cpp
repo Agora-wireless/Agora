@@ -4,24 +4,25 @@
  *
  */
 #include "dozf.hpp"
-#include "Consumer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 #include "doer.hpp"
 
 using namespace arma;
 DoZF::DoZF(Config* in_config, int in_tid,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    Consumer& in_consumer, Table<complex_float>& in_csi_buffer,
-    Table<complex_float>& in_recip_buffer,
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ProducerToken* worker_producer_token,
+    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
     Table<complex_float>& in_ul_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, in_consumer)
+    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+          worker_producer_token)
     , csi_buffer_(in_csi_buffer)
     , recip_buffer_(in_recip_buffer)
     , ul_precoder_buffer_(in_ul_precoder_buffer)
     , dl_precoder_buffer_(in_dl_precoder_buffer)
 {
-    ZF_task_duration = &in_stats_manager->zf_stats_worker.task_duration;
-    ZF_task_count = in_stats_manager->zf_stats_worker.task_count;
+    duration_stat = in_stats_manager->get_duration_stat(DoerType::kZF, in_tid);
     alloc_buffer_1d(&pred_csi_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(&csi_gather_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
 }
@@ -38,16 +39,8 @@ Event_data DoZF::launch(int offset)
         ZF_freq_orthogonal(offset);
     else
         ZF_time_orthogonal(offset);
-    // finish(offset);
-    Event_data ZF_finish_event(EventType::kZF, offset);
-    return ZF_finish_event;
-}
 
-void DoZF::finish(int offset)
-{
-    // inform main thread
-    Event_data ZF_finish_event(EventType::kZF, offset);
-    consumer_.handle(ZF_finish_event);
+    return Event_data(EventType::kZF, offset);
 }
 
 void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
@@ -67,12 +60,12 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
             H = mat_calib * H;
         }
         //mat_dl_precoder = trans(conj(H) * inv(trans(H)*conj(H)));
-        pinv(mat_dl_precoder, H, 1e-1, "dc");
+        pinv(mat_dl_precoder, H, 1e-2, "dc");
     } else {
         cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
         cx_fmat mat_ul_precoder(
             ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-        pinv(mat_ul_precoder, H, 1e-1, "dc");
+        pinv(mat_ul_precoder, H, 1e-2, "dc");
     }
 }
 
@@ -129,8 +122,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-        double duration1 = get_time() - start_time1;
-        (*ZF_task_duration)[tid * 8][1] += duration1;
+        duration_stat->task_duration[1] += get_time() - start_time1;
 #endif
         cx_float* ptr_in = (cx_float*)csi_gather_buffer;
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
@@ -141,14 +133,13 @@ void DoZF::ZF_time_orthogonal(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
         double start_time2 = get_time();
-        double duration2 = start_time2 - start_time1;
-        (*ZF_task_duration)[tid * 8][2] += duration2;
+        duration_stat->task_duration[2] += start_time2 - start_time1;
 #endif
 
         // cout<<"Precoder:" <<mat_output<<endl;
 #if DEBUG_UPDATE_STATS_DETAILED
         double duration3 = get_time() - start_time2;
-        (*ZF_task_duration)[tid * 8][3] += duration3;
+        duration_stat->task_duration[3] += duration3;
 #endif
         // // int mat_elem = UE_NUM * BS_ANT_NUM;
         // // int cache_line_num = mat_elem / 8;
@@ -160,9 +151,8 @@ void DoZF::ZF_time_orthogonal(int offset)
         // }
 
 #if DEBUG_UPDATE_STATS
-        ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
-        double duration = get_time() - start_time1;
-        (*ZF_task_duration)[tid * 8][0] += duration;
+        duration_stat->task_count++;
+        duration_stat->task_duration[0] += get_time() - start_time1;
         // if (duration > 500) {
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
@@ -216,8 +206,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     }
 
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration1 = get_time() - start_time1;
-    (*ZF_task_duration)[tid * 8][1] += duration1;
+    duration_stat->task_duration[1] += get_time() - start_time1;
 #endif
     cx_float* ptr_in = (cx_float*)csi_gather_buffer;
     cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
@@ -228,20 +217,17 @@ void DoZF::ZF_freq_orthogonal(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
     double start_time2 = get_time();
-    double duration2 = start_time2 - start_time1;
-    (*ZF_task_duration)[tid * 8][2] += duration2;
+    duration_stat->task_duration[2] += start_time2 - start_time1;
 #endif
 
     // cout<<"Precoder:" <<mat_output<<endl;
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration3 = get_time() - start_time2;
-    (*ZF_task_duration)[tid * 8][3] += duration3;
+    duration_stat->task_duration[3] += get_time() - start_time2;
 #endif
 
 #if DEBUG_UPDATE_STATS
-    ZF_task_count[tid * 16] = ZF_task_count[tid * 16] + 1;
-    double duration = get_time() - start_time1;
-    (*ZF_task_duration)[tid * 8][0] += duration;
+    duration_stat->task_count++;
+    duration_stat->task_duration[0] += get_time() - start_time1;
     // if (duration > 500) {
     //     printf("Thread %d ZF takes %.2f\n", tid, duration);
     // }
@@ -264,7 +250,4 @@ void DoZF::Predict(int offset)
         = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM + sc_id;
     precoder(&mat_input, frame_id, sc_id, offset_next_frame,
         cfg->dl_data_symbol_num_perframe > 0);
-
-    // inform main thread
-    finish(offset_next_frame);
 }
