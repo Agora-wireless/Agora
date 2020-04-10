@@ -546,7 +546,7 @@ void Millipede::handle_event_fft(int tag)
                     fft_stats_.update_frame_count();
                     schedule_task_set(EventType::kZF, config_->zf_block_num,
                         frame_id, zf_queue_, *ptok_zf);
-		}
+                }
             }
         } else if (config_->isUplink(frame_id, subframe_id)) {
             int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
@@ -1322,8 +1322,8 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             int offset = total_data_subframe_id * cfg->BS_ANT_NUM + ant_id;
             int packet_length = config_->packet_length;
-            struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[offset
-                * packet_length]);
+            struct Packet* pkt
+                = (struct Packet*)(&dl_socket_buffer_[offset * packet_length]);
             short* socket_ptr = pkt->data;
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
