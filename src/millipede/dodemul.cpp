@@ -22,9 +22,9 @@ DoDemul::DoDemul(Config* in_config, int in_tid,
     , equal_buffer_(in_equal_buffer)
     , demod_hard_buffer_(in_demod_hard_buffer)
     , demod_soft_buffer_(in_demod_soft_buffer)
-    , Demul_task_duration(in_stats_manager->demul_stats_worker.task_duration)
 {
-    Demul_task_count = in_stats_manager->demul_stats_worker.task_count;
+    duration_stat
+        = in_stats_manager->get_duration_stat(DoerType::kDemul, in_tid);
 
     alloc_buffer_1d(&spm_buffer, 8 * cfg->BS_ANT_NUM, 64, 0);
     alloc_buffer_1d(
@@ -95,8 +95,7 @@ Event_data DoDemul::launch(int offset)
             tar_data_ptr += 8;
         }
 #if DEBUG_UPDATE_STATS_DETAILED
-        double duration1 = get_time() - start_time1;
-        Demul_task_duration[tid * 8][1] += duration1;
+        duration_stat->task_duration[1] += get_time() - start_time1;
 #endif
 
         /* computation for 8 subcarriers */
@@ -137,8 +136,7 @@ Event_data DoDemul::launch(int offset)
 
 #if DEBUG_UPDATE_STATS_DETAILED
             double start_time3 = get_time();
-            double duration2 = get_time() - start_time2;
-            Demul_task_duration[tid * 8][2] += duration2;
+            duration_stat->task_duration[2] += start_time3 - start_time2;
 #endif
             // cout << "Equaled data sc "<<cur_sc_id<<": "<<mat_equaled.st();
 
@@ -155,12 +153,11 @@ Event_data DoDemul::launch(int offset)
 #endif
 
 #if DEBUG_UPDATE_STATS_DETAILED
-            double duration3 = get_time() - start_time3;
-            Demul_task_duration[tid * 8][3] += duration3;
+            duration_stat->task_duration[3] += get_time() - start_time3;
 #endif
 
 #if DEBUG_UPDATE_STATS
-            Demul_task_count[tid * 16] = Demul_task_count[tid * 16] + 1;
+            duration_stat->task_count++;
 #endif
         }
     }
@@ -202,8 +199,7 @@ Event_data DoDemul::launch(int offset)
 #endif
 
 #if DEBUG_UPDATE_STATS
-    double duration = get_time() - start_time;
-    Demul_task_duration[tid * 8][0] += duration;
+    duration_stat->task_duration[0] += get_time() - start_time;
     // if (duration > 500)
     //     printf("Thread %d Demul takes %.2f\n", tid, duration);
 #endif
@@ -288,13 +284,8 @@ Event_data DoDemul::DemulSingleSC(int offset)
     }
     cout << endl;
 
-    // inform main thread
-    double duration3 = get_time() - start_time;
-    Demul_task_duration[tid][1] += duration3;
-
-    Demul_task_count[tid] = Demul_task_count[tid] + 1;
-    double duration = get_time() - start_time;
-    Demul_task_duration[tid][0] += duration;
-
+    duration_stat->task_duration[1] += get_time() - start_time; // TODO ???
+    duration_stat->task_duration[0] += get_time() - start_time;
+    duration_stat->task_count++;
     return Event_data(EventType::kDemul, offset);
 }

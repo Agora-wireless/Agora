@@ -29,12 +29,9 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
 #else
     , dl_raw_data(in_dl_raw_data)
 #endif
-    , Precode_task_duration(
-          in_stats_manager->precode_stats_worker.task_duration)
 {
-
-    Precode_task_count = in_stats_manager->precode_stats_worker.task_count;
-
+    duration_stat
+        = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
     init_modulation_table(qam_table, cfg->mod_type);
 
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
@@ -117,8 +114,7 @@ Event_data DoPrecode::launch(int offset)
             cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
 
 #if DEBUG_UPDATE_STATS_DETAILED
-            double duration1 = get_time() - start_time2;
-            Precode_task_duration[tid * 8][1] += duration1;
+            duration_stat->task_duration[1] += get_time() - start_time2;
 #endif
             mat_precoded = mat_data * mat_precoder;
 
@@ -130,8 +126,7 @@ Event_data DoPrecode::launch(int offset)
             // cout << "Precoded data: \n" << mat_precoded << endl;
         }
 #if DEBUG_UPDATE_STATS_DETAILED
-        double duration2 = get_time() - start_time1;
-        Precode_task_duration[tid * 8][2] += duration2;
+        duration_stat->task_duration[2] += get_time() - start_time1;
 #endif
     }
 
@@ -154,23 +149,18 @@ Event_data DoPrecode::launch(int offset)
         }
     }
 #if DEBUG_UPDATE_STATS_DETAILED
-    double duration3 = get_time() - start_time3;
-    Precode_task_duration[tid * 8][3] += duration3;
+    duration_stat->task_duration[3] += get_time() - start_time3;
 #endif
 
 #if DEBUG_UPDATE_STATS
-    Precode_task_count[tid * 16] = Precode_task_count[tid * 16] + max_sc_ite;
-    Precode_task_duration[tid * 8][0] += get_time() - start_time;
+    duration_stat->task_duration[0] += get_time() - start_time;
+    duration_stat->task_count++;
 #endif
-
-    /* Inform main thread */
-    Event_data precode_finish_event(EventType::kPrecode, offset);
-    // consumer_.handle(precode_finish_event);
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, "
            "subcarrier: %d , offset: %d\n",
         tid, frame_id, current_data_subframe_id, sc_id, offset);
 #endif
-    return precode_finish_event;
+    return Event_data(EventType::kPrecode, offset);
 }

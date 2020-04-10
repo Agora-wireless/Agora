@@ -48,8 +48,7 @@ private:
     Table<int8_t>& encoded_buffer_;
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
     };
-    Table<double>& Encode_task_duration;
-    int* Encode_task_count;
+    DurationStat* duration_stat;
     const int16_t* pShiftMatrix;
     const int16_t* pMatrixNumPerCol;
     const int16_t* pAddr;
@@ -87,8 +86,7 @@ public:
 private:
     Table<int8_t>& llr_buffer_;
     Table<uint8_t>& decoded_buffer_;
-    Table<double>& Decode_task_duration;
-    int* Decode_task_count;
+    DurationStat* duration_stat;
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {

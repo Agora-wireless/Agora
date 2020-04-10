@@ -37,9 +37,7 @@ private:
 
     Table<complex_float> calib_buffer_;
     Table<complex_float> recip_buffer_;
-
-    Table<double>* RC_task_duration;
-    int* RC_task_count;
+    DurationStat* duration_stat;
 
     /**
      * Intermediate buffer to gather CSI
