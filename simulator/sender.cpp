@@ -28,7 +28,7 @@ Sender::Sender(
     , frame_id(0)
     , subframe_id(0)
     , thread_num(in_thread_num)
-    , socket_num(in_thread_num)
+    , socket_num(cfg->nRadios)
     , core_offset(in_core_offset)
     , delay(in_delay)
 {
@@ -56,6 +56,12 @@ Sender::Sender(
         task_ptok[i] = new moodycamel::ProducerToken(task_queue_);
 
     socket_ = new int[socket_num];
+#if USE_IPV4
+    servaddr_ = new struct sockaddr_in[socket_num];
+#else
+    servaddr_ = new struct sockaddr_in6[socket_num];
+#endif
+
     for (size_t i = 0; i < socket_num; i++) {
 #if USE_IPV4
         socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -86,6 +92,7 @@ Sender::~Sender()
     packet_count_per_subframe.free();
     free_buffer_1d(&packet_count_per_frame);
 
+    delete[] servaddr_;
     delete[] socket_;
     delete cfg;
     pthread_mutex_destroy(&lock_);
@@ -230,12 +237,14 @@ void* Sender::loopSend(int tid)
     size_t packet_count = 0;
     size_t total_tx_packets = 0;
     size_t max_subframe_id = get_max_subframe_id();
-    size_t ant_num_this_thread = cfg->BS_ANT_NUM / thread_num
-        + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
+    int radio_lo = tid * cfg->nRadios / thread_num;
+    int radio_hi = (tid + 1) * cfg->nRadios / thread_num;
+    size_t ant_num_this_thread = radio_hi - radio_lo;
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, thread number: %zu\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
+    int radio_id = radio_lo;
     while (true) {
-        int data_ptr = dequeue_send(tid);
+        int data_ptr = dequeue_send(tid, radio_id);
         if (data_ptr == -1)
             continue;
         packet_count++;
@@ -255,10 +264,13 @@ void* Sender::loopSend(int tid)
             begin = get_time();
             packet_count = 0;
         }
+
+        if (++radio_id == radio_hi)
+            radio_id = radio_lo;
     }
 }
 
-int Sender::dequeue_send(int tid)
+int Sender::dequeue_send(int tid, int radio_id)
 {
     size_t data_ptr;
     if (!task_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
@@ -271,11 +283,11 @@ int Sender::dequeue_send(int tid)
     /* send a message to the server */
     int ret = 0;
 #if defined(USE_DPDK) || !CONNECT_UDP
-    ret = sendto(socket_[tid], tx_buffer_[data_ptr],
+    ret = sendto(socket_[radio_id], tx_buffer_[data_ptr],
             buffer_length, 0, (struct sockaddr*)&servaddr_[tid],
             sizeof(servaddr_[tid]);
 #else
-    ret = send(socket_[tid], tx_buffer_[data_ptr], buffer_length, 0);
+    ret = send(socket_[radio_id], tx_buffer_[data_ptr], buffer_length, 0);
 #endif
     if (ret < 0) {
         perror("Socket sendto failed");

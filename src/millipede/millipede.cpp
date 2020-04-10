@@ -529,17 +529,15 @@ void Millipede::start()
 finish:
 
     printf("Millipede: printing stats\n");
-    int last_frame_id = stats_manager_->last_frame_id;
-    stats_manager_->save_to_file(last_frame_id);
-    stats_manager_->print_summary(last_frame_id);
-
+    stats_manager_->print_summary();
+    stats_manager_->save_to_file();
 #ifdef USE_LDPC
-    save_decode_data_to_file(last_frame_id);
+    save_decode_data_to_file(stats_manager_->last_frame_id);
 #else
-    save_demul_data_to_file(last_frame_id);
+    save_demul_data_to_file(stats_manager_->last_frame_id);
 #endif
 
-    save_ifft_data_to_file(last_frame_id);
+    save_ifft_data_to_file(stats_manager_->last_frame_id);
     this->stop();
     // exit(0);
 }
