@@ -53,10 +53,7 @@ void DoZF::finish(int offset)
 void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
     bool downlink_mode)
 {
-    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
-    cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
-    cx_fmat mat_ul_precoder(ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-    pinv(mat_ul_precoder, mat_input, 1e-1, "dc");
+    cx_fmat& H = *(cx_fmat*)mat_input_ptr;
     if (downlink_mode) {
         cx_float* ptr_dl_out = (cx_float*)dl_precoder_buffer_[offset];
         cx_fmat mat_dl_precoder(
@@ -67,9 +64,15 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
             cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
             cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = diagmat(vec_calib);
-            mat_dl_precoder = mat_ul_precoder * inv(mat_calib);
-        } else
-            mat_dl_precoder = mat_ul_precoder;
+            H = mat_calib * H;
+        }
+        //mat_dl_precoder = trans(conj(H) * inv(trans(H)*conj(H)));
+        pinv(mat_dl_precoder, H, 1e-1, "dc");
+    } else {
+        cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
+        cx_fmat mat_ul_precoder(
+            ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        pinv(mat_ul_precoder, H, 1e-1, "dc");
     }
 }
 
