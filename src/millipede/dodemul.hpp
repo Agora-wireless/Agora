@@ -25,7 +25,9 @@ class DoDemul : public Doer {
 public:
     DoDemul(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_data_buffer,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<complex_float>& in_data_buffer,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_equal_buffer,
         Table<uint8_t>& in_demul_hard_buffer,
@@ -60,7 +62,7 @@ public:
      */
     Event_data launch(int offset);
 
-    void DemulSingleSC(int offset);
+    Event_data DemulSingleSC(int offset);
 
 private:
     Table<complex_float>& data_buffer_;
@@ -68,9 +70,7 @@ private:
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
-
-    Table<double>& Demul_task_duration;
-    int* Demul_task_count;
+    DurationStat* duration_stat;
 
     /**
      * Intermediate buffer to gather raw data

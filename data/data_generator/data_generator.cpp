@@ -456,7 +456,7 @@ int main(int argc, char* argv[])
         cx_fmat mat_input(ptr_in, BS_ANT_NUM, UE_NUM, false);
         cx_float* ptr_out = (cx_float*)precoder[i];
         cx_fmat mat_output(ptr_out, UE_NUM, BS_ANT_NUM, false);
-        pinv(mat_output, mat_input, 1e-1, "dc");
+        pinv(mat_output, mat_input, 1e-2, "dc");
     }
 
     // printf("CSI \n");

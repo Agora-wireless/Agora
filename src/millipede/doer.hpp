@@ -2,9 +2,10 @@
 #define DOER
 
 class Config;
-class Consumer;
-#include "Consumer.hpp"
+#include "buffer.hpp"
+#include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
+#include "stats.hpp"
 
 class Doer {
 public:
@@ -14,7 +15,8 @@ public:
         if (task_queue_.try_dequeue(event)) {
             if (event.num_offsets == 0) {
                 Event_data finish_event = launch(event.data);
-                consumer_.handle(finish_event);
+                try_enqueue_fallback(
+                    complete_task_queue, *worker_producer_token, finish_event);
             } else {
                 Event_data finish_event;
                 Event_data temp_event;
@@ -24,7 +26,8 @@ public:
                     finish_event.offsets[i] = temp_event.data;
                 }
                 finish_event.event_type = temp_event.event_type;
-                consumer_.handle(finish_event);
+                try_enqueue_fallback(
+                    complete_task_queue, *worker_producer_token, finish_event);
             }
             return true;
         }
@@ -35,17 +38,20 @@ protected:
     virtual Event_data launch(int offset) = 0;
     Doer(Config* in_config, int in_tid,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer)
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token)
         : cfg(in_config)
         , tid(in_tid)
         , task_queue_(in_task_queue)
-        , consumer_(in_consumer)
+        , complete_task_queue(complete_task_queue)
+        , worker_producer_token(worker_producer_token)
     {
     }
 
     Config* cfg;
     int tid;
     moodycamel::ConcurrentQueue<Event_data>& task_queue_;
-    Consumer& consumer_;
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue;
+    moodycamel::ProducerToken* worker_producer_token;
 };
 #endif /* DOER */
