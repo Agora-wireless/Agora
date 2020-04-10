@@ -14,6 +14,7 @@
 #include "gettime.h"
 #include "mkl_dfti.h"
 #include "stats.hpp"
+#include <armadillo>
 #include <iostream>
 #include <stdio.h> /* for fprintf */
 #include <string.h> /* for memcpy */
