@@ -468,6 +468,7 @@ void Phy_UE::start()
 
             case EventType::kIFFT: {
                 // Do nothing for now
+                int offset = event.data;
 #if WRITE_MODUL
                 std::string filename = "bin/ul_modul.bin";
                 FILE* fp = fopen(filename.c_str(), "wb");
