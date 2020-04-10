@@ -136,17 +136,19 @@ void check_correctness_dl(Config* cfg)
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
-    std::string raw_data_filename = cur_directory
-        + "/data/LDPC_dl_tx_data_"+std::to_string(OFDM_CA_NUM)+"_ant" + std::to_string(BS_ANT_NUM)
+    std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
 #else
-    std::string raw_data_filename = cur_directory
-        + "/data/dl_tx_data_"+std::to_string(OFDM_CA_NUM)+"_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string raw_data_filename = cur_directory + "/data/dl_tx_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
 #endif
     std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
     Table<short> raw_data;
     Table<short> tx_data;
-    raw_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
+    raw_data.calloc(
+        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
     tx_data.calloc(
         data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
 
@@ -157,29 +159,27 @@ void check_correctness_dl(Config* cfg)
     int total_count = 0;
     float sum_diff = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        //if (i != DL_PILOT_SYMS - 1) {
-            for (int ant = 0; ant < BS_ANT_NUM; ant++) {
-                // printf("symbol %d, antenna %d\n", i, ant);
-                sum_diff = 0;
-                total_count++;
-                for (int sc = 0; sc < sampsPerSymbol * 2; sc++) {
-                    int offset = BS_ANT_NUM * i + ant;
-                    float diff
-                        = fabs((raw_data[offset][sc] - tx_data[offset][sc])/32768.0);
-                    sum_diff += diff;
-                    // if (i == 0)
-                    // printf("symbol %d ant %d sc %d, (%.3f, %.3f) diff:
-                    // %.3f\n",
-                    //     i, ant, sc / 2, raw_data[offset][sc],
-                    //     ifft_data[offset][sc], diff);
-                }
-		float avg_diff = sum_diff / sampsPerSymbol;
-                printf(
-                    "symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant, avg_diff );
-                if (avg_diff > 0.01)
-                    error_cnt++;
+        for (int ant = 0; ant < BS_ANT_NUM; ant++) {
+            // printf("symbol %d, antenna %d\n", i, ant);
+            sum_diff = 0;
+            total_count++;
+            for (int sc = 0; sc < sampsPerSymbol * 2; sc++) {
+                int offset = BS_ANT_NUM * i + ant;
+                float diff = fabs(
+                    (raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
+                sum_diff += diff;
+                // if (i == 0)
+                // printf("symbol %d ant %d sc %d, (%.3f, %.3f) diff:
+                // %.3f\n",
+                //     i, ant, sc / 2, raw_data[offset][sc],
+                //     ifft_data[offset][sc], diff);
             }
-        //}
+            float avg_diff = sum_diff / sampsPerSymbol;
+            printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
+                avg_diff);
+            if (avg_diff > 0.01)
+                error_cnt++;
+        }
     }
     printf("======================\n");
     printf("Downlink test: \n\n");

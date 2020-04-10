@@ -481,14 +481,14 @@ int main(int argc, char* argv[])
         for (int j = 0; j < UE_NUM; j++) {
             if (i <= dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
                 for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++)
-                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id]
-                        = pilots_t[sc_id];
+                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id] = pilots_t[sc_id];
             } else {
                 memset(dl_mod_data[i] + j * OFDM_CA_NUM, 0, OFDM_DATA_START);
                 memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
                     mod_output[(i - dl_data_symbol_start) * UE_NUM + j],
                     OFDM_DATA_NUM * sizeof(complex_float));
-                memset(dl_mod_data[i] + (j + 1) * OFDM_CA_NUM - OFDM_DATA_START, 0, OFDM_DATA_START);
+                memset(dl_mod_data[i] + (j + 1) * OFDM_CA_NUM - OFDM_DATA_START,
+                    0, OFDM_DATA_START);
             }
         }
     }

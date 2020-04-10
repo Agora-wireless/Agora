@@ -59,7 +59,7 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
             mat_calib = diagmat(vec_calib);
             H = mat_calib * H;
         }
-        //mat_dl_precoder = trans(conj(H) * inv(trans(H)*conj(H)));
+        // mat_dl_precoder = trans(conj(H) * inv(trans(H)*conj(H)));
         pinv(mat_dl_precoder, H, 1e-2, "dc");
     } else {
         cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
