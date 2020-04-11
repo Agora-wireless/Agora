@@ -24,7 +24,7 @@
 
 class DoPrecode : public Doer {
 public:
-    DoPrecode(Config* in_config, int in_tid,
+    DoPrecode(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,

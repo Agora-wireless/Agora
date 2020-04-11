@@ -113,11 +113,12 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    Stats* stats_manager_;
+    Stats* stats;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
+    double freq_ghz = -1.0; // RDTSC frequency in GHz
     /*****************************************************
      * Buffers
      *****************************************************/
