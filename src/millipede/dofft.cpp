@@ -335,10 +335,6 @@ Event_data DoIFFT::launch(int offset)
     memset(ifft_buf_ptr + (cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM) * 2, 0,
         sizeof(float) * cfg->OFDM_DATA_START * 2);
 
-    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    float pre_scale = abs(mat_data).max();
-    mat_data /= pre_scale;
-
     DftiComputeBackward(mkl_handle, ifft_buf_ptr);
     // printf("data after ifft\n");
     // for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
@@ -346,6 +342,7 @@ Event_data DoIFFT::launch(int offset)
     //         dl_ifft_buffer_[buffer_subframe_offset][i].im);
     // printf("\n");
 
+    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
     float post_scale = abs(mat_data).max();
     mat_data /= post_scale;
 
