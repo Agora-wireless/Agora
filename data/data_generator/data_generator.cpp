@@ -533,14 +533,11 @@ int main(int argc, char* argv[])
         for (int j = 0; j < BS_ANT_NUM; j++) {
             complex_float* ptr_ifft = dl_ifft_data[i] + j * OFDM_CA_NUM;
 
-            cx_fmat mat_data((cx_float*)ptr_ifft, 1, OFDM_CA_NUM, false);
-            float pre_scale = abs(mat_data).max();
-            mat_data /= pre_scale;
-
             CommsLib::IFFT(ptr_ifft, OFDM_CA_NUM, false);
 
-            float post_scale = abs(mat_data).max();
-            mat_data /= post_scale;
+            cx_fmat mat_data((cx_float*)ptr_ifft, 1, OFDM_CA_NUM, false);
+            float scale = abs(mat_data).max();
+            mat_data /= scale;
 
             short* txSymbol = dl_tx_data[i] + j * sampsPerSymbol * 2;
             memset(txSymbol, 0, sizeof(short) * 2 * prefix);
