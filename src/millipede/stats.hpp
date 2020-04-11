@@ -1,7 +1,6 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- *
  */
 
 #ifndef STATS
@@ -19,11 +18,12 @@ static constexpr size_t kMaxStatBreakdown = 4;
 
 /* Accumulated task duration for all frames in each worker thread */
 struct DurationStat {
-    double task_duration[kMaxStatBreakdown];
+    size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
     size_t task_count;
     DurationStat() { memset(this, 0, sizeof(DurationStat)); }
 };
 
+// Duration unit = microseconds
 struct Stats_worker_per_frame {
     double duration_this_thread[kMaxStatBreakdown];
     double duration_this_thread_per_task[kMaxStatBreakdown];
@@ -74,7 +74,8 @@ static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 class Stats {
 public:
     Stats(Config* cfg, int break_down_num, int task_thread_num,
-        int fft_thread_num, int zf_thread_num, int demul_thread_num);
+        int fft_thread_num, int zf_thread_num, int demul_thread_num,
+        double freq_ghz);
     ~Stats();
 
     void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
@@ -95,26 +96,49 @@ public:
 
     size_t last_frame_id;
 
-    void master_set_timestamp(TsType timestamp_type, int frame_id)
+    /// From the master, set the RDTSC timestamp for a frame ID and timestamp
+    /// type
+    void master_set_tsc(TsType timestamp_type, int frame_id)
     {
         master_timestamps[static_cast<size_t>(timestamp_type)]
                          [frame_id % kNumStatsFrames]
-            = get_time();
+            = rdtsc();
     }
 
-    double master_get_timestamp(TsType timestamp_type, int frame_id)
+    /// From the master, get the RDTSC timestamp for a frame ID and timestamp
+    /// type
+    size_t master_get_tsc(TsType timestamp_type, int frame_id)
     {
         return master_timestamps[static_cast<size_t>(timestamp_type)]
                                 [frame_id % kNumStatsFrames];
     }
 
-    double master_get_timestamp_delta(
+    /// From the master, get the microsecond elapsed since the timestamp of
+    /// timestamp_type was taken for frame_id for frame_id
+    double master_get_us_since(TsType timestamp_type, int frame_id)
+    {
+        return cycles_to_us(
+            rdtsc() - master_get_tsc(timestamp_type, frame_id), freq_ghz);
+    }
+
+    /// From the master, for a frame ID, get the microsecond difference
+    /// between two timestamp types
+    double master_get_delta_us(
         TsType timestamp_type_1, TsType timestamp_type_2, int frame_id)
     {
-        return master_timestamps[static_cast<size_t>(timestamp_type_1)]
-                                [frame_id % kNumStatsFrames]
-            - master_timestamps[static_cast<size_t>(timestamp_type_2)]
-                               [frame_id % kNumStatsFrames];
+        return cycles_to_us(master_get_tsc(timestamp_type_1, frame_id)
+                - master_get_tsc(timestamp_type_2, frame_id),
+            freq_ghz);
+    }
+
+    /// From the master, get the microsecond difference between the times that
+    /// a timestamp type was taken for two frames
+    double master_get_delta_us(
+        TsType timestamp_type, int frame_id_1, int frame_id_2)
+    {
+        return cycles_to_us(master_get_tsc(timestamp_type, frame_id_1)
+                - master_get_tsc(timestamp_type, frame_id_2),
+            freq_ghz);
     }
 
     /// Get the DurationStat object used by thread thread_id for DoerType
@@ -180,12 +204,12 @@ private:
         Stats_worker_per_frame* encode_stats_per_frame);
 
     Config* config_;
-
     int task_thread_num;
     int fft_thread_num;
     int zf_thread_num;
     int demul_thread_num;
     int break_down_num;
+    double freq_ghz;
 
     /// Timestamps taken by the master thread at different points in a frame's
     /// processing
@@ -209,12 +233,10 @@ private:
     double encode_time_in_function[kNumStatsFrames];
     double rc_time_in_function[kNumStatsFrames];
 
-#if DEBUG_UPDATE_STATS_DETAILED
     Table<double> csi_time_in_function_details;
     Table<double> fft_time_in_function_details;
     Table<double> zf_time_in_function_details;
     Table<double> demul_time_in_function_details;
-#endif
 };
 
 #endif

@@ -58,14 +58,14 @@ void cvtShortToFloatSIMD(short*& in_buf, float*& out_buf, size_t length)
 #endif
 }
 
-DoFFT::DoFFT(Config* in_config, int in_tid,
+DoFFT::DoFFT(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
     Table<complex_float>& in_data_buffer, Table<complex_float>& in_csi_buffer,
     Table<complex_float>& in_calib_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , socket_buffer_(in_socket_buffer)
     , socket_buffer_status_(in_socket_buffer_status)
@@ -97,9 +97,7 @@ DoFFT::~DoFFT()
 
 Event_data DoFFT::launch(int tag)
 {
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif
+    size_t start_tsc = worker_rdtsc();
 
     int socket_thread_id = fft_req_tag_t(tag).tid;
     size_t buf_offset = fft_req_tag_t(tag).offset;
@@ -139,29 +137,25 @@ Event_data DoFFT::launch(int tag)
     else if (cfg->isCalUlPilot(frame_id, subframe_id))
         cur_symbol_type = SymbolType::kCalUL;
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time1 = get_time();
+    size_t start_tsc1 = worker_rdtsc();
     if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_duration[1] += start_time1 - start_time;
+        duration_stat_fft->task_duration[1] += start_tsc1 - start_tsc;
     } else if (cur_symbol_type == SymbolType::kPilot) {
-        duration_stat_csi->task_duration[1] += start_time1 - start_time;
+        duration_stat_csi->task_duration[1] += start_tsc1 - start_tsc;
     }
-#endif
 
     /* compute FFT */
     DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]);
     // DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0],
     // fft_buffer_.FFT_outputs[0]);
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time2 = get_time();
+    size_t start_tsc2 = worker_rdtsc();
     if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_duration[2] += start_time2 - start_time1;
+        duration_stat_fft->task_duration[2] += start_tsc2 - start_tsc1;
     } else if (cur_symbol_type == SymbolType::kPilot) {
-        duration_stat_csi->task_duration[2] += start_time2 - start_time1;
+        duration_stat_csi->task_duration[2] += start_tsc2 - start_tsc1;
     }
-    double start_time_part3 = get_time();
-#endif
+    size_t start_tsc_part3 = worker_rdtsc();
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doFFT thread %d: frame: %zu, subframe: %zu, ant: %zu\n", tid,
@@ -197,26 +191,22 @@ Event_data DoFFT::launch(int tag)
         printf("unkown or unsupported symbol type.\n");
     }
 
-#if DEBUG_UPDATE_STATS_DETAILED
     if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_duration[3] += get_time() - start_time_part3;
+        duration_stat_fft->task_duration[3] += worker_rdtsc() - start_tsc_part3;
     } else {
-        duration_stat_csi->task_duration[3] += get_time() - start_time_part3;
+        duration_stat_csi->task_duration[3] += worker_rdtsc() - start_tsc_part3;
     }
-#endif
 
     /* After finish, reset socket buffer status */
     socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
-#if DEBUG_UPDATE_STATS
     if (cur_symbol_type == SymbolType::kUL) {
         duration_stat_fft->task_count++;
-        duration_stat_fft->task_duration[0] += get_time() - start_time;
+        duration_stat_fft->task_duration[0] += worker_rdtsc() - start_tsc;
     } else {
         duration_stat_csi->task_count++;
-        duration_stat_csi->task_duration[0] += get_time() - start_time;
+        duration_stat_csi->task_duration[0] += worker_rdtsc() - start_tsc;
     }
-#endif
 
     /* Inform main thread */
     return Event_data(EventType::kFFT,
@@ -284,13 +274,13 @@ void DoFFT::simd_store_to_buf(
     }
 }
 
-DoIFFT::DoIFFT(Config* in_config, int in_tid,
+DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
@@ -306,9 +296,8 @@ DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
 Event_data DoIFFT::launch(int offset)
 {
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif
+    size_t start_tsc = worker_rdtsc();
+
 #if DEBUG_PRINT_IN_TASK
     int ant_id = offset % cfg->BS_ANT_NUM;
     int total_data_subframe_id = offset / cfg->BS_ANT_NUM;
@@ -323,10 +312,8 @@ Event_data DoIFFT::launch(int offset)
         * TASK_BUFFER_FRAME_NUM;
     int buffer_subframe_offset = offset % dl_ifft_buffer_size;
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time1 = get_time();
-    duration_stat->task_duration[1] += start_time1 - start_time;
-#endif
+    size_t start_tsc1 = worker_rdtsc();
+    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
     float* ifft_buf_ptr = (float*)dl_ifft_buffer_[buffer_subframe_offset];
     memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
@@ -340,10 +327,8 @@ Event_data DoIFFT::launch(int offset)
     //         dl_ifft_buffer_[buffer_subframe_offset][i].im);
     // printf("\n");
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time2 = get_time();
-    duration_stat->task_duration[2] += start_time2 - start_time1;
-#endif
+    size_t start_tsc2 = worker_rdtsc();
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
         * cfg->data_symbol_num_perframe;
@@ -374,9 +359,7 @@ Event_data DoIFFT::launch(int offset)
                 integer1);
     }
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    duration_stat->task_duration[2] += get_time() - start_time2;
-#endif
+    duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
 
     // cout << "In ifft: frame: "<< frame_id<<", subframe: "<<
     // current_data_subframe_id<<", ant: " << ant_id << ", data: "; for (int j =
@@ -388,13 +371,7 @@ Event_data DoIFFT::launch(int offset)
     // }
     // cout<<"\n\n"<<endl;
 
-#if DEBUG_UPDATE_STATS
     duration_stat->task_count++;
-    duration_stat->task_duration[0] += get_time() - start_time;
-#endif
-
-    /* Inform main thread */
-    Event_data ifft_finish_event(EventType::kIFFT, offset);
-    // consumer_.handle(ifft_finish_event);
-    return ifft_finish_event;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
+    return Event_data(EventType::kIFFT, offset);
 }
