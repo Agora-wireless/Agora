@@ -40,7 +40,7 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 add_definitions(-DWRITE_DEMUL)
-add_definitions(-DWRITE_IFFT)
+add_definitions(-DWRITE_TX)
 
 
 find_package(Armadillo)

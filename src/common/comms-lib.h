@@ -85,8 +85,8 @@ public:
         std::vector<float> const&, double, double, size_t,
         const size_t delta = 10);
     static std::vector<std::complex<float>> composeRefSymbol(
-        std::vector<std::complex<float>>, size_t, size_t, size_t,
-        bool timeDomain = true);
+        std::vector<std::complex<float>>, size_t, size_t, size_t, size_t,
+        size_t, size_t, bool timeDomain = true);
     // private:
     //    static inline float** init_qpsk();
     //    static inline float** init_qam16();

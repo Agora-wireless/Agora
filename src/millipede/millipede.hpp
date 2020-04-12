@@ -101,7 +101,7 @@ public:
 
     void save_demul_data_to_file(int frame_id);
     void save_decode_data_to_file(int frame_id);
-    void save_ifft_data_to_file(int frame_id);
+    void save_tx_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 
