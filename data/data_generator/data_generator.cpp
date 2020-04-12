@@ -151,6 +151,12 @@ int main(int argc, char* argv[])
     int symbol_num_perframe = config_->symbol_num_perframe;
     int data_symbol_num_perframe = config_->data_symbol_num_perframe;
     int pilot_symbol_num_perframe = config_->pilot_symbol_num_perframe;
+    int dl_data_symbol_num_perframe = config_->dl_data_symbol_num_perframe;
+    int dl_data_symbol_start = config_->dl_data_symbol_start;
+    int sampsPerSymbol = config_->sampsPerSymbol;
+    int CP_LEN = config_->CP_LEN;
+    int prefix = config_->prefix;
+    int postfix = config_->postfix;
     // randomly generate input
     srand(time(NULL));
     // srand(0);
@@ -472,10 +478,16 @@ int main(int argc, char* argv[])
     Table<complex_float> dl_mod_data;
     dl_mod_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * UE_NUM, 64);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        for (int j = 0; j < UE_NUM; j++)
-            memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
-                mod_output[i * UE_NUM + j],
-                OFDM_DATA_NUM * sizeof(complex_float));
+        for (int j = 0; j < UE_NUM; j++) {
+            if (i <= dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
+                for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++)
+                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id] = pilots_t[sc_id];
+            } else {
+                memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
+                    mod_output[(i - dl_data_symbol_start) * UE_NUM + j],
+                    OFDM_DATA_NUM * sizeof(complex_float));
+            }
+        }
     }
 
     // printf("dl mod data \n");
@@ -493,12 +505,15 @@ int main(int argc, char* argv[])
     // }
 
     /* perform precoding and ifft */
-    Table<complex_float> dl_tx_data;
-    dl_tx_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * BS_ANT_NUM, 64);
+    Table<complex_float> dl_ifft_data;
+    dl_ifft_data.calloc(data_symbol_num_perframe, OFDM_CA_NUM * BS_ANT_NUM, 64);
+    Table<short> dl_tx_data;
+    dl_tx_data.calloc(
+        data_symbol_num_perframe, 2 * sampsPerSymbol * BS_ANT_NUM, 64);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         cx_float* ptr_in_data = (cx_float*)dl_mod_data[i];
         cx_fmat mat_input_data(ptr_in_data, OFDM_CA_NUM, UE_NUM, false);
-        cx_float* ptr_out = (cx_float*)dl_tx_data[i];
+        cx_float* ptr_out = (cx_float*)dl_ifft_data[i];
         cx_fmat mat_output(ptr_out, OFDM_CA_NUM, BS_ANT_NUM, false);
         for (int j = OFDM_DATA_START; j < OFDM_DATA_NUM + OFDM_DATA_START;
              j++) {
@@ -513,26 +528,45 @@ int main(int argc, char* argv[])
             // }
         }
         for (int j = 0; j < BS_ANT_NUM; j++) {
-            complex_float* ptr_ifft = dl_tx_data[i] + j * OFDM_CA_NUM;
+            complex_float* ptr_ifft = dl_ifft_data[i] + j * OFDM_CA_NUM;
+
             CommsLib::IFFT(ptr_ifft, OFDM_CA_NUM, false);
+
+            cx_fmat mat_data((cx_float*)ptr_ifft, 1, OFDM_CA_NUM, false);
+            float scale = abs(mat_data).max();
+            mat_data /= scale;
+
+            short* txSymbol = dl_tx_data[i] + j * sampsPerSymbol * 2;
+            memset(txSymbol, 0, sizeof(short) * 2 * prefix);
+            for (int k = 0; k < OFDM_CA_NUM; k++) {
+                txSymbol[2 * (k + CP_LEN + prefix)]
+                    = (short)(32768 * ptr_ifft[k].re);
+                txSymbol[2 * (k + CP_LEN + prefix) + 1]
+                    = (short)(32768 * ptr_ifft[k].im);
+            }
+            for (int k = 0; k < 2 * CP_LEN; k++) {
+                txSymbol[2 * prefix + k] = txSymbol[2 * (prefix + OFDM_CA_NUM)];
+            }
+            memset(txSymbol + 2 * (prefix + CP_LEN + OFDM_CA_NUM), 0,
+                sizeof(short) * 2 * postfix);
         }
     }
 
     printf("saving dl tx data...\n");
 #ifdef USE_LDPC
-    std::string filename_dl_tx = cur_directory + "/data/LDPC_dl_ifft_data_"
+    std::string filename_dl_tx = cur_directory + "/data/LDPC_dl_tx_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
 #else
-    std::string filename_dl_tx = cur_directory + "/data/dl_ifft_data_"
+    std::string filename_dl_tx = cur_directory + "/data/dl_tx_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
 #endif
 
     FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
-    for (int i = 0; i < data_symbol_num_perframe; i++) {
-        float* ptr = (float*)dl_tx_data[i];
-        fwrite(ptr, OFDM_CA_NUM * BS_ANT_NUM * 2, sizeof(float), fp_dl_tx);
+    for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
+        short* ptr = (short*)dl_tx_data[i + dl_data_symbol_start];
+        fwrite(ptr, sampsPerSymbol * BS_ANT_NUM * 2, sizeof(short), fp_dl_tx);
     }
     fclose(fp_dl_tx);
 

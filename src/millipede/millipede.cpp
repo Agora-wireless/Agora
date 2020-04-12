@@ -184,6 +184,7 @@ void Millipede::start()
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
                 fft_stats_.symbol_cal_count[frame_id] = 0;
                 rc_stats_.update_frame_count();
+                rc_stats_.last_frame = frame_id;
             } break;
 
             case EventType::kZF: {
@@ -518,7 +519,7 @@ finish:
     save_demul_data_to_file(stats_manager_->last_frame_id);
 #endif
 
-    save_ifft_data_to_file(stats_manager_->last_frame_id);
+    save_tx_data_to_file(stats_manager_->last_frame_id);
     this->stop();
     // exit(0);
 }
@@ -532,15 +533,20 @@ void Millipede::handle_event_fft(int tag)
         if (config_->isPilot(frame_id, subframe_id)) {
             print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count,
                 frame_id, subframe_id);
-            /* If CSI of all UEs is ready, schedule ZF/prediction */
-            if (fft_stats_.last_symbol(frame_id)) {
-                stats_manager_->master_set_timestamp(
-                    TsType::kFFTDone, fft_stats_.frame_count);
-                print_per_frame_done(
-                    PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
-                fft_stats_.update_frame_count();
-                schedule_task_set(EventType::kZF, config_->zf_block_num,
-                    frame_id, zf_queue_, *ptok_zf);
+            if (!config_->downlink_mode
+                || (config_->downlink_mode && !config_->recipCalEn)
+                || (config_->downlink_mode && config_->recipCalEn
+                       && rc_stats_.last_frame == frame_id)) {
+                /* If CSI of all UEs is ready, schedule ZF/prediction */
+                if (fft_stats_.last_symbol(frame_id)) {
+                    stats_manager_->master_set_timestamp(
+                        TsType::kFFTDone, fft_stats_.frame_count);
+                    print_per_frame_done(
+                        PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
+                    fft_stats_.update_frame_count();
+                    schedule_task_set(EventType::kZF, config_->zf_block_num,
+                        frame_id, zf_queue_, *ptok_zf);
+                }
             }
         } else if (config_->isUplink(frame_id, subframe_id)) {
             int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
@@ -1184,14 +1190,14 @@ void Millipede::initialize_downlink_buffers()
         cfg->BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
-    dl_encoded_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     recip_buffer_.malloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.malloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-
 #ifdef USE_LDPC
+    dl_encoded_buffer_.malloc(
+        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
         cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
         cfg->data_symbol_num_perframe, 64);
@@ -1237,6 +1243,10 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
+    recip_buffer_.free();
+    calib_buffer_.free();
+    dl_precoder_buffer_.free();
+    dl_encoded_buffer_.free();
 
 #ifdef USE_LDPC
     encode_stats_.fini();
@@ -1294,14 +1304,14 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 #endif
 }
 
-void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
+void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_IFFT
+#ifdef WRITE_TX
     auto& cfg = config_;
-    printf("Saving IFFT data to data/ifft_data.bin\n");
+    printf("Saving TX data to data/tx_data.bin\n");
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/ifft_data.bin";
+    std::string filename = cur_directory + "/data/tx_data.bin";
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
@@ -1311,8 +1321,11 @@ void Millipede::save_ifft_data_to_file(UNUSED int frame_id)
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             int offset = total_data_subframe_id * cfg->BS_ANT_NUM + ant_id;
-            float* ptr = (float*)dl_ifft_buffer_[offset];
-            fwrite(ptr, cfg->OFDM_CA_NUM * 2, sizeof(float), fp);
+            int packet_length = config_->packet_length;
+            struct Packet* pkt
+                = (struct Packet*)(&dl_socket_buffer_[offset * packet_length]);
+            short* socket_ptr = pkt->data;
+            fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
     fclose(fp);

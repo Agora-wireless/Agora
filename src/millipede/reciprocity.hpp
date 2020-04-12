@@ -38,12 +38,6 @@ private:
     Table<complex_float> calib_buffer_;
     Table<complex_float> recip_buffer_;
     DurationStat* duration_stat;
-
-    /**
-     * Intermediate buffer to gather CSI
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
-    complex_float* calib_gather_buffer;
 };
 
 #endif
