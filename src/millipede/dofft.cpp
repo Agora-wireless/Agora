@@ -6,6 +6,8 @@
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
 
+using namespace arma;
+
 /**
  * Use SIMD to vectorize data type conversion from short to float
  * reference:
@@ -327,6 +329,10 @@ Event_data DoIFFT::launch(int offset)
     //         dl_ifft_buffer_[buffer_subframe_offset][i].im);
     // printf("\n");
 
+    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
+    float post_scale = abs(mat_data).max();
+    mat_data /= post_scale;
+
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
@@ -341,7 +347,7 @@ Event_data DoIFFT::launch(int offset)
 
     for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
         /* ifft scaled results by OFDM_CA_NUM */
-        __m256 scale_factor = _mm256_set1_ps(32768.0 / cfg->OFDM_CA_NUM);
+        __m256 scale_factor = _mm256_set1_ps(32768.0);
         __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
         __m256 ifft2 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id + 8);
         __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);

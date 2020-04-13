@@ -399,17 +399,21 @@ void CommsLib::FFT(complex_float* in, int fftsize)
 
 std::vector<std::complex<float>> CommsLib::composeRefSymbol(
     std::vector<std::complex<float>> pilot, size_t offset, size_t period,
-    size_t fftSize, bool timeDomain)
+    size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,
+    bool timeDomain)
 {
     std::vector<std::complex<float>> fft_in(fftSize, 0);
-    size_t pilotNum = fftSize / period;
+    size_t pilotNum = dataSize / period;
     for (size_t i = 0; i < pilotNum; i++) {
-        size_t index = i * period + offset;
+        size_t index = i * period + offset + dataStart;
         fft_in[index] = pilot[index];
     }
-    if (timeDomain)
-        return CommsLib::IFFT(fft_in, fftSize);
-    else
+    if (timeDomain) {
+        auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
+        pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
+            pilot_cf32.end()); // add CP
+        return pilot_cf32;
+    } else
         return fft_in;
 }
 

@@ -238,7 +238,8 @@ void* Sender::loopSend(int tid)
     size_t max_subframe_id = get_max_subframe_id();
     int radio_lo = tid * cfg->nRadios / thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / thread_num;
-    size_t ant_num_this_thread = radio_hi - radio_lo;
+    size_t ant_num_this_thread = cfg->BS_ANT_NUM / thread_num
+        + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, thread number: %zu\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     int radio_id = radio_lo;
