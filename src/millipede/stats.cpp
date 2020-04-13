@@ -85,6 +85,8 @@ void Stats::print_per_frame(Stats_worker_per_frame stats_per_frame)
 
 void Stats::update_stats_in_functions_uplink(int frame_id)
 {
+    if (!kIsWorkerTimingEnabled)
+        return;
     Stats_worker_per_frame fft_stats_per_frame;
     Stats_worker_per_frame csi_stats_per_frame;
     Stats_worker_per_frame zf_stats_per_frame;
@@ -150,6 +152,8 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
 
 void Stats::update_stats_in_functions_downlink(int frame_id)
 {
+    if (!kIsWorkerTimingEnabled)
+        return;
     Stats_worker_per_frame ifft_stats_per_frame;
     Stats_worker_per_frame csi_stats_per_frame;
     Stats_worker_per_frame zf_stats_per_frame;
@@ -486,13 +490,9 @@ void Stats::save_to_file()
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
-    if (fp_debug == NULL) {
-        printf("open file faild\n");
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(0);
-    }
-
-    printf("Saving timestamps to data/timeresult.txt\n");
+    rt_assert(fp_debug != nullptr,
+        std::string("Open file failed ") + std::to_string(errno));
+    printf("Stats: Saving master timestamps to %s\n", filename.c_str());
 
     if (config_->downlink_mode) {
         for (size_t ii = 0; ii < last_frame_id; ii++) {
@@ -539,17 +539,18 @@ void Stats::save_to_file()
                 cycles_to_us(
                     master_get_tsc(TsType::kPilotAllRX, ii), freq_ghz));
         }
+    }
+    fclose(fp_debug);
 
-        printf("Printing detailed results to data/timeresult_detail.txt\n");
-
+    if (kIsWorkerTimingEnabled) {
         std::string filename_detailed
             = cur_directory + "/data/timeresult_detail.txt";
+        printf("Stats: Printing detailed results to %s\n",
+            filename_detailed.c_str());
+
         FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
-        if (fp_debug_detailed == NULL) {
-            printf("open file faild\n");
-            std::cerr << "Error: " << strerror(errno) << std::endl;
-            exit(0);
-        }
+        rt_assert(fp_debug_detailed != nullptr,
+            std::string("Open file failed ") + std::to_string(errno));
 
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug_detailed,
@@ -566,7 +567,6 @@ void Stats::save_to_file()
         }
         fclose(fp_debug_detailed);
     }
-    fclose(fp_debug);
 }
 
 int Stats::get_total_task_count(DoerType doer_type, int thread_num)
@@ -581,6 +581,11 @@ int Stats::get_total_task_count(DoerType doer_type, int thread_num)
 void Stats::print_summary()
 {
     printf("Stats: total processed frames %zu\n", last_frame_id + 1);
+    if (!kIsWorkerTimingEnabled) {
+        printf("Stats: Worker timing is disabled. Not printing summary\n");
+        return;
+    }
+
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;

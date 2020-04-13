@@ -180,7 +180,7 @@ typedef struct LDPCconfig LDPCconfig;
 static constexpr size_t kNumStatsFrames = 10000;
 
 // If true, enable timing measurements in workers
-static constexpr size_t kTimeWorkers = true;
+static constexpr bool kIsWorkerTimingEnabled = true;
 
 // Maximum breakdown of a statistic (e.g., timing)
 static constexpr size_t kMaxStatsBreakdown = 4;
