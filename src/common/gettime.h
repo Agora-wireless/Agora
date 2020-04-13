@@ -33,7 +33,10 @@ static inline size_t rdtsc()
 
 /// Return the TSC or zero, depending on whether timing of workers is
 /// enabled
-static inline size_t worker_rdtsc() { return kTimeWorkers ? rdtsc() : 0; }
+static inline size_t worker_rdtsc()
+{
+    return kIsWorkerTimingEnabled ? rdtsc() : 0;
+}
 
 /// Sleep for some nanoseconds
 static inline void nano_sleep(size_t ns, double freq_ghz)

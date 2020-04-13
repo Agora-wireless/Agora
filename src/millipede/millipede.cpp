@@ -108,7 +108,7 @@ void Millipede::start()
     /* Counters for printing summary */
     int demul_count = 0;
     int tx_count = 0;
-    size_t demul_begin = get_time_us();
+    double demul_begin = get_time_us();
     double tx_begin = get_time_us();
 
     bool is_turn_to_dequeue_from_io = true;
@@ -509,7 +509,7 @@ void Millipede::start()
 
 finish:
 
-    printf("Millipede: printing stats\n");
+    printf("Millipede: printing stats and saving to file\n");
     stats->print_summary();
     stats->save_to_file();
 #ifdef USE_LDPC

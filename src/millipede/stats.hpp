@@ -78,20 +78,19 @@ public:
         double freq_ghz);
     ~Stats();
 
-    void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
-        const DurationStat* duration_stat, DurationStat* stats_in_worker_old,
-        int break_down_num);
-
-    void compute_avg_over_threads(Stats_worker_per_frame* stats_per_frame,
-        int thread_num, int break_down_num);
-    void print_per_thread_per_task(Stats_worker_per_frame stats_per_frame);
-    void print_per_frame(Stats_worker_per_frame stats_per_frame);
-
+    /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all uplink Doer types. Else return immediately.
     void update_stats_in_functions_uplink(int frame_id);
+
+    /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all downlink Doer types. Else return immediately.
     void update_stats_in_functions_downlink(int frame_id);
+
+    /// Save master timestamps to a file. If worker stats collection is enabled,
+    /// also save detailed worker timing info to a file.
     void save_to_file();
 
-    int get_total_task_count(DoerType doer_type, int thread_num);
+    /// If worker stats collection is enabled, print a summary of stats
     void print_summary();
 
     size_t last_frame_id;
@@ -161,6 +160,17 @@ public:
     Table<double> frame_start;
 
 private:
+    void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
+        const DurationStat* duration_stat, DurationStat* stats_in_worker_old,
+        int break_down_num);
+
+    void compute_avg_over_threads(Stats_worker_per_frame* stats_per_frame,
+        int thread_num, int break_down_num);
+    void print_per_thread_per_task(Stats_worker_per_frame stats_per_frame);
+    void print_per_frame(Stats_worker_per_frame stats_per_frame);
+
+    int get_total_task_count(DoerType doer_type, int thread_num);
+
     /* stats for the worker threads */
     void update_stats_in_dofft_bigstation(int frame_id, int thread_num,
         int thread_num_offset, Stats_worker_per_frame* fft_stats_per_frame,
