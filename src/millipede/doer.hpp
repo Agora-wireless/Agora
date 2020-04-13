@@ -36,12 +36,13 @@ public:
 
 protected:
     virtual Event_data launch(int offset) = 0;
-    Doer(Config* in_config, int in_tid,
+    Doer(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token)
         : cfg(in_config)
         , tid(in_tid)
+        , freq_ghz(freq_ghz)
         , task_queue_(in_task_queue)
         , complete_task_queue(complete_task_queue)
         , worker_producer_token(worker_producer_token)
@@ -49,7 +50,8 @@ protected:
     }
 
     Config* cfg;
-    int tid;
+    int tid; // Thread ID of this Doer
+    double freq_ghz; // RDTSC frequency in GHz
     moodycamel::ConcurrentQueue<Event_data>& task_queue_;
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue;
     moodycamel::ProducerToken* worker_producer_token;

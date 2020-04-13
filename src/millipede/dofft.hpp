@@ -22,7 +22,7 @@
 
 class DoFFT : public Doer {
 public:
-    DoFFT(Config* in_config, int in_tid,
+    DoFFT(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
@@ -83,7 +83,7 @@ private:
 
 class DoIFFT : public Doer {
 public:
-    DoIFFT(Config* in_config, int in_tid,
+    DoIFFT(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,

@@ -7,7 +7,7 @@
 #include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(Config* in_config, int in_tid,
+DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
@@ -15,7 +15,7 @@ DoDemul::DoDemul(Config* in_config, int in_tid,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
@@ -49,9 +49,7 @@ Event_data DoDemul::launch(int offset)
     int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
     int frame_id = total_data_subframe_id / data_subframe_num_perframe;
 
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif
+    size_t start_tsc = worker_rdtsc();
 
 #if DEBUG_PRINT_IN_TASK
     int current_data_subframe_id
@@ -71,9 +69,8 @@ Event_data DoDemul::launch(int offset)
         = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - sc_id);
     /* Iterate through cache lines (each cache line has 8 subcarriers) */
     for (int i = 0; i < max_sc_ite / 8; i++) {
-#if DEBUG_UPDATE_STATS_DETAILED
-        double start_time1 = get_time();
-#endif
+        size_t start_tsc1 = worker_rdtsc();
+
         /* gather data for all antennas and 8 subcarriers in the same cache line
          * 1 subcarrier and 4 ants per iteration */
         int cur_block_id = (sc_id + i * 8) / transpose_block_size;
@@ -94,9 +91,7 @@ Event_data DoDemul::launch(int offset)
             src_data_ptr += gather_step_size;
             tar_data_ptr += 8;
         }
-#if DEBUG_UPDATE_STATS_DETAILED
-        duration_stat->task_duration[1] += get_time() - start_time1;
-#endif
+        duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
 
         /* computation for 8 subcarriers */
         for (int j = 0; j < 8; j++) {
@@ -128,16 +123,12 @@ Event_data DoDemul::launch(int offset)
             /* create output matrix for equalization */
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
 
-#if DEBUG_UPDATE_STATS_DETAILED
-            double start_time2 = get_time();
-#endif
+            size_t start_tsc2 = worker_rdtsc();
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
 
-#if DEBUG_UPDATE_STATS_DETAILED
-            double start_time3 = get_time();
-            duration_stat->task_duration[2] += start_time3 - start_time2;
-#endif
+            size_t start_tsc3 = worker_rdtsc();
+            duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
             // cout << "Equaled data sc "<<cur_sc_id<<": "<<mat_equaled.st();
 
 #ifndef USE_LDPC
@@ -152,13 +143,8 @@ Event_data DoDemul::launch(int offset)
             // cout<<endl;
 #endif
 
-#if DEBUG_UPDATE_STATS_DETAILED
-            duration_stat->task_duration[3] += get_time() - start_time3;
-#endif
-
-#if DEBUG_UPDATE_STATS
+            duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
             duration_stat->task_count++;
-#endif
         }
     }
 
@@ -198,21 +184,16 @@ Event_data DoDemul::launch(int offset)
     }
 #endif
 
-#if DEBUG_UPDATE_STATS
-    duration_stat->task_duration[0] += get_time() - start_time;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     // if (duration > 500)
     //     printf("Thread %d Demul takes %.2f\n", tid, duration);
-#endif
 
-    /* Inform main thread */
-    Event_data demul_finish_event(EventType::kDemul, offset);
-    // consumer_.handle(demul_finish_event);
-    return demul_finish_event;
+    return Event_data(EventType::kDemul, offset);
 }
 
 Event_data DoDemul::DemulSingleSC(int offset)
 {
-    double start_time = get_time();
+    size_t start_tsc = worker_rdtsc();
 
     int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
     int total_data_subframe_id = offset / cfg->demul_block_num;
@@ -284,8 +265,8 @@ Event_data DoDemul::DemulSingleSC(int offset)
     }
     cout << endl;
 
-    duration_stat->task_duration[1] += get_time() - start_time; // TODO ???
-    duration_stat->task_duration[0] += get_time() - start_time;
+    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     duration_stat->task_count++;
     return Event_data(EventType::kDemul, offset);
 }

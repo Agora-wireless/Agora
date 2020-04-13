@@ -8,14 +8,14 @@
 #include "doer.hpp"
 
 using namespace arma;
-DoZF::DoZF(Config* in_config, int in_tid,
+DoZF::DoZF(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
     Table<complex_float>& in_ul_precoder_buffer,
     Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , csi_buffer_(in_csi_buffer)
     , recip_buffer_(in_recip_buffer)
@@ -77,10 +77,8 @@ void DoZF::ZF_time_orthogonal(int offset)
     int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
     int max_sc_ite = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - sc_id);
     for (int i = 0; i < max_sc_ite; i++) {
+        size_t start_tsc1 = worker_rdtsc();
 
-#if DEBUG_UPDATE_STATS
-        double start_time1 = get_time();
-#endif
         int cur_sc_id = sc_id + i;
         int cur_offset = offset_in_buffer + i;
         int transpose_block_size = cfg->transpose_block_size;
@@ -118,9 +116,7 @@ void DoZF::ZF_time_orthogonal(int offset)
             }
         }
 
-#if DEBUG_UPDATE_STATS_DETAILED
-        duration_stat->task_duration[1] += get_time() - start_time1;
-#endif
+        duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         cx_float* ptr_in = (cx_float*)csi_gather_buffer;
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
@@ -128,16 +124,12 @@ void DoZF::ZF_time_orthogonal(int offset)
         precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
             cfg->dl_data_symbol_num_perframe > 0);
 
-#if DEBUG_UPDATE_STATS_DETAILED
-        double start_time2 = get_time();
-        duration_stat->task_duration[2] += start_time2 - start_time1;
-#endif
+        double start_tsc2 = worker_rdtsc();
+        duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
         // cout<<"Precoder:" <<mat_output<<endl;
-#if DEBUG_UPDATE_STATS_DETAILED
-        double duration3 = get_time() - start_time2;
+        double duration3 = worker_rdtsc() - start_tsc2;
         duration_stat->task_duration[3] += duration3;
-#endif
         // // int mat_elem = UE_NUM * BS_ANT_NUM;
         // // int cache_line_num = mat_elem / 8;
         // for (int line_idx = 0; line_idx < cache_line_num; line_idx++) {
@@ -147,13 +139,11 @@ void DoZF::ZF_time_orthogonal(int offset)
         //     src_ptr += 16;
         // }
 
-#if DEBUG_UPDATE_STATS
         duration_stat->task_count++;
-        duration_stat->task_duration[0] += get_time() - start_time1;
+        duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
         // if (duration > 500) {
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
-#endif
     }
 }
 
@@ -167,9 +157,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
 #endif
     int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
 
-#if DEBUG_UPDATE_STATS
-    double start_time1 = get_time();
-#endif
+    double start_tsc1 = worker_rdtsc();
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
         int cur_sc_id = sc_id + i;
         __m256i index = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
@@ -202,9 +190,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
         }
     }
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    duration_stat->task_duration[1] += get_time() - start_time1;
-#endif
+    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     cx_float* ptr_in = (cx_float*)csi_gather_buffer;
     cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
@@ -212,23 +198,17 @@ void DoZF::ZF_freq_orthogonal(int offset)
     precoder(&mat_input, frame_id, sc_id, offset_in_buffer,
         cfg->dl_data_symbol_num_perframe > 0);
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time2 = get_time();
-    duration_stat->task_duration[2] += start_time2 - start_time1;
-#endif
+    double start_tsc2 = worker_rdtsc();
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     // cout<<"Precoder:" <<mat_output<<endl;
-#if DEBUG_UPDATE_STATS_DETAILED
-    duration_stat->task_duration[3] += get_time() - start_time2;
-#endif
-
-#if DEBUG_UPDATE_STATS
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
     duration_stat->task_count++;
-    duration_stat->task_duration[0] += get_time() - start_time1;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
+
     // if (duration > 500) {
     //     printf("Thread %d ZF takes %.2f\n", tid, duration);
     // }
-#endif
 }
 
 void DoZF::Predict(int offset)

@@ -22,7 +22,7 @@
 
 class Reciprocity : public Doer {
 public:
-    Reciprocity(Config* cfg, int in_tid,
+    Reciprocity(Config* cfg, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,

@@ -8,18 +8,19 @@
 #include <typeinfo>
 
 Stats::Stats(Config* cfg, int break_down_num, int task_thread_num,
-    int fft_thread_num, int zf_thread_num, int demul_thread_num)
+    int fft_thread_num, int zf_thread_num, int demul_thread_num,
+    double freq_ghz)
     : config_(cfg)
     , task_thread_num(task_thread_num)
     , fft_thread_num(fft_thread_num)
     , zf_thread_num(zf_thread_num)
     , demul_thread_num(demul_thread_num)
     , break_down_num(break_down_num)
+    , freq_ghz(freq_ghz)
 {
     rt_assert(break_down_num <= (int)kMaxStatBreakdown,
         "Statistics breakdown too high");
 
-#if DEBUG_UPDATE_STATS_DETAILED
     csi_time_in_function_details.calloc(
         break_down_num - 1, kNumStatsFrames, 4096);
     fft_time_in_function_details.calloc(
@@ -28,7 +29,6 @@ Stats::Stats(Config* cfg, int break_down_num, int task_thread_num,
         break_down_num - 1, kNumStatsFrames, 4096);
     demul_time_in_function_details.calloc(
         break_down_num - 1, kNumStatsFrames, 4096);
-#endif
 
     frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, 64);
 }
@@ -36,17 +36,17 @@ Stats::Stats(Config* cfg, int break_down_num, int task_thread_num,
 Stats::~Stats() {}
 
 void Stats::update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
-    const DurationStat* duration_stat, DurationStat* duration_stat_old,
-    int break_down_num)
+    size_t thread_id, DoerType doer_type)
 {
-    stats_per_frame->count_this_thread
-        = duration_stat->task_count - duration_stat_old->task_count;
+    DurationStat* ds = get_duration_stat(doer_type, thread_id);
+    DurationStat* ds_old = get_duration_stat_old(doer_type, thread_id);
+
+    stats_per_frame->count_this_thread = ds->task_count - ds_old->task_count;
     stats_per_frame->count_all_threads += stats_per_frame->count_this_thread;
 
     for (int j = 0; j < break_down_num; j++) {
-        stats_per_frame->duration_this_thread[j]
-            = duration_stat->task_duration[j]
-            - duration_stat_old->task_duration[j];
+        stats_per_frame->duration_this_thread[j] = cycles_to_us(
+            ds->task_duration[j] - ds_old->task_duration[j], freq_ghz);
         stats_per_frame->duration_avg_threads[j]
             += stats_per_frame->duration_this_thread[j];
 #if DEBUG_PRINT_STATS_PER_THREAD
@@ -55,7 +55,7 @@ void Stats::update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
             / stats_per_frame->count_this_thread;
 #endif
     }
-    *duration_stat_old = *duration_stat;
+    *ds_old = *ds;
 }
 
 void Stats::compute_avg_over_threads(
@@ -88,13 +88,16 @@ void Stats::print_per_frame(Stats_worker_per_frame stats_per_frame)
 
 void Stats::update_stats_in_functions_uplink(int frame_id)
 {
+    last_frame_id = (size_t)frame_id;
+    if (!kIsWorkerTimingEnabled)
+        return;
+
     Stats_worker_per_frame fft_stats_per_frame;
     Stats_worker_per_frame csi_stats_per_frame;
     Stats_worker_per_frame zf_stats_per_frame;
     Stats_worker_per_frame demul_stats_per_frame;
     Stats_worker_per_frame decode_stats_per_frame;
 
-#if DEBUG_UPDATE_STATS
 #if BIGSTATION
     update_stats_in_functions_uplink_bigstation(frame_id, &fft_stats_per_frame,
         &csi_stats_per_frame, &zf_stats_per_frame, &demul_stats_per_frame,
@@ -121,7 +124,6 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
     decode_time_in_function[frame_id]
         = decode_stats_per_frame.duration_avg_threads[0];
 
-#if DEBUG_UPDATE_STATS_DETAILED
     for (int i = 1; i < break_down_num; i++) {
         csi_time_in_function_details[i - 1][frame_id]
             = csi_stats_per_frame.duration_avg_threads[i];
@@ -132,7 +134,6 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
         demul_time_in_function_details[i - 1][frame_id]
             = demul_stats_per_frame.duration_avg_threads[i];
     }
-#endif
 
 #if DEBUG_PRINT_PER_FRAME_DONE
     printf("In frame %d (us): ", frame_id);
@@ -150,20 +151,20 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
 #endif
     printf("Total: %.1f\n", sum_time_this_frame);
 #endif
-#endif
-
-    last_frame_id = (size_t)frame_id;
 }
 
 void Stats::update_stats_in_functions_downlink(int frame_id)
 {
+    last_frame_id = (size_t)frame_id;
+    if (!kIsWorkerTimingEnabled)
+        return;
+
     Stats_worker_per_frame ifft_stats_per_frame;
     Stats_worker_per_frame csi_stats_per_frame;
     Stats_worker_per_frame zf_stats_per_frame;
     Stats_worker_per_frame precode_stats_per_frame;
     Stats_worker_per_frame encode_stats_per_frame;
 
-#if DEBUG_UPDATE_STATS
 #if BIGSTATION
     update_stats_in_functions_downlink_bigstation(frame_id,
         &ifft_stats_per_frame, &csi_stats_per_frame, &zf_stats_per_frame,
@@ -205,9 +206,6 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
 #endif
     printf("Total: %.1f\n", sum_time_this_frame);
 #endif
-#endif
-
-    last_frame_id = (size_t)frame_id;
 }
 
 void Stats::update_stats_in_dofft_bigstation(UNUSED int frame_id,
@@ -216,13 +214,8 @@ void Stats::update_stats_in_dofft_bigstation(UNUSED int frame_id,
     Stats_worker_per_frame* csi_stats_per_frame)
 {
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
-        update_stats_for_breakdowns(fft_stats_per_frame,
-            get_duration_stat(DoerType::kFFT, i),
-            get_duration_stat_old(DoerType::kFFT, i), break_down_num);
-
-        update_stats_for_breakdowns(csi_stats_per_frame,
-            get_duration_stat(DoerType::kCSI, i),
-            get_duration_stat_old(DoerType::kCSI, i), break_down_num);
+        update_stats_for_breakdowns(fft_stats_per_frame, i, DoerType::kFFT);
+        update_stats_for_breakdowns(csi_stats_per_frame, i, DoerType::kCSI);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -244,9 +237,7 @@ void Stats::update_stats_in_dozf_bigstation(UNUSED int frame_id, int thread_num,
     int thread_num_offset, Stats_worker_per_frame* zf_stats_per_frame)
 {
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
-        update_stats_for_breakdowns(zf_stats_per_frame,
-            get_duration_stat(DoerType::kZF, i),
-            get_duration_stat_old(DoerType::kZF, i), break_down_num);
+        update_stats_for_breakdowns(zf_stats_per_frame, i, DoerType::kZF);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -265,9 +256,7 @@ void Stats::update_stats_in_dodemul_bigstation(UNUSED int frame_id,
     Stats_worker_per_frame* demul_stats_per_frame)
 {
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
-        update_stats_for_breakdowns(demul_stats_per_frame,
-            get_duration_stat(DoerType::kDemul, i),
-            get_duration_stat_old(DoerType::kDemul, i), break_down_num);
+        update_stats_for_breakdowns(demul_stats_per_frame, i, DoerType::kDemul);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -287,13 +276,8 @@ void Stats::update_stats_in_doifft_bigstation(UNUSED int frame_id,
     Stats_worker_per_frame* csi_stats_per_frame)
 {
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
-        update_stats_for_breakdowns(ifft_stats_per_frame,
-            get_duration_stat(DoerType::kIFFT, i),
-            get_duration_stat_old(DoerType::kIFFT, i), break_down_num);
-
-        update_stats_for_breakdowns(csi_stats_per_frame,
-            get_duration_stat(DoerType::kCSI, i),
-            get_duration_stat_old(DoerType::kCSI, i), break_down_num);
+        update_stats_for_breakdowns(ifft_stats_per_frame, i, DoerType::kIFFT);
+        update_stats_for_breakdowns(csi_stats_per_frame, i, DoerType::kCSI);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -316,9 +300,8 @@ void Stats::update_stats_in_doprecode_bigstation(UNUSED int frame_id,
     Stats_worker_per_frame* precode_stats_per_frame)
 {
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
-        update_stats_for_breakdowns(precode_stats_per_frame,
-            get_duration_stat(DoerType::kPrecode, i),
-            get_duration_stat_old(DoerType::kPrecode, i), break_down_num);
+        update_stats_for_breakdowns(
+            precode_stats_per_frame, i, DoerType::kPrecode);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -371,25 +354,12 @@ void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id,
     Stats_worker_per_frame* decode_stats_per_frame)
 {
     for (int i = 0; i < task_thread_num; i++) {
-        update_stats_for_breakdowns(fft_stats_per_frame,
-            get_duration_stat(DoerType::kFFT, i),
-            get_duration_stat_old(DoerType::kFFT, i), break_down_num);
-
-        update_stats_for_breakdowns(csi_stats_per_frame,
-            get_duration_stat(DoerType::kCSI, i),
-            get_duration_stat_old(DoerType::kCSI, i), break_down_num);
-
-        update_stats_for_breakdowns(zf_stats_per_frame,
-            get_duration_stat(DoerType::kZF, i),
-            get_duration_stat_old(DoerType::kZF, i), break_down_num);
-
-        update_stats_for_breakdowns(demul_stats_per_frame,
-            get_duration_stat(DoerType::kDemul, i),
-            get_duration_stat_old(DoerType::kDemul, i), break_down_num);
-
-        update_stats_for_breakdowns(decode_stats_per_frame,
-            get_duration_stat(DoerType::kDecode, i),
-            get_duration_stat_old(DoerType::kDecode, i), break_down_num);
+        update_stats_for_breakdowns(fft_stats_per_frame, i, DoerType::kFFT);
+        update_stats_for_breakdowns(csi_stats_per_frame, i, DoerType::kCSI);
+        update_stats_for_breakdowns(zf_stats_per_frame, i, DoerType::kZF);
+        update_stats_for_breakdowns(demul_stats_per_frame, i, DoerType::kDemul);
+        update_stats_for_breakdowns(
+            decode_stats_per_frame, i, DoerType::kDecode);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -435,25 +405,13 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id,
 {
 
     for (int i = 0; i < task_thread_num; i++) {
-        update_stats_for_breakdowns(ifft_stats_per_frame,
-            get_duration_stat(DoerType::kIFFT, i),
-            get_duration_stat_old(DoerType::kIFFT, i), break_down_num);
-
-        update_stats_for_breakdowns(csi_stats_per_frame,
-            get_duration_stat(DoerType::kCSI, i),
-            get_duration_stat_old(DoerType::kCSI, i), break_down_num);
-
-        update_stats_for_breakdowns(zf_stats_per_frame,
-            get_duration_stat(DoerType::kZF, i),
-            get_duration_stat_old(DoerType::kZF, i), break_down_num);
-
-        update_stats_for_breakdowns(precode_stats_per_frame,
-            get_duration_stat(DoerType::kPrecode, i),
-            get_duration_stat_old(DoerType::kPrecode, i), break_down_num);
-
-        update_stats_for_breakdowns(encode_stats_per_frame,
-            get_duration_stat(DoerType::kEncode, i),
-            get_duration_stat_old(DoerType::kEncode, i), break_down_num);
+        update_stats_for_breakdowns(ifft_stats_per_frame, i, DoerType::kIFFT);
+        update_stats_for_breakdowns(csi_stats_per_frame, i, DoerType::kCSI);
+        update_stats_for_breakdowns(zf_stats_per_frame, i, DoerType::kZF);
+        update_stats_for_breakdowns(
+            precode_stats_per_frame, i, DoerType::kPrecode);
+        update_stats_for_breakdowns(
+            encode_stats_per_frame, i, DoerType::kEncode);
 
 #if DEBUG_PRINT_STATS_PER_THREAD
         double sum_time_this_frame_this_thread
@@ -495,30 +453,29 @@ void Stats::save_to_file()
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     FILE* fp_debug = fopen(filename.c_str(), "w");
-    if (fp_debug == NULL) {
-        printf("open file faild\n");
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(0);
-    }
-
-    printf("Saving timestamps to data/timeresult.txt\n");
+    rt_assert(fp_debug != nullptr,
+        std::string("Open file failed ") + std::to_string(errno));
+    printf("Stats: Saving master timestamps to %s\n", filename.c_str());
 
     if (config_->downlink_mode) {
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
                 "%.3f %.3f %.3f",
-                master_get_timestamp(TsType::kPilotRX, ii),
-                master_get_timestamp(TsType::kRXDone, ii),
-                master_get_timestamp(TsType::kFFTDone, ii),
-                master_get_timestamp(TsType::kZFDone, ii),
-                master_get_timestamp(TsType::kPrecodeDone, ii),
-                master_get_timestamp(TsType::kIFFTDone, ii),
-                master_get_timestamp(TsType::kTXDone, ii),
-                master_get_timestamp(TsType::kTXProcessedFirst, ii),
+                cycles_to_us(master_get_tsc(TsType::kPilotRX, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kRXDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kFFTDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kZFDone, ii), freq_ghz),
+                cycles_to_us(
+                    master_get_tsc(TsType::kPrecodeDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kIFFTDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kTXDone, ii), freq_ghz),
+                cycles_to_us(
+                    master_get_tsc(TsType::kTXProcessedFirst, ii), freq_ghz),
                 csi_time_in_function[ii], zf_time_in_function[ii],
                 precode_time_in_function[ii], ifft_time_in_function[ii],
-                master_get_timestamp(TsType::kProcessingStarted, ii),
+                cycles_to_us(
+                    master_get_tsc(TsType::kProcessingStarted, ii), freq_ghz),
                 frame_start[0][ii]);
 
             if (config_->socket_thread_num > 1)
@@ -529,32 +486,34 @@ void Stats::save_to_file()
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",
-                master_get_timestamp(TsType::kPilotRX, ii),
-                master_get_timestamp(TsType::kRXDone, ii),
-                master_get_timestamp(TsType::kFFTDone, ii),
-                master_get_timestamp(TsType::kZFDone, ii),
-                master_get_timestamp(TsType::kDemulDone, ii),
+                cycles_to_us(master_get_tsc(TsType::kPilotRX, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kRXDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kFFTDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kZFDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kDemulDone, ii), freq_ghz),
                 csi_time_in_function[ii], fft_time_in_function[ii],
                 zf_time_in_function[ii], demul_time_in_function[ii],
-                master_get_timestamp(TsType::kProcessingStarted, ii),
+                cycles_to_us(
+                    master_get_tsc(TsType::kProcessingStarted, ii), freq_ghz),
                 frame_start[0][ii]);
             if (config_->socket_thread_num > 1)
                 fprintf(fp_debug, " %.3f", frame_start[1][ii]);
             fprintf(fp_debug, " %.3f\n",
-                master_get_timestamp(TsType::kPilotAllRX, ii));
+                cycles_to_us(
+                    master_get_tsc(TsType::kPilotAllRX, ii), freq_ghz));
         }
+    }
+    fclose(fp_debug);
 
-#if DEBUG_UPDATE_STATS_DETAILED
-        printf("Printing detailed results to data/timeresult_detail.txt\n");
-
+    if (kIsWorkerTimingEnabled) {
         std::string filename_detailed
             = cur_directory + "/data/timeresult_detail.txt";
+        printf("Stats: Printing detailed results to %s\n",
+            filename_detailed.c_str());
+
         FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
-        if (fp_debug_detailed == NULL) {
-            printf("open file faild\n");
-            std::cerr << "Error: " << strerror(errno) << std::endl;
-            exit(0);
-        }
+        rt_assert(fp_debug_detailed != nullptr,
+            std::string("Open file failed ") + std::to_string(errno));
 
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug_detailed,
@@ -570,9 +529,7 @@ void Stats::save_to_file()
                 demul_time_in_function_details[2][ii]);
         }
         fclose(fp_debug_detailed);
-#endif
     }
-    fclose(fp_debug);
 }
 
 int Stats::get_total_task_count(DoerType doer_type, int thread_num)
@@ -587,6 +544,11 @@ int Stats::get_total_task_count(DoerType doer_type, int thread_num)
 void Stats::print_summary()
 {
     printf("Stats: total processed frames %zu\n", last_frame_id + 1);
+    if (!kIsWorkerTimingEnabled) {
+        printf("Stats: Worker timing is disabled. Not printing summary\n");
+        return;
+    }
+
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int PILOT_NUM = config_->pilot_symbol_num_perframe;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;

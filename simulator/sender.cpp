@@ -15,8 +15,7 @@ void intHandler(int)
 
 void delay_ticks(uint64_t start, uint64_t ticks)
 {
-    // double start_time = get_time();
-    while ((RDTSC() - start) < ticks)
+    while ((rdtsc() - start) < ticks)
         _mm_pause();
     // printf("duration: %.5f\n", get_time() - start_time);
 }
@@ -157,7 +156,7 @@ void* Sender::loopMain(int tid)
     size_t tx_frame_count = 0;
     int ret;
     frame_start[0] = get_time();
-    uint64_t tick_start = RDTSC();
+    uint64_t tick_start = rdtsc();
 #if DEBUG_SENDER
     double start_time = get_time();
 #endif
@@ -181,7 +180,7 @@ void* Sender::loopMain(int tid)
 #endif
             packet_count_per_frame[tx_frame_id]++;
             delay_for_symbol(tx_frame_count, tick_start);
-            tick_start = RDTSC();
+            tick_start = rdtsc();
 
             if (packet_count_per_frame[tx_frame_id] == max_subframe_id) {
                 frame_end[tx_frame_count] = get_time();
@@ -198,7 +197,7 @@ void* Sender::loopMain(int tid)
                 if (tx_frame_count == (size_t)cfg->tx_frame_num)
                     break;
                 frame_start[tx_frame_count] = get_time();
-                tick_start = RDTSC();
+                tick_start = rdtsc();
                 // printf("Finished transmit all antennas in frame: %d, in %.5f
                 // us\n", tx_frame_count -1, frame_end[tx_frame_count - 1] -
                 // frame_start[tx_frame_count-1]);

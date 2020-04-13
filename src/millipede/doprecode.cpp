@@ -8,7 +8,7 @@
 
 using namespace arma;
 
-DoPrecode::DoPrecode(Config* in_config, int in_tid,
+DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
@@ -20,7 +20,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
     Table<int8_t>& in_dl_raw_data,
 #endif
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , precoder_buffer_(in_precoder_buffer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
@@ -54,9 +54,7 @@ Event_data DoPrecode::launch(int offset)
     int current_data_subframe_id
         = total_data_subframe_id % data_subframe_num_perframe;
 
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif
+    double start_tsc = worker_rdtsc();
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n",
         tid, frame_id, current_data_subframe_id, sc_id);
@@ -68,13 +66,9 @@ Event_data DoPrecode::launch(int offset)
         = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - sc_id);
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
-#if DEBUG_UPDATE_STATS_DETAILED
-        double start_time1 = get_time();
-#endif
+        double start_tsc1 = worker_rdtsc();
         for (int j = 0; j < 4; j++) {
-#if DEBUG_UPDATE_STATS_DETAILED
-            double start_time2 = get_time();
-#endif
+            double start_tsc2 = worker_rdtsc();
             int cur_sc_id = sc_id + i + j;
             int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
             if (cfg->freq_orthogonal_pilot)
@@ -114,9 +108,7 @@ Event_data DoPrecode::launch(int offset)
                 = (cx_float*)precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM;
             cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
 
-#if DEBUG_UPDATE_STATS_DETAILED
-            duration_stat->task_duration[1] += get_time() - start_time2;
-#endif
+            duration_stat->task_duration[1] += worker_rdtsc() - start_tsc2;
             mat_precoded = mat_data * mat_precoder;
 
             // printf("In doPrecode thread %d: frame: %d, subframe: %d, "
@@ -126,14 +118,10 @@ Event_data DoPrecode::launch(int offset)
             // cout << "Data: \n" << mat_data << endl;
             // cout << "Precoded data: \n" << mat_precoded << endl;
         }
-#if DEBUG_UPDATE_STATS_DETAILED
-        duration_stat->task_duration[2] += get_time() - start_time1;
-#endif
+        duration_stat->task_duration[2] += worker_rdtsc() - start_tsc1;
     }
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time3 = get_time();
-#endif
+    double start_tsc3 = worker_rdtsc();
 
     float* precoded_ptr = (float*)precoded_buffer_temp;
     for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
@@ -149,14 +137,9 @@ Event_data DoPrecode::launch(int offset)
             _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);
         }
     }
-#if DEBUG_UPDATE_STATS_DETAILED
-    duration_stat->task_duration[3] += get_time() - start_time3;
-#endif
-
-#if DEBUG_UPDATE_STATS
-    duration_stat->task_duration[0] += get_time() - start_time;
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     duration_stat->task_count++;
-#endif
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, subframe: %d, "
