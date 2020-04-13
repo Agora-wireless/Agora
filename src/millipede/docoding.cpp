@@ -45,13 +45,13 @@ static void adapt_bits_for_mod(
     }
 }
 
-DoEncode::DoEncode(Config* in_config, int in_tid,
+DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
@@ -115,9 +115,7 @@ Event_data DoEncode::launch(int offset)
         frame_id, symbol_id, cur_cb_id);
 #endif
 
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif
+    size_t start_tsc = worker_rdtsc();
 
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
@@ -161,28 +159,23 @@ Event_data DoEncode::launch(int offset)
     // }
     // printf("\n");
 
-#if DEBUG_UPDATE_STATS
-    double duration = get_time() - start_time;
+    double duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
     if (duration > 500) {
         printf("Thread %d Encode takes %.2f\n", tid, duration);
     }
-#endif
 
-    /* Inform main thread */
-    Event_data encode_finish_event(EventType::kEncode, offset);
-    // consumer_.handle(encode_finish_event);
-    return encode_finish_event;
+    return Event_data(EventType::kEncode, offset);
 }
 
-DoDecode::DoDecode(Config* in_config, int in_tid,
+DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , llr_buffer_(in_demod_buffer)
     , decoded_buffer_(in_decoded_buffer)
@@ -231,9 +224,7 @@ Event_data DoDecode::launch(int offset)
         frame_id, symbol_id, cur_cb_id);
 #endif
 
-#if DEBUG_UPDATE_STATS
-    double start_time = get_time();
-#endif
+    size_t start_tsc = worker_rdtsc();
 
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     int input_offset
@@ -262,15 +253,13 @@ Event_data DoDecode::launch(int offset)
     // }
     // printf("\n");
 
-#if DEBUG_UPDATE_STATS
-    double duration = get_time() - start_time;
+    double duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
-    if (duration > 500) {
-        printf("Thread %d Decode takes %.2f\n", tid, duration);
+    if (cycles_to_us(duration, freq_ghz) > 500) {
+        printf("Thread %d Decode takes %.2f\n", tid,
+            cycles_to_us(duration, freq_ghz));
     }
-#endif
 
-    /* Inform main thread */
     return Event_data(EventType::kDecode, offset);
 }

@@ -7,13 +7,13 @@
 #include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
-Reciprocity::Reciprocity(Config* in_config, int in_tid,
+Reciprocity::Reciprocity(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_calib_buffer,
     Table<complex_float>& in_recip_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, in_task_queue, complete_task_queue,
+    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , calib_buffer_(in_calib_buffer)
     , recip_buffer_(in_recip_buffer)
@@ -31,9 +31,7 @@ Event_data Reciprocity::launch(int offset)
     printf("In doRecip thread %d: frame: %d, \n", tid, offset);
 #endif
 
-#if DEBUG_UPDATE_STATS
-    double start_time1 = get_time();
-#endif
+    size_t start_tsc1 = worker_rdtsc();
 
     cx_float* ptr_in = (cx_float*)calib_buffer_[offset];
     cx_fmat mat_input(ptr_in, OFDM_DATA_NUM, BS_ANT_NUM, false);
@@ -49,27 +47,18 @@ Event_data Reciprocity::launch(int offset)
             = recip_mat.col(i);
     }
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    duration_stat->task_duration[1] += get_time() - start_time1;
-#endif
+    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
+    size_t start_tsc2 = worker_rdtsc();
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
-#if DEBUG_UPDATE_STATS_DETAILED
-    double start_time2 = get_time();
-    duration_stat->task_duration[2] += start_time2 - start_time1;
-#endif
-
-#if DEBUG_UPDATE_STATS_DETAILED
-    duration_stat->task_duration[3] += get_time() - start_time2;
-#endif
-
-#if DEBUG_UPDATE_STATS
-    double duration = get_time() - start_time1;
+    double duration = worker_rdtsc() - start_tsc1;
     duration_stat->task_duration[0] += duration;
-    if (duration > 500) {
-        printf("Thread %d RC takes %.2f\n", tid, duration);
+    if (cycles_to_us(duration, freq_ghz) > 500) {
+        printf(
+            "Thread %d RC takes %.2f\n", tid, cycles_to_us(duration, freq_ghz));
     }
     duration_stat->task_count++;
-#endif
 
     return Event_data(EventType::kRC, offset);
 }
