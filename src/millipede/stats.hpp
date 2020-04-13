@@ -161,13 +161,14 @@ public:
 
 private:
     void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
-        const DurationStat* duration_stat, DurationStat* stats_in_worker_old,
-        int break_down_num);
+        size_t thread_id, DoerType doer_type);
 
-    void compute_avg_over_threads(Stats_worker_per_frame* stats_per_frame,
-        int thread_num, int break_down_num);
-    void print_per_thread_per_task(Stats_worker_per_frame stats_per_frame);
-    void print_per_frame(Stats_worker_per_frame stats_per_frame);
+    static void compute_avg_over_threads(
+        Stats_worker_per_frame* stats_per_frame, int thread_num,
+        int break_down_num);
+    static void print_per_thread_per_task(
+        Stats_worker_per_frame stats_per_frame);
+    static void print_per_frame(Stats_worker_per_frame stats_per_frame);
 
     int get_total_task_count(DoerType doer_type, int thread_num);
 
