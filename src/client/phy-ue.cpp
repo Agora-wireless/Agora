@@ -477,6 +477,7 @@ void Phy_UE::start()
 #endif
 
 #if WRITE_IFFT
+                int offset = event.data;
                 std::string filename = "bin/ul_ifft.bin";
                 FILE* fp = fopen(filename.c_str(), "wb");
                 for (int ii = 0; ii < ul_data_symbol_perframe; ii++) {

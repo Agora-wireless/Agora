@@ -76,9 +76,10 @@ Event_data DoPrecode::launch(int offset)
 
             complex_float* data_ptr = modulated_buffer_temp;
             if ((unsigned)current_data_subframe_id
-                == cfg->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
+                <= cfg->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
-                    data_ptr[user_id] = { cfg->pilots_[cur_sc_id], 0 };
+                    data_ptr[user_id]
+                        = { cfg->pilots_[cur_sc_id + cfg->OFDM_DATA_START], 0 };
             } else {
                 int subframe_id_in_buffer
                     = current_data_subframe_id - cfg->dl_data_symbol_start;
