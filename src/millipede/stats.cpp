@@ -492,25 +492,25 @@ void Stats::save_to_file()
             }
 
             fprintf(fp_debug,
-                "Frame ID %zu: Pilot RX by socket threads at %.2f us. "
+                "Frame ID %zu: Pilot RX by socket threads at %.0f us. "
                 "Master time deltas since this reference:\n"
-                "  kPilotRX: %.2f us\n"
-                "  kPilotAllRX: %.2f us\n"
-                "  kRXDone: %.2f us\n"
-                "  kProcessingStarted: %.2f us\n"
-                "  kFFTDone: %.2f us\n"
-                "  kZFDone: %.2f us\n"
-                "  kDemulDone: %.2f us\n"
-                "  Time in functions: CSI %.2f us, FFT %.2f us, ZF %.2f us, "
-                "Demul %.2f us\n",
+                "  kPilotRX: %.1f us\n"
+                "  kPilotAllRX: %.1f us\n"
+                "  kRXDone: %.1f us\n"
+                "  kProcessingStarted: %.1f us\n"
+                "  kFFTDone: %.1f us\n"
+                "  kZFDone: %.1f us\n"
+                "  kDemulDone: %.1f us\n"
+                "  Time in functions: CSI %.1f us, FFT %.1f us, ZF %.1f us, "
+                "Demul %.1f us\n",
                 i, cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
                 master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
-                master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
-                master_get_us_from_ref(TsType::kRXDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
+                master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
                 master_get_us_from_ref(TsType::kFFTDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kZFDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kDemulDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kRXDone, i, ref_tsc),
                 csi_time_in_function[i], fft_time_in_function[i],
                 zf_time_in_function[i], demul_time_in_function[i]);
         }
@@ -562,47 +562,41 @@ void Stats::print_summary()
         return;
     }
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int PILOT_NUM = config_->pilot_symbol_num_perframe;
-    int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
-    int csi_total_count = get_total_task_count(DoerType::kCSI, task_thread_num);
-    int fft_total_count = get_total_task_count(DoerType::kFFT, task_thread_num);
-    int zf_total_count = get_total_task_count(DoerType::kZF, task_thread_num);
-    int demul_total_count
+    auto& c = config_;
+    int num_csi_tasks = get_total_task_count(DoerType::kCSI, task_thread_num);
+    int num_fft_tasks = get_total_task_count(DoerType::kFFT, task_thread_num);
+    int num_zf_tasks = get_total_task_count(DoerType::kZF, task_thread_num);
+    int num_demul_tasks
         = get_total_task_count(DoerType::kDemul, task_thread_num);
 #if USE_LDPC
-    int UE_NUM = config_->UE_NUM;
-    int decode_total_count
+    int num_decode_tasks
         = get_total_task_count(DoerType::kDecode, task_thread_num);
-    int encode_total_count
+    int num_encode_tasks
         = get_total_task_count(DoerType::kEncode, task_thread_num);
-    int nblocksInSymbol = config_->LDPC_config.nblocksInSymbol;
 #endif
-    int ifft_total_count
-        = get_total_task_count(DoerType::kIFFT, task_thread_num);
-    int precode_total_count
+    int num_ifft_tasks = get_total_task_count(DoerType::kIFFT, task_thread_num);
+    int num_precode_tasks
         = get_total_task_count(DoerType::kPrecode, task_thread_num);
-    double csi_frames = (double)csi_total_count / BS_ANT_NUM / PILOT_NUM;
-    double zf_frames = (double)zf_total_count / config_->zf_block_num;
+    double csi_frames
+        = (double)num_csi_tasks / c->BS_ANT_NUM / c->pilot_symbol_num_perframe;
+    double zf_frames = (double)num_zf_tasks / c->zf_block_num;
 
-    if (config_->downlink_mode) {
-        double precode_frames = (double)precode_total_count / OFDM_DATA_NUM
-            / dl_data_subframe_num_perframe;
-        double ifft_frames = (double)ifft_total_count / BS_ANT_NUM
-            / dl_data_subframe_num_perframe;
-        printf("Downlink totals: ");
-        printf("CSI %d (%.2f frames), ", csi_total_count, csi_frames);
-        printf("ZF: %d (%.2f frames), ", zf_total_count, zf_frames);
+    if (c->downlink_mode) {
+        double precode_frames = (double)num_precode_tasks / c->OFDM_DATA_NUM
+            / c->dl_data_symbol_num_perframe;
+        double ifft_frames = (double)num_ifft_tasks / c->BS_ANT_NUM
+            / c->dl_data_symbol_num_perframe;
+        printf("Downlink totals (tasks, frames): ");
+        printf("CSI (%d, %.2f), ", num_csi_tasks, csi_frames);
+        printf("ZF (%d, %.2f), ", num_zf_tasks, zf_frames);
 #if USE_LDPC
-        double encode_frames = (double)encode_total_count / nblocksInSymbol
-            / UE_NUM / dl_data_subframe_num_perframe;
-        printf("Encode: %d (%.2f frames), ", encode_total_count, encode_frames);
+        double encode_frames = (double)num_encode_tasks
+            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
+            / c->dl_data_symbol_num_perframe;
+        printf("Encode (%d, %.2f), ", num_encode_tasks, encode_frames);
 #endif
-        printf(
-            "Precode: %d (%.2f frames), ", precode_total_count, precode_frames);
-        printf("IFFT: %d (%.2f frames)", ifft_total_count, ifft_frames);
+        printf("Precode (%d, %.2f), ", num_precode_tasks, precode_frames);
+        printf("IFFT (%d, %.2f)", num_ifft_tasks, ifft_frames);
         printf("\n");
         for (int i = 0; i < task_thread_num; i++) {
             int num_csi_i = get_duration_stat(DoerType::kCSI, i)->task_count;
@@ -611,62 +605,62 @@ void Stats::print_summary()
                 = get_duration_stat(DoerType::kPrecode, i)->task_count;
             int num_ifft_i = get_duration_stat(DoerType::kIFFT, i)->task_count;
 
-            double percent_csi = num_csi_i * 100.0 / csi_total_count;
-            double percent_zf = num_zf_i * 100.0 / zf_total_count;
-            double percent_precode
-                = num_precode_i * 100.0 / precode_total_count;
-            double percent_ifft = num_ifft_i * 100.0 / ifft_total_count;
-            printf("thread %d performed ", i);
-            printf("CSI: %d (%.2f%%), ", num_csi_i, percent_csi);
-            printf("ZF: %d (%.2f%%), ", num_zf_i, percent_zf);
+            double percent_csi = num_csi_i * 100.0 / num_csi_tasks;
+            double percent_zf = num_zf_i * 100.0 / num_zf_tasks;
+            double percent_precode = num_precode_i * 100.0 / num_precode_tasks;
+            double percent_ifft = num_ifft_i * 100.0 / num_ifft_tasks;
+            printf("Thread %d performed (tasks, fraction of tasks): ", i);
+            printf("CSI (%d, %.2f%%), ", num_csi_i, percent_csi);
+            printf("ZF (%d, %.2f%%), ", num_zf_i, percent_zf);
 #if USE_LDPC
             int num_encode_i
                 = get_duration_stat(DoerType::kEncode, i)->task_count;
-            double percent_encode = num_encode_i * 100.0 / encode_total_count;
-            printf("Encode: %d (%.2f%%), ", num_encode_i, percent_encode);
+            double percent_encode = num_encode_i * 100.0 / num_encode_tasks;
+            printf("Encode (%d, %.2f%%), ", num_encode_i, percent_encode);
 #endif
-            printf("Precode: %d (%.2f%%), ", num_precode_i, percent_precode);
-            printf("IFFT: %d (%.2f%%)", num_ifft_i, percent_ifft);
+            printf("Precode (%d, %.2f%%), ", num_precode_i, percent_precode);
+            printf("IFFT (%d, %.2f%%)", num_ifft_i, percent_ifft);
             printf("\n");
         }
     } else {
-        double fft_frames = (double)fft_total_count / BS_ANT_NUM
-            / ul_data_subframe_num_perframe;
-        double demul_frames = (double)demul_total_count / OFDM_DATA_NUM
-            / ul_data_subframe_num_perframe;
-        printf("Uplink totals: ");
-        printf("CSI %d (%.2f frames), ", csi_total_count, csi_frames);
-        printf("ZF: %d (%.2f frames), ", zf_total_count, zf_frames);
-        printf("FFT: %d (%.2f frames), ", fft_total_count, fft_frames);
-        printf("Demul: %d (%.2f frames) ", demul_total_count, demul_frames);
+        double fft_frames = (double)num_fft_tasks / c->BS_ANT_NUM
+            / c->ul_data_symbol_num_perframe;
+        double demul_frames = (double)num_demul_tasks / c->OFDM_DATA_NUM
+            / c->ul_data_symbol_num_perframe;
+        printf("Uplink totals (tasks, frames): ");
+        printf("CSI (%d, %.2f), ", num_csi_tasks, csi_frames);
+        printf("ZF (%d, %.2f), ", num_zf_tasks, zf_frames);
+        printf("FFT (%d, %.2f), ", num_fft_tasks, fft_frames);
+        printf("Demul (%d, %.2f), ", num_demul_tasks, demul_frames);
 #if USE_LDPC
-        double decode_frames = (double)decode_total_count / nblocksInSymbol
-            / UE_NUM / ul_data_subframe_num_perframe;
-        printf("Decode: %d (%.2f frames)", decode_total_count, decode_frames);
+        double decode_frames = (double)num_decode_tasks
+            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
+            / c->ul_data_symbol_num_perframe;
+        printf("Decode (%d, %.2f)", num_decode_tasks, decode_frames);
 #endif
         printf("\n");
         for (int i = 0; i < task_thread_num; i++) {
             int num_csi_i = get_duration_stat(DoerType::kCSI, i)->task_count;
-            int num_fft_i = get_duration_stat(DoerType::kIFFT, i)->task_count;
+            int num_fft_i = get_duration_stat(DoerType::kFFT, i)->task_count;
             int num_zf_i = get_duration_stat(DoerType::kZF, i)->task_count;
             int num_demul_i
                 = get_duration_stat(DoerType::kDemul, i)->task_count;
 
-            double percent_csi = num_csi_i * 100.0 / csi_total_count;
-            double percent_fft = num_fft_i * 100.0 / fft_total_count;
-            double percent_zf = num_zf_i * 100.0 / zf_total_count;
-            double percent_demul = num_demul_i * 100.0 / demul_total_count;
+            double percent_csi = num_csi_i * 100.0 / num_csi_tasks;
+            double percent_fft = num_fft_i * 100.0 / num_fft_tasks;
+            double percent_zf = num_zf_i * 100.0 / num_zf_tasks;
+            double percent_demul = num_demul_i * 100.0 / num_demul_tasks;
 
-            printf("Thread %d performed: ", i);
-            printf("CSI: %d (%.1f%%), ", num_csi_i, percent_csi);
-            printf("ZF: %d (%.1f%%), ", num_zf_i, percent_zf);
-            printf("FFT: %d (%.1f%%), ", num_fft_i, percent_fft);
-            printf("Demul: %d (%.1f%%) ", num_demul_i, percent_demul);
+            printf("Thread %d performed (tasks, fraction of tasks): ", i);
+            printf("CSI (%d, %.1f%%), ", num_csi_i, percent_csi);
+            printf("ZF (%d, %.1f%%), ", num_zf_i, percent_zf);
+            printf("FFT (%d, %.1f%%), ", num_fft_i, percent_fft);
+            printf("Demul (%d, %.1f%%), ", num_demul_i, percent_demul);
 #if USE_LDPC
             int num_decode_i
                 = get_duration_stat(DoerType::kDecode, i)->task_count;
-            double percent_decode = num_decode_i * 100.0 / decode_total_count;
-            printf("Decode: %d (%.1f%%) ", num_decode_i, percent_decode);
+            double percent_decode = num_decode_i * 100.0 / num_decode_tasks;
+            printf("Decode (%d, %.1f%%) ", num_decode_i, percent_decode);
 #endif
             printf("\n");
         }

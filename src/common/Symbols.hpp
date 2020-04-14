@@ -187,6 +187,12 @@ static constexpr size_t kMaxStatsBreakdown = 4;
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;
 
+#if USE_LDPC
+static constexpr bool kUseLDPC = true;
+#else
+static constexpr bool kUseLDPC = false;
+#endif
+
 static const int MAX_FRAME_ID = 1e4;
 static const int float_num_in_simd256 = 8;
 static const int double_num_in_simd256 = 4;
