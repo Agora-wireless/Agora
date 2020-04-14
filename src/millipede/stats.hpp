@@ -157,7 +157,10 @@ public:
                     .duration_stat[static_cast<size_t>(doer_type)];
     }
 
-    Table<double> frame_start;
+    /// Dimensions = number of packet RX threads x kNumStatsFrames.
+    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
+    /// starts receiving frame j.
+    Table<size_t> frame_start;
 
 private:
     void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,

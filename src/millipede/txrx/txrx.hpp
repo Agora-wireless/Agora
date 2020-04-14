@@ -111,7 +111,7 @@ public:
      */
     bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         int in_buffer_frame_num, long long in_buffer_length,
-        Table<double>& in_frame_start, char* in_tx_buffer,
+        Table<size_t>& in_frame_start, char* in_tx_buffer,
         int* in_tx_buffer_status, int in_tx_buffer_frame_num,
         int in_tx_buffer_length);
     /**
@@ -161,7 +161,7 @@ private:
 
     int comm_thread_num_;
 
-    Table<double>* frame_start_;
+    Table<size_t>* frame_start_;
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_;

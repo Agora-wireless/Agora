@@ -476,10 +476,11 @@ void Stats::save_to_file()
                 precode_time_in_function[ii], ifft_time_in_function[ii],
                 cycles_to_us(
                     master_get_tsc(TsType::kProcessingStarted, ii), freq_ghz),
-                frame_start[0][ii]);
+                cycles_to_us(frame_start[0][ii], freq_ghz));
 
             if (config_->socket_thread_num > 1)
-                fprintf(fp_debug, " %.3f", frame_start[1][ii]);
+                fprintf(fp_debug, " %.3f",
+                    cycles_to_us(frame_start[1][ii], freq_ghz));
             fprintf(fp_debug, "\n");
         }
     } else {
@@ -495,9 +496,10 @@ void Stats::save_to_file()
                 zf_time_in_function[ii], demul_time_in_function[ii],
                 cycles_to_us(
                     master_get_tsc(TsType::kProcessingStarted, ii), freq_ghz),
-                frame_start[0][ii]);
+                cycles_to_us(frame_start[0][ii], freq_ghz));
             if (config_->socket_thread_num > 1)
-                fprintf(fp_debug, " %.3f", frame_start[1][ii]);
+                fprintf(fp_debug, " %.3f",
+                    cycles_to_us(frame_start[1][ii], freq_ghz));
             fprintf(fp_debug, " %.3f\n",
                 cycles_to_us(
                     master_get_tsc(TsType::kPilotAllRX, ii), freq_ghz));
