@@ -59,10 +59,10 @@ public:
     void* loopSend(int tid);
     int dequeue_send(int tid, int radio_id);
     void init_IQ_from_file();
-    size_t get_max_subframe_id();
+    size_t get_max_symbol_id();
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
-    void update_ids(size_t max_ant_id, size_t max_subframe_id);
+    void update_ids(size_t max_ant_id, size_t max_symbol_id);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void preload_tx_buffer();
@@ -82,7 +82,7 @@ private:
     struct sockaddr_in6 cliaddr_; /* server address */
 #endif
     int* socket_;
-    // First dimension: BUFFER_FRAME_NUM * subframe_num_perframe * BS_ANT_NUM
+    // First dimension: BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
     Table<char> tx_buffer_;
     size_t buffer_len_;
@@ -96,9 +96,9 @@ private:
 
     size_t ant_id;
     size_t frame_id;
-    size_t subframe_id;
+    size_t symbol_id;
 
-    // First dimension: subframe_num_perframe * BS_ANT_NUM
+    // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
     Table<float> IQ_data;
     Table<ushort> IQ_data_coded;
@@ -109,7 +109,7 @@ private:
     size_t core_offset;
     size_t delay;
 
-    Table<size_t> packet_count_per_subframe;
+    Table<size_t> packet_count_per_symbol;
     size_t* packet_count_per_frame;
 
     double* frame_start;
