@@ -28,7 +28,7 @@
 #define MLPD_LOG_LEVEL_WARN 2 // Conditions from which it's possible to recover
 #define MLPD_LOG_LEVEL_INFO 3 // Reasonable to log (e.g., management packets)
 #define MLPD_LOG_LEVEL_FRAME 4 // Per-frame logging
-#define MLPD_LOG_LEVEL_SUBFRAME 5 // Per-subframe logging
+#define MLPD_LOG_LEVEL_SUBFRAME 5 // Per-symbol logging
 #define MLPD_LOG_LEVEL_TRACE 6 // Reserved for very high verbosity
 
 #define MLPD_LOG_DEFAULT_STREAM stdout

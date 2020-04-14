@@ -285,8 +285,8 @@ void Phy_UE::start()
                     // frame=frame_id+TX_RX_FRAME_OFFSET
                     int tx_frame_id = (frame_id + TX_RX_FRAME_OFFSET);
                     for (size_t i = 0; i < ul_data_symbol_perframe; i++) {
-                        l2_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, 
-					ul_data_symbol_perframe, tx_frame_id , i);
+                        l2_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM,
+                            ul_data_symbol_perframe, tx_frame_id, i);
                         // if (l2_buffer_status_[l2_offset] == 0)
                         {
                             // modul_buffer_[l2_offset] = ul_IQ_modul[i];
@@ -426,7 +426,7 @@ void Phy_UE::start()
                 // ant_id = ant_id_t;
 
                 demul_checker_[frame_id][dl_symbol_id]++;
-                // if this subframe is ready
+                // if this symbol is ready
                 if (demul_checker_[frame_id][dl_symbol_id] == numAntennas) {
 
 #if DEBUG_PRINT_TASK_DONE
@@ -927,8 +927,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     // demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
 
     // downlink_mode = config_->downlink_mode;
-    // dl_data_subframe_start = config_->dl_data_symbol_start;
-    // dl_data_subframe_end = config_->dl_data_symbol_end;
+    // dl_data_symbol_start = config_->dl_data_symbol_start;
+    // dl_data_symbol_end = config_->dl_data_symbol_end;
     packet_length = config_->packet_length;
     tx_packet_length = config_->packet_length;
 

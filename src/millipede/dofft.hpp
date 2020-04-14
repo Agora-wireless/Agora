@@ -39,27 +39,27 @@ public:
      *
      * Buffers: socket_buffer_, fft_buffer_, csi_buffer_, data_buffer_
      *     Input buffer: socket_buffer_
-     *     Output buffer: csi_buffer_ if subframe is pilot
-     *                    data_buffer_ if subframe is data
+     *     Output buffer: csi_buffer_ if symbol is pilot
+     *                    data_buffer_ if symbol is data
      *     Intermediate buffer: fft_buffer_ (FFT_inputs, FFT_outputs)
      * Offsets:
      *     socket_buffer_:
      *         dim1: socket thread index: (offset / # of OFDM symbols per
      * thread) dim2: OFDM symbol index in this socket thread (offset - # of
-     * subframes in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
-     * * # of OFDM symbols per frame + subframe index * # of atennas + antenna
+     * symbols in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
+     * * # of OFDM symbols per frame + symbol index * # of atennas + antenna
      * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size +
      * subcarrier index in the current frame dim2: user index * # of antennas +
-     * antenna index data_buffer_: dim1: frame index * # of data subframes per
-     * frame + data subframe index dim2: transpose block index * block size * #
+     * antenna index data_buffer_: dim1: frame index * # of data symbols per
+     * frame + data symbol index dim2: transpose block index * block size * #
      * of antennas + antenna index * block size Event offset: frame index * # of
-     * subframe per frame + subframe index Description:
+     * symbol per frame + symbol index Description:
      *     1. copy received data (one OFDM symbol) from socket_buffer to
      * fft_buffer_.FFT_inputs (remove CP)
      *     2. perform FFT on fft_buffer_.FFT_inputs and store results in
      * fft_buffer_.FFT_outputs
-     *     3. if subframe is pilot, do channel estimation from
-     * fft_buffer_.FFT_outputs to csi_buffer_ if subframe is data, copy data
+     *     3. if symbol is pilot, do channel estimation from
+     * fft_buffer_.FFT_outputs to csi_buffer_ if symbol is data, copy data
      * from fft_buffer_.FFT_outputs to data_buffer_ and do block transpose
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
@@ -100,11 +100,11 @@ public:
      *     Intermediate buffer: dl_ifft_buffer_
      * Offsets:
      *     dl_IQ_data_long_:
-     *         dim1: data subframe index in the current frame * # of users +
+     *         dim1: data symbol index in the current frame * # of users +
      * user index dim2: subcarrier index dl_ifft_buffer_: dim1: frame index * #
-     * of data subframes per frame * # of users + data subframe index * # of
+     * of data symbols per frame * # of users + data symbol index * # of
      * users + user index dim2: subcarrier index dl_iffted_data_buffer_: dim1:
-     * frame index * # of data subframes per frame + data subframe index dim2:
+     * frame index * # of data symbols per frame + data symbol index dim2:
      * transpose block index * block size * # of UEs + user index * block size
      * Event offset: offset
      * Description:

@@ -83,18 +83,18 @@ Config::Config(std::string jsonfile)
     bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     if (tddConf.find("frames") == tddConf.end()) {
-        symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
+        symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
         pilot_symbol_num_perframe
             = tddConf.value("pilot_num", pilot_num_default);
-        data_symbol_num_perframe = tddConf.value("data_subframe_num_perframe",
+        data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
             symbol_num_perframe - pilot_symbol_num_perframe);
-        ul_data_symbol_num_perframe = tddConf.value("ul_subframe_num_perframe",
+        ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
             downlink_mode ? 0
                           : symbol_num_perframe - pilot_symbol_num_perframe);
         dl_data_symbol_num_perframe
-            = tddConf.value("dl_subframe_num_perframe", downlink_mode ? 10 : 0);
-        dl_data_symbol_start = tddConf.value("dl_data_subframe_start", 10);
+            = tddConf.value("dl_symbol_num_perframe", downlink_mode ? 10 : 0);
+        dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
         dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
         std::string sched("");
         for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
@@ -260,7 +260,7 @@ void Config::genData()
     beacon_len = beacon_ci16.size();
 
     if (sampsPerSymbol < beacon_len + prefix + postfix) {
-        std::string msg = "Minimum supported subframe_size is ";
+        std::string msg = "Minimum supported symbol_size is ";
         msg += std::to_string(beacon_len);
         throw std::invalid_argument(msg);
     }
@@ -399,12 +399,14 @@ void Config::genData()
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_" + std::to_string(OFDM_CA_NUM) + "_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
     size_t num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
 #else
-    std::string filename1 = cur_directory1 + "/data/orig_data_" + std::to_string(OFDM_CA_NUM) + "_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename1 = cur_directory1 + "/data/orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
     size_t num_bytes_per_ue = OFDM_DATA_NUM;
 #endif
     FILE* fd = fopen(filename1.c_str(), "rb");

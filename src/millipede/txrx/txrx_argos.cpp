@@ -194,12 +194,12 @@ int PacketTXRX::dequeue_send(int tid)
     }
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
 
     int offset = task_event.data;
     int ant_id = offset % BS_ANT_NUM;
-    int symbol_id = offset / BS_ANT_NUM % data_subframe_num_perframe;
-    int frame_id = offset / (BS_ANT_NUM * data_subframe_num_perframe);
+    int symbol_id = offset / BS_ANT_NUM % data_symbol_num_perframe;
+    int frame_id = offset / (BS_ANT_NUM * data_symbol_num_perframe);
 
     symbol_id += config_->UE_ANT_NUM;
     frame_id += TX_FRAME_DELTA;
@@ -231,7 +231,7 @@ int PacketTXRX::dequeue_send(int tid)
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
 #if DEBUG_BS_SENDER
-    printf("In TX thread %d: Transmitted frame %d, subframe %d, "
+    printf("In TX thread %d: Transmitted frame %d, symbol %d, "
            "ant %d, offset: %d, msg_queue_length: %zu\n",
         tid, frame_id, symbol_id, ant_id, offset,
         message_queue_->size_approx());
