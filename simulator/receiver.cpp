@@ -135,12 +135,16 @@ void* Receiver::loopRecv(int tid)
             exit(0);
         }
 
-#if DEBUG_SENDER
-        printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
-            frame_id, pkt->symbol_id, pkt->ant_id);
-#endif
+        // Read information from received packet
+        auto* pkt = (struct Packet*)cur_buffer_ptr;
+        int frame_id = pkt->frame_id;
+
+        if (kDebugSenderReceiver) {
+            printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
+                frame_id, pkt->symbol_id, pkt->ant_id);
+        }
+
         if (kIsWorkerTimingEnabled) {
-            int frame_id = ((struct Packet*)cur_buffer_ptr)->frame_id;
             if (frame_id > prev_frame_id) {
                 frame_start[frame_id] = get_time();
                 prev_frame_id = frame_id;

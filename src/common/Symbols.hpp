@@ -100,7 +100,6 @@ enum class EventType : int {
 #define DEBUG_PLOT 0
 
 #define DEBUG_PRINT_IN_TASK 0
-#define DEBUG_SENDER 0
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
 #define DEBUG_RADIO_TX 0
@@ -187,11 +186,14 @@ static constexpr size_t kMaxStatsBreakdown = 4;
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;
 
-#if USE_LDPC
+#ifdef USE_LDPC
 static constexpr bool kUseLDPC = true;
 #else
 static constexpr bool kUseLDPC = false;
 #endif
+
+// Enable debugging for sender and receiver applications
+static constexpr bool kDebugSenderReceiver = false;
 
 static const int MAX_FRAME_ID = 1e4;
 static const int float_num_in_simd256 = 8;

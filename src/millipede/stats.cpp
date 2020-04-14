@@ -485,6 +485,12 @@ void Stats::save_to_file()
             fprintf(fp_debug, "\n");
         }
     } else {
+        // Print the header
+        fprintf(fp_debug,
+            "Pilot RX by socket threads (= reference time), "
+            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTDone, kZFDone, "
+            "kDemulDone, kRXDone, time in CSI, time in FFT, time in ZF, "
+            "time in Demul\n");
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
             for (size_t j = 0; j < config_->socket_thread_num; j++) {
@@ -492,18 +498,8 @@ void Stats::save_to_file()
             }
 
             fprintf(fp_debug,
-                "Frame ID %zu: Pilot RX by socket threads at %.0f us. "
-                "Master time deltas since this reference:\n"
-                "  kPilotRX: %.1f us\n"
-                "  kPilotAllRX: %.1f us\n"
-                "  kRXDone: %.1f us\n"
-                "  kProcessingStarted: %.1f us\n"
-                "  kFFTDone: %.1f us\n"
-                "  kZFDone: %.1f us\n"
-                "  kDemulDone: %.1f us\n"
-                "  Time in functions: CSI %.1f us, FFT %.1f us, ZF %.1f us, "
-                "Demul %.1f us\n",
-                i, cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
+                "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
+                cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
                 master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
                 master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
                 master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
