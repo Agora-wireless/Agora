@@ -112,12 +112,21 @@ public:
                                 [frame_id % kNumStatsFrames];
     }
 
-    /// From the master, get the microsecond elapsed since the timestamp of
-    /// timestamp_type was taken for frame_id for frame_id
+    /// From the master, get the microseconds elapsed since the timestamp of
+    /// timestamp_type was taken for frame_id
     double master_get_us_since(TsType timestamp_type, int frame_id)
     {
         return cycles_to_us(
             rdtsc() - master_get_tsc(timestamp_type, frame_id), freq_ghz);
+    }
+
+    /// From the master, get the microseconds between when the timestamp of
+    /// timestamp_type was taken for frame_id, and reference_tsc
+    double master_get_us_from_ref(
+        TsType timestamp_type, int frame_id, size_t reference_tsc)
+    {
+        return cycles_to_us(
+            master_get_tsc(timestamp_type, frame_id) - reference_tsc, freq_ghz);
     }
 
     /// From the master, for a frame ID, get the microsecond difference
@@ -224,6 +233,7 @@ private:
     int demul_thread_num;
     int break_down_num;
     double freq_ghz;
+    size_t creation_tsc; // TSC at which this object was created
 
     /// Timestamps taken by the master thread at different points in a frame's
     /// processing

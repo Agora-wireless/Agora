@@ -17,6 +17,7 @@ Stats::Stats(Config* cfg, int break_down_num, int task_thread_num,
     , demul_thread_num(demul_thread_num)
     , break_down_num(break_down_num)
     , freq_ghz(freq_ghz)
+    , creation_tsc(rdtsc())
 {
     rt_assert(break_down_num <= (int)kMaxStatBreakdown,
         "Statistics breakdown too high");
@@ -484,27 +485,37 @@ void Stats::save_to_file()
             fprintf(fp_debug, "\n");
         }
     } else {
-        for (size_t ii = 0; ii < last_frame_id; ii++) {
+        for (size_t i = 0; i < last_frame_id; i++) {
+            size_t ref_tsc = SIZE_MAX;
+            for (size_t j = 0; j < config_->socket_thread_num; j++) {
+                ref_tsc = std::min(ref_tsc, frame_start[j][i]);
+            }
+
             fprintf(fp_debug,
-                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",
-                cycles_to_us(master_get_tsc(TsType::kPilotRX, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kRXDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kFFTDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kZFDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kDemulDone, ii), freq_ghz),
-                csi_time_in_function[ii], fft_time_in_function[ii],
-                zf_time_in_function[ii], demul_time_in_function[ii],
-                cycles_to_us(
-                    master_get_tsc(TsType::kProcessingStarted, ii), freq_ghz),
-                cycles_to_us(frame_start[0][ii], freq_ghz));
-            if (config_->socket_thread_num > 1)
-                fprintf(fp_debug, " %.3f",
-                    cycles_to_us(frame_start[1][ii], freq_ghz));
-            fprintf(fp_debug, " %.3f\n",
-                cycles_to_us(
-                    master_get_tsc(TsType::kPilotAllRX, ii), freq_ghz));
+                "Frame ID %zu: Pilot RX by socket threads at %.2f us. "
+                "Master time deltas since this reference:\n"
+                "  kPilotRX: %.2f us\n"
+                "  kPilotAllRX: %.2f us\n"
+                "  kRXDone: %.2f us\n"
+                "  kProcessingStarted: %.2f us\n"
+                "  kFFTDone: %.2f us\n"
+                "  kZFDone: %.2f us\n"
+                "  kDemulDone: %.2f us\n"
+                "  Time in functions: CSI %.2f us, FFT %.2f us, ZF %.2f us, "
+                "Demul %.2f us\n",
+                i, cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
+                master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
+                master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
+                master_get_us_from_ref(TsType::kRXDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
+                master_get_us_from_ref(TsType::kFFTDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kZFDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kDemulDone, i, ref_tsc),
+                csi_time_in_function[i], fft_time_in_function[i],
+                zf_time_in_function[i], demul_time_in_function[i]);
         }
     }
+
     fclose(fp_debug);
 
     if (kIsWorkerTimingEnabled) {
