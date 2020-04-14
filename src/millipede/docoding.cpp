@@ -107,10 +107,10 @@ Event_data DoEncode::launch(int offset)
     int UE_NUM = cfg->UE_NUM;
     int ue_id = (offset / nblocksInSymbol) % UE_NUM;
     int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
-    int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    int symbol_id = symbol_offset % data_subframe_num_perframe;
+    int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
+    int symbol_id = symbol_offset % data_symbol_num_perframe;
 #if DEBUG_PRINT_IN_TASK
-    int frame_id = symbol_offset / data_subframe_num_perframe;
+    int frame_id = symbol_offset / data_symbol_num_perframe;
     printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
         frame_id, symbol_id, cur_cb_id);
 #endif
@@ -147,7 +147,7 @@ Event_data DoEncode::launch(int offset)
     adapt_bits_for_mod(output_ptr, final_output_ptr,
         (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
 
-    // int frame_id = symbol_offset / data_subframe_num_perframe;
+    // int frame_id = symbol_offset / data_symbol_num_perframe;
     // printf("In doEncode thread %d: frame: %d, symbol: %d, ue: %d, code block
     // %d\n",
     //     tid, frame_id, symbol_id, ue_id, cur_cb_id);
@@ -216,10 +216,10 @@ Event_data DoDecode::launch(int offset)
     int UE_NUM = cfg->UE_NUM;
     int ue_id = (offset / nblocksInSymbol) % UE_NUM;
     int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
-    int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-    int symbol_id = symbol_offset % data_subframe_num_perframe;
+    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
+    int symbol_id = symbol_offset % data_symbol_num_perframe;
 #if DEBUG_PRINT_IN_TASK
-    int frame_id = symbol_offset / data_subframe_num_perframe;
+    int frame_id = symbol_offset / data_symbol_num_perframe;
     printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
         frame_id, symbol_id, cur_cb_id);
 #endif
@@ -241,7 +241,7 @@ Event_data DoDecode::launch(int offset)
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
-    // int frame_id = symbol_offset / data_subframe_num_perframe;
+    // int frame_id = symbol_offset / data_symbol_num_perframe;
     // printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n",
     // tid,
     //     frame_id, symbol_id, cur_cb_id);

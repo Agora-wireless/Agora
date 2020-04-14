@@ -32,10 +32,10 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     UE_NUM = config_->UE_NUM;
     OFDM_CA_NUM = config_->OFDM_CA_NUM;
     OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    subframe_num_perframe = config_->symbol_num_perframe;
-    data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
+    symbol_num_perframe = config_->symbol_num_perframe;
+    data_symbol_num_perframe = config_->data_symbol_num_perframe;
+    ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
+    dl_data_symbol_num_perframe = config_->dl_data_symbol_num_perframe;
     packet_length = config_->packet_length;
 
     // frameID = new int[TASK_BUFFER_FRAME_NUM];
@@ -377,10 +377,10 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     int UE_NUM = config_->UE_NUM;
     int OFDM_CA_NUM = config_->OFDM_CA_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int subframe_num_perframe = config_->subframe_num_perframe;
-    int data_subframe_num_perframe = config_->data_subframe_num_perframe;
-    int ul_data_subframe_num_perframe = config_->ul_data_subframe_num_perframe;
-    int dl_data_subframe_num_perframe = config_->dl_data_subframe_num_perframe;
+    int symbol_num_perframe = config_->symbol_num_perframe;
+    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
+    int ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
+    int dl_data_symbol_num_perframe = config_->dl_data_symbol_num_perframe;
     int packet_length = config_->packet_length;
 
     uint16_t nic;
@@ -419,9 +419,9 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     auto begin = std::chrono::system_clock::now();
 
     int ret = 0;
-    int max_subframe_id = config_->dl_data_symbol_num_perframe > 0
+    int max_symbol_id = config_->dl_data_symbol_num_perframe > 0
         ? UE_NUM
-        : subframe_num_perframe;
+        : symbol_num_perframe;
     int prev_frame_id = -1;
     int packet_num_per_frame = 0;
     double start_time = get_time();
@@ -518,11 +518,11 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
             // read information from received packet
             struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
             int frame_id = pkt->frame_id;
-            int subframe_id = pkt->symbol_id;
+            int symbol_id = pkt->symbol_id;
             // int cell_id = pkt->cell_id;
             int ant_id = pkt->ant_id;
-            // printf("RX thread %d received frame %d subframe %d, ant %d\n",
-            // tid, frame_id, subframe_id, ant_id);
+            // printf("RX thread %d received frame %d symbol %d, ant %d\n",
+            // tid, frame_id, symbol_id, ant_id);
             if (frame_id > prev_frame_id) {
                 *(frame_start + frame_id) = get_time();
                 prev_frame_id = frame_id;
@@ -555,10 +555,10 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
             packet_num++;
 
             // Print some information
-            if (packet_num == BS_ANT_NUM * max_subframe_id * 1000) {
+            if (packet_num == BS_ANT_NUM * max_symbol_id * 1000) {
                 auto end = std::chrono::system_clock::now();
                 double byte_len = sizeof(ushort) * OFDM_FRAME_LEN * 2
-                    * BS_ANT_NUM * max_subframe_id * 1000;
+                    * BS_ANT_NUM * max_symbol_id * 1000;
                 std::chrono::duration<double> diff = end - begin;
                 // print network throughput & maximum message queue length
                 // during this period
@@ -585,13 +585,13 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
     }
 
     int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
+    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
     int packet_length = config_->packet_length;
     int offset = task_event.data;
     int ant_id = offset % BS_ANT_NUM;
-    int symbol_id = offset / BS_ANT_NUM % data_subframe_num_perframe;
+    int symbol_id = offset / BS_ANT_NUM % data_symbol_num_perframe;
     symbol_id = config_->DLSymbols[0][symbol_id];
-    int frame_id = offset / (BS_ANT_NUM * data_subframe_num_perframe);
+    int frame_id = offset / (BS_ANT_NUM * data_symbol_num_perframe);
 
 #if DEBUG_BS_SENDER
     printf("In TX thread %d: Transmitted frame %d, symbol %d, ant %d, "
