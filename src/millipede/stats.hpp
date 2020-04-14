@@ -36,16 +36,16 @@ struct Stats_worker_per_frame {
     }
 };
 
-// Type of timestamps recorded
+// Type of timestamps recorded at the master for a frame
 // TODO: Add definitions of what each event means
 enum class TsType : size_t {
-    kPilotRX,
-    kPilotAllRX,
-    kProcessingStarted,
-    kRXDone,
+    kPilotRX, // First pilot packet received
+    kProcessingStarted, // Signal processing started on a pilot symbol
+    kPilotAllRX, // All pilot packets received
     kFFTDone,
-    kDemulDone,
     kZFDone,
+    kDemulDone,
+    kRXDone, // All packets of a frame received
     kRCDone,
     kEncodeDone,
     kDecodeDone,
