@@ -515,7 +515,7 @@ void Phy_UE::start()
                 interpretOffset3d(config_->ul_data_symbol_num_perframe,
                     config_->getNumAntennas(), offset, &frame_id_t,
                     &total_symbol_id_t, &symbol_id_t, &ant_id_t);
-#if DEBUG_PRINT_PER_SUBFRAME_DONE
+#if DEBUG_PRINT_PER_SYMBOL_DONE
                 printf("Main thread: finished TX for frame %d, symbol %d, ant "
                        "%d\n",
                     frame_id_t, symbol_id_t, ant_id_t);
