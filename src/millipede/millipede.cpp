@@ -736,7 +736,7 @@ void Millipede::schedule_demul_task(
                 = frame_id * data_symbol_num_perframe + data_symbol_id;
             schedule_task_set(EventType::kDemul, config_->demul_block_num,
                 total_data_symbol_id, demul_queue_, *ptok_demul);
-#if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
+#if DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE
             printf("Main thread: created Demodulation task for frame: %d, "
                    "start symbol: %d, current symbol: %d, in %.2f\n",
                 frame_id, start_symbol_id, data_symbol_id,
@@ -912,7 +912,7 @@ void Millipede::print_per_frame_done(
 void Millipede::print_per_symbol_done(UNUSED int task_type,
     UNUSED int frame_count, UNUSED int frame_id, UNUSED int symbol_id)
 {
-#if DEBUG_PRINT_PER_SUBFRAME_DONE
+#if DEBUG_PRINT_PER_SYMBOL_DONE
     switch (task_type) {
     case (PRINT_FFT_PILOTS):
         printf("Main thread: pilot FFT done frame: %d, %d, symbol: %d, num "
@@ -1081,7 +1081,7 @@ void Millipede::initialize_queues()
 void Millipede::initialize_uplink_buffers()
 {
     auto& cfg = config_;
-    int TASK_BUFFER_SUBFRAME_NUM
+    int TASK_BUFFER_SYMBOL_NUM
         = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
@@ -1103,21 +1103,21 @@ void Millipede::initialize_uplink_buffers()
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 
     equal_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     demod_hard_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;
-    demod_soft_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM,
+    demod_soft_buffer_.malloc(TASK_BUFFER_SYMBOL_NUM,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t num_decoded_bytes
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        TASK_BUFFER_SUBFRAME_NUM, num_decoded_bytes * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, num_decoded_bytes * cfg->UE_NUM, 64);
 
     int max_packet_num_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1155,7 +1155,7 @@ void Millipede::initialize_uplink_buffers()
 void Millipede::initialize_downlink_buffers()
 {
     auto& cfg = config_;
-    int TASK_BUFFER_SUBFRAME_NUM
+    int TASK_BUFFER_SYMBOL_NUM
         = cfg->data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     dl_socket_buffer_status_size_ = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
@@ -1166,7 +1166,7 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
     dl_ifft_buffer_.calloc(
-        cfg->BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_CA_NUM, 64);
+        cfg->BS_ANT_NUM * TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.malloc(
@@ -1175,7 +1175,7 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 #ifdef USE_LDPC
     dl_encoded_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
 
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
         cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,

@@ -28,7 +28,7 @@
 #define MLPD_LOG_LEVEL_WARN 2 // Conditions from which it's possible to recover
 #define MLPD_LOG_LEVEL_INFO 3 // Reasonable to log (e.g., management packets)
 #define MLPD_LOG_LEVEL_FRAME 4 // Per-frame logging
-#define MLPD_LOG_LEVEL_SUBFRAME 5 // Per-symbol logging
+#define MLPD_LOG_LEVEL_SYMBOL 5 // Per-symbol logging
 #define MLPD_LOG_LEVEL_TRACE 6 // Reserved for very high verbosity
 
 #define MLPD_LOG_DEFAULT_STREAM stdout
@@ -82,13 +82,13 @@
 #define MLPD_FRAME(...) ((void)0)
 #endif
 
-#if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_SUBFRAME
-#define MLPD_SUBFRAME(...)                                                     \
-    output_log_header(trace_file_or_default_stream, MLPD_LOG_LEVEL_SUBFRAME);  \
+#if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_SYMBOL
+#define MLPD_SYMBOL(...)                                                       \
+    output_log_header(trace_file_or_default_stream, MLPD_LOG_LEVEL_SYMBOL);    \
     fprintf(trace_file_or_default_stream, __VA_ARGS__);                        \
     fflush(trace_file_or_default_stream)
 #else
-#define MLPD_SUBFRAME(...) ((void)0)
+#define MLPD_SYMBOL(...) ((void)0)
 #endif
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_TRACE
@@ -132,7 +132,7 @@ static void output_log_header(FILE* stream, int level)
     case MLPD_LOG_LEVEL_FRAME:
         type = "FRAME";
         break;
-    case MLPD_LOG_LEVEL_SUBFRAME:
+    case MLPD_LOG_LEVEL_SYMBOL:
         type = "SBFRM";
         break;
     case MLPD_LOG_LEVEL_TRACE:
