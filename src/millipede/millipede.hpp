@@ -86,12 +86,12 @@ public:
     /* Add tasks into task queue based on event type */
     void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id);
 
-    void update_rx_counters(int frame_count, int frame_id, int subframe_id);
+    void update_rx_counters(int frame_count, int frame_id, int symbol_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
-    void print_per_subframe_done(
-        int task_type, int frame_count, int frame_id, int subframe_id);
+    void print_per_symbol_done(
+        int task_type, int frame_count, int frame_id, int symbol_id);
     void print_per_task_done(
-        int task_type, int frame_id, int subframe_id, int ant_or_sc_id);
+        int task_type, int frame_id, int symbol_id, int ant_or_sc_id);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -127,9 +127,9 @@ private:
      * received data
      * Frist dimension: SOCKET_THREAD_NUM
      * Second dimension of buffer (type: char): packet_length *
-     * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * Second dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
      * SOCKET_BUFFER_FRAME_NUM
      */
     Table<char> socket_buffer_;
@@ -148,8 +148,8 @@ private:
 
     /**
      * Data symbols after IFFT
-     * First dimension: total subframe number in the buffer:
-     * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
+     * First dimension: total symbol number in the buffer:
+     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
      * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
@@ -165,14 +165,14 @@ private:
 
     /**
      * Data after equalization
-     * First dimension: data_subframe_num_perframe (40-4) *
+     * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     Table<complex_float> equal_buffer_;
 
     /**
      * Data after demodulation
-     * First dimension: data_subframe_num_perframe (40-4) *
+     * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     Table<uint8_t> demod_hard_buffer_;
@@ -200,14 +200,14 @@ private:
 
     /**
      * Raw data
-     * First dimension: data_subframe_num_perframe * UE_NUM
+     * First dimension: data_symbol_num_perframe * UE_NUM
      * Second dimension: OFDM_CA_NUM
      */
     Table<long long> dl_IQ_data_long;
 
     /**
      * Modulated data
-     * First dimension: subframe_num_perframe (40) * UE_NUM *
+     * First dimension: symbol_num_perframe (40) * UE_NUM *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM
      */
     // RawDataBuffer dl_rawdata_buffer_;
@@ -215,14 +215,14 @@ private:
     /**
      * Data for IFFT
      * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
-     * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
+     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
      * OFDM_CA_NUM
      */
     Table<complex_float> dl_ifft_buffer_;
 
     /**
      * Data after IFFT
-     * First dimension: data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM
+     * First dimension: data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM
      * second dimension: UE_NUM * OFDM_CA_NUM
      * second dimension data order: SC1-32 of UEs, SC33-64 of UEs, ...,
      * SC993-1024 of UEs (32 blocks each with 32 subcarriers)
@@ -236,10 +236,10 @@ private:
 
     /**
      * Data for transmission
-     * First dimension of buffer (type: char): subframe_num_perframe *
+     * First dimension of buffer (type: char): symbol_num_perframe *
      * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * BS_ANT_NUM
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * First dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * First dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
      * SOCKET_BUFFER_FRAME_NUM
      */
     char* dl_socket_buffer_;

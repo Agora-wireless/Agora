@@ -91,7 +91,7 @@ void DoZF::ZF_time_orthogonal(int offset)
         int offset_in_csi_buffer
             = transpose_block_id * cfg->BS_ANT_NUM * transpose_block_size
             + sc_inblock_idx;
-        int subframe_offset = frame_id * cfg->UE_NUM;
+        int symbol_offset = frame_id * cfg->UE_NUM;
         float* tar_csi_ptr = (float*)csi_gather_buffer;
 
         // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid,
@@ -99,7 +99,7 @@ void DoZF::ZF_time_orthogonal(int offset)
 
         /* Gather csi matrix of all users and antennas */
         for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-            float* src_csi_ptr = (float*)csi_buffer_[subframe_offset + ue_idx]
+            float* src_csi_ptr = (float*)csi_buffer_[symbol_offset + ue_idx]
                 + offset_in_csi_buffer * 2;
             for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
                 /* Fetch 4 complex floats for 4 ants */
@@ -170,12 +170,12 @@ void DoZF::ZF_freq_orthogonal(int offset)
         int offset_in_csi_buffer
             = transpose_block_id * cfg->BS_ANT_NUM * cfg->transpose_block_size
             + sc_inblock_idx;
-        int subframe_offset = frame_id;
+        int symbol_offset = frame_id;
         float* tar_csi_ptr
             = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
 
         float* src_csi_ptr
-            = (float*)csi_buffer_[subframe_offset] + offset_in_csi_buffer * 2;
+            = (float*)csi_buffer_[symbol_offset] + offset_in_csi_buffer * 2;
         for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
             // fetch 4 complex floats for 4 ants
             __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);

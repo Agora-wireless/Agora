@@ -48,13 +48,13 @@ using fft_req_tag_t = rx_tag_t;
 union fft_resp_tag_t {
     struct {
         uint32_t frame_id : 16;
-        uint32_t subframe_id : 16;
+        uint32_t symbol_id : 16;
     };
     int _tag;
 
-    fft_resp_tag_t(uint32_t frame_id, uint32_t subframe_id)
+    fft_resp_tag_t(uint32_t frame_id, uint32_t symbol_id)
         : frame_id(frame_id)
-        , subframe_id(subframe_id)
+        , symbol_id(symbol_id)
     {
     }
 
@@ -163,10 +163,10 @@ struct Data_stats : public Frame_stats {
     int max_task_count;
 
     void init(int max_tasks, int max_symbols, int max_frame,
-        int max_data_subframe, int align)
+        int max_data_symbol, int align)
     {
         Frame_stats::init(max_symbols, max_frame, align);
-        task_count.calloc(max_frame, max_data_subframe, align);
+        task_count.calloc(max_frame, max_data_symbol, align);
         max_task_count = max_tasks;
     }
     void fini()
@@ -174,10 +174,10 @@ struct Data_stats : public Frame_stats {
         task_count.free();
         Frame_stats::fini();
     }
-    bool last_task(int frame_id, int data_subframe_id)
+    bool last_task(int frame_id, int data_symbol_id)
     {
-        if (++task_count[frame_id][data_subframe_id] == max_task_count) {
-            task_count[frame_id][data_subframe_id] = 0;
+        if (++task_count[frame_id][data_symbol_id] == max_task_count) {
+            task_count[frame_id][data_symbol_id] = 0;
             return (true);
         }
         return (false);
@@ -198,7 +198,7 @@ struct RC_stats {
     RC_stats(void)
         : frame_count(0)
         , max_task_count(1)
-	, last_frame (-1)
+        , last_frame(-1)
     {
     }
     void update_frame_count(void)
