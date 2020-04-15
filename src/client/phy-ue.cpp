@@ -259,20 +259,6 @@ void Phy_UE::start()
                     + offset_in_current_buffer * packet_length);
                 frame_id = pkt->frame_id;
                 symbol_id = pkt->symbol_id;
-#if WRITE_RECV
-                if (frame_id < 10
-                    && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
-                    int ant_id = pkt->ant_id;
-                    int len = config_->sampsPerSymbol;
-                    void* cur_buf = pkt->data;
-                    std::string filename = "sig_ant" + std::to_string(ant_id)
-                        + "_f" + std::to_string(frame_id) + ".bin";
-                    fp = fopen(filename.c_str(), "wb");
-                    fwrite(cur_buf, sizeof(std::complex<short>),
-                        config_->sampsPerSymbol, fp);
-                    fclose(fp);
-                }
-#endif
 
                 // if (ul_data_symbol_perframe > 0 && prev_frame_id ==
                 // config_->maxFrame)
@@ -334,17 +320,6 @@ void Phy_UE::start()
                 csi_checker_[frame_id]++;
 
                 if (csi_checker_[frame_id] == DL_PILOT_SYMS * numAntennas) {
-#if WRITE_CSI_MATRIX
-                    int csi_offset = generateOffset2d(
-                        TASK_BUFFER_FRAME_NUM, numAntennas, frame_id, 0);
-                    fp = fopen("bin/csi_dl.bin", "wb");
-                    for (int i = 0; i < numAntennas; i++) {
-                        fwrite(csi_buffer_[csi_offset].data(),
-                            sizeof(complex_float), non_null_sc_len, fp);
-                        csi_offset++;
-                    }
-                    fclose(fp);
-#endif
                     csi_checker_[frame_id] = 0;
 #if DEBUG_PRINT_SUMMARY
                     printf("Main thread: pilot frame: %d, finished collecting "
@@ -379,32 +354,6 @@ void Phy_UE::start()
 
                 if (data_checker_[frame_id]
                     == dl_data_symbol_perframe * numAntennas) {
-#if WRITE_FFT_DATA
-                    int FFT_buffer_offset
-                        = generateOffset3d(TASK_BUFFER_FRAME_NUM,
-                            rx_symbol_perframe, numAntennas, frame_id, 0, 0);
-                    fp = fopen("bin/fft_dl.bin", "wb");
-                    for (int i = 0; i < dl_symbol_perframe * numAntennas; i++) {
-                        fwrite(
-                            (void*)fft_buffer_.FFT_outputs[FFT_buffer_offset],
-                            sizeof(complex_float), FFT_LEN, fp);
-                        FFT_buffer_offset++;
-                    }
-                    fclose(fp);
-#endif
-#if WRITE_DEMUL
-                    int eq_buffer_offset = generateOffset3d(
-                        TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
-                        numAntennas, frame_id, 0, 0);
-                    fp = fopen("bin/equal_dl.bin", "wb");
-                    for (int i = 0; i < numAntennas * dl_data_symbol_perframe;
-                         i++) {
-                        fwrite(equal_buffer_[eq_buffer_offset].data(),
-                            sizeof(complex_float), non_null_sc_len, fp);
-                        eq_buffer_offset++;
-                    }
-                    fclose(fp);
-#endif
 #if DEBUG_PRINT_SUMMARY
                     printf("Main thread: frame: %d, finished collecting data "
                            "frames\n",
@@ -468,46 +417,7 @@ void Phy_UE::start()
 
             case EventType::kIFFT: {
                 // Do nothing for now
-#if WRITE_MODUL
-                std::string filename = "bin/ul_modul.bin";
-                FILE* fp = fopen(filename.c_str(), "wb");
-                // fwrite(modul_buffer_[offset].data(), sizeof(complex_float),
-                // data_sc_len * nUEs * ul_data_symbol_perframe, fp);
-                fclose(fp);
-#endif
 
-#if WRITE_IFFT
-                int offset = event.data;
-                std::string filename = "bin/ul_ifft.bin";
-                FILE* fp = fopen(filename.c_str(), "wb");
-                for (int ii = 0; ii < ul_data_symbol_perframe; ii++) {
-                    int IFFT_buffer_target_id
-                        = offset * (numAntennas * ul_data_symbol_perframe)
-                        + ii * numAntennas;
-                    for (int jj = 0; jj < numAntennas; jj++) {
-                        fwrite(ifft_buffer_
-                                   .IFFT_inputs[IFFT_buffer_target_id + jj],
-                            sizeof(complex_float), FFT_LEN, fp);
-                    }
-                }
-                fclose(fp);
-#endif
-
-#if WRITE_TX_BUFFER
-                std::string filename = "bin/ul_tx_buf.bin";
-                FILE* fp = fopen(filename.c_str(), "wb");
-                int frame_samp_size = (config_->getTxPackageLength()
-                    * numAntennas * ul_data_symbol_perframe);
-                fwrite(&tx_buffer_[offset * frame_samp_size],
-                    sizeof(complex_float),
-                    (CP_LEN + FFT_LEN + offsetof(Packet, data)) * numAntennas
-                        * dl_data_symbol_perframe,
-                    fp);
-                // fwrite(tx_buffer_.buffer[offset].data(),
-                // sizeof(std::complex<short>), (CP_LEN+FFT_LEN+4) * numAntennas
-                // * dl_data_symbol_perframe, fp);
-                fclose(fp);
-#endif
             } break;
 
             case EventType::kPacketTX: {
@@ -603,15 +513,9 @@ void Phy_UE::doFFT(int tid, int offset)
         rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id);
 
     size_t sym_offset = 0;
-    if (config_->isPilot(frame_id, symbol_id)) {
-        if (frame_id == 3 * TX_FRAME_DELTA) {
-            std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
-            FILE* f = fopen(fname.c_str(), "wb");
-            fwrite(pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
-            fclose(f);
-        }
-
+    //int record_frame = -1;
 #if DEBUG_DL_PILOT
+    if (config_->isPilot(frame_id, symbol_id)) {
         std::vector<std::complex<double>> vec;
         for (size_t i = 0; i < config_->sampsPerSymbol; i++)
             vec.push_back(std::complex<double>(
@@ -630,15 +534,25 @@ void Phy_UE::doFFT(int tid, int offset)
         double SNR = 10 * std::log10(signal_power / noise_power);
         printf("frame %d symbol %d ant %d: corr offset %zu, SNR %2.1f \n",
             frame_id, symbol_id, ant_id, sym_offset, SNR);
-#endif
-    } else {
-        if (frame_id == 3 * TX_FRAME_DELTA) {
-            std::string fname = "rxdata" + std::to_string(symbol_id) + ".bin";
+        if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250)
+            record_frame = frame_id; 
+        if (frame_id == record_frame) {
+            std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
             FILE* f = fopen(fname.c_str(), "wb");
             fwrite(pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
             fclose(f);
         }
+
+    } else {
+        if (frame_id == record_frame) {
+            std::string fname = "rxdata" + std::to_string(symbol_id) + ".bin";
+            FILE* f = fopen(fname.c_str(), "wb");
+            fwrite(pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
+            fclose(f);
+            //record_frame = -1;
+        }
     }
+#endif
 
     // transfer ushort to float
     size_t delay_offset = (dl_prefix_len + CP_LEN)
