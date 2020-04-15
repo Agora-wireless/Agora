@@ -46,7 +46,7 @@ PacketTXRX::~PacketTXRX()
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
-    Table<double>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
+    Table<size_t>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
     int in_tx_buffer_frame_num, int in_tx_buffer_length)
 {
     buffer_ = &in_buffer; // for save data
@@ -86,7 +86,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
-    double* rx_frame_start = (*frame_start_)[tid];
+    size_t* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
     int radio_lo = tid * config_->nRadios / comm_thread_num_;
     int radio_hi = (tid + 1) * config_->nRadios / comm_thread_num_;
@@ -109,9 +109,7 @@ void* PacketTXRX::loopTXRX(int tid)
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
-#if MEASURE_TIME
     int prev_frame_id = -1;
-#endif
     int radio_id = radio_lo;
     while (config_->running) {
         if (-1 != dequeue_send(tid))
@@ -121,17 +119,14 @@ void* PacketTXRX::loopTXRX(int tid)
         if (pkt == NULL)
             continue;
         rx_offset = (rx_offset + 1) % buffer_frame_num_;
-#if MEASURE_TIME
-        int frame_id = pkt->frame_id;
-        if (frame_id > prev_frame_id) {
-            *(rx_frame_start + frame_id) = get_time();
-            prev_frame_id = frame_id;
-            if (frame_id % 512 == 200) {
-                _mm_prefetch(
-                    (char*)(rx_frame_start + frame_id + 512), _MM_HINT_T0);
+
+        if (kIsWorkerTimingEnabled) {
+            int frame_id = pkt->frame_id;
+            if (frame_id > prev_frame_id) {
+                rx_frame_start[frame_id] = rdtsc();
+                prev_frame_id = frame_id;
             }
         }
-#endif
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
