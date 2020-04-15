@@ -156,9 +156,7 @@ void* Sender::loopMain(int tid)
     int ret;
     frame_start[0] = get_time();
     uint64_t tick_start = rdtsc();
-#if DEBUG_SENDER
-    double start_time = get_time();
-#endif
+    double start_time = kDebugSenderReceiver ? get_time() : -1.0;
     while (keep_running) {
         size_t data_ptr;
         ret = message_queue_.try_dequeue(data_ptr);
@@ -171,12 +169,12 @@ void* Sender::loopMain(int tid)
         packet_count_per_symbol[tx_frame_id][tx_current_symbol_id]++;
         if (packet_count_per_symbol[tx_frame_id][tx_current_symbol_id]
             == cfg->BS_ANT_NUM) {
-#if DEBUG_SENDER
-            double cur_time = get_time();
-            printf("Finished transmit all antennas in frame: %zu, symbol: %zu,"
-                   " in %.5f us\n ",
-                tx_frame_id, tx_current_symbol_id, cur_time - start_time);
-#endif
+            if (kDebugSenderReceiver) {
+                printf(
+                    "Finished transmit all antennas in frame: %zu, symbol: %zu,"
+                    " in %.5f us\n ",
+                    tx_frame_id, tx_current_symbol_id, get_time() - start_time);
+            }
             packet_count_per_frame[tx_frame_id]++;
             delay_for_symbol(tx_frame_count, tick_start);
             tick_start = rdtsc();
@@ -186,12 +184,12 @@ void* Sender::loopMain(int tid)
                 packet_count_per_frame[tx_frame_id] = 0;
 
                 delay_for_frame(tx_frame_count, tick_start);
-#if DEBUG_SENDER
-                printf("Finished transmit all antennas in frame: %zu, "
-                       "next scheduled: %zu, in %.5f us\n",
-                    tx_frame_count, frame_id, get_time() - start_time);
-                start_time = get_time();
-#endif
+                if (kDebugSenderReceiver) {
+                    printf("Finished transmit all antennas in frame: %zu, "
+                           "next scheduled: %zu, in %.5f us\n",
+                        tx_frame_count, frame_id, get_time() - start_time);
+                    start_time = get_time();
+                }
                 tx_frame_count++;
                 if (tx_frame_count == (size_t)cfg->tx_frame_num)
                     break;
@@ -276,9 +274,7 @@ int Sender::dequeue_send(int tid, int radio_id)
         return -1;
 
     size_t buffer_length = kTXBufOffset + cfg->packet_length;
-#if DEBUG_SENDER
-    double start_time_send = get_time();
-#endif
+    double start_time_send = kDebugSenderReceiver ? get_time() : -1.0;
     /* send a message to the server */
     int ret = 0;
 #if defined(USE_DPDK) || !CONNECT_UDP
@@ -293,13 +289,13 @@ int Sender::dequeue_send(int tid, int radio_id)
         exit(0);
     }
 
-#if DEBUG_SENDER
-    double tx_duration = get_time() - start_time_send;
-    struct Packet* pkt = (struct Packet*)tx_buffer_[data_ptr];
-    printf("Thread %d transmit frame %d, symbol %d, ant %d, data_ptr: %zu,"
-        " tx time: %.3f\n", tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, 
-        data_ptr, tx_duration);
-#endif
+    if (kDebugSenderReceiver) {
+        auto* pkt = (struct Packet*)tx_buffer_[data_ptr];
+        printf("Thread %d transmit frame %d, symbol %d, ant %d, data_ptr: %zu, "
+               " tx time: %.3f\n",
+            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, data_ptr,
+            get_time() - start_time_send);
+    }
 
     if (!message_queue_.enqueue(data_ptr)) {
         printf("Send message enqueue failed\n");

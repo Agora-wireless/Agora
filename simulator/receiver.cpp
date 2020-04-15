@@ -135,24 +135,21 @@ void* Receiver::loopRecv(int tid)
             exit(0);
         }
 
-#if MEASURE_TIME
-        // read information from received packet
-        struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+        // Read information from received packet
+        auto* pkt = (struct Packet*)cur_buffer_ptr;
         int frame_id = pkt->frame_id;
-#if DEBUG_SENDER
-        printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
-            frame_id, pkt->symbol_id, pkt->ant_id);
-#endif
-        if (frame_id > prev_frame_id) {
-            *(frame_start + frame_id) = get_time();
-            prev_frame_id = frame_id;
-            if (frame_id % 512 == 200) {
-                _mm_prefetch(
-                    (char*)(frame_start + frame_id + 512), _MM_HINT_T0);
-                // double temp = frame_start[frame_id+3];
+
+        if (kDebugSenderReceiver) {
+            printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
+                frame_id, pkt->symbol_id, pkt->ant_id);
+        }
+
+        if (kIsWorkerTimingEnabled) {
+            if (frame_id > prev_frame_id) {
+                frame_start[frame_id] = get_time();
+                prev_frame_id = frame_id;
             }
         }
-#endif
         /* get the position in buffer */
         offset = cur_buffer_status_ptr - buffer_status_ptr;
         cur_buffer_status_ptr[0] = 1;

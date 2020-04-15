@@ -220,7 +220,7 @@ int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
 
 bool PacketTXRX::startTXRX(char** in_buffer, int** in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
-    double** in_frame_start)
+    size_t** in_frame_start)
 {
     // check length
     buffer_frame_num_ = in_buffer_frame_num;
@@ -402,13 +402,7 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     int* buffer_status = obj_ptr->buffer_status_[tid];
     long long buffer_length = obj_ptr->buffer_length_;
     int buffer_frame_num = obj_ptr->buffer_frame_num_;
-    double* frame_start = obj_ptr->frame_start_[tid];
-
-    // walk through all the pages
-    double temp;
-    for (int i = 0; i < 20; i++) {
-        temp = frame_start[i * 512];
-    }
+    size_t* frame_start = obj_ptr->frame_start_[tid];
 
     char* cur_ptr_buffer = buffer;
     int* cur_ptr_buffer_status = buffer_status;
@@ -514,25 +508,13 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
             fastMemcpy(cur_ptr_buffer, payload, packet_length);
             rte_pktmbuf_free(bufs[i]);
 
-#if MEASURE_TIME
-            // read information from received packet
-            struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-            int frame_id = pkt->frame_id;
-            int symbol_id = pkt->symbol_id;
-            // int cell_id = pkt->cell_id;
-            int ant_id = pkt->ant_id;
-            // printf("RX thread %d received frame %d symbol %d, ant %d\n",
-            // tid, frame_id, symbol_id, ant_id);
-            if (frame_id > prev_frame_id) {
-                *(frame_start + frame_id) = get_time();
-                prev_frame_id = frame_id;
-                if (frame_id % 512 == 200) {
-                    _mm_prefetch(
-                        (char*)(frame_start + frame_id + 512), _MM_HINT_T0);
-                    // double temp = frame_start[frame_id+3];
+            if (kIsWorkerTimingEnabled) {
+                int frame_id = ((struct Packet*)cur_buffer_ptr)->frame_id;
+                if (frame_id > prev_frame_id) {
+                    frame_start[frame_id] = rdtsc();
+                    prev_frame_id = frame_id;
                 }
             }
-#endif
 
             // get the position in buffer
             offset = cur_ptr_buffer_status - buffer_status;
