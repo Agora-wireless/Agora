@@ -20,6 +20,7 @@ for i in `seq 1 $num_iters`; do
   echo -e "======================================\n"
   ./millipede data/tddconfig-correctness-test-ul.json &
   ./sender 4 10 5000 data/tddconfig-correctness-test-ul.json
+  wait
 
   echo "==========================================="
   echo "Generating data for downlink correctness test $i......"
@@ -33,4 +34,5 @@ for i in `seq 1 $num_iters`; do
   ./millipede data/tddconfig-correctness-test-dl.json &
   ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
   echo -e "-------------------------------------------------------\n\n\n"
+  wait
 done
