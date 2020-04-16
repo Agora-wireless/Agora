@@ -18,6 +18,8 @@ fi
 if [ "$#" -eq 2 ]; then
   out_file=$2
   echo "Redirecting stdout to file = ${out_file}"
+  rm -f ${out_file}
+  touch ${out_file}
 fi
 
 # Process out_file and print summary of pass/fails stats. This should be called
@@ -62,7 +64,7 @@ for i in `seq 1 $num_iters`; do
     ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
     echo -e "-------------------------------------------------------\n\n\n"
     wait
-  } > $out_file
+  } >> $out_file
 
   # If the user supplied an output file, print pass/fail summary analysis
   if [ "$#" -eq 2 ]; then
