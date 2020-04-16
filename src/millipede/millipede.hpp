@@ -186,10 +186,8 @@ private:
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
     Data_stats demul_stats_;
-#ifdef USE_LDPC
-    Data_stats decode_stats_;
-    Data_stats encode_stats_;
-#endif
+    Data_stats decode_stats_; // LDPC-only
+    Data_stats encode_stats_; // LDPC-only
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
@@ -254,9 +252,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> zf_queue_;
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
-#ifdef USE_LDPC
-    moodycamel::ConcurrentQueue<Event_data> decode_queue_;
-#endif
+    moodycamel::ConcurrentQueue<Event_data> decode_queue_; // LDPC-only
     /* main thread message queue for data receiving */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     /* main thread message queue for task completion*/
@@ -265,10 +261,7 @@ private:
     /* Downlink*/
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> rc_queue_;
-    // moodycamel::ConcurrentQueue<Event_data> modulate_queue_;
-#ifdef USE_LDPC
-    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
-#endif
+    moodycamel::ConcurrentQueue<Event_data> encode_queue_; // LDPC-only
     moodycamel::ConcurrentQueue<Event_data> precode_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
@@ -276,10 +269,8 @@ private:
     moodycamel::ProducerToken* ptok_fft;
     moodycamel::ProducerToken* ptok_zf;
     moodycamel::ProducerToken* ptok_demul;
-#ifdef USE_LDPC
-    moodycamel::ProducerToken* ptok_decode;
-    moodycamel::ProducerToken* ptok_encode;
-#endif
+    moodycamel::ProducerToken* ptok_decode; // LDPC-only
+    moodycamel::ProducerToken* ptok_encode; // LDPC-only
     moodycamel::ProducerToken* ptok_ifft;
     moodycamel::ProducerToken* ptok_rc;
     moodycamel::ProducerToken* ptok_precode;

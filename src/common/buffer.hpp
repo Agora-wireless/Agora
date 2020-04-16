@@ -65,31 +65,23 @@ union fft_resp_tag_t {
 };
 
 /**
- * Millipede uses these event messages for communication between threads
- *
- * @data is used for events with only a single offset
- *
- * num_offsets and offsets are used for events with multiple offsets
- *     num_offsets: number of offsets in an event
- *     offsets: the values of offsets
+ * Millipede uses these event messages for communication between threads. Each
+ * tag encodes information about a task.
  */
 struct Event_data {
-    // TODO: @data can be removed and replaced with num_offsets and offsets
-    // TODO: offsets should be called "data" or "tags" to avoid confusing with
-    // offsets into memory buffers
     EventType event_type;
-    int data;
-    int num_offsets;
-    int offsets[13];
+    uint32_t num_tags;
+    int tags[14];
 
-    Event_data(EventType event_type, int data)
+    // Create an event with one tag
+    Event_data(EventType event_type, int tag)
         : event_type(event_type)
-        , data(data)
-        , num_offsets(0)
+        , num_tags(1)
     {
+        tags[0] = tag;
     }
 
-    Event_data() { num_offsets = 0; }
+    Event_data() { num_tags = 0; }
 };
 static_assert(sizeof(Event_data) == 64, "");
 
