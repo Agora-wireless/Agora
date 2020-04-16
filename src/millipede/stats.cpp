@@ -146,10 +146,10 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
     print_per_frame(zf_stats_per_frame);
     printf("Demul: ");
     print_per_frame(demul_stats_per_frame);
-#if USE_LDPC
-    printf("Decode: ");
-    print_per_frame(decode_stats_per_frame);
-#endif
+    if (kUseLDPC) {
+        printf("Decode: ");
+        print_per_frame(decode_stats_per_frame);
+    }
     printf("Total: %.1f\n", sum_time_this_frame);
 #endif
 }
@@ -201,10 +201,10 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
     print_per_frame(zf_stats_per_frame);
     printf("Precode: ");
     print_per_frame(precode_stats_per_frame);
-#if USE_LDPC
-    printf("Encode: ");
-    print_per_frame(encode_stats_per_frame);
-#endif
+    if (kUseLDPC) {
+        printf("Encode: ");
+        print_per_frame(encode_stats_per_frame);
+    }
     printf("Total: %.1f\n", sum_time_this_frame);
 #endif
 }
@@ -322,7 +322,7 @@ void Stats::update_stats_in_functions_uplink_bigstation(int frame_id,
     Stats_worker_per_frame* csi_stats_per_frame,
     Stats_worker_per_frame* zf_stats_per_frame,
     Stats_worker_per_frame* demul_stats_per_frame,
-    Stats_worker_per_frame* decode_stats_per_frame)
+    UNUSED Stats_worker_per_frame* decode_stats_per_frame)
 {
     update_stats_in_dofft_bigstation(
         frame_id, fft_thread_num, 0, fft_stats_per_frame, csi_stats_per_frame);
@@ -337,7 +337,7 @@ void Stats::update_stats_in_functions_downlink_bigstation(int frame_id,
     Stats_worker_per_frame* csi_stats_per_frame,
     Stats_worker_per_frame* zf_stats_per_frame,
     Stats_worker_per_frame* precode_stats_per_frame,
-    Stats_worker_per_frame* encode_stats_per_frame)
+    UNUSED Stats_worker_per_frame* encode_stats_per_frame)
 {
     update_stats_in_doifft_bigstation(
         frame_id, fft_thread_num, 0, ifft_stats_per_frame, csi_stats_per_frame);
@@ -378,10 +378,10 @@ void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id,
         print_per_thread_per_task(*zf_stats_per_frame);
         printf("demul: ");
         print_per_thread_per_task(*demul_stats_per_frame);
-#if USE_LDPC
-        printf("decode: ");
-        print_per_thread_per_task(*decode_stats_per_frame);
-#endif
+        if (kUseLDPC) {
+            printf("decode: ");
+            print_per_thread_per_task(*decode_stats_per_frame);
+        }
         printf("sum: %.3f\n", sum_time_this_frame_this_thread);
 #endif
     }
@@ -429,10 +429,10 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id,
         printf("zf: ");
         print_per_thread_per_task(*zf_stats_per_frame);
         printf("precode: ");
-#if USE_LDPC
-        print_per_thread_per_task(*precode_stats_per_frame);
-        printf("encode: ");
-#endif
+        if (kUseLDPC) {
+            print_per_thread_per_task(*precode_stats_per_frame);
+            printf("encode: ");
+        }
         print_per_thread_per_task(*encode_stats_per_frame);
         printf("sum: %.3f\n", sum_time_this_frame_this_thread);
 #endif
@@ -564,12 +564,12 @@ void Stats::print_summary()
     int num_zf_tasks = get_total_task_count(DoerType::kZF, task_thread_num);
     int num_demul_tasks
         = get_total_task_count(DoerType::kDemul, task_thread_num);
-#if USE_LDPC
-    int num_decode_tasks
-        = get_total_task_count(DoerType::kDecode, task_thread_num);
-    int num_encode_tasks
-        = get_total_task_count(DoerType::kEncode, task_thread_num);
-#endif
+    int num_decode_tasks = kUseLDPC
+        ? get_total_task_count(DoerType::kDecode, task_thread_num)
+        : -1;
+    int num_encode_tasks = kUseLDPC
+        ? get_total_task_count(DoerType::kEncode, task_thread_num)
+        : -1;
     int num_ifft_tasks = get_total_task_count(DoerType::kIFFT, task_thread_num);
     int num_precode_tasks
         = get_total_task_count(DoerType::kPrecode, task_thread_num);
@@ -585,12 +585,12 @@ void Stats::print_summary()
         printf("Downlink totals (tasks, frames): ");
         printf("CSI (%d, %.2f), ", num_csi_tasks, csi_frames);
         printf("ZF (%d, %.2f), ", num_zf_tasks, zf_frames);
-#if USE_LDPC
-        double encode_frames = (double)num_encode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
-            / c->dl_data_symbol_num_perframe;
-        printf("Encode (%d, %.2f), ", num_encode_tasks, encode_frames);
-#endif
+        if (kUseLDPC) {
+            double encode_frames = (double)num_encode_tasks
+                / c->LDPC_config.nblocksInSymbol / c->UE_NUM
+                / c->dl_data_symbol_num_perframe;
+            printf("Encode (%d, %.2f), ", num_encode_tasks, encode_frames);
+        }
         printf("Precode (%d, %.2f), ", num_precode_tasks, precode_frames);
         printf("IFFT (%d, %.2f)", num_ifft_tasks, ifft_frames);
         printf("\n");
@@ -608,12 +608,12 @@ void Stats::print_summary()
             printf("Thread %d performed (tasks, fraction of tasks): ", i);
             printf("CSI (%d, %.2f%%), ", num_csi_i, percent_csi);
             printf("ZF (%d, %.2f%%), ", num_zf_i, percent_zf);
-#if USE_LDPC
-            int num_encode_i
-                = get_duration_stat(DoerType::kEncode, i)->task_count;
-            double percent_encode = num_encode_i * 100.0 / num_encode_tasks;
-            printf("Encode (%d, %.2f%%), ", num_encode_i, percent_encode);
-#endif
+            if (kUseLDPC) {
+                int num_encode_i
+                    = get_duration_stat(DoerType::kEncode, i)->task_count;
+                double percent_encode = num_encode_i * 100.0 / num_encode_tasks;
+                printf("Encode (%d, %.2f%%), ", num_encode_i, percent_encode);
+            }
             printf("Precode (%d, %.2f%%), ", num_precode_i, percent_precode);
             printf("IFFT (%d, %.2f%%)", num_ifft_i, percent_ifft);
             printf("\n");
@@ -628,12 +628,12 @@ void Stats::print_summary()
         printf("ZF (%d, %.2f), ", num_zf_tasks, zf_frames);
         printf("FFT (%d, %.2f), ", num_fft_tasks, fft_frames);
         printf("Demul (%d, %.2f), ", num_demul_tasks, demul_frames);
-#if USE_LDPC
-        double decode_frames = (double)num_decode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
-            / c->ul_data_symbol_num_perframe;
-        printf("Decode (%d, %.2f)", num_decode_tasks, decode_frames);
-#endif
+        if (kUseLDPC) {
+            double decode_frames = (double)num_decode_tasks
+                / c->LDPC_config.nblocksInSymbol / c->UE_NUM
+                / c->ul_data_symbol_num_perframe;
+            printf("Decode (%d, %.2f)", num_decode_tasks, decode_frames);
+        }
         printf("\n");
         for (int i = 0; i < task_thread_num; i++) {
             int num_csi_i = get_duration_stat(DoerType::kCSI, i)->task_count;
@@ -652,12 +652,12 @@ void Stats::print_summary()
             printf("ZF (%d, %.1f%%), ", num_zf_i, percent_zf);
             printf("FFT (%d, %.1f%%), ", num_fft_i, percent_fft);
             printf("Demul (%d, %.1f%%), ", num_demul_i, percent_demul);
-#if USE_LDPC
-            int num_decode_i
-                = get_duration_stat(DoerType::kDecode, i)->task_count;
-            double percent_decode = num_decode_i * 100.0 / num_decode_tasks;
-            printf("Decode (%d, %.1f%%) ", num_decode_i, percent_decode);
-#endif
+            if (kUseLDPC) {
+                int num_decode_i
+                    = get_duration_stat(DoerType::kDecode, i)->task_count;
+                double percent_decode = num_decode_i * 100.0 / num_decode_tasks;
+                printf("Decode (%d, %.1f%%) ", num_decode_i, percent_decode);
+            }
             printf("\n");
         }
     }

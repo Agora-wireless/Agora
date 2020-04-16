@@ -172,7 +172,7 @@ void RU::sendThread(int tid)
             exit(0);
         }
 
-        ant_id = task_event.data; //% config_->getNumAntennas();
+        ant_id = task_event.tags[0]; //% config_->getNumAntennas();
         // frame_id = task_event.more_data;
 
         // symbol_id = task_event.data / config_->getNumAntennas();
@@ -380,8 +380,8 @@ void RU::taskThread(int tid)
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
                     int tx_offset = tx_frame_offset * frame_samp_size
                         + tx_packet_length * (tx_ant_offset);
-                    char* cur_buffer_ = (tx_buffer_ + tx_offset
-                        + tx_packet_length);
+                    char* cur_buffer_
+                        = (tx_buffer_ + tx_offset + tx_packet_length);
                     struct Packet* pkt = (struct Packet*)cur_buffer_;
                     char* tx_cur_buffer_ = (char*)pkt->data;
                     for (size_t ch = 0; ch < config_->nChannels; ++ch)
