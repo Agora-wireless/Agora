@@ -306,7 +306,7 @@ void Phy_UE::start()
                 if (dl_data_symbol_perframe > 0
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
-                    Event_data do_crop_task(EventType::kIFFT, offset);
+                    Event_data do_crop_task(EventType::kFFT, offset);
                     schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT
 
