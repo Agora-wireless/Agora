@@ -186,7 +186,7 @@ int PacketTXRX::dequeue_send(int tid)
     int BS_ANT_NUM = config_->BS_ANT_NUM;
     int data_symbol_num_perframe = config_->data_symbol_num_perframe;
     int packet_length = config_->packet_length;
-    int offset = task_event.data;
+    int offset = task_event.tags[0];
     int ant_id = offset % BS_ANT_NUM;
     int symbol_id = offset / BS_ANT_NUM % data_symbol_num_perframe;
     symbol_id += config_->pilot_symbol_num_perframe;
