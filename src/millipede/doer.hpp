@@ -6,7 +6,6 @@ class Config;
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "stats.hpp"
-#include "utils.h"
 
 class Doer {
 public:
