@@ -134,8 +134,9 @@ public:
     int ue_rx_port;
     int ue_tx_port;
 
-    /* used in sender to control how many frames to send*/
-    size_t tx_frame_num;
+    // Number of frames sent by sender during testing = number of frames
+    // processed by Millipede before exiting.
+    size_t frames_to_test;
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;
