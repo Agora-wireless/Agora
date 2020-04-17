@@ -9,6 +9,7 @@
 
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include <sstream>
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>
@@ -98,6 +99,14 @@ struct Packet {
         , cell_id(c)
         , ant_id(a)
     {
+    }
+
+    std::string to_string()
+    {
+        std::ostringstream ret;
+        ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
+            << ", cell ID " << cell_id << ", antenna ID " << ant_id << "]";
+        return ret.str();
     }
 };
 
