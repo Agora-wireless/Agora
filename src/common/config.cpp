@@ -164,7 +164,7 @@ Config::Config(std::string jsonfile)
     }
 
     /* Millipede configurations */
-    tx_frame_num = tddConf.value("tx_frame_num", 9600);
+    frames_to_test = tddConf.value("frames_to_test", 9600);
     core_offset = tddConf.value("core_offset", 18);
     transpose_block_size = tddConf.value("transpose_block_size", 16);
     worker_thread_num = tddConf.value("worker_thread_num", 25);

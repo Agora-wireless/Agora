@@ -277,8 +277,7 @@ void Millipede::start()
                             frame_count = demul_stats_.frame_count + 1;
                             stats->update_stats_in_functions_uplink(
                                 demul_stats_.frame_count);
-                            if (stats->last_frame_id
-                                == config_->tx_frame_num - 1)
+                            if (stats->last_frame_id == cfg->frames_to_test - 1)
                                 goto finish;
                         }
                         stats->master_set_tsc(
@@ -328,7 +327,7 @@ void Millipede::start()
                             PRINT_DECODE, decode_stats_.frame_count, frame_id);
                         stats->update_stats_in_functions_uplink(
                             decode_stats_.frame_count);
-                        if (stats->last_frame_id == config_->tx_frame_num - 1)
+                        if (stats->last_frame_id == cfg->frames_to_test - 1)
                             goto finish;
                         decode_stats_.update_frame_count();
                     }
@@ -468,7 +467,7 @@ void Millipede::start()
                             PRINT_TX, tx_stats_.frame_count, frame_id);
                         stats->update_stats_in_functions_downlink(
                             tx_stats_.frame_count);
-                        if (stats->last_frame_id == config_->tx_frame_num - 1)
+                        if (stats->last_frame_id == cfg->frames_to_test - 1)
                             goto finish;
                         tx_stats_.update_frame_count();
                     }
