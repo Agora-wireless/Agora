@@ -11,13 +11,22 @@ class Doer {
 public:
     virtual bool try_launch(void)
     {
-        Event_data event;
-        if (task_queue_.try_dequeue(event)) {
-            for (size_t i = 0; i < event.num_tags; i++) {
-                Event_data finish_event = launch(event.tags[i]);
-                try_enqueue_fallback(
-                    complete_task_queue, *worker_producer_token, finish_event);
+        Event_data req_event;
+        if (task_queue_.try_dequeue(req_event)) {
+            // We will enqueue one response event containing results for all
+            // request tags in the request event
+            Event_data resp_event;
+            resp_event.num_tags = req_event.num_tags;
+
+            for (size_t i = 0; i < req_event.num_tags; i++) {
+                Event_data resp_i = launch(req_event.tags[i]);
+                rt_assert(resp_i.num_tags == 1, "Invalid num_tags in resp");
+                resp_event.tags[i] = resp_i.tags[0];
+                resp_event.event_type = resp_i.event_type;
             }
+
+            try_enqueue_fallback(
+                complete_task_queue, *worker_producer_token, resp_event);
             return true;
         }
         return false;
