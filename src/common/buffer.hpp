@@ -121,11 +121,11 @@ struct Frame_stats {
         }
         return (false);
     }
-    void init(int max_symbols)
+    void init(int _max_symbol_count)
     {
         frame_count = 0;
         memset(symbol_count, 0, TASK_BUFFER_FRAME_NUM * sizeof(int));
-        max_symbol_count = max_symbols;
+        max_symbol_count = _max_symbol_count;
     }
     void update_frame_count() { frame_count++; }
 };
@@ -148,12 +148,12 @@ struct Data_stats : public Frame_stats {
     size_t* task_count[TASK_BUFFER_FRAME_NUM];
     size_t max_task_count;
 
-    void init(int max_tasks, int max_symbols, int max_data_symbol)
+    void init(int _max_task_count, int max_symbols, int max_data_symbol)
     {
         Frame_stats::init(max_symbols);
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
             task_count[i] = new size_t[max_data_symbol]();
-        max_task_count = max_tasks;
+        max_task_count = _max_task_count;
     }
     void fini()
     {
