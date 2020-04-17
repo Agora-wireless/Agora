@@ -99,10 +99,6 @@ void Millipede::start()
         return;
     }
 
-    /* Tokens used for dequeue */
-    moodycamel::ConsumerToken ctok(message_queue_);
-    moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
-
     size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
@@ -133,8 +129,6 @@ void Millipede::start()
                         *(worker_ptoks_ptr[i]), events_list + num_events,
                         kDequeueBulkSizeWorker);
             }
-            // ret = complete_task_queue_.try_dequeue_bulk(
-            //     ctok_complete, events_list, dequeue_bulk_size_single);
         }
         is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
@@ -142,8 +136,6 @@ void Millipede::start()
         int frame_count = 0;
         for (int ev_i = 0; ev_i < num_events; ev_i++) {
             Event_data& event = events_list[ev_i];
-
-            // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
                 int offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
@@ -168,6 +160,37 @@ void Millipede::start()
                 }
 
                 fft_queue_arr[frame_id].push(fft_req_tag_t(event.tags[0]));
+
+                /* Schedule multiple fft tasks as one event */
+                if (fft_queue_arr[cur_frame_id].size()
+                    >= config_->fft_block_size) {
+                    size_t num_fft_blocks = fft_queue_arr[cur_frame_id].size()
+                        / config_->fft_block_size;
+
+                    for (size_t i = 0; i < num_fft_blocks; i++) {
+                        Event_data fft_task;
+                        fft_task.num_tags = config_->fft_block_size;
+                        fft_task.event_type = EventType::kFFT;
+
+                        for (size_t j = 0; j < config_->fft_block_size; j++) {
+                            fft_task.tags[j]
+                                = fft_queue_arr[cur_frame_id].front()._tag;
+                            fft_queue_arr[cur_frame_id].pop();
+
+                            if (!config_->bigstation_mode) {
+                                if (fft_created_count++ == 0) {
+                                    stats->master_set_tsc(
+                                        TsType::kProcessingStarted,
+                                        frame_count);
+                                } else if (fft_created_count
+                                    == rx_stats_.max_task_count) {
+                                    fft_created_count = 0;
+                                }
+                            }
+                        }
+                        try_enqueue_fallback(fft_queue_, *ptok_fft, fft_task);
+                    }
+                }
             } break;
 
             case EventType::kFFT: {
@@ -471,35 +494,6 @@ void Millipede::start()
                 printf("Wrong event type in message queue!");
                 exit(0);
             } /* End of switch */
-
-            /* Schedule multiple fft tasks as one event */
-            if (fft_queue_arr[cur_frame_id].size() >= config_->fft_block_size) {
-                size_t num_fft_blocks = fft_queue_arr[cur_frame_id].size()
-                    / config_->fft_block_size;
-
-                for (size_t i = 0; i < num_fft_blocks; i++) {
-                    Event_data do_fft_task;
-                    do_fft_task.num_tags = config_->fft_block_size;
-                    do_fft_task.event_type = EventType::kFFT;
-
-                    for (size_t j = 0; j < config_->fft_block_size; j++) {
-                        do_fft_task.tags[j]
-                            = fft_queue_arr[cur_frame_id].front()._tag;
-                        fft_queue_arr[cur_frame_id].pop();
-
-                        if (!config_->bigstation_mode) {
-                            if (fft_created_count++ == 0) {
-                                stats->master_set_tsc(
-                                    TsType::kProcessingStarted, frame_count);
-                            } else if (fft_created_count
-                                == rx_stats_.max_task_count) {
-                                fft_created_count = 0;
-                            }
-                        }
-                    }
-                    try_enqueue_fallback(fft_queue_, *ptok_fft, do_fft_task);
-                }
-            }
         } /* End of for */
     } /* End of while */
 
