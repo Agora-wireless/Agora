@@ -47,7 +47,11 @@ public:
     std::string hub_file;
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
+
+    // A string in \p frames contains letters representing the symbol types in
+    // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames;
+
     std::vector<std::vector<size_t>> pilotSymbols;
     std::vector<std::vector<size_t>> ULSymbols;
     std::vector<std::vector<size_t>> DLSymbols;
@@ -80,7 +84,6 @@ public:
     double nco;
     double radioRfFreq;
     double bwFilter;
-    size_t framePeriod;
     size_t nCells;
     size_t nRadios;
     size_t nAntennas;

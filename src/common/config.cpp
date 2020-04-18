@@ -121,12 +121,10 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-        framePeriod = 1;
         printf("Frame schedule %s\n", sched.c_str());
     } else {
         json jframes = tddConf.value("frames", json::array());
-        framePeriod = jframes.size();
-        for (size_t f = 0; f < framePeriod; f++) {
+        for (size_t f = 0; f < jframes.size(); f++) {
             frames.push_back(jframes.at(f).get<std::string>());
         }
     }
@@ -446,7 +444,7 @@ int Config::getSymbolId(size_t symbol_id)
 int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    size_t fid = frame_id % framePeriod;
+    size_t fid = frame_id % frames.size();
     it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end()) {
         int id = it - DLSymbols[fid].begin();
@@ -464,7 +462,7 @@ int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
 int Config::getDlSFIndex(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    size_t fid = frame_id % framePeriod;
+    size_t fid = frame_id % frames.size();
     it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
         return it - DLSymbols[fid].begin();
@@ -475,7 +473,7 @@ int Config::getDlSFIndex(size_t frame_id, size_t symbol_id)
 int Config::getPilotSFIndex(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    size_t fid = frame_id % framePeriod;
+    size_t fid = frame_id % frames.size();
     it = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
     if (it != pilotSymbols[fid].end()) {
 #ifdef DEBUG3
@@ -490,7 +488,7 @@ int Config::getPilotSFIndex(size_t frame_id, size_t symbol_id)
 int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
 {
     std::vector<size_t>::iterator it;
-    size_t fid = frame_id % framePeriod;
+    size_t fid = frame_id % frames.size();
     it = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
     if (it != ULSymbols[fid].end()) {
 #ifdef DEBUG3
@@ -510,7 +508,7 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
             symbol_id, frame_id);
         return false;
     }
-    size_t fid = frame_id % framePeriod;
+    size_t fid = frame_id % frames.size();
     char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
     printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
@@ -536,12 +534,9 @@ bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
             symbol_id, frame_id);
         return false;
     }
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
-    if (isUE) {
+    if (isUE)
         return false;
-    } else
-        return (s == 'C');
+    return frames[frame_id % frames.size()].at(symbol_id) == 'C';
 }
 
 bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
@@ -552,12 +547,9 @@ bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
             symbol_id, frame_id);
         return false;
     }
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
-    if (isUE) {
+    if (isUE)
         return false;
-    } else
-        return (s == 'L');
+    return frames[frame_id % frames.size()].at(symbol_id) == 'L';
 }
 
 bool Config::isUplink(size_t frame_id, size_t symbol_id)
@@ -568,13 +560,11 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
             symbol_id, frame_id);
         return false;
     }
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
+    char s = frames[frame_id % frames.size()].at(symbol_id);
 #ifdef DEBUG3
     printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     return s == 'U';
-    // return (symbol_id < symbol_num_perframe) && (symbol_id >= UE_NUM);
 }
 
 bool Config::isDownlink(size_t frame_id, size_t symbol_id)
@@ -585,8 +575,7 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
             symbol_id, frame_id);
         return false;
     }
-    size_t fid = frame_id % framePeriod;
-    char s = frames[fid].at(symbol_id);
+    char s = frames[frame_id % frames.size()].at(symbol_id);
 #ifdef DEBUG3
     printf("isDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
