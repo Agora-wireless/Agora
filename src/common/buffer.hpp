@@ -25,8 +25,8 @@ struct complex_float {
 // Event data tag for RX events
 union rx_tag_t {
     struct {
-        uint32_t tid : 4;
-        uint32_t offset : 28;
+        uint32_t tid : 4; // ID of the socket thread that received the packet
+        uint32_t offset : 28; // Offset in the socket thread's RX buffer
     };
     int _tag;
 
@@ -74,6 +74,13 @@ struct Event_data {
     uint32_t num_tags;
     int tags[14];
 
+    // Initialize and event with only the event type field set
+    Event_data(EventType event_type)
+        : event_type(event_type)
+        , num_tags(0)
+    {
+    }
+
     // Create an event with one tag
     Event_data(EventType event_type, int tag)
         : event_type(event_type)
@@ -82,7 +89,10 @@ struct Event_data {
         tags[0] = tag;
     }
 
-    Event_data() { num_tags = 0; }
+    Event_data()
+        : num_tags(0)
+    {
+    }
 };
 static_assert(sizeof(Event_data) == 64, "");
 
