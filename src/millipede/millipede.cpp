@@ -412,9 +412,8 @@ void Millipede::start()
                     = total_data_symbol_id % cfg->data_symbol_num_perframe;
                 int ptok_id = ant_id % cfg->socket_thread_num; /* RX */
 
-                Event_data tx_event(EventType::kPacketTX, event.tags[0]);
-                try_enqueue_fallback(
-                    tx_queue_, *tx_ptoks_ptr[ptok_id], tx_event);
+                try_enqueue_fallback(tx_queue_, *tx_ptoks_ptr[ptok_id],
+                    Event_data(EventType::kPacketTX, event.tags[0]));
 
                 print_per_task_done(
                     PRINT_IFFT, frame_id, data_symbol_id, ant_id);
