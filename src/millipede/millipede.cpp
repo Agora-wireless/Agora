@@ -166,9 +166,8 @@ void Millipede::start()
                         / config_->fft_block_size;
 
                     for (size_t i = 0; i < num_fft_blocks; i++) {
-                        Event_data fft_task;
+                        Event_data fft_task(EventType::kFFT);
                         fft_task.num_tags = config_->fft_block_size;
-                        fft_task.event_type = EventType::kFFT;
 
                         for (size_t j = 0; j < config_->fft_block_size; j++) {
                             fft_task.tags[j]
