@@ -125,6 +125,7 @@ public:
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
     bool bigstation_mode;
+    bool correct_phase_shift;
 
     size_t packet_length;
 

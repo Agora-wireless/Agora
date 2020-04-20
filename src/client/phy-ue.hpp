@@ -29,6 +29,8 @@ typedef std::vector<complex_float,
     boost::alignment::aligned_allocator<complex_float, 64>>
     myVec;
 
+using namespace arma;
+
 class Phy_UE {
 public:
 /* TASK & SOCKET thread number */
@@ -311,6 +313,8 @@ private:
      * TASK_BUFFER_FRAME_NUM Second dimension: DATA_CA_NUM * UE_NUM
      */
     std::vector<myVec> equal_pc_buffer_;
+
+    Table<cx_float> phase_shift_buffer_;
 
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<int> data_sc_ind_;

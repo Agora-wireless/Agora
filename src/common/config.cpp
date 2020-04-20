@@ -82,6 +82,7 @@ Config::Config(std::string jsonfile)
     downlink_mode = tddConf.value("downlink_mode", false);
     bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
+    correct_phase_shift = tddConf.value("correct_phase_shift", false);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
         size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
