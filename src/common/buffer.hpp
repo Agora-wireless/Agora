@@ -9,6 +9,7 @@
 
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include <sstream>
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>
@@ -99,6 +100,14 @@ struct Packet {
         , ant_id(a)
     {
     }
+
+    std::string to_string()
+    {
+        std::ostringstream ret;
+        ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
+            << ", cell ID " << cell_id << ", antenna ID " << ant_id << "]";
+        return ret.str();
+    }
 };
 
 struct RX_stats {
@@ -110,8 +119,8 @@ struct RX_stats {
 };
 
 struct Frame_stats {
-    int frame_count;
-    int* symbol_count;
+    size_t frame_count;
+    int symbol_count[TASK_BUFFER_FRAME_NUM];
     int max_symbol_count;
     bool last_symbol(int frame_id)
     {
@@ -121,18 +130,13 @@ struct Frame_stats {
         }
         return (false);
     }
-    void init(int max_symbols, int max_frame, int align)
+    void init(int _max_symbol_count)
     {
         frame_count = 0;
-        alloc_buffer_1d(&symbol_count, max_frame, align, 1);
-        max_symbol_count = max_symbols;
+        memset(symbol_count, 0, TASK_BUFFER_FRAME_NUM * sizeof(int));
+        max_symbol_count = _max_symbol_count;
     }
-    void fini() { free_buffer_1d(&symbol_count); }
-    void update_frame_count(void)
-    {
-        if (++frame_count == 1e9)
-            frame_count = 0;
-    }
+    void update_frame_count() { frame_count++; }
 };
 
 struct ZF_stats : public Frame_stats {
@@ -142,29 +146,28 @@ struct ZF_stats : public Frame_stats {
         : max_task_count(max_symbol_count)
     {
     }
-    void init(int max_tasks, int max_frame, int align)
+    void init(int max_tasks)
     {
-        Frame_stats::init(max_tasks, max_frame, align);
+        Frame_stats::init(max_tasks);
         coded_frame = -1;
     }
-    void fini() { Frame_stats::fini(); }
 };
 
 struct Data_stats : public Frame_stats {
-    Table<int> task_count;
-    int max_task_count;
+    size_t* task_count[TASK_BUFFER_FRAME_NUM];
+    size_t max_task_count;
 
-    void init(int max_tasks, int max_symbols, int max_frame,
-        int max_data_symbol, int align)
+    void init(int _max_task_count, int max_symbols, int max_data_symbol)
     {
-        Frame_stats::init(max_symbols, max_frame, align);
-        task_count.calloc(max_frame, max_data_symbol, align);
-        max_task_count = max_tasks;
+        Frame_stats::init(max_symbols);
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+            task_count[i] = new size_t[max_data_symbol]();
+        max_task_count = _max_task_count;
     }
     void fini()
     {
-        task_count.free();
-        Frame_stats::fini();
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+            delete[] task_count[i];
     }
     bool last_task(int frame_id, int data_symbol_id)
     {
@@ -184,7 +187,7 @@ struct FFT_stats : public Data_stats {
 };
 
 struct RC_stats {
-    int frame_count;
+    size_t frame_count;
     int max_task_count;
     int last_frame;
     RC_stats(void)
@@ -193,11 +196,7 @@ struct RC_stats {
         , last_frame(-1)
     {
     }
-    void update_frame_count(void)
-    {
-        if (++frame_count == 1e9)
-            frame_count = 0;
-    }
+    void update_frame_count(void) { frame_count++; }
 };
 
 /* TODO: clean up the legency code below */

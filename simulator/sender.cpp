@@ -191,7 +191,7 @@ void* Sender::loopMain(int tid)
                     start_time = get_time();
                 }
                 tx_frame_count++;
-                if (tx_frame_count == (size_t)cfg->tx_frame_num)
+                if (tx_frame_count == cfg->frames_to_test)
                     break;
                 frame_start[tx_frame_count] = get_time();
                 tick_start = rdtsc();
