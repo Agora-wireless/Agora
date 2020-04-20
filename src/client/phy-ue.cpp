@@ -511,9 +511,8 @@ void Phy_UE::doFFT(int tid, int offset)
     int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM,
         rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id);
 
-    size_t sym_offset = 0;
-    //int record_frame = -1;
 #if DEBUG_DL_PILOT
+    size_t sym_offset = 0;
     if (config_->isPilot(frame_id, symbol_id)) {
         std::vector<std::complex<double>> vec;
         for (size_t i = 0; i < config_->sampsPerSymbol; i++)
