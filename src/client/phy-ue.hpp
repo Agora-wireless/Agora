@@ -376,5 +376,6 @@ private:
     int max_equaled_frame = 0;
     // long long* demul_output;
     // float* equal_output;
+    int record_frame = -1;
 };
 #endif
