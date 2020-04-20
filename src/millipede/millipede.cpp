@@ -23,7 +23,8 @@ Millipede::Millipede(Config* cfg)
 #endif
 
     freq_ghz = measure_rdtsc_freq();
-    printf("Measured RDTSC frequency = %.2f\n", freq_ghz);
+    printf("Measured RDTSC frequency = %.2f. ZF events per symbol = %zu\n",
+        freq_ghz, cfg->zf_events_per_symbol());
 
     pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
     initialize_queues();
@@ -206,8 +207,7 @@ void Millipede::start()
             } break;
 
             case EventType::kZF: {
-                int frame_id = event.tags[0] / zf_stats_.max_symbol_count;
-
+                int frame_id = zf_tag_t(event.tags[0]).frame_id;
                 print_per_task_done(
                     PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
@@ -520,8 +520,14 @@ void Millipede::handle_event_fft(int tag)
                     print_per_frame_done(
                         PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                     fft_stats_.update_frame_count();
-                    schedule_task_set(EventType::kZF, config_->zf_block_num,
-                        frame_id, zf_queue_, *ptok_zf);
+
+                    zf_tag_t tag(frame_id, 0 /* base subcarrier ID */);
+                    for (size_t i = 0; i < config_->zf_events_per_symbol();
+                         i++) {
+                        try_enqueue_fallback(zf_queue_, *ptok_zf,
+                            Event_data(EventType::kZF, tag._tag));
+                        tag.base_sc_id += config_->zf_block_size;
+                    }
                 }
             }
         } else if (config_->isUplink(frame_id, symbol_id)) {
@@ -1096,7 +1102,7 @@ void Millipede::initialize_uplink_buffers()
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; ++i)
         fft_stats_.cur_frame_for_symbol[i] = -1;
 
-    zf_stats_.init(config_->zf_block_num);
+    zf_stats_.init(config_->zf_events_per_symbol());
 
     demul_stats_.init(config_->demul_block_num,
         cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);

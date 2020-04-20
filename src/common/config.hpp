@@ -105,8 +105,9 @@ public:
     size_t zf_thread_num;
     size_t demul_block_size;
     int demul_block_num;
+
+    // Number of OFDM data subcarriers handled in one ZF event
     size_t zf_block_size;
-    int zf_block_num;
     size_t fft_block_size;
 
     bool freq_orthogonal_pilot;
@@ -164,5 +165,11 @@ public:
     Config(std::string);
     void genData();
     ~Config();
+
+    /// Return the number of ZF events generated per symbol
+    inline size_t zf_events_per_symbol() const
+    {
+        return 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+    }
 };
 #endif

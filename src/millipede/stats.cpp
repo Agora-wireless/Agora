@@ -575,7 +575,7 @@ void Stats::print_summary()
         = get_total_task_count(DoerType::kPrecode, task_thread_num);
     double csi_frames
         = (double)num_csi_tasks / c->BS_ANT_NUM / c->pilot_symbol_num_perframe;
-    double zf_frames = (double)num_zf_tasks / c->zf_block_num;
+    double zf_frames = (double)num_zf_tasks / c->zf_events_per_symbol();
 
     if (c->downlink_mode) {
         double precode_frames = (double)num_precode_tasks / c->OFDM_DATA_NUM

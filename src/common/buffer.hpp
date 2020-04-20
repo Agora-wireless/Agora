@@ -65,6 +65,30 @@ union fft_resp_tag_t {
     }
 };
 
+// Event data tag for ZF requests and responses
+union zf_tag_t {
+    struct {
+        uint32_t frame_id : 16;
+
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 16;
+    };
+    int _tag;
+
+    zf_tag_t(uint32_t frame_id, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , base_sc_id(base_sc_id)
+    {
+    }
+
+    zf_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(zf_tag_t) == sizeof(int), "");
+
 /**
  * Millipede uses these event messages for communication between threads. Each
  * tag encodes information about a task.
