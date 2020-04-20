@@ -172,10 +172,13 @@ Config::Config(std::string jsonfile)
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
 
     demul_block_size = tddConf.value("demul_block_size", 48);
+    demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
+    zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+
     fft_block_size = tddConf.value("fft_block_size", 4);
-    demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
 
     /* Modulation configurations */
     mod_type = modulation == "64QAM"

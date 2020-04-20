@@ -44,8 +44,8 @@ DoDemul::~DoDemul()
 
 Event_data DoDemul::launch(int offset)
 {
-    int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
-    int total_data_symbol_id = offset / cfg->demul_block_num;
+    int sc_id = (offset % cfg->demul_events_per_symbol) * cfg->demul_block_size;
+    int total_data_symbol_id = offset / cfg->demul_events_per_symbol;
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int frame_id = total_data_symbol_id / data_symbol_num_perframe;
 
@@ -195,8 +195,8 @@ Event_data DoDemul::DemulSingleSC(int offset)
 {
     size_t start_tsc = worker_rdtsc();
 
-    int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
-    int total_data_symbol_id = offset / cfg->demul_block_num;
+    int sc_id = (offset % cfg->demul_events_per_symbol) * cfg->demul_block_size;
+    int total_data_symbol_id = offset / cfg->demul_events_per_symbol;
     int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
     int frame_id = total_data_symbol_id / data_symbol_num_perframe;
     int current_data_symbol_id
