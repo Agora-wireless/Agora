@@ -99,8 +99,8 @@ Config::Config(std::string jsonfile)
         std::string sched("");
         for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
             sched += "P";
-        if (downlink_mode) { // here it is assumed either dl or ul to be active
-                             // at one time
+        // Below it is assumed either dl or ul to be active at one time
+        if (downlink_mode) {
             size_t dl_symbol_start
                 = pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
@@ -172,12 +172,10 @@ Config::Config(std::string jsonfile)
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
 
     demul_block_size = tddConf.value("demul_block_size", 48);
-    zf_block_size = tddConf.value("zf_block_size", 1);
+    zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
+                                          : tddConf.value("zf_block_size", 1);
     fft_block_size = tddConf.value("fft_block_size", 4);
-    if (freq_orthogonal_pilot)
-        zf_block_size = UE_ANT_NUM;
     demul_block_num = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
-    zf_block_num = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
     /* Modulation configurations */
     mod_type = modulation == "64QAM"
