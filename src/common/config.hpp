@@ -118,6 +118,8 @@ public:
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
     size_t OFDM_SYM_LEN;
+    size_t DL_PILOT_SYMS;
+    size_t UL_PILOT_SYMS;
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
         data_symbol_num_perframe;

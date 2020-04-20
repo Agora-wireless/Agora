@@ -157,6 +157,7 @@ int main(int argc, char* argv[])
     int CP_LEN = config_->CP_LEN;
     int prefix = config_->prefix;
     int postfix = config_->postfix;
+    int DL_PILOT_SYMS = config_->DL_PILOT_SYMS;
     // randomly generate input
     srand(time(NULL));
     // srand(0);

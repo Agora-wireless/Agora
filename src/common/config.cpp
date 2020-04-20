@@ -83,6 +83,8 @@ Config::Config(std::string jsonfile)
     bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
+    DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 2);
+    UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 1);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("subframe_num_perframe", 70);
         size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
@@ -400,12 +402,14 @@ void Config::genData()
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_" + std::to_string(OFDM_CA_NUM) + "_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
     size_t num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
 #else
-    std::string filename1 = cur_directory1 + "/data/orig_data_" + std::to_string(OFDM_CA_NUM) + "_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string filename1 = cur_directory1 + "/data/orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
     size_t num_bytes_per_ue = OFDM_DATA_NUM;
 #endif
     FILE* fd = fopen(filename1.c_str(), "rb");
@@ -449,7 +453,7 @@ int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
     it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end()) {
         int id = it - DLSymbols[fid].begin();
-        if (id < DL_PILOT_SYMS) {
+        if (id < (int)DL_PILOT_SYMS) {
 #ifdef DEBUG3
             printf("getDownlinkPilotId(%zu, %zu) = %zu\n", frame_id, symbol_id,
                 id);
@@ -520,7 +524,7 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
         int ind = DL_PILOT_SYMS;
         if (it != DLSymbols[fid].end())
             ind = it - DLSymbols[fid].begin();
-        return (ind < DL_PILOT_SYMS);
+        return (ind < (int)DL_PILOT_SYMS);
         // return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
     } else
         return s == 'P';
