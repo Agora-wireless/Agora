@@ -136,6 +136,7 @@ void Millipede::start()
         is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
         /* Handle each event */
+        int frame_count = 0;
         for (int ev_i = 0; ev_i < num_events; ev_i++) {
             Event_data& event = events_list[ev_i];
 
@@ -149,7 +150,7 @@ void Millipede::start()
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
-                int frame_count = pkt->frame_id % kNumStatsFrames;
+                frame_count = pkt->frame_id % kNumStatsFrames;
                 size_t pkt_frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
 
                 update_rx_counters(frame_count, pkt_frame_id, pkt->symbol_id);
@@ -158,7 +159,7 @@ void Millipede::start()
                     if (cur_frame_id != pkt_frame_id) {
                         cur_frame_id = pkt_frame_id;
                         stats->master_set_tsc(
-                            TsType::kProcessingStarted, cur_frame_id);
+                            TsType::kProcessingStarted, frame_count);
                     }
                 }
 
@@ -246,6 +247,7 @@ void Millipede::start()
                         if (!kUseLDPC) {
                             cur_frame_id
                                 = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                            frame_count = demul_stats_.frame_count + 1;
                             stats->update_stats_in_functions_uplink(
                                 demul_stats_.frame_count);
                             if (stats->last_frame_id == cfg->frames_to_test - 1)
@@ -291,6 +293,7 @@ void Millipede::start()
                         decode_stats_.frame_count, frame_id, data_symbol_id);
                     if (decode_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                        frame_count = decode_stats_.frame_count + 1;
                         stats->master_set_tsc(
                             TsType::kDecodeDone, decode_stats_.frame_count);
                         print_per_frame_done(
@@ -396,6 +399,7 @@ void Millipede::start()
                 if (ifft_stats_.last_task(frame_id, data_symbol_id)) {
                     if (ifft_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                        frame_count = ifft_stats_.frame_count + 1;
                         stats->master_set_tsc(
                             TsType::kIFFTDone, ifft_stats_.frame_count);
                         print_per_frame_done(
@@ -483,7 +487,7 @@ void Millipede::start()
                         if (!config_->bigstation_mode) {
                             if (fft_created_count++ == 0) {
                                 stats->master_set_tsc(
-                                    TsType::kProcessingStarted, cur_frame_id);
+                                    TsType::kProcessingStarted, frame_count);
                             } else if (fft_created_count
                                 == rx_stats_.max_task_count) {
                                 fft_created_count = 0;
