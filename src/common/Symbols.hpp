@@ -96,7 +96,7 @@ enum class EventType : int {
 
 #define DEBUG_PRINT_STATS_PER_THREAD 0
 #define DEBUG_PRINT_PILOT 0
-#define DEBUG_DL_PILOT 1
+#define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
 #define MEASURE_TIME 1
 

@@ -1,8 +1,5 @@
 #include "phy-ue.hpp"
 
-using namespace arma;
-typedef cx_float COMPLEX;
-
 Phy_UE::Phy_UE(Config* config)
     : ul_IQ_data(config->ul_IQ_data)
     , ul_IQ_modul(config->ul_IQ_modul)
@@ -84,6 +81,7 @@ Phy_UE::Phy_UE(Config* config)
     for (size_t i = 0; i < csi_buffer_.size(); i++)
         csi_buffer_[i].resize(non_null_sc_len);
 
+    phase_shift_buffer_.calloc(TASK_BUFFER_FRAME_NUM, numAntennas, 64);
     if (dl_data_symbol_perframe > 0) {
         // initialize equalized data buffer
         equal_buffer_.resize(
@@ -502,6 +500,7 @@ void Phy_UE::doFFT(int tid, int offset)
     int symbol_id = pkt->symbol_id;
     // int cell_id = pkt->cell_id;
     int ant_id = pkt->ant_id;
+    int buffer_frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
 
     if (!config_->isPilot(frame_id, symbol_id)
         && !(config_->isDownlink(frame_id, symbol_id)))
@@ -578,9 +577,9 @@ void Phy_UE::doFFT(int tid, int offset)
     int csi_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, numAntennas,
         frame_id,
         ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) * numAntennas + ant_id;
-    float* csi_buffer_ptr = (float*)(csi_buffer_[csi_offset].data());
-    float* fft_buffer_ptr
-        = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
+    cx_float* csi_buffer_ptr = (cx_float*)(csi_buffer_[csi_offset].data());
+    cx_float* fft_buffer_ptr
+        = (cx_float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
     Event_data crop_finish_event;
 
@@ -589,34 +588,32 @@ void Phy_UE::doFFT(int tid, int offset)
 
         int csi_fftshift_offset = 0;
         int pilot_id = config_->getDownlinkPilotId(frame_id, symbol_id);
+        cx_float avg_csi(0, 0);
         for (int j = 0; j < non_null_sc_len; j++) {
             // if (j < FFT_LEN / 2)
             //    csi_fftshift_offset = FFT_LEN/2;
             // else
             //    csi_fftshift_offset = -FFT_LEN/2;
             // divide fft output by pilot data to get CSI estimation
-            int i = non_null_sc_ind_[j];
+            int sc_id = non_null_sc_ind_[j];
             if (pilot_id == 0) {
-                *(csi_buffer_ptr + 2 * j) = 0;
-                *(csi_buffer_ptr + 2 * j + 1) = 0;
+                csi_buffer_ptr[j] = 0;
             }
             // printf("%.4f+j%.4f  ",cur_fft_buffer_float_output[2*j],
             // cur_fft_buffer_float_output[2*j+1]);
             // TODO: here it is assumed pilots_ is real-valued (in LTS case it
             // is), whereas it could be complex
-            *(csi_buffer_ptr + 2 * j)
-                += fft_buffer_ptr[2 * (i + csi_fftshift_offset)]
-                * pilots_[i + csi_fftshift_offset];
-            *(csi_buffer_ptr + 2 * j + 1)
-                += fft_buffer_ptr[2 * (i + csi_fftshift_offset) + 1]
-                * pilots_[i + csi_fftshift_offset];
+
+            cx_float p(pilots_[sc_id + csi_fftshift_offset], 0);
+            csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * p);
             if (pilot_id == DL_PILOT_SYMS - 1) {
-                *(csi_buffer_ptr + 2 * j)
-                    /= (DL_PILOT_SYMS > 0 ? DL_PILOT_SYMS : 1);
-                *(csi_buffer_ptr + 2 * j + 1)
-                    /= (DL_PILOT_SYMS > 0 ? DL_PILOT_SYMS : 1);
+                csi_buffer_ptr[j] /= DL_PILOT_SYMS; 
+                avg_csi += csi_buffer_ptr[j];
             }
         }
+        avg_csi /= non_null_sc_len;
+        phase_shift_buffer_[buffer_frame_id][ant_id] = cx_float(std::cos(-std::arg(avg_csi)),
+                                                          std::sin(-std::arg(avg_csi)));
 
         crop_finish_event.event_type = EventType::kFFT;
         crop_finish_event.data = csi_offset;
@@ -627,11 +624,13 @@ void Phy_UE::doFFT(int tid, int offset)
                 ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) *
                          // dl_data_symbol_perframe + dl_data_symbol_id;
 
-        float* equ_buffer_ptr
-            = (float*)(equal_buffer_[eq_buffer_offset].data());
+        cx_float* equ_buffer_ptr
+            = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
         // int csi_fftshift_offset = 0;
-        float csi_re = 1;
-        float csi_im = 0;
+        cx_float csi(1, 0);
+        cx_float phc(1, 0);
+        if (config_->correct_phase_shift)
+            phc = phase_shift_buffer_[buffer_frame_id][ant_id];
 
         for (int j = 0; j < non_null_sc_len; j++) {
             // if (j < FFT_LEN / 2)
@@ -641,17 +640,10 @@ void Phy_UE::doFFT(int tid, int offset)
             // divide fft output by pilot data to get CSI estimation
             int i = non_null_sc_ind_[j];
             if (DL_PILOT_SYMS > 0) {
-                csi_re = csi_buffer_ptr[2 * j];
-                csi_im = csi_buffer_ptr[2 * j + 1];
+                csi = csi_buffer_ptr[j];
             }
-            float y_re = fft_buffer_ptr[2 * i];
-            float y_im = fft_buffer_ptr[2 * i + 1];
-            equ_buffer_ptr[2 * j] = (y_re * csi_re + y_im * csi_im)
-                / (csi_re * csi_re
-                      + csi_im * csi_im); // fft_buffer_ptr[2*i] / csi_re;
-            equ_buffer_ptr[2 * j + 1] = (y_im * csi_re - y_re * csi_im)
-                / (csi_re * csi_re
-                      + csi_im * csi_im); // fft_buffer_ptr[2*i+1] / csi_im;
+            cx_float y = fft_buffer_ptr[i];
+            equ_buffer_ptr[j] = (y * phc) / csi;
         }
 
         crop_finish_event.event_type = EventType::kZF;
