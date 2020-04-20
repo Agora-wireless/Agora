@@ -99,6 +99,9 @@ void Millipede::start()
         return;
     }
 
+    // Millipede processes a frame after completing processing for previous
+    // frames is complete. cur_frame_id is the frame that is currently being
+    // processed.
     size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
@@ -135,6 +138,8 @@ void Millipede::start()
         /* Handle each event */
         for (int ev_i = 0; ev_i < num_events; ev_i++) {
             Event_data& event = events_list[ev_i];
+
+            // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
                 int offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
@@ -145,50 +150,19 @@ void Millipede::start()
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
                 int frame_count = pkt->frame_id % kNumStatsFrames;
-                size_t frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
+                size_t pkt_frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
 
-                update_rx_counters(frame_count, frame_id, pkt->symbol_id);
+                update_rx_counters(frame_count, pkt_frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
                     /* In BigStation, schedule FFT whenever a packet is RX */
-                    if (cur_frame_id != frame_id) {
+                    if (cur_frame_id != pkt_frame_id) {
+                        cur_frame_id = pkt_frame_id;
                         stats->master_set_tsc(
-                            TsType::kProcessingStarted, frame_count);
-                        cur_frame_id = frame_id;
+                            TsType::kProcessingStarted, cur_frame_id);
                     }
                 }
 
-                fft_queue_arr[frame_id].push(fft_req_tag_t(event.tags[0]));
-
-                /* Schedule multiple fft tasks as one event */
-                if (fft_queue_arr[cur_frame_id].size()
-                    >= config_->fft_block_size) {
-                    size_t num_fft_blocks = fft_queue_arr[cur_frame_id].size()
-                        / config_->fft_block_size;
-
-                    for (size_t i = 0; i < num_fft_blocks; i++) {
-                        Event_data fft_task;
-                        fft_task.num_tags = config_->fft_block_size;
-                        fft_task.event_type = EventType::kFFT;
-
-                        for (size_t j = 0; j < config_->fft_block_size; j++) {
-                            fft_task.tags[j]
-                                = fft_queue_arr[cur_frame_id].front()._tag;
-                            fft_queue_arr[cur_frame_id].pop();
-
-                            if (!config_->bigstation_mode) {
-                                if (fft_created_count++ == 0) {
-                                    stats->master_set_tsc(
-                                        TsType::kProcessingStarted,
-                                        frame_count);
-                                } else if (fft_created_count
-                                    == rx_stats_.max_task_count) {
-                                    fft_created_count = 0;
-                                }
-                            }
-                        }
-                        try_enqueue_fallback(fft_queue_, *ptok_fft, fft_task);
-                    }
-                }
+                fft_queue_arr[pkt_frame_id].push(fft_req_tag_t(event.tags[0]));
             } break;
 
             case EventType::kFFT: {
@@ -488,6 +462,37 @@ void Millipede::start()
                 printf("Wrong event type in message queue!");
                 exit(0);
             } /* End of switch */
+
+            // We schedule FFT processing if the event handling above results in
+            // either (a) sufficient packets received for the current frame,
+            // or (b) the current frame being updated.
+            if (fft_queue_arr[cur_frame_id].size() >= config_->fft_block_size) {
+                size_t num_fft_blocks = fft_queue_arr[cur_frame_id].size()
+                    / config_->fft_block_size;
+
+                for (size_t i = 0; i < num_fft_blocks; i++) {
+                    Event_data do_fft_task;
+                    do_fft_task.num_tags = config_->fft_block_size;
+                    do_fft_task.event_type = EventType::kFFT;
+
+                    for (size_t j = 0; j < config_->fft_block_size; j++) {
+                        do_fft_task.tags[j]
+                            = fft_queue_arr[cur_frame_id].front()._tag;
+                        fft_queue_arr[cur_frame_id].pop();
+
+                        if (!config_->bigstation_mode) {
+                            if (fft_created_count++ == 0) {
+                                stats->master_set_tsc(
+                                    TsType::kProcessingStarted, cur_frame_id);
+                            } else if (fft_created_count
+                                == rx_stats_.max_task_count) {
+                                fft_created_count = 0;
+                            }
+                        }
+                    }
+                    try_enqueue_fallback(fft_queue_, *ptok_fft, do_fft_task);
+                }
+            }
         } /* End of for */
     } /* End of while */
 
