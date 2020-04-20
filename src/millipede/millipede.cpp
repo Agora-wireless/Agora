@@ -182,8 +182,7 @@ void Millipede::start()
             } break;
 
             case EventType::kZF: {
-                int frame_id = event.tags[0] / zf_stats_.max_symbol_count;
-
+                int frame_id = zf_tag_t(event.tags[0]).frame_id;
                 print_per_task_done(
                     PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
@@ -195,7 +194,7 @@ void Millipede::start()
                     zf_stats_.update_frame_count();
 
                     /* If all the data in a frame has arrived when ZF is done */
-                    schedule_demul_task(
+                    schedule_demul(
                         frame_id, 0, fft_stats_.max_symbol_data_count);
                     if (config_->dl_data_symbol_num_perframe > 0) {
                         /* If downlink data transmission is enabled, schedule
@@ -212,18 +211,19 @@ void Millipede::start()
                                 *ptok_encode);
                         } else {
                             schedule_task_set(EventType::kPrecode,
-                                config_->demul_block_num, total_data_symbol_id,
-                                precode_queue_, *ptok_precode);
+                                cfg->demul_events_per_symbol,
+                                total_data_symbol_id, precode_queue_,
+                                *ptok_precode);
                         }
                     }
                 }
             } break;
 
             case EventType::kDemul: {
-                int block_size = config_->demul_block_size;
-                int block_num = demul_stats_.max_task_count;
-                int sc_id = event.tags[0] % block_num * block_size;
-                int total_data_symbol_id = event.tags[0] / block_num;
+                int sc_id = (event.tags[0] % cfg->demul_events_per_symbol)
+                    * cfg->demul_block_size;
+                int total_data_symbol_id
+                    = event.tags[0] / cfg->demul_events_per_symbol;
                 int frame_id
                     = total_data_symbol_id / cfg->ul_data_symbol_num_perframe;
                 int data_symbol_id
@@ -236,8 +236,8 @@ void Millipede::start()
                     max_equaled_frame = frame_id;
                     if (kUseLDPC) {
                         schedule_task_set(EventType::kDecode,
-                            config_->demul_block_num, total_data_symbol_id,
-                            decode_queue_, *ptok_decode);
+                            config_->demul_events_per_symbol,
+                            total_data_symbol_id, decode_queue_, *ptok_decode);
                     }
                     print_per_symbol_done(PRINT_DEMUL, demul_stats_.frame_count,
                         frame_id, data_symbol_id);
@@ -318,7 +318,7 @@ void Millipede::start()
 
                 if (encode_stats_.last_task(frame_id, data_symbol_id)) {
                     schedule_task_set(EventType::kPrecode,
-                        config_->demul_block_num, total_data_symbol_id,
+                        config_->demul_events_per_symbol, total_data_symbol_id,
                         precode_queue_, *ptok_precode);
                     print_per_symbol_done(PRINT_ENCODE,
                         encode_stats_.frame_count, frame_id, data_symbol_id);
@@ -361,7 +361,7 @@ void Millipede::start()
                                 *ptok_encode);
                         } else {
                             schedule_task_set(EventType::kPrecode,
-                                config_->demul_block_num,
+                                config_->demul_events_per_symbol,
                                 total_data_symbol_id + 1, precode_queue_,
                                 *ptok_precode);
                         }
@@ -389,9 +389,8 @@ void Millipede::start()
                     = total_data_symbol_id % cfg->data_symbol_num_perframe;
                 int ptok_id = ant_id % cfg->socket_thread_num; /* RX */
 
-                Event_data tx_event(EventType::kPacketTX, event.tags[0]);
-                try_enqueue_fallback(
-                    tx_queue_, *tx_ptoks_ptr[ptok_id], tx_event);
+                try_enqueue_fallback(tx_queue_, *tx_ptoks_ptr[ptok_id],
+                    Event_data(EventType::kPacketTX, event.tags[0]));
 
                 print_per_task_done(
                     PRINT_IFFT, frame_id, data_symbol_id, ant_id);
@@ -531,8 +530,13 @@ void Millipede::handle_event_fft(int tag)
                     print_per_frame_done(
                         PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                     fft_stats_.update_frame_count();
-                    schedule_task_set(EventType::kZF, config_->zf_block_num,
-                        frame_id, zf_queue_, *ptok_zf);
+
+                    zf_tag_t tag(frame_id, 0 /* base subcarrier ID */);
+                    for (size_t i = 0; i < config_->zf_events_per_symbol; i++) {
+                        try_enqueue_fallback(zf_queue_, *ptok_zf,
+                            Event_data(EventType::kZF, tag._tag));
+                        tag.base_sc_id += config_->zf_block_size;
+                    }
                 }
             }
         } else if (config_->isUplink(frame_id, symbol_id)) {
@@ -542,8 +546,7 @@ void Millipede::handle_event_fft(int tag)
                 frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
             if (zf_stats_.coded_frame == frame_id)
-                schedule_demul_task(
-                    frame_id, data_symbol_id, data_symbol_id + 1);
+                schedule_demul(frame_id, data_symbol_id, data_symbol_id + 1);
         } else if (config_->isCalDlPilot(frame_id, symbol_id)
             || config_->isCalUlPilot(frame_id, symbol_id)) {
             print_per_symbol_done(
@@ -698,18 +701,18 @@ void Millipede::create_threads(
     }
 }
 
-void Millipede::schedule_demul_task(
-    int frame_id, int start_symbol_id, int end_symbol_id)
+void Millipede::schedule_demul(
+    size_t frame_id, size_t start_symbol_id, size_t end_symbol_id)
 {
     int data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
-    for (int data_symbol_id = start_symbol_id; data_symbol_id < end_symbol_id;
-         data_symbol_id++) {
-        if (fft_stats_.cur_frame_for_symbol[data_symbol_id] == frame_id) {
+    for (size_t s_id = start_symbol_id; s_id < end_symbol_id; s_id++) {
+        if (fft_stats_.cur_frame_for_symbol[s_id] == (int)frame_id) {
             /* Schedule demodulation task for subcarrier blocks */
             int total_data_symbol_id
-                = frame_id * data_symbol_num_perframe + data_symbol_id;
-            schedule_task_set(EventType::kDemul, config_->demul_block_num,
-                total_data_symbol_id, demul_queue_, *ptok_demul);
+                = frame_id * data_symbol_num_perframe + s_id;
+            schedule_task_set(EventType::kDemul,
+                config_->demul_events_per_symbol, total_data_symbol_id,
+                demul_queue_, *ptok_demul);
 #if DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE
             printf("Main thread: created Demodulation task for frame: %d, "
                    "start symbol: %d, current symbol: %d, in %.2f\n",
@@ -1107,9 +1110,9 @@ void Millipede::initialize_uplink_buffers()
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; ++i)
         fft_stats_.cur_frame_for_symbol[i] = -1;
 
-    zf_stats_.init(config_->zf_block_num);
+    zf_stats_.init(config_->zf_events_per_symbol);
 
-    demul_stats_.init(config_->demul_block_num,
+    demul_stats_.init(config_->demul_events_per_symbol,
         cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 
     decode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
@@ -1141,7 +1144,7 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
         cfg->dl_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
-    precode_stats_.init(config_->demul_block_num,
+    precode_stats_.init(config_->demul_events_per_symbol,
         cfg->dl_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
     ifft_stats_.init(cfg->BS_ANT_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
