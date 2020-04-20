@@ -25,8 +25,8 @@ struct complex_float {
 // Event data tag for RX events
 union rx_tag_t {
     struct {
-        uint32_t tid : 4;
-        uint32_t offset : 28;
+        uint32_t tid : 4; // ID of the socket thread that received the packet
+        uint32_t offset : 28; // Offset in the socket thread's RX buffer
     };
     int _tag;
 
@@ -65,6 +65,30 @@ union fft_resp_tag_t {
     }
 };
 
+// Event data tag for ZF requests and responses
+union zf_tag_t {
+    struct {
+        uint32_t frame_id : 16;
+
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 16;
+    };
+    int _tag;
+
+    zf_tag_t(uint32_t frame_id, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , base_sc_id(base_sc_id)
+    {
+    }
+
+    zf_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(zf_tag_t) == sizeof(int), "");
+
 /**
  * Millipede uses these event messages for communication between threads. Each
  * tag encodes information about a task.
@@ -74,6 +98,13 @@ struct Event_data {
     uint32_t num_tags;
     int tags[14];
 
+    // Initialize and event with only the event type field set
+    Event_data(EventType event_type)
+        : event_type(event_type)
+        , num_tags(0)
+    {
+    }
+
     // Create an event with one tag
     Event_data(EventType event_type, int tag)
         : event_type(event_type)
@@ -82,7 +113,10 @@ struct Event_data {
         tags[0] = tag;
     }
 
-    Event_data() { num_tags = 0; }
+    Event_data()
+        : num_tags(0)
+    {
+    }
 };
 static_assert(sizeof(Event_data) == 64, "");
 

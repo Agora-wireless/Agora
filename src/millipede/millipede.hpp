@@ -83,8 +83,9 @@ public:
 
     void handle_event_fft(int tag);
 
-    /* Add tasks into task queue based on event type */
-    void schedule_demul_task(int frame_id, int start_sche_id, int end_sche_id);
+    // Schedule demodulation for a range of symbols for this frame
+    void schedule_demul(
+        size_t frame_id, size_t start_symbol_id, size_t end_symbol_id);
 
     void update_rx_counters(int frame_count, int frame_id, int symbol_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);

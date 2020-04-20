@@ -33,14 +33,14 @@ DoZF::~DoZF()
     free_buffer_1d(&pred_csi_buffer);
 }
 
-Event_data DoZF::launch(int offset)
+Event_data DoZF::launch(int tag)
 {
     if (cfg->freq_orthogonal_pilot)
-        ZF_freq_orthogonal(offset);
+        ZF_freq_orthogonal(tag);
     else
-        ZF_time_orthogonal(offset);
+        ZF_time_orthogonal(tag);
 
-    return Event_data(EventType::kZF, offset);
+    return Event_data(EventType::kZF, tag);
 }
 
 void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
@@ -66,20 +66,21 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
     }
 }
 
-void DoZF::ZF_time_orthogonal(int offset)
+void DoZF::ZF_time_orthogonal(int tag)
 {
-    int frame_id = offset / cfg->zf_block_num;
-    int sc_id = offset % cfg->zf_block_num * cfg->zf_block_size;
+    size_t frame_id = zf_tag_t(tag).frame_id;
+    size_t base_sc_id = zf_tag_t(tag).base_sc_id;
 #if DEBUG_PRINT_IN_TASK
-    printf(
-        "In doZF thread %d: frame: %d, subcarrier: %d\n", tid, frame_id, sc_id);
+    printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
+        frame_id, base_sc_id);
 #endif
-    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
-    int max_sc_ite = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - sc_id);
+    int offset_in_buffer = (frame_id * cfg->OFDM_DATA_NUM) + base_sc_id;
+    int max_sc_ite
+        = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
     for (int i = 0; i < max_sc_ite; i++) {
         size_t start_tsc1 = worker_rdtsc();
 
-        int cur_sc_id = sc_id + i;
+        int cur_sc_id = base_sc_id + i;
         int cur_offset = offset_in_buffer + i;
         int transpose_block_size = cfg->transpose_block_size;
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
@@ -147,19 +148,19 @@ void DoZF::ZF_time_orthogonal(int offset)
     }
 }
 
-void DoZF::ZF_freq_orthogonal(int offset)
+void DoZF::ZF_freq_orthogonal(int tag)
 {
-    int frame_id = offset / cfg->zf_block_num;
-    int sc_id = offset % cfg->zf_block_num * cfg->zf_block_size;
+    size_t frame_id = zf_tag_t(tag).frame_id;
+    size_t base_sc_id = zf_tag_t(tag).base_sc_id;
 #if DEBUG_PRINT_IN_TASK
-    printf("In doZF thread %d: frame: %d, subcarrier: %d, block: %zu\n", tid,
-        frame_id, sc_id, sc_id / cfg->UE_NUM);
+    printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n", tid,
+        frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
 #endif
-    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
+    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + base_sc_id;
 
     double start_tsc1 = worker_rdtsc();
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        int cur_sc_id = sc_id + i;
+        int cur_sc_id = base_sc_id + i;
         __m256i index = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
             cfg->transpose_block_size * 2 + 1, cfg->transpose_block_size * 4,
             cfg->transpose_block_size * 4 + 1, cfg->transpose_block_size * 6,
@@ -195,7 +196,7 @@ void DoZF::ZF_freq_orthogonal(int offset)
     cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    precoder(&mat_input, frame_id, sc_id, offset_in_buffer,
+    precoder(&mat_input, frame_id, base_sc_id, offset_in_buffer,
         cfg->dl_data_symbol_num_perframe > 0);
 
     double start_tsc2 = worker_rdtsc();
@@ -211,20 +212,22 @@ void DoZF::ZF_freq_orthogonal(int offset)
     // }
 }
 
-void DoZF::Predict(int offset)
+// Currently unused
+void DoZF::Predict(int tag)
 {
-    int frame_id = offset / cfg->zf_block_num;
-    int sc_id = offset % cfg->zf_block_num * cfg->zf_block_size;
+    size_t frame_id = zf_tag_t(tag).frame_id;
+    size_t base_sc_id = zf_tag_t(tag).base_sc_id;
 
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
-    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + sc_id;
+    int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + base_sc_id;
     cx_float* ptr_in = (cx_float*)pred_csi_buffer;
     memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer],
         sizeof(cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
     cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     int offset_next_frame
-        = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM + sc_id;
-    precoder(&mat_input, frame_id, sc_id, offset_next_frame,
+        = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
+        + base_sc_id;
+    precoder(&mat_input, frame_id, base_sc_id, offset_next_frame,
         cfg->dl_data_symbol_num_perframe > 0);
 }
