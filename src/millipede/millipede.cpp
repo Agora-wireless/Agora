@@ -194,8 +194,12 @@ void Millipede::start()
                     zf_stats_.update_frame_count();
 
                     /* If all the data in a frame has arrived when ZF is done */
-                    schedule_demul(
-                        frame_id, 0, fft_stats_.max_symbol_data_count);
+                    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe;
+                         i++) {
+                        if (fft_stats_.cur_frame_for_symbol[i] == frame_id)
+                            schedule_demul(frame_id, i);
+                    }
+
                     if (config_->dl_data_symbol_num_perframe > 0) {
                         /* If downlink data transmission is enabled, schedule
                          * downlink encode/modulation for the first data
@@ -540,13 +544,13 @@ void Millipede::handle_event_fft(int tag)
                 }
             }
         } else if (config_->isUplink(frame_id, symbol_id)) {
-            int data_symbol_id = config_->getUlSFIndex(frame_id, symbol_id);
-            fft_stats_.cur_frame_for_symbol[data_symbol_id] = frame_id;
+            int ul_symbol_idx = config_->getUlSFIndex(frame_id, symbol_id);
+            fft_stats_.cur_frame_for_symbol[ul_symbol_idx] = frame_id;
             print_per_symbol_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1,
                 frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
             if (zf_stats_.coded_frame == frame_id)
-                schedule_demul(frame_id, data_symbol_id, data_symbol_id + 1);
+                schedule_demul(frame_id, ul_symbol_idx);
         } else if (config_->isCalDlPilot(frame_id, symbol_id)
             || config_->isCalUlPilot(frame_id, symbol_id)) {
             print_per_symbol_done(
@@ -701,27 +705,19 @@ void Millipede::create_threads(
     }
 }
 
-void Millipede::schedule_demul(
-    size_t frame_id, size_t start_symbol_id, size_t end_symbol_id)
+void Millipede::schedule_demul(size_t frame_id, size_t ul_symbol_idx)
 {
-    int data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
-    for (size_t s_id = start_symbol_id; s_id < end_symbol_id; s_id++) {
-        if (fft_stats_.cur_frame_for_symbol[s_id] == (int)frame_id) {
-            /* Schedule demodulation task for subcarrier blocks */
-            int total_data_symbol_id
-                = frame_id * data_symbol_num_perframe + s_id;
-            schedule_task_set(EventType::kDemul,
-                config_->demul_events_per_symbol, total_data_symbol_id,
-                demul_queue_, *ptok_demul);
+    /* Schedule demodulation task for subcarrier blocks */
+    int total_data_symbol_id
+        = (frame_id * config_->data_symbol_num_perframe) + ul_symbol_idx;
+    schedule_task_set(EventType::kDemul, config_->demul_events_per_symbol,
+        total_data_symbol_id, demul_queue_, *ptok_demul);
 #if DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE
-            printf("Main thread: created Demodulation task for frame: %d, "
-                   "start symbol: %d, current symbol: %d, in %.2f\n",
-                frame_id, start_symbol_id, data_symbol_id,
-                stats->master_get_us_since(
-                    TsType::kPilotRX, demul_stats_.frame_count));
+    printf("Main thread: created Demodulation task for frame: %d, "
+           "start symbol: %d, current symbol: %d, in %.2f\n",
+        frame_id, start_symbol_id, data_symbol_id,
+        stats->master_get_us_since(TsType::kPilotRX, demul_stats_.frame_count));
 #endif
-        }
-    }
 }
 
 void Millipede::update_rx_counters(int frame_count, int frame_id, int symbol_id)

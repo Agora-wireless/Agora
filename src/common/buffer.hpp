@@ -217,6 +217,9 @@ struct FFT_stats : public Data_stats {
     int max_symbol_data_count;
     int* symbol_cal_count;
     int max_symbol_cal_count;
+
+    // cur_frame_for_symbol[i] is the current frame for the symbol whose
+    // index in the frame's uplink symbols is i
     int* cur_frame_for_symbol;
 };
 
