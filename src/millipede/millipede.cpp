@@ -224,27 +224,26 @@ void Millipede::start()
             } break;
 
             case EventType::kDemul: {
-                int sc_id = (event.tags[0] % cfg->demul_events_per_symbol)
-                    * cfg->demul_block_size;
-                int total_data_symbol_id
-                    = event.tags[0] / cfg->demul_events_per_symbol;
-                int frame_id
-                    = total_data_symbol_id / cfg->ul_data_symbol_num_perframe;
-                int data_symbol_id
-                    = total_data_symbol_id % cfg->ul_data_symbol_num_perframe;
+                int frame_id = demul_tag_t(event.tags[0]).frame_id;
+                int symbol_idx_ul = demul_tag_t(event.tags[0]).symbol_idx_ul;
+                int base_sc_id = demul_tag_t(event.tags[0]).base_sc_id;
+
+                int total_data_symbol_idx
+                    = (frame_id * cfg->ul_data_symbol_num_perframe)
+                    + symbol_idx_ul;
 
                 print_per_task_done(
-                    PRINT_DEMUL, frame_id, data_symbol_id, sc_id);
+                    PRINT_DEMUL, frame_id, symbol_idx_ul, base_sc_id);
                 /* If this symbol is ready */
-                if (demul_stats_.last_task(frame_id, data_symbol_id)) {
+                if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
                     max_equaled_frame = frame_id;
                     if (kUseLDPC) {
                         schedule_task_set(EventType::kDecode,
                             config_->demul_events_per_symbol,
-                            total_data_symbol_id, decode_queue_, *ptok_decode);
+                            total_data_symbol_idx, decode_queue_, *ptok_decode);
                     }
                     print_per_symbol_done(PRINT_DEMUL, demul_stats_.frame_count,
-                        frame_id, data_symbol_id);
+                        frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
                         /* Schedule fft for the next frame if there are delayed
                          * fft tasks */
@@ -707,11 +706,13 @@ void Millipede::create_threads(
 
 void Millipede::schedule_demul(size_t frame_id, size_t symbol_idx_ul)
 {
-    /* Schedule demodulation task for subcarrier blocks */
-    int total_data_symbol_id
-        = (frame_id * config_->data_symbol_num_perframe) + symbol_idx_ul;
-    schedule_task_set(EventType::kDemul, config_->demul_events_per_symbol,
-        total_data_symbol_id, demul_queue_, *ptok_demul);
+    demul_tag_t tag(frame_id, symbol_idx_ul, 0 /* base subcarrier ID */);
+    for (size_t i = 0; i < config_->demul_events_per_symbol; i++) {
+        try_enqueue_fallback(
+            demul_queue_, *ptok_demul, Event_data(EventType::kDemul, tag._tag));
+        tag.base_sc_id += config_->demul_block_size;
+    }
+
 #if DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE
     printf("Main thread: created Demodulation task for frame: %d, "
            "start symbol: %d, current symbol: %d, in %.2f\n",
