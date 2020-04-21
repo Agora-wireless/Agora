@@ -714,9 +714,9 @@ void Millipede::schedule_demul(size_t frame_id, size_t symbol_idx_ul)
     }
 
 #if DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE
-    printf("Main thread: created Demodulation task for frame: %d, "
-           "start symbol: %d, current symbol: %d, in %.2f\n",
-        frame_id, start_symbol_id, data_symbol_id,
+    printf("Main thread: created Demodulation task for frame %zu, "
+           "UL symbol idx %zu, in %.2f\n",
+        frame_id, symbol_idx_ul,
         stats->master_get_us_since(TsType::kPilotRX, demul_stats_.frame_count));
 #endif
 }
