@@ -142,10 +142,9 @@ Config::Config(std::string jsonfile)
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;
-    dl_data_symbol_start = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0][0] - pilot_symbol_num_perframe
-        : 0;
-    dl_data_symbol_end = dl_data_symbol_num_perframe > 0
+    dl_data_symbol_start
+        = downlink_mode ? DLSymbols[0][0] - pilot_symbol_num_perframe : 0;
+    dl_data_symbol_end = downlink_mode
         ? DLSymbols[0].back() - pilot_symbol_num_perframe + 1
         : 0;
 
