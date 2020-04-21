@@ -45,7 +45,7 @@ DoPrecode::~DoPrecode()
     free_buffer_1d(&precoded_buffer_temp);
 }
 
-Event_data DoPrecode::launch(int offset)
+Event_data DoPrecode::launch(size_t offset)
 {
     int sc_id = (offset % cfg->demul_events_per_symbol) * cfg->demul_block_size;
     int total_data_symbol_id = offset / cfg->demul_events_per_symbol;
@@ -55,10 +55,10 @@ Event_data DoPrecode::launch(int offset)
         = total_data_symbol_id % data_symbol_num_perframe;
 
     double start_tsc = worker_rdtsc();
-#if DEBUG_PRINT_IN_TASK
-    printf("In doPrecode thread %d: frame: %d, symbol: %d, subcarrier: %d\n",
-        tid, frame_id, current_data_symbol_id, sc_id);
-#endif
+    if (kDebugPrintInTask) {
+        printf("In doPrecode TID %d: frame: %d, symbol: %d, subcarrier: %d\n",
+            tid, frame_id, current_data_symbol_id, sc_id);
+    }
 
     __m256i index = _mm256_setr_epi64x(
         0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
@@ -141,10 +141,10 @@ Event_data DoPrecode::launch(int offset)
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     duration_stat->task_count++;
 
-#if DEBUG_PRINT_IN_TASK
-    printf("In doPrecode thread %d: finished frame: %d, symbol: %d, "
-           "subcarrier: %d , offset: %d\n",
-        tid, frame_id, current_data_symbol_id, sc_id, offset);
-#endif
+    if (kDebugPrintInTask) {
+        printf("In doPrecode thread %d: finished frame: %d, symbol: %d, "
+               "subcarrier: %d , offset: %zu\n",
+            tid, frame_id, current_data_symbol_id, sc_id, offset);
+    }
     return Event_data(EventType::kPrecode, offset);
 }

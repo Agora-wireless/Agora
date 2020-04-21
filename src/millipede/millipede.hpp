@@ -81,7 +81,7 @@ public:
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
-    void handle_event_fft(int tag);
+    void handle_event_fft(size_t tag);
 
     // Schedule demodulation for a symbol. symbol_idx_ul is this uplink symbol's
     // index among this frame's uplink symbols.
@@ -110,7 +110,7 @@ private:
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
     Config* config_;
-    int fft_created_count;
+    size_t fft_created_count;
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
