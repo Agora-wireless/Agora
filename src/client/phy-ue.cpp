@@ -582,7 +582,7 @@ void Phy_UE::doFFT(int tid, int offset)
     if (config_->isPilot(frame_id, symbol_id)) {
 
         int csi_fftshift_offset = 0;
-        int pilot_id = config_->getDownlinkPilotId(frame_id, symbol_id);
+        size_t pilot_id = config_->getDownlinkPilotId(frame_id, symbol_id);
         cx_float avg_csi(0, 0);
         for (int j = 0; j < non_null_sc_len; j++) {
             // if (j < FFT_LEN / 2)
@@ -706,8 +706,8 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // int buffer_symbol_num = TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe ;
     // int l2_thread_id = 0; //offset / buffer_symbol_num;
     // offset = offset - l2_thread_id * buffer_symbol_num;
-    int frame_offset = 0; //offset / TASK_BUFFER_FRAME_NUM;
-    int ul_symbol_id = 0; //offset % TASK_BUFFER_FRAME_NUM;
+    int frame_offset = offset / TASK_BUFFER_FRAME_NUM;
+    int ul_symbol_id = offset % TASK_BUFFER_FRAME_NUM;
 
     size_t frame_id = frame;
 
