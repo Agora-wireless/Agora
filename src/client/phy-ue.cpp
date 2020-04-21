@@ -314,8 +314,7 @@ void Phy_UE::start()
                         = (frame_id % TASK_BUFFER_FRAME_NUM);
                     cropper_created_checker_[cropper_created_checker_id]++;
 #endif
-                } else { // if we are not entering doFFT, let's reset buffer
-                         // here
+                } else { // if we are not entering doFFT, reset buffer here
                     rx_buffer_status_[rx_thread_id][offset_in_current_buffer]
                         = 0; // now empty
                 }
@@ -707,7 +706,7 @@ void Phy_UE::doFFT(int tid, int offset)
             = generateOffset3d(TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
                 numAntennas, frame_id, dl_symbol_id - DL_PILOT_SYMS,
                 ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) *
-                         // dl_data_symbol_perframe + dl_data_symbol_id;
+        // dl_data_symbol_perframe + dl_data_symbol_id;
 
         float* equ_buffer_ptr
             = (float*)(equal_buffer_[eq_buffer_offset].data());
@@ -810,7 +809,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // for (int ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
     // ul_symbol_id++)
     //{
-    int frame_period_id = frame_id % config_->framePeriod;
+    int frame_period_id = frame_id % config_->frames.size();
     int symbol_id = config_->ULSymbols[frame_period_id][ul_symbol_id];
 
     // int modulbuf_offset = (data_sc_len * numAntennas * ul_symbol_id);

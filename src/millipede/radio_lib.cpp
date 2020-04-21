@@ -300,7 +300,7 @@ bool RadioConfig::radioStart()
             "TX_SW_DELAY", "30"); // experimentally good value for dev front-end
         baStn[i]->writeSetting("TDD_MODE", "true");
         std::vector<std::string> tddSched;
-        for (size_t f = 0; f < _cfg->framePeriod; f++) {
+        for (size_t f = 0; f < _cfg->frames.size(); f++) {
             std::string sched = _cfg->frames[f];
             size_t schedSize = sched.size();
             for (size_t s = 0; s < schedSize; s++) {
