@@ -413,9 +413,7 @@ void* PacketTXRX::loopRecv_DPDK(void* in_context)
     auto begin = std::chrono::system_clock::now();
 
     int ret = 0;
-    int max_symbol_id = config_->dl_data_symbol_num_perframe > 0
-        ? UE_NUM
-        : symbol_num_perframe;
+    int max_symbol_id = config_->downlink_mode ? UE_NUM : symbol_num_perframe;
     int prev_frame_id = -1;
     int packet_num_per_frame = 0;
     double start_time = get_time();
