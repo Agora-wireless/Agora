@@ -83,9 +83,9 @@ public:
 
     void handle_event_fft(int tag);
 
-    // Schedule demodulation for a symbol. ul_symbol_idx is this uplink symbol's
+    // Schedule demodulation for a symbol. symbol_idx_ul is this uplink symbol's
     // index among this frame's uplink symbols.
-    void schedule_demul(size_t frame_id, size_t ul_symbol_idx);
+    void schedule_demul(size_t frame_id, size_t symbol_idx_ul);
 
     void update_rx_counters(int frame_count, int frame_id, int symbol_id);
     void print_per_frame_done(int task_type, int frame_count, int frame_id);
