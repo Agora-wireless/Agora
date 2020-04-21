@@ -89,6 +89,32 @@ union zf_tag_t {
 };
 static_assert(sizeof(zf_tag_t) == sizeof(int), "");
 
+// Event data tag for demodulation requests and responses
+union demul_tag_t {
+    struct {
+        uint32_t frame_id : 9;
+        uint32_t symbol_idx_ul : 9;
+
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 14;
+    };
+    int _tag;
+
+    demul_tag_t(uint32_t frame_id, uint32_t symbol_idx_ul, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , symbol_idx_ul(symbol_idx_ul)
+        , base_sc_id(base_sc_id)
+    {
+    }
+
+    demul_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(demul_tag_t) == sizeof(int), "");
+
 /**
  * Millipede uses these event messages for communication between threads. Each
  * tag encodes information about a task.
