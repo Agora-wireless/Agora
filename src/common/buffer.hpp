@@ -25,8 +25,8 @@ struct complex_float {
 // Event data tag for RX events
 union rx_tag_t {
     struct {
-        uint32_t tid : 4;
-        uint32_t offset : 28;
+        uint32_t tid : 4; // ID of the socket thread that received the packet
+        uint32_t offset : 28; // Offset in the socket thread's RX buffer
     };
     int _tag;
 
@@ -65,6 +65,58 @@ union fft_resp_tag_t {
     }
 };
 
+// Event data tag for ZF requests and responses
+union zf_tag_t {
+    struct {
+        uint32_t frame_id : 16;
+
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 16;
+    };
+    int _tag;
+
+    zf_tag_t(uint32_t frame_id, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , base_sc_id(base_sc_id)
+    {
+    }
+
+    zf_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(zf_tag_t) == sizeof(int), "");
+
+// Event data tag for demodulation requests and responses
+union demul_tag_t {
+    struct {
+        uint32_t frame_id : 9;
+
+        // Index of this symbol among this frame's uplink symbols
+        uint32_t symbol_idx_ul : 9;
+
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 14;
+    };
+    int _tag;
+
+    demul_tag_t(uint32_t frame_id, uint32_t symbol_idx_ul, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , symbol_idx_ul(symbol_idx_ul)
+        , base_sc_id(base_sc_id)
+    {
+    }
+
+    demul_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(demul_tag_t) == sizeof(int), "");
+
 /**
  * Millipede uses these event messages for communication between threads. Each
  * tag encodes information about a task.
@@ -74,6 +126,13 @@ struct Event_data {
     uint32_t num_tags;
     int tags[14];
 
+    // Initialize and event with only the event type field set
+    Event_data(EventType event_type)
+        : event_type(event_type)
+        , num_tags(0)
+    {
+    }
+
     // Create an event with one tag
     Event_data(EventType event_type, int tag)
         : event_type(event_type)
@@ -82,7 +141,10 @@ struct Event_data {
         tags[0] = tag;
     }
 
-    Event_data() { num_tags = 0; }
+    Event_data()
+        : num_tags(0)
+    {
+    }
 };
 static_assert(sizeof(Event_data) == 64, "");
 
@@ -183,6 +245,9 @@ struct FFT_stats : public Data_stats {
     int max_symbol_data_count;
     int* symbol_cal_count;
     int max_symbol_cal_count;
+
+    // cur_frame_for_symbol[i] is the current frame for the symbol whose
+    // index in the frame's uplink symbols is i
     int* cur_frame_for_symbol;
 };
 
