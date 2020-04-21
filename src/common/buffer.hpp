@@ -93,6 +93,8 @@ static_assert(sizeof(zf_tag_t) == sizeof(int), "");
 union demul_tag_t {
     struct {
         uint32_t frame_id : 9;
+
+        // Index of this symbol among this frame's uplink symbols
         uint32_t symbol_idx_ul : 9;
 
         // The Doer handling this tag will process the batch of subcarriers
