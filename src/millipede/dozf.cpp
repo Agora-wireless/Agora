@@ -122,8 +122,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        precoder(
-            &mat_input, frame_id, cur_sc_id, cur_offset, cfg->downlink_mode);
+        precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
+            cfg->dl_data_symbol_num_perframe > 0);
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -196,8 +196,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    precoder(
-        &mat_input, frame_id, base_sc_id, offset_in_buffer, cfg->downlink_mode);
+    precoder(&mat_input, frame_id, base_sc_id, offset_in_buffer,
+        cfg->dl_data_symbol_num_perframe > 0);
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -229,5 +229,5 @@ void DoZF::Predict(size_t tag)
         = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
         + base_sc_id;
     precoder(&mat_input, frame_id, base_sc_id, offset_next_frame,
-        cfg->downlink_mode);
+        cfg->dl_data_symbol_num_perframe > 0);
 }
