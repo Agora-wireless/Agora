@@ -79,6 +79,7 @@ Config::Config(std::string jsonfile)
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     OFDM_DATA_START
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
+    OFDM_DATA_STOP = OFDM_DATA_START + OFDM_DATA_NUM;
     downlink_mode = tddConf.value("downlink_mode", false);
     bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
@@ -344,7 +345,7 @@ void Config::genData()
             = CommsLib::modulate(in_modul, mod_type);
         std::vector<std::complex<float>> ifft_in_data;
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
                 ifft_in_data.push_back(0);
             } else {
                 ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
@@ -383,7 +384,7 @@ void Config::genData()
             mod_type);
         std::vector<std::complex<float>> ifft_ul_data_in;
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_START + OFDM_DATA_NUM) {
+            if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
                 // continue;
                 ifft_ul_data_in.push_back(0);
             } else {

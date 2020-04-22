@@ -81,7 +81,7 @@ public:
     Table<complex_float> ul_IQ_modul;
     Table<std::complex<int16_t>> dl_IQ_symbol;
     Table<std::complex<int16_t>> ul_IQ_symbol;
-    Table<std::complex<float>> ue_specific_pilot;
+    Table<complex_float> ue_specific_pilot;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
@@ -132,6 +132,7 @@ public:
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
     size_t OFDM_DATA_START;
+    size_t OFDM_DATA_STOP;
     size_t TX_PREFIX_LEN;
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;

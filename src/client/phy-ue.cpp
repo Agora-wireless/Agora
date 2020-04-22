@@ -313,7 +313,8 @@ void Phy_UE::start()
                 // checker to count # of pilots/users
                 csi_checker_[frame_id]++;
 
-                if (csi_checker_[frame_id] == dl_pilot_symbol_perframe * numAntennas) {
+                if (csi_checker_[frame_id]
+                    == dl_pilot_symbol_perframe * numAntennas) {
                     csi_checker_[frame_id] = 0;
 #if DEBUG_PRINT_SUMMARY
                     printf("Main thread: pilot frame: %d, finished collecting "
@@ -529,7 +530,7 @@ void Phy_UE::doFFT(int tid, int offset)
         printf("frame %d symbol %d ant %d: corr offset %zu, SNR %2.1f \n",
             frame_id, symbol_id, ant_id, sym_offset, SNR);
         if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250)
-            record_frame = frame_id; 
+            record_frame = frame_id;
         if (frame_id == record_frame) {
             std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
             FILE* f = fopen(fname.c_str(), "wb");
@@ -549,8 +550,7 @@ void Phy_UE::doFFT(int tid, int offset)
 #endif
 
     // transfer ushort to float
-    size_t delay_offset = (dl_prefix_len + CP_LEN)
-        * 2; 
+    size_t delay_offset = (dl_prefix_len + CP_LEN) * 2;
     float* cur_fft_buffer_float
         = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
 
@@ -596,15 +596,17 @@ void Phy_UE::doFFT(int tid, int offset)
             // is), whereas it could be complex
 
             cx_float p(pilots_[sc_id + csi_fftshift_offset], 0);
-            csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * p);
-            if (dl_pilot_symbol_perframe > 0 && pilot_id == dl_pilot_symbol_perframe - 1) {
-                csi_buffer_ptr[j] /= dl_pilot_symbol_perframe; 
+            csi_buffer_ptr[j]
+                += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * p);
+            if (dl_pilot_symbol_perframe > 0
+                && pilot_id == dl_pilot_symbol_perframe - 1) {
+                csi_buffer_ptr[j] /= dl_pilot_symbol_perframe;
                 avg_csi += csi_buffer_ptr[j];
             }
         }
         avg_csi /= non_null_sc_len;
-        phase_shift_buffer_[buffer_frame_id][ant_id] = cx_float(std::cos(-std::arg(avg_csi)),
-                                                          std::sin(-std::arg(avg_csi)));
+        phase_shift_buffer_[buffer_frame_id][ant_id] = cx_float(
+            std::cos(-std::arg(avg_csi)), std::sin(-std::arg(avg_csi)));
 
         crop_finish_event = Event_data(EventType::kFFT, csi_offset);
     } else if (config_->isDownlink(frame_id, symbol_id)) {
@@ -699,8 +701,8 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // int buffer_symbol_num = TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe ;
     // int l2_thread_id = 0; //offset / buffer_symbol_num;
     // offset = offset - l2_thread_id * buffer_symbol_num;
-    int frame_offset = offset / TASK_BUFFER_FRAME_NUM;
-    int ul_symbol_id = offset % TASK_BUFFER_FRAME_NUM;
+    size_t frame_offset = offset / TASK_BUFFER_FRAME_NUM;
+    size_t ul_symbol_id = offset % TASK_BUFFER_FRAME_NUM;
 
     size_t frame_id = frame;
 
@@ -741,18 +743,26 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
         //}
         complex_float* cur_modul_buf
             = &ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id][0];
-        for (size_t n = 0; n < FFT_LEN; n++) {
-            // printf("ul_symbol_id %d, ue_id %d, sc %d\n", ul_symbol_id,
-            // ant_id, n);
-            cur_modul_buf[n]
-                = ul_IQ_modul[ul_symbol_id * numAntennas + ant_id][n];
+        if (ul_symbol_id < config_->UL_PILOT_SYMS) {
+            memset(cur_modul_buf, 0,
+                sizeof(complex_float) * config_->OFDM_DATA_START);
+            memcpy((void*)(cur_modul_buf + config_->OFDM_DATA_START),
+                config_->ue_specific_pilot[ant_id],
+                config_->OFDM_DATA_START * sizeof(complex_float));
+            memset(cur_modul_buf + config_->OFDM_DATA_STOP, 0,
+                sizeof(complex_float) * config_->OFDM_DATA_START);
+        } else {
+            memcpy((void*)cur_modul_buf,
+                ul_IQ_modul[ul_symbol_id * numAntennas + ant_id],
+                FFT_LEN * sizeof(complex_float));
         }
+        //for (size_t n = 0; n < FFT_LEN; n++) {
+        //    cur_modul_buf[n]
+        //        = ul_IQ_modul[ul_symbol_id * numAntennas + ant_id][n];
+        //}
 
-        DftiComputeBackward(mkl_handle,
-            ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id]);
-        cx_float* ifft_out_buffer
-            = (cx_float*)
-                  ifft_buffer_.IFFT_inputs[IFFT_buffer_target_id + ant_id];
+        DftiComputeBackward(mkl_handle, cur_modul_buf);
+        cx_float* ifft_out_buffer = (cx_float*)cur_modul_buf;
         cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
         float max_val = abs(mat_ifft_out).max();
         mat_ifft_out /= max_val;
@@ -831,8 +841,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
     ul_pilot_symbol_perframe = config_->pilot_symbol_num_perframe;
     ul_data_symbol_perframe = config_->ul_data_symbol_num_perframe;
     dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
-    dl_data_symbol_perframe
-        = dl_symbol_perframe - dl_pilot_symbol_perframe;
+    dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     rx_symbol_perframe = dl_symbol_perframe;
     prefix_len = config_->prefix;
     dl_prefix_len = config_->dl_prefix;
