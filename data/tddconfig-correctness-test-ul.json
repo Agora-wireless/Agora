@@ -9,5 +9,5 @@
  "demul_block_size" : 40,
  "antenna_num": 8,
  "modulation": "16QAM",
- "tx_frame_num":1
+ "frames_to_test":1
 }

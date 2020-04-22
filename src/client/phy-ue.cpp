@@ -248,7 +248,7 @@ void Phy_UE::start()
                 // if EVENT_RX_SYMBOL, do crop
 
             case EventType::kPacketRX: {
-                int offset = event.data;
+                int offset = event.tags[0];
 
                 int buffer_frame_num = rx_buffer_status_size;
                 int rx_thread_id = offset / buffer_frame_num;
@@ -269,8 +269,8 @@ void Phy_UE::start()
                     // frame=frame_id+TX_RX_FRAME_OFFSET
                     int tx_frame_id = (frame_id + TX_RX_FRAME_OFFSET);
                     for (size_t i = 0; i < ul_data_symbol_perframe; i++) {
-                        l2_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, 
-					ul_data_symbol_perframe, tx_frame_id , i);
+                        l2_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM,
+                            ul_data_symbol_perframe, tx_frame_id, i);
                         // if (l2_buffer_status_[l2_offset] == 0)
                         {
                             // modul_buffer_[l2_offset] = ul_IQ_modul[i];
@@ -278,9 +278,8 @@ void Phy_UE::start()
                             // printf("At frame %d (prev is %d) scheduling tx
                             // for frame %d with l2_offset %d\n", frame_id,
                             // prev_frame_id, tx_frame_id, l2_offset);
-                            Event_data do_modul_task;
-                            do_modul_task.event_type = EventType::kIFFT;
-                            do_modul_task.data = l2_offset;
+                            Event_data do_modul_task(
+                                EventType::kIFFT, l2_offset);
                             schedule_task(do_modul_task, &fft_queue_, ptok_fft);
                         }
                     }
@@ -291,9 +290,7 @@ void Phy_UE::start()
                 if (dl_data_symbol_perframe > 0
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
-                    Event_data do_crop_task;
-                    do_crop_task.event_type = EventType::kFFT;
-                    do_crop_task.data = offset;
+                    Event_data do_crop_task(EventType::kFFT, offset);
                     schedule_task(do_crop_task, &task_queue_, ptok);
 #if DEBUG_PRINT_ENTER_QUEUE_FFT
 
@@ -301,15 +298,14 @@ void Phy_UE::start()
                         = (frame_id % TASK_BUFFER_FRAME_NUM);
                     cropper_created_checker_[cropper_created_checker_id]++;
 #endif
-                } else { // if we are not entering doFFT, let's reset buffer
-                         // here
+                } else { // if we are not entering doFFT, reset buffer here
                     rx_buffer_status_[rx_thread_id][offset_in_current_buffer]
                         = 0; // now empty
                 }
             } break;
 
             case EventType::kFFT: {
-                int offset_csi = event.data;
+                int offset_csi = event.tags[0];
                 interpretOffset2d(
                     numAntennas, offset_csi, &frame_id_t, &ant_id_t);
                 frame_id = frame_id_t;
@@ -329,7 +325,7 @@ void Phy_UE::start()
             } break;
 
             case EventType::kZF: {
-                int offset_eq = event.data;
+                int offset_eq = event.tags[0];
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas,
                     offset_eq, &frame_id_t, &total_symbol_id_t, &dl_symbol_id_t,
                     &ant_id_t);
@@ -363,7 +359,7 @@ void Phy_UE::start()
 
             case EventType::kDemul: {
                 // do nothing
-                int offset_demul = event.data;
+                int offset_demul = event.tags[0];
                 interpretOffset3d(dl_data_symbol_perframe, numAntennas,
                     offset_demul, &frame_id_t, &total_symbol_id_t,
                     &dl_symbol_id_t, &ant_id_t);
@@ -373,7 +369,7 @@ void Phy_UE::start()
                 // ant_id = ant_id_t;
 
                 demul_checker_[frame_id][dl_symbol_id]++;
-                // if this subframe is ready
+                // if this symbol is ready
                 if (demul_checker_[frame_id][dl_symbol_id] == numAntennas) {
 
 #if DEBUG_PRINT_TASK_DONE
@@ -419,11 +415,11 @@ void Phy_UE::start()
             } break;
 
             case EventType::kPacketTX: {
-                int offset = event.data;
+                int offset = event.tags[0];
                 interpretOffset3d(config_->ul_data_symbol_num_perframe,
                     config_->getNumAntennas(), offset, &frame_id_t,
                     &total_symbol_id_t, &symbol_id_t, &ant_id_t);
-#if DEBUG_PRINT_PER_SUBFRAME_DONE
+#if DEBUG_PRINT_PER_SYMBOL_DONE
                 printf("Main thread: finished TX for frame %d, symbol %d, ant "
                        "%d\n",
                     frame_id_t, symbol_id_t, ant_id_t);
@@ -475,11 +471,11 @@ void Phy_UE::taskThread(int tid)
     Event_data event;
     while (config_->running) {
         if (demul_queue_.try_dequeue(event))
-            doDemul(tid, event.data);
+            doDemul(tid, event.tags[0]);
         else if (fft_queue_.try_dequeue(event))
-            doTransmit(tid, event.data, 0); //, event.more_data);
+            doTransmit(tid, event.tags[0], 0); //, event.more_data);
         else if (task_queue_.try_dequeue(event))
-            doFFT(tid, event.data);
+            doFFT(tid, event.tags[0]);
     }
 }
 
@@ -610,14 +606,13 @@ void Phy_UE::doFFT(int tid, int offset)
         phase_shift_buffer_[buffer_frame_id][ant_id] = cx_float(std::cos(-std::arg(avg_csi)),
                                                           std::sin(-std::arg(avg_csi)));
 
-        crop_finish_event.event_type = EventType::kFFT;
-        crop_finish_event.data = csi_offset;
+        crop_finish_event = Event_data(EventType::kFFT, csi_offset);
     } else if (config_->isDownlink(frame_id, symbol_id)) {
         int eq_buffer_offset
             = generateOffset3d(TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
                 numAntennas, frame_id, dl_symbol_id - dl_pilot_symbol_perframe,
                 ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) *
-                         // dl_data_symbol_perframe + dl_data_symbol_id;
+        // dl_data_symbol_perframe + dl_data_symbol_id;
 
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
@@ -641,9 +636,7 @@ void Phy_UE::doFFT(int tid, int offset)
             equ_buffer_ptr[j] = (y * phc) / csi;
         }
 
-        crop_finish_event.event_type = EventType::kZF;
-        crop_finish_event.data = eq_buffer_offset;
-
+        crop_finish_event = Event_data(EventType::kZF, eq_buffer_offset);
         // generateOffset3d(numAntennas, dl_symbol_perframe, frame_id,
         // dl_symbol_id, ant_id);
     }
@@ -717,7 +710,7 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
     // for (int ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
     // ul_symbol_id++)
     //{
-    int frame_period_id = frame_id % config_->framePeriod;
+    int frame_period_id = frame_id % config_->frames.size();
     int symbol_id = config_->ULSymbols[frame_period_id][ul_symbol_id];
 
     // int modulbuf_offset = (data_sc_len * numAntennas * ul_symbol_id);
@@ -828,8 +821,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     // demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
 
     // downlink_mode = config_->downlink_mode;
-    // dl_data_subframe_start = config_->dl_data_symbol_start;
-    // dl_data_subframe_end = config_->dl_data_symbol_end;
+    // dl_data_symbol_start = config_->dl_data_symbol_start;
+    // dl_data_symbol_end = config_->dl_data_symbol_end;
     packet_length = config_->packet_length;
     tx_packet_length = config_->packet_length;
 

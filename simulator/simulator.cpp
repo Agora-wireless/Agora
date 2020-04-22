@@ -63,8 +63,8 @@ void Simulator::start()
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
     buffer_frame_num
-        = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    max_packet_num_per_frame = BS_ANT_NUM * dl_data_subframe_num_perframe;
+        = symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    max_packet_num_per_frame = BS_ANT_NUM * dl_data_symbol_num_perframe;
 
     /* counters for printing summary */
     int frame_count_rx = 0;
@@ -88,25 +88,25 @@ void Simulator::start()
             Event_data& event = events_list[bulk_count];
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int socket_thread_id = rx_tag_t(event.data).tid;
-                int buf_offset = rx_tag_t(event.data).offset;
+                int socket_thread_id = rx_tag_t(event.tags[0]).tid;
+                int buf_offset = rx_tag_t(event.tags[0]).offset;
 
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)buf_offset * packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
                 int frame_id = pkt->frame_id % 10000;
-                int subframe_id = pkt->symbol_id;
+                int symbol_id = pkt->symbol_id;
                 int ant_id = pkt->ant_id;
                 int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
                 socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
                 // printf(
-                //     "In main: received from frame %d %d, subframe %d, ant
-                //     %d\n", frame_id, frame_id_in_buffer, subframe_id,
+                //     "In main: received from frame %d %d, symbol %d, ant
+                //     %d\n", frame_id, frame_id_in_buffer, symbol_id,
                 //     ant_id);
 
                 update_rx_counters(
-                    frame_id, frame_id_in_buffer, subframe_id, ant_id);
+                    frame_id, frame_id_in_buffer, symbol_id, ant_id);
             } break;
 
             default:
@@ -140,17 +140,17 @@ inline void Simulator::update_frame_count(int* frame_count)
         *frame_count = 0;
 }
 
-void Simulator::update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
-    size_t subframe_id, size_t ant_id)
+void Simulator::update_rx_counters(
+    size_t frame_id, size_t frame_id_in_buffer, size_t symbol_id, size_t ant_id)
 {
     rx_counter_packets_[frame_id_in_buffer]++;
     if (rx_counter_packets_[frame_id_in_buffer] == 1) {
         frame_start_receive[frame_id] = get_time();
 #if DEBUG_PRINT_PER_FRAME_START
         printf(
-            "Main thread: data received from frame %zu, subframe %zu, ant %zu, "
+            "Main thread: data received from frame %zu, symbol %zu, ant %zu, "
             "in %.2f since tx, in %.2f us since last frame\n",
-            frame_id, subframe_id, ant_id,
+            frame_id, symbol_id, ant_id,
             frame_start_receive[frame_id] - frame_start_tx[frame_id],
             frame_start_receive[frame_id] - frame_start_receive[frame_id - 1]);
 #endif
@@ -187,12 +187,12 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
     UE_NUM = cfg->UE_NUM;
     OFDM_CA_NUM = cfg->OFDM_CA_NUM;
     OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    subframe_num_perframe = cfg->symbol_num_perframe;
-    data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    ul_data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-    dl_data_subframe_num_perframe = cfg->dl_data_symbol_num_perframe;
-    dl_data_subframe_start = cfg->dl_data_symbol_start;
-    dl_data_subframe_end = cfg->dl_data_symbol_end;
+    symbol_num_perframe = cfg->symbol_num_perframe;
+    data_symbol_num_perframe = cfg->data_symbol_num_perframe;
+    ul_data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
+    dl_data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
+    dl_data_symbol_start = cfg->dl_data_symbol_start;
+    dl_data_symbol_end = cfg->dl_data_symbol_end;
     packet_length = cfg->packet_length;
 
     demul_block_size = cfg->demul_block_size;
@@ -203,9 +203,9 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
 void Simulator::initialize_queues()
 {
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe);
+        512 * data_symbol_num_perframe);
     complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        512 * data_subframe_num_perframe * 4);
+        512 * data_symbol_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
@@ -223,10 +223,10 @@ void Simulator::initialize_uplink_buffers()
     alloc_buffer_1d(&task_threads, TASK_THREAD_NUM, 64, 0);
     alloc_buffer_1d(&context, TASK_THREAD_NUM, 64, 0);
 
-    socket_buffer_size_ = (long long)packet_length * subframe_num_perframe
+    socket_buffer_size_ = (long long)packet_length * symbol_num_perframe
         * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     socket_buffer_status_size_
-        = subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+        = symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
     socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(
         SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);

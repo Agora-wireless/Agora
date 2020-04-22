@@ -9,6 +9,7 @@
 
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include <sstream>
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>
@@ -24,8 +25,8 @@ struct complex_float {
 // Event data tag for RX events
 union rx_tag_t {
     struct {
-        uint32_t tid : 4;
-        uint32_t offset : 28;
+        uint32_t tid : 4; // ID of the socket thread that received the packet
+        uint32_t offset : 28; // Offset in the socket thread's RX buffer
     };
     int _tag;
 
@@ -48,13 +49,13 @@ using fft_req_tag_t = rx_tag_t;
 union fft_resp_tag_t {
     struct {
         uint32_t frame_id : 16;
-        uint32_t subframe_id : 16;
+        uint32_t symbol_id : 16;
     };
     int _tag;
 
-    fft_resp_tag_t(uint32_t frame_id, uint32_t subframe_id)
+    fft_resp_tag_t(uint32_t frame_id, uint32_t symbol_id)
         : frame_id(frame_id)
-        , subframe_id(subframe_id)
+        , symbol_id(symbol_id)
     {
     }
 
@@ -64,32 +65,86 @@ union fft_resp_tag_t {
     }
 };
 
-/**
- * Millipede uses these event messages for communication between threads
- *
- * @data is used for events with only a single offset
- *
- * num_offsets and offsets are used for events with multiple offsets
- *     num_offsets: number of offsets in an event
- *     offsets: the values of offsets
- */
-struct Event_data {
-    // TODO: @data can be removed and replaced with num_offsets and offsets
-    // TODO: offsets should be called "data" or "tags" to avoid confusing with
-    // offsets into memory buffers
-    EventType event_type;
-    int data;
-    int num_offsets;
-    int offsets[13];
+// Event data tag for ZF requests and responses
+union zf_tag_t {
+    struct {
+        uint32_t frame_id : 16;
 
-    Event_data(EventType event_type, int data)
-        : event_type(event_type)
-        , data(data)
-        , num_offsets(0)
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 16;
+    };
+    int _tag;
+
+    zf_tag_t(uint32_t frame_id, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , base_sc_id(base_sc_id)
     {
     }
 
-    Event_data() { num_offsets = 0; }
+    zf_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(zf_tag_t) == sizeof(int), "");
+
+// Event data tag for demodulation requests and responses
+union demul_tag_t {
+    struct {
+        uint32_t frame_id : 9;
+
+        // Index of this symbol among this frame's uplink symbols
+        uint32_t symbol_idx_ul : 9;
+
+        // The Doer handling this tag will process the batch of subcarriers
+        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
+        uint32_t base_sc_id : 14;
+    };
+    int _tag;
+
+    demul_tag_t(uint32_t frame_id, uint32_t symbol_idx_ul, uint32_t base_sc_id)
+        : frame_id(frame_id)
+        , symbol_idx_ul(symbol_idx_ul)
+        , base_sc_id(base_sc_id)
+    {
+    }
+
+    demul_tag_t(int _tag)
+        : _tag(_tag)
+    {
+    }
+};
+static_assert(sizeof(demul_tag_t) == sizeof(int), "");
+
+/**
+ * Millipede uses these event messages for communication between threads. Each
+ * tag encodes information about a task.
+ */
+struct Event_data {
+    EventType event_type;
+    uint32_t num_tags;
+    int tags[14];
+
+    // Initialize and event with only the event type field set
+    Event_data(EventType event_type)
+        : event_type(event_type)
+        , num_tags(0)
+    {
+    }
+
+    // Create an event with one tag
+    Event_data(EventType event_type, int tag)
+        : event_type(event_type)
+        , num_tags(1)
+    {
+        tags[0] = tag;
+    }
+
+    Event_data()
+        : num_tags(0)
+    {
+    }
 };
 static_assert(sizeof(Event_data) == 64, "");
 
@@ -107,6 +162,14 @@ struct Packet {
         , ant_id(a)
     {
     }
+
+    std::string to_string()
+    {
+        std::ostringstream ret;
+        ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
+            << ", cell ID " << cell_id << ", antenna ID " << ant_id << "]";
+        return ret.str();
+    }
 };
 
 struct RX_stats {
@@ -118,8 +181,8 @@ struct RX_stats {
 };
 
 struct Frame_stats {
-    int frame_count;
-    int* symbol_count;
+    size_t frame_count;
+    int symbol_count[TASK_BUFFER_FRAME_NUM];
     int max_symbol_count;
     bool last_symbol(int frame_id)
     {
@@ -129,18 +192,13 @@ struct Frame_stats {
         }
         return (false);
     }
-    void init(int max_symbols, int max_frame, int align)
+    void init(int _max_symbol_count)
     {
         frame_count = 0;
-        alloc_buffer_1d(&symbol_count, max_frame, align, 1);
-        max_symbol_count = max_symbols;
+        memset(symbol_count, 0, TASK_BUFFER_FRAME_NUM * sizeof(int));
+        max_symbol_count = _max_symbol_count;
     }
-    void fini() { free_buffer_1d(&symbol_count); }
-    void update_frame_count(void)
-    {
-        if (++frame_count == 1e9)
-            frame_count = 0;
-    }
+    void update_frame_count() { frame_count++; }
 };
 
 struct ZF_stats : public Frame_stats {
@@ -150,34 +208,33 @@ struct ZF_stats : public Frame_stats {
         : max_task_count(max_symbol_count)
     {
     }
-    void init(int max_tasks, int max_frame, int align)
+    void init(int max_tasks)
     {
-        Frame_stats::init(max_tasks, max_frame, align);
+        Frame_stats::init(max_tasks);
         coded_frame = -1;
     }
-    void fini() { Frame_stats::fini(); }
 };
 
 struct Data_stats : public Frame_stats {
-    Table<int> task_count;
-    int max_task_count;
+    size_t* task_count[TASK_BUFFER_FRAME_NUM];
+    size_t max_task_count;
 
-    void init(int max_tasks, int max_symbols, int max_frame,
-        int max_data_subframe, int align)
+    void init(int _max_task_count, int max_symbols, int max_data_symbol)
     {
-        Frame_stats::init(max_symbols, max_frame, align);
-        task_count.calloc(max_frame, max_data_subframe, align);
-        max_task_count = max_tasks;
+        Frame_stats::init(max_symbols);
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+            task_count[i] = new size_t[max_data_symbol]();
+        max_task_count = _max_task_count;
     }
     void fini()
     {
-        task_count.free();
-        Frame_stats::fini();
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+            delete[] task_count[i];
     }
-    bool last_task(int frame_id, int data_subframe_id)
+    bool last_task(int frame_id, int data_symbol_id)
     {
-        if (++task_count[frame_id][data_subframe_id] == max_task_count) {
-            task_count[frame_id][data_subframe_id] = 0;
+        if (++task_count[frame_id][data_symbol_id] == max_task_count) {
+            task_count[frame_id][data_symbol_id] = 0;
             return (true);
         }
         return (false);
@@ -188,24 +245,23 @@ struct FFT_stats : public Data_stats {
     int max_symbol_data_count;
     int* symbol_cal_count;
     int max_symbol_cal_count;
+
+    // cur_frame_for_symbol[i] is the current frame for the symbol whose
+    // index in the frame's uplink symbols is i
     int* cur_frame_for_symbol;
 };
 
 struct RC_stats {
-    int frame_count;
+    size_t frame_count;
     int max_task_count;
     int last_frame;
     RC_stats(void)
         : frame_count(0)
         , max_task_count(1)
-	, last_frame (-1)
+        , last_frame(-1)
     {
     }
-    void update_frame_count(void)
-    {
-        if (++frame_count == 1e9)
-            frame_count = 0;
-    }
+    void update_frame_count(void) { frame_count++; }
 };
 
 /* TODO: clean up the legency code below */

@@ -47,17 +47,17 @@ DoPrecode::~DoPrecode()
 
 Event_data DoPrecode::launch(int offset)
 {
-    int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
-    int total_data_subframe_id = offset / cfg->demul_block_num;
-    int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-    int current_data_subframe_id
-        = total_data_subframe_id % data_subframe_num_perframe;
+    int sc_id = (offset % cfg->demul_events_per_symbol) * cfg->demul_block_size;
+    int total_data_symbol_id = offset / cfg->demul_events_per_symbol;
+    int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
+    int frame_id = total_data_symbol_id / data_symbol_num_perframe;
+    int current_data_symbol_id
+        = total_data_symbol_id % data_symbol_num_perframe;
 
     double start_tsc = worker_rdtsc();
 #if DEBUG_PRINT_IN_TASK
-    printf("In doPrecode thread %d: frame: %d, subframe: %d, subcarrier: %d\n",
-        tid, frame_id, current_data_subframe_id, sc_id);
+    printf("In doPrecode thread %d: frame: %d, symbol: %d, subcarrier: %d\n",
+        tid, frame_id, current_data_symbol_id, sc_id);
 #endif
 
     __m256i index = _mm256_setr_epi64x(
@@ -75,23 +75,23 @@ Event_data DoPrecode::launch(int offset)
                 precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
 
             complex_float* data_ptr = modulated_buffer_temp;
-            if ((unsigned)current_data_subframe_id
+            if ((unsigned)current_data_symbol_id
                 <= cfg->dl_data_symbol_start - 1 + cfg->DL_PILOT_SYMS) {
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                     data_ptr[user_id]
                         = { cfg->pilots_[cur_sc_id + cfg->OFDM_DATA_START], 0 };
             } else {
-                int subframe_id_in_buffer
-                    = current_data_subframe_id - cfg->dl_data_symbol_start;
+                int symbol_id_in_buffer
+                    = current_data_symbol_id - cfg->dl_data_symbol_start;
 
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
 #ifdef USE_LDPC
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[total_data_subframe_id][cur_sc_id
+                        = &dl_raw_data[total_data_symbol_id][cur_sc_id
                             + cfg->OFDM_DATA_NUM * user_id];
 #else
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[subframe_id_in_buffer][cur_sc_id
+                        = &dl_raw_data[symbol_id_in_buffer][cur_sc_id
                             + cfg->OFDM_DATA_NUM * user_id];
 #endif
                     data_ptr[user_id] = mod_single_uint8(
@@ -111,9 +111,9 @@ Event_data DoPrecode::launch(int offset)
             duration_stat->task_duration[1] += worker_rdtsc() - start_tsc2;
             mat_precoded = mat_data * mat_precoder;
 
-            // printf("In doPrecode thread %d: frame: %d, subframe: %d, "
+            // printf("In doPrecode thread %d: frame: %d, symbol: %d, "
             //        "subcarrier: % d\n ",
-            //     tid, frame_id, current_data_subframe_id, sc_id);
+            //     tid, frame_id, current_data_symbol_id, sc_id);
             // cout << "Precoder: \n" << mat_precoder << endl;
             // cout << "Data: \n" << mat_data << endl;
             // cout << "Precoded data: \n" << mat_precoded << endl;
@@ -126,7 +126,7 @@ Event_data DoPrecode::launch(int offset)
     float* precoded_ptr = (float*)precoded_buffer_temp;
     for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
         int ifft_buffer_offset
-            = ant_id + cfg->BS_ANT_NUM * total_data_subframe_id;
+            = ant_id + cfg->BS_ANT_NUM * total_data_symbol_id;
         float* ifft_ptr = (float*)&dl_ifft_buffer_[ifft_buffer_offset][sc_id
             + cfg->OFDM_DATA_START];
         for (size_t i = 0; i < cfg->demul_block_size / 4; i++) {
@@ -142,9 +142,9 @@ Event_data DoPrecode::launch(int offset)
     duration_stat->task_count++;
 
 #if DEBUG_PRINT_IN_TASK
-    printf("In doPrecode thread %d: finished frame: %d, subframe: %d, "
+    printf("In doPrecode thread %d: finished frame: %d, symbol: %d, "
            "subcarrier: %d , offset: %d\n",
-        tid, frame_id, current_data_subframe_id, sc_id, offset);
+        tid, frame_id, current_data_symbol_id, sc_id, offset);
 #endif
     return Event_data(EventType::kPrecode, offset);
 }

@@ -82,7 +82,7 @@ static void schedule_task_set(EventType task_type, int task_set_size,
     Event_data task(task_type, task_set_size * task_set_id);
     for (int i = 0; i < task_set_size; i++) {
         try_enqueue_fallback(task_queue, producer_token, task);
-        task.data++;
+        task.tags[0]++;
     }
 }
 
@@ -99,10 +99,9 @@ void Millipede::start()
         return;
     }
 
-    /* Tokens used for dequeue */
-    moodycamel::ConsumerToken ctok(message_queue_);
-    moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
-
+    // Millipede processes a frame after completing processing for previous
+    // frames is complete. cur_frame_id is the frame that is currently being
+    // processed.
     size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
@@ -133,8 +132,6 @@ void Millipede::start()
                         *(worker_ptoks_ptr[i]), events_list + num_events,
                         kDequeueBulkSizeWorker);
             }
-            // ret = complete_task_queue_.try_dequeue_bulk(
-            //     ctok_complete, events_list, dequeue_bulk_size_single);
         }
         is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
@@ -146,42 +143,37 @@ void Millipede::start()
             // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                int offset_in_current_buffer = rx_tag_t(event.data).offset;
-                int socket_thread_id = rx_tag_t(event.data).tid;
+                int offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
+                int socket_thread_id = rx_tag_t(event.tags[0]).tid;
 
                 char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
                     + (long long)offset_in_current_buffer * cfg->packet_length;
                 struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
 
                 frame_count = pkt->frame_id % kNumStatsFrames;
-                size_t frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
-                int subframe_id = pkt->symbol_id;
+                size_t pkt_frame_id = frame_count % TASK_BUFFER_FRAME_NUM;
 
-                update_rx_counters(frame_count, frame_id, subframe_id);
+                update_rx_counters(frame_count, pkt_frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
                     /* In BigStation, schedule FFT whenever a packet is RX */
-                    if (cur_frame_id != frame_id) {
+                    if (cur_frame_id != pkt_frame_id) {
+                        cur_frame_id = pkt_frame_id;
                         stats->master_set_tsc(
                             TsType::kProcessingStarted, frame_count);
-                        cur_frame_id = frame_id;
                     }
                 }
 
-                fft_queue_arr[frame_id].push(fft_req_tag_t(event.data));
+                fft_queue_arr[pkt_frame_id].push(fft_req_tag_t(event.tags[0]));
             } break;
 
             case EventType::kFFT: {
-                if (event.num_offsets == 0) {
-                    handle_event_fft(event.data);
-                } else {
-                    for (int i = 0; i < event.num_offsets; i++) {
-                        handle_event_fft(event.offsets[i]);
-                    }
+                for (size_t i = 0; i < event.num_tags; i++) {
+                    handle_event_fft(event.tags[i]);
                 }
             } break;
 
             case EventType::kRC: {
-                int frame_id = event.data;
+                int frame_id = event.tags[0];
                 stats->master_set_tsc(TsType::kRCDone, rc_stats_.frame_count);
                 print_per_frame_done(PRINT_RC, rc_stats_.frame_count, frame_id);
                 fft_stats_.symbol_cal_count[frame_id] = 0;
@@ -190,9 +182,7 @@ void Millipede::start()
             } break;
 
             case EventType::kZF: {
-                int offset = event.data;
-                int frame_id = offset / zf_stats_.max_symbol_count;
-
+                int frame_id = zf_tag_t(event.tags[0]).frame_id;
                 print_per_task_done(
                     PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
@@ -204,60 +194,68 @@ void Millipede::start()
                     zf_stats_.update_frame_count();
 
                     /* If all the data in a frame has arrived when ZF is done */
-                    schedule_demul_task(
-                        frame_id, 0, fft_stats_.max_symbol_data_count);
+                    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe;
+                         i++) {
+                        if (fft_stats_.cur_frame_for_symbol[i] == frame_id)
+                            schedule_demul(frame_id, i);
+                    }
+
                     if (config_->dl_data_symbol_num_perframe > 0) {
                         /* If downlink data transmission is enabled, schedule
                          * downlink encode/modulation for the first data
-                         * subframe */
-                        int total_data_subframe_id
+                         * symbol */
+                        int total_data_symbol_id
                             = frame_id * cfg->data_symbol_num_perframe
                             + cfg->dl_data_symbol_start;
-#if USE_LDPC
-                        schedule_task_set(EventType::kEncode,
-                            config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-                            total_data_subframe_id, encode_queue_, ptok_encode);
-#else
-                        schedule_task_set(EventType::kPrecode,
-                            config_->demul_block_num, total_data_subframe_id,
-                            precode_queue_, *ptok_precode);
-#endif
+                        if (kUseLDPC) {
+                            schedule_task_set(EventType::kEncode,
+                                config_->LDPC_config.nblocksInSymbol
+                                    * cfg->UE_NUM,
+                                total_data_symbol_id, encode_queue_,
+                                *ptok_encode);
+                        } else {
+                            schedule_task_set(EventType::kPrecode,
+                                cfg->demul_events_per_symbol,
+                                total_data_symbol_id, precode_queue_,
+                                *ptok_precode);
+                        }
                     }
                 }
             } break;
 
             case EventType::kDemul: {
-                int offset = event.data;
-                int block_size = config_->demul_block_size;
-                int block_num = demul_stats_.max_task_count;
-                int sc_id = offset % block_num * block_size;
-                int total_data_subframe_id = offset / block_num;
-                int frame_id
-                    = total_data_subframe_id / cfg->ul_data_symbol_num_perframe;
-                int data_subframe_id
-                    = total_data_subframe_id % cfg->ul_data_symbol_num_perframe;
+                int frame_id = demul_tag_t(event.tags[0]).frame_id;
+                int symbol_idx_ul = demul_tag_t(event.tags[0]).symbol_idx_ul;
+                int base_sc_id = demul_tag_t(event.tags[0]).base_sc_id;
+
+                int total_data_symbol_idx
+                    = (frame_id * cfg->ul_data_symbol_num_perframe)
+                    + symbol_idx_ul;
 
                 print_per_task_done(
-                    PRINT_DEMUL, frame_id, data_subframe_id, sc_id);
-                /* If this subframe is ready */
-                if (demul_stats_.last_task(frame_id, data_subframe_id)) {
+                    PRINT_DEMUL, frame_id, symbol_idx_ul, base_sc_id);
+                /* If this symbol is ready */
+                if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
                     max_equaled_frame = frame_id;
-#ifdef USE_LDPC
-                    consumer_decode.schedule_task_set(total_data_subframe_id);
-#endif
-                    print_per_subframe_done(PRINT_DEMUL,
-                        demul_stats_.frame_count, frame_id, data_subframe_id);
+                    if (kUseLDPC) {
+                        schedule_task_set(EventType::kDecode,
+                            config_->demul_events_per_symbol,
+                            total_data_symbol_idx, decode_queue_, *ptok_decode);
+                    }
+                    print_per_symbol_done(PRINT_DEMUL, demul_stats_.frame_count,
+                        frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
                         /* Schedule fft for the next frame if there are delayed
                          * fft tasks */
-#ifndef USE_LDPC
-                        cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
-                        frame_count = demul_stats_.frame_count + 1;
-                        stats->update_stats_in_functions_uplink(
-                            demul_stats_.frame_count);
-                        if (stats->last_frame_id == config_->tx_frame_num - 1)
-                            goto finish;
-#endif
+                        if (!kUseLDPC) {
+                            cur_frame_id
+                                = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                            frame_count = demul_stats_.frame_count + 1;
+                            stats->update_stats_in_functions_uplink(
+                                demul_stats_.frame_count);
+                            if (stats->last_frame_id == cfg->frames_to_test - 1)
+                                goto finish;
+                        }
                         stats->master_set_tsc(
                             TsType::kDemulDone, demul_stats_.frame_count);
                         print_per_frame_done(
@@ -273,7 +271,7 @@ void Millipede::start()
                         int samples_num_per_UE = cfg->OFDM_DATA_NUM
                             * demul_stats_.max_symbol_count * 1000;
                         printf(
-                            "Frame %d: RX %d samples (per-client) from %zu "
+                            "Frame %zu: RX %d samples (per-client) from %zu "
                             "clients in %f secs, throughtput %f bps per-client "
                             "(16QAM), current task queue length %zu\n",
                             demul_stats_.frame_count, samples_num_per_UE,
@@ -285,19 +283,17 @@ void Millipede::start()
                 }
             } break;
 
-#ifdef USE_LDPC
             case EventType::kDecode: {
-                int offset = event.data;
                 int num_code_blocks = decode_stats_.max_task_count;
-                int total_data_subframe_id = offset / num_code_blocks;
+                int total_data_symbol_id = event.tags[0] / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / cfg->ul_data_symbol_num_perframe;
-                int data_subframe_id
-                    = total_data_subframe_id % cfg->ul_data_symbol_num_perframe;
+                    = total_data_symbol_id / cfg->ul_data_symbol_num_perframe;
+                int data_symbol_id
+                    = total_data_symbol_id % cfg->ul_data_symbol_num_perframe;
 
-                if (decode_stats_.last_task(frame_id, data_subframe_id)) {
-                    print_per_subframe_done(PRINT_DECODE,
-                        decode_stats_.frame_count, frame_id, data_subframe_id);
+                if (decode_stats_.last_task(frame_id, data_symbol_id)) {
+                    print_per_symbol_done(PRINT_DECODE,
+                        decode_stats_.frame_count, frame_id, data_symbol_id);
                     if (decode_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         frame_count = decode_stats_.frame_count + 1;
@@ -307,7 +303,7 @@ void Millipede::start()
                             PRINT_DECODE, decode_stats_.frame_count, frame_id);
                         stats->update_stats_in_functions_uplink(
                             decode_stats_.frame_count);
-                        if (stats->last_frame_id == config_->tx_frame_num - 1)
+                        if (stats->last_frame_id == cfg->frames_to_test - 1)
                             goto finish;
                         decode_stats_.update_frame_count();
                     }
@@ -315,18 +311,20 @@ void Millipede::start()
             } break;
 
             case EventType::kEncode: {
-                int offset = event.data;
+                int offset = event.tags[0];
                 int num_code_blocks = encode_stats_.max_task_count;
-                int total_data_subframe_id = offset / num_code_blocks;
+                int total_data_symbol_id = offset / num_code_blocks;
                 int frame_id
-                    = total_data_subframe_id / cfg->data_symbol_num_perframe;
-                int data_subframe_id
-                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
+                    = total_data_symbol_id / cfg->data_symbol_num_perframe;
+                int data_symbol_id
+                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
 
-                if (encode_stats_.last_task(frame_id, data_subframe_id)) {
-                    consumer_precode.schedule_task_set(total_data_subframe_id);
-                    print_per_subframe_done(PRINT_ENCODE,
-                        encode_stats_.frame_count, frame_id, data_subframe_id);
+                if (encode_stats_.last_task(frame_id, data_symbol_id)) {
+                    schedule_task_set(EventType::kPrecode,
+                        config_->demul_events_per_symbol, total_data_symbol_id,
+                        precode_queue_, *ptok_precode);
+                    print_per_symbol_done(PRINT_ENCODE,
+                        encode_stats_.frame_count, frame_id, data_symbol_id);
                     if (encode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(
                             TsType::kEncodeDone, encode_stats_.frame_count);
@@ -336,45 +334,44 @@ void Millipede::start()
                     }
                 }
             } break;
-#endif /* defined(USE_LDPC) */
 
             case EventType::kPrecode: {
                 /* Precoding is done, schedule ifft */
-                int offset = event.data;
                 int block_size = config_->demul_block_size;
                 int block_num = precode_stats_.max_task_count;
-                int sc_id = offset % block_num * block_size;
-                int total_data_subframe_id = offset / block_num;
-                int data_subframe_id
-                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
+                int sc_id = event.tags[0] % block_num * block_size;
+                int total_data_symbol_id = event.tags[0] / block_num;
+                int data_symbol_id
+                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
                 int frame_id
-                    = total_data_subframe_id / cfg->data_symbol_num_perframe;
+                    = total_data_symbol_id / cfg->data_symbol_num_perframe;
 
                 print_per_task_done(
-                    PRINT_PRECODE, frame_id, data_subframe_id, sc_id);
-                if (precode_stats_.last_task(frame_id, data_subframe_id)) {
+                    PRINT_PRECODE, frame_id, data_symbol_id, sc_id);
+                if (precode_stats_.last_task(frame_id, data_symbol_id)) {
                     // TODO: offset below should have a descriptive name
                     int offset = precode_stats_.frame_count
                             * cfg->data_symbol_num_perframe
-                        + data_subframe_id;
+                        + data_symbol_id;
                     schedule_task_set(EventType::kIFFT, cfg->BS_ANT_NUM, offset,
                         ifft_queue_, *ptok_ifft);
-                    if (data_subframe_id < (int)cfg->dl_data_symbol_end - 1) {
-#ifdef USE_LDPC
-                        schedule_task_set(EventType::kEncode,
-                            config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-                            total_data_subframe_id + 1, encode_queue_,
-                            ptok_encode);
-#else
-                        schedule_task_set(EventType::kPrecode,
-                            config_->demul_block_num,
-                            total_data_subframe_id + 1, precode_queue_,
-                            *ptok_precode);
-#endif
+                    if (data_symbol_id < (int)cfg->dl_data_symbol_end - 1) {
+                        if (kUseLDPC) {
+                            schedule_task_set(EventType::kEncode,
+                                config_->LDPC_config.nblocksInSymbol
+                                    * cfg->UE_NUM,
+                                total_data_symbol_id + 1, encode_queue_,
+                                *ptok_encode);
+                        } else {
+                            schedule_task_set(EventType::kPrecode,
+                                config_->demul_events_per_symbol,
+                                total_data_symbol_id + 1, precode_queue_,
+                                *ptok_precode);
+                        }
                     }
 
-                    print_per_subframe_done(PRINT_PRECODE,
-                        precode_stats_.frame_count, frame_id, data_subframe_id);
+                    print_per_symbol_done(PRINT_PRECODE,
+                        precode_stats_.frame_count, frame_id, data_symbol_id);
                     if (precode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(
                             TsType::kPrecodeDone, precode_stats_.frame_count);
@@ -387,23 +384,21 @@ void Millipede::start()
 
             case EventType::kIFFT: {
                 /* IFFT is done, schedule data transmission */
-                int offset = event.data;
-                int ant_id = offset % cfg->BS_ANT_NUM;
-                int total_data_subframe_id = offset / cfg->BS_ANT_NUM;
-                int frame_id = total_data_subframe_id
+                int ant_id = event.tags[0] % cfg->BS_ANT_NUM;
+                int total_data_symbol_id = event.tags[0] / cfg->BS_ANT_NUM;
+                int frame_id = total_data_symbol_id
                     / cfg->data_symbol_num_perframe % TASK_BUFFER_FRAME_NUM;
-                int data_subframe_id
-                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
+                int data_symbol_id
+                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
                 int ptok_id = ant_id % cfg->socket_thread_num; /* RX */
 
-                Event_data tx_event(EventType::kPacketTX, offset);
-                try_enqueue_fallback(
-                    tx_queue_, *tx_ptoks_ptr[ptok_id], tx_event);
+                try_enqueue_fallback(tx_queue_, *tx_ptoks_ptr[ptok_id],
+                    Event_data(EventType::kPacketTX, event.tags[0]));
 
                 print_per_task_done(
-                    PRINT_IFFT, frame_id, data_subframe_id, ant_id);
+                    PRINT_IFFT, frame_id, data_symbol_id, ant_id);
 
-                if (ifft_stats_.last_task(frame_id, data_subframe_id)) {
+                if (ifft_stats_.last_task(frame_id, data_symbol_id)) {
                     if (ifft_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         frame_count = ifft_stats_.frame_count + 1;
@@ -418,25 +413,23 @@ void Millipede::start()
 
             case EventType::kPacketTX: {
                 /* Data is sent */
-                int offset = event.data;
-                int ant_id = offset % cfg->BS_ANT_NUM;
-                int total_data_subframe_id = offset / cfg->BS_ANT_NUM;
+                int ant_id = event.tags[0] % cfg->BS_ANT_NUM;
+                int total_data_symbol_id = event.tags[0] / cfg->BS_ANT_NUM;
                 int frame_id
-                    = total_data_subframe_id / cfg->data_symbol_num_perframe;
-                int data_subframe_id
-                    = total_data_subframe_id % cfg->data_symbol_num_perframe;
+                    = total_data_symbol_id / cfg->data_symbol_num_perframe;
+                int data_symbol_id
+                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
                 // printf("In main thread: tx finished for ",
-                //     "frame %d subframe %d ant %d\n",
-                //     frame_id, data_subframe_id, ant_id);
+                //     "frame %d symbol %d ant %d\n",
+                //     frame_id, data_symbol_id, ant_id);
                 frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
 
-                print_per_task_done(
-                    PRINT_TX, frame_id, data_subframe_id, ant_id);
-                if (tx_stats_.last_task(frame_id, data_subframe_id)) {
-                    print_per_subframe_done(PRINT_TX, tx_stats_.frame_count,
-                        frame_id, data_subframe_id);
+                print_per_task_done(PRINT_TX, frame_id, data_symbol_id, ant_id);
+                if (tx_stats_.last_task(frame_id, data_symbol_id)) {
+                    print_per_symbol_done(PRINT_TX, tx_stats_.frame_count,
+                        frame_id, data_symbol_id);
                     /* If tx of the first symbol is done */
-                    if (data_subframe_id == (int)cfg->dl_data_symbol_start) {
+                    if (data_symbol_id == (int)cfg->dl_data_symbol_start) {
                         stats->master_set_tsc(
                             TsType::kTXProcessedFirst, tx_stats_.frame_count);
                         print_per_frame_done(
@@ -449,7 +442,7 @@ void Millipede::start()
                             PRINT_TX, tx_stats_.frame_count, frame_id);
                         stats->update_stats_in_functions_downlink(
                             tx_stats_.frame_count);
-                        if (stats->last_frame_id == config_->tx_frame_num - 1)
+                        if (stats->last_frame_id == cfg->frames_to_test - 1)
                             goto finish;
                         tx_stats_.update_frame_count();
                     }
@@ -476,18 +469,20 @@ void Millipede::start()
                 exit(0);
             } /* End of switch */
 
-            /* Schedule multiple fft tasks as one event */
+            // We schedule FFT processing if the event handling above results in
+            // either (a) sufficient packets received for the current frame,
+            // or (b) the current frame being updated.
             if (fft_queue_arr[cur_frame_id].size() >= config_->fft_block_size) {
-                size_t fft_block_num = fft_queue_arr[cur_frame_id].size()
+                size_t num_fft_blocks = fft_queue_arr[cur_frame_id].size()
                     / config_->fft_block_size;
 
-                for (size_t i = 0; i < fft_block_num; i++) {
+                for (size_t i = 0; i < num_fft_blocks; i++) {
                     Event_data do_fft_task;
-                    do_fft_task.num_offsets = config_->fft_block_size;
+                    do_fft_task.num_tags = config_->fft_block_size;
                     do_fft_task.event_type = EventType::kFFT;
 
                     for (size_t j = 0; j < config_->fft_block_size; j++) {
-                        do_fft_task.offsets[j]
+                        do_fft_task.tags[j]
                             = fft_queue_arr[cur_frame_id].front()._tag;
                         fft_queue_arr[cur_frame_id].pop();
 
@@ -512,12 +507,8 @@ finish:
     printf("Millipede: printing stats and saving to file\n");
     stats->print_summary();
     stats->save_to_file();
-#ifdef USE_LDPC
-    save_decode_data_to_file(stats->last_frame_id);
-#else
-    save_demul_data_to_file(stats->last_frame_id);
-#endif
-
+    kUseLDPC ? save_decode_data_to_file(stats->last_frame_id)
+             : save_demul_data_to_file(stats->last_frame_id);
     save_tx_data_to_file(stats->last_frame_id);
     this->stop();
 }
@@ -525,12 +516,12 @@ finish:
 void Millipede::handle_event_fft(int tag)
 {
     int frame_id = fft_resp_tag_t(tag).frame_id;
-    int subframe_id = fft_resp_tag_t(tag).subframe_id;
+    int symbol_id = fft_resp_tag_t(tag).symbol_id;
 
-    if (fft_stats_.last_task(frame_id, subframe_id)) {
-        if (config_->isPilot(frame_id, subframe_id)) {
-            print_per_subframe_done(PRINT_FFT_PILOTS, fft_stats_.frame_count,
-                frame_id, subframe_id);
+    if (fft_stats_.last_task(frame_id, symbol_id)) {
+        if (config_->isPilot(frame_id, symbol_id)) {
+            print_per_symbol_done(
+                PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id, symbol_id);
             if (!config_->downlink_mode
                 || (config_->downlink_mode && !config_->recipCalEn)
                 || (config_->downlink_mode && config_->recipCalEn
@@ -542,23 +533,27 @@ void Millipede::handle_event_fft(int tag)
                     print_per_frame_done(
                         PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                     fft_stats_.update_frame_count();
-                    schedule_task_set(EventType::kZF, config_->zf_block_num,
-                        frame_id, zf_queue_, *ptok_zf);
+
+                    zf_tag_t tag(frame_id, 0 /* base subcarrier ID */);
+                    for (size_t i = 0; i < config_->zf_events_per_symbol; i++) {
+                        try_enqueue_fallback(zf_queue_, *ptok_zf,
+                            Event_data(EventType::kZF, tag._tag));
+                        tag.base_sc_id += config_->zf_block_size;
+                    }
                 }
             }
-        } else if (config_->isUplink(frame_id, subframe_id)) {
-            int data_subframe_id = config_->getUlSFIndex(frame_id, subframe_id);
-            fft_stats_.cur_frame_for_symbol[data_subframe_id] = frame_id;
-            print_per_subframe_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1,
-                frame_id, subframe_id);
+        } else if (config_->isUplink(frame_id, symbol_id)) {
+            int symbol_idx_ul = config_->getUlSFIndex(frame_id, symbol_id);
+            fft_stats_.cur_frame_for_symbol[symbol_idx_ul] = frame_id;
+            print_per_symbol_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1,
+                frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
             if (zf_stats_.coded_frame == frame_id)
-                schedule_demul_task(
-                    frame_id, data_subframe_id, data_subframe_id + 1);
-        } else if (config_->isCalDlPilot(frame_id, subframe_id)
-            || config_->isCalUlPilot(frame_id, subframe_id)) {
-            print_per_subframe_done(PRINT_FFT_CAL, fft_stats_.frame_count - 1,
-                frame_id, subframe_id);
+                schedule_demul(frame_id, symbol_idx_ul);
+        } else if (config_->isCalDlPilot(frame_id, symbol_id)
+            || config_->isCalUlPilot(frame_id, symbol_id)) {
+            print_per_symbol_done(
+                PRINT_FFT_CAL, fft_stats_.frame_count - 1, frame_id, symbol_id);
             if (++fft_stats_.symbol_cal_count[frame_id]
                 == fft_stats_.max_symbol_cal_count) {
                 print_per_frame_done(
@@ -602,19 +597,17 @@ void* Millipede::worker(int tid)
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], dl_precoder_buffer_,
-        dl_ifft_buffer_,
-#ifdef USE_LDPC
-        dl_encoded_buffer_,
-#else
-        config_->dl_IQ_data,
-#endif
+        dl_ifft_buffer_, kUseLDPC ? dl_encoded_buffer_ : config_->dl_IQ_data,
         stats);
 
+    Doer* computeEncoding = nullptr;
+    Doer* computeDecoding = nullptr;
+
 #ifdef USE_LDPC
-    auto* computeEncoding = new DoEncode(config_, tid, freq_ghz, encode_queue_,
+    computeEncoding = new DoEncode(config_, tid, freq_ghz, encode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], config_->dl_IQ_data,
         dl_encoded_buffer_, stats);
-    auto* computeDecoding = new DoDecode(config_, tid, freq_ghz, decode_queue_,
+    computeDecoding = new DoDecode(config_, tid, freq_ghz, decode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
         decoded_buffer_, stats);
 #endif
@@ -622,26 +615,16 @@ void* Millipede::worker(int tid)
         rc_queue_, complete_task_queue_, worker_ptoks_ptr[tid], calib_buffer_,
         recip_buffer_, stats);
 
-    Doer* computers[] = {
-        computeIFFT,
-        computePrecode,
-#ifdef USE_LDPC
-        computeEncoding,
-#endif
-        computeZF,
-        computeReciprocity,
-        computeFFT,
-        computeDemul,
-#ifdef USE_LDPC
-        computeDecoding,
-#endif
-    };
-
-#define NITEMS(a) (sizeof(a) / sizeof(*a))
+    std::vector<Doer*> computers_vec = { computeIFFT, computePrecode, computeZF,
+        computeReciprocity, computeFFT, computeDemul };
+    if (kUseLDPC) {
+        computers_vec.push_back(computeEncoding);
+        computers_vec.push_back(computeDecoding);
+    }
 
     while (true) {
-        for (size_t i = 0; i < NITEMS(computers); i++) {
-            if (computers[i]->try_launch())
+        for (size_t i = 0; i < computers_vec.size(); i++) {
+            if (computers_vec[i]->try_launch())
                 break;
         }
     }
@@ -693,12 +676,7 @@ void* Millipede::worker_demul(int tid)
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], dl_precoder_buffer_,
-        dl_ifft_buffer_,
-#ifdef USE_LDPC
-        dl_encoded_buffer_,
-#else
-        config_->dl_IQ_data,
-#endif
+        dl_ifft_buffer_, kUseLDPC ? dl_encoded_buffer_ : config_->dl_IQ_data,
         stats);
 
     while (true) {
@@ -726,33 +704,26 @@ void Millipede::create_threads(
     }
 }
 
-void Millipede::schedule_demul_task(
-    int frame_id, int start_subframe_id, int end_subframe_id)
+void Millipede::schedule_demul(size_t frame_id, size_t symbol_idx_ul)
 {
-    int data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
-    for (int data_subframe_id = start_subframe_id;
-         data_subframe_id < end_subframe_id; data_subframe_id++) {
-        if (fft_stats_.cur_frame_for_symbol[data_subframe_id] == frame_id) {
-            /* Schedule demodulation task for subcarrier blocks */
-            int total_data_subframe_id
-                = frame_id * data_subframe_num_perframe + data_subframe_id;
-            schedule_task_set(EventType::kDemul, config_->demul_block_num,
-                total_data_subframe_id, demul_queue_, *ptok_demul);
-#if DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE
-            printf("Main thread: created Demodulation task for frame: %d, "
-                   "start subframe: %d, current subframe: %d, in %.2f\n",
-                frame_id, start_subframe_id, data_subframe_id,
-                stats->master_get_us_since(
-                    TsType::kPilotRX, demul_stats_.frame_count));
-#endif
-        }
+    demul_tag_t tag(frame_id, symbol_idx_ul, 0 /* base subcarrier ID */);
+    for (size_t i = 0; i < config_->demul_events_per_symbol; i++) {
+        try_enqueue_fallback(
+            demul_queue_, *ptok_demul, Event_data(EventType::kDemul, tag._tag));
+        tag.base_sc_id += config_->demul_block_size;
     }
+
+#if DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE
+    printf("Main thread: created Demodulation task for frame %zu, "
+           "UL symbol idx %zu, in %.2f\n",
+        frame_id, symbol_idx_ul,
+        stats->master_get_us_since(TsType::kPilotRX, demul_stats_.frame_count));
+#endif
 }
 
-void Millipede::update_rx_counters(
-    int frame_count, int frame_id, int subframe_id)
+void Millipede::update_rx_counters(int frame_count, int frame_id, int symbol_id)
 {
-    if (config_->isPilot(frame_count, subframe_id)) {
+    if (config_->isPilot(frame_count, symbol_id)) {
         if (++rx_stats_.task_pilot_count[frame_id]
             == rx_stats_.max_task_pilot_count) {
             rx_stats_.task_pilot_count[frame_id] = 0;
@@ -765,9 +736,9 @@ void Millipede::update_rx_counters(
 #if DEBUG_PRINT_PER_FRAME_START
         int prev_frame_id
             = (frame_count + TASK_BUFFER_FRAME_NUM - 1) % TASK_BUFFER_FRAME_NUM;
-        printf("Main thread: data received from frame %d, subframe %d, in %.2f "
+        printf("Main thread: data received from frame %d, symbol %d, in %.2f "
                "us. RX in prev frame: %d\n",
-            frame_count, subframe_id,
+            frame_count, symbol_id,
             stats->master_get_delta_us(
                 TsType::kPilotRX, frame_count, frame_count - 1),
             rx_stats_.task_count[prev_frame_id]);
@@ -782,8 +753,8 @@ void Millipede::update_rx_counters(
 void Millipede::print_per_frame_done(
     int task_type, int frame_count, int frame_id)
 {
-    int dl_data_subframe_num_perframe = config_->dl_data_symbol_num_perframe;
-    int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
+    int dl_data_symbol_num_perframe = config_->dl_data_symbol_num_perframe;
+    int ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
 #if DEBUG_PRINT_PER_FRAME_DONE
     switch (task_type) {
     case (PRINT_RX): {
@@ -805,7 +776,7 @@ void Millipede::print_per_frame_done(
         break;
     case (PRINT_FFT_PILOTS):
         printf("Main thread: pilot frame: %d, %d, finished FFT for all pilot "
-               "subframes in %.2f us, pilot all received: %.2f\n",
+               "symbols in %.2f us, pilot all received: %.2f\n",
             frame_count, frame_id,
             stats->master_get_delta_us(
                 TsType::kFFTDone, TsType::kPilotRX, frame_count),
@@ -814,13 +785,13 @@ void Millipede::print_per_frame_done(
         break;
     case (PRINT_FFT_DATA):
         printf("Main thread: data frame: %d, %d, finished FFT for all data "
-               "subframes in %.2f us\n",
+               "symbols in %.2f us\n",
             frame_count, frame_id,
             stats->master_get_us_since(TsType::kPilotRX, frame_count));
         break;
     case (PRINT_FFT_CAL):
         printf("Main thread: cal frame: %d, %d, finished FFT for all cal "
-               "subframes in %.2f us\n",
+               "symbols in %.2f us\n",
             frame_count, frame_id,
             stats->master_get_us_since(TsType::kPilotRX, frame_count));
         break;
@@ -835,18 +806,18 @@ void Millipede::print_per_frame_done(
             fft_queue_.size_approx());
         break;
     case (PRINT_DEMUL):
-        printf("Main thread: Demodulation done frame: %d, %d (%d UL subframes) "
+        printf("Main thread: Demodulation done frame: %d, %d (%d UL symbols) "
                "in %.2f us since ZF done, total %.2f us\n",
-            frame_count, frame_id, ul_data_subframe_num_perframe,
+            frame_count, frame_id, ul_data_symbol_num_perframe,
             stats->master_get_delta_us(
                 TsType::kDemulDone, TsType::kZFDone, frame_count),
             stats->master_get_delta_us(
                 TsType::kDemulDone, TsType::kPilotRX, frame_count));
         break;
     case (PRINT_DECODE):
-        printf("Main thread: Decoding done frame: %d, %d (%d UL subframes) in "
+        printf("Main thread: Decoding done frame: %d, %d (%d UL symbols) in "
                "%.2f us since ZF done, total %.2f us\n",
-            frame_count, frame_id, ul_data_subframe_num_perframe,
+            frame_count, frame_id, ul_data_symbol_num_perframe,
             stats->master_get_delta_us(
                 TsType::kDecodeDone, TsType::kZFDone, frame_count),
             stats->master_get_delta_us(
@@ -889,7 +860,7 @@ void Millipede::print_per_frame_done(
                 TsType::kIFFTDone, TsType::kPilotRX, frame_count));
         break;
     case (PRINT_TX_FIRST):
-        printf("Main thread: TX of first subframe done frame: %d, %d in %.2f "
+        printf("Main thread: TX of first symbol done frame: %d, %d in %.2f "
                "us since ZF done, total: %.2f us\n",
             frame_count, frame_id,
             stats->master_get_delta_us(
@@ -898,9 +869,9 @@ void Millipede::print_per_frame_done(
                 TsType::kTXProcessedFirst, TsType::kPilotRX, frame_count));
         break;
     case (PRINT_TX):
-        printf("Main thread: TX done frame: %d %d (%d DL subframes) in %.2f us "
+        printf("Main thread: TX done frame: %d %d (%d DL symbols) in %.2f us "
                "since ZF done, total: %.2f us\n",
-            frame_count, frame_id, dl_data_subframe_num_perframe,
+            frame_count, frame_id, dl_data_symbol_num_perframe,
             stats->master_get_delta_us(
                 TsType::kTXDone, TsType::kZFDone, frame_count),
             stats->master_get_delta_us(
@@ -912,63 +883,61 @@ void Millipede::print_per_frame_done(
 #endif
 }
 
-void Millipede::print_per_subframe_done(UNUSED int task_type,
-    UNUSED int frame_count, UNUSED int frame_id, UNUSED int subframe_id)
+void Millipede::print_per_symbol_done(UNUSED int task_type,
+    UNUSED int frame_count, UNUSED int frame_id, UNUSED int symbol_id)
 {
-#if DEBUG_PRINT_PER_SUBFRAME_DONE
+#if DEBUG_PRINT_PER_SYMBOL_DONE
     switch (task_type) {
     case (PRINT_FFT_PILOTS):
-        printf("Main thread: pilot FFT done frame: %d, %d, subframe: %d, num "
-               "subframes done: %d\n",
-            frame_count, frame_id, subframe_id,
+        printf("Main thread: pilot FFT done frame: %d, %d, symbol: %d, num "
+               "symbols done: %d\n",
+            frame_count, frame_id, symbol_id,
             fft_stats_.symbol_count[frame_id]);
         break;
     case (PRINT_FFT_DATA):
         printf(
-            "Main thread: data FFT done frame %d, %d, subframe %d, precoder "
+            "Main thread: data FFT done frame %d, %d, symbol %d, precoder "
             "status: %d, fft queue: %zu, zf queue: %zu, demul queue: %zu, in "
             "%.2f\n",
-            frame_count, frame_id, subframe_id,
-            zf_stats_.coded_frame == frame_id, fft_queue_.size_approx(),
-            zf_queue_.size_approx(), demul_queue_.size_approx(),
+            frame_count, frame_id, symbol_id, zf_stats_.coded_frame == frame_id,
+            fft_queue_.size_approx(), zf_queue_.size_approx(),
+            demul_queue_.size_approx(),
             stats->master_get_us_since(TsType::kPilotRX, frame_count));
         break;
     case (PRINT_RC):
-        printf("Main thread: cal symbol FFT done frame: %d, %d, subframe: %d, "
-               "num subframes done: %d\n",
-            frame_count, frame_id, subframe_id,
+        printf("Main thread: cal symbol FFT done frame: %d, %d, symbol: %d, "
+               "num symbols done: %d\n",
+            frame_count, frame_id, symbol_id,
             fft_stats_.symbol_cal_count[frame_id]);
         break;
     case (PRINT_DEMUL):
-        printf("Main thread: Demodulation done frame %d %d, subframe: %d, num "
-               "subframes done: %d in %.2f\n",
-            frame_count, frame_id, subframe_id,
+        printf("Main thread: Demodulation done frame %d %d, symbol: %d, num "
+               "symbols done: %d in %.2f\n",
+            frame_count, frame_id, symbol_id,
             demul_stats_.symbol_count[frame_id],
             stats->master_get_us_since(TsType::kPilotRX, frame_count));
         break;
-#ifdef USE_LDPC
     case (PRINT_DECODE):
-        printf("Main thread: Decoding done frame %d %d, subframe: %d, num "
-               "subframes done: %d\n",
-            frame_count, frame_id, subframe_id,
+        printf("Main thread: Decoding done frame %d %d, symbol: %d, num "
+               "symbols done: %d\n",
+            frame_count, frame_id, symbol_id,
             decode_stats_.symbol_count[frame_id]);
         break;
     case (PRINT_ENCODE):
-        printf("Main thread: Encoding done frame %d %d, subframe: %d, num "
-               "subframes done: %d\n",
-            frame_count, frame_id, subframe_id,
+        printf("Main thread: Encoding done frame %d %d, symbol: %d, num "
+               "symbols done: %d\n",
+            frame_count, frame_id, symbol_id,
             encode_stats_.symbol_count[frame_id]);
         break;
-#endif
     case (PRINT_PRECODE):
-        printf("Main thread: Precoding done frame: %d %d, subframe: %d in %.2f "
+        printf("Main thread: Precoding done frame: %d %d, symbol: %d in %.2f "
                "us\n",
-            frame_count, frame_id, subframe_id,
+            frame_count, frame_id, symbol_id,
             stats->master_get_us_since(TsType::kPilotRX, frame_count));
         break;
     case (PRINT_TX):
-        printf("Main thread: TX done frame: %d %d, subframe: %d in %.2f us\n",
-            frame_count, frame_id, subframe_id,
+        printf("Main thread: TX done frame: %d %d, symbol: %d in %.2f us\n",
+            frame_count, frame_id, symbol_id,
             stats->master_get_us_since(TsType::kPilotRX, frame_count));
         break;
     default:
@@ -978,7 +947,7 @@ void Millipede::print_per_subframe_done(UNUSED int task_type,
 }
 
 void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id,
-    UNUSED int subframe_id, UNUSED int ant_or_sc_id)
+    UNUSED int symbol_id, UNUSED int ant_or_sc_id)
 {
 #if DEBUG_PRINT_PER_TASK_DONE
     switch (task_type) {
@@ -991,36 +960,34 @@ void Millipede::print_per_task_done(UNUSED int task_type, UNUSED int frame_id,
             ant_or_sc_id);
         break;
     case (PRINT_DEMUL):
-        printf("Main thread: Demodulation done frame: %d, subframe: %d, sc: "
+        printf("Main thread: Demodulation done frame: %d, symbol: %d, sc: "
                "%d, num blocks done: %d\n",
-            frame_id, subframe_id, ant_or_sc_id,
-            demul_stats_.task_count[frame_id][subframe_id]);
+            frame_id, symbol_id, ant_or_sc_id,
+            demul_stats_.task_count[frame_id][symbol_id]);
         break;
-#ifdef USE_LDPC
     case (PRINT_DECODE):
-        printf("Main thread: Decoding done frame: %d, subframe: %d, sc: %d, "
+        printf("Main thread: Decoding done frame: %d, symbol: %d, sc: %d, "
                "num blocks done: %d\n",
-            frame_id, subframe_id, ant_or_sc_id,
-            decode_stats_.task_count[frame_id][subframe_id]);
+            frame_id, symbol_id, ant_or_sc_id,
+            decode_stats_.task_count[frame_id][symbol_id]);
         break;
-#endif
     case (PRINT_PRECODE):
-        printf("Main thread: Precoding done frame: %d, subframe: %d, "
+        printf("Main thread: Precoding done frame: %d, symbol: %d, "
                "subcarrier: %d, total SCs: %d\n",
-            frame_id, subframe_id, ant_or_sc_id,
-            precode_stats_.task_count[frame_id][subframe_id]);
+            frame_id, symbol_id, ant_or_sc_id,
+            precode_stats_.task_count[frame_id][symbol_id]);
         break;
     case (PRINT_IFFT):
-        printf("Main thread: IFFT done frame: %d, subframe: %d, antenna: %d, "
+        printf("Main thread: IFFT done frame: %d, symbol: %d, antenna: %d, "
                "total ants: %d\n",
-            frame_id, subframe_id, ant_or_sc_id,
-            ifft_stats_.task_count[frame_id][subframe_id]);
+            frame_id, symbol_id, ant_or_sc_id,
+            ifft_stats_.task_count[frame_id][symbol_id]);
         break;
     case (PRINT_TX):
-        printf("Main thread: TX done frame: %d, subframe: %d, antenna: %d, "
+        printf("Main thread: TX done frame: %d, symbol: %d, antenna: %d, "
                "total packets: %d\n",
-            frame_id, subframe_id, ant_or_sc_id,
-            tx_stats_.task_count[frame_id][subframe_id]);
+            frame_id, symbol_id, ant_or_sc_id,
+            tx_stats_.task_count[frame_id][symbol_id]);
         break;
     default:
         printf("Wrong task type in frame done print!");
@@ -1033,36 +1000,34 @@ void Millipede::initialize_queues()
 {
     using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
 
-    int data_subframe_num_perframe = config_->data_symbol_num_perframe;
-    message_queue_ = mt_queue_t(512 * data_subframe_num_perframe);
-    complete_task_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
+    message_queue_ = mt_queue_t(512 * data_symbol_num_perframe);
+    complete_task_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
 
-    fft_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    fft_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
     ptok_fft = new moodycamel::ProducerToken(fft_queue_);
 
-    zf_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    zf_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
     ptok_zf = new moodycamel::ProducerToken(zf_queue_);
 
     rc_queue_ = mt_queue_t(512 * 2 * 4);
     ptok_rc = new moodycamel::ProducerToken(rc_queue_);
 
-    demul_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    demul_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
     ptok_demul = new moodycamel::ProducerToken(demul_queue_);
 
-#ifdef USE_LDPC
-    decode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
-    ptok_decode = moodycamel::ProducerToken(decode_queue_);
-#endif
+    decode_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
+    ptok_decode = new moodycamel::ProducerToken(decode_queue_);
 
-    ifft_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    ifft_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
     ptok_ifft = new moodycamel::ProducerToken(ifft_queue_);
-#ifdef USE_LDPC
-    encode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+
+    encode_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
     ptok_encode = new moodycamel::ProducerToken(encode_queue_);
-#endif
-    precode_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+
+    precode_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
     ptok_precode = new moodycamel::ProducerToken(precode_queue_);
-    tx_queue_ = mt_queue_t(512 * data_subframe_num_perframe * 4);
+    tx_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
         64, config_->socket_thread_num * sizeof(moodycamel::ProducerToken*));
@@ -1084,7 +1049,7 @@ void Millipede::initialize_queues()
 void Millipede::initialize_uplink_buffers()
 {
     auto& cfg = config_;
-    int TASK_BUFFER_SUBFRAME_NUM
+    int TASK_BUFFER_SYMBOL_NUM
         = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
@@ -1106,21 +1071,21 @@ void Millipede::initialize_uplink_buffers()
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 
     equal_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     demod_hard_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;
-    demod_soft_buffer_.malloc(TASK_BUFFER_SUBFRAME_NUM,
+    demod_soft_buffer_.malloc(TASK_BUFFER_SYMBOL_NUM,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t num_decoded_bytes
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        TASK_BUFFER_SUBFRAME_NUM, num_decoded_bytes * cfg->UE_NUM, 64);
+        TASK_BUFFER_SYMBOL_NUM, num_decoded_bytes * cfg->UE_NUM, 64);
 
     int max_packet_num_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1132,7 +1097,7 @@ void Millipede::initialize_uplink_buffers()
         &(rx_stats_.task_pilot_count), TASK_BUFFER_FRAME_NUM, 64, 1);
     fft_created_count = 0;
     fft_stats_.init(cfg->BS_ANT_NUM, cfg->pilot_symbol_num_perframe,
-        TASK_BUFFER_FRAME_NUM, cfg->symbol_num_perframe, 64);
+        cfg->symbol_num_perframe);
     fft_stats_.max_symbol_data_count = cfg->ul_data_symbol_num_perframe;
     alloc_buffer_1d(
         &(fft_stats_.symbol_cal_count), TASK_BUFFER_FRAME_NUM, 64, 1);
@@ -1142,23 +1107,19 @@ void Millipede::initialize_uplink_buffers()
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; ++i)
         fft_stats_.cur_frame_for_symbol[i] = -1;
 
-    zf_stats_.init(config_->zf_block_num, TASK_BUFFER_FRAME_NUM, 1);
+    zf_stats_.init(config_->zf_events_per_symbol);
 
-    demul_stats_.init(config_->demul_block_num,
-        cfg->ul_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
-        cfg->data_symbol_num_perframe, 64);
+    demul_stats_.init(config_->demul_events_per_symbol,
+        cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 
-#ifdef USE_LDPC
     decode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        cfg->ul_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
-        cfg->data_symbol_num_perframe, 64);
-#endif
+        cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 }
 
 void Millipede::initialize_downlink_buffers()
 {
     auto& cfg = config_;
-    int TASK_BUFFER_SUBFRAME_NUM
+    int TASK_BUFFER_SYMBOL_NUM
         = cfg->data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     dl_socket_buffer_status_size_ = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
@@ -1169,30 +1130,23 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
     dl_ifft_buffer_.calloc(
-        cfg->BS_ANT_NUM * TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_CA_NUM, 64);
+        cfg->BS_ANT_NUM * TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.malloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.malloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-#ifdef USE_LDPC
     dl_encoded_buffer_.malloc(
-        TASK_BUFFER_SUBFRAME_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-
+        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
-        cfg->data_symbol_num_perframe, 64);
-#endif
-    precode_stats_.init(config_->demul_block_num,
-        cfg->dl_data_symbol_num_perframe, TASK_BUFFER_FRAME_NUM,
-        cfg->data_symbol_num_perframe, 64);
-
+        cfg->dl_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
+    precode_stats_.init(config_->demul_events_per_symbol,
+        cfg->dl_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
     ifft_stats_.init(cfg->BS_ANT_NUM, cfg->dl_data_symbol_num_perframe,
-        TASK_BUFFER_FRAME_NUM, cfg->data_symbol_num_perframe, 64);
-
+        cfg->data_symbol_num_perframe);
     tx_stats_.init(cfg->BS_ANT_NUM, cfg->dl_data_symbol_num_perframe,
-        TASK_BUFFER_FRAME_NUM, cfg->data_symbol_num_perframe, 64);
+        cfg->data_symbol_num_perframe);
 }
 
 void Millipede::free_uplink_buffers()
@@ -1212,11 +1166,8 @@ void Millipede::free_uplink_buffers()
     fft_stats_.fini();
     free_buffer_1d(&fft_stats_.symbol_cal_count);
     free_buffer_1d(&fft_stats_.cur_frame_for_symbol);
-    zf_stats_.fini();
     demul_stats_.fini();
-#ifdef USE_LDPC
     decode_stats_.fini();
-#endif
 }
 
 void Millipede::free_downlink_buffers()
@@ -1230,9 +1181,7 @@ void Millipede::free_downlink_buffers()
     dl_precoder_buffer_.free();
     dl_encoded_buffer_.free();
 
-#ifdef USE_LDPC
     encode_stats_.fini();
-#endif
     precode_stats_.fini();
     ifft_stats_.fini();
     tx_stats_.fini();
@@ -1249,13 +1198,13 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 
     FILE* fp = fopen(filename.c_str(), "wb");
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM)
+        int total_data_symbol_id = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * cfg->ul_data_symbol_num_perframe
             + i;
 
         for (size_t sc = 0; sc < cfg->OFDM_DATA_NUM; sc++) {
             uint8_t* ptr
-                = &demod_hard_buffer_[total_data_subframe_id][sc * cfg->UE_NUM];
+                = &demod_hard_buffer_[total_data_symbol_id][sc * cfg->UE_NUM];
             fwrite(ptr, cfg->UE_NUM, sizeof(uint8_t), fp);
         }
     }
@@ -1276,10 +1225,10 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        int total_data_subframe_id = (frame_id % TASK_BUFFER_FRAME_NUM)
+        int total_data_symbol_id = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * cfg->ul_data_symbol_num_perframe
             + i;
-        uint8_t* ptr = decoded_buffer_[total_data_subframe_id];
+        uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
         fwrite(ptr, cfg->UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
     }
     fclose(fp);
@@ -1297,12 +1246,12 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        int total_data_subframe_id
+        int total_data_symbol_id
             = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->data_symbol_num_perframe
             + i + cfg->dl_data_symbol_start;
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
-            int offset = total_data_subframe_id * cfg->BS_ANT_NUM + ant_id;
+            int offset = total_data_symbol_id * cfg->BS_ANT_NUM + ant_id;
             int packet_length = config_->packet_length;
             struct Packet* pkt
                 = (struct Packet*)(&dl_socket_buffer_[offset * packet_length]);
@@ -1316,11 +1265,11 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 
 void Millipede::getDemulData(int** ptr, int* size)
 {
-    int ul_data_subframe_num_perframe = config_->ul_data_symbol_num_perframe;
+    int ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
     size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int UE_NUM = config_->UE_NUM;
     *ptr = (int*)&demod_hard_buffer_[max_equaled_frame
-        * ul_data_subframe_num_perframe][0];
+        * ul_data_symbol_num_perframe][0];
     *size = UE_NUM * OFDM_DATA_NUM;
 }
 
