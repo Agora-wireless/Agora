@@ -75,7 +75,6 @@ void Millipede::stop()
 
 /// Enqueue a batch of task_set_size tasks starting from task index
 /// (task_set_size * task_set_id).
-/// TODO: This can be deleted once we use schedule_subcarrier_set() everywhere.
 static void schedule_task_set(EventType task_type, int task_set_size,
     int task_set_id, moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ProducerToken& producer_token)
@@ -87,6 +86,8 @@ static void schedule_task_set(EventType task_type, int task_set_size,
     }
 }
 
+/// TODO: Add schedule_users() and schedule_antennae() for tasks that schedule
+/// over users or antennas.
 /// Queue tasks with these base subcarriers:
 /// {0, sc_block_size, ..., (num_events - 1) * sc_block_size}
 static void schedule_subcarriers(EventType task_type, size_t num_events,
