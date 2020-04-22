@@ -29,7 +29,7 @@ Millipede::Millipede(Config* cfg)
     initialize_queues();
     initialize_uplink_buffers();
 
-    if (config_->downlink_mode) {
+    if (config_->dl_data_symbol_num_perframe > 0) {
         printf("Millipede: Initializing downlink buffers\n");
         initialize_downlink_buffers();
     }
@@ -61,7 +61,7 @@ Millipede::~Millipede()
 {
     free_uplink_buffers();
     /* Downlink */
-    if (config_->downlink_mode)
+    if (config_->dl_data_symbol_num_perframe > 0)
         free_downlink_buffers();
 }
 
@@ -199,7 +199,7 @@ void Millipede::start()
                             schedule_demul(frame_id, i);
                     }
 
-                    if (config_->downlink_mode) {
+                    if (config_->dl_data_symbol_num_perframe > 0) {
                         /* If downlink data transmission is enabled, schedule
                          * downlink encode/modulation for the first data
                          * symbol */
@@ -643,7 +643,8 @@ void* Millipede::worker_fft(int tid)
 
     while (true) {
         if (computeFFT->try_launch()) {
-        } else if (config_->downlink_mode && computeIFFT->try_launch()) {
+        } else if (config_->dl_data_symbol_num_perframe > 0
+            && computeIFFT->try_launch()) {
         }
     }
 }
@@ -678,7 +679,7 @@ void* Millipede::worker_demul(int tid)
         stats);
 
     while (true) {
-        if (config_->downlink_mode) {
+        if (config_->dl_data_symbol_num_perframe > 0) {
             computePrecode->try_launch();
         } else {
             computeDemul->try_launch();
