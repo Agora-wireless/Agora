@@ -42,7 +42,7 @@ DoDemul::~DoDemul()
     free_buffer_1d(&equaled_buffer_temp_transposed);
 }
 
-Event_data DoDemul::launch(int tag)
+Event_data DoDemul::launch(size_t tag)
 {
     size_t frame_id = demul_tag_t(tag).frame_id;
     size_t total_data_symbol_idx = (frame_id * cfg->ul_data_symbol_num_perframe)
@@ -51,10 +51,10 @@ Event_data DoDemul::launch(int tag)
 
     size_t start_tsc = worker_rdtsc();
 
-#if DEBUG_PRINT_IN_TASK
-    printf("In doDemul thread %d: frame: %zu, symbol: %d, subcarrier: %zu \n",
-        tid, frame_id, demul_tag_t(tag).symbol_idx_ul, base_sc_id);
-#endif
+    if (kDebugPrintInTask) {
+        printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
+            tid, frame_id, demul_tag_t(tag).symbol_idx_ul, base_sc_id);
+    }
 
     int transpose_block_size = cfg->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
@@ -190,7 +190,7 @@ Event_data DoDemul::launch(int tag)
 }
 
 // Currently unused
-Event_data DoDemul::DemulSingleSC(int offset)
+Event_data DoDemul::DemulSingleSC(size_t offset)
 {
     size_t start_tsc = worker_rdtsc();
 
@@ -200,10 +200,10 @@ Event_data DoDemul::DemulSingleSC(int offset)
     int frame_id = total_data_symbol_id / data_symbol_num_perframe;
     int current_data_symbol_id
         = total_data_symbol_id % data_symbol_num_perframe;
-#if DEBUG_PRINT_IN_TASK
-    printf("In doDemul thread %d: frame: %d, symbol: %d, subcarrier: %d \n",
-        tid, frame_id, current_data_symbol_id, sc_id);
-#endif
+    if (kDebugPrintInTask) {
+        printf("In doDemul thread %d: frame: %d, symbol: %d, subcarrier: %d \n",
+            tid, frame_id, current_data_symbol_id, sc_id);
+    }
     // int symbol_offset = symbol_num_perframe * frame_id + UE_NUM +
     // current_data_symbol_id;
 

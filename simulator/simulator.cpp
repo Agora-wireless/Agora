@@ -146,14 +146,14 @@ void Simulator::update_rx_counters(
     rx_counter_packets_[frame_id_in_buffer]++;
     if (rx_counter_packets_[frame_id_in_buffer] == 1) {
         frame_start_receive[frame_id] = get_time();
-#if DEBUG_PRINT_PER_FRAME_START
-        printf(
-            "Main thread: data received from frame %zu, symbol %zu, ant %zu, "
-            "in %.2f since tx, in %.2f us since last frame\n",
-            frame_id, symbol_id, ant_id,
-            frame_start_receive[frame_id] - frame_start_tx[frame_id],
-            frame_start_receive[frame_id] - frame_start_receive[frame_id - 1]);
-#endif
+        if (kDebugPrintPerFrameStart) {
+            printf("Main thread: data received from frame %zu, symbol %zu, ant "
+                   "%zu, in %.2f since tx, in %.2f us since last frame\n",
+                frame_id, symbol_id, ant_id,
+                frame_start_receive[frame_id] - frame_start_tx[frame_id],
+                frame_start_receive[frame_id]
+                    - frame_start_receive[frame_id - 1]);
+        }
     } else if (rx_counter_packets_[frame_id_in_buffer]
         == max_packet_num_per_frame) {
         frame_end_receive[frame_id] = get_time();
@@ -165,7 +165,8 @@ void Simulator::update_rx_counters(
 void Simulator::print_per_frame_done(
     size_t task_type, size_t frame_id, size_t frame_id_in_buffer)
 {
-#if DEBUG_PRINT_PER_FRAME_DONE
+    if (!kDebugPrintPerFrameDone)
+        return;
     switch (task_type) {
     case (PRINT_RX): {
         printf(
@@ -178,7 +179,6 @@ void Simulator::print_per_frame_done(
     default:
         printf("Wrong task type in frame done print!");
     }
-#endif
 }
 
 void Simulator::initialize_vars_from_cfg(Config* cfg)

@@ -10,6 +10,7 @@
 #include "Symbols.hpp"
 #include "memory_manage.h"
 #include <sstream>
+#include <vector>
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>
@@ -22,21 +23,30 @@ struct complex_float {
 };
 #endif
 
+// Number of bits in tags
+static constexpr size_t kSymbolIdBits = 14;
+static_assert(k5GMaxSymbolsPerFrame < (1ull << kSymbolIdBits), "");
+
+static constexpr size_t kSubcarrierBits = 13;
+static_assert(k5GMaxSubcarriers < (1ull << kSubcarrierBits), "");
+
+static constexpr size_t kFrameIdBits = (64 - (kSymbolIdBits + kSubcarrierBits));
+
 // Event data tag for RX events
 union rx_tag_t {
     struct {
-        uint32_t tid : 4; // ID of the socket thread that received the packet
-        uint32_t offset : 28; // Offset in the socket thread's RX buffer
+        size_t tid : 8; // ID of the socket thread that received the packet
+        size_t offset : 56; // Offset in the socket thread's RX buffer
     };
-    int _tag;
+    size_t _tag;
 
-    rx_tag_t(uint32_t tid, uint32_t offset)
+    rx_tag_t(size_t tid, size_t offset)
         : tid(tid)
         , offset(offset)
     {
     }
 
-    rx_tag_t(int _tag)
+    rx_tag_t(size_t _tag)
         : _tag(_tag)
     {
     }
@@ -48,18 +58,18 @@ using fft_req_tag_t = rx_tag_t;
 // Event data tag for FFT responses responses
 union fft_resp_tag_t {
     struct {
-        uint32_t frame_id : 16;
-        uint32_t symbol_id : 16;
+        size_t frame_id : kFrameIdBits;
+        size_t symbol_id : kSymbolIdBits;
     };
-    int _tag;
+    size_t _tag;
 
-    fft_resp_tag_t(uint32_t frame_id, uint32_t symbol_id)
+    fft_resp_tag_t(size_t frame_id, size_t symbol_id)
         : frame_id(frame_id)
         , symbol_id(symbol_id)
     {
     }
 
-    fft_resp_tag_t(int _tag)
+    fft_resp_tag_t(size_t _tag)
         : _tag(_tag)
     {
     }
@@ -68,63 +78,64 @@ union fft_resp_tag_t {
 // Event data tag for ZF requests and responses
 union zf_tag_t {
     struct {
-        uint32_t frame_id : 16;
+        size_t frame_id : kFrameIdBits;
 
         // The Doer handling this tag will process the batch of subcarriers
         // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
-        uint32_t base_sc_id : 16;
+        size_t base_sc_id : kSubcarrierBits;
     };
-    int _tag;
+    size_t _tag;
 
-    zf_tag_t(uint32_t frame_id, uint32_t base_sc_id)
+    zf_tag_t(size_t frame_id, size_t base_sc_id)
         : frame_id(frame_id)
         , base_sc_id(base_sc_id)
     {
     }
 
-    zf_tag_t(int _tag)
+    zf_tag_t(size_t _tag)
         : _tag(_tag)
     {
     }
 };
-static_assert(sizeof(zf_tag_t) == sizeof(int), "");
+static_assert(sizeof(zf_tag_t) == sizeof(size_t), "");
 
 // Event data tag for demodulation requests and responses
 union demul_tag_t {
     struct {
-        uint32_t frame_id : 9;
+        size_t frame_id : kFrameIdBits;
 
-        // Index of this symbol among this frame's uplink symbols
-        uint32_t symbol_idx_ul : 9;
+        // Index of this symbol among this frame's uplink symbols.
+        size_t symbol_idx_ul : kSymbolIdBits;
 
         // The Doer handling this tag will process the batch of subcarriers
         // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
-        uint32_t base_sc_id : 14;
+        size_t base_sc_id : kSubcarrierBits;
     };
-    int _tag;
+    size_t _tag;
 
-    demul_tag_t(uint32_t frame_id, uint32_t symbol_idx_ul, uint32_t base_sc_id)
+    demul_tag_t(size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id)
         : frame_id(frame_id)
         , symbol_idx_ul(symbol_idx_ul)
         , base_sc_id(base_sc_id)
     {
     }
 
-    demul_tag_t(int _tag)
+    demul_tag_t(size_t _tag)
         : _tag(_tag)
     {
     }
 };
-static_assert(sizeof(demul_tag_t) == sizeof(int), "");
+static_assert(sizeof(demul_tag_t) == sizeof(size_t), "");
 
 /**
  * Millipede uses these event messages for communication between threads. Each
  * tag encodes information about a task.
  */
 struct Event_data {
+    static constexpr size_t kMaxTags = 7;
     EventType event_type;
     uint32_t num_tags;
-    int tags[14];
+    size_t tags[7];
 
     // Initialize and event with only the event type field set
     Event_data(EventType event_type)
@@ -134,7 +145,7 @@ struct Event_data {
     }
 
     // Create an event with one tag
-    Event_data(EventType event_type, int tag)
+    Event_data(EventType event_type, size_t tag)
         : event_type(event_type)
         , num_tags(1)
     {
@@ -173,17 +184,16 @@ struct Packet {
 };
 
 struct RX_stats {
-    int* task_count;
-    int* task_pilot_count;
-    // int frame_count = 0;
-    int max_task_count;
-    int max_task_pilot_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> task_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> task_pilot_count;
+    size_t max_task_count; // Max packets per frame
+    size_t max_task_pilot_count; // Max pilot packets per frame
 };
 
 struct Frame_stats {
     size_t frame_count;
-    int symbol_count[TASK_BUFFER_FRAME_NUM];
-    int max_symbol_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_count;
+    size_t max_symbol_count;
     bool last_symbol(int frame_id)
     {
         if (++symbol_count[frame_id] == max_symbol_count) {
@@ -195,7 +205,7 @@ struct Frame_stats {
     void init(int _max_symbol_count)
     {
         frame_count = 0;
-        memset(symbol_count, 0, TASK_BUFFER_FRAME_NUM * sizeof(int));
+        symbol_count.fill(0);
         max_symbol_count = _max_symbol_count;
     }
     void update_frame_count() { frame_count++; }
@@ -203,7 +213,7 @@ struct Frame_stats {
 
 struct ZF_stats : public Frame_stats {
     int coded_frame;
-    int& max_task_count;
+    size_t& max_task_count;
     ZF_stats(void)
         : max_task_count(max_symbol_count)
     {
@@ -242,13 +252,13 @@ struct Data_stats : public Frame_stats {
 };
 
 struct FFT_stats : public Data_stats {
-    int max_symbol_data_count;
-    int* symbol_cal_count;
-    int max_symbol_cal_count;
+    size_t max_symbol_data_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_cal_count;
+    size_t max_symbol_cal_count;
 
     // cur_frame_for_symbol[i] is the current frame for the symbol whose
     // index in the frame's uplink symbols is i
-    int* cur_frame_for_symbol;
+    std::vector<size_t> cur_frame_for_symbol;
 };
 
 struct RC_stats {

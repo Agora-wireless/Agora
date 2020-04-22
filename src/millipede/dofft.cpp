@@ -97,7 +97,7 @@ DoFFT::~DoFFT()
     fft_buffer_.FFT_outputs.free();
 }
 
-Event_data DoFFT::launch(int tag)
+Event_data DoFFT::launch(size_t tag)
 {
     size_t start_tsc = worker_rdtsc();
 
@@ -159,10 +159,10 @@ Event_data DoFFT::launch(int tag)
     }
     size_t start_tsc_part3 = worker_rdtsc();
 
-#if DEBUG_PRINT_IN_TASK
-    printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
-        frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
-#endif
+    if (kDebugPrintInTask) {
+        printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
+            frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
+    }
 
     if (cur_symbol_type == SymbolType::kPilot) {
         int pilot_id = cfg->getPilotSFIndex(frame_id, symbol_id);
@@ -296,19 +296,19 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
-Event_data DoIFFT::launch(int offset)
+Event_data DoIFFT::launch(size_t offset)
 {
     size_t start_tsc = worker_rdtsc();
 
-#if DEBUG_PRINT_IN_TASK
-    int ant_id = offset % cfg->BS_ANT_NUM;
-    int total_data_symbol_id = offset / cfg->BS_ANT_NUM;
-    int frame_id = total_data_symbol_id / cfg->data_symbol_num_perframe;
-    int current_data_symbol_id
-        = total_data_symbol_id % cfg->data_symbol_num_perframe;
-    printf("In doIFFT thread %d: frame: %d, symbol: %d, antenna: %d\n", tid,
-        frame_id, current_data_symbol_id, ant_id);
-#endif
+    if (kDebugPrintInTask) {
+        int ant_id = offset % cfg->BS_ANT_NUM;
+        int total_data_symbol_id = offset / cfg->BS_ANT_NUM;
+        int frame_id = total_data_symbol_id / cfg->data_symbol_num_perframe;
+        int current_data_symbol_id
+            = total_data_symbol_id % cfg->data_symbol_num_perframe;
+        printf("In doIFFT thread %d: frame: %d, symbol: %d, antenna: %d\n", tid,
+            frame_id, current_data_symbol_id, ant_id);
+    }
 
     int dl_ifft_buffer_size = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
         * TASK_BUFFER_FRAME_NUM;

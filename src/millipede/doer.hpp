@@ -33,7 +33,7 @@ public:
     }
 
 protected:
-    virtual Event_data launch(int tag) = 0;
+    virtual Event_data launch(size_t tag) = 0;
     Doer(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
