@@ -327,6 +327,7 @@ void Config::genData()
         ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
     ul_IQ_symbol.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
+    ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
@@ -363,6 +364,15 @@ void Config::genData()
                           (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
             }
         }
+    }
+
+    auto zc_pilot_double
+         = CommsLib::getSequence(CommsLib::LTE_ZADOFF_CHU, OFDM_DATA_NUM);
+    auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
+    for (size_t i = 0; i < UE_ANT_NUM; i++) {
+       auto zc_pilot_i = CommsLib::seqCyclicShift(zc_pilot, i * (float)M_PI / 6); // LTE DMRS
+       for (size_t j = 0; j < OFDM_DATA_NUM; j++)
+           ue_specific_pilot[i][j] = {zc_pilot_i[j].real(), zc_pilot_i[j].imag()};
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {

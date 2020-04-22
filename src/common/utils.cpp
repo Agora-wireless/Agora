@@ -70,6 +70,16 @@ std::vector<std::complex<int16_t>> Utils::double_to_cint16(
     return out;
 }
 
+std::vector<std::complex<float>> Utils::double_to_cfloat(
+    std::vector<std::vector<double>> in)
+{
+    int len = in[0].size();
+    std::vector<std::complex<float>> out(len, 0);
+    for (int i = 0; i < len; i++)
+        out[i] = std::complex<float>(in[0][i], in[1][i]);
+    return out;
+}
+
 std::vector<std::complex<float>> Utils::uint32tocfloat(
     std::vector<uint32_t> in, const std::string& order)
 {

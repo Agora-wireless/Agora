@@ -40,8 +40,6 @@ public:
     size_t mod_order;
 
     std::string conf;
-    // std::string beacon_file;
-    // std::string coeffs_file;
     std::string pilot_file;
     std::string serial_file;
     std::string hub_file;
@@ -83,6 +81,7 @@ public:
     Table<complex_float> ul_IQ_modul;
     Table<std::complex<int16_t>> dl_IQ_symbol;
     Table<std::complex<int16_t>> ul_IQ_symbol;
+    Table<std::complex<float>> ue_specific_pilot;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
