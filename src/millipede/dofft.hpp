@@ -64,7 +64,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(int tag);
+    Event_data launch(size_t tag);
 
     void simd_store_to_buf(
         float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type);
@@ -114,7 +114,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(int offset);
+    Event_data launch(size_t offset);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;
