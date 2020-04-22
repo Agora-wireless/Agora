@@ -373,9 +373,13 @@ void RU::taskThread(int tid)
                         = tx_symbol_id * config_->getNumAntennas() + ant_id;
                     void* txbuf[2];
 #if DEBUG_UPLINK
-                    for (size_t ch = 0; ch < config_->nChannels; ++ch)
+                    for (size_t ch = 0; ch < config_->nChannels; ++ch) {
+                        if (tx_symbol_id < config_->UL_PILOT_SYMS)
+                            txbuf[ch] = (void*)config_
+                                > ue_specific_pilot_t[ant_id + ch];
                         txbuf[ch]
                             = (void*)config_->ul_IQ_symbol[tx_ant_offset + ch];
+                    }
 #else
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
                     int tx_offset = tx_frame_offset * frame_samp_size
