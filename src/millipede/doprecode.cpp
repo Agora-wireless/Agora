@@ -117,6 +117,7 @@ Event_data DoPrecode::launch(int offset)
             // cout << "Precoder: \n" << mat_precoder << endl;
             // cout << "Data: \n" << mat_data << endl;
             // cout << "Precoded data: \n" << mat_precoded << endl;
+            duration_stat->task_count++;
         }
         duration_stat->task_duration[2] += worker_rdtsc() - start_tsc1;
     }
@@ -139,7 +140,7 @@ Event_data DoPrecode::launch(int offset)
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    duration_stat->task_count++;
+    // duration_stat->task_count++;
 
 #if DEBUG_PRINT_IN_TASK
     printf("In doPrecode thread %d: finished frame: %d, symbol: %d, "
