@@ -220,7 +220,7 @@ std::vector<float> CommsLib::magnitudeFFT(
     }
     std::reverse(
         fftMag.begin(), fftMag.end()); // not sure why we need reverse here, but
-        // this seems to give the right spectrum
+    // this seems to give the right spectrum
     return fftMag;
 }
 
@@ -477,6 +477,16 @@ std::vector<std::complex<float>> CommsLib::modulate(
         // Not Supported
         std::cout << "Modulation Type " << type << " not supported!"
                   << std::endl;
+    }
+    return out;
+}
+
+std::vector<std::complex<float>> CommsLib::seqCyclicShift(
+    std::vector<std::complex<float>> in, float alpha)
+{
+    std::vector<std::complex<float>> out(in.size(), 0);
+    for (size_t i = 0; i < in.size(); i++) {
+        out[i] = in[i] * std::exp(std::complex<float>(0, i * alpha));
     }
     return out;
 }
