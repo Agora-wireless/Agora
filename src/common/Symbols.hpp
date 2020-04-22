@@ -174,6 +174,9 @@ static constexpr size_t k5GMaxSymbolsPerFrame = 4480;
 // Maximum number of OFDM subcarriers in the 5G spec
 static constexpr size_t k5GMaxSubcarriers = 3300;
 
+// Maximum number of antennas supported by Millipede
+static constexpr size_t kMaxAntennas = 64;
+
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
 

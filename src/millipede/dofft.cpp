@@ -211,10 +211,8 @@ Event_data DoFFT::launch(size_t tag)
     }
 
     /* Inform main thread */
-    return Event_data(EventType::kFFT,
-        gen_tag_t(
-            frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, kInvalidSubcarrierId)
-            ._tag);
+    auto ret = gen_tag_t::frm_sym(frame_id % TASK_BUFFER_FRAME_NUM, symbol_id);
+    return Event_data(EventType::kFFT, ret._tag);
 }
 
 void DoFFT::simd_store_to_buf(
