@@ -239,7 +239,8 @@ void Millipede::start()
                     max_equaled_frame = frame_id;
                     if (kUseLDPC) {
                         schedule_task_set(EventType::kDecode,
-                            config_->demul_events_per_symbol,
+                            config_->LDPC_config.nblocksInSymbol
+                                    * cfg->UE_NUM,
                             total_data_symbol_idx, decode_queue_, *ptok_decode);
                     }
                     print_per_symbol_done(PRINT_DEMUL, demul_stats_.frame_count,
