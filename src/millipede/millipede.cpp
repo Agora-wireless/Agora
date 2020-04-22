@@ -592,8 +592,8 @@ void* Millipede::worker(int tid)
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz, demul_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-        precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_,
-        stats);
+        precoder_buffer_, ue_phase_rotation_buffer_, equal_buffer_, demod_hard_buffer_,
+        demod_soft_buffer_, stats);
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], dl_precoder_buffer_,
@@ -670,8 +670,8 @@ void* Millipede::worker_demul(int tid)
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz, demul_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-        precoder_buffer_, equal_buffer_, demod_hard_buffer_, demod_soft_buffer_,
-        stats);
+        precoder_buffer_, ue_phase_rotation_buffer_, equal_buffer_, demod_hard_buffer_,
+        demod_soft_buffer_, stats);
 
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
@@ -1077,6 +1077,7 @@ void Millipede::initialize_uplink_buffers()
 
     equal_buffer_.malloc(
         TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    ue_phase_rotation_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_NUM, 64);
     demod_hard_buffer_.malloc(
         TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;

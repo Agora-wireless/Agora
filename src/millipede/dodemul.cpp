@@ -6,19 +6,20 @@
 #include "dodemul.hpp"
 #include "concurrent_queue_wrapper.hpp"
 
-using namespace arma;
 DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_data_buffer,
     Table<complex_float>& in_precoder_buffer,
+    Table<complex_float>& in_pilot_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
+    , pilot_buffer_(in_pilot_buffer)
     , equal_buffer_(in_equal_buffer)
     , demod_hard_buffer_(in_demod_hard_buffer)
     , demod_soft_buffer_(in_demod_soft_buffer)
@@ -31,6 +32,10 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
         &equaled_buffer_temp, cfg->demul_block_size * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(&equaled_buffer_temp_transposed,
         cfg->demul_block_size * cfg->UE_NUM, 64, 0);
+
+    cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
+    cx_fmat mat_pilot_data(ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
+    ue_pilot_data = mat_pilot_data.st();
 
     ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
 }
@@ -45,8 +50,9 @@ DoDemul::~DoDemul()
 Event_data DoDemul::launch(int tag)
 {
     size_t frame_id = demul_tag_t(tag).frame_id;
+    size_t symbol_id = demul_tag_t(tag).symbol_idx_ul;
     size_t total_data_symbol_idx = (frame_id * cfg->ul_data_symbol_num_perframe)
-        + demul_tag_t(tag).symbol_idx_ul;
+        + symbol_id;
     size_t base_sc_id = demul_tag_t(tag).base_sc_id;
 
     size_t start_tsc = worker_rdtsc();
@@ -124,6 +130,11 @@ Event_data DoDemul::launch(int tag)
             size_t start_tsc2 = worker_rdtsc();
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
+	    if (symbol_id < cfg->UL_PILOT_SYMS) {
+                cx_float* phase_shift_ptr = (cx_float*)pilot_buffer_[frame_id];
+                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
+		mat_phase_shift += conj(mat_equaled) % ue_pilot_data.col(cur_sc_id);
+            }
 
             size_t start_tsc3 = worker_rdtsc();
             duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
