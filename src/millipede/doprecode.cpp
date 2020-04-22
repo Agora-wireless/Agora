@@ -113,7 +113,7 @@ Event_data DoPrecode::launch(int offset)
 
             // printf("In doPrecode thread %d: frame: %d, symbol: %d, "
             //        "subcarrier: % d\n ",
-            //     tid, frame_id, current_data_symbol_id, sc_id);
+            //     tid, frame_id, current_data_symbol_id, cur_sc_id);
             // cout << "Precoder: \n" << mat_precoder << endl;
             // cout << "Data: \n" << mat_data << endl;
             // cout << "Precoded data: \n" << mat_precoded << endl;
