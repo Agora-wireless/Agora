@@ -48,35 +48,63 @@ using fft_req_tag_t = rx_tag_t;
 
 // Number of bits in the generic 3D tag type
 static constexpr size_t kSymbolIdBits = 14;
-static constexpr size_t kInvalidSymbolId = (1ull << kSymbolIdBits) - 1;
-static_assert(k5GMaxSymbolsPerFrame < kInvalidSymbolId, "");
+static constexpr size_t kBlankSymbolId = (1ull << kSymbolIdBits) - 1;
+static_assert(k5GMaxSymbolsPerFrame < kBlankSymbolId, "");
 
-static constexpr size_t kSubcarrierBits = 13;
-static constexpr size_t kInvalidSubcarrierId = (1ull << kSubcarrierBits) - 1;
-static_assert(k5GMaxSubcarriers < kInvalidSymbolId - 1, "");
+static constexpr size_t kSubcarrierIdBits = 13;
+static constexpr size_t kBlankSubcarrierId = (1ull << kSubcarrierIdBits) - 1;
+static_assert(k5GMaxSubcarriers < kBlankSymbolId - 1, "");
 
-static constexpr size_t kFrameIdBits = (64 - (kSymbolIdBits + kSubcarrierBits));
+static constexpr size_t kAntennaIdBits = 9;
+static constexpr size_t kBlankAntennaId = (1ull << kAntennaIdBits) - 1;
+static_assert(kMaxAntennas < kBlankAntennaId - 1, "");
+
+static constexpr size_t kFrameIdBits
+    = (64 - (kSymbolIdBits + kSubcarrierIdBits + kAntennaIdBits));
 
 // A generic tag type for Millipede tasks
 union gen_tag_t {
     struct {
+        size_t ant_id : kAntennaIdBits;
         size_t frame_id : kFrameIdBits;
         size_t symbol_id : kSymbolIdBits;
-        size_t base_sc_id : kSubcarrierBits;
+        size_t sc_id : kSubcarrierIdBits;
     };
 
     size_t _tag;
 
-    gen_tag_t(size_t frame_id, size_t symbol_id, size_t base_sc_id)
-        : frame_id(frame_id)
+    gen_tag_t(size_t ant_id, size_t frame_id, size_t symbol_id, size_t sc_id)
+        : ant_id(ant_id)
+        , frame_id(frame_id)
         , symbol_id(symbol_id)
-        , base_sc_id(base_sc_id)
+        , sc_id(sc_id)
     {
     }
 
     gen_tag_t(size_t _tag)
         : _tag(_tag)
     {
+    }
+
+    // Generate a tag with frame ID, symbol ID, and subcarrier ID bits set and
+    // other fields blank
+    static gen_tag_t frm_sym_sc(size_t frame_id, size_t symbol_id, size_t sc_id)
+    {
+        return gen_tag_t(kBlankAntennaId, frame_id, symbol_id, sc_id);
+    }
+
+    // Generate a tag with frame ID and subcarrier ID bits set, and other fields
+    // blank
+    static gen_tag_t frm_sc(size_t frame_id, size_t sc_id)
+    {
+        return gen_tag_t(kBlankAntennaId, frame_id, kBlankSymbolId, sc_id);
+    }
+
+    // Generate a tag with frame ID and symbol ID bits set, and other fields
+    // blank
+    static gen_tag_t frm_sym(size_t frame_id, size_t sym_id)
+    {
+        return gen_tag_t(kBlankAntennaId, frame_id, sym_id, kBlankSubcarrierId);
     }
 };
 static_assert(sizeof(gen_tag_t) == sizeof(size_t), "");

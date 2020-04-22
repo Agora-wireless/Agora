@@ -69,7 +69,7 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
 void DoZF::ZF_time_orthogonal(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
+    size_t base_sc_id = gen_tag_t(tag).sc_id;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
             frame_id, base_sc_id);
@@ -151,7 +151,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
 void DoZF::ZF_freq_orthogonal(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
+    size_t base_sc_id = gen_tag_t(tag).sc_id;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n",
             tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
@@ -216,7 +216,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
 void DoZF::Predict(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
+    size_t base_sc_id = gen_tag_t(tag).sc_id;
 
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm

@@ -95,11 +95,11 @@ static void schedule_subcarriers(EventType task_type, size_t num_events,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ProducerToken& producer_token)
 {
-    assert(base_tag.base_sc_id == 0);
+    assert(base_tag.sc_id == 0);
     for (size_t i = 0; i < num_events; i++) {
         try_enqueue_fallback(
             task_queue, producer_token, Event_data(task_type, base_tag._tag));
-        base_tag.base_sc_id += sc_block_size;
+        base_tag.sc_id += sc_block_size;
     }
 }
 
@@ -216,8 +216,8 @@ void Millipede::start()
                             schedule_subcarriers(EventType::kDemul,
                                 config_->demul_events_per_symbol,
                                 config_->demul_block_size,
-                                gen_tag_t(frame_id, i, 0), demul_queue_,
-                                *ptok_demul);
+                                gen_tag_t::frm_sym_sc(frame_id, i, 0),
+                                demul_queue_, *ptok_demul);
                         }
                     }
 
@@ -247,7 +247,7 @@ void Millipede::start()
             case EventType::kDemul: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-                size_t base_sc_id = gen_tag_t(event.tags[0]).base_sc_id;
+                size_t base_sc_id = gen_tag_t(event.tags[0]).sc_id;
 
                 size_t total_data_symbol_idx
                     = (frame_id * cfg->ul_data_symbol_num_perframe)
@@ -557,8 +557,7 @@ void Millipede::handle_event_fft(size_t tag)
 
                     schedule_subcarriers(EventType::kZF,
                         config_->zf_events_per_symbol, config_->zf_block_size,
-                        gen_tag_t(frame_id, kInvalidSymbolId, 0), zf_queue_,
-                        *ptok_zf);
+                        gen_tag_t::frm_sc(frame_id, 0), zf_queue_, *ptok_zf);
                 }
             }
         } else if (config_->isUplink(frame_id, symbol_id)) {
@@ -570,8 +569,8 @@ void Millipede::handle_event_fft(size_t tag)
             if (zf_stats_.coded_frame == frame_id) {
                 schedule_subcarriers(EventType::kDemul,
                     config_->demul_events_per_symbol, config_->demul_block_size,
-                    gen_tag_t(frame_id, symbol_idx_ul, 0), demul_queue_,
-                    *ptok_demul);
+                    gen_tag_t::frm_sym_sc(frame_id, symbol_idx_ul, 0),
+                    demul_queue_, *ptok_demul);
             }
         } else if (config_->isCalDlPilot(frame_id, symbol_id)
             || config_->isCalUlPilot(frame_id, symbol_id)) {
