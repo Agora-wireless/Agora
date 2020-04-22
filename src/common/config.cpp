@@ -329,6 +329,7 @@ void Config::genData()
     ul_IQ_symbol.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
+    ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
@@ -374,6 +375,9 @@ void Config::genData()
        auto zc_pilot_i = CommsLib::seqCyclicShift(zc_pilot, i * (float)M_PI / 6); // LTE DMRS
        for (size_t j = 0; j < OFDM_DATA_NUM; j++)
            ue_specific_pilot[i][j] = {zc_pilot_i[j].real(), zc_pilot_i[j].imag()};
+       memcpy(ue_specific_pilot_t[i] + prefix + CP_LEN + OFDM_DATA_START, ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
+       CommsLib::IFFT(ue_specific_pilot_t[i] + prefix + CP_LEN, OFDM_CA_NUM);
+       memcpy(ue_specific_pilot_t[i] + prefix, ue_specific_pilot_t[i] + prefix + OFDM_CA_NUM, CP_LEN * sizeof(complex_float));
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {
