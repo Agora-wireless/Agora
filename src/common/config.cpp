@@ -369,7 +369,7 @@ void Config::genData()
     }
 
     auto zc_pilot_double
-         = CommsLib::getSequence(CommsLib::LTE_ZADOFF_CHU, OFDM_DATA_NUM);
+         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
        auto zc_pilot_i = CommsLib::seqCyclicShift(zc_pilot, i * (float)M_PI / 6); // LTE DMRS
