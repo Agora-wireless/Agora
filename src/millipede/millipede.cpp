@@ -74,7 +74,8 @@ void Millipede::stop()
 }
 
 /// Enqueue a batch of task_set_size tasks starting from task index
-/// (task_set_size * task_set_id)
+/// (task_set_size * task_set_id).
+/// TODO: This can be deleted once we use schedule_subcarrier_set() everywhere.
 static void schedule_task_set(EventType task_type, int task_set_size,
     int task_set_id, moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ProducerToken& producer_token)
@@ -83,6 +84,21 @@ static void schedule_task_set(EventType task_type, int task_set_size,
     for (int i = 0; i < task_set_size; i++) {
         try_enqueue_fallback(task_queue, producer_token, task);
         task.tags[0]++;
+    }
+}
+
+/// Queue tasks with these base subcarriers:
+/// {0, sc_block_size, ..., (num_events - 1) * sc_block_size}
+static void schedule_subcarriers(EventType task_type, size_t num_events,
+    size_t sc_block_size, fss_tag_t base_tag,
+    moodycamel::ConcurrentQueue<Event_data>& task_queue,
+    moodycamel::ProducerToken& producer_token)
+{
+    assert(base_tag.base_sc_id == 0);
+    for (size_t i = 0; i < num_events; i++) {
+        try_enqueue_fallback(
+            task_queue, producer_token, Event_data(task_type, base_tag._tag));
+        base_tag.base_sc_id += sc_block_size;
     }
 }
 
@@ -181,7 +197,7 @@ void Millipede::start()
             } break;
 
             case EventType::kZF: {
-                size_t frame_id = zf_tag_t(event.tags[0]).frame_id;
+                size_t frame_id = fss_tag_t(event.tags[0]).frame_id;
                 print_per_task_done(
                     PRINT_ZF, frame_id, 0, zf_stats_.symbol_count[frame_id]);
                 if (zf_stats_.last_symbol(frame_id)) {
@@ -195,8 +211,13 @@ void Millipede::start()
                     /* If all the data in a frame has arrived when ZF is done */
                     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe;
                          i++) {
-                        if (fft_stats_.cur_frame_for_symbol[i] == frame_id)
-                            schedule_demul(frame_id, i);
+                        if (fft_stats_.cur_frame_for_symbol[i] == frame_id) {
+                            schedule_subcarriers(EventType::kDemul,
+                                config_->demul_events_per_symbol,
+                                config_->demul_block_size,
+                                fss_tag_t(frame_id, i, 0), demul_queue_,
+                                *ptok_demul);
+                        }
                     }
 
                     if (config_->dl_data_symbol_num_perframe > 0) {
@@ -223,9 +244,9 @@ void Millipede::start()
             } break;
 
             case EventType::kDemul: {
-                size_t frame_id = demul_tag_t(event.tags[0]).frame_id;
-                size_t symbol_idx_ul = demul_tag_t(event.tags[0]).symbol_idx_ul;
-                size_t base_sc_id = demul_tag_t(event.tags[0]).base_sc_id;
+                size_t frame_id = fss_tag_t(event.tags[0]).frame_id;
+                size_t symbol_idx_ul = fss_tag_t(event.tags[0]).symbol_id;
+                size_t base_sc_id = fss_tag_t(event.tags[0]).base_sc_id;
 
                 size_t total_data_symbol_idx
                     = (frame_id * cfg->ul_data_symbol_num_perframe)
@@ -514,8 +535,8 @@ finish:
 
 void Millipede::handle_event_fft(size_t tag)
 {
-    int frame_id = fft_resp_tag_t(tag).frame_id;
-    int symbol_id = fft_resp_tag_t(tag).symbol_id;
+    int frame_id = fss_tag_t(tag).frame_id;
+    int symbol_id = fss_tag_t(tag).symbol_id;
 
     if (fft_stats_.last_task(frame_id, symbol_id)) {
         if (config_->isPilot(frame_id, symbol_id)) {
@@ -533,12 +554,10 @@ void Millipede::handle_event_fft(size_t tag)
                         PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                     fft_stats_.update_frame_count();
 
-                    zf_tag_t tag(frame_id, 0 /* base subcarrier ID */);
-                    for (size_t i = 0; i < config_->zf_events_per_symbol; i++) {
-                        try_enqueue_fallback(zf_queue_, *ptok_zf,
-                            Event_data(EventType::kZF, tag._tag));
-                        tag.base_sc_id += config_->zf_block_size;
-                    }
+                    schedule_subcarriers(EventType::kZF,
+                        config_->zf_events_per_symbol, config_->zf_block_size,
+                        fss_tag_t(frame_id, kInvalidSymbolId, 0), zf_queue_,
+                        *ptok_zf);
                 }
             }
         } else if (config_->isUplink(frame_id, symbol_id)) {
@@ -547,8 +566,12 @@ void Millipede::handle_event_fft(size_t tag)
             print_per_symbol_done(PRINT_FFT_DATA, fft_stats_.frame_count - 1,
                 frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
-            if (zf_stats_.coded_frame == frame_id)
-                schedule_demul(frame_id, symbol_idx_ul);
+            if (zf_stats_.coded_frame == frame_id) {
+                schedule_subcarriers(EventType::kDemul,
+                    config_->demul_events_per_symbol, config_->demul_block_size,
+                    fss_tag_t(frame_id, symbol_idx_ul, 0), demul_queue_,
+                    *ptok_demul);
+            }
         } else if (config_->isCalDlPilot(frame_id, symbol_id)
             || config_->isCalUlPilot(frame_id, symbol_id)) {
             print_per_symbol_done(
@@ -700,24 +723,6 @@ void Millipede::create_threads(
             perror("task thread create failed");
             exit(0);
         }
-    }
-}
-
-void Millipede::schedule_demul(size_t frame_id, size_t symbol_idx_ul)
-{
-    demul_tag_t tag(frame_id, symbol_idx_ul, 0 /* base subcarrier ID */);
-    for (size_t i = 0; i < config_->demul_events_per_symbol; i++) {
-        try_enqueue_fallback(
-            demul_queue_, *ptok_demul, Event_data(EventType::kDemul, tag._tag));
-        tag.base_sc_id += config_->demul_block_size;
-    }
-
-    if (kDebugPrintPerSymbolEnterQueue) {
-        printf("Main thread: created Demodulation task for frame %zu, "
-               "UL symbol idx %zu, in %.2f\n",
-            frame_id, symbol_idx_ul,
-            stats->master_get_us_since(
-                TsType::kPilotRX, demul_stats_.frame_count));
     }
 }
 

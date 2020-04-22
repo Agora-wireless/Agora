@@ -23,15 +23,6 @@ struct complex_float {
 };
 #endif
 
-// Number of bits in tags
-static constexpr size_t kSymbolIdBits = 14;
-static_assert(k5GMaxSymbolsPerFrame < (1ull << kSymbolIdBits), "");
-
-static constexpr size_t kSubcarrierBits = 13;
-static_assert(k5GMaxSubcarriers < (1ull << kSubcarrierBits), "");
-
-static constexpr size_t kFrameIdBits = (64 - (kSymbolIdBits + kSubcarrierBits));
-
 // Event data tag for RX events
 union rx_tag_t {
     struct {
@@ -55,77 +46,40 @@ union rx_tag_t {
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
 
-// Event data tag for FFT responses responses
-union fft_resp_tag_t {
+// Number of bits in the generic 3D tag type
+static constexpr size_t kSymbolIdBits = 14;
+static constexpr size_t kInvalidSymbolId = (1ull << kSymbolIdBits) - 1;
+static_assert(k5GMaxSymbolsPerFrame < kInvalidSymbolId, "");
+
+static constexpr size_t kSubcarrierBits = 13;
+static constexpr size_t kInvalidSubcarrierId = (1ull << kSubcarrierBits) - 1;
+static_assert(k5GMaxSubcarriers < kInvalidSymbolId - 1, "");
+
+static constexpr size_t kFrameIdBits = (64 - (kSymbolIdBits + kSubcarrierBits));
+
+// A generic tag type for Millipede tasks
+union fss_tag_t {
     struct {
         size_t frame_id : kFrameIdBits;
         size_t symbol_id : kSymbolIdBits;
+        size_t base_sc_id : kSubcarrierBits;
     };
+
     size_t _tag;
 
-    fft_resp_tag_t(size_t frame_id, size_t symbol_id)
+    fss_tag_t(size_t frame_id, size_t symbol_id, size_t base_sc_id)
         : frame_id(frame_id)
         , symbol_id(symbol_id)
-    {
-    }
-
-    fft_resp_tag_t(size_t _tag)
-        : _tag(_tag)
-    {
-    }
-};
-
-// Event data tag for ZF requests and responses
-union zf_tag_t {
-    struct {
-        size_t frame_id : kFrameIdBits;
-
-        // The Doer handling this tag will process the batch of subcarriers
-        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
-        size_t base_sc_id : kSubcarrierBits;
-    };
-    size_t _tag;
-
-    zf_tag_t(size_t frame_id, size_t base_sc_id)
-        : frame_id(frame_id)
         , base_sc_id(base_sc_id)
     {
     }
 
-    zf_tag_t(size_t _tag)
+    fss_tag_t(size_t _tag)
         : _tag(_tag)
     {
     }
 };
-static_assert(sizeof(zf_tag_t) == sizeof(size_t), "");
-
-// Event data tag for demodulation requests and responses
-union demul_tag_t {
-    struct {
-        size_t frame_id : kFrameIdBits;
-
-        // Index of this symbol among this frame's uplink symbols.
-        size_t symbol_idx_ul : kSymbolIdBits;
-
-        // The Doer handling this tag will process the batch of subcarriers
-        // {base_sc_id, ..., base_sc_id + config.zf_block_size - 1}
-        size_t base_sc_id : kSubcarrierBits;
-    };
-    size_t _tag;
-
-    demul_tag_t(size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id)
-        : frame_id(frame_id)
-        , symbol_idx_ul(symbol_idx_ul)
-        , base_sc_id(base_sc_id)
-    {
-    }
-
-    demul_tag_t(size_t _tag)
-        : _tag(_tag)
-    {
-    }
-};
-static_assert(sizeof(demul_tag_t) == sizeof(size_t), "");
+static_assert(sizeof(fss_tag_t) == sizeof(size_t), "");
 
 /**
  * Millipede uses these event messages for communication between threads. Each
