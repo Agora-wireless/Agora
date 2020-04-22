@@ -82,6 +82,7 @@ public:
     Table<std::complex<int16_t>> dl_IQ_symbol;
     Table<std::complex<int16_t>> ul_IQ_symbol;
     Table<complex_float> ue_specific_pilot;
+    Table<complex_float> ue_specific_pilot_t;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
