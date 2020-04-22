@@ -58,7 +58,7 @@ static_assert(k5GMaxSubcarriers < kInvalidSymbolId - 1, "");
 static constexpr size_t kFrameIdBits = (64 - (kSymbolIdBits + kSubcarrierBits));
 
 // A generic tag type for Millipede tasks
-union fss_tag_t {
+union gen_tag_t {
     struct {
         size_t frame_id : kFrameIdBits;
         size_t symbol_id : kSymbolIdBits;
@@ -67,19 +67,19 @@ union fss_tag_t {
 
     size_t _tag;
 
-    fss_tag_t(size_t frame_id, size_t symbol_id, size_t base_sc_id)
+    gen_tag_t(size_t frame_id, size_t symbol_id, size_t base_sc_id)
         : frame_id(frame_id)
         , symbol_id(symbol_id)
         , base_sc_id(base_sc_id)
     {
     }
 
-    fss_tag_t(size_t _tag)
+    gen_tag_t(size_t _tag)
         : _tag(_tag)
     {
     }
 };
-static_assert(sizeof(fss_tag_t) == sizeof(size_t), "");
+static_assert(sizeof(gen_tag_t) == sizeof(size_t), "");
 
 /**
  * Millipede uses these event messages for communication between threads. Each
