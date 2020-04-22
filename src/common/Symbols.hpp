@@ -87,7 +87,6 @@ static constexpr bool kDebugPrintPerFrameDone = true;
 static constexpr bool kDebugPrintPerFrameStart = false;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
-static constexpr bool kDebugPrintPerSymbolEnterQueue = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
