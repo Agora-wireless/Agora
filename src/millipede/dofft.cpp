@@ -212,7 +212,7 @@ Event_data DoFFT::launch(size_t tag)
 
     /* Inform main thread */
     return Event_data(EventType::kFFT,
-        fss_tag_t(
+        gen_tag_t(
             frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, kInvalidSubcarrierId)
             ._tag);
 }
