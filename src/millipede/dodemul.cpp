@@ -42,20 +42,18 @@ DoDemul::~DoDemul()
     free_buffer_1d(&equaled_buffer_temp_transposed);
 }
 
-Event_data DoDemul::launch(int offset)
+Event_data DoDemul::launch(int tag)
 {
-    int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
-    int total_data_subframe_id = offset / cfg->demul_block_num;
-    int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
+    size_t frame_id = demul_tag_t(tag).frame_id;
+    size_t total_data_symbol_idx = (frame_id * cfg->ul_data_symbol_num_perframe)
+        + demul_tag_t(tag).symbol_idx_ul;
+    size_t base_sc_id = demul_tag_t(tag).base_sc_id;
 
     size_t start_tsc = worker_rdtsc();
 
 #if DEBUG_PRINT_IN_TASK
-    int current_data_subframe_id
-        = total_data_subframe_id % data_subframe_num_perframe;
-    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n",
-        tid, frame_id, current_data_subframe_id, sc_id);
+    printf("In doDemul thread %d: frame: %zu, symbol: %d, subcarrier: %zu \n",
+        tid, frame_id, demul_tag_t(tag).symbol_idx_ul, base_sc_id);
 #endif
 
     int transpose_block_size = cfg->transpose_block_size;
@@ -66,20 +64,20 @@ Event_data DoDemul::launch(int offset)
         transpose_block_size * 6 + 1);
 
     int max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - sc_id);
+        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
     /* Iterate through cache lines (each cache line has 8 subcarriers) */
     for (int i = 0; i < max_sc_ite / 8; i++) {
         size_t start_tsc1 = worker_rdtsc();
 
         /* gather data for all antennas and 8 subcarriers in the same cache line
          * 1 subcarrier and 4 ants per iteration */
-        int cur_block_id = (sc_id + i * 8) / transpose_block_size;
-        int sc_inblock_idx = (sc_id + i * 8) % transpose_block_size;
+        int cur_block_id = (base_sc_id + i * 8) / transpose_block_size;
+        int sc_inblock_idx = (base_sc_id + i * 8) % transpose_block_size;
         int cur_sc_offset
             = cur_block_id * transpose_block_size * cfg->BS_ANT_NUM
             + sc_inblock_idx;
         float* src_data_ptr
-            = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
+            = (float*)data_buffer_[total_data_symbol_idx] + cur_sc_offset * 2;
         float* tar_data_ptr = (float*)spm_buffer;
         for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
             for (int j = 0; j < 8; j++) {
@@ -100,7 +98,7 @@ Event_data DoDemul::launch(int offset)
             cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
 
             /* create input precoder matrix */
-            int cur_sc_id = i * 8 + j + sc_id;
+            int cur_sc_id = i * 8 + j + base_sc_id;
             int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
             if (cfg->freq_orthogonal_pilot)
                 precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
@@ -113,11 +111,11 @@ Event_data DoDemul::launch(int offset)
 
 #if EXPORT_CONSTELLATION
             cx_float* equal_ptr
-                = (cx_float*)(&equal_buffer_[total_data_subframe_id]
+                = (cx_float*)(&equal_buffer_[total_data_symbol_idx]
                                             [cur_sc_id * cfg->UE_NUM]);
 #else
             cx_float* equal_ptr
-                = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - sc_id)
+                = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
                     * cfg->UE_NUM]);
 #endif
             /* create output matrix for equalization */
@@ -133,7 +131,7 @@ Event_data DoDemul::launch(int offset)
 
 #ifndef USE_LDPC
             /* decode with hard decision */
-            uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_subframe_id]
+            uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_symbol_idx]
                                                      [cur_sc_id * cfg->UE_NUM]);
             demod_16qam_hard_avx2((float*)equal_ptr, demul_ptr, cfg->UE_NUM);
             // cout<< "Demuled data:";
@@ -156,8 +154,8 @@ Event_data DoDemul::launch(int offset)
     for (int i = 0; i < cfg->UE_NUM; i++) {
         float* equal_ptr = (float*)(equaled_buffer_temp + i);
         int8_t* demul_ptr
-            = (&demod_soft_buffer_[total_data_subframe_id]
-                                  [(cfg->OFDM_DATA_NUM * i + sc_id)
+            = (&demod_soft_buffer_[total_data_symbol_idx]
+                                  [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                       * cfg->mod_type]);
         for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) {
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
@@ -175,8 +173,8 @@ Event_data DoDemul::launch(int offset)
             demod_16qam_soft_sse(
                 (equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2),
                 demul_ptr + cfg->mod_type * num_sc_avx2, rest);
-        // printf("In doDemul thread %d: frame: %d, subframe: %d, sc_id: %d \n",
-        // tid, frame_id, current_data_subframe_id, sc_id); cout<< "Demuled
+        // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
+        // tid, frame_id, current_data_symbol_id, sc_id); cout<< "Demuled
         // data: \n"; cout<<"UE "<<i<<": "; for (int k = 0; k < max_sc_ite *
         // cfg->mod_order; k++)
         //     printf("%i ", demul_ptr[k]);
@@ -188,25 +186,26 @@ Event_data DoDemul::launch(int offset)
     // if (duration > 500)
     //     printf("Thread %d Demul takes %.2f\n", tid, duration);
 
-    return Event_data(EventType::kDemul, offset);
+    return Event_data(EventType::kDemul, tag);
 }
 
+// Currently unused
 Event_data DoDemul::DemulSingleSC(int offset)
 {
     size_t start_tsc = worker_rdtsc();
 
-    int sc_id = offset % cfg->demul_block_num * cfg->demul_block_size;
-    int total_data_subframe_id = offset / cfg->demul_block_num;
-    int data_subframe_num_perframe = cfg->data_symbol_num_perframe;
-    int frame_id = total_data_subframe_id / data_subframe_num_perframe;
-    int current_data_subframe_id
-        = total_data_subframe_id % data_subframe_num_perframe;
+    int sc_id = (offset % cfg->demul_events_per_symbol) * cfg->demul_block_size;
+    int total_data_symbol_id = offset / cfg->demul_events_per_symbol;
+    int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
+    int frame_id = total_data_symbol_id / data_symbol_num_perframe;
+    int current_data_symbol_id
+        = total_data_symbol_id % data_symbol_num_perframe;
 #if DEBUG_PRINT_IN_TASK
-    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n",
-        tid, frame_id, current_data_subframe_id, sc_id);
+    printf("In doDemul thread %d: frame: %d, symbol: %d, subcarrier: %d \n",
+        tid, frame_id, current_data_symbol_id, sc_id);
 #endif
-    // int subframe_offset = subframe_num_perframe * frame_id + UE_NUM +
-    // current_data_subframe_id;
+    // int symbol_offset = symbol_num_perframe * frame_id + UE_NUM +
+    // current_data_symbol_id;
 
     int transpose_block_size = cfg->transpose_block_size;
     int gather_step_size = 8 * transpose_block_size;
@@ -222,7 +221,7 @@ Event_data DoDemul::DemulSingleSC(int offset)
         + sc_inblock_idx;
     float* tar_data_ptr = (float*)spm_buffer;
     float* src_data_ptr
-        = (float*)data_buffer_[total_data_subframe_id] + cur_sc_offset * 2;
+        = (float*)data_buffer_[total_data_symbol_id] + cur_sc_offset * 2;
     for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
         __m256 data_rx = _mm256_i32gather_ps(src_data_ptr, index, 4);
         _mm256_store_ps(tar_data_ptr, data_rx);
@@ -243,13 +242,13 @@ Event_data DoDemul::DemulSingleSC(int offset)
     // cout<<"Precoder: "<< mat_precoder<<endl;
 
     // mat_demuled size: cfg->UE_NUM \times 1
-    cx_float* equal_ptr = (cx_float*)(&equal_buffer_[total_data_subframe_id]
+    cx_float* equal_ptr = (cx_float*)(&equal_buffer_[total_data_symbol_id]
                                                     [sc_id * cfg->UE_NUM]);
     cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
 
     // Demodulation
     uint8_t* demul_ptr
-        = (&demod_hard_buffer_[total_data_subframe_id][sc_id * cfg->UE_NUM]);
+        = (&demod_hard_buffer_[total_data_symbol_id][sc_id * cfg->UE_NUM]);
 
     // Equalization
     mat_equaled = mat_precoder * mat_data;
@@ -257,8 +256,8 @@ Event_data DoDemul::DemulSingleSC(int offset)
 
     // Hard decision
     demod_16qam_hard_loop((float*)equal_ptr, demul_ptr, cfg->UE_NUM);
-    printf("In doDemul thread %d: frame: %d, subframe: %d, subcarrier: %d \n",
-        tid, frame_id, current_data_subframe_id, sc_id);
+    printf("In doDemul thread %d: frame: %d, symbol: %d, subcarrier: %d \n",
+        tid, frame_id, current_data_symbol_id, sc_id);
     cout << "Demuled data: ";
     for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
         cout << *(demul_ptr + ue_idx) << "  ";

@@ -110,7 +110,7 @@ Event_data DoFFT::launch(int tag)
         = socket_buffer_[socket_thread_id] + buf_offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     size_t frame_id = pkt->frame_id % kNumStatsFrames;
-    size_t subframe_id = pkt->symbol_id;
+    size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
     short* cur_buffer_ptr_ushort = &pkt->data[2 * cfg->OFDM_PREFIX_LEN];
@@ -120,8 +120,8 @@ Event_data DoFFT::launch(int tag)
     cvtShortToFloatSIMD(
         cur_buffer_ptr_ushort, fft_buf_ptr, cfg->OFDM_CA_NUM * 2);
 
-    // printf("In doFFT thread %d: frame: %d, subframe: %d, ant: %d\n", tid,
-    //     frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+    // printf("In doFFT thread %d: frame: %d, symbol: %d, ant: %d\n", tid,
+    //     frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
     // printf("FFT input\n");
     // for (int i = 0; i < cfg->OFDM_CA_NUM; i++) {
     //     printf("%.4f+%.4fi ", *(fft_buf_ptr + i * 2),
@@ -130,13 +130,13 @@ Event_data DoFFT::launch(int tag)
     // printf("\n");
 
     auto cur_symbol_type = SymbolType::kUnknown;
-    if (cfg->isUplink(frame_id, subframe_id))
+    if (cfg->isUplink(frame_id, symbol_id))
         cur_symbol_type = SymbolType::kUL;
-    else if (cfg->isPilot(frame_id, subframe_id))
+    else if (cfg->isPilot(frame_id, symbol_id))
         cur_symbol_type = SymbolType::kPilot;
-    else if (cfg->isCalDlPilot(frame_id, subframe_id))
+    else if (cfg->isCalDlPilot(frame_id, symbol_id))
         cur_symbol_type = SymbolType::kCalDL;
-    else if (cfg->isCalUlPilot(frame_id, subframe_id))
+    else if (cfg->isCalUlPilot(frame_id, symbol_id))
         cur_symbol_type = SymbolType::kCalUL;
 
     size_t start_tsc1 = worker_rdtsc();
@@ -160,25 +160,25 @@ Event_data DoFFT::launch(int tag)
     size_t start_tsc_part3 = worker_rdtsc();
 
 #if DEBUG_PRINT_IN_TASK
-    printf("In doFFT thread %d: frame: %zu, subframe: %zu, ant: %zu\n", tid,
-        frame_id % TASK_BUFFER_FRAME_NUM, subframe_id, ant_id);
+    printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
+        frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
 #endif
 
     if (cur_symbol_type == SymbolType::kPilot) {
-        int pilot_id = cfg->getPilotSFIndex(frame_id, subframe_id);
-        int subframe_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
+        int pilot_id = cfg->getPilotSFIndex(frame_id, symbol_id);
+        int symbol_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * cfg->pilot_symbol_num_perframe
             + pilot_id;
-        float* csi_buffer_ptr = (float*)(csi_buffer_[subframe_offset]);
+        float* csi_buffer_ptr = (float*)(csi_buffer_[symbol_offset]);
         simd_store_to_buf(
             fft_buf_ptr, csi_buffer_ptr, ant_id, SymbolType::kPilot);
     } else if (cur_symbol_type == SymbolType::kUL) {
-        int data_subframe_id = cfg->getUlSFIndex(frame_id, subframe_id);
-        int data_subframe_num_perframe = cfg->ul_data_symbol_num_perframe;
-        int subframe_offset
-            = (frame_id % TASK_BUFFER_FRAME_NUM) * data_subframe_num_perframe
-            + data_subframe_id;
-        float* data_buf_ptr = (float*)&data_buffer_[subframe_offset][0];
+        int data_symbol_id = cfg->getUlSFIndex(frame_id, symbol_id);
+        int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
+        int symbol_offset
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * data_symbol_num_perframe
+            + data_symbol_id;
+        float* data_buf_ptr = (float*)&data_buffer_[symbol_offset][0];
         simd_store_to_buf(fft_buf_ptr, data_buf_ptr, ant_id, SymbolType::kUL);
     } else if (((cur_symbol_type == SymbolType::kCalDL)
                    && (ant_id == cfg->ref_ant))
@@ -212,7 +212,7 @@ Event_data DoFFT::launch(int tag)
 
     /* Inform main thread */
     return Event_data(EventType::kFFT,
-        fft_resp_tag_t(frame_id % TASK_BUFFER_FRAME_NUM, subframe_id)._tag);
+        fft_resp_tag_t(frame_id % TASK_BUFFER_FRAME_NUM, symbol_id)._tag);
 }
 
 void DoFFT::simd_store_to_buf(
@@ -302,22 +302,22 @@ Event_data DoIFFT::launch(int offset)
 
 #if DEBUG_PRINT_IN_TASK
     int ant_id = offset % cfg->BS_ANT_NUM;
-    int total_data_subframe_id = offset / cfg->BS_ANT_NUM;
-    int frame_id = total_data_subframe_id / cfg->data_symbol_num_perframe;
-    int current_data_subframe_id
-        = total_data_subframe_id % cfg->data_symbol_num_perframe;
-    printf("In doIFFT thread %d: frame: %d, subframe: %d, antenna: %d\n", tid,
-        frame_id, current_data_subframe_id, ant_id);
+    int total_data_symbol_id = offset / cfg->BS_ANT_NUM;
+    int frame_id = total_data_symbol_id / cfg->data_symbol_num_perframe;
+    int current_data_symbol_id
+        = total_data_symbol_id % cfg->data_symbol_num_perframe;
+    printf("In doIFFT thread %d: frame: %d, symbol: %d, antenna: %d\n", tid,
+        frame_id, current_data_symbol_id, ant_id);
 #endif
 
     int dl_ifft_buffer_size = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
         * TASK_BUFFER_FRAME_NUM;
-    int buffer_subframe_offset = offset % dl_ifft_buffer_size;
+    int buffer_symbol_offset = offset % dl_ifft_buffer_size;
 
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[buffer_subframe_offset];
+    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[buffer_symbol_offset];
     memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
     memset(ifft_buf_ptr + (cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM) * 2, 0,
         sizeof(float) * cfg->OFDM_DATA_START * 2);
@@ -325,8 +325,8 @@ Event_data DoIFFT::launch(int offset)
     DftiComputeBackward(mkl_handle, ifft_buf_ptr);
     // printf("data after ifft\n");
     // for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
-    //     printf("%.1f+%.1fj ", dl_ifft_buffer_[buffer_subframe_offset][i].re,
-    //         dl_ifft_buffer_[buffer_subframe_offset][i].im);
+    //     printf("%.1f+%.1fj ", dl_ifft_buffer_[buffer_symbol_offset][i].re,
+    //         dl_ifft_buffer_[buffer_symbol_offset][i].im);
     // printf("\n");
 
     cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
@@ -338,11 +338,10 @@ Event_data DoIFFT::launch(int offset)
 
     int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
         * cfg->data_symbol_num_perframe;
-    int socket_subframe_offset = offset % dl_socket_buffer_status_size;
+    int socket_symbol_offset = offset % dl_socket_buffer_status_size;
     int packet_length = cfg->packet_length;
-    struct Packet* pkt
-        = (struct Packet*)&dl_socket_buffer_[socket_subframe_offset
-            * packet_length];
+    struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
+        * packet_length];
     short* socket_ptr = &pkt->data[2 * cfg->TX_PREFIX_LEN];
 
     for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
@@ -367,8 +366,8 @@ Event_data DoIFFT::launch(int offset)
 
     duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
 
-    // cout << "In ifft: frame: "<< frame_id<<", subframe: "<<
-    // current_data_subframe_id<<", ant: " << ant_id << ", data: "; for (int j =
+    // cout << "In ifft: frame: "<< frame_id<<", symbol: "<<
+    // current_data_symbol_id<<", ant: " << ant_id << ", data: "; for (int j =
     // 0; j <OFDM_CA_NUM; j++) {
     //     int socket_offset = sizeof(int) * 16 + ant_id *
     //     packetReceiver::packet_length; cout <<*((short *)(socket_ptr +

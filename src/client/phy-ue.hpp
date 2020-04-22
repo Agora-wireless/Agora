@@ -53,7 +53,7 @@ public:
     // static const int TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
     // buffer length of each socket thread
     // the actual length will be RX_BUFFER_FRAME_NUM
-    // * subframe_num_perframe * BS_ANT_NUM
+    // * symbol_num_perframe * BS_ANT_NUM
     // static const int RX_BUFFER_FRAME_NUM = 80;
     // static const int TX_BUFFER_FRAME_NUM = 80;
     // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
@@ -92,27 +92,27 @@ public:
      * @param offset: offset of the OFDM symbol in rx_buffer_
      * Buffers: rx_buffer_, fft_buffer_, csi_buffer_, ul_data_buffer_
      *     Input buffer: rx_buffer_
-     *     Output buffer: csi_buffer_ if subframe is pilot
-     *                    ul_data_buffer_ if subframe is data
+     *     Output buffer: csi_buffer_ if symbol is pilot
+     *                    ul_data_buffer_ if symbol is data
      *     Intermediate buffer: fft_buffer_ (FFT_inputs, FFT_outputs)
      * Offsets:
      *     rx_buffer_:
      *         dim1: socket thread index: (offset / # of OFDM symbols per
      * thread) dim2: OFDM symbol index in this socket thread (offset - # of
-     * subframes in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
-     * * # of OFDM symbols per frame + subframe index * # of atennas + antenna
+     * symbols in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
+     * * # of OFDM symbols per frame + symbol index * # of atennas + antenna
      * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size +
      * subcarrier index in the current frame dim2: user index * # of antennas +
-     * antenna index ul_data_buffer_: dim1: frame index * # of data subframes
-     * per frame + data subframe index dim2: transpose block index * block size
+     * antenna index ul_data_buffer_: dim1: frame index * # of data symbols
+     * per frame + data symbol index dim2: transpose block index * block size
      * * # of antennas + antenna index * block size Event offset: frame index *
-     * # of subframe per frame + subframe index Description:
+     * # of symbol per frame + symbol index Description:
      *     1. copy received data (one OFDM symbol) from rx_buffer to
      * fft_buffer_.FFT_inputs (remove CP)
      *     2. perform FFT on fft_buffer_.FFT_inputs and store results in
      * fft_buffer_.FFT_outputs
-     *     3. if subframe is pilot, do channel estimation from
-     * fft_buffer_.FFT_outputs to csi_buffer_ if subframe is data, copy data
+     *     3. if symbol is pilot, do channel estimation from
+     * fft_buffer_.FFT_outputs to csi_buffer_ if symbol is data, copy data
      * from fft_buffer_.FFT_outputs to ul_data_buffer_ and do block transpose
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
@@ -128,7 +128,7 @@ public:
      * equal_buffer_, demul_buffer_ Input buffer: ul_data_buffer_,
      * precoder_buffer_ Output buffer: demul_buffer_ Intermediate buffer:
      * spm_buffer, equal_buffer_ Offsets: ul_data_buffer_: dim1: frame index * #
-     * of data subframes per frame + data subframe index dim2: transpose block
+     * of data symbols per frame + data symbol index dim2: transpose block
      * index * block size * # of antennas + antenna index * block size
      *     spm_buffer:
      *         dim1: task thread index
@@ -136,7 +136,7 @@ public:
      *     precoder_buffer_:
      *         dim1: frame index * FFT size + subcarrier index in the current
      * frame equal_buffer_, demul_buffer: dim1: frame index * # of data
-     * subframes per frame + data subframe index dim2: subcarrier index * # of
+     * symbols per frame + data symbol index dim2: subcarrier index * # of
      * users Event offset: offset Description:
      *     1. for each subcarrier in the block, block-wisely copy data from
      * ul_data_buffer_ to spm_buffer_
@@ -172,7 +172,7 @@ private:
     size_t symbol_perframe;
     size_t ul_pilot_symbol_perframe;
     size_t dl_pilot_symbol_perframe;
-    // static const int empty_subframe_num_perframe;
+    // static const int empty_symbol_num_perframe;
     size_t ul_data_symbol_perframe;
     size_t dl_data_symbol_perframe;
     size_t dl_symbol_perframe;
@@ -182,8 +182,7 @@ private:
     size_t dl_prefix_len;
     size_t prefix_len;
     size_t postfix_len;
-    size_t
-        ofdm_syms; // number of OFDM symbols in general symbol (i.e. subframe)
+    size_t ofdm_syms; // number of OFDM symbols in general symbol (i.e. symbol)
     size_t FFT_LEN;
     size_t CP_LEN;
     size_t nUEs;
@@ -242,7 +241,7 @@ private:
 
     /**
      * Data before modulation
-     * First dimension: data_subframe_num_perframe (40-4) *
+     * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     std::vector<complex_float> l2_data_buffer_;
@@ -250,7 +249,7 @@ private:
 
     /**
      * Data after modulation
-     * First dimension: data_subframe_num_perframe (40-4) *
+     * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     std::vector<myVec> modul_buffer_;
@@ -265,9 +264,9 @@ private:
      * received data
      * Frist dimension: RX_THREAD_NUM
      * Second dimension of buffer (type: char): packet_length *
-     * subframe_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM packet_length =
+     * symbol_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM packet_length =
      * sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2; Second dimension
-     * of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * of buffer_status: symbol_num_perframe * BS_ANT_NUM *
      * RX_BUFFER_FRAME_NUM
      */
     Table<char> rx_buffer_;
@@ -278,7 +277,7 @@ private:
     /**
      * Data for FFT, after time sync (prefix removed)
      * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
-     * subframe_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
+     * symbol_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
      * OFDM_CA_NUM
      */
     FFTBuffer fft_buffer_;
@@ -292,8 +291,8 @@ private:
 
     /**
      * Data symbols after IFFT
-     * First dimension: total subframe number in the buffer:
-     * data_subframe_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
+     * First dimension: total symbol number in the buffer:
+     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
      * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
@@ -302,14 +301,14 @@ private:
 
     /**
      * Data after equalization
-     * First dimension: data_subframe_num_perframe (40-4) *
+     * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     std::vector<myVec> equal_buffer_;
 
     /**
      * Data after phase correction
-     * First dimension: data_subframe_num_perframe (40-4) *
+     * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: DATA_CA_NUM * UE_NUM
      */
     std::vector<myVec> equal_pc_buffer_;
@@ -326,24 +325,24 @@ private:
     moodycamel::ConcurrentQueue<Event_data>
         task_queue_; // =
                      // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                     // * subframe_num_perframe * BS_ANT_NUM  * 36);
+                     // * symbol_num_perframe * BS_ANT_NUM  * 36);
     /* task queue for uplink demodulation */
     moodycamel::ConcurrentQueue<Event_data>
         demul_queue_; // =
                       // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                      // * subframe_num_perframe * BS_ANT_NUM  * 36);
+                      // * symbol_num_perframe * BS_ANT_NUM  * 36);
     /* main thread message queue */
     moodycamel::ConcurrentQueue<Event_data>
         message_queue_; // =
                         // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                        // * subframe_num_perframe * BS_ANT_NUM  * 36);
+                        // * symbol_num_perframe * BS_ANT_NUM  * 36);
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
 
     // all checkers
-    // int cropper_checker_[subframe_num_perframe * TASK_BUFFER_FRAME_NUM];
+    // int cropper_checker_[symbol_num_perframe * TASK_BUFFER_FRAME_NUM];
     size_t* cropper_checker_;
     size_t csi_checker_[TASK_BUFFER_FRAME_NUM];
     size_t data_checker_[TASK_BUFFER_FRAME_NUM];
@@ -354,7 +353,7 @@ private:
     size_t cropper_created_checker_[TASK_BUFFER_FRAME_NUM];
 
     // can possibly remove this checker
-    // int demul_checker_[TASK_BUFFER_FRAME_NUM][(subframe_num_perframe -
+    // int demul_checker_[TASK_BUFFER_FRAME_NUM][(symbol_num_perframe -
     // UE_NUM)];
     size_t* demul_checker_[TASK_BUFFER_FRAME_NUM];
     size_t demul_status_[TASK_BUFFER_FRAME_NUM];

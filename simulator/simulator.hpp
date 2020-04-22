@@ -60,7 +60,7 @@ public:
     inline void update_frame_count(int* frame_count);
 
     void update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
-        size_t subframe_id, size_t ant_id);
+        size_t symbol_id, size_t ant_id);
     void print_per_frame_done(
         size_t task_type, size_t frame_id, size_t frame_id_in_buffer);
 
@@ -73,9 +73,9 @@ private:
     size_t BS_ANT_NUM, UE_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
-    size_t subframe_num_perframe, data_subframe_num_perframe;
-    size_t ul_data_subframe_num_perframe, dl_data_subframe_num_perframe;
-    size_t dl_data_subframe_start, dl_data_subframe_end;
+    size_t symbol_num_perframe, data_symbol_num_perframe;
+    size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
+    size_t dl_data_symbol_start, dl_data_symbol_end;
     size_t packet_length;
 
     size_t TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
@@ -102,9 +102,9 @@ private:
      * received data
      * Frist dimension: SOCKET_THREAD_NUM
      * Second dimension of buffer (type: char): packet_length *
-     * subframe_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+     * symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
      * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: subframe_num_perframe * BS_ANT_NUM *
+     * Second dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
      * SOCKET_BUFFER_FRAME_NUM
      */
 
@@ -114,8 +114,8 @@ private:
     size_t socket_buffer_status_size_;
 
     /* Uplink status checkers used by master thread */
-    /* used to check if RX for all antennas and all subframes in a frame is done
-     * (max: BS_ANT_NUM * subframe_num_perframe) */
+    /* used to check if RX for all antennas and all symbols in a frame is done
+     * (max: BS_ANT_NUM * symbol_num_perframe) */
     size_t* rx_counter_packets_;
 
     /*****************************************************

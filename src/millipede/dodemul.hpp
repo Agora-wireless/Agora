@@ -43,7 +43,7 @@ public:
      * equal_buffer_, demod_hard_buffer_ Input buffer: data_buffer_,
      * precoder_buffer_ Output buffer: demod_hard_buffer_ Intermediate buffer:
      * spm_buffer, equal_buffer_ Offsets: data_buffer_: dim1: frame index * # of
-     * data subframes per frame + data subframe index dim2: transpose block
+     * data symbols per frame + data symbol index dim2: transpose block
      * index * block size * # of antennas + antenna index * block size
      *     spm_buffer:
      *         dim1: task thread index
@@ -51,7 +51,7 @@ public:
      *     precoder_buffer_:
      *         dim1: frame index * FFT size + subcarrier index in the current
      * frame equal_buffer_, demul_buffer: dim1: frame index * # of data
-     * subframes per frame + data subframe index dim2: subcarrier index * # of
+     * symbols per frame + data symbol index dim2: subcarrier index * # of
      * users Event offset: offset Description:
      *     1. for each subcarrier in the block, block-wisely copy data from
      * data_buffer_ to spm_buffer_
@@ -60,7 +60,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(int offset);
+    Event_data launch(int tag);
 
     Event_data DemulSingleSC(int offset);
 
