@@ -34,7 +34,8 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
         cfg->demul_block_size * cfg->UE_NUM, 64, 0);
 
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
-    cx_fmat mat_pilot_data(ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
+    cx_fmat mat_pilot_data(
+        ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
 
     ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
@@ -51,8 +52,8 @@ Event_data DoDemul::launch(int tag)
 {
     size_t frame_id = demul_tag_t(tag).frame_id;
     size_t symbol_id = demul_tag_t(tag).symbol_idx_ul;
-    size_t total_data_symbol_idx = (frame_id * cfg->ul_data_symbol_num_perframe)
-        + symbol_id;
+    size_t total_data_symbol_idx
+        = (frame_id * cfg->ul_data_symbol_num_perframe) + symbol_id;
     size_t base_sc_id = demul_tag_t(tag).base_sc_id;
 
     size_t start_tsc = worker_rdtsc();
@@ -130,10 +131,21 @@ Event_data DoDemul::launch(int tag)
             size_t start_tsc2 = worker_rdtsc();
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
-	    if (symbol_id < cfg->UL_PILOT_SYMS) {
+            if (symbol_id < cfg->UL_PILOT_SYMS) { // calc new phase shift
                 cx_float* phase_shift_ptr = (cx_float*)pilot_buffer_[frame_id];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
-		mat_phase_shift += conj(mat_equaled) % ue_pilot_data.col(cur_sc_id);
+                mat_phase_shift
+                    += conj(mat_equaled) % ue_pilot_data.col(cur_sc_id);
+            } else { // apply previously calc'ed phase shift to data
+                size_t prev_frame = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
+                cx_float* phase_shift_ptr
+                    = (cx_float*)pilot_buffer_[prev_frame];
+                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
+                cx_fmat mat_phase_correct
+                    = zeros<cx_fmat>(size(mat_phase_shift));
+                mat_phase_correct.set_imag(
+                    arg(mat_phase_shift / cfg->OFDM_DATA_NUM));
+                mat_equaled %= exp(mat_phase_correct);
             }
 
             size_t start_tsc3 = worker_rdtsc();
