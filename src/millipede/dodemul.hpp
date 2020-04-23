@@ -90,6 +90,7 @@ private:
     cx_fmat ue_pilot_data;
 
     int ue_num_simd256;
+    const size_t moving_avg_sz = 4;
 };
 
 #endif
