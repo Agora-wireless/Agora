@@ -135,16 +135,25 @@ Event_data DoDemul::launch(int tag)
                 cx_float* phase_shift_ptr = (cx_float*)pilot_buffer_[frame_id];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
                 mat_phase_shift
-                    += conj(mat_equaled) % ue_pilot_data.col(cur_sc_id);
+                    += mat_equaled % conj(ue_pilot_data.col(cur_sc_id));
             } else { // apply previously calc'ed phase shift to data
-                size_t prev_frame = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
-                cx_float* phase_shift_ptr
-                    = (cx_float*)pilot_buffer_[prev_frame];
-                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
+                cx_fmat mat_phase_shift_w = zeros<cx_fmat>(cfg->UE_NUM, 1);
+                float w = 1;
+                for (size_t fr = 1; fr <= moving_avg_sz; fr++) {
+                    size_t prev_frame = (frame_id + fr + TASK_BUFFER_FRAME_NUM)
+                        % TASK_BUFFER_FRAME_NUM;
+                    cx_float* phase_shift_ptr
+                        = (cx_float*)pilot_buffer_[prev_frame];
+                    cx_fmat mat_phase_shift(
+                        phase_shift_ptr, cfg->UE_NUM, 1, false);
+                    w *= fr < moving_avg_sz ? 0.5 : 1;
+                    mat_phase_shift_w += w * mat_phase_shift;
+                }
+                mat_phase_shift_w /= moving_avg_sz;
                 cx_fmat mat_phase_correct
-                    = zeros<cx_fmat>(size(mat_phase_shift));
+                    = zeros<cx_fmat>(size(mat_phase_shift_w));
                 mat_phase_correct.set_imag(
-                    arg(mat_phase_shift / cfg->OFDM_DATA_NUM));
+                    arg(mat_phase_shift_w / cfg->OFDM_DATA_NUM));
                 mat_equaled %= exp(mat_phase_correct);
             }
 
