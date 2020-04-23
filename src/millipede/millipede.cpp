@@ -236,7 +236,8 @@ void Millipede::start()
                     PRINT_DEMUL, frame_id, symbol_idx_ul, base_sc_id);
                 /* If this symbol is ready */
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
-                    max_equaled_frame = frame_id;
+                    if (symbol_idx_ul >= (int)cfg->UL_PILOT_SYMS)
+                        max_equaled_frame = frame_id;
                     if (kUseLDPC) {
                         schedule_task_set(EventType::kDecode,
                             config_->demul_events_per_symbol,
@@ -592,8 +593,8 @@ void* Millipede::worker(int tid)
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz, demul_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-        precoder_buffer_, ue_phase_rotation_buffer_, equal_buffer_, demod_hard_buffer_,
-        demod_soft_buffer_, stats);
+        precoder_buffer_, ue_phase_rotation_buffer_, equal_buffer_,
+        demod_hard_buffer_, demod_soft_buffer_, stats);
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], dl_precoder_buffer_,
@@ -670,8 +671,8 @@ void* Millipede::worker_demul(int tid)
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz, demul_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-        precoder_buffer_, ue_phase_rotation_buffer_, equal_buffer_, demod_hard_buffer_,
-        demod_soft_buffer_, stats);
+        precoder_buffer_, ue_phase_rotation_buffer_, equal_buffer_,
+        demod_hard_buffer_, demod_soft_buffer_, stats);
 
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
@@ -1278,7 +1279,8 @@ void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
     *ptr = (float*)&equal_buffer_[max_equaled_frame
-        * cfg->ul_data_symbol_num_perframe][0];
+            * cfg->ul_data_symbol_num_perframe
+        + cfg->UL_PILOT_SYMS][0];
     // *ptr = equal_output;
     *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
 
