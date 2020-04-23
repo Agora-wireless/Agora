@@ -29,7 +29,7 @@ public:
         Table<complex_float>& in_calib_buffer,
         Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~Reciprocity();
-    Event_data launch(int offset);
+    Event_data launch(size_t offset);
 
 private:
     int BS_ANT_NUM;

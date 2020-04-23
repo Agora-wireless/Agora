@@ -33,7 +33,7 @@ DoZF::~DoZF()
     free_buffer_1d(&pred_csi_buffer);
 }
 
-Event_data DoZF::launch(int tag)
+Event_data DoZF::launch(size_t tag)
 {
     if (cfg->freq_orthogonal_pilot)
         ZF_freq_orthogonal(tag);
@@ -66,14 +66,14 @@ void DoZF::precoder(void* mat_input_ptr, int frame_id, int sc_id, int offset,
     }
 }
 
-void DoZF::ZF_time_orthogonal(int tag)
+void DoZF::ZF_time_orthogonal(size_t tag)
 {
-    size_t frame_id = zf_tag_t(tag).frame_id;
-    size_t base_sc_id = zf_tag_t(tag).base_sc_id;
-#if DEBUG_PRINT_IN_TASK
-    printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
-        frame_id, base_sc_id);
-#endif
+    size_t frame_id = gen_tag_t(tag).frame_id;
+    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
+    if (kDebugPrintInTask) {
+        printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
+            frame_id, base_sc_id);
+    }
     int offset_in_buffer = (frame_id * cfg->OFDM_DATA_NUM) + base_sc_id;
     int max_sc_ite
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
@@ -148,14 +148,14 @@ void DoZF::ZF_time_orthogonal(int tag)
     }
 }
 
-void DoZF::ZF_freq_orthogonal(int tag)
+void DoZF::ZF_freq_orthogonal(size_t tag)
 {
-    size_t frame_id = zf_tag_t(tag).frame_id;
-    size_t base_sc_id = zf_tag_t(tag).base_sc_id;
-#if DEBUG_PRINT_IN_TASK
-    printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n", tid,
-        frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
-#endif
+    size_t frame_id = gen_tag_t(tag).frame_id;
+    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
+    if (kDebugPrintInTask) {
+        printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n",
+            tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
+    }
     int offset_in_buffer = frame_id * cfg->OFDM_DATA_NUM + base_sc_id;
 
     double start_tsc1 = worker_rdtsc();
@@ -213,10 +213,10 @@ void DoZF::ZF_freq_orthogonal(int tag)
 }
 
 // Currently unused
-void DoZF::Predict(int tag)
+void DoZF::Predict(size_t tag)
 {
-    size_t frame_id = zf_tag_t(tag).frame_id;
-    size_t base_sc_id = zf_tag_t(tag).base_sc_id;
+    size_t frame_id = gen_tag_t(tag).frame_id;
+    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
 
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
