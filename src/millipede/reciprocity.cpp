@@ -25,12 +25,10 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid, double freq_ghz,
 
 Reciprocity::~Reciprocity() {}
 
-Event_data Reciprocity::launch(int offset)
+Event_data Reciprocity::launch(size_t offset)
 {
-#if DEBUG_PRINT_IN_TASK
-    printf("In doRecip thread %d: frame: %d, \n", tid, offset);
-#endif
-
+    if (kDebugPrintInTask)
+        printf("In doRecip thread %d: frame: %zu, \n", tid, offset);
     size_t start_tsc1 = worker_rdtsc();
 
     cx_float* ptr_in = (cx_float*)calib_buffer_[offset];

@@ -420,11 +420,11 @@ void Phy_UE::start()
                 interpretOffset3d(config_->ul_data_symbol_num_perframe,
                     config_->getNumAntennas(), offset, &frame_id_t,
                     &total_symbol_id_t, &symbol_id_t, &ant_id_t);
-#if DEBUG_PRINT_PER_SYMBOL_DONE
-                printf("Main thread: finished TX for frame %d, symbol %d, ant "
-                       "%d\n",
-                    frame_id_t, symbol_id_t, ant_id_t);
-#endif
+                if (kDebugPrintPerSymbolDone) {
+                    printf("Main thread: finished TX for frame %zu, symbol "
+                           "%zu, ant %zu\n",
+                        frame_id_t, symbol_id_t, ant_id_t);
+                }
             } break;
 
             default:
@@ -561,10 +561,10 @@ void Phy_UE::doFFT(int tid, int offset)
     DftiComputeForward(
         mkl_handle, fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
 
-#if DEBUG_PRINT_IN_TASK
-    printf("In doCrop thread %d: frame: %d, symbol: %d, ant: %d\n", tid,
-        frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
-#endif
+    if (kDebugPrintInTask) {
+        printf("In doCrop thread %d: frame: %d, symbol: %d, ant: %d\n", tid,
+            frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
+    }
     int csi_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, numAntennas,
         frame_id,
         ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) * numAntennas + ant_id;
@@ -819,12 +819,12 @@ void Phy_UE::initialize_vars_from_cfg(void)
 {
     pilots_ = config_->pilots_;
 
-#if DEBUG_PRINT_PILOT
-    cout << "Pilot data" << endl;
-    for (size_t i = 0; i < config_->OFDM_CA_NUM; i++)
-        cout << pilots_[i] << ",";
-    cout << endl;
-#endif
+    if (kDebugPrintPilot) {
+        cout << "Pilot data" << endl;
+        for (size_t i = 0; i < config_->OFDM_CA_NUM; i++)
+            cout << pilots_[i] << ",";
+        cout << endl;
+    }
 
     // demul_block_size = config_->demul_block_size;
     // //OFDM_CA_NUM*2/transpose_block_size; demul_block_num = OFDM_DATA_NUM /

@@ -169,15 +169,13 @@ void check_correctness_dl(Config* cfg)
                     (raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
                 sum_diff += diff;
                 // if (i == 0)
-                // printf("symbol %d ant %d sc %d, (%.3f, %.3f) diff:
-                // %.3f\n",
-                //     i, ant, sc / 2, raw_data[offset][sc],
-                //     ifft_data[offset][sc], diff);
+                // printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
+                //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
             }
             float avg_diff = sum_diff / sampsPerSymbol;
             printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
                 avg_diff);
-            if (avg_diff > 0.01)
+            if (avg_diff > 0.03)
                 error_cnt++;
         }
     }

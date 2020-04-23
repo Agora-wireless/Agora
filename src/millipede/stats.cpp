@@ -50,11 +50,11 @@ void Stats::update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
             ds->task_duration[j] - ds_old->task_duration[j], freq_ghz);
         stats_per_frame->duration_avg_threads[j]
             += stats_per_frame->duration_this_thread[j];
-#if DEBUG_PRINT_STATS_PER_THREAD
-        stats_per_frame->duration_this_thread_per_task[j]
-            = stats_per_frame->duration_this_thread[j]
-            / stats_per_frame->count_this_thread;
-#endif
+        if (kDebugPrintStatsPerThread) {
+            stats_per_frame->duration_this_thread_per_task[j]
+                = stats_per_frame->duration_this_thread[j]
+                / stats_per_frame->count_this_thread;
+        }
     }
     *ds_old = *ds;
 }
@@ -136,22 +136,22 @@ void Stats::update_stats_in_functions_uplink(int frame_id)
             = demul_stats_per_frame.duration_avg_threads[i];
     }
 
-#if DEBUG_PRINT_PER_FRAME_DONE
-    printf("In frame %d (us): ", frame_id);
-    printf("CSI: ");
-    print_per_frame(csi_stats_per_frame);
-    printf("FFT: ");
-    print_per_frame(fft_stats_per_frame);
-    printf("ZF: ");
-    print_per_frame(zf_stats_per_frame);
-    printf("Demul: ");
-    print_per_frame(demul_stats_per_frame);
-    if (kUseLDPC) {
-        printf("Decode: ");
-        print_per_frame(decode_stats_per_frame);
+    if (kDebugPrintPerFrameDone) {
+        printf("In frame %d (us): ", frame_id);
+        printf("CSI: ");
+        print_per_frame(csi_stats_per_frame);
+        printf("FFT: ");
+        print_per_frame(fft_stats_per_frame);
+        printf("ZF: ");
+        print_per_frame(zf_stats_per_frame);
+        printf("Demul: ");
+        print_per_frame(demul_stats_per_frame);
+        if (kUseLDPC) {
+            printf("Decode: ");
+            print_per_frame(decode_stats_per_frame);
+        }
+        printf("Total: %.1f\n", sum_time_this_frame);
     }
-    printf("Total: %.1f\n", sum_time_this_frame);
-#endif
 }
 
 void Stats::update_stats_in_functions_downlink(int frame_id)
@@ -191,22 +191,22 @@ void Stats::update_stats_in_functions_downlink(int frame_id)
     encode_time_in_function[frame_id]
         = encode_stats_per_frame.duration_avg_threads[0];
 
-#if DEBUG_PRINT_PER_FRAME_DONE
-    printf("In frame %d (us)", frame_id);
-    printf("CSI: ");
-    print_per_frame(csi_stats_per_frame);
-    printf("IFFT: ");
-    print_per_frame(ifft_stats_per_frame);
-    printf("ZF: ");
-    print_per_frame(zf_stats_per_frame);
-    printf("Precode: ");
-    print_per_frame(precode_stats_per_frame);
-    if (kUseLDPC) {
-        printf("Encode: ");
-        print_per_frame(encode_stats_per_frame);
+    if (kDebugPrintPerFrameDone) {
+        printf("In frame %d (us)", frame_id);
+        printf("CSI: ");
+        print_per_frame(csi_stats_per_frame);
+        printf("IFFT: ");
+        print_per_frame(ifft_stats_per_frame);
+        printf("ZF: ");
+        print_per_frame(zf_stats_per_frame);
+        printf("Precode: ");
+        print_per_frame(precode_stats_per_frame);
+        if (kUseLDPC) {
+            printf("Encode: ");
+            print_per_frame(encode_stats_per_frame);
+        }
+        printf("Total: %.1f\n", sum_time_this_frame);
     }
-    printf("Total: %.1f\n", sum_time_this_frame);
-#endif
 }
 
 void Stats::update_stats_in_dofft_bigstation(UNUSED int frame_id,
@@ -218,17 +218,17 @@ void Stats::update_stats_in_dofft_bigstation(UNUSED int frame_id,
         update_stats_for_breakdowns(fft_stats_per_frame, i, DoerType::kFFT);
         update_stats_for_breakdowns(csi_stats_per_frame, i, DoerType::kCSI);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = fft_stats_per_frame->duration_this_thread[0]
-            + csi_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("csi: ");
-        print_per_thread_per_task(*csi_stats_per_frame);
-        printf("fft: ");
-        print_per_thread_per_task(*fft_stats_per_frame);
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = fft_stats_per_frame->duration_this_thread[0]
+                + csi_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("csi: ");
+            print_per_thread_per_task(*csi_stats_per_frame);
+            printf("fft: ");
+            print_per_thread_per_task(*fft_stats_per_frame);
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
+        }
     }
     compute_avg_over_threads(fft_stats_per_frame, thread_num, break_down_num);
     compute_avg_over_threads(csi_stats_per_frame, thread_num, break_down_num);
@@ -240,14 +240,14 @@ void Stats::update_stats_in_dozf_bigstation(UNUSED int frame_id, int thread_num,
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         update_stats_for_breakdowns(zf_stats_per_frame, i, DoerType::kZF);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = zf_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("zf: ");
-        print_per_thread_per_task(*zf_stats_per_frame);
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = zf_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("zf: ");
+            print_per_thread_per_task(*zf_stats_per_frame);
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
+        }
     }
     compute_avg_over_threads(zf_stats_per_frame, thread_num, break_down_num);
 }
@@ -259,14 +259,14 @@ void Stats::update_stats_in_dodemul_bigstation(UNUSED int frame_id,
     for (int i = thread_num_offset; i < thread_num_offset + thread_num; i++) {
         update_stats_for_breakdowns(demul_stats_per_frame, i, DoerType::kDemul);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = demul_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("demul: ");
-        print_per_thread_per_task(*demul_stats_per_frame);
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = demul_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("demul: ");
+            print_per_thread_per_task(*demul_stats_per_frame);
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
+        }
     }
     compute_avg_over_threads(demul_stats_per_frame, thread_num, break_down_num);
 }
@@ -280,17 +280,17 @@ void Stats::update_stats_in_doifft_bigstation(UNUSED int frame_id,
         update_stats_for_breakdowns(ifft_stats_per_frame, i, DoerType::kIFFT);
         update_stats_for_breakdowns(csi_stats_per_frame, i, DoerType::kCSI);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = ifft_stats_per_frame->duration_this_thread[0]
-            + csi_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("csi: ");
-        print_per_thread_per_task(*csi_stats_per_frame);
-        printf("ifft: ");
-        print_per_thread_per_task(*ifft_stats_per_frame);
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = ifft_stats_per_frame->duration_this_thread[0]
+                + csi_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("csi: ");
+            print_per_thread_per_task(*csi_stats_per_frame);
+            printf("ifft: ");
+            print_per_thread_per_task(*ifft_stats_per_frame);
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
+        }
     }
     compute_avg_over_threads(ifft_stats_per_frame, thread_num, break_down_num);
     compute_avg_over_threads(csi_stats_per_frame, thread_num, break_down_num);
@@ -304,14 +304,14 @@ void Stats::update_stats_in_doprecode_bigstation(UNUSED int frame_id,
         update_stats_for_breakdowns(
             precode_stats_per_frame, i, DoerType::kPrecode);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = precode_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("precode: ");
-        print_per_thread_per_task(*precode_stats_per_frame);
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = precode_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("precode: ");
+            print_per_thread_per_task(*precode_stats_per_frame);
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
+        }
     }
     compute_avg_over_threads(
         precode_stats_per_frame, thread_num, break_down_num);
@@ -362,28 +362,28 @@ void Stats::update_stats_in_functions_uplink_millipede(UNUSED int frame_id,
         update_stats_for_breakdowns(
             decode_stats_per_frame, i, DoerType::kDecode);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = fft_stats_per_frame->duration_this_thread[0]
-            + csi_stats_per_frame->duration_this_thread[0]
-            + zf_stats_per_frame->duration_this_thread[0]
-            + demul_stats_per_frame->duration_this_thread[0]
-            + decode_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("csi: ");
-        print_per_thread_per_task(*csi_stats_per_frame);
-        printf("fft: ");
-        print_per_thread_per_task(*fft_stats_per_frame);
-        printf("zf: ");
-        print_per_thread_per_task(*zf_stats_per_frame);
-        printf("demul: ");
-        print_per_thread_per_task(*demul_stats_per_frame);
-        if (kUseLDPC) {
-            printf("decode: ");
-            print_per_thread_per_task(*decode_stats_per_frame);
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = fft_stats_per_frame->duration_this_thread[0]
+                + csi_stats_per_frame->duration_this_thread[0]
+                + zf_stats_per_frame->duration_this_thread[0]
+                + demul_stats_per_frame->duration_this_thread[0]
+                + decode_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("csi: ");
+            print_per_thread_per_task(*csi_stats_per_frame);
+            printf("fft: ");
+            print_per_thread_per_task(*fft_stats_per_frame);
+            printf("zf: ");
+            print_per_thread_per_task(*zf_stats_per_frame);
+            printf("demul: ");
+            print_per_thread_per_task(*demul_stats_per_frame);
+            if (kUseLDPC) {
+                printf("decode: ");
+                print_per_thread_per_task(*decode_stats_per_frame);
+            }
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
         }
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
     }
     compute_avg_over_threads(
         fft_stats_per_frame, task_thread_num, break_down_num);
@@ -414,28 +414,28 @@ void Stats::update_stats_in_functions_downlink_millipede(UNUSED int frame_id,
         update_stats_for_breakdowns(
             encode_stats_per_frame, i, DoerType::kEncode);
 
-#if DEBUG_PRINT_STATS_PER_THREAD
-        double sum_time_this_frame_this_thread
-            = ifft_stats_per_frame->duration_this_thread[0]
-            + csi_stats_per_frame->duration_this_thread[0]
-            + zf_stats_per_frame->duration_this_thread[0]
-            + precode_stats_per_frame->duration_this_thread[0]
-            + encode_stats_per_frame->duration_this_thread[0];
-        printf("In frame %d, thread %d, \t", frame_id, i);
-        printf("csi: ");
-        print_per_thread_per_task(*csi_stats_per_frame);
-        printf("ifft: ");
-        print_per_thread_per_task(*ifft_stats_per_frame);
-        printf("zf: ");
-        print_per_thread_per_task(*zf_stats_per_frame);
-        printf("precode: ");
-        if (kUseLDPC) {
-            print_per_thread_per_task(*precode_stats_per_frame);
-            printf("encode: ");
+        if (kDebugPrintStatsPerThread) {
+            double sum_time_this_frame_this_thread
+                = ifft_stats_per_frame->duration_this_thread[0]
+                + csi_stats_per_frame->duration_this_thread[0]
+                + zf_stats_per_frame->duration_this_thread[0]
+                + precode_stats_per_frame->duration_this_thread[0]
+                + encode_stats_per_frame->duration_this_thread[0];
+            printf("In frame %d, thread %d, \t", frame_id, i);
+            printf("csi: ");
+            print_per_thread_per_task(*csi_stats_per_frame);
+            printf("ifft: ");
+            print_per_thread_per_task(*ifft_stats_per_frame);
+            printf("zf: ");
+            print_per_thread_per_task(*zf_stats_per_frame);
+            printf("precode: ");
+            if (kUseLDPC) {
+                print_per_thread_per_task(*precode_stats_per_frame);
+                printf("encode: ");
+            }
+            print_per_thread_per_task(*encode_stats_per_frame);
+            printf("sum: %.3f\n", sum_time_this_frame_this_thread);
         }
-        print_per_thread_per_task(*encode_stats_per_frame);
-        printf("sum: %.3f\n", sum_time_this_frame_this_thread);
-#endif
     }
     compute_avg_over_threads(
         ifft_stats_per_frame, task_thread_num, break_down_num);

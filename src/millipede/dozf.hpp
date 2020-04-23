@@ -48,14 +48,14 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(int tag);
+    Event_data launch(size_t tag);
 
 private:
-    void ZF_time_orthogonal(int tag);
+    void ZF_time_orthogonal(size_t tag);
     void precoder(void* mat_input, int frame_id, int sc_id, int offset,
         bool downlink_mode);
 
-    void ZF_freq_orthogonal(int tag);
+    void ZF_freq_orthogonal(size_t tag);
 
     /**
      * Do prediction task for one subcarrier
@@ -79,7 +79,7 @@ private:
      *     3. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void Predict(int offset);
+    void Predict(size_t offset);
 
     Table<complex_float> csi_buffer_;
     complex_float* pred_csi_buffer;

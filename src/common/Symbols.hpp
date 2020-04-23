@@ -82,23 +82,16 @@ enum class EventType : int {
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10
 
-#define DEBUG_PRINT_PER_FRAME_DONE 1
-#define DEBUG_PRINT_PER_SYMBOL_DONE 0
-#define DEBUG_PRINT_PER_TASK_DONE 0
-#define DEBUG_PRINT_SUMMARY_100_FRAMES 0
+static constexpr bool kDebugPrintPerFrameDone = true;
+static constexpr bool kDebugPrintPerFrameStart = false;
+static constexpr bool kDebugPrintPerSymbolDone = false;
+static constexpr bool kDebugPrintPerTaskDone = false;
+static constexpr bool kDebugPrintStatsPerThread = false;
+static constexpr bool kDebugPrintInTask = false;
+static constexpr bool kDebugPrintPilot = false;
 
-#define DEBUG_PRINT_PER_FRAME_ENTER_QUEUE 0
-#define DEBUG_PRINT_PER_SYMBOL_ENTER_QUEUE 0
-#define DEBUG_PRINT_PER_TASK_ENTER_QUEUE 0
-
-#define DEBUG_PRINT_PER_FRAME_START 1
-
-#define DEBUG_PRINT_STATS_PER_THREAD 0
-#define DEBUG_PRINT_PILOT 0
 #define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
-
-#define DEBUG_PRINT_IN_TASK 0
 #define DEBUG_RECV 0
 #define DEBUG_BS_SENDER 0
 #define DEBUG_RADIO_TX 0
@@ -172,6 +165,13 @@ struct LDPCconfig {
 };
 
 typedef struct LDPCconfig LDPCconfig;
+
+// Maximum number of symbols per frame allowed by the 5G spec = 14 symbols
+// per slot times 320 slots per frame.
+static constexpr size_t k5GMaxSymbolsPerFrame = 4480;
+
+// Maximum number of OFDM subcarriers in the 5G spec
+static constexpr size_t k5GMaxSubcarriers = 3300;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
