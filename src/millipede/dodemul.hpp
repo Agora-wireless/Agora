@@ -62,9 +62,9 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(int tag);
+    Event_data launch(size_t tag);
 
-    Event_data DemulSingleSC(int offset);
+    Event_data DemulSingleSC(size_t offset);
 
 private:
     Table<complex_float>& data_buffer_;
