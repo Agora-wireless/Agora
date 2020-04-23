@@ -99,7 +99,7 @@ DoEncode::~DoEncode()
     free_buffer_1d(&ldpc_decoder_5gnr_response.varNodes);
 }
 
-Event_data DoEncode::launch(int offset)
+Event_data DoEncode::launch(size_t offset)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     int nblocksInSymbol = LDPC_config.nblocksInSymbol;
@@ -109,11 +109,11 @@ Event_data DoEncode::launch(int offset)
     int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
     int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
     int symbol_id = symbol_offset % data_symbol_num_perframe;
-#if DEBUG_PRINT_IN_TASK
-    int frame_id = symbol_offset / data_symbol_num_perframe;
-    printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
-        frame_id, symbol_id, cur_cb_id);
-#endif
+    if (kDebugPrintInTask) {
+        int frame_id = symbol_offset / data_symbol_num_perframe;
+        printf("In doEncode thread %d: frame: %d, symbol: %d, code block %d\n",
+            tid, frame_id, symbol_id, cur_cb_id);
+    }
 
     size_t start_tsc = worker_rdtsc();
 
@@ -208,7 +208,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() {}
 
-Event_data DoDecode::launch(int offset)
+Event_data DoDecode::launch(size_t offset)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     int nblocksInSymbol = LDPC_config.nblocksInSymbol;
@@ -218,11 +218,11 @@ Event_data DoDecode::launch(int offset)
     int symbol_offset = offset / (UE_NUM * LDPC_config.nblocksInSymbol);
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int symbol_id = symbol_offset % data_symbol_num_perframe;
-#if DEBUG_PRINT_IN_TASK
-    int frame_id = symbol_offset / data_symbol_num_perframe;
-    printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n", tid,
-        frame_id, symbol_id, cur_cb_id);
-#endif
+    if (kDebugPrintInTask) {
+        int frame_id = symbol_offset / data_symbol_num_perframe;
+        printf("In doDecode thread %d: frame: %d, symbol: %d, code block %d\n",
+            tid, frame_id, symbol_id, cur_cb_id);
+    }
 
     size_t start_tsc = worker_rdtsc();
 
