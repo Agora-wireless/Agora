@@ -152,7 +152,6 @@ int main(int argc, char* argv[])
     int data_symbol_num_perframe = config_->data_symbol_num_perframe;
     int pilot_symbol_num_perframe = config_->pilot_symbol_num_perframe;
     int dl_data_symbol_num_perframe = config_->dl_data_symbol_num_perframe;
-    int dl_data_symbol_start = config_->dl_data_symbol_start;
     int sampsPerSymbol = config_->sampsPerSymbol;
     int CP_LEN = config_->CP_LEN;
     int prefix = config_->prefix;
