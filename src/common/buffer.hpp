@@ -103,6 +103,15 @@ union gen_tag_t {
             kBlankUEId, kBlankAntennaId, frame_id, symbol_id, sc_id);
     }
 
+    // Generate a tag with antenna ID, frame ID, and symbol ID bits set and
+    // other fields blank
+    static gen_tag_t ant_frm_sym(
+        size_t ant_id, size_t frame_id, size_t symbol_id)
+    {
+        return gen_tag_t(
+            kBlankUEId, ant_id, frame_id, symbol_id, kBlankSubcarrierId);
+    }
+
     // Generate a tag with frame ID and subcarrier ID bits set, and other fields
     // blank
     static gen_tag_t frm_sc(size_t frame_id, size_t sc_id)
