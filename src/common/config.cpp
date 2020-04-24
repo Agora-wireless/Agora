@@ -318,15 +318,12 @@ void Config::genData()
         exit(1);
     }
 
-    dl_IQ_data.malloc(
-        dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
-    dl_IQ_symbol.malloc(
+    dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
+    dl_iq_t.malloc(
         dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
-    ul_IQ_data.malloc(
-        ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
-    ul_IQ_modul.malloc(
-        ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
-    ul_IQ_symbol.malloc(
+    ul_bits.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
+    ul_iq_f.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
+    ul_iq_t.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
@@ -337,9 +334,9 @@ void Config::genData()
         for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
             for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
                 int cur_offset = j * UE_ANT_NUM + ue_id;
-                dl_IQ_data[i][cur_offset] = rand() % mod_order;
+                dl_bits[i][cur_offset] = rand() % mod_order;
                 if (ue_id == 0)
-                    in_modul.push_back(dl_IQ_data[i][cur_offset]);
+                    in_modul.push_back(dl_bits[i][cur_offset]);
             }
         }
         std::vector<std::complex<float>> modul_data
@@ -359,9 +356,9 @@ void Config::genData()
             ifft_dl_data.end());
         for (size_t j = 0; j < sampsPerSymbol; j++) {
             if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                dl_IQ_symbol[i][j] = 0;
+                dl_iq_t[i][j] = 0;
             } else {
-                dl_IQ_symbol[i][j]
+                dl_iq_t[i][j]
                     = { (int16_t)(ifft_dl_data[j - prefix].real() * 32768),
                           (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
             }
@@ -369,22 +366,27 @@ void Config::genData()
     }
 
     auto zc_pilot_double
-         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
-       auto zc_pilot_i = CommsLib::seqCyclicShift(zc_pilot, i * (float)M_PI / 6); // LTE DMRS
-       for (size_t j = 0; j < OFDM_DATA_NUM; j++)
-           ue_specific_pilot[i][j] = {zc_pilot_i[j].real(), zc_pilot_i[j].imag()};
-       memcpy(ue_specific_pilot_t[i] + prefix + CP_LEN + OFDM_DATA_START, ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
-       CommsLib::IFFT(ue_specific_pilot_t[i] + prefix + CP_LEN, OFDM_CA_NUM);
-       memcpy(ue_specific_pilot_t[i] + prefix, ue_specific_pilot_t[i] + prefix + OFDM_CA_NUM, CP_LEN * sizeof(complex_float));
+        auto zc_pilot_i = CommsLib::seqCyclicShift(
+            zc_pilot, i * (float)M_PI / 6); // LTE DMRS
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++)
+            ue_specific_pilot[i][j]
+                = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
+        memcpy(ue_specific_pilot_t[i] + prefix + CP_LEN + OFDM_DATA_START,
+            ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
+        CommsLib::IFFT(ue_specific_pilot_t[i] + prefix + CP_LEN, OFDM_CA_NUM);
+        memcpy(ue_specific_pilot_t[i] + prefix,
+            ue_specific_pilot_t[i] + prefix + OFDM_CA_NUM,
+            CP_LEN * sizeof(complex_float));
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {
         for (size_t j = 0; j < OFDM_DATA_NUM; j++)
-            ul_IQ_data[i][j] = rand() % mod_order;
+            ul_bits[i][j] = rand() % mod_order;
         std::vector<std::complex<float>> modul_data = CommsLib::modulate(
-            std::vector<int8_t>(ul_IQ_data[i], ul_IQ_data[i] + OFDM_DATA_NUM),
+            std::vector<int8_t>(ul_bits[i], ul_bits[i] + OFDM_DATA_NUM),
             mod_type);
         std::vector<std::complex<float>> ifft_ul_data_in;
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
@@ -393,8 +395,8 @@ void Config::genData()
                 ifft_ul_data_in.push_back(0);
             } else {
                 size_t k = j - OFDM_DATA_START;
-                ul_IQ_modul[i][j].re = modul_data[k].real();
-                ul_IQ_modul[i][j].im = modul_data[k].imag();
+                ul_iq_f[i][j].re = modul_data[k].real();
+                ul_iq_f[i][j].im = modul_data[k].imag();
                 ifft_ul_data_in.push_back(modul_data[k]);
             }
         }
@@ -405,9 +407,9 @@ void Config::genData()
             ifft_ul_data.end());
         for (size_t j = 0; j < sampsPerSymbol; j++) {
             if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                ul_IQ_symbol[i][j] = 0;
+                ul_iq_t[i][j] = 0;
             } else {
-                ul_IQ_symbol[i][j]
+                ul_iq_t[i][j]
                     = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
                           (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
             }
@@ -433,7 +435,7 @@ void Config::genData()
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         r = fread(
-            dl_IQ_data[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
+            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
@@ -445,11 +447,11 @@ void Config::genData()
 Config::~Config()
 {
     free_buffer_1d(&pilots_);
-    dl_IQ_data.free();
+    dl_bits.free();
 #ifdef GENERATE_DATA
-    dl_IQ_symbol.free();
-    ul_IQ_data.free();
-    ul_IQ_modul.free();
+    ul_bits.free();
+    dl_iq_t.free();
+    ul_iq_f.free();
 #endif
 }
 

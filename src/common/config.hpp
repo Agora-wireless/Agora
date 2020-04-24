@@ -76,11 +76,11 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float* pilots_;
-    Table<int8_t> dl_IQ_data;
-    Table<int8_t> ul_IQ_data;
-    Table<complex_float> ul_IQ_modul;
-    Table<std::complex<int16_t>> dl_IQ_symbol;
-    Table<std::complex<int16_t>> ul_IQ_symbol;
+    Table<int8_t> dl_bits;
+    Table<int8_t> ul_bits;
+    Table<complex_float> ul_iq_f;
+    Table<std::complex<int16_t>> dl_iq_t;
+    Table<std::complex<int16_t>> ul_iq_t;
     Table<complex_float> ue_specific_pilot;
     Table<complex_float> ue_specific_pilot_t;
     std::vector<std::complex<float>> pilotsF;
