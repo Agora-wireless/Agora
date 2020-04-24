@@ -621,7 +621,7 @@ void* Millipede::worker(int tid)
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], dl_precoder_buffer_,
-        dl_ifft_buffer_, kUseLDPC ? dl_encoded_buffer_ : config_->dl_IQ_data,
+        dl_ifft_buffer_, kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits,
         stats);
 
     Doer* computeEncoding = nullptr;
@@ -629,7 +629,7 @@ void* Millipede::worker(int tid)
 
 #ifdef USE_LDPC
     computeEncoding = new DoEncode(config_, tid, freq_ghz, encode_queue_,
-        complete_task_queue_, worker_ptoks_ptr[tid], config_->dl_IQ_data,
+        complete_task_queue_, worker_ptoks_ptr[tid], config_->dl_bits,
         dl_encoded_buffer_, stats);
     computeDecoding = new DoDecode(config_, tid, freq_ghz, decode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
@@ -700,7 +700,7 @@ void* Millipede::worker_demul(int tid)
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz, precode_queue_,
         complete_task_queue_, worker_ptoks_ptr[tid], dl_precoder_buffer_,
-        dl_ifft_buffer_, kUseLDPC ? dl_encoded_buffer_ : config_->dl_IQ_data,
+        dl_ifft_buffer_, kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits,
         stats);
 
     while (true) {

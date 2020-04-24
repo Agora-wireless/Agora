@@ -1,8 +1,8 @@
 #include "phy-ue.hpp"
 
 Phy_UE::Phy_UE(Config* config)
-    : ul_IQ_data(config->ul_IQ_data)
-    , ul_IQ_modul(config->ul_IQ_modul)
+    : ul_bits(config->ul_bits)
+    , ul_iq_f(config->ul_iq_f)
 {
     srand(time(NULL));
 
@@ -273,7 +273,7 @@ void Phy_UE::start()
                             ul_data_symbol_perframe, tx_frame_id, i);
                         // if (l2_buffer_status_[l2_offset] == 0)
                         {
-                            // modul_buffer_[l2_offset] = ul_IQ_modul[i];
+                            // modul_buffer_[l2_offset] = ul_iq_f[i];
                             // l2_buffer_status_[l2_offset] = 1;
                             // printf("At frame %d (prev is %d) scheduling tx
                             // for frame %d with l2_offset %d\n", frame_id,
@@ -753,12 +753,12 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
                 sizeof(complex_float) * config_->OFDM_DATA_START);
         } else {
             memcpy((void*)cur_modul_buf,
-                ul_IQ_modul[ul_symbol_id * numAntennas + ant_id],
+                ul_iq_f[ul_symbol_id * numAntennas + ant_id],
                 FFT_LEN * sizeof(complex_float));
         }
         //for (size_t n = 0; n < FFT_LEN; n++) {
         //    cur_modul_buf[n]
-        //        = ul_IQ_modul[ul_symbol_id * numAntennas + ant_id][n];
+        //        = ul_iq_f[ul_symbol_id * numAntennas + ant_id][n];
         //}
 
         DftiComputeBackward(mkl_handle, cur_modul_buf);

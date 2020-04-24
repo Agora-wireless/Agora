@@ -200,8 +200,8 @@ private:
     float* pilots_;
     complex_float* ul_pilot;
     char* ul_pilot_aligned;
-    Table<int8_t>& ul_IQ_data;
-    Table<complex_float>& ul_IQ_modul;
+    Table<int8_t>& ul_bits;
+    Table<complex_float>& ul_iq_f;
 
     int pilot_sc_len;
     int data_sc_len;
@@ -322,20 +322,11 @@ private:
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
-    moodycamel::ConcurrentQueue<Event_data>
-        task_queue_; // =
-                     // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                     // * symbol_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> task_queue_;
     /* task queue for uplink demodulation */
-    moodycamel::ConcurrentQueue<Event_data>
-        demul_queue_; // =
-                      // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                      // * symbol_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> demul_queue_;
     /* main thread message queue */
-    moodycamel::ConcurrentQueue<Event_data>
-        message_queue_; // =
-                        // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                        // * symbol_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
