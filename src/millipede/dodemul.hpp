@@ -80,6 +80,7 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM */
     complex_float* spm_buffer;
+    Table<float> evm_buffer_;
 
     /**
      * Intermediate buffers for equalized data
@@ -88,6 +89,7 @@ private:
     complex_float* equaled_buffer_temp_transposed;
 
     cx_fmat ue_pilot_data;
+    cx_fmat ul_gt_mat;
 
     int ue_num_simd256;
     const size_t moving_avg_sz = 4;
