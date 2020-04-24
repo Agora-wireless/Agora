@@ -377,24 +377,17 @@ void Millipede::start()
                 /* Precoding is done, schedule ifft */
                 size_t sc_id = gen_tag_t(event.tags[0]).sc_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t data_symbol_idx_dl = gen_tag_t(event.tags[0]).symbol_id;
+                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
                 size_t total_data_symbol_id
                     = (frame_id * cfg->data_symbol_num_perframe)
-                    + data_symbol_idx_dl;
+                    + data_symbol_idx;
 
                 print_per_task_done(
-                    PRINT_PRECODE, frame_id, data_symbol_idx_dl, sc_id);
-                if (precode_stats_.last_task(frame_id, data_symbol_idx_dl)) {
-                    // TODO: offset below should have a descriptive name
-                    int offset = precode_stats_.frame_count
-                            * cfg->data_symbol_num_perframe
-                        + data_symbol_idx_dl;
-                    schedule_task_set(EventType::kIFFT, cfg->BS_ANT_NUM, offset,
-                        get_conq(EventType::kIFFT), get_ptok(EventType::kIFFT));
-
-                    // schedule_antennas(EventType::kIFFT,
-                    //    precode_stats_.frame_count, data_symbol_idx_dl);
-                    if (data_symbol_idx_dl < cfg->dl_data_symbol_end - 1) {
+                    PRINT_PRECODE, frame_id, data_symbol_idx, sc_id);
+                if (precode_stats_.last_task(frame_id, data_symbol_idx)) {
+                    schedule_antennas(EventType::kIFFT,
+                        precode_stats_.frame_count, data_symbol_idx);
+                    if (data_symbol_idx < cfg->dl_data_symbol_end - 1) {
                         if (kUseLDPC) {
                             schedule_task_set(EventType::kEncode,
                                 config_->LDPC_config.nblocksInSymbol
@@ -404,13 +397,12 @@ void Millipede::start()
                                 get_ptok(EventType::kEncode));
                         } else {
                             schedule_subcarriers(EventType::kPrecode, frame_id,
-                                data_symbol_idx_dl + 1);
+                                data_symbol_idx + 1);
                         }
                     }
 
                     print_per_symbol_done(PRINT_PRECODE,
-                        precode_stats_.frame_count, frame_id,
-                        data_symbol_idx_dl);
+                        precode_stats_.frame_count, frame_id, data_symbol_idx);
                     if (precode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(
                             TsType::kPrecodeDone, precode_stats_.frame_count);
@@ -437,6 +429,23 @@ void Millipede::start()
 
                 print_per_task_done(
                     PRINT_IFFT, frame_id, data_symbol_id, ant_id);
+
+                /*
+                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t data_symbol_idx_dl = gen_tag_t(event.tags[0]).symbol_id;
+
+                try_enqueue_fallback(get_conq(EventType::kPacketTX),
+                    tx_ptoks_ptr[ant_id % cfg->socket_thread_num],
+                    Event_data(EventType::kPacketTX,
+                        frame_id * cfg->data_symbol_num_perframe
+                            + data_symbol_idx_dl));
+
+                print_per_task_done(
+                    PRINT_IFFT, frame_id, data_symbol_idx_dl, ant_id);
+
+                if (ifft_stats_.last_task(frame_id, data_symbol_idx_dl)) {
+                */
 
                 if (ifft_stats_.last_task(frame_id, data_symbol_id)) {
                     if (ifft_stats_.last_symbol(frame_id)) {

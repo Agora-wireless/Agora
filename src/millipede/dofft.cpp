@@ -296,28 +296,29 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
-Event_data DoIFFT::launch(size_t offset)
+Event_data DoIFFT::launch(size_t tag)
 {
     size_t start_tsc = worker_rdtsc();
+    size_t ant_id = gen_tag_t(tag).ant_id;
+    size_t frame_id = gen_tag_t(tag).frame_id;
+    size_t data_symbol_idx_dl = gen_tag_t(tag).symbol_id;
 
     if (kDebugPrintInTask) {
-        int ant_id = offset % cfg->BS_ANT_NUM;
-        int total_data_symbol_id = offset / cfg->BS_ANT_NUM;
-        int frame_id = total_data_symbol_id / cfg->data_symbol_num_perframe;
-        int current_data_symbol_id
-            = total_data_symbol_id % cfg->data_symbol_num_perframe;
-        printf("In doIFFT thread %d: frame: %d, symbol: %d, antenna: %d\n", tid,
-            frame_id, current_data_symbol_id, ant_id);
+        printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
+            tid, frame_id, data_symbol_idx_dl, ant_id);
     }
 
-    int dl_ifft_buffer_size = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
+    size_t total_data_symbol_idx
+        = (frame_id * cfg->data_symbol_num_perframe) + data_symbol_idx_dl;
+    size_t offset = (total_data_symbol_idx * cfg->BS_ANT_NUM) + ant_id;
+
+    size_t num_dl_ifft_buffers = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
         * TASK_BUFFER_FRAME_NUM;
-    int buffer_symbol_offset = offset % dl_ifft_buffer_size;
 
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[buffer_symbol_offset];
+    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset % num_dl_ifft_buffers];
     memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
     memset(ifft_buf_ptr + (cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM) * 2, 0,
         sizeof(float) * cfg->OFDM_DATA_START * 2);
