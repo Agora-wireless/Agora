@@ -104,11 +104,11 @@ static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
+static constexpr bool kDebugBSSender = false;
 
 #define DEBUG_DL_PILOT 1
 #define DEBUG_PLOT 0
 #define DEBUG_RECV 0
-#define DEBUG_BS_SENDER 0
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
