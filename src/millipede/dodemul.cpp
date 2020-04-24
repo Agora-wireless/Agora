@@ -149,7 +149,6 @@ Event_data DoDemul::launch(size_t tag)
                     w *= fr < moving_avg_sz ? 0.5 : 1;
                     mat_phase_shift_w += w * mat_phase_shift;
                 }
-                mat_phase_shift_w /= moving_avg_sz;
                 cx_fmat mat_phase_correct
                     = zeros<cx_fmat>(size(mat_phase_shift_w));
                 mat_phase_correct.set_imag(
