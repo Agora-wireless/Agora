@@ -321,28 +321,21 @@ void Config::genData()
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
     dl_iq_t.malloc(
         dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
-    ul_bits.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
-    ul_iq_f.calloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
+    ul_bits.malloc(ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
+    ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     ul_iq_t.malloc(
-        ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
+        ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
 
 #ifdef GENERATE_DATA
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
-            for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
-                int cur_offset = j * UE_ANT_NUM + ue_id;
+    for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
+            int cur_offset = j * UE_ANT_NUM + ue_id;
+            for (size_t i = 0; i < ul_data_symbol_num_perframe; i++)
+                ul_bits[i][cur_offset] = rand() % mod_order;
+            for (size_t i = 0; i < dl_data_symbol_num_perframe; i++)
                 dl_bits[i][cur_offset] = rand() % mod_order;
-	    }
-        }
-    }
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
-            for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
-                int cur_offset = i * UE_ANT_NUM + ue_id;
-                ul_bits[cur_offset][j] = rand() % mod_order;
-	    }
         }
     }
 #else
@@ -363,17 +356,17 @@ void Config::genData()
         printf("open antenna file %s failed.\n", filename1.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         r = fread(
-            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
+            ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
-    for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         r = fread(
-            ul_bits[i], sizeof(int8_t), num_bytes_per_ue, fd);
-        if (r < num_bytes_per_ue)
+            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
+        if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
@@ -429,36 +422,37 @@ void Config::genData()
             CP_LEN * sizeof(complex_float));
     }
 
-    for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {
-        for (size_t j = 0; j < OFDM_DATA_NUM; j++)
-            ul_bits[i][j] = rand() % mod_order;
-        std::vector<std::complex<float>> modul_data = CommsLib::modulate(
-            std::vector<int8_t>(ul_bits[i], ul_bits[i] + OFDM_DATA_NUM),
-            mod_type);
-        std::vector<std::complex<float>> ifft_ul_data_in;
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
-                // continue;
-                ifft_ul_data_in.push_back(0);
-            } else {
-                size_t k = j - OFDM_DATA_START;
-                ul_iq_f[i][j].re = modul_data[k].real();
-                ul_iq_f[i][j].im = modul_data[k].imag();
-                ifft_ul_data_in.push_back(modul_data[k]);
+    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
+            size_t p = ue_id * OFDM_DATA_NUM;
+            std::vector<std::complex<float>> modul_data = CommsLib::modulate(
+                std::vector<int8_t>(ul_bits[i] + p, ul_bits[i] + p + OFDM_DATA_NUM),
+                mod_type);
+            std::vector<std::complex<float>> ifft_ul_data_in;
+            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+                if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
+                    // continue;
+                    ifft_ul_data_in.push_back(0);
+                } else {
+                    size_t k = j - OFDM_DATA_START;
+                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].re = modul_data[k].real();
+                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].im = modul_data[k].imag();
+                    ifft_ul_data_in.push_back(modul_data[k]);
+                }
             }
-        }
 
-        std::vector<std::complex<float>> ifft_ul_data
-            = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
-        ifft_ul_data.insert(ifft_ul_data.begin(), ifft_ul_data.end() - CP_LEN,
-            ifft_ul_data.end());
-        for (size_t j = 0; j < sampsPerSymbol; j++) {
-            if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                ul_iq_t[i][j] = 0;
-            } else {
-                ul_iq_t[i][j]
-                    = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
-                          (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
+            std::vector<std::complex<float>> ifft_ul_data
+                = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
+            ifft_ul_data.insert(ifft_ul_data.begin(), ifft_ul_data.end() - CP_LEN,
+                ifft_ul_data.end());
+            for (size_t j = 0; j < sampsPerSymbol; j++) {
+                if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
+                    ul_iq_t[i][ue_id * sampsPerSymbol + j] = 0;
+                } else {
+                    ul_iq_t[i][ue_id * sampsPerSymbol + j]
+                        = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
+                              (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
+                }
             }
         }
     }

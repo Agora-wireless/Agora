@@ -753,12 +753,12 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
                 sizeof(complex_float) * config_->OFDM_DATA_START);
         } else {
             memcpy((void*)cur_modul_buf,
-                ul_iq_f[ul_symbol_id * numAntennas + ant_id],
+                (void*)&ul_iq_f[ul_symbol_id][FFT_LEN * ant_id],
                 FFT_LEN * sizeof(complex_float));
         }
         //for (size_t n = 0; n < FFT_LEN; n++) {
         //    cur_modul_buf[n]
-        //        = ul_iq_f[ul_symbol_id * numAntennas + ant_id][n];
+        //        = ul_iq_f[ul_symbol_id][FFT_LEN * ant_id + n];
         //}
 
         DftiComputeBackward(mkl_handle, cur_modul_buf);
@@ -769,8 +769,6 @@ void Phy_UE::doTransmit(int tid, int offset, int frame)
 
         size_t tx_offset = txbuf_offset + ant_id * tx_packet_length;
         char* cur_tx_buffer = &tx_buffer_[tx_offset];
-        // complex_float* tx_buffer_ptr = (complex_float*)(cur_tx_buffer +
-        // prefix_len*sizeof(complex_float) + config_->packet_header_offset);
         struct Packet* pkt = (struct Packet*)cur_tx_buffer;
         pkt->frame_id = frame_id;
         pkt->symbol_id = symbol_id;
