@@ -38,6 +38,11 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
 
+    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
+    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+    ul_gt_mat = ul_iq_f_mat.st();
+    evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+
     ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
 }
 
@@ -52,8 +57,8 @@ Event_data DoDemul::launch(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t total_data_symbol_idx = (frame_id * cfg->ul_data_symbol_num_perframe)
-        + symbol_id;
+    size_t total_data_symbol_idx
+        = (frame_id * cfg->ul_data_symbol_num_perframe) + symbol_id;
     size_t base_sc_id = gen_tag_t(tag).base_sc_id;
 
     size_t start_tsc = worker_rdtsc();
@@ -149,11 +154,29 @@ Event_data DoDemul::launch(size_t tag)
                     w *= fr < moving_avg_sz ? 0.5 : 1;
                     mat_phase_shift_w += w * mat_phase_shift;
                 }
+                //mat_phase_shift_w /= moving_avg_sz;
                 cx_fmat mat_phase_correct
                     = zeros<cx_fmat>(size(mat_phase_shift_w));
                 mat_phase_correct.set_imag(
                     arg(mat_phase_shift_w / cfg->OFDM_DATA_NUM));
                 mat_equaled %= exp(mat_phase_correct);
+            }
+
+            if (symbol_id == cfg->UL_PILOT_SYMS) {
+                fmat evm = abs(mat_equaled
+                    - ul_gt_mat.col(cfg->OFDM_DATA_START + cur_sc_id));
+                fmat cur_evm_mat(evm_buffer_[frame_id], cfg->UE_NUM, 1, false);
+                cur_evm_mat += evm % evm;
+                if (cur_sc_id == 0) {
+                    size_t prev_frame = (frame_id + 1 + TASK_BUFFER_FRAME_NUM)
+                        % TASK_BUFFER_FRAME_NUM;
+                    fmat evm_mat(
+                        evm_buffer_[prev_frame], cfg->UE_NUM, 1, false);
+                    evm_mat /= cfg->OFDM_DATA_NUM;
+                    std::cout << "Frame " << prev_frame << ": EVM "
+                              << 100 * evm_mat << ", SNR "
+                              << -10 * log10(evm_mat) << std::endl;
+                }
             }
 
             size_t start_tsc3 = worker_rdtsc();
