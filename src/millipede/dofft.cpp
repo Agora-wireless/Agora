@@ -301,15 +301,15 @@ Event_data DoIFFT::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
     size_t ant_id = gen_tag_t(tag).ant_id;
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t data_symbol_idx_dl = gen_tag_t(tag).symbol_id;
+    size_t data_symbol_idx = gen_tag_t(tag).symbol_id;
 
     if (kDebugPrintInTask) {
         printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
-            tid, frame_id, data_symbol_idx_dl, ant_id);
+            tid, frame_id, data_symbol_idx, ant_id);
     }
 
     size_t total_data_symbol_idx
-        = (frame_id * cfg->data_symbol_num_perframe) + data_symbol_idx_dl;
+        = (frame_id * cfg->data_symbol_num_perframe) + data_symbol_idx;
     size_t offset = (total_data_symbol_idx * cfg->BS_ANT_NUM) + ant_id;
 
     size_t num_dl_ifft_buffers = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
@@ -379,5 +379,5 @@ Event_data DoIFFT::launch(size_t tag)
 
     duration_stat->task_count++;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    return Event_data(EventType::kIFFT, offset);
+    return Event_data(EventType::kIFFT, tag);
 }
