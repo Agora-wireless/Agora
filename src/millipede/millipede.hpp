@@ -89,9 +89,12 @@ public:
     void print_per_task_done(
         int task_type, int frame_id, int symbol_id, int ant_or_sc_id);
 
-    void schedule_subcarriers(EventType task_type, gen_tag_t base_tag);
+    void schedule_subcarriers(
+        EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, gen_tag_t base_tag);
-    void schedule_antennas(EventType task_type, gen_tag_t base_tag);
+    void schedule_antennas(
+        EventType task_type, size_t frame_id, size_t symbol_id);
+
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();

@@ -86,12 +86,27 @@ static void schedule_task_set(EventType task_type, int task_set_size,
     }
 }
 
-void Millipede::schedule_subcarriers(EventType task_type, gen_tag_t base_tag)
+void Millipede::schedule_antennas(
+    EventType event_type, size_t frame_id, size_t symbol_id)
 {
+    assert(event_type == EventType::kFFT or event_type == EventType::kIFFT);
+    auto base_tag = gen_tag_t::ant_frm_sym(0, frame_id, symbol_id);
+
+    for (size_t i = 0; i < config_->BS_ANT_NUM; i++) {
+        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+            Event_data(event_type, base_tag._tag));
+        base_tag.ant_id++;
+    }
+}
+
+void Millipede::schedule_subcarriers(
+    EventType event_type, size_t frame_id, size_t symbol_id)
+{
+    auto base_tag = gen_tag_t::frm_sym_sc(frame_id, symbol_id, 0);
     size_t num_events = SIZE_MAX;
     size_t block_size = SIZE_MAX;
 
-    switch (task_type) {
+    switch (event_type) {
     case EventType::kDemul:
     case EventType::kPrecode:
         num_events = config_->demul_events_per_symbol;
@@ -102,12 +117,12 @@ void Millipede::schedule_subcarriers(EventType task_type, gen_tag_t base_tag)
         block_size = config_->zf_block_size;
         break;
     default:
-        rt_assert(false, "Invalid event type");
+        assert(false);
     }
 
     for (size_t i = 0; i < num_events; i++) {
-        try_enqueue_fallback(get_conq(task_type), get_ptok(task_type),
-            Event_data(task_type, base_tag._tag));
+        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+            Event_data(event_type, base_tag._tag));
         base_tag.sc_id += block_size;
     }
 }
@@ -222,8 +237,8 @@ void Millipede::start()
                     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe;
                          i++) {
                         if (fft_stats_.cur_frame_for_symbol[i] == frame_id) {
-                            schedule_subcarriers(EventType::kDemul,
-                                gen_tag_t::frm_sym_sc(frame_id, i, 0));
+                            schedule_subcarriers(
+                                EventType::kDemul, frame_id, i);
                         }
                     }
 
@@ -241,9 +256,8 @@ void Millipede::start()
                                 get_conq(EventType::kEncode),
                                 get_ptok(EventType::kEncode));
                         } else {
-                            schedule_subcarriers(EventType::kPrecode,
-                                gen_tag_t::frm_sym_sc(
-                                    frame_id, cfg->dl_data_symbol_start, 0));
+                            schedule_subcarriers(EventType::kPrecode, frame_id,
+                                cfg->dl_data_symbol_start);
                         }
                     }
                 }
@@ -345,8 +359,8 @@ void Millipede::start()
                     = total_data_symbol_id % cfg->data_symbol_num_perframe;
 
                 if (encode_stats_.last_task(frame_id, data_symbol_id)) {
-                    schedule_subcarriers(EventType::kPrecode,
-                        gen_tag_t::frm_sym_sc(frame_id, data_symbol_id, 0));
+                    schedule_subcarriers(
+                        EventType::kPrecode, frame_id, data_symbol_id);
                     print_per_symbol_done(PRINT_ENCODE,
                         encode_stats_.frame_count, frame_id, data_symbol_id);
                     if (encode_stats_.last_symbol(frame_id)) {
@@ -385,9 +399,8 @@ void Millipede::start()
                                 get_conq(EventType::kEncode),
                                 get_ptok(EventType::kEncode));
                         } else {
-                            schedule_subcarriers(EventType::kPrecode,
-                                gen_tag_t::frm_sym_sc(
-                                    frame_id, data_symbol_id + 1, 0));
+                            schedule_subcarriers(EventType::kPrecode, frame_id,
+                                data_symbol_id + 1);
                         }
                     }
 
@@ -556,9 +569,7 @@ void Millipede::handle_event_fft(size_t tag)
                     print_per_frame_done(
                         PRINT_FFT_PILOTS, fft_stats_.frame_count, frame_id);
                     fft_stats_.update_frame_count();
-
-                    schedule_subcarriers(
-                        EventType::kZF, gen_tag_t::frm_sc(frame_id, 0));
+                    schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
         } else if (config_->isUplink(frame_id, symbol_id)) {
@@ -568,8 +579,8 @@ void Millipede::handle_event_fft(size_t tag)
                 frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
             if (zf_stats_.coded_frame == frame_id) {
-                schedule_subcarriers(EventType::kDemul,
-                    gen_tag_t::frm_sym_sc(frame_id, symbol_idx_ul, 0));
+                schedule_subcarriers(
+                    EventType::kDemul, frame_id, symbol_idx_ul);
             }
         } else if (config_->isCalDlPilot(frame_id, symbol_id)
             || config_->isCalUlPilot(frame_id, symbol_id)) {
