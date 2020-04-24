@@ -337,6 +337,14 @@ void Config::genData()
 	    }
         }
     }
+    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
+            for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
+                int cur_offset = i * UE_ANT_NUM + ue_id;
+                ul_bits[cur_offset][j] = rand() % mod_order;
+	    }
+        }
+    }
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
@@ -358,6 +366,13 @@ void Config::genData()
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         r = fread(
             dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
+        if (r < num_bytes_per_ue * UE_ANT_NUM)
+            printf(
+                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+    }
+    for (size_t i = 0; i < ul_data_symbol_num_perframe * UE_ANT_NUM; i++) {
+        r = fread(
+            ul_bits[i], sizeof(int8_t), num_bytes_per_ue, fd);
         if (r < num_bytes_per_ue)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
