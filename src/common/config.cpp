@@ -342,12 +342,12 @@ void Config::genData()
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
         + ".bin";
     size_t num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
 #else
     std::string filename1 = cur_directory1 + "/data/orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
         + ".bin";
     size_t num_bytes_per_ue = OFDM_DATA_NUM;
 #endif

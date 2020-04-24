@@ -295,7 +295,7 @@ int main(int argc, char* argv[])
     printf("saving raw data...\n");
 #ifdef USE_LDPC
     std::string filename_input = cur_directory + "/data/LDPC_orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_NUM)
         + ".bin";
     FILE* fp_input = fopen(filename_input.c_str(), "wb");
     for (int i = 0; i < numberCodeblocks; i++) {
@@ -305,7 +305,7 @@ int main(int argc, char* argv[])
     fclose(fp_input);
 #else
     std::string filename_input = cur_directory + "/data/orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_NUM)
         + ".bin";
     FILE* fp_input = fopen(filename_input.c_str(), "wb");
     for (int i = 0; i < numberCodeblocks; i++) {
