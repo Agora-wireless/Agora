@@ -112,10 +112,11 @@ Event_data DoPrecode::launch(size_t tag)
 
             // printf("In doPrecode thread %d: frame: %d, symbol: %d, "
             //        "subcarrier: % d\n ",
-            //     tid, frame_id, current_data_symbol_id, sc_id);
+            //     tid, frame_id, current_data_symbol_id, cur_sc_id);
             // cout << "Precoder: \n" << mat_precoder << endl;
             // cout << "Data: \n" << mat_data << endl;
             // cout << "Precoded data: \n" << mat_precoded << endl;
+            duration_stat->task_count++;
         }
         duration_stat->task_duration[2] += worker_rdtsc() - start_tsc1;
     }
@@ -139,7 +140,7 @@ Event_data DoPrecode::launch(size_t tag)
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    duration_stat->task_count++;
+    // duration_stat->task_count++;
 
     if (kDebugPrintInTask) {
         printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
