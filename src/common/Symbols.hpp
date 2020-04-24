@@ -41,13 +41,12 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
+// TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
     kPacketRX,
     kFFT,
     kZF,
     kDemul,
-    kPred,
-    kModul,
     kIFFT,
     kPrecode,
     kPacketTX,
@@ -55,8 +54,23 @@ enum class EventType : int {
     kEncode,
     kRC,
     kRXSymbol,
-    kInvalid
 };
+static constexpr size_t kNumEventTypes
+    = static_cast<size_t>(EventType::kRXSymbol) + 1;
+
+// Types of Millipede Doers
+enum class DoerType : size_t {
+    kFFT,
+    kCSI,
+    kZF,
+    kDemul,
+    kDecode,
+    kEncode,
+    kIFFT,
+    kPrecode,
+    kRC
+};
+static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1
@@ -167,15 +181,17 @@ struct LDPCconfig {
 
 typedef struct LDPCconfig LDPCconfig;
 
-// Maximum number of symbols per frame allowed by the 5G spec = 14 symbols
-// per slot times 320 slots per frame.
-static constexpr size_t k5GMaxSymbolsPerFrame = 4480;
+// Maximum number of symbols per frame allowed by Millipede
+static constexpr size_t kMaxSymbolsPerFrame = 140;
 
 // Maximum number of OFDM subcarriers in the 5G spec
 static constexpr size_t k5GMaxSubcarriers = 3300;
 
 // Maximum number of antennas supported by Millipede
 static constexpr size_t kMaxAntennas = 64;
+
+// Maximum number of UEs supported by Millipede
+static constexpr size_t kMaxUEs = 64;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
