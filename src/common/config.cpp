@@ -322,7 +322,7 @@ void Config::genData()
     dl_iq_t.malloc(
         dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
     ul_bits.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_DATA_NUM, 64);
-    ul_iq_f.malloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
+    ul_iq_f.calloc(ul_data_symbol_num_perframe * UE_ANT_NUM, OFDM_CA_NUM, 64);
     ul_iq_t.malloc(
         ul_data_symbol_num_perframe * UE_ANT_NUM, sampsPerSymbol, 64);
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
@@ -330,14 +330,46 @@ void Config::genData()
 
 #ifdef GENERATE_DATA
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        std::vector<int8_t> in_modul;
         for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
             for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
                 int cur_offset = j * UE_ANT_NUM + ue_id;
                 dl_bits[i][cur_offset] = rand() % mod_order;
-                if (ue_id == 0)
-                    in_modul.push_back(dl_bits[i][cur_offset]);
-            }
+	    }
+        }
+    }
+#else
+    std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
+#ifdef USE_LDPC
+    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
+    size_t num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
+#else
+    std::string filename1 = cur_directory1 + "/data/orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
+    size_t num_bytes_per_ue = OFDM_DATA_NUM;
+#endif
+    FILE* fd = fopen(filename1.c_str(), "rb");
+    if (fd == NULL) {
+        printf("open antenna file %s failed.\n", filename1.c_str());
+        std::cerr << "Error: " << strerror(errno) << std::endl;
+    }
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        r = fread(
+            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
+        if (r < num_bytes_per_ue)
+            printf(
+                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+    }
+    fclose(fd);
+#endif
+
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        std::vector<int8_t> in_modul;
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
+            int cur_offset = j * UE_ANT_NUM;
+            in_modul.push_back(dl_bits[i][cur_offset]);
         }
         std::vector<std::complex<float>> modul_data
             = CommsLib::modulate(in_modul, mod_type);
@@ -415,33 +447,6 @@ void Config::genData()
             }
         }
     }
-#else
-    std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
-#ifdef USE_LDPC
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
-        + ".bin";
-    size_t num_bytes_per_ue = (LDPC_config.cbLen + 7) >> 3;
-#else
-    std::string filename1 = cur_directory1 + "/data/orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
-        + ".bin";
-    size_t num_bytes_per_ue = OFDM_DATA_NUM;
-#endif
-    FILE* fd = fopen(filename1.c_str(), "rb");
-    if (fd == NULL) {
-        printf("open antenna file %s failed.\n", filename1.c_str());
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-    }
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        r = fread(
-            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
-        if (r < num_bytes_per_ue)
-            printf(
-                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
-    }
-    fclose(fd);
-#endif
 }
 
 Config::~Config()
