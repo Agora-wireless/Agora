@@ -114,7 +114,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t offset);
+    Event_data launch(size_t tag);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;

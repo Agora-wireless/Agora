@@ -49,14 +49,14 @@ Event_data DoPrecode::launch(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t base_sc_id = gen_tag_t(tag).sc_id;
-    size_t current_data_symbol_id = gen_tag_t(tag).symbol_id;
-    size_t total_data_symbol_id
-        = frame_id * cfg->data_symbol_num_perframe + current_data_symbol_id;
+    size_t data_symbol_idx_dl = gen_tag_t(tag).symbol_id;
+    size_t total_data_symbol_idx
+        = (frame_id * cfg->data_symbol_num_perframe) + data_symbol_idx_dl;
 
-    double start_tsc = worker_rdtsc();
+    size_t start_tsc = worker_rdtsc();
     if (kDebugPrintInTask) {
         printf("In doPrecode TID %d: frame %zu, symbol %zu, subcarrier %zu\n",
-            tid, frame_id, current_data_symbol_id, base_sc_id);
+            tid, frame_id, data_symbol_idx_dl, base_sc_id);
     }
 
     __m256i index = _mm256_setr_epi64x(
@@ -65,34 +65,29 @@ Event_data DoPrecode::launch(size_t tag)
         = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
-        double start_tsc1 = worker_rdtsc();
+        size_t start_tsc1 = worker_rdtsc();
         for (int j = 0; j < 4; j++) {
-            double start_tsc2 = worker_rdtsc();
+            size_t start_tsc2 = worker_rdtsc();
             int cur_sc_id = base_sc_id + i + j;
             int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
             if (cfg->freq_orthogonal_pilot)
                 precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
 
             complex_float* data_ptr = modulated_buffer_temp;
-            if ((unsigned)current_data_symbol_id
+            if (data_symbol_idx_dl
                 <= cfg->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                     data_ptr[user_id]
                         = { cfg->pilots_[cur_sc_id + cfg->OFDM_DATA_START], 0 };
             } else {
                 int symbol_id_in_buffer
-                    = current_data_symbol_id - cfg->dl_data_symbol_start;
+                    = data_symbol_idx_dl - cfg->dl_data_symbol_start;
 
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
-#ifdef USE_LDPC
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[total_data_symbol_id][cur_sc_id
+                        = &dl_raw_data[kUseLDPC ? total_data_symbol_idx
+                                                : symbol_id_in_buffer][cur_sc_id
                             + cfg->OFDM_DATA_NUM * user_id];
-#else
-                    int8_t* raw_data_ptr
-                        = &dl_raw_data[symbol_id_in_buffer][cur_sc_id
-                            + cfg->OFDM_DATA_NUM * user_id];
-#endif
                     data_ptr[user_id] = mod_single_uint8(
                         (uint8_t) * (raw_data_ptr), qam_table);
                 }
@@ -121,12 +116,12 @@ Event_data DoPrecode::launch(size_t tag)
         duration_stat->task_duration[2] += worker_rdtsc() - start_tsc1;
     }
 
-    double start_tsc3 = worker_rdtsc();
+    size_t start_tsc3 = worker_rdtsc();
 
     float* precoded_ptr = (float*)precoded_buffer_temp;
     for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
         int ifft_buffer_offset
-            = ant_id + cfg->BS_ANT_NUM * total_data_symbol_id;
+            = ant_id + cfg->BS_ANT_NUM * total_data_symbol_idx;
         float* ifft_ptr
             = (float*)&dl_ifft_buffer_[ifft_buffer_offset]
                                       [base_sc_id + cfg->OFDM_DATA_START];
@@ -145,7 +140,7 @@ Event_data DoPrecode::launch(size_t tag)
     if (kDebugPrintInTask) {
         printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
                "subcarrier: %zu\n",
-            tid, frame_id, current_data_symbol_id, base_sc_id);
+            tid, frame_id, data_symbol_idx_dl, base_sc_id);
     }
     return Event_data(EventType::kPrecode, tag);
 }
