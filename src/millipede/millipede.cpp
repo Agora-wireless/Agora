@@ -415,39 +415,24 @@ void Millipede::start()
 
             case EventType::kIFFT: {
                 /* IFFT is done, schedule data transmission */
-                int ant_id = event.tags[0] % cfg->BS_ANT_NUM;
-                int total_data_symbol_id = event.tags[0] / cfg->BS_ANT_NUM;
-                int frame_id = total_data_symbol_id
-                    / cfg->data_symbol_num_perframe % TASK_BUFFER_FRAME_NUM;
-                int data_symbol_id
-                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
-                int ptok_id = ant_id % cfg->socket_thread_num; /* RX */
-
-                try_enqueue_fallback(get_conq(EventType::kPacketTX),
-                    tx_ptoks_ptr[ptok_id],
-                    Event_data(EventType::kPacketTX, event.tags[0]));
-
-                print_per_task_done(
-                    PRINT_IFFT, frame_id, data_symbol_id, ant_id);
-
-                /*
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t data_symbol_idx_dl = gen_tag_t(event.tags[0]).symbol_id;
+                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+
+                size_t total_data_symbol_idx
+                    = (frame_id * cfg->data_symbol_num_perframe)
+                    + data_symbol_idx;
+                size_t offset
+                    = (total_data_symbol_idx * cfg->BS_ANT_NUM) + ant_id;
 
                 try_enqueue_fallback(get_conq(EventType::kPacketTX),
                     tx_ptoks_ptr[ant_id % cfg->socket_thread_num],
-                    Event_data(EventType::kPacketTX,
-                        frame_id * cfg->data_symbol_num_perframe
-                            + data_symbol_idx_dl));
+                    Event_data(EventType::kPacketTX, offset));
 
                 print_per_task_done(
-                    PRINT_IFFT, frame_id, data_symbol_idx_dl, ant_id);
+                    PRINT_IFFT, frame_id, data_symbol_idx, ant_id);
 
-                if (ifft_stats_.last_task(frame_id, data_symbol_idx_dl)) {
-                */
-
-                if (ifft_stats_.last_task(frame_id, data_symbol_id)) {
+                if (ifft_stats_.last_task(frame_id, data_symbol_idx)) {
                     if (ifft_stats_.last_symbol(frame_id)) {
                         cur_frame_id = (frame_id + 1) % TASK_BUFFER_FRAME_NUM;
                         frame_count = ifft_stats_.frame_count + 1;
