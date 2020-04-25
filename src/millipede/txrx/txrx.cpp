@@ -210,7 +210,7 @@ int PacketTXRX::dequeue_send(int tid)
     rt_assert(ret > 0, "sendto() failed");
 
     rt_assert(message_queue_->enqueue(
-                  *rx_ptoks_[tid], Event_data(EventType::kPacketRX, offset)),
+                  *rx_ptoks_[tid], Event_data(EventType::kPacketTX, offset)),
         "Socket message enqueue failed\n");
     return event.tags[0];
 }

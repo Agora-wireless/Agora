@@ -420,7 +420,7 @@ void Millipede::start()
                 size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
                 try_enqueue_fallback(get_conq(EventType::kPacketTX),
                     tx_ptoks_ptr[ant_id % cfg->socket_thread_num],
-                    Event_data(EentType::kPacketTX, event.tags[0]));
+                    Event_data(EventType::kPacketTX, event.tags[0]));
 
                 print_per_task_done(
                     PRINT_IFFT, frame_id, data_symbol_idx, ant_id);
