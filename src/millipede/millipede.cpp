@@ -416,7 +416,8 @@ void Millipede::start()
             case EventType::kIFFT: {
                 /* IFFT is done, schedule data transmission */
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t frame_id
+                    = gen_tag_t(event.tags[0]).frame_id % TASK_BUFFER_FRAME_NUM;
                 size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
                 try_enqueue_fallback(get_conq(EventType::kPacketTX),
                     tx_ptoks_ptr[ant_id % cfg->socket_thread_num],
