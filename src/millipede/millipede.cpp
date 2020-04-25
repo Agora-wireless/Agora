@@ -418,16 +418,9 @@ void Millipede::start()
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
-
-                size_t total_data_symbol_idx
-                    = (frame_id * cfg->data_symbol_num_perframe)
-                    + data_symbol_idx;
-                size_t offset
-                    = (total_data_symbol_idx * cfg->BS_ANT_NUM) + ant_id;
-
                 try_enqueue_fallback(get_conq(EventType::kPacketTX),
                     tx_ptoks_ptr[ant_id % cfg->socket_thread_num],
-                    Event_data(EventType::kPacketTX, offset));
+                    Event_data(EentType::kPacketTX, event.tags[0]));
 
                 print_per_task_done(
                     PRINT_IFFT, frame_id, data_symbol_idx, ant_id);
@@ -447,23 +440,17 @@ void Millipede::start()
 
             case EventType::kPacketTX: {
                 /* Data is sent */
-                int ant_id = event.tags[0] % cfg->BS_ANT_NUM;
-                int total_data_symbol_id = event.tags[0] / cfg->BS_ANT_NUM;
-                int frame_id
-                    = total_data_symbol_id / cfg->data_symbol_num_perframe;
-                int data_symbol_id
-                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
-                // printf("In main thread: tx finished for ",
-                //     "frame %d symbol %d ant %d\n",
-                //     frame_id, data_symbol_id, ant_id);
-                frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
+                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
-                print_per_task_done(PRINT_TX, frame_id, data_symbol_id, ant_id);
-                if (tx_stats_.last_task(frame_id, data_symbol_id)) {
+                print_per_task_done(
+                    PRINT_TX, frame_id, data_symbol_idx, ant_id);
+                if (tx_stats_.last_task(frame_id, data_symbol_idx)) {
                     print_per_symbol_done(PRINT_TX, tx_stats_.frame_count,
-                        frame_id, data_symbol_id);
+                        frame_id, data_symbol_idx);
                     /* If tx of the first symbol is done */
-                    if (data_symbol_id == (int)cfg->dl_data_symbol_start) {
+                    if (data_symbol_idx == cfg->dl_data_symbol_start) {
                         stats->master_set_tsc(
                             TsType::kTXProcessedFirst, tx_stats_.frame_count);
                         print_per_frame_done(

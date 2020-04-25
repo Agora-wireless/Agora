@@ -173,52 +173,44 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
 int PacketTXRX::dequeue_send(int tid)
 {
-    Event_data task_event;
-    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
+    auto& c = config_;
+    Event_data event;
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    if (task_event.event_type != EventType::kPacketTX) {
-        printf("Wrong event type!");
-        exit(0);
-    }
+    assert(event.event_type == EventType::kPacketTX);
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
-    int packet_length = config_->packet_length;
-    int offset = task_event.tags[0];
-    int ant_id = offset % BS_ANT_NUM;
-    int symbol_id = offset / BS_ANT_NUM % data_symbol_num_perframe;
-    symbol_id += config_->pilot_symbol_num_perframe;
-    int frame_id = offset / (BS_ANT_NUM * data_symbol_num_perframe);
+    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+    size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+
+    size_t total_data_symbol_idx
+        = (frame_id * c->data_symbol_num_perframe) + data_symbol_idx;
+    size_t offset = (total_data_symbol_idx * c->BS_ANT_NUM) + ant_id;
 
     if (kDebugBSSender) {
-        printf("In TX thread %d: Transmitted frame %d, symbol %d, "
-               "ant %d, offset: %d, msg_queue_length: %zu\n",
-            tid, frame_id, symbol_id, ant_id, offset,
+        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+               "ant %zu, offset: %zu, msg_queue_length: %zu\n",
+            tid, frame_id, data_symbol_idx, ant_id, offset,
             message_queue_->size_approx());
     }
 
-    int socket_symbol_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * data_symbol_num_perframe * BS_ANT_NUM);
-    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * packet_length;
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+    size_t socket_symbol_offset = offset
+        % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
+              * c->BS_ANT_NUM);
+    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
+    auto* pkt = (Packet*)cur_buffer_ptr;
+    new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
 
-    // send data (one OFDM symbol)
-    if (sendto(socket_[ant_id % config_->socket_thread_num],
-            (char*)cur_buffer_ptr, packet_length, 0,
-            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]))
-        < 0) {
-        perror("socket sendto failed");
-        exit(0);
-    }
+    // Send data (one OFDM symbol)
+    ssize_t ret = sendto(socket_[ant_id % config_->socket_thread_num],
+        cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
+        sizeof(servaddr_[tid]));
+    rt_assert(ret > 0, "sendto() failed");
 
-    Event_data tx_message(EventType::kPacketTX, offset);
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    if (!message_queue_->enqueue(*local_ptok, tx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
-    }
-    return offset;
+    rt_assert(message_queue_->enqueue(
+                  *rx_ptoks_[tid], Event_data(EventType::kPacketRX, offset)),
+        "Socket message enqueue failed\n");
+    return event.tags[0];
 }
