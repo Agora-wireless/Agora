@@ -160,7 +160,7 @@ private:
     Table<complex_float> csi_buffer_;
 
     // Data symbols after FFT
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of antennas * number of OFDM data subcarriers
     //
     // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
@@ -174,22 +174,22 @@ private:
     Table<complex_float> precoder_buffer_;
 
     // Data after equalization
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
 
     // Data after hard demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<uint8_t> demod_hard_buffer_;
 
     // Data after soft demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> demod_soft_buffer_;
 
     // Data after LDPC decoding
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
 
