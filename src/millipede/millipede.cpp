@@ -1040,8 +1040,8 @@ void Millipede::initialize_uplink_buffers()
     socket_buffer_size_
         = (long long)cfg->packet_length * socket_buffer_status_size_;
 
-    printf("Millipede: Initializing uplink buffers: socket buffer size %lld, "
-           "socket buffer status size %d\n",
+    printf("Millipede: Initializing uplink buffers: socket buffer size %zu, "
+           "socket buffer status size %zu\n",
         socket_buffer_size_, socket_buffer_status_size_);
 
     socket_buffer_.malloc(
@@ -1106,6 +1106,7 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size_, 64, 0);
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
+
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
