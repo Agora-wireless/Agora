@@ -1030,7 +1030,7 @@ void Millipede::initialize_queues()
 void Millipede::initialize_uplink_buffers()
 {
     auto& cfg = config_;
-    int TASK_BUFFER_SYMBOL_NUM
+    const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
@@ -1052,21 +1052,21 @@ void Millipede::initialize_uplink_buffers()
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
-        TASK_BUFFER_SYMBOL_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 
     equal_buffer_.malloc(
-        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     demod_hard_buffer_.malloc(
-        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;
-    demod_soft_buffer_.malloc(TASK_BUFFER_SYMBOL_NUM,
+    demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t num_decoded_bytes
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        TASK_BUFFER_SYMBOL_NUM, num_decoded_bytes * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, num_decoded_bytes * cfg->UE_NUM, 64);
 
     rx_stats_.max_task_count = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1096,7 +1096,7 @@ void Millipede::initialize_uplink_buffers()
 void Millipede::initialize_downlink_buffers()
 {
     auto& cfg = config_;
-    int TASK_BUFFER_SYMBOL_NUM
+    const size_t task_buffer_symbol_num
         = cfg->data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     dl_socket_buffer_status_size_ = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
@@ -1108,7 +1108,7 @@ void Millipede::initialize_downlink_buffers()
         &dl_socket_buffer_status_, dl_socket_buffer_status_size_, 64, 1);
 
     dl_ifft_buffer_.calloc(
-        cfg->BS_ANT_NUM * TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_CA_NUM, 64);
+        cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.calloc(
@@ -1116,7 +1116,7 @@ void Millipede::initialize_downlink_buffers()
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(
-        TASK_BUFFER_SYMBOL_NUM, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
         cfg->dl_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
     precode_stats_.init(config_->demul_events_per_symbol,
