@@ -189,10 +189,11 @@ int PacketTXRX::dequeue_send(int tid)
         = (frame_id * c->data_symbol_num_perframe) + data_symbol_idx;
     size_t offset = (total_data_symbol_idx * c->BS_ANT_NUM) + ant_id;
 
-    if (kDebugBSSender) {
+    if (kDebugPrintInTask) {
         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, data_symbol_idx, ant_id, offset,
+               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+            tid, frame_id, data_symbol_idx, ant_id,
+            gen_tag_t(event.tags[0])._tag, offset,
             message_queue_->size_approx());
     }
 
@@ -209,8 +210,8 @@ int PacketTXRX::dequeue_send(int tid)
         sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
-    rt_assert(message_queue_->enqueue(
-                  *rx_ptoks_[tid], Event_data(EventType::kPacketTX, offset)),
+    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                  Event_data(EventType::kPacketTX, event.tags[0])),
         "Socket message enqueue failed\n");
     return event.tags[0];
 }
