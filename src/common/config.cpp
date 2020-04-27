@@ -19,8 +19,10 @@ Config::Config(std::string jsonfile)
     isUE = tddConf.value("UE", false);
     UE_NUM = tddConf.value("ue_num", 8);
     UE_ANT_NUM = UE_NUM;
-    Utils::loadDevices(hub_file, hub_ids);
-    Utils::loadDevices(serial_file, radio_ids);
+    if (hub_file.size() > 0)
+        Utils::loadDevices(hub_file, hub_ids);
+    if (serial_file.size() > 0)
+        Utils::loadDevices(serial_file, radio_ids);
     if (radio_ids.size() != 0) {
         nRadios = radio_ids.size();
         nAntennas = nChannels * nRadios;
@@ -503,12 +505,7 @@ int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
 
 bool Config::isPilot(size_t frame_id, size_t symbol_id)
 {
-    if (symbol_id > symbol_num_perframe) {
-        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
-               "%zu\x1B[0m\n",
-            symbol_id, frame_id);
-        return false;
-    }
+    assert(symbol_id < symbol_num_perframe);
     size_t fid = frame_id % frames.size();
     char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
@@ -529,12 +526,7 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
 {
-    if (symbol_id > symbol_num_perframe) {
-        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
-               "%zu\x1B[0m\n",
-            symbol_id, frame_id);
-        return false;
-    }
+    assert(symbol_id < symbol_num_perframe);
     if (isUE)
         return false;
     return frames[frame_id % frames.size()].at(symbol_id) == 'C';
@@ -542,12 +534,7 @@ bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
 {
-    if (symbol_id > symbol_num_perframe) {
-        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
-               "%zu\x1B[0m\n",
-            symbol_id, frame_id);
-        return false;
-    }
+    assert(symbol_id < symbol_num_perframe);
     if (isUE)
         return false;
     return frames[frame_id % frames.size()].at(symbol_id) == 'L';
@@ -555,12 +542,7 @@ bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
 
 bool Config::isUplink(size_t frame_id, size_t symbol_id)
 {
-    if (symbol_id > symbol_num_perframe) {
-        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
-               "%zu\x1B[0m\n",
-            symbol_id, frame_id);
-        return false;
-    }
+    assert(symbol_id < symbol_num_perframe);
     char s = frames[frame_id % frames.size()].at(symbol_id);
 #ifdef DEBUG3
     printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
@@ -570,12 +552,7 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
 
 bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 {
-    if (symbol_id > symbol_num_perframe) {
-        printf("\x1B[31mERROR: Received out of range symbol %zu at frame "
-               "%zu\x1B[0m\n",
-            symbol_id, frame_id);
-        return false;
-    }
+    assert(symbol_id < symbol_num_perframe);
     char s = frames[frame_id % frames.size()].at(symbol_id);
 #ifdef DEBUG3
     printf("isDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
