@@ -52,7 +52,7 @@ Event_data DoDemul::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
-        printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
+        printf("In doDemul tid %d: frame: %zu, symbol: %u, subcarrier: %zu \n",
             tid, frame_id, gen_tag_t(tag).symbol_id, base_sc_id);
     }
 
