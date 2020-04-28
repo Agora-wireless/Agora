@@ -408,26 +408,39 @@ void Config::genData()
     auto zc_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
+    complex_float* pilot_ifft_in;
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         auto zc_pilot_i = CommsLib::seqCyclicShift(
             zc_pilot, i * (float)M_PI / 6); // LTE DMRS
-        for (size_t j = 0; j < OFDM_DATA_NUM; j++)
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
+            std::cout << zc_pilot_i[j].real() << "+1i*" << zc_pilot_i[j].imag()
+                      << " ";
             ue_specific_pilot[i][j]
                 = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
-        memcpy(ue_specific_pilot_t[i] + prefix + CP_LEN + OFDM_DATA_START,
-            ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
-        CommsLib::IFFT(ue_specific_pilot_t[i] + prefix + CP_LEN, OFDM_CA_NUM);
-        memcpy(ue_specific_pilot_t[i] + prefix,
-            ue_specific_pilot_t[i] + prefix + OFDM_CA_NUM,
-            CP_LEN * sizeof(complex_float));
+        }
+        std::cout << std::endl;
+        alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
+        memcpy((void*)(pilot_ifft_in + OFDM_DATA_START),
+            (void*)ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
+        CommsLib::IFFT(pilot_ifft_in, OFDM_CA_NUM);
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            ue_specific_pilot_t[i][prefix + CP_LEN + j]
+                = { (int16_t)(pilot_ifft_in[j].re * 32768),
+                      (int16_t)(pilot_ifft_in[j].im * 32768) };
+        }
+        memcpy((void*)(ue_specific_pilot_t[i] + prefix),
+            (void*)(ue_specific_pilot_t[i] + prefix + OFDM_CA_NUM),
+            CP_LEN * sizeof(int16_t) * 2);
+        free_buffer_1d(&pilot_ifft_in);
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
             size_t p = ue_id * OFDM_DATA_NUM;
-            std::vector<std::complex<float>> modul_data = CommsLib::modulate(
-                std::vector<int8_t>(ul_bits[i] + p, ul_bits[i] + p + OFDM_DATA_NUM),
-                mod_type);
+            std::vector<std::complex<float>> modul_data
+                = CommsLib::modulate(std::vector<int8_t>(ul_bits[i] + p,
+                                         ul_bits[i] + p + OFDM_DATA_NUM),
+                    mod_type);
             std::vector<std::complex<float>> ifft_ul_data_in;
             for (size_t j = 0; j < OFDM_CA_NUM; j++) {
                 if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
@@ -435,23 +448,26 @@ void Config::genData()
                     ifft_ul_data_in.push_back(0);
                 } else {
                     size_t k = j - OFDM_DATA_START;
-                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].re = modul_data[k].real();
-                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].im = modul_data[k].imag();
+                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].re
+                        = modul_data[k].real();
+                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].im
+                        = modul_data[k].imag();
                     ifft_ul_data_in.push_back(modul_data[k]);
                 }
             }
 
             std::vector<std::complex<float>> ifft_ul_data
                 = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
-            ifft_ul_data.insert(ifft_ul_data.begin(), ifft_ul_data.end() - CP_LEN,
-                ifft_ul_data.end());
+            ifft_ul_data.insert(ifft_ul_data.begin(),
+                ifft_ul_data.end() - CP_LEN, ifft_ul_data.end());
             for (size_t j = 0; j < sampsPerSymbol; j++) {
                 if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
                     ul_iq_t[i][ue_id * sampsPerSymbol + j] = 0;
                 } else {
-                    ul_iq_t[i][ue_id * sampsPerSymbol + j]
-                        = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
-                              (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
+                    ul_iq_t[i][ue_id * sampsPerSymbol + j] = {
+                        (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
+                        (int16_t)(ifft_ul_data[j - prefix].imag() * 32768)
+                    };
                 }
             }
         }
