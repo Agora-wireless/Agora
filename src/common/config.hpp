@@ -82,7 +82,7 @@ public:
     Table<std::complex<int16_t>> dl_iq_t;
     Table<std::complex<int16_t>> ul_iq_t;
     Table<complex_float> ue_specific_pilot;
-    Table<complex_float> ue_specific_pilot_t;
+    Table<std::complex<int16_t>> ue_specific_pilot_t;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
