@@ -257,8 +257,6 @@ void Millipede::start()
                     PRINT_DEMUL, frame_id, symbol_idx_ul, base_sc_id);
                 /* If this symbol is ready */
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
-                    if (symbol_idx_ul >= cfg->UL_PILOT_SYMS)
-                        max_equaled_frame = frame_id;
                     if (kUseLDPC) {
                         schedule_task_set(EventType::kDecode,
                             config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
@@ -267,6 +265,7 @@ void Millipede::start()
                     print_per_symbol_done(PRINT_DEMUL, demul_stats_.frame_count,
                         frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
+                        max_equaled_frame = frame_id;
                         /* Schedule fft for the next frame if there are delayed
                          * fft tasks */
                         if (!kUseLDPC) {
