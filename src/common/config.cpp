@@ -478,11 +478,9 @@ Config::~Config()
 {
     free_buffer_1d(&pilots_);
     dl_bits.free();
-#ifdef GENERATE_DATA
     ul_bits.free();
     dl_iq_t.free();
     ul_iq_f.free();
-#endif
 }
 
 int Config::getSymbolId(size_t symbol_id)
