@@ -177,7 +177,7 @@ private:
 
     Table<uint8_t> decoded_buffer_;
 
-    Table<complex_float> ue_phase_rotation_buffer_;
+    Table<complex_float> ue_spec_pilot_buffer_;
 
     RX_stats rx_stats_;
     FFT_stats fft_stats_;
