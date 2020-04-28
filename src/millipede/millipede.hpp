@@ -89,6 +89,12 @@ public:
     void print_per_task_done(
         int task_type, int frame_id, int symbol_id, int ant_or_sc_id);
 
+    void schedule_subcarriers(
+        EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_users(EventType task_type, gen_tag_t base_tag);
+    void schedule_antennas(
+        EventType task_type, size_t frame_id, size_t symbol_id);
+
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
@@ -102,6 +108,18 @@ public:
     void getEqualData(float** ptr, int* size);
 
 private:
+    /// Fetch the concurrent queue for this event type
+    moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)
+    {
+        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q;
+    }
+
+    /// Fetch the producer token for this event type
+    moodycamel::ProducerToken* get_ptok(EventType event_type)
+    {
+        return sched_info_arr[static_cast<size_t>(event_type)].ptok;
+    }
+
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
     Config* config_;
@@ -241,39 +259,21 @@ private:
     long long dl_socket_buffer_size_;
     int dl_socket_buffer_status_size_;
 
-    /*****************************************************
-     * Concurrent queues
-     *****************************************************/
-    /* Uplink*/
-    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> zf_queue_;
-    moodycamel::ConcurrentQueue<Event_data> demul_queue_;
-    moodycamel::ConcurrentQueue<Event_data> decode_queue_; // LDPC-only
-    /* main thread message queue for data receiving */
+    struct sched_info_t {
+        moodycamel::ConcurrentQueue<Event_data> concurrent_q;
+        moodycamel::ProducerToken* ptok;
+    };
+    sched_info_t sched_info_arr[kNumEventTypes];
+
+    // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
-    /* main thread message queue for task completion*/
+
+    // Master thread's message queue for event completion from Doers;
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
 
-    /* Downlink*/
-    moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> rc_queue_;
-    moodycamel::ConcurrentQueue<Event_data> encode_queue_; // LDPC-only
-    moodycamel::ConcurrentQueue<Event_data> precode_queue_;
-    moodycamel::ConcurrentQueue<Event_data> tx_queue_;
-
-    /* Tokens */
-    moodycamel::ProducerToken* ptok_fft;
-    moodycamel::ProducerToken* ptok_zf;
-    moodycamel::ProducerToken* ptok_demul;
-    moodycamel::ProducerToken* ptok_decode; // LDPC-only
-    moodycamel::ProducerToken* ptok_encode; // LDPC-only
-    moodycamel::ProducerToken* ptok_ifft;
-    moodycamel::ProducerToken* ptok_rc;
-    moodycamel::ProducerToken* ptok_precode;
-
-    moodycamel::ProducerToken** rx_ptoks_ptr;
-    moodycamel::ProducerToken** tx_ptoks_ptr;
-    moodycamel::ProducerToken** worker_ptoks_ptr;
+    moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 };
 
 #endif
