@@ -12,14 +12,14 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_data_buffer,
     Table<complex_float>& in_precoder_buffer,
-    Table<complex_float>& in_pilot_buffer,
+    Table<complex_float>& in_ue_spec_pilot_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
-    , pilot_buffer_(in_pilot_buffer)
+    , ue_spec_pilot_buffer_(in_ue_spec_pilot_buffer)
     , equal_buffer_(in_equal_buffer)
     , demod_hard_buffer_(in_demod_hard_buffer)
     , demod_soft_buffer_(in_demod_soft_buffer)
@@ -141,7 +141,7 @@ Event_data DoDemul::launch(size_t tag)
             fmat theta_avg;
             if (symbol_id < cfg->UL_PILOT_SYMS) { // calc new phase shift
                 cx_float* phase_shift_ptr
-                    = (cx_float*)&pilot_buffer_[frame_id]
+                    = (cx_float*)&ue_spec_pilot_buffer_[frame_id]
                                                [cur_sc_id * cfg->UE_NUM];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
                 if (symbol_id == 0)
@@ -158,7 +158,7 @@ Event_data DoDemul::launch(size_t tag)
                         = (frame_id + fr - 1 + TASK_BUFFER_FRAME_NUM)
                         % TASK_BUFFER_FRAME_NUM;
                     cx_float* phase_shift_ptr
-                        = (cx_float*)pilot_buffer_[prev_frame];
+                        = (cx_float*)ue_spec_pilot_buffer_[prev_frame];
                     cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
                         cfg->OFDM_DATA_NUM, false);
                     w *= fr < moving_avg_sz ? w_decay : 1;

@@ -30,7 +30,7 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& in_data_buffer,
         Table<complex_float>& in_precoder_buffer,
-        Table<complex_float>& in_pilot_buffer,
+        Table<complex_float>& in_ue_spec_pilot_buffer,
         Table<complex_float>& in_equal_buffer,
         Table<uint8_t>& in_demul_hard_buffer,
         Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
@@ -69,7 +69,7 @@ public:
 private:
     Table<complex_float>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
-    Table<complex_float>& pilot_buffer_;
+    Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
