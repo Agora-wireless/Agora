@@ -224,12 +224,12 @@ int PacketTXRX::dequeue_send(int tid)
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
-#if DEBUG_BS_SENDER
-    printf("In TX thread %d: Transmitted frame %d, symbol %d, "
-           "ant %d, offset: %d, msg_queue_length: %zu\n",
-        tid, frame_id, symbol_id, ant_id, offset,
-        message_queue_->size_approx());
-#endif
+    if (kDebugBSSender) {
+        printf("In TX thread %d: Transmitted frame %d, symbol %d, "
+               "ant %d, offset: %d, msg_queue_length: %zu\n",
+            tid, frame_id, symbol_id, ant_id, offset,
+            message_queue_->size_approx());
+    }
 
     Event_data tx_message(EventType::kPacketTX, offset);
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
