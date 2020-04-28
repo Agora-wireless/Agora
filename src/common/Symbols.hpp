@@ -8,13 +8,6 @@
 
 #define ENABLE_CPU_ATTACH
 
-#ifdef USE_ARGOS
-#ifndef GENERATE_DATA
-#define GENERATE_DATA
-#endif
-#define GENERATE_PILOT
-#endif
-
 #define ARMA_ALLOW_FAKE_GCC
 
 #define SEPARATE_TX_RX_UE 0
