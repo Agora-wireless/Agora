@@ -57,20 +57,6 @@ enum class TsType : size_t {
 static constexpr size_t kNumTimestampTypes
     = static_cast<size_t>(TsType::kTXDone) + 1;
 
-// Types of Millipede Doers
-enum class DoerType : size_t {
-    kFFT,
-    kCSI,
-    kZF,
-    kDemul,
-    kDecode,
-    kEncode,
-    kIFFT,
-    kPrecode,
-    kRC
-};
-static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
-
 class Stats {
 public:
     Stats(Config* cfg, int break_down_num, int task_thread_num,

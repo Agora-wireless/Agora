@@ -575,12 +575,12 @@ int PacketTXRX::dequeue_send(int tid, int socket_local, sockaddr_t* remote_addr)
     symbol_id = config_->DLSymbols[0][symbol_id];
     int frame_id = offset / (BS_ANT_NUM * data_symbol_num_perframe);
 
-#if DEBUG_BS_SENDER
-    printf("In TX thread %d: Transmitted frame %d, symbol %d, ant %d, "
-           "offset: %d, msg_queue_length: %d\n",
-        tid, frame_id, symbol_id, ant_id, offset,
-        message_queue_->size_approx());
-#endif
+    if (kDebugBSSender) {
+        printf("In TX thread %d: Transmitted frame %d, symbol %d, ant %d, "
+               "offset: %d, msg_queue_length: %d\n",
+            tid, frame_id, symbol_id, ant_id, offset,
+            message_queue_->size_approx());
+    }
 
     char* cur_buffer_ptr = tx_buffer_ + offset * packet_length;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;

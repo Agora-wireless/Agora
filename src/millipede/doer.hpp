@@ -26,7 +26,7 @@ public:
             }
 
             try_enqueue_fallback(
-                complete_task_queue, *worker_producer_token, resp_event);
+                &complete_task_queue, worker_producer_token, resp_event);
             return true;
         }
         return false;

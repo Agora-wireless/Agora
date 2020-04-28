@@ -61,12 +61,12 @@ Event_data DoDemul::launch(size_t tag)
     size_t symbol_id = gen_tag_t(tag).symbol_id;
     size_t total_data_symbol_idx
         = (frame_id * cfg->ul_data_symbol_num_perframe) + symbol_id;
-    size_t base_sc_id = gen_tag_t(tag).base_sc_id;
+    size_t base_sc_id = gen_tag_t(tag).sc_id;
 
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
-        printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
+        printf("In doDemul tid %d: frame: %zu, symbol: %u, subcarrier: %zu \n",
             tid, frame_id, gen_tag_t(tag).symbol_id, base_sc_id);
     }
 
@@ -141,8 +141,8 @@ Event_data DoDemul::launch(size_t tag)
             fmat theta_avg;
             if (symbol_id < cfg->UL_PILOT_SYMS) { // calc new phase shift
                 cx_float* phase_shift_ptr
-                    = (cx_float*)&ue_spec_pilot_buffer_[frame_id]
-                                               [cur_sc_id * cfg->UE_NUM];
+                    = (cx_float*)&ue_spec_pilot_buffer_[frame_id][cur_sc_id
+                        * cfg->UE_NUM];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
                 if (symbol_id == 0)
                     mat_phase_shift.fill(0);
