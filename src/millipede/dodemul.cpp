@@ -33,11 +33,13 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     alloc_buffer_1d(&equaled_buffer_temp_transposed,
         cfg->demul_block_size * cfg->UE_NUM, 64, 0);
 
+    // phase rotation calculation data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
 
+    // EVM calculation data
     cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
     cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
     ul_gt_mat = ul_iq_f_mat.st();
@@ -136,30 +138,42 @@ Event_data DoDemul::launch(size_t tag)
             size_t start_tsc2 = worker_rdtsc();
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
+            fmat theta_avg;
             if (symbol_id < cfg->UL_PILOT_SYMS) { // calc new phase shift
-                cx_float* phase_shift_ptr = (cx_float*)pilot_buffer_[frame_id];
+                cx_float* phase_shift_ptr
+                    = (cx_float*)&pilot_buffer_[frame_id]
+                                               [cur_sc_id * cfg->UE_NUM];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
-                mat_phase_shift
-                    += mat_equaled % conj(ue_pilot_data.col(cur_sc_id));
-            } else { // apply previously calc'ed phase shift to data
-                cx_fmat mat_phase_shift_w = zeros<cx_fmat>(cfg->UE_NUM, 1);
+                if (symbol_id == 0)
+                    mat_phase_shift.fill(0);
+                mat_phase_shift += mat_equaled;
+            } else if (cfg->UL_PILOT_SYMS
+                > 0) { // apply previously calc'ed phase shift to data
+                cx_fmat mat_phase_shift_w
+                    = zeros<cx_fmat>(cfg->UE_NUM, cfg->OFDM_DATA_NUM);
                 float w = 1;
+                float w_tot = 0;
                 for (size_t fr = 1; fr <= moving_avg_sz; fr++) {
-                    size_t prev_frame = (frame_id + fr + TASK_BUFFER_FRAME_NUM)
+                    size_t prev_frame
+                        = (frame_id + fr - 1 + TASK_BUFFER_FRAME_NUM)
                         % TASK_BUFFER_FRAME_NUM;
                     cx_float* phase_shift_ptr
                         = (cx_float*)pilot_buffer_[prev_frame];
-                    cx_fmat mat_phase_shift(
-                        phase_shift_ptr, cfg->UE_NUM, 1, false);
-                    w *= fr < moving_avg_sz ? 0.5 : 1;
+                    cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
+                        cfg->OFDM_DATA_NUM, false);
+                    w *= fr < moving_avg_sz ? w_decay : 1;
+                    w_tot += w;
                     mat_phase_shift_w += w * mat_phase_shift;
                 }
-                //mat_phase_shift_w /= moving_avg_sz;
-                cx_fmat mat_phase_correct
-                    = zeros<cx_fmat>(size(mat_phase_shift_w));
-                mat_phase_correct.set_imag(
-                    arg(mat_phase_shift_w / cfg->OFDM_DATA_NUM));
-                mat_equaled %= exp(mat_phase_correct);
+                mat_phase_shift_w /= (w_tot * cfg->UL_PILOT_SYMS);
+                fmat theta = arg(mat_phase_shift_w % conj(ue_pilot_data));
+                theta.transform(
+                    [](double val) { return (val + (val < 0 ? M_PI : 0)); });
+                theta_avg = mean(theta, 1);
+                cx_fmat mat_phase_correct = zeros<cx_fmat>(size(theta_avg));
+                mat_phase_correct.set_real(cos(theta_avg));
+                mat_phase_correct.set_imag(sin(theta_avg));
+                mat_equaled %= mat_phase_correct;
             }
 
             if (symbol_id == cfg->UL_PILOT_SYMS) {
@@ -173,9 +187,10 @@ Event_data DoDemul::launch(size_t tag)
                     fmat evm_mat(
                         evm_buffer_[prev_frame], cfg->UE_NUM, 1, false);
                     evm_mat /= cfg->OFDM_DATA_NUM;
-                    std::cout << "Frame " << prev_frame << ": EVM "
-                              << 100 * evm_mat << ", SNR "
-                              << -10 * log10(evm_mat) << std::endl;
+                    std::cout << "Frame " << prev_frame << ":\n"
+                              << "  EVM " << 100 * evm_mat << ", SNR "
+                              << -10 * log10(evm_mat) << ", theta " << theta_avg
+                              << std::endl;
                 }
             }
 
