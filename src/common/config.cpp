@@ -413,8 +413,6 @@ void Config::genData()
         auto zc_pilot_i = CommsLib::seqCyclicShift(
             zc_pilot, i * (float)M_PI / 6); // LTE DMRS
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
-            std::cout << zc_pilot_i[j].real() << "+1i*" << zc_pilot_i[j].imag()
-                      << " ";
             ue_specific_pilot[i][j]
                 = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
         }
