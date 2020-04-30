@@ -82,12 +82,12 @@ public:
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
     void handle_event_fft(size_t tag);
-    void update_rx_counters(int frame_count, int frame_id, int symbol_id);
-    void print_per_frame_done(int task_type, int frame_count, int frame_id);
+    void update_rx_counters(size_t frame_id, size_t symbol_id);
+    void print_per_frame_done(size_t task_type, size_t frame_id);
     void print_per_symbol_done(
-        int task_type, int frame_count, int frame_id, int symbol_id);
-    void print_per_task_done(
-        int task_type, int frame_id, int symbol_id, int ant_or_sc_id);
+        size_t task_type, size_t frame_id, size_t symbol_id);
+    void print_per_task_done(size_t task_type, size_t frame_id,
+        size_t symbol_id, size_t ant_or_sc_id);
 
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
@@ -118,6 +118,18 @@ private:
     moodycamel::ProducerToken* get_ptok(EventType event_type)
     {
         return sched_info_arr[static_cast<size_t>(event_type)].ptok;
+    }
+
+    /// Return a string containing the sizes of the FFT queues
+    std::string get_fft_queue_sizes_string() const
+    {
+        std::ostringstream ret;
+        ret << "[";
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+            ret << std::to_string(fft_queue_arr[i].size()) << " ";
+        }
+        ret << "]";
+        return ret.str();
     }
 
     /* lookup table for 16 QAM, real and imag */
