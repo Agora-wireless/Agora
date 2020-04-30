@@ -594,10 +594,9 @@ void Phy_UE::doFFT(int tid, int offset)
             // cur_fft_buffer_float_output[2*j+1]);
             // TODO: here it is assumed pilots_ is real-valued (in LTS case it
             // is), whereas it could be complex
-
-            cx_float p(pilots_[sc_id + csi_fftshift_offset], 0);
+            complex_float p = config_->ue_specific_pilot[ant_id][j];
             csi_buffer_ptr[j]
-                += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * p);
+                += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * cx_float(p.re, p.im));
             if (dl_pilot_symbol_perframe > 0
                 && pilot_id == dl_pilot_symbol_perframe - 1) {
                 csi_buffer_ptr[j] /= dl_pilot_symbol_perframe;
