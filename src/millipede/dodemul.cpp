@@ -33,7 +33,7 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     alloc_buffer_1d(&equaled_buffer_temp_transposed,
         cfg->demul_block_size * cfg->UE_NUM, 64, 0);
 
-    // phase rotation calculation data
+    // phase offset calibration data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
@@ -167,15 +167,14 @@ Event_data DoDemul::launch(size_t tag)
                 }
                 mat_phase_shift_w /= (w_tot * cfg->UL_PILOT_SYMS);
                 fmat theta = arg(mat_phase_shift_w % conj(ue_pilot_data));
-                theta.transform(
-                    [](double val) { return (val + (val < 0 ? M_PI : 0)); });
                 theta_avg = mean(theta, 1);
                 cx_fmat mat_phase_correct = zeros<cx_fmat>(size(theta_avg));
-                mat_phase_correct.set_real(cos(theta_avg));
-                mat_phase_correct.set_imag(sin(theta_avg));
+                mat_phase_correct.set_real(cos(-theta_avg));
+                mat_phase_correct.set_imag(sin(-theta_avg));
                 mat_equaled %= mat_phase_correct;
             }
 
+            // measrure EVM from ground truth
             if (symbol_id == cfg->UL_PILOT_SYMS) {
                 fmat evm = abs(mat_equaled
                     - ul_gt_mat.col(cfg->OFDM_DATA_START + cur_sc_id));
@@ -188,9 +187,9 @@ Event_data DoDemul::launch(size_t tag)
                         evm_buffer_[prev_frame], cfg->UE_NUM, 1, false);
                     evm_mat /= cfg->OFDM_DATA_NUM;
                     std::cout << "Frame " << prev_frame << ":\n"
-                              << "  EVM " << 100 * evm_mat << ", SNR "
-                              << -10 * log10(evm_mat) << ", theta " << theta_avg
-                              << std::endl;
+                              << "  EVM " << 100 * evm_mat.st() << ", SNR "
+                              << -10 * log10(evm_mat.st()) << ", theta "
+                              << theta_avg.st() << std::endl;
                 }
             }
 
