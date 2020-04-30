@@ -52,7 +52,7 @@ public:
 
 private:
     void ZF_time_orthogonal(size_t tag);
-    void precoder(void* mat_input, int frame_id, int sc_id, int offset,
+    void precoder(void* mat_input, size_t frame_id, size_t sc_id, size_t offset,
         bool downlink_mode);
 
     void ZF_freq_orthogonal(size_t tag);
