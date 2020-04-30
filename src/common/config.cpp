@@ -274,24 +274,24 @@ void Config::genData()
     coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 #endif
 
-    pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    // read pilots from file
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/pilot_f_"
-        + std::to_string(OFDM_CA_NUM) + ".bin";
-    FILE* fp = fopen(filename.c_str(), "rb");
-    if (fp == NULL) {
-        printf("open pilots file %s failed.\n", filename.c_str());
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-    }
-    size_t r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
-    if (r < OFDM_CA_NUM)
-        printf("bad read from file %s \n", filename.c_str());
-    fclose(fp);
+    auto zc_double
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+    auto zc_seq = Utils::double_to_cfloat(zc_double);
+    auto zc_pilot = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // LTE SRS
 
+    pilotsF.resize(OFDM_DATA_START);
+    pilotsF.insert(pilotsF.end(), zc_pilot.begin(), zc_pilot.end());
     pilotsF.resize(OFDM_CA_NUM);
-    for (size_t i = 0; i < OFDM_CA_NUM; i++)
-        pilotsF[i] = pilots_[i];
+    pilots_ = (complex_float*)aligned_alloc(
+        64, OFDM_DATA_NUM * sizeof(complex_float));
+    pilots_sgn_ = (complex_float*)aligned_alloc(
+        64, OFDM_DATA_NUM * sizeof(complex_float));
+    for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
+        pilots_[i] = { zc_pilot[i].real(), zc_pilot[i].imag() };
+        auto zc_pilot_sgn
+            = zc_pilot[i] / (float)std::pow(std::abs(zc_pilot[i]), 2);
+        pilots_sgn_[i] = { zc_pilot_sgn.real(), zc_pilot_sgn.imag() };
+    }
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP
@@ -307,8 +307,6 @@ void Config::genData()
     size_t seq_len = pilot_cf32.size();
     for (size_t i = 0; i < seq_len; i++) {
         std::complex<float> cf = pilot_cf32[i];
-        // pilot_cs16.push_back(std::complex<int16_t>((int16_t)(cf.real() *
-        // 32768), (int16_t)(cf.imag() * 32768)));
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
@@ -359,14 +357,14 @@ void Config::genData()
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        r = fread(
+        size_t r = fread(
             ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        r = fread(
+        size_t r = fread(
             dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
@@ -407,13 +405,10 @@ void Config::genData()
         }
     }
 
-    auto zc_pilot_double
-        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
     complex_float* pilot_ifft_in;
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
-        auto zc_pilot_i = CommsLib::seqCyclicShift(
-            zc_pilot, i * (float)M_PI / 6); // LTE DMRS
+        auto zc_pilot_i
+            = CommsLib::seqCyclicShift(zc_seq, i * (float)M_PI / 6); // LTE DMRS
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
                 = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
@@ -477,6 +472,7 @@ void Config::genData()
 Config::~Config()
 {
     free_buffer_1d(&pilots_);
+    free_buffer_1d(&pilots_sgn_);
     dl_bits.free();
     ul_bits.free();
     dl_iq_t.free();

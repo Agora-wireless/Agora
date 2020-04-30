@@ -60,6 +60,38 @@ void cvtShortToFloatSIMD(short*& in_buf, float*& out_buf, size_t length)
 #endif
 }
 
+static inline __m256 __m256_complex_cf32_mult(
+    __m256 data1, __m256 data2, bool conj)
+{
+    __m256 prod0 __attribute__((aligned(32)));
+    __m256 prod1 __attribute__((aligned(32)));
+    __m256 res __attribute__((aligned(32)));
+
+    // https://stackoverflow.com/questions/39509746
+    const __m256 neg0
+        = _mm256_setr_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+    const __m256 neg1
+        = _mm256_set_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+    prod0 = _mm256_mul_ps(data1, data2); // q1*q2, i1*i2, ...
+
+    /* Step 2: Negate the imaginary elements of vec2 */
+    data2 = _mm256_mul_ps(data2, conj ? neg0 : neg1);
+
+    /* Step 3: Switch the real and imaginary elements of vec2 */
+    data2 = _mm256_permute_ps(data2, 0xb1);
+
+    /* Step 4: Multiply vec1 and the modified vec2 */
+    prod1 = _mm256_mul_ps(data1, data2); // i2*q1, -i1*q2, ...
+
+    /* Horizontally add the elements in vec3 and vec4 */
+    res = conj
+        ? _mm256_hadd_ps(prod0, prod1)
+        : _mm256_hsub_ps(prod0, prod1); // i2*q1+-i1*q2, i1*i2+-q1*q2, ...
+    res = _mm256_permute_ps(res, 0xd8);
+
+    return res;
+}
+
 DoFFT::DoFFT(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -219,13 +251,13 @@ void DoFFT::simd_store_to_buf(
     float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type)
 {
     size_t block_num = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
-    size_t sc_idx = cfg->OFDM_DATA_START;
+    size_t sc_idx = 0; //cfg->OFDM_DATA_START;
 
     for (size_t block_idx = 0; block_idx < block_num; block_idx++) {
         for (size_t sc_inblock_idx = 0;
              sc_inblock_idx < cfg->transpose_block_size; sc_inblock_idx += 8) {
 
-            float* src_ptr_cur = fft_buf + sc_idx * 2;
+            float* src_ptr_cur = fft_buf + (sc_idx + cfg->OFDM_DATA_START) * 2;
             float* tar_ptr_cur = out_buf + sc_inblock_idx * 2;
             if (symbol_type == SymbolType::kCalUL) {
                 tar_ptr_cur += block_idx * cfg->transpose_block_size * 2;
@@ -234,41 +266,57 @@ void DoFFT::simd_store_to_buf(
                     * cfg->transpose_block_size * 2;
             }
 #ifdef __AVX512F__
-            /* load 256 bits = 32 bytes = 8 float values = 4 subcarriers */
+            /* load 512 bits = 64 bytes = 16 float values = 8 subcarriers */
             __m512 fft_result = _mm512_load_ps(src_ptr_cur);
             if (symbol_type == SymbolType::kPilot) {
-                __m512 pilot_tx = _mm512_set_ps(cfg->pilots_[sc_idx + 7],
-                    cfg->pilots_[sc_idx + 7], cfg->pilots_[sc_idx + 6],
-                    cfg->pilots_[sc_idx + 6], cfg->pilots_[sc_idx + 5],
-                    cfg->pilots_[sc_idx + 5], cfg->pilots_[sc_idx + 4],
-                    cfg->pilots_[sc_idx + 4], cfg->pilots_[sc_idx + 3],
-                    cfg->pilots_[sc_idx + 3], cfg->pilots_[sc_idx + 2],
-                    cfg->pilots_[sc_idx + 2], cfg->pilots_[sc_idx + 1],
-                    cfg->pilots_[sc_idx + 1], cfg->pilots_[sc_idx],
-                    cfg->pilots_[sc_idx]);
+                __m512 pilot_tx = _mm512_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
+                    cfg->pilots_sgn_[sc_idx + 7].re,
+                    cfg->pilots_sgn_[sc_idx + 6].im,
+                    cfg->pilots_sgn_[sc_idx + 6].re,
+                    cfg->pilots_sgn_[sc_idx + 5].im,
+                    cfg->pilots_sgn_[sc_idx + 5].re,
+                    cfg->pilots_sgn_[sc_idx + 4].im,
+                    cfg->pilots_sgn_[sc_idx + 4].re,
+                    cfg->pilots_sgn_[sc_idx + 3].im,
+                    cfg->pilots_sgn_[sc_idx + 3].re,
+                    cfg->pilots_sgn_[sc_idx + 2].im,
+                    cfg->pilots_sgn_[sc_idx + 2].re,
+                    cfg->pilots_sgn_[sc_idx + 1].im,
+                    cfg->pilots_sgn_[sc_idx + 1].re,
+                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+		// TODO: implement complex multiply for __m512 type
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
             _mm512_stream_ps(tar_ptr_cur, fft_result);
 #else
-            /* load 256 bits = 32 bytes = 8 float values = 4 subcarriers */
-            __m256 fft_result = _mm256_load_ps(src_ptr_cur);
+            /* load 2x 256 bits = 2x 32 bytes = 2x 8 float values = 8 subcarriers */
+            __m256 fft_result0 = _mm256_load_ps(src_ptr_cur);
             __m256 fft_result1 = _mm256_load_ps(src_ptr_cur + 8);
             if (symbol_type == SymbolType::kPilot) {
-                __m256 pilot_tx = _mm256_set_ps(cfg->pilots_[sc_idx + 3],
-                    cfg->pilots_[sc_idx + 3], cfg->pilots_[sc_idx + 2],
-                    cfg->pilots_[sc_idx + 2], cfg->pilots_[sc_idx + 1],
-                    cfg->pilots_[sc_idx + 1], cfg->pilots_[sc_idx],
-                    cfg->pilots_[sc_idx]);
-                fft_result = _mm256_mul_ps(fft_result, pilot_tx);
+                __m256 pilot_tx0 = _mm256_set_ps(
+                    cfg->pilots_sgn_[sc_idx + 3].im,
+                    cfg->pilots_sgn_[sc_idx + 3].re,
+                    cfg->pilots_sgn_[sc_idx + 2].im,
+                    cfg->pilots_sgn_[sc_idx + 2].re,
+                    cfg->pilots_sgn_[sc_idx + 1].im,
+                    cfg->pilots_sgn_[sc_idx + 1].re,
+                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                fft_result0
+                    = __m256_complex_cf32_mult(fft_result0, pilot_tx0, true);
 
-                __m256 pilot_tx1 = _mm256_set_ps(cfg->pilots_[sc_idx + 7],
-                    cfg->pilots_[sc_idx + 7], cfg->pilots_[sc_idx + 6],
-                    cfg->pilots_[sc_idx + 6], cfg->pilots_[sc_idx + 5],
-                    cfg->pilots_[sc_idx + 5], cfg->pilots_[sc_idx + 4],
-                    cfg->pilots_[sc_idx + 4]);
-                fft_result1 = _mm256_mul_ps(fft_result1, pilot_tx1);
+                __m256 pilot_tx1
+                    = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
+                        cfg->pilots_sgn_[sc_idx + 7].re,
+                        cfg->pilots_sgn_[sc_idx + 6].im,
+                        cfg->pilots_sgn_[sc_idx + 6].re,
+                        cfg->pilots_sgn_[sc_idx + 5].im,
+                        cfg->pilots_sgn_[sc_idx + 5].re,
+                        cfg->pilots_sgn_[sc_idx + 4].im,
+                        cfg->pilots_sgn_[sc_idx + 4].re);
+                fft_result1
+                    = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
             }
-            _mm256_stream_ps(tar_ptr_cur, fft_result);
+            _mm256_stream_ps(tar_ptr_cur, fft_result0);
             _mm256_stream_ps(tar_ptr_cur + 8, fft_result1);
 #endif
             sc_idx += 8;
