@@ -18,7 +18,8 @@ Millipede::Millipede(Config* cfg)
     if (kDebugPrintPilot) {
         cout << "Millipede: Pilot data: " << endl;
         for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
-            cout << config_->pilots_[i] << ",";
+            cout << config_->pilots_[i].re << "+1i*" << config_->pilots_[i].im
+                 << ",";
         cout << endl;
     }
 
