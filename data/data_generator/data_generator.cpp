@@ -325,23 +325,21 @@ int main(int argc, char* argv[])
     }
 
     /* generate pilot data and convert to time domain */
-    float* pilots_f = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    for (int i = 0; i < OFDM_CA_NUM; i++) {
-        if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
-            pilots_f[i] = 0;
-        else
-            pilots_f[i] = 1 - 2 * (rand() % 2);
+    auto zc_double
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+    auto zc_seq = Utils::double_to_cfloat(zc_double);
+    auto zc_pilot = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // LTE SRS
+
+    complex_float* pilots_f = (complex_float*)aligned_alloc(
+        64, OFDM_DATA_NUM * sizeof(complex_float));
+    for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
+        pilots_f[i] = { zc_pilot[i].real(), zc_pilot[i].imag() };
     }
-    std::string filename_pilot_f = cur_directory + "/data/pilot_f_"
-        + std::to_string(OFDM_CA_NUM) + ".bin";
-    FILE* fp_pilot_f = fopen(filename_pilot_f.c_str(), "wb");
-    fwrite(pilots_f, OFDM_CA_NUM, sizeof(float), fp_pilot_f);
-    fclose(fp_pilot_f);
 
     complex_float* pilots_t;
-    alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 1);
-    for (int i = 0; i < OFDM_CA_NUM; i++)
-        pilots_t[i].re = pilots_f[i];
+    alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 0);
+    for (int i = 0; i < OFDM_DATA_NUM; i++)
+        pilots_t[i + OFDM_DATA_START] = pilots_f[i];
     // CommsLib::IFFT(pilots_t, OFDM_CA_NUM);
 
     /* put pilot and data symbols together */
@@ -358,7 +356,7 @@ int main(int argc, char* argv[])
             memset(pilots_t_ue, 0, OFDM_CA_NUM * sizeof(complex_float));
             for (int j = OFDM_DATA_START; j < OFDM_DATA_START + OFDM_DATA_NUM;
                  j += UE_NUM) {
-                pilots_t_ue[i + j].re = pilots_f[i + j];
+                pilots_t_ue[i + j] = pilots_t[i + j];
             }
             // CommsLib::IFFT(pilots_t_ue, OFDM_CA_NUM);
             memcpy(tx_data_all_symbols[0] + i * OFDM_CA_NUM, pilots_t_ue,
@@ -596,6 +594,7 @@ int main(int argc, char* argv[])
     mod_output.free();
     IFFT_data.free();
     CSI_matrix.free();
+    free_buffer_1d(&pilots_f);
     free_buffer_1d(&pilots_t);
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
