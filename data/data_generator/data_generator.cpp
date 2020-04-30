@@ -378,6 +378,20 @@ int main(int argc, char* argv[])
         }
     }
 
+    Table<complex_float> ue_specific_pilot;
+    ue_specific_pilot.malloc(UE_NUM, OFDM_DATA_NUM, 64);
+    auto zc_pilot_double
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+    auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
+    for (size_t i = 0; i < UE_NUM; i++) {
+        auto zc_pilot_i = CommsLib::seqCyclicShift(
+            zc_pilot, i * (float)M_PI / 6); // LTE DMRS
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
+            ue_specific_pilot[i][j]
+                = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
+        }
+    }
+
     /* generate CSI matrix */
     Table<complex_float> CSI_matrix;
     CSI_matrix.calloc(OFDM_CA_NUM, UE_NUM * BS_ANT_NUM, 32);
@@ -480,8 +494,8 @@ int main(int argc, char* argv[])
     for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (int j = 0; j < UE_NUM; j++) {
             if (i <= DL_PILOT_SYMS - 1) {
-                for (int sc_id = 0; sc_id < OFDM_CA_NUM; sc_id++)
-                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id] = pilots_t[sc_id];
+                for (int sc_id = 0; sc_id < OFDM_DATA_NUM; sc_id++)
+                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START] = ue_specific_pilot[j][sc_id];
             } else {
                 memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
                     mod_output[i * UE_NUM + j],
@@ -599,6 +613,7 @@ int main(int argc, char* argv[])
     free_buffer_1d(&pilots_t);
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
+    ue_specific_pilot.free();
 
     return 0;
 }
