@@ -347,10 +347,8 @@ std::vector<std::complex<float>> CommsLib::IFFT(
                 // max_ind = i;
             }
         }
-        std::cout << "IFFT output is normalized with "
-                  << std::to_string(max_val) << std::endl;
-        // std::cout << "max sample is " << std::to_string(out[max_ind].real())
-        // << "+1j*" << std::to_string(out[max_ind].imag()) << std::endl;
+        //std::cout << "IFFT output is normalized with "
+        //         << std::to_string(max_val) << std::endl;
         for (int i = 0; i < fftsize; i++)
             in[i] /= (max_val / scale);
     }
