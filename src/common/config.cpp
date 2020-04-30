@@ -418,7 +418,6 @@ void Config::genData()
             ue_specific_pilot[i][j]
                 = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
         }
-        std::cout << std::endl;
         alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
         memcpy((void*)(pilot_ifft_in + OFDM_DATA_START),
             (void*)ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
