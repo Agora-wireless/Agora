@@ -90,7 +90,7 @@ void Millipede::schedule_antennas(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
     assert(event_type == EventType::kFFT or event_type == EventType::kIFFT);
-    auto base_tag = gen_tag_t::ant_frm_sym(0, frame_id, symbol_id);
+    auto base_tag = gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0);
 
     for (size_t i = 0; i < config_->BS_ANT_NUM; i++) {
         try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),

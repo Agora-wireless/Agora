@@ -182,7 +182,7 @@ struct LDPCconfig {
 typedef struct LDPCconfig LDPCconfig;
 
 // Maximum number of symbols per frame allowed by Millipede
-static constexpr size_t kMaxSymbolsPerFrame = 140;
+static constexpr size_t kMaxSymbolsPerFrame = 1400;
 
 // Maximum number of OFDM subcarriers in the 5G spec
 static constexpr size_t k5GMaxSubcarriers = 3300;
@@ -191,7 +191,7 @@ static constexpr size_t k5GMaxSubcarriers = 3300;
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 64;
+static constexpr size_t kMaxUEs = 1000;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
