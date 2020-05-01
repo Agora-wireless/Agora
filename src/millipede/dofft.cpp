@@ -101,6 +101,7 @@ DoFFT::~DoFFT()
 
 Event_data DoFFT::launch(size_t tag)
 {
+    DurationStat dummy_duration_stat; // For calibration symbols for now
     size_t start_tsc = worker_rdtsc();
 
     size_t socket_thread_id = fft_req_tag_t(tag).tid;
@@ -133,34 +134,29 @@ Event_data DoFFT::launch(size_t tag)
         }
     }
 
+    DurationStat* duration_stat = nullptr;
     auto cur_symbol_type = SymbolType::kUnknown;
-    if (cfg->isUplink(frame_id, symbol_id))
+    if (cfg->isUplink(frame_id, symbol_id)) {
         cur_symbol_type = SymbolType::kUL;
-    else if (cfg->isPilot(frame_id, symbol_id))
+        duration_stat = duration_stat_fft;
+    } else if (cfg->isPilot(frame_id, symbol_id)) {
         cur_symbol_type = SymbolType::kPilot;
-    else if (cfg->isCalDlPilot(frame_id, symbol_id))
+        duration_stat = duration_stat_csi;
+    } else if (cfg->isCalDlPilot(frame_id, symbol_id)) {
         cur_symbol_type = SymbolType::kCalDL;
-    else if (cfg->isCalUlPilot(frame_id, symbol_id))
+        duration_stat = &dummy_duration_stat;
+    } else if (cfg->isCalUlPilot(frame_id, symbol_id)) {
         cur_symbol_type = SymbolType::kCalUL;
+        duration_stat = &dummy_duration_stat;
+    }
 
     size_t start_tsc1 = worker_rdtsc();
-    if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_duration[1] += start_tsc1 - start_tsc;
-    } else if (cur_symbol_type == SymbolType::kPilot) {
-        duration_stat_csi->task_duration[1] += start_tsc1 - start_tsc;
-    }
+    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    /* compute FFT */
-    DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]);
-    // DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0],
-    // fft_buffer_.FFT_outputs[0]);
+    DftiComputeForward(mkl_handle, fft_buffer_.FFT_inputs[0]); // Compute FFT
 
     size_t start_tsc2 = worker_rdtsc();
-    if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_duration[2] += start_tsc2 - start_tsc1;
-    } else if (cur_symbol_type == SymbolType::kPilot) {
-        duration_stat_csi->task_duration[2] += start_tsc2 - start_tsc1;
-    }
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     size_t start_tsc_part3 = worker_rdtsc();
     if (cur_symbol_type == SymbolType::kPilot) {
@@ -192,23 +188,13 @@ Event_data DoFFT::launch(size_t tag)
         rt_assert(false, "Unknown or unsupported symbol type");
     }
 
-    if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_duration[3] += worker_rdtsc() - start_tsc_part3;
-    } else {
-        duration_stat_csi->task_duration[3] += worker_rdtsc() - start_tsc_part3;
-    }
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc_part3;
 
     /* After finish, reset socket buffer status */
     socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
-    if (cur_symbol_type == SymbolType::kUL) {
-        duration_stat_fft->task_count++;
-        duration_stat_fft->task_duration[0] += worker_rdtsc() - start_tsc;
-    } else {
-        duration_stat_csi->task_count++;
-        duration_stat_csi->task_duration[0] += worker_rdtsc() - start_tsc;
-    }
-
+    duration_stat->task_count++;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     return Event_data(EventType::kFFT,
         gen_tag_t::frm_sym(pkt->frame_id, pkt->symbol_id)._tag);
 }
