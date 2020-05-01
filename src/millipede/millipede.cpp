@@ -159,7 +159,7 @@ void Millipede::start()
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* Get a batch of events */
-        int num_events = 0;
+        size_t num_events = 0;
         if (is_turn_to_dequeue_from_io) {
             for (size_t i = 0; i < config_->socket_thread_num; i++) {
                 num_events += message_queue_.try_dequeue_bulk_from_producer(
@@ -177,7 +177,7 @@ void Millipede::start()
         is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
         /* Handle each event */
-        for (int ev_i = 0; ev_i < num_events; ev_i++) {
+        for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
             Event_data& event = events_list[ev_i];
 
             // FFT processing is scheduled after falling through the switch
@@ -188,6 +188,7 @@ void Millipede::start()
 
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
+                assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM);
 
                 update_rx_counters(pkt->frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
