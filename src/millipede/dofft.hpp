@@ -22,14 +22,13 @@
 
 class DoFFT : public Doer {
 public:
-    DoFFT(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    DoFFT(Config* config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
-        Table<complex_float>& in_data_buffer,
-        Table<complex_float>& in_csi_buffer,
-        Table<complex_float>& in_calib_buffer, Stats* in_stats_manager);
+        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
+        Table<complex_float>& data_buffer, Table<complex_float>& csi_buffer,
+        Table<complex_float>& calib_buffer, Stats* stats_manager);
     ~DoFFT();
 
     /**
@@ -66,8 +65,8 @@ public:
      */
     Event_data launch(size_t tag);
 
-    void simd_store_to_buf(
-        float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type);
+    void simd_store_to_buf(const complex_float* fft_buf, complex_float* out_buf,
+        size_t ant_id, SymbolType symbol_type) const;
 
 private:
     Table<char>& socket_buffer_;
@@ -76,7 +75,7 @@ private:
     Table<complex_float>& csi_buffer_;
     Table<complex_float>& calib_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    FFTBuffer fft_buffer_;
+    complex_float* fft_inout; // Buffer for both FFT input and output
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
 };
