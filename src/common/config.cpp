@@ -422,7 +422,7 @@ void Config::genData()
         }
         for (size_t j = 0; j < CP_LEN; j++) {
             ue_specific_pilot_t[i][prefix + j]
-                = pilot_ifft_in[i][OFDM_CA_NUM - CP_LEN + j];
+                = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
         }
         free_buffer_1d(&pilot_ifft_in);
     }
