@@ -321,11 +321,11 @@ void Config::genData()
     }
 
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
-    dl_iq_t.malloc(
+    dl_iq_t.calloc(
         dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
     ul_bits.malloc(ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
     ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
-    ul_iq_t.malloc(
+    ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
@@ -381,29 +381,21 @@ void Config::genData()
             int cur_offset = j * UE_ANT_NUM;
             in_modul.push_back(dl_bits[i][cur_offset]);
         }
-        std::vector<std::complex<float>> modul_data
+        auto modul_data
             = CommsLib::modulate(in_modul, mod_type);
-        std::vector<std::complex<float>> ifft_in_data;
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
-                ifft_in_data.push_back(0);
-            } else {
-                ifft_in_data.push_back(modul_data[j - OFDM_DATA_START]);
-            }
+        std::vector<std::complex<float>> ifft_in_data(OFDM_CA_NUM, 0);
+        for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
+            ifft_in_data[j] = modul_data[j - OFDM_DATA_START];
         }
 
         std::vector<std::complex<float>> ifft_dl_data
             = CommsLib::IFFT(ifft_in_data, OFDM_CA_NUM);
         ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN,
             ifft_dl_data.end());
-        for (size_t j = 0; j < sampsPerSymbol; j++) {
-            if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                dl_iq_t[i][j] = 0;
-            } else {
-                dl_iq_t[i][j]
-                    = { (int16_t)(ifft_dl_data[j - prefix].real() * 32768),
-                          (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
-            }
+        for (size_t j = prefix; j < prefix + CP_LEN + OFDM_CA_NUM; j++) {
+            dl_iq_t[i][j]
+                = { (int16_t)(ifft_dl_data[j - prefix].real() * 32768),
+                      (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
         }
     }
 
@@ -412,63 +404,55 @@ void Config::genData()
     auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
     complex_float* pilot_ifft_in;
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
+        alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
+        memset(pilot_ifft_in, 0, sizeof(complex_float) * OFDM_DATA_START);
+        memset(pilot_ifft_in + OFDM_DATA_STOP, 0,
+            sizeof(complex_float) * OFDM_DATA_START);
         auto zc_pilot_i = CommsLib::seqCyclicShift(
             zc_pilot, i * (float)M_PI / 6); // LTE DMRS
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
                 = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
+            pilot_ifft_in[j + OFDM_DATA_START] = ue_specific_pilot[i][j];
         }
-        std::cout << std::endl;
-        alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
-        memcpy((void*)(pilot_ifft_in + OFDM_DATA_START),
-            (void*)ue_specific_pilot[i], OFDM_DATA_NUM * sizeof(complex_float));
         CommsLib::IFFT(pilot_ifft_in, OFDM_CA_NUM);
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
             ue_specific_pilot_t[i][prefix + CP_LEN + j]
-                = { (int16_t)(pilot_ifft_in[j].re * 32768),
-                      (int16_t)(pilot_ifft_in[j].im * 32768) };
+                = std::complex<int16_t>( (int16_t)(pilot_ifft_in[j].re * 32768),
+                      (int16_t)(pilot_ifft_in[j].im * 32768) );
         }
-        memcpy((void*)(ue_specific_pilot_t[i] + prefix),
-            (void*)(ue_specific_pilot_t[i] + prefix + OFDM_CA_NUM),
-            CP_LEN * sizeof(int16_t) * 2);
+        for (size_t j = 0; j < CP_LEN; j++) {
+            ue_specific_pilot_t[i][prefix + j] = 
+                pilot_ifft_in[i][OFDM_CA_NUM - CP_LEN + j];
+        }
         free_buffer_1d(&pilot_ifft_in);
     }
 
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
             size_t p = ue_id * OFDM_DATA_NUM;
-            std::vector<std::complex<float>> modul_data
+            auto modul_data
                 = CommsLib::modulate(std::vector<int8_t>(ul_bits[i] + p,
                                          ul_bits[i] + p + OFDM_DATA_NUM),
                     mod_type);
-            std::vector<std::complex<float>> ifft_ul_data_in;
-            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-                if (j < OFDM_DATA_START || j >= OFDM_DATA_STOP) {
-                    // continue;
-                    ifft_ul_data_in.push_back(0);
-                } else {
-                    size_t k = j - OFDM_DATA_START;
-                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].re
-                        = modul_data[k].real();
-                    ul_iq_f[i][ue_id * OFDM_CA_NUM + j].im
-                        = modul_data[k].imag();
-                    ifft_ul_data_in.push_back(modul_data[k]);
-                }
+            std::vector<std::complex<float>> ifft_ul_data_in(OFDM_CA_NUM, 0);
+            for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
+                size_t k = j - OFDM_DATA_START;
+                ul_iq_f[i][ue_id * OFDM_CA_NUM + j]
+                    = {modul_data[k].real(),
+                          modul_data[k].imag()};
+                ifft_ul_data_in[j] = modul_data[k];
             }
 
-            std::vector<std::complex<float>> ifft_ul_data
+            auto ifft_ul_data
                 = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
             ifft_ul_data.insert(ifft_ul_data.begin(),
                 ifft_ul_data.end() - CP_LEN, ifft_ul_data.end());
-            for (size_t j = 0; j < sampsPerSymbol; j++) {
-                if (j < prefix || j >= prefix + CP_LEN + OFDM_CA_NUM) {
-                    ul_iq_t[i][ue_id * sampsPerSymbol + j] = 0;
-                } else {
-                    ul_iq_t[i][ue_id * sampsPerSymbol + j] = {
-                        (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
-                        (int16_t)(ifft_ul_data[j - prefix].imag() * 32768)
-                    };
-                }
+            for (size_t j = prefix; j < prefix + CP_LEN + OFDM_CA_NUM; j++) {
+                ul_iq_t[i][ue_id * sampsPerSymbol + j] = {
+                    (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
+                    (int16_t)(ifft_ul_data[j - prefix].imag() * 32768)
+                };
             }
         }
     }
