@@ -65,7 +65,33 @@ public:
      */
     Event_data launch(size_t tag);
 
-    void simd_store_to_buf(const complex_float* fft_buf, complex_float* out_buf,
+    /**
+     * The fully-transposed matrix after FFT is a subcarriers x antennas matrix
+     * that should look like so (using the notation subcarrier/antenna, and
+     * assuming transpose_block_size = 16)
+     *
+     * 0/0, 0/1, ........................................................., 0/63
+     * 1/0, 0/1, ........................................................ , 1/63
+     * ...
+     * 15/0, 15/1, ......................................................, 15/63
+     * ...
+     * 1199/0, 1199/1, ............................................... , 1199/63
+     *
+     *
+     * The partially-tranposed matrix looks like so:
+     * 0/0 1/0 ... 15/0  0/1 1/1 ... 15/1 .................... 0/3 1/3 .... 15/3
+     * 0/4 1/4 ... 15/4  0/5 1/5 ... 15/5 .................... 0/7 1/5 .... 15/7
+     * ...
+     * ...........................................................0/63 ... 15/63
+     * <end of partial transpose block>
+     * 16/0 17/0 ... 31/0 ....................................16/3 17/3 ... 31/3
+     * 16/4 17/4 ... 31/4 ....................................16/7 17/7 ... 31/7
+     *
+     *
+     * Each partially-transposed block is identical to the corresponding
+     * fully-transposed matrix, but laid out in memory in column-major order.
+     */
+    void partial_transpose(const complex_float* fft_buf, complex_float* out_buf,
         size_t ant_id, SymbolType symbol_type) const;
 
 private:

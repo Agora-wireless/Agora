@@ -150,18 +150,16 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        size_t symbol_offset = (frame_slot * cfg->pilot_symbol_num_perframe)
-            + cfg->getPilotSFIndex(frame_id, symbol_id);
-        simd_store_to_buf(
-            fft_inout, csi_buffer_[symbol_offset], ant_id, SymbolType::kPilot);
+        partial_transpose(fft_inout,
+            cfg->get_csi_buf_ptr(csi_buffer_, frame_id, symbol_id), ant_id,
+            SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
-        size_t symbol_offset = cfg->get_total_data_symbol_idx_ul(
-            frame_id, cfg->getUlSFIndex(frame_id, symbol_id));
-        simd_store_to_buf(
-            fft_inout, data_buffer_[symbol_offset], ant_id, SymbolType::kUL);
+        partial_transpose(fft_inout,
+            cfg->get_data_buf_ptr(data_buffer_, frame_id, symbol_id), ant_id,
+            SymbolType::kUL);
     } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
         or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
-        simd_store_to_buf(fft_inout,
+        partial_transpose(fft_inout,
             &calib_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM], ant_id,
             SymbolType::kCalUL);
     } else {
@@ -176,29 +174,31 @@ Event_data DoFFT::launch(size_t tag)
         gen_tag_t::frm_sym(pkt->frame_id, pkt->symbol_id)._tag);
 }
 
-void DoFFT::simd_store_to_buf(const complex_float* fft_buf,
+void DoFFT::partial_transpose(const complex_float* fft_buf,
     complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const
 {
-    size_t block_num = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
+    const size_t num_blocks = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
     size_t sc_idx = cfg->OFDM_DATA_START;
 
-    for (size_t block_idx = 0; block_idx < block_num; block_idx++) {
-        for (size_t sc_inblock_idx = 0;
-             sc_inblock_idx < cfg->transpose_block_size; sc_inblock_idx += 8) {
+    for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
+        const size_t block_base_offset
+            = block_idx * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
 
-            const float* src_ptr_cur
-                = reinterpret_cast<const float*>(&fft_buf[sc_idx]);
-            float* tar_ptr_cur
-                = reinterpret_cast<float*>(&out_buf[sc_inblock_idx]);
+        for (size_t sc_j = 0; sc_j < cfg->transpose_block_size; sc_j += 8) {
+            const complex_float* src = &fft_buf[sc_idx];
+            complex_float* dst = nullptr;
             if (symbol_type == SymbolType::kCalUL) {
-                tar_ptr_cur += block_idx * cfg->transpose_block_size * 2;
+                dst = &out_buf[block_idx * cfg->transpose_block_size + sc_j];
             } else {
-                tar_ptr_cur += (block_idx * cfg->BS_ANT_NUM + ant_id)
-                    * cfg->transpose_block_size * 2;
+                dst = &out_buf[block_base_offset
+                    + (ant_id * cfg->transpose_block_size) + sc_j];
             }
+
+            // With either of AVX-512 or AVX2, load 512 bits = 64 bytes =
+            // 16 float values = 8 subcarriers
 #ifdef __AVX512F__
-            /* load 256 bits = 32 bytes = 8 float values = 4 subcarriers */
-            __m512 fft_result = _mm512_load_ps(src_ptr_cur);
+            __m512 fft_result
+                = _mm512_load_ps(reinterpret_cast<const float*>(src));
             if (symbol_type == SymbolType::kPilot) {
                 __m512 pilot_tx = _mm512_set_ps(cfg->pilots_[sc_idx + 7],
                     cfg->pilots_[sc_idx + 7], cfg->pilots_[sc_idx + 6],
@@ -211,11 +211,12 @@ void DoFFT::simd_store_to_buf(const complex_float* fft_buf,
                     cfg->pilots_[sc_idx]);
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
-            _mm512_stream_ps(tar_ptr_cur, fft_result);
+            _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
 #else
-            /* load 256 bits = 32 bytes = 8 float values = 4 subcarriers */
-            __m256 fft_result = _mm256_load_ps(src_ptr_cur);
-            __m256 fft_result1 = _mm256_load_ps(src_ptr_cur + 8);
+            __m256 fft_result
+                = _mm256_load_ps(reinterpret_cast<const float*>(src));
+            __m256 fft_result1
+                = _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
             if (symbol_type == SymbolType::kPilot) {
                 __m256 pilot_tx = _mm256_set_ps(cfg->pilots_[sc_idx + 3],
                     cfg->pilots_[sc_idx + 3], cfg->pilots_[sc_idx + 2],
@@ -231,8 +232,8 @@ void DoFFT::simd_store_to_buf(const complex_float* fft_buf,
                     cfg->pilots_[sc_idx + 4]);
                 fft_result1 = _mm256_mul_ps(fft_result1, pilot_tx1);
             }
-            _mm256_stream_ps(tar_ptr_cur, fft_result);
-            _mm256_stream_ps(tar_ptr_cur + 8, fft_result1);
+            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result);
+            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
             sc_idx += 8;
         }
