@@ -179,6 +179,9 @@ public:
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
 
+    /// Return the symbol type of this symbol in this frame
+    SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
+
     // TODO: Documentation
     inline size_t get_total_data_symbol_idx(
         size_t frame_id, size_t symbol_id) const
@@ -198,7 +201,7 @@ public:
 
     /// Fetch the channel state information buffer for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
-    complex_float* get_csi_buf_ptr(
+    inline complex_float* get_csi_buf_ptr(
         Table<complex_float>& csi_buffer, size_t frame_id, size_t symbol_id)
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -209,7 +212,7 @@ public:
 
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
     /// be an uplink symbol.
-    complex_float* get_data_buf_ptr(
+    inline complex_float* get_data_buf_ptr(
         Table<complex_float>& data_buffer, size_t frame_id, size_t symbol_id)
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
