@@ -180,7 +180,8 @@ struct Packet {
     }
 };
 
-struct RX_stats {
+class RX_stats {
+public:
     std::array<size_t, TASK_BUFFER_FRAME_NUM> task_count;
     std::array<size_t, TASK_BUFFER_FRAME_NUM> task_pilot_count;
     size_t max_task_count; // Max packets per frame
@@ -230,7 +231,8 @@ public:
     }
 };
 
-struct Data_stats : public Frame_stats {
+class Data_stats : public Frame_stats {
+public:
     size_t max_task_count;
 
     void init(int _max_task_count, int max_symbols, int max_data_symbol)
@@ -264,7 +266,8 @@ private:
     size_t* task_count[TASK_BUFFER_FRAME_NUM];
 };
 
-struct FFT_stats : public Data_stats {
+class FFT_stats : public Data_stats {
+public:
     size_t max_symbol_data_count;
     std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_cal_count;
     size_t max_symbol_cal_count;
@@ -274,7 +277,8 @@ struct FFT_stats : public Data_stats {
     std::vector<size_t> cur_frame_for_symbol;
 };
 
-struct RC_stats {
+class RC_stats {
+public:
     size_t max_task_count;
     size_t last_frame;
     RC_stats(void)
