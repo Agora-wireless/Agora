@@ -66,6 +66,9 @@ public:
     Event_data launch(size_t tag);
 
     /**
+     * Fill-in the partial transpose of the computed FFT for this antenna into
+     * out_buf.
+     *
      * The fully-transposed matrix after FFT is a subcarriers x antennas matrix
      * that should look like so (using the notation subcarrier/antenna, and
      * assuming transpose_block_size = 16)
@@ -88,11 +91,12 @@ public:
      * 16/4 17/4 ... 31/4 ....................................16/7 17/7 ... 31/7
      *
      *
-     * Each partially-transposed block is identical to the corresponding
-     * fully-transposed matrix, but laid out in memory in column-major order.
+     * Each partially-transposed block is identical to the corresponding block
+     * of the fully-transposed matrix, but laid out in memory in column-major
+     * order.
      */
-    void partial_transpose(const complex_float* fft_buf, complex_float* out_buf,
-        size_t ant_id, SymbolType symbol_type) const;
+    void partial_transpose(
+        complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const;
 
 private:
     Table<char>& socket_buffer_;

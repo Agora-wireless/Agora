@@ -563,6 +563,26 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
         return s == 'D';
 }
 
+SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
+{
+    assert(!isUE); // Currently implemented for only the Millipede server
+    char s = frames[frame_id % frames.size()][symbol_id];
+    switch (s) {
+    case 'D':
+        return SymbolType::kDL;
+    case 'U':
+        return SymbolType::kUL;
+    case 'P':
+        return SymbolType::kPilot;
+    case 'C':
+        return SymbolType::kCalDL;
+    case 'L':
+        return SymbolType::kCalUL;
+    }
+    rt_assert(false, "Should not reach here");
+    return SymbolType::kUnknown;
+}
+
 extern "C" {
 __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {

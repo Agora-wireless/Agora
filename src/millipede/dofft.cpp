@@ -123,21 +123,15 @@ Event_data DoFFT::launch(size_t tag)
         }
     }
 
-    DurationStat dummy_duration_stat; // For calibration symbols for now
+    DurationStat dummy_duration_stat; // TODO: timing for calibration symbols
     DurationStat* duration_stat = nullptr;
-    auto sym_type = SymbolType::kUnknown;
-    if (cfg->isUplink(frame_id, symbol_id)) {
-        sym_type = SymbolType::kUL;
+    SymbolType sym_type = cfg->get_symbol_type(frame_id, symbol_id);
+    if (sym_type == SymbolType::kUL) {
         duration_stat = duration_stat_fft;
-    } else if (cfg->isPilot(frame_id, symbol_id)) {
-        sym_type = SymbolType::kPilot;
+    } else if (sym_type == SymbolType::kPilot) {
         duration_stat = duration_stat_csi;
-    } else if (cfg->isCalDlPilot(frame_id, symbol_id)) {
-        sym_type = SymbolType::kCalDL;
-        duration_stat = &dummy_duration_stat;
-    } else if (cfg->isCalUlPilot(frame_id, symbol_id)) {
-        sym_type = SymbolType::kCalUL;
-        duration_stat = &dummy_duration_stat;
+    } else {
+        duration_stat = &dummy_duration_stat; // For calibration symbols
     }
 
     size_t start_tsc1 = worker_rdtsc();
@@ -150,16 +144,16 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        partial_transpose(fft_inout,
+        partial_transpose(
             cfg->get_csi_buf_ptr(csi_buffer_, frame_id, symbol_id), ant_id,
             SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
-        partial_transpose(fft_inout,
+        partial_transpose(
             cfg->get_data_buf_ptr(data_buffer_, frame_id, symbol_id), ant_id,
             SymbolType::kUL);
     } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
         or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
-        partial_transpose(fft_inout,
+        partial_transpose(
             &calib_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM], ant_id,
             SymbolType::kCalUL);
     } else {
@@ -174,7 +168,7 @@ Event_data DoFFT::launch(size_t tag)
         gen_tag_t::frm_sym(pkt->frame_id, pkt->symbol_id)._tag);
 }
 
-void DoFFT::partial_transpose(const complex_float* fft_buf,
+void DoFFT::partial_transpose(
     complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const
 {
     const size_t num_blocks = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
@@ -185,10 +179,10 @@ void DoFFT::partial_transpose(const complex_float* fft_buf,
             = block_idx * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
 
         for (size_t sc_j = 0; sc_j < cfg->transpose_block_size; sc_j += 8) {
-            const complex_float* src = &fft_buf[sc_idx];
+            const complex_float* src = &fft_inout[sc_idx];
             complex_float* dst = nullptr;
             if (symbol_type == SymbolType::kCalUL) {
-                dst = &out_buf[block_idx * cfg->transpose_block_size + sc_j];
+                dst = &out_buf[(block_idx * cfg->transpose_block_size) + sc_j];
             } else {
                 dst = &out_buf[block_base_offset
                     + (ant_id * cfg->transpose_block_size) + sc_j];
