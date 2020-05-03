@@ -45,15 +45,16 @@ DoDemul::~DoDemul()
 Event_data DoDemul::launch(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t total_data_symbol_idx = (frame_id * cfg->ul_data_symbol_num_perframe)
-        + gen_tag_t(tag).symbol_id;
+    size_t symbol_id = gen_tag_t(tag).symbol_id;
+    size_t total_data_symbol_idx
+        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
     size_t base_sc_id = gen_tag_t(tag).sc_id;
 
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
-        printf("In doDemul tid %d: frame: %zu, symbol: %u, subcarrier: %zu \n",
-            tid, frame_id, gen_tag_t(tag).symbol_id, base_sc_id);
+        printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
+            tid, frame_id, symbol_id, base_sc_id);
     }
 
     int transpose_block_size = cfg->transpose_block_size;
@@ -99,7 +100,9 @@ Event_data DoDemul::launch(size_t tag)
 
             /* create input precoder matrix */
             int cur_sc_id = i * 8 + j + base_sc_id;
-            int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
+            size_t precoder_offset
+                = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
+                + cur_sc_id;
             if (cfg->freq_orthogonal_pilot)
                 precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
             cx_float* precoder_ptr
