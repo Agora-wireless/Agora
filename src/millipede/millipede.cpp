@@ -1001,7 +1001,7 @@ void Millipede::initialize_uplink_buffers()
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 

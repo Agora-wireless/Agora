@@ -22,14 +22,13 @@
 
 class DoFFT : public Doer {
 public:
-    DoFFT(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    DoFFT(Config* config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<char>& in_socket_buffer, Table<int>& in_socket_buffer_status,
-        Table<complex_float>& in_data_buffer,
-        Table<complex_float>& in_csi_buffer,
-        Table<complex_float>& in_calib_buffer, Stats* in_stats_manager);
+        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
+        Table<complex_float>& data_buffer, Table<complex_float>& csi_buffer,
+        Table<complex_float>& calib_buffer, Stats* stats_manager);
     ~DoFFT();
 
     /**
@@ -66,8 +65,34 @@ public:
      */
     Event_data launch(size_t tag);
 
-    void simd_store_to_buf(
-        float* fft_buf, float*& out_buf, size_t ant_id, SymbolType symbol_type);
+    /**
+     * The fully-transposed matrix after FFT is a subcarriers x antennas matrix
+     * that should look like so (using the notation subcarrier/antenna, and
+     * assuming transpose_block_size = 16)
+     *
+     * 0/0, 0/1, ........................................................., 0/63
+     * 1/0, 0/1, ........................................................ , 1/63
+     * ...
+     * 15/0, 15/1, ......................................................, 15/63
+     * ...
+     * 1199/0, 1199/1, ............................................... , 1199/63
+     *
+     *
+     * The partially-tranposed matrix looks like so:
+     * 0/0 1/0 ... 15/0  0/1 1/1 ... 15/1 .................... 0/3 1/3 .... 15/3
+     * 0/4 1/4 ... 15/4  0/5 1/5 ... 15/5 .................... 0/7 1/5 .... 15/7
+     * ...
+     * ...........................................................0/63 ... 15/63
+     * <end of partial transpose block>
+     * 16/0 17/0 ... 31/0 ....................................16/3 17/3 ... 31/3
+     * 16/4 17/4 ... 31/4 ....................................16/7 17/7 ... 31/7
+     *
+     *
+     * Each partially-transposed block is identical to the corresponding
+     * fully-transposed matrix, but laid out in memory in column-major order.
+     */
+    void partial_transpose(const complex_float* fft_buf, complex_float* out_buf,
+        size_t ant_id, SymbolType symbol_type) const;
 
 private:
     Table<char>& socket_buffer_;
@@ -76,7 +101,7 @@ private:
     Table<complex_float>& csi_buffer_;
     Table<complex_float>& calib_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    FFTBuffer fft_buffer_;
+    complex_float* fft_inout; // Buffer for both FFT input and output
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
 };
