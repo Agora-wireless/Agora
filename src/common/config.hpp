@@ -196,6 +196,28 @@ public:
             + symbol_idx_ul;
     }
 
+    /// Fetch the channel state information buffer for this frame and symbol ID.
+    /// The symbol must be a pilot symbol.
+    complex_float* get_csi_buf_ptr(
+        Table<complex_float>& csi_buffer, size_t frame_id, size_t symbol_id)
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
+            + getPilotSFIndex(frame_id, symbol_id);
+        return csi_buffer[symbol_offset];
+    }
+
+    /// Fetch the data buffer for this frame and symbol ID. The symbol must
+    /// be an uplink symbol.
+    complex_float* get_data_buf_ptr(
+        Table<complex_float>& data_buffer, size_t frame_id, size_t symbol_id)
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
+            + getUlSFIndex(frame_id, symbol_id);
+        return data_buffer[symbol_offset];
+    }
+
     Config(std::string);
     void genData();
     ~Config();
