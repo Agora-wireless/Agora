@@ -51,7 +51,7 @@ Event_data DoPrecode::launch(size_t tag)
     size_t base_sc_id = gen_tag_t(tag).sc_id;
     size_t data_symbol_idx_dl = gen_tag_t(tag).symbol_id;
     size_t total_data_symbol_idx
-        = (frame_id * cfg->data_symbol_num_perframe) + data_symbol_idx_dl;
+        = cfg->get_total_data_symbol_idx(frame_id, data_symbol_idx_dl);
 
     size_t start_tsc = worker_rdtsc();
     if (kDebugPrintInTask) {
@@ -69,9 +69,11 @@ Event_data DoPrecode::launch(size_t tag)
         for (int j = 0; j < 4; j++) {
             size_t start_tsc2 = worker_rdtsc();
             int cur_sc_id = base_sc_id + i + j;
-            int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + cur_sc_id;
+            int precoder_offset
+                = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
+                + cur_sc_id;
             if (cfg->freq_orthogonal_pilot)
-                precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
+                precoder_offset = precoder_offset - (cur_sc_id % cfg->UE_NUM);
 
             complex_float* data_ptr = modulated_buffer_temp;
             if (data_symbol_idx_dl
