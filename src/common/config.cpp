@@ -375,6 +375,7 @@ void Config::genData()
     fclose(fd);
 #endif
 
+    // Generate freq-domain and time-domain downlink symbols
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         std::vector<int8_t> in_modul;
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
@@ -398,6 +399,7 @@ void Config::genData()
         }
     }
 
+    // Generate UE-specific pilots based on Zadoff-Chu sequence used for phase tracking
     auto zc_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
@@ -427,6 +429,7 @@ void Config::genData()
         free_buffer_1d(&pilot_ifft_in);
     }
 
+    // Generate freq-domain and time-domain uplink symbols
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
             size_t p = ue_id * OFDM_DATA_NUM;
