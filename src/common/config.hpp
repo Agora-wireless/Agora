@@ -208,24 +208,32 @@ public:
 
     /// Fetch the channel state information buffer for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
-    inline complex_float* get_csi_buf_ptr(
-        Table<complex_float>& csi_buffer, size_t frame_id, size_t symbol_id)
+    inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
+        size_t frame_id, size_t symbol_id) const
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
             + get_pilot_symbol_idx(frame_id, symbol_id);
-        return csi_buffer[symbol_offset];
+        return csi_buffers[symbol_offset];
     }
 
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
     /// be an uplink symbol.
-    inline complex_float* get_data_buf_ptr(
-        Table<complex_float>& data_buffer, size_t frame_id, size_t symbol_id)
+    inline complex_float* get_data_buf(Table<complex_float>& data_buffers,
+        size_t frame_id, size_t symbol_id) const
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
             + get_ul_symbol_idx(frame_id, symbol_id);
-        return data_buffer[symbol_offset];
+        return data_buffers[symbol_offset];
+    }
+
+    inline complex_float* get_precoder_buf(
+        Table<complex_float>& precoder_buffers, size_t frame_id,
+        size_t sc_id) const
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
 
     Config(std::string);

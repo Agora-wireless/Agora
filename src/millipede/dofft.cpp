@@ -144,13 +144,11 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        partial_transpose(
-            cfg->get_csi_buf_ptr(csi_buffer_, frame_id, symbol_id), ant_id,
-            SymbolType::kPilot);
+        partial_transpose(cfg->get_csi_buf(csi_buffer_, frame_id, symbol_id),
+            ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
-        partial_transpose(
-            cfg->get_data_buf_ptr(data_buffer_, frame_id, symbol_id), ant_id,
-            SymbolType::kUL);
+        partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
+            ant_id, SymbolType::kUL);
     } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
         or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
         partial_transpose(
