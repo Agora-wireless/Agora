@@ -43,6 +43,7 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
     cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
     ul_gt_mat = ul_iq_f_mat.st();
+    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
     evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 
     ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
@@ -139,35 +140,46 @@ Event_data DoDemul::launch(size_t tag)
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
             fmat theta_avg;
+            fmat theta_diff = zeros<fmat>(cfg->UE_NUM, 1);
             if (symbol_id < cfg->UL_PILOT_SYMS) { // calc new phase shift
                 cx_float* phase_shift_ptr
-                    = (cx_float*)&ue_spec_pilot_buffer_[frame_id][cur_sc_id
-                        * cfg->UE_NUM];
+                    = (cx_float*)&ue_spec_pilot_buffer_[frame_id
+                            * cfg->UL_PILOT_SYMS
+                        + symbol_id][cur_sc_id * cfg->UE_NUM];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
                 if (symbol_id == 0)
                     mat_phase_shift.fill(0);
-                mat_phase_shift += mat_equaled;
+                mat_phase_shift = mat_equaled;
             } else if (cfg->UL_PILOT_SYMS
                 > 0) { // apply previously calc'ed phase shift to data
-                cx_fmat mat_phase_shift_w
-                    = zeros<cx_fmat>(cfg->UE_NUM, cfg->OFDM_DATA_NUM);
-                float w = 1;
-                float w_tot = 0;
-                for (size_t fr = 1; fr <= moving_avg_sz; fr++) {
-                    size_t prev_frame
-                        = (frame_id + fr - 1 + TASK_BUFFER_FRAME_NUM)
-                        % TASK_BUFFER_FRAME_NUM;
-                    cx_float* phase_shift_ptr
-                        = (cx_float*)ue_spec_pilot_buffer_[prev_frame];
+                cx_float* phase_shift_ptr = (cx_float*)
+                    ue_spec_pilot_buffer_[frame_id * cfg->UL_PILOT_SYMS];
+                cx_fmat mat_phase_shift(
+                    phase_shift_ptr, cfg->UE_NUM, cfg->OFDM_DATA_NUM, false);
+                fmat cur_theta
+                    = mean(arg(mat_phase_shift % conj(ue_pilot_data)), 1);
+                fmat theta0 = cur_theta;
+                //float w = 1;
+                //float w_tot = 0;
+                for (int fr = 0; fr < (int)cfg->UL_PILOT_SYMS - 1; fr++) {
+                    size_t next_symbol
+                        //= (frame_id + fr - 1 + TASK_BUFFER_FRAME_NUM)
+                        //% TASK_BUFFER_FRAME_NUM;
+                        = (frame_id * cfg->UL_PILOT_SYMS + fr + 1);
+                    phase_shift_ptr
+                        = (cx_float*)ue_spec_pilot_buffer_[next_symbol];
                     cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
                         cfg->OFDM_DATA_NUM, false);
-                    w *= fr < moving_avg_sz ? w_decay : 1;
-                    w_tot += w;
-                    mat_phase_shift_w += w * mat_phase_shift;
+                    //w *= fr < moving_avg_sz ? w_decay : 1;
+                    //w_tot += w;
+                    //mat_phase_shift_w += w * mat_phase_shift;
+                    fmat next_theta
+                        = mean(arg(mat_phase_shift % conj(ue_pilot_data)), 1);
+                    theta_diff += (next_theta - cur_theta);
+                    cur_theta = next_theta;
                 }
-                mat_phase_shift_w /= (w_tot * cfg->UL_PILOT_SYMS);
-                fmat theta = arg(mat_phase_shift_w % conj(ue_pilot_data));
-                theta_avg = mean(theta, 1);
+                theta_diff /= (float)std::max(1, (int)cfg->UL_PILOT_SYMS - 1);
+                theta_avg = theta0 + symbol_id * theta_diff;
                 cx_fmat mat_phase_correct = zeros<cx_fmat>(size(theta_avg));
                 mat_phase_correct.set_real(cos(-theta_avg));
                 mat_phase_correct.set_imag(sin(-theta_avg));
@@ -176,8 +188,7 @@ Event_data DoDemul::launch(size_t tag)
 
             // measrure EVM from ground truth
             if (symbol_id == cfg->UL_PILOT_SYMS) {
-                fmat evm = abs(mat_equaled
-                    - ul_gt_mat.col(cfg->OFDM_DATA_START + cur_sc_id));
+                fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
                 fmat cur_evm_mat(evm_buffer_[frame_id], cfg->UE_NUM, 1, false);
                 cur_evm_mat += evm % evm;
                 if (cur_sc_id == 0) {
@@ -189,7 +200,8 @@ Event_data DoDemul::launch(size_t tag)
                     std::cout << "Frame " << prev_frame << ":\n"
                               << "  EVM " << 100 * evm_mat.st() << ", SNR "
                               << -10 * log10(evm_mat.st()) << ", theta "
-                              << theta_avg.st() << std::endl;
+                              << theta_avg.st() << ", theta_diff"
+                              << theta_diff.st() << std::endl;
                 }
             }
 
