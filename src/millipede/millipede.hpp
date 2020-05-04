@@ -82,12 +82,12 @@ public:
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
 
     void handle_event_fft(size_t tag);
-    void update_rx_counters(int frame_count, int frame_id, int symbol_id);
-    void print_per_frame_done(int task_type, int frame_count, int frame_id);
+    void update_rx_counters(size_t frame_id, size_t symbol_id);
+    void print_per_frame_done(size_t task_type, size_t frame_id);
     void print_per_symbol_done(
-        int task_type, int frame_count, int frame_id, int symbol_id);
-    void print_per_task_done(
-        int task_type, int frame_id, int symbol_id, int ant_or_sc_id);
+        size_t task_type, size_t frame_id, size_t symbol_id);
+    void print_per_task_done(size_t task_type, size_t frame_id,
+        size_t symbol_id, size_t ant_or_sc_id);
 
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
@@ -120,6 +120,18 @@ private:
         return sched_info_arr[static_cast<size_t>(event_type)].ptok;
     }
 
+    /// Return a string containing the sizes of the FFT queues
+    std::string get_fft_queue_sizes_string() const
+    {
+        std::ostringstream ret;
+        ret << "[";
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+            ret << std::to_string(fft_queue_arr[i].size()) << " ";
+        }
+        ret << "]";
+        return ret.str();
+    }
+
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
     Config* config_;
@@ -133,66 +145,64 @@ private:
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
     double freq_ghz = -1.0; // RDTSC frequency in GHz
+
     /*****************************************************
      * Buffers
      *****************************************************/
-    /* Uplink */
-    /**
-     * received data
-     * Frist dimension: SOCKET_THREAD_NUM
-     * Second dimension of buffer (type: char): packet_length *
-     * symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * SOCKET_BUFFER_FRAME_NUM
-     */
-    Table<char> socket_buffer_;
-    Table<int> socket_buffer_status_;
-    long long socket_buffer_size_;
-    int socket_buffer_status_size_;
 
-    /**
-     * Estimated CSI data
-     * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM
-     * First dimension: UE_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: BS_ANT_NUM * OFDM_CA_NUM
-     */
+    /* Uplink */
+    size_t socket_buffer_size_; // RX buffer size per socket RX thread
+
+    // Max number of packets that can be buffered in one RX thread
+    size_t socket_buffer_status_size_;
+
+    // Received data buffers
+    // 1st dimension: number of socket RX threads
+    // 2nd dimension: socket buffer size
+    Table<char> socket_buffer_;
+
+    // Status of received data buffers
+    // 1st dimension: number of socket RX threads
+    // 2nd dimension: socket buffer status size
+    Table<int> socket_buffer_status_;
+
+    // Estimated CSI data
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * pilots per frame
+    // 2nd dimension: number of antennas * number of OFDM data subcarriers
     Table<complex_float> csi_buffer_;
 
-    /**
-     * Data symbols after IFFT
-     * First dimension: total symbol number in the buffer:
-     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
-     * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
-     * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
-     * subcarriers)
-     */
+    // Data symbols after FFT
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: number of antennas * number of OFDM data subcarriers
+    //
+    // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
+    // subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
+    // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    /**
-     * Calculated precoder
-     * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
-     * Second dimension: UE_NUM * BS_ANT_NUM
-     */
+    // Calculated precoder
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
+    // 2nd dimension: number of antennas * number of UEs
     Table<complex_float> precoder_buffer_;
 
-    /**
-     * Data after equalization
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
-     */
+    // Data after equalization
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
 
-    /**
-     * Data after demodulation
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
-     */
+    // Data after hard demodulation
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<uint8_t> demod_hard_buffer_;
 
+    // Data after soft demodulation
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> demod_soft_buffer_;
 
+    // Data after LDPC decoding
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
 
     Table<complex_float> ue_spec_pilot_buffer_;
@@ -212,40 +222,26 @@ private:
     // TX/RX buffers.
     std::array<std::queue<fft_req_tag_t>, TASK_BUFFER_FRAME_NUM> fft_queue_arr;
 
-    /**
-     * Raw data
-     * First dimension: data_symbol_num_perframe * UE_NUM
-     * Second dimension: OFDM_CA_NUM
-     */
-    Table<long long> dl_IQ_data_long;
-
-    /**
-     * Modulated data
-     * First dimension: symbol_num_perframe (40) * UE_NUM *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM
-     */
-    // RawDataBuffer dl_rawdata_buffer_;
-
-    /**
-     * Data for IFFT
-     * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
-     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
-     * OFDM_CA_NUM
-     */
+    // Data for IFFT
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of antennas * number of
+    // data symbols per frame
+    // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
 
-    /**
-     * Data after IFFT
-     * First dimension: data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
-     * second dimension data order: SC1-32 of UEs, SC33-64 of UEs, ...,
-     * SC993-1024 of UEs (32 blocks each with 32 subcarriers)
-     */
-    // DataBuffer dl_iffted_data_buffer_;
-
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
+    // 2nd dimension: number of antennas * number of UEs
     Table<complex_float> dl_precoder_buffer_;
+
+    // 1st dimension: TASK_BUFFER_FRAME_NUM
+    // 2nd dimension: number of OFDM data subcarriers * number of antennas
     Table<complex_float> recip_buffer_;
+
+    // 1st dimension: TASK_BUFFER_FRAME_NUM
+    // 2nd dimension: number of OFDM data subcarriers * number of antennas
     Table<complex_float> calib_buffer_;
+
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> dl_encoded_buffer_;
 
     /**

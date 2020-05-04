@@ -180,36 +180,45 @@ struct Packet {
     }
 };
 
-struct RX_stats {
+class RX_stats {
+public:
     std::array<size_t, TASK_BUFFER_FRAME_NUM> task_count;
     std::array<size_t, TASK_BUFFER_FRAME_NUM> task_pilot_count;
     size_t max_task_count; // Max packets per frame
     size_t max_task_pilot_count; // Max pilot packets per frame
 };
 
-struct Frame_stats {
-    size_t frame_count;
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_count;
+class Frame_stats {
+public:
     size_t max_symbol_count;
     bool last_symbol(int frame_id)
     {
-        if (++symbol_count[frame_id] == max_symbol_count) {
-            symbol_count[frame_id] = 0;
-            return (true);
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        if (++symbol_count[frame_slot] == max_symbol_count) {
+            symbol_count[frame_slot] = 0;
+            return true;
         }
-        return (false);
+        return false;
     }
+
     void init(int _max_symbol_count)
     {
-        frame_count = 0;
         symbol_count.fill(0);
         max_symbol_count = _max_symbol_count;
     }
-    void update_frame_count() { frame_count++; }
+
+    size_t get_symbol_count(size_t frame_id)
+    {
+        return symbol_count[frame_id % TASK_BUFFER_FRAME_NUM];
+    }
+
+private:
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_count;
 };
 
-struct ZF_stats : public Frame_stats {
-    int coded_frame;
+class ZF_stats : public Frame_stats {
+public:
+    size_t coded_frame;
     size_t& max_task_count;
     ZF_stats(void)
         : max_task_count(max_symbol_count)
@@ -222,8 +231,8 @@ struct ZF_stats : public Frame_stats {
     }
 };
 
-struct Data_stats : public Frame_stats {
-    size_t* task_count[TASK_BUFFER_FRAME_NUM];
+class Data_stats : public Frame_stats {
+public:
     size_t max_task_count;
 
     void init(int _max_task_count, int max_symbols, int max_data_symbol)
@@ -238,17 +247,27 @@ struct Data_stats : public Frame_stats {
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
             delete[] task_count[i];
     }
-    bool last_task(int frame_id, int data_symbol_id)
+    bool last_task(size_t frame_id, size_t data_symbol_id)
     {
-        if (++task_count[frame_id][data_symbol_id] == max_task_count) {
-            task_count[frame_id][data_symbol_id] = 0;
-            return (true);
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        if (++task_count[frame_slot][data_symbol_id] == max_task_count) {
+            task_count[frame_slot][data_symbol_id] = 0;
+            return true;
         }
-        return (false);
+        return false;
     }
+
+    size_t get_task_count(size_t frame_id, size_t symbol_id)
+    {
+        return task_count[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id];
+    }
+
+private:
+    size_t* task_count[TASK_BUFFER_FRAME_NUM];
 };
 
-struct FFT_stats : public Data_stats {
+class FFT_stats : public Data_stats {
+public:
     size_t max_symbol_data_count;
     std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_cal_count;
     size_t max_symbol_cal_count;
@@ -258,17 +277,15 @@ struct FFT_stats : public Data_stats {
     std::vector<size_t> cur_frame_for_symbol;
 };
 
-struct RC_stats {
-    size_t frame_count;
-    int max_task_count;
-    int last_frame;
+class RC_stats {
+public:
+    size_t max_task_count;
+    size_t last_frame;
     RC_stats(void)
-        : frame_count(0)
-        , max_task_count(1)
-        , last_frame(-1)
+        : max_task_count(1)
+        , last_frame(SIZE_MAX)
     {
     }
-    void update_frame_count(void) { frame_count++; }
 };
 
 /* TODO: clean up the legency code below */

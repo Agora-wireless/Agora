@@ -182,6 +182,24 @@ public:
     bool isCalUlPilot(size_t, size_t);
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
+
+    // TODO: Documentation
+    inline size_t get_total_data_symbol_idx(
+        size_t frame_id, size_t symbol_id) const
+    {
+        return ((frame_id % TASK_BUFFER_FRAME_NUM) * data_symbol_num_perframe)
+            + symbol_id;
+    }
+
+    // TODO: Documentation
+    inline size_t get_total_data_symbol_idx_ul(
+        size_t frame_id, size_t symbol_idx_ul) const
+    {
+        return ((frame_id % TASK_BUFFER_FRAME_NUM)
+                   * ul_data_symbol_num_perframe)
+            + symbol_idx_ul;
+    }
+
     Config(std::string);
     void genData();
     ~Config();
