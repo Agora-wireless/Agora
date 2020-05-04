@@ -45,24 +45,23 @@ Event_data DoZF::launch(size_t tag)
     return Event_data(EventType::kZF, tag);
 }
 
-void DoZF::precoder(const arma::cx_fmat& mat_input, size_t frame_id,
-    size_t sc_id, bool downlink_mode)
+void DoZF::compute_precoder(const arma::cx_fmat& mat_input,
+    complex_float* precoder_ul, complex_float* precoder_dl,
+    complex_float* recip_ptr)
 {
     arma::cx_fmat mat_ul_precoder(
-        reinterpret_cast<arma::cx_float*>(
-            cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, sc_id)),
-        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        reinterpret_cast<arma::cx_float*>(precoder_ul), cfg->UE_NUM,
+        cfg->BS_ANT_NUM, false);
     pinv(mat_ul_precoder, mat_input, 1e-2, "dc");
 
-    if (downlink_mode) {
+    if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_precoder(
-            reinterpret_cast<arma::cx_float*>(
-                cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, sc_id)),
-            cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            reinterpret_cast<arma::cx_float*>(precoder_dl), cfg->UE_NUM,
+            cfg->BS_ANT_NUM, false);
         if (cfg->recipCalEn) {
-            auto* calib = (arma::cx_float*)(&recip_buffer_[frame_id
-                % TASK_BUFFER_FRAME_NUM][sc_id * cfg->BS_ANT_NUM]);
-            arma::cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
+            arma::cx_fvec vec_calib(
+                reinterpret_cast<arma::cx_float*>(recip_ptr), cfg->BS_ANT_NUM,
+                false);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = diagmat(vec_calib);
             mat_dl_precoder = mat_ul_precoder * inv(mat_calib);
@@ -122,8 +121,10 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        precoder(mat_input, frame_id, cur_sc_id,
-            cfg->dl_data_symbol_num_perframe > 0);
+        compute_precoder(mat_input,
+            cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, cur_sc_id),
+            cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, cur_sc_id),
+            cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id));
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -187,8 +188,10 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    precoder(
-        mat_input, frame_id, base_sc_id, cfg->dl_data_symbol_num_perframe > 0);
+    compute_precoder(mat_input,
+        cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, base_sc_id),
+        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, base_sc_id),
+        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id));
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -218,6 +221,9 @@ void DoZF::Predict(size_t tag)
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
         sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-    precoder(mat_input, frame_id + 1, base_sc_id,
-        cfg->dl_data_symbol_num_perframe > 0);
+
+    compute_precoder(mat_input,
+        cfg->get_precoder_buf(ul_precoder_buffer_, frame_id + 1, base_sc_id),
+        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id + 1, base_sc_id),
+        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id));
 }
