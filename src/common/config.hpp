@@ -228,12 +228,21 @@ public:
         return data_buffers[symbol_offset];
     }
 
+    /// Get the precoder buffer for this frame and subcarrier ID
     inline complex_float* get_precoder_buf(
         Table<complex_float>& precoder_buffers, size_t frame_id,
         size_t sc_id) const
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+    }
+
+    /// Get the calibration buffer
+    inline complex_float* get_calib_buffer(
+        Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
     Config(std::string);
