@@ -51,9 +51,11 @@ public:
 
 private:
     void ZF_time_orthogonal(size_t tag);
+
+    /// Compute uplink and/or downlink precoders usign
     void compute_precoder(const arma::cx_fmat& mat_input,
-        complex_float* ul_precoder_buf, complex_float* dl_precoder_buf,
-        complex_float* recip_buf);
+        const complex_float* recip_buf, complex_float* ul_precoder_buf,
+        complex_float* dl_precoder_buf);
 
     void ZF_freq_orthogonal(size_t tag);
 
