@@ -360,7 +360,7 @@ void RU::taskThread(int tid)
 
 #if SEPARATE_TX_RX_CLIENT
         if (txSymbols.size() > 0
-            && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
+            && config_->get_dl_symbol_idx(frame_id, symbol_id) == 0) {
             // notify TXthread to start transmitting frame_id+offset
             Event_data do_tx_task(EventType::kPacketTX, ant_id);
             do_tx_task.more_data = frame_id + TX_FRAME_DELTA;

@@ -169,10 +169,17 @@ public:
 
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
-    int getDlSFIndex(size_t, size_t);
-    int getUlSFIndex(size_t, size_t);
     int getDownlinkPilotId(size_t, size_t);
-    int getPilotSFIndex(size_t, size_t);
+
+    // Get the index of this downlink symbol among this frame's downlink symbols
+    size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this uplink symbol among this frame's uplink symbols
+    size_t get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this pilot symbol among this frame's pilot symbols
+    size_t get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
     bool isPilot(size_t, size_t);
     bool isCalDlPilot(size_t, size_t);
     bool isCalUlPilot(size_t, size_t);
@@ -206,7 +213,7 @@ public:
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
-            + getPilotSFIndex(frame_id, symbol_id);
+            + get_pilot_symbol_idx(frame_id, symbol_id);
         return csi_buffer[symbol_offset];
     }
 
@@ -217,7 +224,7 @@ public:
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
-            + getUlSFIndex(frame_id, symbol_id);
+            + get_ul_symbol_idx(frame_id, symbol_id);
         return data_buffer[symbol_offset];
     }
 
