@@ -45,18 +45,20 @@ Event_data DoZF::launch(size_t tag)
     return Event_data(EventType::kZF, tag);
 }
 
-void DoZF::precoder(void* mat_input_ptr, size_t frame_id, size_t sc_id,
-    size_t offset, bool downlink_mode)
+void DoZF::precoder(const arma::cx_fmat& mat_input, size_t frame_id,
+    size_t sc_id, bool downlink_mode)
 {
-    auto& mat_input = *(arma::cx_fmat*)mat_input_ptr;
-    auto* ptr_ul_out = (arma::cx_float*)ul_precoder_buffer_[offset];
     arma::cx_fmat mat_ul_precoder(
-        ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        reinterpret_cast<arma::cx_float*>(
+            cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, sc_id)),
+        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
     pinv(mat_ul_precoder, mat_input, 1e-2, "dc");
+
     if (downlink_mode) {
-        auto* ptr_dl_out = (arma::cx_float*)dl_precoder_buffer_[offset];
         arma::cx_fmat mat_dl_precoder(
-            ptr_dl_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            reinterpret_cast<arma::cx_float*>(
+                cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, sc_id)),
+            cfg->UE_NUM, cfg->BS_ANT_NUM, false);
         if (cfg->recipCalEn) {
             auto* calib = (arma::cx_float*)(&recip_buffer_[frame_id
                 % TASK_BUFFER_FRAME_NUM][sc_id * cfg->BS_ANT_NUM]);
@@ -77,15 +79,11 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
             frame_id, base_sc_id);
     }
-    const size_t offset_in_buffer
-        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
-        + base_sc_id;
     size_t num_subcarriers
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
     for (size_t i = 0; i < num_subcarriers; i++) {
         size_t start_tsc1 = worker_rdtsc();
         size_t cur_sc_id = base_sc_id + i;
-        int cur_offset = offset_in_buffer + i;
         int transpose_block_size = cfg->transpose_block_size;
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
             transpose_block_size * 2 + 1, transpose_block_size * 4,
@@ -124,7 +122,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
+        precoder(mat_input, frame_id, cur_sc_id,
             cfg->dl_data_symbol_num_perframe > 0);
 
         double start_tsc2 = worker_rdtsc();
@@ -150,9 +148,6 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
         printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n",
             tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
     }
-    const size_t offset_in_buffer
-        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
-        + base_sc_id;
 
     double start_tsc1 = worker_rdtsc();
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
@@ -192,8 +187,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    precoder(&mat_input, frame_id, base_sc_id, offset_in_buffer,
-        cfg->dl_data_symbol_num_perframe > 0);
+    precoder(
+        mat_input, frame_id, base_sc_id, cfg->dl_data_symbol_num_perframe > 0);
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -223,9 +218,6 @@ void DoZF::Predict(size_t tag)
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
         sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-    const size_t offset_next_frame
-        = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
-        + base_sc_id;
-    precoder(&mat_input, frame_id, base_sc_id, offset_next_frame,
+    precoder(mat_input, frame_id + 1, base_sc_id,
         cfg->dl_data_symbol_num_perframe > 0);
 }
