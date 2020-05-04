@@ -15,10 +15,8 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-// #include "mkl_dfti.h"
+#include <stdio.h>
+#include <string.h>
 
 class DoZF : public Doer {
 public:
