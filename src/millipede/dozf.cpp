@@ -6,31 +6,33 @@
 #include "dozf.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "doer.hpp"
+#include <malloc.h>
 
-using namespace arma;
-DoZF::DoZF(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+DoZF::DoZF(Config* config, int tid, double freq_ghz,
+    moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& in_csi_buffer, Table<complex_float>& in_recip_buffer,
-    Table<complex_float>& in_ul_precoder_buffer,
-    Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
+    Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
+    Table<complex_float>& ul_precoder_buffer,
+    Table<complex_float>& dl_precoder_buffer, Stats* stats_manager)
+    : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
-    , csi_buffer_(in_csi_buffer)
-    , recip_buffer_(in_recip_buffer)
-    , ul_precoder_buffer_(in_ul_precoder_buffer)
-    , dl_precoder_buffer_(in_dl_precoder_buffer)
+    , csi_buffer_(csi_buffer)
+    , recip_buffer_(recip_buffer)
+    , ul_precoder_buffer_(ul_precoder_buffer)
+    , dl_precoder_buffer_(dl_precoder_buffer)
 {
-    duration_stat = in_stats_manager->get_duration_stat(DoerType::kZF, in_tid);
-    alloc_buffer_1d(&pred_csi_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
-    alloc_buffer_1d(&csi_gather_buffer, cfg->BS_ANT_NUM * cfg->UE_NUM, 64, 0);
+    duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
+    pred_csi_buffer = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)));
+    csi_gather_buffer = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
 {
-    free_buffer_1d(&csi_gather_buffer);
-    free_buffer_1d(&pred_csi_buffer);
+    free(pred_csi_buffer);
+    free(csi_gather_buffer);
 }
 
 Event_data DoZF::launch(size_t tag)
@@ -46,19 +48,20 @@ Event_data DoZF::launch(size_t tag)
 void DoZF::precoder(void* mat_input_ptr, size_t frame_id, size_t sc_id,
     size_t offset, bool downlink_mode)
 {
-    cx_fmat& mat_input = *(cx_fmat*)mat_input_ptr;
-    cx_float* ptr_ul_out = (cx_float*)ul_precoder_buffer_[offset];
-    cx_fmat mat_ul_precoder(ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+    auto& mat_input = *(arma::cx_fmat*)mat_input_ptr;
+    auto* ptr_ul_out = (arma::cx_float*)ul_precoder_buffer_[offset];
+    arma::cx_fmat mat_ul_precoder(
+        ptr_ul_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
     pinv(mat_ul_precoder, mat_input, 1e-2, "dc");
     if (downlink_mode) {
-        cx_float* ptr_dl_out = (cx_float*)dl_precoder_buffer_[offset];
-        cx_fmat mat_dl_precoder(
+        auto* ptr_dl_out = (arma::cx_float*)dl_precoder_buffer_[offset];
+        arma::cx_fmat mat_dl_precoder(
             ptr_dl_out, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
         if (cfg->recipCalEn) {
-            cx_float* calib = (cx_float*)(&recip_buffer_[frame_id
+            auto* calib = (arma::cx_float*)(&recip_buffer_[frame_id
                 % TASK_BUFFER_FRAME_NUM][sc_id * cfg->BS_ANT_NUM]);
-            cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
-            cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
+            arma::cx_fvec vec_calib(calib, cfg->BS_ANT_NUM, false);
+            arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = diagmat(vec_calib);
             mat_dl_precoder = mat_ul_precoder * inv(mat_calib);
         } else
@@ -77,12 +80,11 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     const size_t offset_in_buffer
         = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
         + base_sc_id;
-    int max_sc_ite
+    size_t num_subcarriers
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
-    for (int i = 0; i < max_sc_ite; i++) {
+    for (size_t i = 0; i < num_subcarriers; i++) {
         size_t start_tsc1 = worker_rdtsc();
-
-        int cur_sc_id = base_sc_id + i;
+        size_t cur_sc_id = base_sc_id + i;
         int cur_offset = offset_in_buffer + i;
         int transpose_block_size = cfg->transpose_block_size;
         __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
@@ -97,9 +99,6 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         const size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->UE_NUM;
         float* tar_csi_ptr = (float*)csi_gather_buffer;
-
-        // printf("In doZF thread %d: frame: %d, subcarrier: %d\n", tid,
-        // frame_id, sc_id);
 
         /* Gather csi matrix of all users and antennas */
         for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
@@ -121,8 +120,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-        cx_float* ptr_in = (cx_float*)csi_gather_buffer;
-        cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        auto* ptr_in = (arma::cx_float*)csi_gather_buffer;
+        arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
         precoder(&mat_input, frame_id, cur_sc_id, cur_offset,
@@ -189,8 +188,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-    cx_float* ptr_in = (cx_float*)csi_gather_buffer;
-    cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    auto* ptr_in = (arma::cx_float*)csi_gather_buffer;
+    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
     precoder(&mat_input, frame_id, base_sc_id, offset_in_buffer,
@@ -220,10 +219,10 @@ void DoZF::Predict(size_t tag)
     const size_t offset_in_buffer
         = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
         + base_sc_id;
-    cx_float* ptr_in = (cx_float*)pred_csi_buffer;
-    memcpy(ptr_in, (cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
-    cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
+    memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
+        sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
+    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     const size_t offset_next_frame
         = ((frame_id + 1) % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
         + base_sc_id;
