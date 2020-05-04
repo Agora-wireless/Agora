@@ -50,8 +50,9 @@ public:
 private:
     void ZF_time_orthogonal(size_t tag);
 
-    /// Compute uplink and/or downlink precoders usign
-    void compute_precoder(const arma::cx_fmat& mat_input,
+    /// Compute uplink and/or downlink precoders using this CSI matrix
+    /// and calibration buffer as input
+    void compute_precoder(const arma::cx_fmat& mat_csi,
         const complex_float* recip_buf, complex_float* ul_precoder_buf,
         complex_float* dl_precoder_buf);
 

@@ -45,14 +45,14 @@ Event_data DoZF::launch(size_t tag)
     return Event_data(EventType::kZF, tag);
 }
 
-void DoZF::compute_precoder(const arma::cx_fmat& mat_input,
+void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     const complex_float* recip_ptr, complex_float* precoder_ul,
     complex_float* precoder_dl)
 {
     arma::cx_fmat mat_ul_precoder(
         reinterpret_cast<arma::cx_float*>(precoder_ul), cfg->UE_NUM,
         cfg->BS_ANT_NUM, false);
-    arma::pinv(mat_ul_precoder, mat_input, 1e-2, "dc");
+    arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_precoder(
@@ -102,11 +102,11 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-        auto* ptr_in = (arma::cx_float*)csi_gather_buffer;
-        arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
+            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        compute_precoder(mat_input,
+        compute_precoder(mat_csi,
             cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id),
             cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, cur_sc_id),
             cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, cur_sc_id));
@@ -153,11 +153,11 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-    auto* ptr_in = (arma::cx_float*)csi_gather_buffer;
-    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
+        cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    compute_precoder(mat_input,
+    compute_precoder(mat_csi,
         cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
         cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, base_sc_id),
         cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, base_sc_id));
