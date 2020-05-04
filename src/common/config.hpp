@@ -169,15 +169,25 @@ public:
 
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
-    int getDlSFIndex(size_t, size_t);
-    int getUlSFIndex(size_t, size_t);
     int getDownlinkPilotId(size_t, size_t);
-    int getPilotSFIndex(size_t, size_t);
+
+    // Get the index of this downlink symbol among this frame's downlink symbols
+    size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this uplink symbol among this frame's uplink symbols
+    size_t get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this pilot symbol among this frame's pilot symbols
+    size_t get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
     bool isPilot(size_t, size_t);
     bool isCalDlPilot(size_t, size_t);
     bool isCalUlPilot(size_t, size_t);
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
+
+    /// Return the symbol type of this symbol in this frame
+    SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
     // TODO: Documentation
     inline size_t get_total_data_symbol_idx(
@@ -194,6 +204,28 @@ public:
         return ((frame_id % TASK_BUFFER_FRAME_NUM)
                    * ul_data_symbol_num_perframe)
             + symbol_idx_ul;
+    }
+
+    /// Fetch the channel state information buffer for this frame and symbol ID.
+    /// The symbol must be a pilot symbol.
+    inline complex_float* get_csi_buf_ptr(
+        Table<complex_float>& csi_buffer, size_t frame_id, size_t symbol_id)
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
+            + get_pilot_symbol_idx(frame_id, symbol_id);
+        return csi_buffer[symbol_offset];
+    }
+
+    /// Fetch the data buffer for this frame and symbol ID. The symbol must
+    /// be an uplink symbol.
+    inline complex_float* get_data_buf_ptr(
+        Table<complex_float>& data_buffer, size_t frame_id, size_t symbol_id)
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
+            + get_ul_symbol_idx(frame_id, symbol_id);
+        return data_buffer[symbol_offset];
     }
 
     Config(std::string);

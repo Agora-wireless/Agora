@@ -364,7 +364,7 @@ void RU::taskThread(int tid)
 
 #if !SEPARATE_TX_RX_UE
             if (txSymbols.size() > 0
-                && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
+                && config_->get_dl_symbol_idx(frame_id, symbol_id) == 0) {
                 for (size_t tx_symbol_id = 0; tx_symbol_id < txSymbols.size();
                      tx_symbol_id++) {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;

@@ -504,9 +504,10 @@ void Millipede::handle_event_fft(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
+    SymbolType sym_type = config_->get_symbol_type(frame_id, symbol_id);
 
     if (fft_stats_.last_task(frame_id, symbol_id)) {
-        if (config_->isPilot(frame_id, symbol_id)) {
+        if (sym_type == SymbolType::kPilot) {
             print_per_symbol_done(PRINT_FFT_PILOTS, frame_id, symbol_id);
             if (!config_->downlink_mode
                 || (config_->downlink_mode && !config_->recipCalEn)
@@ -519,8 +520,9 @@ void Millipede::handle_event_fft(size_t tag)
                     schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
-        } else if (config_->isUplink(frame_id, symbol_id)) {
-            int symbol_idx_ul = config_->getUlSFIndex(frame_id, symbol_id);
+        } else if (sym_type == SymbolType::kUL) {
+            size_t symbol_idx_ul
+                = config_->get_ul_symbol_idx(frame_id, symbol_id);
             fft_stats_.cur_frame_for_symbol[symbol_idx_ul] = frame_id;
             print_per_symbol_done(PRINT_FFT_DATA, frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
@@ -528,8 +530,8 @@ void Millipede::handle_event_fft(size_t tag)
                 schedule_subcarriers(
                     EventType::kDemul, frame_id, symbol_idx_ul);
             }
-        } else if (config_->isCalDlPilot(frame_id, symbol_id)
-            || config_->isCalUlPilot(frame_id, symbol_id)) {
+        } else if (sym_type == SymbolType::kCalDL
+            or sym_type == SymbolType::kCalUL) {
             print_per_symbol_done(PRINT_FFT_CAL, frame_id, symbol_id);
             if (++fft_stats_.symbol_cal_count[frame_id]
                 == fft_stats_.max_symbol_cal_count) {
@@ -1001,7 +1003,7 @@ void Millipede::initialize_uplink_buffers()
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 

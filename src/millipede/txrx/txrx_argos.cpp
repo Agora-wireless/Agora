@@ -211,7 +211,7 @@ int PacketTXRX::dequeue_send(int tid)
     else
         txbuf[ch]
             = (void*)config_
-                  ->dl_IQ_symbol[config_->getDlSFIndex(frame_id, symbol_id)
+                  ->dl_IQ_symbol[config_->get_dl_symbol_idx(frame_id, symbol_id)
                       - DL_PILOT_SYMS];
 #else
     int data_offset = (offset % tx_buffer_frame_num_) * config_->packet_length;

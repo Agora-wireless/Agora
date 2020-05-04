@@ -261,7 +261,7 @@ void Phy_UE::start()
                 symbol_id = pkt->symbol_id;
 #if WRITE_RECV
                 if (frame_id < 10
-                    && config_->getDlSFIndex(frame_id, symbol_id) == 0) {
+                    && config_->get_dl_symbol_idx(frame_id, symbol_id) == 0) {
                     int ant_id = pkt->ant_id;
                     int len = config_->sampsPerSymbol;
                     void* cur_buf = pkt->data;
@@ -594,7 +594,7 @@ void Phy_UE::doFFT(int tid, int offset)
         return;
 
     // remove CP, do FFT
-    int dl_symbol_id = config_->getDlSFIndex(frame_id, symbol_id);
+    int dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
     int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM,
         rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id);
 
