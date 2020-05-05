@@ -180,7 +180,7 @@ Event_data DoDemul::launch(size_t tag)
                 mat_equaled %= mat_phase_correct;
 
                 // measrure EVM from ground truth
-                if (symbol_id == cfg->UL_PILOT_SYMS) {
+                if (kDebugPrintInTask && symbol_id == cfg->UL_PILOT_SYMS) {
                     fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
                     fmat cur_evm_mat(
                         evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
