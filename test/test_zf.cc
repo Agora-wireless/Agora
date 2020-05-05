@@ -1,8 +1,5 @@
-#include <algorithm>
 #include <gtest/gtest.h>
-#include <time.h>
-#include <vector>
-
+// For some reason, gtest include order matters
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "dozf.hpp"
