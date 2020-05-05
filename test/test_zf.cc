@@ -7,6 +7,7 @@
 #include "config.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
+#include "utils.h"
 
 /// Measure performance of zeroforcing
 TEST(TestZF, Perf)
@@ -27,13 +28,16 @@ TEST(TestZF, Perf)
 
     Table<complex_float> csi_buffer_, ul_precoder_buffer_, dl_precoder_buffer_,
         recip_buffer_;
-    csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
+    csi_buffer_.rand_alloc_float(
+        cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
-    ul_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    ul_precoder_buffer_.rand_alloc_float(
+        cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-    dl_precoder_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    dl_precoder_buffer_.rand_alloc_float(
+        cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
-    recip_buffer_.calloc(
+    recip_buffer_.rand_alloc_float(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, cfg->worker_thread_num,
@@ -43,6 +47,19 @@ TEST(TestZF, Perf)
     auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
         csi_buffer_, recip_buffer_, ul_precoder_buffer_, dl_precoder_buffer_,
         stats);
+
+    FastRand fast_rand;
+    size_t start_tsc = rdtsc();
+    for (size_t i = 0; i < kNumIters; i++) {
+        uint32_t frame_id = fast_rand.next_u32();
+        size_t base_sc_id
+            = (fast_rand.next_u32() % (cfg->OFDM_DATA_NUM / cfg->zf_block_size))
+            * cfg->zf_block_size;
+        computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
+    }
+    double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
+
+    printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 }
 
 int main(int argc, char** argv)
