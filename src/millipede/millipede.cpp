@@ -1009,8 +1009,8 @@ void Millipede::initialize_uplink_buffers()
 
     equal_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    ue_spec_pilot_buffer_.calloc(
-        TASK_BUFFER_FRAME_NUM * cfg->UL_PILOT_SYMS, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    ue_spec_pilot_buffer_.calloc(TASK_BUFFER_FRAME_NUM * cfg->UL_PILOT_SYMS,
+        cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     demod_hard_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;
@@ -1192,31 +1192,20 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 
 void Millipede::getDemulData(int** ptr, int* size)
 {
-    int ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
-    size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int UE_NUM = config_->UE_NUM;
-    *ptr = (int*)&demod_hard_buffer_[max_equaled_frame
-        * ul_data_symbol_num_perframe][0];
-    *size = UE_NUM * OFDM_DATA_NUM;
+    auto& cfg = config_;
+    auto offset = cfg->get_total_data_symbol_idx_ul(
+        max_equaled_frame, cfg->UL_PILOT_SYMS);
+    *ptr = (int*)&demod_hard_buffer_[offset][0];
+    *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM;
 }
 
 void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
-    *ptr = (float*)&equal_buffer_[max_equaled_frame
-            * cfg->ul_data_symbol_num_perframe
-        + cfg->UL_PILOT_SYMS][0];
-    // *ptr = equal_output;
+    auto offset = cfg->get_total_data_symbol_idx_ul(
+        max_equaled_frame, cfg->UL_PILOT_SYMS);
+    *ptr = (float*)&equal_buffer_[offset][0];
     *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
-
-    // printf("In getEqualData()\n");
-    // for(int ii = 0; ii < UE_NUM*OFDM_DATA_NUM; ii++)
-    //{
-    //    // printf("User %d: %d, ", ii,demul_ptr2(ii));
-    //    printf("[%.4f+j%.4f] ", *(*ptr+ii*UE_NUM*2), *(*ptr+ii*UE_NUM*2+1));
-    //}
-    // printf("\n");
-    // printf("\n");
 }
 
 extern "C" {
