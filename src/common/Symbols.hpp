@@ -213,8 +213,4 @@ static constexpr bool kUseLDPC = false;
 
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
-
-static const int MAX_FRAME_ID = 1e4;
-static const int float_num_in_simd256 = 8;
-static const int double_num_in_simd256 = 4;
 #endif

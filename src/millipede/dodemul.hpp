@@ -23,15 +23,14 @@
 
 class DoDemul : public Doer {
 public:
-    DoDemul(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    DoDemul(Config* config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& in_data_buffer,
-        Table<complex_float>& in_precoder_buffer,
-        Table<complex_float>& in_equal_buffer,
-        Table<uint8_t>& in_demul_hard_buffer,
-        Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
+        Table<complex_float>& data_buffer,
+        Table<complex_float>& precoder_buffer,
+        Table<complex_float>& equal_buffer, Table<uint8_t>& demul_hard_buffer,
+        Table<int8_t>& demod_soft_buffer, Stats* stats_manager);
     ~DoDemul();
 
     /**
@@ -62,8 +61,6 @@ public:
      */
     Event_data launch(size_t tag);
 
-    Event_data DemulSingleSC(size_t offset);
-
 private:
     Table<complex_float>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
@@ -83,8 +80,6 @@ private:
      * dimension: UE_NUM * demul_block_size */
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
-
-    int ue_num_simd256;
 };
 
 #endif

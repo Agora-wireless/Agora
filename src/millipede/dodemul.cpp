@@ -7,32 +7,28 @@
 #include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
-DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
+    moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& in_data_buffer,
-    Table<complex_float>& in_precoder_buffer,
-    Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
-    Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
+    Table<complex_float>& data_buffer, Table<complex_float>& precoder_buffer,
+    Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
+    Table<int8_t>& demod_soft_buffer, Stats* stats_manager)
+    : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
-    , data_buffer_(in_data_buffer)
-    , precoder_buffer_(in_precoder_buffer)
-    , equal_buffer_(in_equal_buffer)
-    , demod_hard_buffer_(in_demod_hard_buffer)
-    , demod_soft_buffer_(in_demod_soft_buffer)
+    , data_buffer_(data_buffer)
+    , precoder_buffer_(precoder_buffer)
+    , equal_buffer_(equal_buffer)
+    , demod_hard_buffer_(demod_hard_buffer)
+    , demod_soft_buffer_(demod_soft_buffer)
 {
-    duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kDemul, in_tid);
+    duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
     alloc_buffer_1d(&spm_buffer, 8 * cfg->BS_ANT_NUM, 64, 0);
     alloc_buffer_1d(
         &equaled_buffer_temp, cfg->demul_block_size * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(&equaled_buffer_temp_transposed,
         cfg->demul_block_size * cfg->UE_NUM, 64, 0);
-
-    ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
 }
 
 DoDemul::~DoDemul()
@@ -160,11 +156,12 @@ Event_data DoDemul::launch(size_t tag)
             = (&demod_soft_buffer_[total_data_symbol_idx]
                                   [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                       * cfg->mod_type]);
-        for (int j = 0; j < max_sc_ite / double_num_in_simd256; j++) {
+        size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
+        for (int j = 0; j < max_sc_ite / kNumDoubleInSIMD256; j++) {
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_T_ptr, equal_T_temp);
             equal_T_ptr += 8;
-            equal_ptr += cfg->UE_NUM * double_num_in_simd256 * 2;
+            equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         int num_sc_avx2 = (max_sc_ite / 16) * 16;
         int rest = max_sc_ite % 16;
@@ -190,85 +187,4 @@ Event_data DoDemul::launch(size_t tag)
     //     printf("Thread %d Demul takes %.2f\n", tid, duration);
 
     return Event_data(EventType::kDemul, tag);
-}
-
-// Currently unused
-Event_data DoDemul::DemulSingleSC(size_t offset)
-{
-    size_t start_tsc = worker_rdtsc();
-
-    int sc_id = (offset % cfg->demul_events_per_symbol) * cfg->demul_block_size;
-    int total_data_symbol_id = offset / cfg->demul_events_per_symbol;
-    int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
-    int frame_id = total_data_symbol_id / data_symbol_num_perframe;
-    int current_data_symbol_id
-        = total_data_symbol_id % data_symbol_num_perframe;
-    if (kDebugPrintInTask) {
-        printf("In doDemul thread %d: frame: %d, symbol: %d, subcarrier: %d \n",
-            tid, frame_id, current_data_symbol_id, sc_id);
-    }
-    // int symbol_offset = symbol_num_perframe * frame_id + UE_NUM +
-    // current_data_symbol_id;
-
-    int transpose_block_size = cfg->transpose_block_size;
-    int gather_step_size = 8 * transpose_block_size;
-
-    __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
-        transpose_block_size * 2 + 1, transpose_block_size * 4,
-        transpose_block_size * 4 + 1, transpose_block_size * 6,
-        transpose_block_size * 6 + 1);
-
-    int cur_block_id = sc_id / transpose_block_size;
-    int sc_inblock_idx = sc_id % transpose_block_size;
-    int cur_sc_offset = cur_block_id * transpose_block_size * cfg->BS_ANT_NUM
-        + sc_inblock_idx;
-    float* tar_data_ptr = (float*)spm_buffer;
-    float* src_data_ptr
-        = (float*)data_buffer_[total_data_symbol_id] + cur_sc_offset * 2;
-    for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-        __m256 data_rx = _mm256_i32gather_ps(src_data_ptr, index, 4);
-        _mm256_store_ps(tar_data_ptr, data_rx);
-        src_data_ptr += gather_step_size;
-        tar_data_ptr += 8;
-    }
-
-    // mat_data size: cfg->BS_ANT_NUM \times 1
-    cx_float* data_ptr = (cx_float*)(spm_buffer);
-    cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
-    // cout<< "Raw data: " << mat_data.st()<<endl;
-
-    // mat_precoder size: cfg->UE_NUM \times cfg->BS_ANT_NUM
-    int precoder_offset = frame_id * cfg->OFDM_DATA_NUM + sc_id;
-    cx_float* precoder_ptr = (cx_float*)precoder_buffer_[precoder_offset];
-
-    cx_fmat mat_precoder(precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-    // cout<<"Precoder: "<< mat_precoder<<endl;
-
-    // mat_demuled size: cfg->UE_NUM \times 1
-    cx_float* equal_ptr = (cx_float*)(&equal_buffer_[total_data_symbol_id]
-                                                    [sc_id * cfg->UE_NUM]);
-    cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
-
-    // Demodulation
-    uint8_t* demul_ptr
-        = (&demod_hard_buffer_[total_data_symbol_id][sc_id * cfg->UE_NUM]);
-
-    // Equalization
-    mat_equaled = mat_precoder * mat_data;
-    // cout << "Equaled data: "<<mat_equaled.st()<<endl;
-
-    // Hard decision
-    demod_16qam_hard_loop((float*)equal_ptr, demul_ptr, cfg->UE_NUM);
-    printf("In doDemul thread %d: frame: %d, symbol: %d, subcarrier: %d \n",
-        tid, frame_id, current_data_symbol_id, sc_id);
-    cout << "Demuled data: ";
-    for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-        cout << *(demul_ptr + ue_idx) << "  ";
-    }
-    cout << endl;
-
-    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    duration_stat->task_count++;
-    return Event_data(EventType::kDemul, offset);
 }
