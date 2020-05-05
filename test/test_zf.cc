@@ -12,7 +12,7 @@
 /// Measure performance of zeroforcing
 TEST(TestZF, Perf)
 {
-    static constexpr size_t kNumIters = 1024;
+    static constexpr size_t kNumIters = 10000;
     size_t x = 0;
     ASSERT_EQ(x, 0);
 
