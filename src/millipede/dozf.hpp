@@ -15,10 +15,8 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-// #include "mkl_dfti.h"
+#include <stdio.h>
+#include <string.h>
 
 class DoZF : public Doer {
 public:
@@ -51,9 +49,12 @@ public:
 
 private:
     void ZF_time_orthogonal(size_t tag);
-    void compute_precoder(const arma::cx_fmat& mat_input,
-        complex_float* ul_precoder_buf, complex_float* dl_precoder_buf,
-        complex_float* recip_buf);
+
+    /// Compute uplink and/or downlink precoders using this CSI matrix
+    /// and calibration buffer as input
+    void compute_precoder(const arma::cx_fmat& mat_csi,
+        const complex_float* recip_buf, complex_float* ul_precoder_buf,
+        complex_float* dl_precoder_buf);
 
     void ZF_freq_orthogonal(size_t tag);
 

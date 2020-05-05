@@ -45,26 +45,26 @@ Event_data DoZF::launch(size_t tag)
     return Event_data(EventType::kZF, tag);
 }
 
-void DoZF::compute_precoder(const arma::cx_fmat& mat_input,
-    complex_float* precoder_ul, complex_float* precoder_dl,
-    complex_float* recip_ptr)
+void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
+    const complex_float* recip_ptr, complex_float* precoder_ul,
+    complex_float* precoder_dl)
 {
     arma::cx_fmat mat_ul_precoder(
         reinterpret_cast<arma::cx_float*>(precoder_ul), cfg->UE_NUM,
         cfg->BS_ANT_NUM, false);
-    pinv(mat_ul_precoder, mat_input, 1e-2, "dc");
+    arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_precoder(
             reinterpret_cast<arma::cx_float*>(precoder_dl), cfg->UE_NUM,
             cfg->BS_ANT_NUM, false);
         if (cfg->recipCalEn) {
-            arma::cx_fvec vec_calib(
-                reinterpret_cast<arma::cx_float*>(recip_ptr), cfg->BS_ANT_NUM,
-                false);
+            auto* _recip_ptr = const_cast<arma::cx_float*>(
+                reinterpret_cast<const arma::cx_float*>(recip_ptr));
+            arma::cx_fvec vec_calib(_recip_ptr, cfg->BS_ANT_NUM, false);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
-            mat_calib = diagmat(vec_calib);
-            mat_dl_precoder = mat_ul_precoder * inv(mat_calib);
+            mat_calib = arma::diagmat(vec_calib);
+            mat_dl_precoder = mat_ul_precoder * arma::inv(mat_calib);
         } else
             mat_dl_precoder = mat_ul_precoder;
     }
@@ -72,8 +72,9 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_input,
 
 void DoZF::ZF_time_orthogonal(size_t tag)
 {
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
             frame_id, base_sc_id);
@@ -82,49 +83,33 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
     for (size_t i = 0; i < num_subcarriers; i++) {
         size_t start_tsc1 = worker_rdtsc();
-        size_t cur_sc_id = base_sc_id + i;
-        int transpose_block_size = cfg->transpose_block_size;
-        __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
-            transpose_block_size * 2 + 1, transpose_block_size * 4,
-            transpose_block_size * 4 + 1, transpose_block_size * 6,
-            transpose_block_size * 6 + 1);
-        int transpose_block_id = cur_sc_id / transpose_block_size;
-        int sc_inblock_idx = cur_sc_id % transpose_block_size;
-        int offset_in_csi_buffer
-            = transpose_block_id * cfg->BS_ANT_NUM * transpose_block_size
-            + sc_inblock_idx;
-        const size_t symbol_offset
-            = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->UE_NUM;
-        float* tar_csi_ptr = (float*)csi_gather_buffer;
+        const size_t cur_sc_id = base_sc_id + i;
 
-        /* Gather csi matrix of all users and antennas */
-        for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-            float* src_csi_ptr = (float*)csi_buffer_[symbol_offset + ue_idx]
-                + offset_in_csi_buffer * 2;
-            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-                /* Fetch 4 complex floats for 4 ants */
-                __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-                _mm256_store_ps(tar_csi_ptr, t_csi);
-                // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f,
-                // %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float
-                // *)tar_csi_ptr+1),
-                //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),
-                //         *((float *)tar_csi_ptr+4), *((float
-                //         *)tar_csi_ptr+5));
-                src_csi_ptr += 8 * cfg->transpose_block_size;
-                tar_csi_ptr += 8;
+        // Gather CSI matrices of each pilots from the partially-transposed CSIs
+        const size_t pt_base_offset = (cur_sc_id / cfg->transpose_block_size)
+            * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
+
+        size_t gather_idx = 0;
+        for (size_t p_i = 0; p_i < cfg->pilot_symbol_num_perframe; p_i++) {
+            const complex_float* csi_buf
+                = csi_buffer_[(frame_slot * cfg->pilot_symbol_num_perframe)
+                    + p_i];
+            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+                csi_gather_buffer[gather_idx++] = csi_buf[pt_base_offset
+                    + (ant_i * cfg->transpose_block_size)
+                    + (cur_sc_id % cfg->transpose_block_size)];
             }
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-        auto* ptr_in = (arma::cx_float*)csi_gather_buffer;
-        arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
+            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        compute_precoder(mat_input,
+        compute_precoder(mat_csi,
+            cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id),
             cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, cur_sc_id),
-            cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, cur_sc_id),
-            cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id));
+            cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, cur_sc_id));
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -132,7 +117,6 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         // cout<<"Precoder:" <<mat_output<<endl;
         double duration3 = worker_rdtsc() - start_tsc2;
         duration_stat->task_duration[3] += duration3;
-
         duration_stat->task_count++;
         duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
         // if (duration > 500) {
@@ -143,55 +127,40 @@ void DoZF::ZF_time_orthogonal(size_t tag)
 
 void DoZF::ZF_freq_orthogonal(size_t tag)
 {
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n",
             tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
     }
 
     double start_tsc1 = worker_rdtsc();
+
+    // Gather CSIs from partially-transposed CSIs
+    size_t gather_idx = 0;
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        int cur_sc_id = base_sc_id + i;
-        __m256i index = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
-            cfg->transpose_block_size * 2 + 1, cfg->transpose_block_size * 4,
-            cfg->transpose_block_size * 4 + 1, cfg->transpose_block_size * 6,
-            cfg->transpose_block_size * 6 + 1);
+        const size_t cur_sc_id = base_sc_id + i;
+        const size_t pt_base_offset = (cur_sc_id / cfg->transpose_block_size)
+            * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
 
-        int transpose_block_id = cur_sc_id / cfg->transpose_block_size;
-        int sc_inblock_idx = cur_sc_id % cfg->transpose_block_size;
-        int offset_in_csi_buffer
-            = transpose_block_id * cfg->BS_ANT_NUM * cfg->transpose_block_size
-            + sc_inblock_idx;
-        const size_t symbol_offset = frame_id % TASK_BUFFER_FRAME_NUM;
-        float* tar_csi_ptr
-            = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
-
-        float* src_csi_ptr
-            = (float*)csi_buffer_[symbol_offset] + offset_in_csi_buffer * 2;
-        for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-            // fetch 4 complex floats for 4 ants
-            __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-            _mm256_store_ps(tar_csi_ptr, t_csi);
-            // printf("UE %d, ant %d, data: %.4f, %.4f, %.4f, %.4f, %.4f,
-            // %.4f\n", ue_idx, ant_idx, *((float *)tar_csi_ptr), *((float
-            // *)tar_csi_ptr+1),
-            //         *((float *)tar_csi_ptr+2), *((float *)tar_csi_ptr+3),
-            //         *((float *)tar_csi_ptr+4), *((float *)tar_csi_ptr+5));
-            src_csi_ptr += 8 * cfg->transpose_block_size;
-            tar_csi_ptr += 8;
+        for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+            csi_gather_buffer[gather_idx++]
+                = csi_buffer_[frame_slot][pt_base_offset
+                    + (ant_i * cfg->transpose_block_size)
+                    + (cur_sc_id % cfg->transpose_block_size)];
         }
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-    auto* ptr_in = (arma::cx_float*)csi_gather_buffer;
-    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
+        cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     // cout<<"CSI matrix"<<endl;
     // cout<<mat_input.st()<<endl;
-    compute_precoder(mat_input,
+    compute_precoder(mat_csi,
+        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
         cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, base_sc_id),
-        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, base_sc_id),
-        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id));
+        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, base_sc_id));
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -222,8 +191,10 @@ void DoZF::Predict(size_t tag)
         sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
+    // Input matrix and calibration are for current frame, output precoders are
+    // for the next frame
     compute_precoder(mat_input,
+        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
         cfg->get_precoder_buf(ul_precoder_buffer_, frame_id + 1, base_sc_id),
-        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id + 1, base_sc_id),
-        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id));
+        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id + 1, base_sc_id));
 }
