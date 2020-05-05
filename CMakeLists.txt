@@ -241,11 +241,6 @@ else()
 endif()
 
 # The tests to run using ctest
-set(UNIT_TESTS
-  test_zf)
-
-foreach(test_name IN LISTS UNIT_TESTS)
-  add_executable(${test_name} test/${test_name}.cc)
-  target_link_libraries(${test_name} ${GTEST_LIBRARIES} ${MKL_LIBS})
-  add_test(NAME ${test_name} COMMAND ${test_name})
-endforeach()
+add_executable(test_zf test/test_zf.cc ${COMMON_SOURCES} src/millipede/stats.cpp src/millipede/dozf.cpp)
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo)
+add_test(NAME test_zf COMMAND test_zf)
