@@ -8,6 +8,8 @@
 #include "doer.hpp"
 #include <malloc.h>
 
+static constexpr bool kUseSIMDGather = false;
+
 DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -85,19 +87,51 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         size_t start_tsc1 = worker_rdtsc();
         const size_t cur_sc_id = base_sc_id + i;
 
-        // Gather CSI matrices of each pilots from the partially-transposed CSIs
-        const size_t pt_base_offset = (cur_sc_id / cfg->transpose_block_size)
-            * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
+        // Gather CSI matrices of each pilot from partially-transposed CSIs.
+        // The SIMD and non-SIMD methods are equivalent.
+        if (kUseSIMDGather) {
+            int transpose_block_size = cfg->transpose_block_size;
+            __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
+                transpose_block_size * 2 + 1, transpose_block_size * 4,
+                transpose_block_size * 4 + 1, transpose_block_size * 6,
+                transpose_block_size * 6 + 1);
+            int transpose_block_id = cur_sc_id / transpose_block_size;
+            int sc_inblock_idx = cur_sc_id % transpose_block_size;
+            int offset_in_csi_buffer
+                = transpose_block_id * cfg->BS_ANT_NUM * transpose_block_size
+                + sc_inblock_idx;
+            const size_t symbol_offset
+                = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->UE_NUM;
+            float* tar_csi_ptr = (float*)csi_gather_buffer;
 
-        size_t gather_idx = 0;
-        for (size_t p_i = 0; p_i < cfg->pilot_symbol_num_perframe; p_i++) {
-            const complex_float* csi_buf
-                = csi_buffer_[(frame_slot * cfg->pilot_symbol_num_perframe)
-                    + p_i];
-            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                csi_gather_buffer[gather_idx++] = csi_buf[pt_base_offset
-                    + (ant_i * cfg->transpose_block_size)
-                    + (cur_sc_id % cfg->transpose_block_size)];
+            /* Gather csi matrix of all users and antennas */
+            for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+                float* src_csi_ptr = (float*)csi_buffer_[symbol_offset + ue_idx]
+                    + offset_in_csi_buffer * 2;
+                for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM;
+                     ant_idx += 4) {
+                    /* Fetch 4 complex floats for 4 ants */
+                    __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
+                    _mm256_store_ps(tar_csi_ptr, t_csi);
+                    src_csi_ptr += 8 * cfg->transpose_block_size;
+                    tar_csi_ptr += 8;
+                }
+            }
+        } else {
+            const size_t pt_base_offset
+                = (cur_sc_id / cfg->transpose_block_size)
+                * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
+
+            size_t gather_idx = 0;
+            for (size_t p_i = 0; p_i < cfg->pilot_symbol_num_perframe; p_i++) {
+                const complex_float* csi_buf
+                    = csi_buffer_[(frame_slot * cfg->pilot_symbol_num_perframe)
+                        + p_i];
+                for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+                    csi_gather_buffer[gather_idx++] = csi_buf[pt_base_offset
+                        + (ant_i * cfg->transpose_block_size)
+                        + (cur_sc_id % cfg->transpose_block_size)];
+                }
             }
         }
 
@@ -141,14 +175,46 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     size_t gather_idx = 0;
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
         const size_t cur_sc_id = base_sc_id + i;
-        const size_t pt_base_offset = (cur_sc_id / cfg->transpose_block_size)
-            * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
 
-        for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-            csi_gather_buffer[gather_idx++]
-                = csi_buffer_[frame_slot][pt_base_offset
-                    + (ant_i * cfg->transpose_block_size)
-                    + (cur_sc_id % cfg->transpose_block_size)];
+        // The SIMD and non-SIMD methods are equivalent.
+        if (kUseSIMDGather) {
+            __m256i index
+                = _mm256_setr_epi32(0, 1, cfg->transpose_block_size * 2,
+                    cfg->transpose_block_size * 2 + 1,
+                    cfg->transpose_block_size * 4,
+                    cfg->transpose_block_size * 4 + 1,
+                    cfg->transpose_block_size * 6,
+                    cfg->transpose_block_size * 6 + 1);
+
+            int transpose_block_id = cur_sc_id / cfg->transpose_block_size;
+            int sc_inblock_idx = cur_sc_id % cfg->transpose_block_size;
+            int offset_in_csi_buffer = transpose_block_id * cfg->BS_ANT_NUM
+                    * cfg->transpose_block_size
+                + sc_inblock_idx;
+            const size_t symbol_offset = frame_id % TASK_BUFFER_FRAME_NUM;
+            float* tar_csi_ptr
+                = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
+
+            float* src_csi_ptr
+                = (float*)csi_buffer_[symbol_offset] + offset_in_csi_buffer * 2;
+            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+                // fetch 4 complex floats for 4 ants
+                __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
+                _mm256_store_ps(tar_csi_ptr, t_csi);
+                src_csi_ptr += 8 * cfg->transpose_block_size;
+                tar_csi_ptr += 8;
+            }
+        } else {
+            const size_t pt_base_offset
+                = (cur_sc_id / cfg->transpose_block_size)
+                * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
+
+            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+                csi_gather_buffer[gather_idx++]
+                    = csi_buffer_[frame_slot][pt_base_offset
+                        + (ant_i * cfg->transpose_block_size)
+                        + (cur_sc_id % cfg->transpose_block_size)];
+            }
         }
     }
 
