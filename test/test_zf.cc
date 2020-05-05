@@ -10,9 +10,6 @@
 TEST(TestZF, Perf)
 {
     static constexpr size_t kNumIters = 10000;
-    size_t x = 0;
-    ASSERT_EQ(x, 0);
-
     auto* cfg = new Config("data/tddconfig-sim-ul.json");
     cfg->genData();
 
