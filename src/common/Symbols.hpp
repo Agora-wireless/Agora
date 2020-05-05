@@ -90,7 +90,7 @@ static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 #define BIGSTATION 0
 #define USE_IPV4 1
 #define CONNECT_UDP 1
-#define EXPORT_CONSTELLATION 0
+static constexpr bool kExportConstellation = false;
 
 #define COMBINE_EQUAL_DECODE 1
 

@@ -69,15 +69,9 @@ private:
     Table<int8_t>& demod_soft_buffer_;
     DurationStat* duration_stat;
 
-    /**
-     * Intermediate buffer to gather raw data
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM */
-    complex_float* spm_buffer;
+    complex_float* spm_buffer; // Intermediate buffer to gather raw data
 
-    /**
-     * Intermediate buffers for equalized data
-     * dimension: UE_NUM * demul_block_size */
+    // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
 };
