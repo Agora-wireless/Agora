@@ -237,7 +237,7 @@ public:
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
 
-    /// Get the calibration buffer
+    /// Get the calibration buffer for this frame and subcarrier ID
     inline complex_float* get_calib_buffer(
         Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
     {
