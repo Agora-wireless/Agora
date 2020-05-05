@@ -186,24 +186,24 @@ Event_data DoDemul::launch(size_t tag)
                 mat_phase_correct.set_real(cos(-theta_avg));
                 mat_phase_correct.set_imag(sin(-theta_avg));
                 mat_equaled %= mat_phase_correct;
-            }
 
-            // measrure EVM from ground truth
-            if (symbol_id == cfg->UL_PILOT_SYMS) {
-                fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
-                fmat cur_evm_mat(evm_buffer_[frame_id], cfg->UE_NUM, 1, false);
-                cur_evm_mat += evm % evm;
-                if (cur_sc_id == 0) {
-                    size_t prev_frame = (frame_id + 1 + TASK_BUFFER_FRAME_NUM)
-                        % TASK_BUFFER_FRAME_NUM;
-                    fmat evm_mat(
-                        evm_buffer_[prev_frame], cfg->UE_NUM, 1, false);
-                    evm_mat /= cfg->OFDM_DATA_NUM;
-                    std::cout << "Frame " << prev_frame << ":\n"
-                              << "  EVM " << 100 * evm_mat.st() << ", SNR "
-                              << -10 * log10(evm_mat.st()) << ", theta "
-                              << theta_avg.st() << ", theta_diff"
-                              << theta_diff.st() << std::endl;
+                // measrure EVM from ground truth
+                if (symbol_id == cfg->UL_PILOT_SYMS) {
+                    fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
+                    fmat cur_evm_mat(evm_buffer_[frame_id], cfg->UE_NUM, 1, false);
+                    cur_evm_mat += evm % evm;
+                    if (cur_sc_id == 0) {
+                        size_t prev_frame = (frame_id + 1 + TASK_BUFFER_FRAME_NUM)
+                            % TASK_BUFFER_FRAME_NUM;
+                        fmat evm_mat(
+                            evm_buffer_[prev_frame], cfg->UE_NUM, 1, false);
+                        evm_mat /= cfg->OFDM_DATA_NUM;
+                        std::cout << "Frame " << prev_frame << ":\n"
+                                  << "  EVM " << 100 * evm_mat.st() << ", SNR "
+                                  << -10 * log10(evm_mat.st()) << ", theta "
+                                  << theta_avg.st() << ", theta_diff"
+                                  << theta_diff.st() << std::endl;
+                    }
                 }
             }
 
