@@ -86,8 +86,8 @@ Config::Config(std::string jsonfile)
     bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
-    DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 2);
-    UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 1);
+    DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
+    UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
