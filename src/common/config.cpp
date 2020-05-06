@@ -491,25 +491,25 @@ int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
     return -1;
 }
 
-int Config::getDlSFIndex(size_t frame_id, size_t symbol_id)
+size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
-    std::vector<size_t>::iterator it;
     size_t fid = frame_id % frames.size();
-    it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
+    const auto it
+        = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
         return it - DLSymbols[fid].begin();
     else
         return -1;
 }
 
-int Config::getPilotSFIndex(size_t frame_id, size_t symbol_id)
+size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
-    std::vector<size_t>::iterator it;
     size_t fid = frame_id % frames.size();
-    it = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
+    const auto it
+        = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
     if (it != pilotSymbols[fid].end()) {
 #ifdef DEBUG3
-        printf("getPilotSFIndex(%zu, %zu) = %zu\n", frame_id, symbol_id,
+        printf("get_pilot_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
             it - pilotSymbols[fid].begin());
 #endif
         return it - pilotSymbols[fid].begin();
@@ -517,14 +517,14 @@ int Config::getPilotSFIndex(size_t frame_id, size_t symbol_id)
         return -1;
 }
 
-int Config::getUlSFIndex(size_t frame_id, size_t symbol_id)
+size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
-    std::vector<size_t>::iterator it;
     size_t fid = frame_id % frames.size();
-    it = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
+    const auto it
+        = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
     if (it != ULSymbols[fid].end()) {
 #ifdef DEBUG3
-        printf("getUlSFIndexId(%zu, %zu) = %zu\n", frame_id, symbol_id,
+        printf("get_ul_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
             it - ULSymbols[fid].begin());
 #endif
         return it - ULSymbols[fid].begin();
@@ -590,6 +590,26 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
         return s == 'D' && !this->isPilot(frame_id, symbol_id);
     else
         return s == 'D';
+}
+
+SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
+{
+    assert(!isUE); // Currently implemented for only the Millipede server
+    char s = frames[frame_id % frames.size()][symbol_id];
+    switch (s) {
+    case 'D':
+        return SymbolType::kDL;
+    case 'U':
+        return SymbolType::kUL;
+    case 'P':
+        return SymbolType::kPilot;
+    case 'C':
+        return SymbolType::kCalDL;
+    case 'L':
+        return SymbolType::kCalUL;
+    }
+    rt_assert(false, "Should not reach here");
+    return SymbolType::kUnknown;
 }
 
 extern "C" {

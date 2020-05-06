@@ -210,7 +210,7 @@ int PacketTXRX::dequeue_send(int tid)
         txbuf[ch] = config_->pilot_ci16.data();
     else
         txbuf[ch]
-            = (void*)config_->dl_iq_t[config_->getDlSFIndex(frame_id, symbol_id)
+            = (void*)config_->dl_iq_t[config_->get_dl_symbol_idx(frame_id, symbol_id)
                 - DL_PILOT_SYMS];
 #else
     int data_offset = (offset % tx_buffer_frame_num_) * config_->packet_length;

@@ -183,7 +183,7 @@ private:
     // Calculated precoder
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
     // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> precoder_buffer_;
+    Table<complex_float> ul_precoder_buffer_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame

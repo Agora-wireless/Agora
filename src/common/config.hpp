@@ -173,15 +173,25 @@ public:
 
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
-    int getDlSFIndex(size_t, size_t);
-    int getUlSFIndex(size_t, size_t);
     int getDownlinkPilotId(size_t, size_t);
-    int getPilotSFIndex(size_t, size_t);
+
+    // Get the index of this downlink symbol among this frame's downlink symbols
+    size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this uplink symbol among this frame's uplink symbols
+    size_t get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this pilot symbol among this frame's pilot symbols
+    size_t get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const;
+
     bool isPilot(size_t, size_t);
     bool isCalDlPilot(size_t, size_t);
     bool isCalUlPilot(size_t, size_t);
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
+
+    /// Return the symbol type of this symbol in this frame
+    SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
     // TODO: Documentation
     inline size_t get_total_data_symbol_idx(
@@ -198,6 +208,45 @@ public:
         return ((frame_id % TASK_BUFFER_FRAME_NUM)
                    * ul_data_symbol_num_perframe)
             + symbol_idx_ul;
+    }
+
+    /// Fetch the channel state information buffer for this frame and symbol ID.
+    /// The symbol must be a pilot symbol.
+    inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
+        size_t frame_id, size_t symbol_id) const
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
+            + get_pilot_symbol_idx(frame_id, symbol_id);
+        return csi_buffers[symbol_offset];
+    }
+
+    /// Fetch the data buffer for this frame and symbol ID. The symbol must
+    /// be an uplink symbol.
+    inline complex_float* get_data_buf(Table<complex_float>& data_buffers,
+        size_t frame_id, size_t symbol_id) const
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
+            + get_ul_symbol_idx(frame_id, symbol_id);
+        return data_buffers[symbol_offset];
+    }
+
+    /// Get the precoder buffer for this frame and subcarrier ID
+    inline complex_float* get_precoder_buf(
+        Table<complex_float>& precoder_buffers, size_t frame_id,
+        size_t sc_id) const
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+    }
+
+    /// Get the calibration buffer for this frame and subcarrier ID
+    inline complex_float* get_calib_buffer(
+        Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
+    {
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
     Config(std::string);
