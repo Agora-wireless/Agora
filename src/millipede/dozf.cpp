@@ -8,7 +8,7 @@
 #include "doer.hpp"
 #include <malloc.h>
 
-static constexpr bool kUseSIMDGather = false;
+static constexpr bool kUseSIMDGather = true;
 
 DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
