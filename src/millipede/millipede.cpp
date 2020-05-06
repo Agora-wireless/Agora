@@ -568,11 +568,11 @@ void* Millipede::worker(int tid)
 
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        precoder_buffer_, dl_precoder_buffer_, stats);
+        ul_precoder_buffer_, dl_precoder_buffer_, stats);
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz,
         *get_conq(EventType::kDemul), complete_task_queue_,
-        worker_ptoks_ptr[tid], data_buffer_, precoder_buffer_, equal_buffer_,
+        worker_ptoks_ptr[tid], data_buffer_, ul_precoder_buffer_, equal_buffer_,
         demod_hard_buffer_, demod_soft_buffer_, stats);
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
@@ -638,7 +638,7 @@ void* Millipede::worker_zf(int tid)
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        precoder_buffer_, dl_precoder_buffer_, stats);
+        ul_precoder_buffer_, dl_precoder_buffer_, stats);
 
     while (true) {
         computeZF->try_launch();
@@ -651,7 +651,7 @@ void* Millipede::worker_demul(int tid)
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz,
         *get_conq(EventType::kDemul), complete_task_queue_,
-        worker_ptoks_ptr[tid], data_buffer_, precoder_buffer_, equal_buffer_,
+        worker_ptoks_ptr[tid], data_buffer_, ul_precoder_buffer_, equal_buffer_,
         demod_hard_buffer_, demod_soft_buffer_, stats);
 
     /* Initialize Precode operator */
@@ -1004,7 +1004,7 @@ void Millipede::initialize_uplink_buffers()
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    ul_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 
     equal_buffer_.malloc(
@@ -1084,7 +1084,7 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
     csi_buffer_.free();
     data_buffer_.free();
-    precoder_buffer_.free();
+    ul_precoder_buffer_.free();
     equal_buffer_.free();
     demod_hard_buffer_.free();
     demod_soft_buffer_.free();
