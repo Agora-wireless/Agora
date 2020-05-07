@@ -77,10 +77,10 @@ Event_data DoPrecode::launch(size_t tag)
 
             complex_float* data_ptr = modulated_buffer_temp;
             if (data_symbol_idx_dl
-                <= cfg->dl_data_symbol_start - 1 + DL_PILOT_SYMS) {
+                <= cfg->dl_data_symbol_start - 1 + cfg->DL_PILOT_SYMS) {
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                     data_ptr[user_id]
-                        = { cfg->pilots_[cur_sc_id + cfg->OFDM_DATA_START], 0 };
+                        = cfg->ue_specific_pilot[user_id][cur_sc_id];
             } else {
                 int symbol_id_in_buffer
                     = data_symbol_idx_dl - cfg->dl_data_symbol_start;

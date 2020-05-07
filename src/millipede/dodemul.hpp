@@ -21,6 +21,7 @@
 #include <vector>
 // #include "mkl_dfti.h"
 
+using namespace arma;
 class DoDemul : public Doer {
 public:
     DoDemul(Config* in_config, int in_tid, double freq_ghz,
@@ -29,6 +30,7 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& in_data_buffer,
         Table<complex_float>& in_precoder_buffer,
+        Table<complex_float>& in_ue_spec_pilot_buffer,
         Table<complex_float>& in_equal_buffer,
         Table<uint8_t>& in_demul_hard_buffer,
         Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
@@ -67,6 +69,7 @@ public:
 private:
     Table<complex_float>& data_buffer_;
     Table<complex_float>& precoder_buffer_;
+    Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
@@ -77,12 +80,16 @@ private:
      * First dimension: TASK_THREAD_NUM
      * Second dimension: BS_ANT_NUM */
     complex_float* spm_buffer;
+    Table<float> evm_buffer_;
 
     /**
      * Intermediate buffers for equalized data
      * dimension: UE_NUM * demul_block_size */
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
+
+    cx_fmat ue_pilot_data;
+    cx_fmat ul_gt_mat;
 
     int ue_num_simd256;
 };

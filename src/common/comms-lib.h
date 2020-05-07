@@ -87,6 +87,8 @@ public:
     static std::vector<std::complex<float>> composeRefSymbol(
         std::vector<std::complex<float>>, size_t, size_t, size_t, size_t,
         size_t, size_t, bool timeDomain = true);
+    static std::vector<std::complex<float>> seqCyclicShift(
+        std::vector<std::complex<float>>, float);
     // private:
     //    static inline float** init_qpsk();
     //    static inline float** init_qam16();

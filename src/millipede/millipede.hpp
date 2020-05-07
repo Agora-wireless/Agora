@@ -205,6 +205,8 @@ private:
     // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
 
+    Table<complex_float> ue_spec_pilot_buffer_;
+
     RX_stats rx_stats_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;

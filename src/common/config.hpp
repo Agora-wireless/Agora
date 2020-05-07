@@ -20,6 +20,7 @@
 #include "comms-lib.h"
 #include "memory_manage.h"
 #include "utils.h"
+#include "modulation.hpp"
 #include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
@@ -40,8 +41,6 @@ public:
     size_t mod_order;
 
     std::string conf;
-    // std::string beacon_file;
-    // std::string coeffs_file;
     std::string pilot_file;
     std::string serial_file;
     std::string hub_file;
@@ -78,11 +77,14 @@ public:
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     float* pilots_;
-    Table<int8_t> dl_IQ_data;
-    Table<int8_t> ul_IQ_data;
-    Table<complex_float> ul_IQ_modul;
-    Table<std::complex<int16_t>> dl_IQ_symbol;
-    Table<std::complex<int16_t>> ul_IQ_symbol;
+    Table<int8_t> dl_bits;
+    Table<int8_t> ul_bits;
+    Table<complex_float> dl_iq_f;
+    Table<complex_float> ul_iq_f;
+    Table<std::complex<int16_t>> dl_iq_t;
+    Table<std::complex<int16_t>> ul_iq_t;
+    Table<complex_float> ue_specific_pilot;
+    Table<std::complex<int16_t>> ue_specific_pilot_t;
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
@@ -133,11 +135,14 @@ public:
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
     size_t OFDM_DATA_START;
+    size_t OFDM_DATA_STOP;
     size_t TX_PREFIX_LEN;
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
     size_t OFDM_SYM_LEN;
+    size_t DL_PILOT_SYMS;
+    size_t UL_PILOT_SYMS;
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
         data_symbol_num_perframe;
@@ -145,6 +150,7 @@ public:
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
     bool bigstation_mode;
+    bool correct_phase_shift;
 
     size_t packet_length;
 

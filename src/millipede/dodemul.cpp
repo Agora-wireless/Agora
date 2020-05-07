@@ -6,19 +6,20 @@
 #include "dodemul.hpp"
 #include "concurrent_queue_wrapper.hpp"
 
-using namespace arma;
 DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_data_buffer,
     Table<complex_float>& in_precoder_buffer,
+    Table<complex_float>& in_ue_spec_pilot_buffer,
     Table<complex_float>& in_equal_buffer, Table<uint8_t>& in_demod_hard_buffer,
     Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(in_data_buffer)
     , precoder_buffer_(in_precoder_buffer)
+    , ue_spec_pilot_buffer_(in_ue_spec_pilot_buffer)
     , equal_buffer_(in_equal_buffer)
     , demod_hard_buffer_(in_demod_hard_buffer)
     , demod_soft_buffer_(in_demod_soft_buffer)
@@ -31,6 +32,19 @@ DoDemul::DoDemul(Config* in_config, int in_tid, double freq_ghz,
         &equaled_buffer_temp, cfg->demul_block_size * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(&equaled_buffer_temp_transposed,
         cfg->demul_block_size * cfg->UE_NUM, 64, 0);
+
+    // phase offset calibration data
+    cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
+    cx_fmat mat_pilot_data(
+        ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
+    ue_pilot_data = mat_pilot_data.st();
+
+    // EVM calculation data
+    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
+    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+    ul_gt_mat = ul_iq_f_mat.st();
+    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
+    evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 
     ue_num_simd256 = cfg->UE_NUM / double_num_in_simd256;
 }
@@ -127,6 +141,63 @@ Event_data DoDemul::launch(size_t tag)
             size_t start_tsc2 = worker_rdtsc();
             /* perform computation for equalization */
             mat_equaled = mat_precoder * mat_data;
+            if (symbol_id < cfg->UL_PILOT_SYMS) { // calc new phase shift
+                if (symbol_id == 0 && cur_sc_id == 0) { // reset previous frame
+                    cx_float* phase_shift_ptr
+                        = (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1)
+                            % TASK_BUFFER_FRAME_NUM];
+                    cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
+                        cfg->UL_PILOT_SYMS, false);
+                    mat_phase_shift.fill(0);
+                }
+                cx_float* phase_shift_ptr
+                    = (cx_float*)&ue_spec_pilot_buffer_[frame_id
+                        % TASK_BUFFER_FRAME_NUM][symbol_id * cfg->UE_NUM];
+                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
+                cx_fmat shift_sc
+                    = sign(mat_equaled % conj(ue_pilot_data.col(cur_sc_id)));
+                mat_phase_shift += shift_sc;
+            } else if (cfg->UL_PILOT_SYMS
+                > 0) { // apply previously calc'ed phase shift to data
+                cx_float* pilot_corr_ptr = (cx_float*)
+                    ue_spec_pilot_buffer_[frame_id % TASK_BUFFER_FRAME_NUM];
+                cx_fmat pilot_corr_mat(
+                    pilot_corr_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
+                fmat theta_mat = arg(pilot_corr_mat);
+                fmat theta_inc = zeros<fmat>(cfg->UE_NUM, 1);
+                for (size_t s = 1; s < cfg->UL_PILOT_SYMS; s++) {
+                    fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
+                    theta_inc += theta_diff;
+                }
+                theta_inc /= (float)std::max(1, (int)cfg->UL_PILOT_SYMS - 1);
+                fmat cur_theta = theta_mat.col(0) + (symbol_id * theta_inc);
+                cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
+                mat_phase_correct.set_real(cos(-cur_theta));
+                mat_phase_correct.set_imag(sin(-cur_theta));
+                mat_equaled %= mat_phase_correct;
+
+                // measrure EVM from ground truth
+                if (symbol_id == cfg->UL_PILOT_SYMS) {
+                    fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
+                    fmat cur_evm_mat(
+                        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
+                        cfg->UE_NUM, 1, false);
+                    cur_evm_mat += evm % evm;
+                    if (kDebugPrintInTask && cur_sc_id == 0) {
+                        size_t prev_frame = (frame_id - 1);
+                        fmat evm_mat(
+                            evm_buffer_[prev_frame % TASK_BUFFER_FRAME_NUM],
+                            cfg->UE_NUM, 1, false);
+                        evm_mat /= cfg->OFDM_DATA_NUM;
+                        std::stringstream ss;
+                        ss << "Frame " << prev_frame << ":\n"
+                           << "  EVM " << 100 * evm_mat.st() << ", SNR "
+                           << -10 * log10(evm_mat.st()) << ", theta "
+                           << cur_theta.st() << ", theta_inc" << theta_inc.st();
+                        std::cout << ss.str();
+                    }
+                }
+            }
 
             size_t start_tsc3 = worker_rdtsc();
             duration_stat->task_duration[2] += start_tsc3 - start_tsc2;

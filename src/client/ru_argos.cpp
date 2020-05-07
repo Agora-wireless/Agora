@@ -369,15 +369,23 @@ void RU::taskThread(int tid)
                      tx_symbol_id++) {
                     int tx_frame_id = frame_id + TX_FRAME_DELTA;
                     size_t tx_symbol = txSymbols[tx_symbol_id];
-                    int tx_ant_offset
-                        = tx_symbol_id * config_->getNumAntennas() + ant_id;
                     void* txbuf[2];
 #if DEBUG_UPLINK
-                    for (size_t ch = 0; ch < config_->nChannels; ++ch)
-                        txbuf[ch]
-                            = (void*)config_->ul_IQ_symbol[tx_ant_offset + ch];
+                    for (size_t ch = 0; ch < config_->nChannels; ++ch) {
+                        if (tx_symbol_id < config_->UL_PILOT_SYMS)
+                            txbuf[ch]
+                                = (void*)
+                                      config_->ue_specific_pilot_t[ant_id + ch];
+                        else
+                            txbuf[ch]
+                                = (void*)&config_
+                                      ->ul_iq_t[tx_symbol_id][(ant_id + ch)
+                                          * config_->sampsPerSymbol];
+                    }
 #else
                     int tx_frame_offset = tx_frame_id % TASK_BUFFER_FRAME_NUM;
+                    int tx_ant_offset
+                        = tx_symbol_id * config_->getNumAntennas() + ant_id;
                     int tx_offset = tx_frame_offset * frame_samp_size
                         + tx_packet_length * (tx_ant_offset);
                     char* cur_buffer_
