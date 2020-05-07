@@ -209,7 +209,8 @@ void DoFFT::partial_transpose(
             = block_idx * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
 
         for (size_t sc_j = 0; sc_j < cfg->transpose_block_size; sc_j += 8) {
-            const complex_float* src = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
+            const complex_float* src
+                = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
             complex_float* dst = nullptr;
             if (symbol_type == SymbolType::kCalUL) {
                 dst = &out_buf[(block_idx * cfg->transpose_block_size) + sc_j];
@@ -239,8 +240,8 @@ void DoFFT::partial_transpose(
                     cfg->pilots_sgn_[sc_idx + 1].im,
                     cfg->pilots_sgn_[sc_idx + 1].re,
                     cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
-		// TODO: this is not correct for complex pilots.
-		// Implement complex multiply for __m512 type
+                // TODO: this is not correct for complex pilots.
+                // Implement complex multiply for __m512 type
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
             _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
