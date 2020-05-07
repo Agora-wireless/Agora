@@ -321,6 +321,7 @@ void Config::genData()
     }
 
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
+    dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM, 64);
     dl_iq_t.calloc(
         dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
     ul_bits.malloc(ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
@@ -375,30 +376,6 @@ void Config::genData()
     fclose(fd);
 #endif
 
-    // Generate freq-domain and time-domain downlink symbols
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        std::vector<int8_t> in_modul;
-        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
-            int cur_offset = j * UE_ANT_NUM;
-            in_modul.push_back(dl_bits[i][cur_offset]);
-        }
-        auto modul_data = CommsLib::modulate(in_modul, mod_type);
-        std::vector<std::complex<float>> ifft_in_data(OFDM_CA_NUM, 0);
-        for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
-            ifft_in_data[j] = modul_data[j - OFDM_DATA_START];
-        }
-
-        std::vector<std::complex<float>> ifft_dl_data
-            = CommsLib::IFFT(ifft_in_data, OFDM_CA_NUM);
-        ifft_dl_data.insert(ifft_dl_data.begin(), ifft_dl_data.end() - CP_LEN,
-            ifft_dl_data.end());
-        for (size_t j = prefix; j < prefix + CP_LEN + OFDM_CA_NUM; j++) {
-            dl_iq_t[i][j]
-                = { (int16_t)(ifft_dl_data[j - prefix].real() * 32768),
-                      (int16_t)(ifft_dl_data[j - prefix].imag() * 32768) };
-        }
-    }
-
     // Generate UE-specific pilots based on Zadoff-Chu sequence used for phase tracking
     auto zc_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
@@ -427,6 +404,26 @@ void Config::genData()
                 = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
         }
         free_buffer_1d(&pilot_ifft_in);
+    }
+
+    Table<float> qam_table;
+    init_modulation_table(qam_table, mod_type);
+
+    // Generate freq-domain and time-domain downlink symbols
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
+            int cur_offset = (j - OFDM_DATA_START) * UE_ANT_NUM;
+	    dl_iq_f[i][j] = mod_single_uint8(dl_bits[i][cur_offset], qam_table);
+        }
+
+	CommsLib::IFFT(dl_iq_f[i], OFDM_CA_NUM);
+	size_t td_symbol_start = prefix + CP_LEN;
+        for (size_t j = td_symbol_start; j < td_symbol_start + OFDM_CA_NUM; j++) {
+            dl_iq_t[i][j]
+                = { (int16_t)(dl_iq_f[i][j - td_symbol_start].re * 32768),
+                      (int16_t)(dl_iq_f[i][j - td_symbol_start].im * 32768) };
+        }
+	memcpy(dl_iq_t[i] + prefix, dl_iq_t[i] + prefix + OFDM_CA_NUM, CP_LEN * sizeof(short) * 2);
     }
 
     // Generate freq-domain and time-domain uplink symbols
