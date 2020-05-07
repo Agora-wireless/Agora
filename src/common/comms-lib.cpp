@@ -377,10 +377,24 @@ void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize)
     DftiComputeBackward(mkl_handle, in);
     DftiFreeDescriptor(&mkl_handle);
     if (normalize) {
+        //for (int i = 0; i < fftsize; i++) {
+        //    in[i].re /= fftsize;
+        //    in[i].im /= fftsize;
+        //}
+        float max_val = 0;
+        // int max_ind = 0;
+        float scale = 0.5;
         for (int i = 0; i < fftsize; i++) {
-            in[i].re /= fftsize;
-            in[i].im /= fftsize;
+            float sc_abs = std::abs(std::complex<float>(in[i].re, in[i].im));
+            if (sc_abs > max_val) {
+                max_val = sc_abs;
+                // max_ind = i;
+            }
         }
+        //std::cout << "IFFT output is normalized with "
+        //         << std::to_string(max_val) << std::endl;
+        for (int i = 0; i < fftsize; i++)
+            in[i] = {in[i].re / (max_val / scale), in[i].im / (max_val / scale)};
     }
 }
 
