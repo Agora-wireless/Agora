@@ -265,7 +265,6 @@ void Millipede::start()
                     PRINT_DEMUL, frame_id, symbol_idx_ul, base_sc_id);
                 /* If this symbol is ready */
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
-                    max_equaled_frame = frame_id;
                     if (kUseLDPC) {
                         schedule_task_set(EventType::kDecode,
                             config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
@@ -276,6 +275,7 @@ void Millipede::start()
                     }
                     print_per_symbol_done(PRINT_DEMUL, frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
+                        max_equaled_frame = frame_id;
                         if (!kUseLDPC) {
                             assert(cur_frame_id == frame_id);
                             cur_frame_id++;
@@ -570,15 +570,16 @@ void* Millipede::worker(int tid)
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
         ul_precoder_buffer_, dl_precoder_buffer_, stats);
 
-    auto computeDemul = new DoDemul(config_, tid, freq_ghz,
-        *get_conq(EventType::kDemul), complete_task_queue_,
-        worker_ptoks_ptr[tid], data_buffer_, ul_precoder_buffer_, equal_buffer_,
-        demod_hard_buffer_, demod_soft_buffer_, stats);
+    auto computeDemul
+        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
+            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
+            ul_precoder_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            demod_hard_buffer_, demod_soft_buffer_, stats);
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
         worker_ptoks_ptr[tid], dl_precoder_buffer_, dl_ifft_buffer_,
-        kUseLDPC ? dl_encoded_buffer_ : config_->dl_IQ_data, stats);
+        kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits, stats);
 
     Doer* computeEncoding = nullptr;
     Doer* computeDecoding = nullptr;
@@ -586,7 +587,7 @@ void* Millipede::worker(int tid)
 #ifdef USE_LDPC
     computeEncoding = new DoEncode(config_, tid, freq_ghz,
         get_conq(EventType::kEncode), complete_task_queue_,
-        worker_ptoks_ptr[tid], config_->dl_IQ_data, dl_encoded_buffer_, stats);
+        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
     computeDecoding = new DoDecode(config_, tid, freq_ghz,
         get_conq(EventType::kDecode), complete_task_queue_,
         worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
@@ -649,16 +650,17 @@ void* Millipede::worker_demul(int tid)
 {
     pin_worker(ThreadType::kWorkerDemul, tid, config_);
 
-    auto computeDemul = new DoDemul(config_, tid, freq_ghz,
-        *get_conq(EventType::kDemul), complete_task_queue_,
-        worker_ptoks_ptr[tid], data_buffer_, ul_precoder_buffer_, equal_buffer_,
-        demod_hard_buffer_, demod_soft_buffer_, stats);
+    auto computeDemul
+        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
+            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
+            ul_precoder_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            demod_hard_buffer_, demod_soft_buffer_, stats);
 
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
         worker_ptoks_ptr[tid], dl_precoder_buffer_, dl_ifft_buffer_,
-        kUseLDPC ? dl_encoded_buffer_ : config_->dl_IQ_data, stats);
+        kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits, stats);
 
     while (true) {
         if (config_->dl_data_symbol_num_perframe > 0) {
@@ -1009,6 +1011,8 @@ void Millipede::initialize_uplink_buffers()
 
     equal_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    ue_spec_pilot_buffer_.calloc(
+        TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
     demod_hard_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;
@@ -1190,30 +1194,20 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 
 void Millipede::getDemulData(int** ptr, int* size)
 {
-    int ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
-    size_t OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
-    int UE_NUM = config_->UE_NUM;
-    *ptr = (int*)&demod_hard_buffer_[max_equaled_frame
-        * ul_data_symbol_num_perframe][0];
-    *size = UE_NUM * OFDM_DATA_NUM;
+    auto& cfg = config_;
+    auto offset = cfg->get_total_data_symbol_idx_ul(
+        max_equaled_frame, cfg->UL_PILOT_SYMS);
+    *ptr = (int*)&demod_hard_buffer_[offset][0];
+    *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM;
 }
 
 void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
-    *ptr = (float*)&equal_buffer_[max_equaled_frame
-        * cfg->ul_data_symbol_num_perframe][0];
-    // *ptr = equal_output;
+    auto offset = cfg->get_total_data_symbol_idx_ul(
+        max_equaled_frame, cfg->UL_PILOT_SYMS);
+    *ptr = (float*)&equal_buffer_[offset][0];
     *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
-
-    // printf("In getEqualData()\n");
-    // for(int ii = 0; ii < UE_NUM*OFDM_DATA_NUM; ii++)
-    //{
-    //    // printf("User %d: %d, ", ii,demul_ptr2(ii));
-    //    printf("[%.4f+j%.4f] ", *(*ptr+ii*UE_NUM*2), *(*ptr+ii*UE_NUM*2+1));
-    //}
-    // printf("\n");
-    // printf("\n");
 }
 
 extern "C" {

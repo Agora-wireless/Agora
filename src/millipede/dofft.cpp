@@ -276,7 +276,7 @@ Event_data DoIFFT::launch(size_t tag)
 
     float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset % num_dl_ifft_buffers];
     memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
-    memset(ifft_buf_ptr + (cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM) * 2, 0,
+    memset(ifft_buf_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
         sizeof(float) * cfg->OFDM_DATA_START * 2);
 
     DftiComputeBackward(mkl_handle, ifft_buf_ptr);

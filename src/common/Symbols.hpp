@@ -8,13 +8,6 @@
 
 #define ENABLE_CPU_ATTACH
 
-#ifdef USE_ARGOS
-#ifndef GENERATE_DATA
-#define GENERATE_DATA
-#endif
-#define GENERATE_PILOT
-#endif
-
 #define ARMA_ALLOW_FAKE_GCC
 
 #define SEPARATE_TX_RX_UE 0
@@ -37,7 +30,6 @@
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
 
-#define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
@@ -106,7 +98,7 @@ static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugBSSender = false;
 
-#define DEBUG_DL_PILOT 1
+#define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
 #define DEBUG_RECV 0
 #define DEBUG_RADIO_TX 0

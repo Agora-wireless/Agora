@@ -29,6 +29,8 @@ typedef std::vector<complex_float,
     boost::alignment::aligned_allocator<complex_float, 64>>
     myVec;
 
+using namespace arma;
+
 class Phy_UE {
 public:
 /* TASK & SOCKET thread number */
@@ -198,8 +200,8 @@ private:
     float* pilots_;
     complex_float* ul_pilot;
     char* ul_pilot_aligned;
-    Table<int8_t>& ul_IQ_data;
-    Table<complex_float>& ul_IQ_modul;
+    Table<int8_t>& ul_bits;
+    Table<complex_float>& ul_iq_f;
 
     int pilot_sc_len;
     int data_sc_len;
@@ -311,6 +313,8 @@ private:
      */
     std::vector<myVec> equal_pc_buffer_;
 
+    Table<cx_float> phase_shift_buffer_;
+
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<int> data_sc_ind_;
     std::vector<int> pilot_sc_ind_;
@@ -318,20 +322,11 @@ private:
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
-    moodycamel::ConcurrentQueue<Event_data>
-        task_queue_; // =
-                     // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                     // * symbol_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> task_queue_;
     /* task queue for uplink demodulation */
-    moodycamel::ConcurrentQueue<Event_data>
-        demul_queue_; // =
-                      // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                      // * symbol_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> demul_queue_;
     /* main thread message queue */
-    moodycamel::ConcurrentQueue<Event_data>
-        message_queue_; // =
-                        // moodycamel::ConcurrentQueue<Event_data>(RX_BUFFER_FRAME_NUM
-                        // * symbol_num_perframe * BS_ANT_NUM  * 36);
+    moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
@@ -375,5 +370,6 @@ private:
     int max_equaled_frame = 0;
     // long long* demul_output;
     // float* equal_output;
+    int record_frame = -1;
 };
 #endif
