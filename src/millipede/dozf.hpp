@@ -15,21 +15,18 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
-#include <vector>
-// #include "mkl_dfti.h"
+#include <stdio.h>
+#include <string.h>
 
 class DoZF : public Doer {
 public:
-    DoZF(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    DoZF(Config* in_config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& in_csi_buffer,
-        Table<complex_float>& in_recip_buffer,
-        Table<complex_float>& in_ul_precoder_buffer,
-        Table<complex_float>& in_dl_precoder_buffer, Stats* in_stats_manager);
+        Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
+        Table<complex_float>& ul_precoder_buffer,
+        Table<complex_float>& dl_precoder_buffer, Stats* stats_manager);
     ~DoZF();
 
     /**
@@ -52,8 +49,12 @@ public:
 
 private:
     void ZF_time_orthogonal(size_t tag);
-    void precoder(void* mat_input, int frame_id, int sc_id, int offset,
-        bool downlink_mode);
+
+    /// Compute uplink and/or downlink precoders using this CSI matrix
+    /// and calibration buffer as input
+    void compute_precoder(const arma::cx_fmat& mat_csi,
+        const complex_float* recip_buf, complex_float* ul_precoder_buf,
+        complex_float* dl_precoder_buf);
 
     void ZF_freq_orthogonal(size_t tag);
 
@@ -88,11 +89,7 @@ private:
     Table<complex_float> dl_precoder_buffer_;
     DurationStat* duration_stat;
 
-    /**
-     * Intermediate buffer to gather CSI
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
-    complex_float* csi_gather_buffer;
+    complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI
 };
 
 #endif

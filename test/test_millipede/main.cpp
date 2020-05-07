@@ -60,6 +60,7 @@ void check_correctness_ul(Config* cfg)
     int UE_NUM = cfg->UE_NUM;
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int UL_PILOT_SYMS = cfg->UL_PILOT_SYMS;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
@@ -91,6 +92,7 @@ void check_correctness_ul(Config* cfg)
     int error_cnt = 0;
     int total_count = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
+	if (i < UL_PILOT_SYMS) continue;
 #ifdef USE_LDPC
         for (int ue = 0; ue < UE_NUM; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
