@@ -413,45 +413,52 @@ void Config::genData()
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
             int cur_offset = (j - OFDM_DATA_START) * UE_ANT_NUM;
-	    dl_iq_f[i][j] = mod_single_uint8(dl_bits[i][cur_offset], qam_table);
+            dl_iq_f[i][j] = mod_single_uint8(dl_bits[i][cur_offset], qam_table);
         }
 
-	CommsLib::IFFT(dl_iq_f[i], OFDM_CA_NUM);
-	size_t td_symbol_start = prefix + CP_LEN;
-        for (size_t j = td_symbol_start; j < td_symbol_start + OFDM_CA_NUM; j++) {
+        CommsLib::IFFT(dl_iq_f[i], OFDM_CA_NUM);
+        size_t td_symbol_start = prefix + CP_LEN;
+        for (size_t j = td_symbol_start; j < td_symbol_start + OFDM_CA_NUM;
+             j++) {
             dl_iq_t[i][j]
                 = { (int16_t)(dl_iq_f[i][j - td_symbol_start].re * 32768),
                       (int16_t)(dl_iq_f[i][j - td_symbol_start].im * 32768) };
         }
-	memcpy(dl_iq_t[i] + prefix, dl_iq_t[i] + prefix + OFDM_CA_NUM, CP_LEN * sizeof(short) * 2);
+        memcpy(dl_iq_t[i] + prefix, dl_iq_t[i] + prefix + OFDM_CA_NUM,
+            CP_LEN * sizeof(short) * 2);
     }
 
     // Generate freq-domain and time-domain uplink symbols
+    complex_float* ifft_ul_data_tmp;
+    alloc_buffer_1d(
+        &ifft_ul_data_tmp, sizeof(complex_float) * OFDM_CA_NUM, 64, 1);
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
-            size_t p = ue_id * OFDM_DATA_NUM;
-            auto modul_data
-                = CommsLib::modulate(std::vector<int8_t>(ul_bits[i] + p,
-                                         ul_bits[i] + p + OFDM_DATA_NUM),
-                    mod_type);
-            std::vector<std::complex<float>> ifft_ul_data_in(OFDM_CA_NUM, 0);
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+
+            size_t p = u * OFDM_DATA_NUM;
+            size_t q = u * OFDM_CA_NUM;
+            size_t r = u * sampsPerSymbol;
+
             for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
                 size_t k = j - OFDM_DATA_START;
-                ul_iq_f[i][ue_id * OFDM_CA_NUM + j]
-                    = { modul_data[k].real(), modul_data[k].imag() };
-                ifft_ul_data_in[j] = modul_data[k];
+                size_t s = p + k;
+                ul_iq_f[i][q + j] = mod_single_uint8(ul_bits[i][s], qam_table);
+                ifft_ul_data_tmp[j] = ul_iq_f[i][q + j];
             }
 
-            auto ifft_ul_data = CommsLib::IFFT(ifft_ul_data_in, OFDM_CA_NUM);
-            ifft_ul_data.insert(ifft_ul_data.begin(),
-                ifft_ul_data.end() - CP_LEN, ifft_ul_data.end());
-            for (size_t j = prefix; j < prefix + CP_LEN + OFDM_CA_NUM; j++) {
-                ul_iq_t[i][ue_id * sampsPerSymbol + j]
-                    = { (int16_t)(ifft_ul_data[j - prefix].real() * 32768),
-                          (int16_t)(ifft_ul_data[j - prefix].imag() * 32768) };
+            CommsLib::IFFT(ifft_ul_data_tmp, OFDM_CA_NUM);
+            size_t t = prefix + CP_LEN;
+            for (size_t j = t; j < t + OFDM_CA_NUM; j++) {
+                ul_iq_t[i][r + j]
+                    = { (int16_t)(ifft_ul_data_tmp[j - t].re * 32768),
+                          (int16_t)(ifft_ul_data_tmp[j - t].im * 32768) };
             }
+            memcpy(ul_iq_t[i] + r + prefix,
+                ul_iq_t[i] + r + prefix + OFDM_CA_NUM,
+                CP_LEN * sizeof(short) * 2);
         }
     }
+    free_buffer_1d(&ifft_ul_data_tmp);
 }
 
 Config::~Config()
@@ -459,8 +466,10 @@ Config::~Config()
     free_buffer_1d(&pilots_);
     dl_bits.free();
     ul_bits.free();
+    dl_iq_f.free();
     dl_iq_t.free();
     ul_iq_f.free();
+    ul_iq_t.free();
 }
 
 int Config::getSymbolId(size_t symbol_id)
