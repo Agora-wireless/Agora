@@ -92,8 +92,6 @@ private:
     cx_fmat ul_gt_mat;
 
     int ue_num_simd256;
-    const size_t moving_avg_sz = 1;
-    const float w_decay = 1;
 };
 
 #endif

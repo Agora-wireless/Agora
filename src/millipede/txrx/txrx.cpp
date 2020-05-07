@@ -185,9 +185,9 @@ int PacketTXRX::dequeue_send(int tid)
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
-    size_t total_data_symbol_idx
-        = (frame_id * c->data_symbol_num_perframe) + data_symbol_idx;
-    size_t offset = (total_data_symbol_idx * c->BS_ANT_NUM) + ant_id;
+    size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
+                        * c->BS_ANT_NUM)
+        + ant_id;
 
     if (kDebugPrintInTask) {
         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "

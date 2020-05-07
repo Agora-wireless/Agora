@@ -25,6 +25,10 @@ else()
   set(CMAKE_CXX_STANDARD 11)
 endif()
 
+# Unit tests
+enable_testing()
+find_package(GTest REQUIRED)
+
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
@@ -235,3 +239,8 @@ else()
   add_executable(sim ${SIMULATOR_SOURCES})
   target_link_libraries(sim ${MKL_LIBS})
 endif()
+
+# The tests to run using ctest
+add_executable(test_zf test/test_zf.cc ${COMMON_SOURCES} src/millipede/stats.cpp src/millipede/dozf.cpp)
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo)
+add_test(NAME test_zf COMMAND test_zf)
