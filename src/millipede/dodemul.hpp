@@ -21,6 +21,7 @@
 #include <vector>
 // #include "mkl_dfti.h"
 
+using namespace arma;
 class DoDemul : public Doer {
 public:
     DoDemul(Config* config, int tid, double freq_ghz,
@@ -29,8 +30,9 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& data_buffer,
         Table<complex_float>& ul_precoder_buffer,
+        Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer, Table<uint8_t>& demul_hard_buffer,
-        Table<int8_t>& demod_soft_buffer, Stats* stats_manager);
+        Table<int8_t>& demod_soft_buffer, Stats* in_stats_manager);
     ~DoDemul();
 
     /**
@@ -64,6 +66,7 @@ public:
 private:
     Table<complex_float>& data_buffer_;
     Table<complex_float>& ul_precoder_buffer_;
+    Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
@@ -72,10 +75,14 @@ private:
     /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
     /// times number of antennas
     complex_float* spm_buffer;
+    Table<float> evm_buffer_;
 
     // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
+    cx_fmat ue_pilot_data;
+    cx_fmat ul_gt_mat;
+    int ue_num_simd256;
 };
 
 #endif
