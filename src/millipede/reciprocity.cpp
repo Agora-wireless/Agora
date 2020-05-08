@@ -31,13 +31,20 @@ Event_data Reciprocity::launch(size_t offset)
         printf("In doRecip thread %d: frame: %zu, \n", tid, offset);
     size_t start_tsc1 = worker_rdtsc();
 
-    cx_float* ptr_in = (cx_float*)calib_buffer_[offset];
+    cx_float* ptr_in = (cx_float*)calib_buffer_[offset % TASK_BUFFER_FRAME_NUM];
     cx_fmat mat_input(ptr_in, OFDM_DATA_NUM, BS_ANT_NUM, false);
     cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant);
-    cx_float* recip_buff = (cx_float*)recip_buffer_[offset];
+    cx_float* recip_buff = (cx_float*)recip_buffer_[offset % TASK_BUFFER_FRAME_NUM];
     cx_fmat calib_mat = mat_input.each_col() / vec_calib_ref;
+
+    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
+    size_t start_tsc2 = worker_rdtsc();
+
     cx_fmat recip_mat(recip_buff, BS_ANT_NUM, OFDM_DATA_NUM, false);
     recip_mat = calib_mat.st();
+
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+
     for (int i = 0; i < OFDM_DATA_NUM; i += BS_ANT_NUM) {
         // TODO: interpolate instead of steps
         recip_mat.cols(i, std::min(i + BS_ANT_NUM - 1, OFDM_DATA_NUM))
@@ -45,9 +52,6 @@ Event_data Reciprocity::launch(size_t offset)
             = recip_mat.col(i);
     }
 
-    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-    size_t start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
     double duration = worker_rdtsc() - start_tsc1;
