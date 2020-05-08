@@ -19,8 +19,8 @@
 #include "buffer.hpp"
 #include "comms-lib.h"
 #include "memory_manage.h"
-#include "utils.h"
 #include "modulation.hpp"
+#include "utils.h"
 #include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
@@ -211,8 +211,8 @@ public:
             + symbol_idx_ul;
     }
 
-    /// Fetch the channel state information buffer for this frame and pilot
-    /// symbol index
+    /// Fetch the channel state information buffer for this frame and symbol ID.
+    /// The symbol must be a pilot symbol.
     inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
         size_t frame_id, size_t symbol_id) const
     {
