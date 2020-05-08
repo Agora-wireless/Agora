@@ -278,24 +278,28 @@ void Config::genData()
     coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 #endif
 
-    pilots_ = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    // read pilots from file
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/pilot_f_"
-        + std::to_string(OFDM_CA_NUM) + ".bin";
-    FILE* fp = fopen(filename.c_str(), "rb");
-    if (fp == NULL) {
-        printf("open pilots file %s failed.\n", filename.c_str());
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-    }
-    size_t r = fread(pilots_, sizeof(float), OFDM_CA_NUM, fp);
-    if (r < OFDM_CA_NUM)
-        printf("bad read from file %s \n", filename.c_str());
-    fclose(fp);
+    // Generate common pilots based on Zadoff-Chu sequence for channel estimation
+    auto zc_common_pilot_double
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+    auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
+    auto zc_common_pilot = CommsLib::seqCyclicShift(
+        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
 
+    pilots_ = (complex_float*)aligned_alloc(
+        64, OFDM_DATA_NUM * sizeof(complex_float));
+    pilots_sgn_ = (complex_float*)aligned_alloc(
+        64, OFDM_DATA_NUM * sizeof(complex_float)); // used in CSI estimation
+    for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
+        pilots_[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
+        auto zc_pilot_sgn = zc_common_pilot[i]
+            / (float)std::pow(std::abs(zc_common_pilot[i]), 2);
+        pilots_sgn_[i] = { zc_pilot_sgn.real(), zc_pilot_sgn.imag() };
+    }
+
+    pilotsF.resize(OFDM_DATA_START);
+    pilotsF.insert(
+        pilotsF.end(), zc_common_pilot.begin(), zc_common_pilot.end());
     pilotsF.resize(OFDM_CA_NUM);
-    for (size_t i = 0; i < OFDM_CA_NUM; i++)
-        pilotsF[i] = pilots_[i];
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP
@@ -309,19 +313,51 @@ void Config::genData()
     pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
     pilot_ci16.insert(pilot_ci16.end(), post_ci16.begin(), post_ci16.end());
     size_t seq_len = pilot_cf32.size();
-    for (size_t i = 0; i < seq_len; i++) {
+
+    for (size_t i = 0; i < seq_len; i++) { // used for plotting
         std::complex<float> cf = pilot_cf32[i];
-        // pilot_cs16.push_back(std::complex<int16_t>((int16_t)(cf.real() *
-        // 32768), (int16_t)(cf.imag() * 32768)));
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
+    // generate a UINT32 version to write to FPGA buffers
     pilot = Utils::cint16_to_uint32(pilot_ci16, false, "QI");
     if (pilot.size() != sampsPerSymbol) {
         std::cout << "generated pilot symbol size does not match configured "
                      "symbol size!"
                   << std::endl;
         exit(1);
+    }
+
+    // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
+    ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
+    ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
+    auto zc_ue_pilot_double
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+    auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
+    complex_float* pilot_ifft_in;
+    for (size_t i = 0; i < UE_ANT_NUM; i++) {
+        alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
+        memset(pilot_ifft_in, 0, sizeof(complex_float) * OFDM_DATA_START);
+        memset(pilot_ifft_in + OFDM_DATA_STOP, 0,
+            sizeof(complex_float) * OFDM_DATA_START);
+        auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
+            zc_ue_pilot, i * (float)M_PI / 6); // LTE DMRS
+        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
+            ue_specific_pilot[i][j]
+                = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
+            pilot_ifft_in[j + OFDM_DATA_START] = ue_specific_pilot[i][j];
+        }
+        CommsLib::IFFT(pilot_ifft_in, OFDM_CA_NUM);
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            ue_specific_pilot_t[i][prefix + CP_LEN + j]
+                = std::complex<int16_t>((int16_t)(pilot_ifft_in[j].re * 32768),
+                    (int16_t)(pilot_ifft_in[j].im * 32768));
+        }
+        for (size_t j = 0; j < CP_LEN; j++) {
+            ue_specific_pilot_t[i][prefix + j]
+                = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
+        }
+        free_buffer_1d(&pilot_ifft_in);
     }
 
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
@@ -332,8 +368,6 @@ void Config::genData()
     ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
-    ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
-    ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
 
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
@@ -364,14 +398,14 @@ void Config::genData()
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        r = fread(
+        size_t r = fread(
             ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        r = fread(
+        size_t r = fread(
             dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
@@ -379,36 +413,6 @@ void Config::genData()
     }
     fclose(fd);
 #endif
-
-    // Generate UE-specific pilots based on Zadoff-Chu sequence used for phase tracking
-    auto zc_pilot_double
-        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
-    complex_float* pilot_ifft_in;
-    for (size_t i = 0; i < UE_ANT_NUM; i++) {
-        alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
-        memset(pilot_ifft_in, 0, sizeof(complex_float) * OFDM_DATA_START);
-        memset(pilot_ifft_in + OFDM_DATA_STOP, 0,
-            sizeof(complex_float) * OFDM_DATA_START);
-        auto zc_pilot_i = CommsLib::seqCyclicShift(
-            zc_pilot, i * (float)M_PI / 6); // LTE DMRS
-        for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
-            ue_specific_pilot[i][j]
-                = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
-            pilot_ifft_in[j + OFDM_DATA_START] = ue_specific_pilot[i][j];
-        }
-        CommsLib::IFFT(pilot_ifft_in, OFDM_CA_NUM);
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            ue_specific_pilot_t[i][prefix + CP_LEN + j]
-                = std::complex<int16_t>((int16_t)(pilot_ifft_in[j].re * 32768),
-                    (int16_t)(pilot_ifft_in[j].im * 32768));
-        }
-        for (size_t j = 0; j < CP_LEN; j++) {
-            ue_specific_pilot_t[i][prefix + j]
-                = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
-        }
-        free_buffer_1d(&pilot_ifft_in);
-    }
 
     Table<float> qam_table;
     init_modulation_table(qam_table, mod_type);
@@ -468,6 +472,7 @@ void Config::genData()
 Config::~Config()
 {
     free_buffer_1d(&pilots_);
+    free_buffer_1d(&pilots_sgn_);
     dl_bits.free();
     ul_bits.free();
     dl_iq_f.free();
