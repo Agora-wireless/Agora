@@ -334,12 +334,12 @@ int main(int argc, char* argv[])
 
     complex_float* pilots_f = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float));
-    for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
+    for (int i = 0; i < OFDM_DATA_NUM; i++) {
         pilots_f[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
     }
 
     complex_float* pilots_t;
-    alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 0);
+    alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 1);
     for (int i = 0; i < OFDM_DATA_NUM; i++)
         pilots_t[i + OFDM_DATA_START] = pilots_f[i];
     // CommsLib::IFFT(pilots_t, OFDM_CA_NUM);
