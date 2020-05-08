@@ -83,6 +83,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     }
     size_t num_subcarriers
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+
+    // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
         size_t start_tsc1 = worker_rdtsc();
         const size_t cur_sc_id = base_sc_id + i;

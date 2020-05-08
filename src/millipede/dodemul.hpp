@@ -69,7 +69,9 @@ private:
     Table<int8_t>& demod_soft_buffer_;
     DurationStat* duration_stat;
 
-    complex_float* spm_buffer; // Intermediate buffer to gather raw data
+    /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
+    /// times number of antennas
+    complex_float* spm_buffer;
 
     // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;

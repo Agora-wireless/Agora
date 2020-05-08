@@ -169,6 +169,7 @@ Event_data DoFFT::launch(size_t tag)
 void DoFFT::partial_transpose(
     complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const
 {
+    assert(cfg->OFDM_DATA_NUM % cfg->transpose_block_size == 0);
     const size_t num_blocks = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
     size_t sc_idx = cfg->OFDM_DATA_START;
 
@@ -176,7 +177,9 @@ void DoFFT::partial_transpose(
         const size_t block_base_offset
             = block_idx * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
 
-        for (size_t sc_j = 0; sc_j < cfg->transpose_block_size; sc_j += 8) {
+        assert(cfg->transpose_block_size % kSCsPerCacheline == 0);
+        for (size_t sc_j = 0; sc_j < cfg->transpose_block_size;
+             sc_j += kSCsPerCacheline) {
             const complex_float* src = &fft_inout[sc_idx];
             complex_float* dst = nullptr;
             if (symbol_type == SymbolType::kCalUL) {

@@ -41,6 +41,12 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
+/// Return true at compile time iff a constant is a power of two
+template <typename T> static constexpr inline bool is_power_of_two(T x)
+{
+    return x && ((x & T(x - 1)) == 0);
+}
+
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
     kPacketRX,
@@ -204,6 +210,13 @@ static constexpr size_t kMaxStatsBreakdown = 4;
 
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;
+
+// Number of subcarriers in one cache line, when represented as complex floats
+static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
+
+// Number of subcarriers in a partial transpose block
+static constexpr size_t kTransposeBlockSize = 8;
+static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 
 #ifdef USE_LDPC
 static constexpr bool kUseLDPC = true;
