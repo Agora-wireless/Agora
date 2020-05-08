@@ -169,21 +169,24 @@ Event_data DoFFT::launch(size_t tag)
 void DoFFT::partial_transpose(
     complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const
 {
-    const size_t num_blocks = cfg->OFDM_DATA_NUM / cfg->transpose_block_size;
+    assert(cfg->OFDM_DATA_NUM % kTransposeBlockSize == 0);
+    const size_t num_blocks = cfg->OFDM_DATA_NUM / kTransposeBlockSize;
     size_t sc_idx = cfg->OFDM_DATA_START;
 
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset
-            = block_idx * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
+            = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
 
-        for (size_t sc_j = 0; sc_j < cfg->transpose_block_size; sc_j += 8) {
+        assert(kTransposeBlockSize % kSCsPerCacheline == 0);
+        for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
+             sc_j += kSCsPerCacheline) {
             const complex_float* src = &fft_inout[sc_idx];
             complex_float* dst = nullptr;
             if (symbol_type == SymbolType::kCalUL) {
-                dst = &out_buf[(block_idx * cfg->transpose_block_size) + sc_j];
+                dst = &out_buf[(block_idx * kTransposeBlockSize) + sc_j];
             } else {
                 dst = &out_buf[block_base_offset
-                    + (ant_id * cfg->transpose_block_size) + sc_j];
+                    + (ant_id * kTransposeBlockSize) + sc_j];
             }
 
             // With either of AVX-512 or AVX2, load 512 bits = 64 bytes =
