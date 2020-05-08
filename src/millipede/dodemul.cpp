@@ -14,13 +14,13 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& data_buffer, Table<complex_float>& precoder_buffer,
+    Table<complex_float>& data_buffer, Table<complex_float>& ul_precoder_buffer,
     Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
     Table<int8_t>& demod_soft_buffer, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
-    , precoder_buffer_(precoder_buffer)
+    , ul_precoder_buffer_(ul_precoder_buffer)
     , equal_buffer_(equal_buffer)
     , demod_hard_buffer_(demod_hard_buffer)
     , demod_soft_buffer_(demod_soft_buffer)
@@ -44,17 +44,17 @@ DoDemul::~DoDemul()
 Event_data DoDemul::launch(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
-    const size_t symbol_id = gen_tag_t(tag).symbol_id;
+    const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
-    const size_t total_data_symbol_idx
-        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    const complex_float* data_buf = data_buffer_[total_data_symbol_idx];
+    const size_t total_data_symbol_idx_ul
+        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
+    const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
         printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
-            tid, frame_id, symbol_id, base_sc_id);
+            tid, frame_id, symbol_idx_ul, base_sc_id);
     }
 
     size_t max_sc_ite
@@ -63,66 +63,65 @@ Event_data DoDemul::launch(size_t tag)
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
         size_t start_tsc1 = worker_rdtsc();
+
+        // Step 1: Populate spm_buffer as a row-major matrix with
+        // kSCsPerCacheline rows and BS_ANT_NUM columns
+
+        // Since kSCsPerCacheline divides demul_block_size and
+        // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
+        // same partial transpose block.
+        const size_t partial_transpose_block_base
+            = ((base_sc_id + i) / kTransposeBlockSize)
+            * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+
         if (kUseSIMDGather) {
-            size_t transpose_block_size = cfg->transpose_block_size;
-            __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
-                transpose_block_size * 2 + 1, transpose_block_size * 4,
-                transpose_block_size * 4 + 1, transpose_block_size * 6,
-                transpose_block_size * 6 + 1);
+            __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
+                kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
+                kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
+                kTransposeBlockSize * 6 + 1);
             // Gather data for all antennas and 8 subcarriers in the same cache
-            // line,  1 subcarrier and 4 ants per iteration
-            size_t cur_sc_offset = (((base_sc_id + i) / transpose_block_size)
-                                       * transpose_block_size * cfg->BS_ANT_NUM)
-                + (base_sc_id + i) % transpose_block_size;
+            // line, 1 subcarrier and 4 ants per iteration
+            size_t cur_sc_offset = partial_transpose_block_base
+                + (base_sc_id + i) % kTransposeBlockSize;
             auto* src = (const float*)&data_buf[cur_sc_offset];
             auto* dst = (float*)spm_buffer;
-            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i += 4) {
                 for (size_t j = 0; j < kSCsPerCacheline; j++) {
                     __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
                     _mm256_store_ps(dst + j * cfg->BS_ANT_NUM * 2, data_rx);
                 }
-                src += (kSCsPerCacheline * transpose_block_size);
+                src += (kSCsPerCacheline * kTransposeBlockSize);
                 dst += 8;
             }
         } else {
             complex_float* dst = spm_buffer;
-            const size_t block_base_offset
-                = ((base_sc_id + i) / cfg->transpose_block_size)
-                * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
             for (size_t j = 0; j < kSCsPerCacheline; j++) {
-                size_t cur_sc_id = base_sc_id + i + j;
                 for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                    *dst++ = data_buf[block_base_offset
-                        + (ant_i * cfg->transpose_block_size)
-                        + (cur_sc_id % cfg->transpose_block_size)];
+                    *dst++ = data_buf[partial_transpose_block_base
+                        + (ant_i * kTransposeBlockSize)
+                        + ((base_sc_id + i + j) % kTransposeBlockSize)];
                 }
             }
         }
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
 
+        // Step 2: For each subcarrier, perform equalization by multipling the
+        // subcarrier's data from each antenna with the subcarrier's precoder
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-            // Create input data matrix
-            cx_float* data_ptr = (cx_float*)(spm_buffer + j * cfg->BS_ANT_NUM);
-            cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+            const size_t cur_sc_id = base_sc_id + i + j;
+            const cx_fmat data_cur_sc(
+                reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]),
+                cfg->BS_ANT_NUM, 1, false);
 
-            // Create input precoder matrix
-            size_t cur_sc_id = base_sc_id + i + j;
-            size_t precoder_offset
-                = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
-                + cur_sc_id;
-            if (cfg->freq_orthogonal_pilot)
-                precoder_offset = precoder_offset - cur_sc_id % cfg->UE_NUM;
-            cx_float* precoder_ptr
-                = (cx_float*)precoder_buffer_[precoder_offset];
-            cx_fmat mat_precoder(
-                precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-            // cout<<"Precoder: "<< mat_precoder<<endl;
-            // cout << "Raw data: " << mat_data.st() <<endl;
+            const cx_fmat precoder_cur_sc(
+                reinterpret_cast<cx_float*>(cfg->get_precoder_buf(
+                    ul_precoder_buffer_, frame_id, cur_sc_id)),
+                cfg->UE_NUM, cfg->BS_ANT_NUM, false);
 
             cx_float* equal_ptr = nullptr;
             if (kExportConstellation) {
                 equal_ptr
-                    = (cx_float*)(&equal_buffer_[total_data_symbol_idx]
+                    = (cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
                                                 [cur_sc_id * cfg->UE_NUM]);
             } else {
                 equal_ptr
@@ -130,17 +129,16 @@ Event_data DoDemul::launch(size_t tag)
                         * cfg->UE_NUM]);
             }
             // Equalization
-            cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+            cx_fmat equaled_cur_sc(equal_ptr, cfg->UE_NUM, 1, false);
             size_t start_tsc2 = worker_rdtsc();
-            mat_equaled = mat_precoder * mat_data;
+            equaled_cur_sc = precoder_cur_sc * data_cur_sc;
             size_t start_tsc3 = worker_rdtsc();
             duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
-            // cout << "Equaled data sc "<<cur_sc_id<<": "<<mat_equaled.st();
 
             if (!kUseLDPC) {
                 // Decode with hard decision
                 uint8_t* demul_ptr
-                    = (&demod_hard_buffer_[total_data_symbol_idx]
+                    = (&demod_hard_buffer_[total_data_symbol_idx_ul]
                                           [cur_sc_id * cfg->UE_NUM]);
                 demod_16qam_hard_avx2(
                     (float*)equal_ptr, demul_ptr, cfg->UE_NUM);
@@ -164,7 +162,7 @@ Event_data DoDemul::launch(size_t tag)
         for (size_t i = 0; i < cfg->UE_NUM; i++) {
             float* equal_ptr = (float*)(equaled_buffer_temp + i);
             int8_t* demul_ptr
-                = (&demod_soft_buffer_[total_data_symbol_idx]
+                = (&demod_soft_buffer_[total_data_symbol_idx_ul]
                                       [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                           * cfg->mod_type]);
             size_t kNumDoubleInSIMD256
