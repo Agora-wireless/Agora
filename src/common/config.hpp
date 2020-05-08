@@ -30,7 +30,6 @@ typedef unsigned short ushort;
 
 class Config {
 public:
-    size_t transpose_block_size;
     size_t sampsPerSymbol;
     size_t dl_prefix;
     size_t prefix;
@@ -206,8 +205,8 @@ public:
             + symbol_idx_ul;
     }
 
-    /// Fetch the channel state information buffer for this frame and symbol ID.
-    /// The symbol must be a pilot symbol.
+    /// Fetch the channel state information buffer for this frame and pilot
+    /// symbol index
     inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
         size_t frame_id, size_t symbol_id) const
     {
@@ -233,6 +232,8 @@ public:
         Table<complex_float>& precoder_buffers, size_t frame_id,
         size_t sc_id) const
     {
+        if (freq_orthogonal_pilot)
+            sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
