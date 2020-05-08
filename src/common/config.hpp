@@ -41,7 +41,6 @@ public:
     size_t mod_order;
 
     std::string conf;
-    std::string pilot_file;
     std::string serial_file;
     std::string hub_file;
     std::vector<std::string> radio_ids;
@@ -76,7 +75,8 @@ public:
     std::vector<std::complex<double>> pilot_cd64;
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
-    float* pilots_;
+    complex_float* pilots_;
+    complex_float* pilots_sgn_;
     Table<int8_t> dl_bits;
     Table<int8_t> ul_bits;
     Table<complex_float> dl_iq_f;

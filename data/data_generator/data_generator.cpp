@@ -325,38 +325,37 @@ int main(int argc, char* argv[])
         // CommsLib::IFFT(IFFT_data[i], OFDM_CA_NUM);
     }
 
-    /* generate common pilot data and convert to time domain */
-    float* pilots_f = (float*)aligned_alloc(64, OFDM_CA_NUM * sizeof(float));
-    for (int i = 0; i < OFDM_CA_NUM; i++) {
-        if (i < OFDM_DATA_START || i >= OFDM_DATA_START + OFDM_DATA_NUM)
-            pilots_f[i] = 0;
-        else
-            pilots_f[i] = 1 - 2 * (rand() % 2);
+    /* generate pilot data and convert to time domain */
+    auto zc_common_pilot_double
+        = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
+    auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
+    auto zc_common_pilot = CommsLib::seqCyclicShift(
+        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
+
+    complex_float* pilots_f = (complex_float*)aligned_alloc(
+        64, OFDM_DATA_NUM * sizeof(complex_float));
+    for (int i = 0; i < OFDM_DATA_NUM; i++) {
+        pilots_f[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
     }
-    std::string filename_pilot_f = cur_directory + "/data/pilot_f_"
-        + std::to_string(OFDM_CA_NUM) + ".bin";
-    FILE* fp_pilot_f = fopen(filename_pilot_f.c_str(), "wb");
-    fwrite(pilots_f, OFDM_CA_NUM, sizeof(float), fp_pilot_f);
-    fclose(fp_pilot_f);
 
     complex_float* pilots_t;
     alloc_buffer_1d(&pilots_t, OFDM_CA_NUM, 64, 1);
-    for (int i = 0; i < OFDM_CA_NUM; i++)
-        pilots_t[i].re = pilots_f[i];
+    for (int i = 0; i < OFDM_DATA_NUM; i++)
+        pilots_t[i + OFDM_DATA_START] = pilots_f[i];
     // CommsLib::IFFT(pilots_t, OFDM_CA_NUM);
 
     /* generate ue-specific pilot data */
     Table<complex_float> ue_specific_pilot;
     ue_specific_pilot.malloc(UE_NUM, OFDM_DATA_NUM, 64);
-    auto zc_pilot_double
+    auto zc_ue_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_pilot = Utils::double_to_cfloat(zc_pilot_double);
+    auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
     for (int i = 0; i < UE_NUM; i++) {
-        auto zc_pilot_i = CommsLib::seqCyclicShift(
-            zc_pilot, i * (float)M_PI / 6); // LTE DMRS
+        auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
+            zc_ue_pilot, i * (float)M_PI / 6); // LTE DMRS
         for (int j = 0; j < OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
-                = { zc_pilot_i[j].real(), zc_pilot_i[j].imag() };
+                = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
         }
     }
 
@@ -374,7 +373,7 @@ int main(int argc, char* argv[])
             memset(pilots_t_ue, 0, OFDM_CA_NUM * sizeof(complex_float));
             for (int j = OFDM_DATA_START; j < OFDM_DATA_START + OFDM_DATA_NUM;
                  j += UE_NUM) {
-                pilots_t_ue[i + j].re = pilots_f[i + j];
+                pilots_t_ue[i + j] = pilots_t[i + j];
             }
             // CommsLib::IFFT(pilots_t_ue, OFDM_CA_NUM);
             memcpy(tx_data_all_symbols[0] + i * OFDM_CA_NUM, pilots_t_ue,
@@ -387,15 +386,16 @@ int main(int argc, char* argv[])
     }
 
     for (int i = pilot_symbol_num_perframe; i < symbol_num_perframe; i++) {
-        int data_symbol_num_perframe = (i - pilot_symbol_num_perframe);
+        int data_symbol_id = (i - pilot_symbol_num_perframe);
         for (int j = 0; j < UE_NUM; j++) {
-            if (data_symbol_num_perframe < UL_PILOT_SYMS)
-                memcpy(tx_data_all_symbols[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
+            if (data_symbol_id < UL_PILOT_SYMS)
+                memcpy(
+                    tx_data_all_symbols[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
                     ue_specific_pilot[j],
                     OFDM_DATA_NUM * sizeof(complex_float));
             else
                 memcpy(tx_data_all_symbols[i] + j * OFDM_CA_NUM,
-                    IFFT_data[data_symbol_num_perframe * UE_NUM + j],
+                    IFFT_data[data_symbol_id * UE_NUM + j],
                     OFDM_CA_NUM * sizeof(complex_float));
         }
     }
@@ -433,7 +433,7 @@ int main(int argc, char* argv[])
         }
         for (int j = 0; j < BS_ANT_NUM; j++) {
             CommsLib::IFFT(
-                rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM);
+                rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM, false);
         }
     }
 
@@ -503,7 +503,8 @@ int main(int argc, char* argv[])
         for (int j = 0; j < UE_NUM; j++) {
             if (i <= DL_PILOT_SYMS - 1) {
                 for (int sc_id = 0; sc_id < OFDM_DATA_NUM; sc_id++)
-                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START] = ue_specific_pilot[j][sc_id];
+                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START]
+                        = ue_specific_pilot[j][sc_id];
             } else {
                 memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
                     mod_output[i * UE_NUM + j],
@@ -618,6 +619,7 @@ int main(int argc, char* argv[])
     mod_output.free();
     IFFT_data.free();
     CSI_matrix.free();
+    free_buffer_1d(&pilots_f);
     free_buffer_1d(&pilots_t);
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
