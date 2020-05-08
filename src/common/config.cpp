@@ -278,22 +278,24 @@ void Config::genData()
     auto zc_common_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
-    auto zc_common_pilot = CommsLib::seqCyclicShift(zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
+    auto zc_common_pilot = CommsLib::seqCyclicShift(
+        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
 
-    pilotsF.resize(OFDM_DATA_START);
-    pilotsF.insert(pilotsF.end(), zc_common_pilot.begin(), zc_common_pilot.end());
-    pilotsF.resize(OFDM_CA_NUM);
     pilots_ = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float));
     pilots_sgn_ = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float)); // used in CSI estimation
     for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
         pilots_[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
-        auto zc_pilot_sgn
-            = zc_common_pilot[i] / (float)std::pow(std::abs(zc_common_pilot[i]), 2);
+        auto zc_pilot_sgn = zc_common_pilot[i]
+            / (float)std::pow(std::abs(zc_common_pilot[i]), 2);
         pilots_sgn_[i] = { zc_pilot_sgn.real(), zc_pilot_sgn.imag() };
     }
 
+    pilotsF.resize(OFDM_DATA_START);
+    pilotsF.insert(
+        pilotsF.end(), zc_common_pilot.begin(), zc_common_pilot.end());
+    pilotsF.resize(OFDM_CA_NUM);
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP

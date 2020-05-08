@@ -329,7 +329,8 @@ int main(int argc, char* argv[])
     auto zc_common_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
-    auto zc_common_pilot = CommsLib::seqCyclicShift(zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
+    auto zc_common_pilot = CommsLib::seqCyclicShift(
+        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
 
     complex_float* pilots_f = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float));
@@ -385,15 +386,16 @@ int main(int argc, char* argv[])
     }
 
     for (int i = pilot_symbol_num_perframe; i < symbol_num_perframe; i++) {
-        int data_symbol_num_perframe = (i - pilot_symbol_num_perframe);
+        int data_symbol_id = (i - pilot_symbol_num_perframe);
         for (int j = 0; j < UE_NUM; j++) {
-            if (data_symbol_num_perframe < UL_PILOT_SYMS)
-                memcpy(tx_data_all_symbols[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
+            if (data_symbol_id < UL_PILOT_SYMS)
+                memcpy(
+                    tx_data_all_symbols[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
                     ue_specific_pilot[j],
                     OFDM_DATA_NUM * sizeof(complex_float));
             else
                 memcpy(tx_data_all_symbols[i] + j * OFDM_CA_NUM,
-                    IFFT_data[data_symbol_num_perframe * UE_NUM + j],
+                    IFFT_data[data_symbol_id * UE_NUM + j],
                     OFDM_CA_NUM * sizeof(complex_float));
         }
     }
@@ -431,7 +433,7 @@ int main(int argc, char* argv[])
         }
         for (int j = 0; j < BS_ANT_NUM; j++) {
             CommsLib::IFFT(
-                rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM);
+                rx_data_all_symbols[i] + j * OFDM_CA_NUM, OFDM_CA_NUM, false);
         }
     }
 
@@ -501,7 +503,8 @@ int main(int argc, char* argv[])
         for (int j = 0; j < UE_NUM; j++) {
             if (i <= DL_PILOT_SYMS - 1) {
                 for (int sc_id = 0; sc_id < OFDM_DATA_NUM; sc_id++)
-                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START] = ue_specific_pilot[j][sc_id];
+                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START]
+                        = ue_specific_pilot[j][sc_id];
             } else {
                 memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
                     mod_output[i * UE_NUM + j],
