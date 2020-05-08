@@ -115,9 +115,6 @@ public:
     size_t demul_thread_num;
     size_t zf_thread_num;
 
-    // Number of OFDM subcarriers in a partial transpose block
-    size_t transpose_block_size;
-
     // Number of OFDM data subcarriers handled in one demodulation event
     size_t demul_block_size;
     size_t demul_events_per_symbol; // Derived from demul_block_size
@@ -208,8 +205,8 @@ public:
             + symbol_idx_ul;
     }
 
-    /// Fetch the channel state information buffer for this frame and symbol ID.
-    /// The symbol must be a pilot symbol.
+    /// Fetch the channel state information buffer for this frame and pilot
+    /// symbol index
     inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
         size_t frame_id, size_t symbol_id) const
     {
@@ -235,6 +232,8 @@ public:
         Table<complex_float>& precoder_buffers, size_t frame_id,
         size_t sc_id) const
     {
+        if (freq_orthogonal_pilot)
+            sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }

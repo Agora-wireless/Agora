@@ -81,6 +81,8 @@ Config::Config(std::string jsonfile)
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
+    rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
+        "Transpose block size must divide number of OFDM data subcarriers");
     OFDM_DATA_START
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     downlink_mode = tddConf.value("downlink_mode", false);
@@ -174,18 +176,11 @@ Config::Config(std::string jsonfile)
     demul_thread_num = tddConf.value("demul_thread_num", 11);
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
 
-    transpose_block_size
-        = tddConf.value("transpose_block_size", kSCsPerCacheline);
-    rt_assert(transpose_block_size % kSCsPerCacheline == 0,
-        "Transpose block size must be a multiple of subcarriers per cacheline");
-    rt_assert(OFDM_DATA_NUM % transpose_block_size == 0,
-        "Transpose block size must divide number of OFDM data subcarriers");
-
     demul_block_size = tddConf.value("demul_block_size", 48);
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
         "Demodulation block size must be a multiple of subcarriers per "
         "cacheline");
-    rt_assert(demul_block_size % transpose_block_size == 0,
+    rt_assert(demul_block_size % kTransposeBlockSize == 0,
         "Demodulation block size must be a multiple of transpose block size");
     demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
 

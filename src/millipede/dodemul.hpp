@@ -63,7 +63,7 @@ public:
 
 private:
     Table<complex_float>& data_buffer_;
-    Table<complex_float>& precoder_buffer_;
+    Table<complex_float>& ul_precoder_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;

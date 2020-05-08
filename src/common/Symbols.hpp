@@ -217,6 +217,7 @@ static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 // Number of subcarriers in a partial transpose block
 static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
+static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
 #ifdef USE_LDPC
 static constexpr bool kUseLDPC = true;
