@@ -30,7 +30,6 @@ typedef unsigned short ushort;
 
 class Config {
 public:
-    size_t transpose_block_size;
     size_t sampsPerSymbol;
     size_t dl_prefix;
     size_t prefix;
@@ -115,6 +114,9 @@ public:
     size_t fft_thread_num;
     size_t demul_thread_num;
     size_t zf_thread_num;
+
+    // Number of OFDM subcarriers in a partial transpose block
+    size_t transpose_block_size;
 
     // Number of OFDM data subcarriers handled in one demodulation event
     size_t demul_block_size;

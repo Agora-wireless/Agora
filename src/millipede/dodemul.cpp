@@ -7,6 +7,8 @@
 #include "concurrent_queue_wrapper.hpp"
 #include <malloc.h>
 
+static constexpr bool kUseSIMDGather = false;
+
 using namespace arma;
 DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
@@ -24,8 +26,8 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     , demod_soft_buffer_(demod_soft_buffer)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
-    spm_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, 8 * cfg->BS_ANT_NUM * sizeof(complex_float)));
+    spm_buffer = reinterpret_cast<complex_float*>(memalign(
+        64, kSCsPerCacheline * cfg->BS_ANT_NUM * sizeof(complex_float)));
     equaled_buffer_temp = reinterpret_cast<complex_float*>(memalign(
         64, cfg->demul_block_size * cfg->UE_NUM * sizeof(complex_float)));
     equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(memalign(
@@ -43,9 +45,10 @@ Event_data DoDemul::launch(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_id = gen_tag_t(tag).symbol_id;
+    const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t total_data_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    const size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const complex_float* data_buf = data_buffer_[total_data_symbol_idx];
 
     size_t start_tsc = worker_rdtsc();
 
@@ -54,47 +57,56 @@ Event_data DoDemul::launch(size_t tag)
             tid, frame_id, symbol_id, base_sc_id);
     }
 
-    size_t transpose_block_size = cfg->transpose_block_size;
-    size_t gather_step_size = 8 * transpose_block_size;
-    __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
-        transpose_block_size * 2 + 1, transpose_block_size * 4,
-        transpose_block_size * 4 + 1, transpose_block_size * 6,
-        transpose_block_size * 6 + 1);
-
     size_t max_sc_ite
         = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
-    // Iterate through cache lines (each cache line has 8 subcarriers)
-    for (size_t i = 0; i < max_sc_ite / 8; i++) {
+    assert(max_sc_ite % kSCsPerCacheline == 0);
+    // Iterate through cache lines
+    for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
         size_t start_tsc1 = worker_rdtsc();
-
-        // Gather data for all antennas and 8 subcarriers in the same cache line
-        // 1 subcarrier and 4 ants per iteration
-        size_t cur_block_id = (base_sc_id + i * 8) / transpose_block_size;
-        size_t sc_inblock_idx = (base_sc_id + i * 8) % transpose_block_size;
-        size_t cur_sc_offset
-            = cur_block_id * transpose_block_size * cfg->BS_ANT_NUM
-            + sc_inblock_idx;
-        auto* src
-            = (float*)data_buffer_[total_data_symbol_idx] + cur_sc_offset * 2;
-        auto* dst = (float*)spm_buffer;
-        for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-            for (size_t j = 0; j < 8; j++) {
-                __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
-                _mm256_store_ps(dst + j * cfg->BS_ANT_NUM * 2, data_rx);
+        if (kUseSIMDGather) {
+            size_t transpose_block_size = cfg->transpose_block_size;
+            __m256i index = _mm256_setr_epi32(0, 1, transpose_block_size * 2,
+                transpose_block_size * 2 + 1, transpose_block_size * 4,
+                transpose_block_size * 4 + 1, transpose_block_size * 6,
+                transpose_block_size * 6 + 1);
+            // Gather data for all antennas and 8 subcarriers in the same cache
+            // line,  1 subcarrier and 4 ants per iteration
+            size_t cur_sc_offset = (((base_sc_id + i) / transpose_block_size)
+                                       * transpose_block_size * cfg->BS_ANT_NUM)
+                + (base_sc_id + i) % transpose_block_size;
+            auto* src = (const float*)&data_buf[cur_sc_offset];
+            auto* dst = (float*)spm_buffer;
+            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
+                for (size_t j = 0; j < kSCsPerCacheline; j++) {
+                    __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
+                    _mm256_store_ps(dst + j * cfg->BS_ANT_NUM * 2, data_rx);
+                }
+                src += (kSCsPerCacheline * transpose_block_size);
+                dst += 8;
             }
-            src += gather_step_size;
-            dst += 8;
+        } else {
+            complex_float* dst = spm_buffer;
+            const size_t block_base_offset
+                = ((base_sc_id + i) / cfg->transpose_block_size)
+                * (cfg->transpose_block_size * cfg->BS_ANT_NUM);
+            for (size_t j = 0; j < kSCsPerCacheline; j++) {
+                size_t cur_sc_id = base_sc_id + i + j;
+                for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+                    *dst++ = data_buf[block_base_offset
+                        + (ant_i * cfg->transpose_block_size)
+                        + (cur_sc_id % cfg->transpose_block_size)];
+                }
+            }
         }
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
 
-        // Computation for 8 subcarriers
-        for (size_t j = 0; j < 8; j++) {
+        for (size_t j = 0; j < kSCsPerCacheline; j++) {
             // Create input data matrix
             cx_float* data_ptr = (cx_float*)(spm_buffer + j * cfg->BS_ANT_NUM);
             cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
 
             // Create input precoder matrix
-            size_t cur_sc_id = i * 8 + j + base_sc_id;
+            size_t cur_sc_id = base_sc_id + i + j;
             size_t precoder_offset
                 = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM
                 + cur_sc_id;
