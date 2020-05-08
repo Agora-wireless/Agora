@@ -7,7 +7,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include <malloc.h>
 
-static constexpr bool kUseSIMDGather = false;
+static constexpr bool kUseSIMDGather = true;
 
 using namespace arma;
 DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
