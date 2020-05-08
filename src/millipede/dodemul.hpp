@@ -28,7 +28,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& data_buffer,
-        Table<complex_float>& precoder_buffer,
+        Table<complex_float>& ul_precoder_buffer,
         Table<complex_float>& equal_buffer, Table<uint8_t>& demul_hard_buffer,
         Table<int8_t>& demod_soft_buffer, Stats* stats_manager);
     ~DoDemul();
