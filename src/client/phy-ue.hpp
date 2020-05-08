@@ -197,7 +197,6 @@ private:
     size_t tx_packet_length;
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
-    float* pilots_;
     complex_float* ul_pilot;
     char* ul_pilot_aligned;
     Table<int8_t>& ul_bits;
