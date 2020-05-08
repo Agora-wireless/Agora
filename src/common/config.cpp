@@ -39,10 +39,7 @@ Config::Config(std::string jsonfile)
         nRadios = tddConf.value("radio_num", BS_ANT_NUM);
 
 #ifdef USE_ARGOS
-    if (nRadios == 0) {
-        printf("Error: no radio exists in Argos mode!\n");
-        exit(0);
-    }
+    rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
 #endif
 
     /* radio configurations */
@@ -157,15 +154,14 @@ Config::Config(std::string jsonfile)
 
     if (isUE and !freq_orthogonal_pilot
         and UE_ANT_NUM != pilot_symbol_num_perframe) {
-        std::cerr << "Number of Pilot Symbols don't match number of Clients!"
-                  << std::endl;
-        exit(0);
+        rt_assert(false, "Number of pilot symbols doesn't match number of UEs");
     }
     if (!isUE and !freq_orthogonal_pilot
         and tddConf.find("ue_num") == tddConf.end()) {
         UE_NUM = pilot_symbol_num_perframe;
         UE_ANT_NUM = UE_NUM;
     }
+    rt_assert(UE_NUM % 4 == 0, "Number of UEs must be multiple of 4");
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
