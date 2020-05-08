@@ -358,10 +358,12 @@ bool RadioConfig::radioStart()
                     recipCalDlPilot.begin(), pre.begin(), pre.end());
                 recipCalDlPilot.insert(
                     recipCalDlPilot.end(), post.begin(), post.end());
-                std::cout << "recipCalPilot[" << i << "]: ";
-                for (auto const& calP : recipCalDlPilot)
-                    std::cout << real(calP) << ", ";
-                std::cout << std::endl;
+                if (kDebugPrintPilot) {
+                    std::cout << "recipCalPilot[" << i << "]: ";
+                    for (auto const& calP : recipCalDlPilot)
+                        std::cout << real(calP) << ", ";
+                    std::cout << std::endl;
+                }
                 baStn[i]->writeRegisters("TX_RAM_A", 0,
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
