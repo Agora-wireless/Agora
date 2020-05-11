@@ -50,7 +50,6 @@ public:
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
     void* master_thread(int tid);
     void* worker_thread(int tid);
-    int dequeue_send(int tid, int radio_id);
     void init_IQ_from_file();
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
@@ -62,6 +61,7 @@ public:
 
 private:
     Config* cfg;
+    double freq_ghz; // RDTSC frequency in GHz
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
