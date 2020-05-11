@@ -36,21 +36,19 @@
 #include "net.hpp"
 #include "utils.h"
 
-#define CPU_FREQ 2.3e9
-
-typedef unsigned short ushort;
-
 class Sender {
 public:
 #ifdef USE_DPDK
-    static const size_t kTXBufOffset = 22;
+    static constexpr size_t kTXBufOffset = 22;
 #else
-    static const size_t kTXBufOffset = 0;
+    static constexpr size_t kTXBufOffset = 0;
 #endif
+    /// Maximum number of network sockets
+    static constexpr size_t kMaxNumSockets = 128;
 
 public:
-    Sender(Config* in_config, size_t in_thread_num, size_t in_core_offset = 30,
-        size_t in_delay = 0);
+    Sender(Config* config, size_t thread_num, size_t core_offset = 30,
+        size_t delay = 0);
     ~Sender();
 
     void startTX();
@@ -59,7 +57,7 @@ public:
     void* loopSend(int tid);
     int dequeue_send(int tid, int radio_id);
     void init_IQ_from_file();
-    size_t get_max_symbol_id();
+    size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
     void update_ids(size_t max_ant_id, size_t max_symbol_id);
@@ -67,24 +65,24 @@ public:
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void preload_tx_buffer();
     void update_tx_buffer(size_t data_ptr);
-    void write_stats_to_file(size_t tx_frame_count);
+    void write_stats_to_file(size_t tx_frame_count) const;
 
 private:
     Config* cfg;
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-#if USE_IPV4
-    struct sockaddr_in* servaddr_; /* server address */
-    struct sockaddr_in cliaddr_; /* server address */
-#else
-    struct sockaddr_in6* servaddr_; /* server address */
-    struct sockaddr_in6 cliaddr_; /* server address */
-#endif
-    int* socket_;
-    // First dimension: BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
+
+    sockaddr_in servaddr_ipv4[kMaxNumSockets]; // Server address for IPv4
+    sockaddr_in cliaddr_ipv4; // Client address for IPv4
+    sockaddr_in6 servaddr_ipv6[kMaxNumSockets]; // Server address for IPv6
+    sockaddr_in6 cliaddr_ipv6; // Client address for IPv6
+    int socket_[kMaxNumSockets]; // Network sockets
+
+    // First dimension:
+    //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
-    Table<char> tx_buffer_;
+    Table<char> tx_buffers_;
     size_t buffer_len_;
     pthread_mutex_t lock_;
 
@@ -109,16 +107,17 @@ private:
     size_t core_offset;
     size_t delay;
 
-    Table<size_t> packet_count_per_symbol;
-    size_t* packet_count_per_frame;
+    // Number of packets transmitted for each symbol in a frame
+    size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
+    size_t packet_count_per_frame[SOCKET_BUFFER_FRAME_NUM];
 
     double* frame_start;
     double* frame_end;
 
-    uint64_t ticks_5 = (uint64_t)500000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_100 = (uint64_t)150000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_200 = (uint64_t)20000 * CPU_FREQ / 1e6 / 70;
-    uint64_t ticks_500 = (uint64_t)10000 * CPU_FREQ / 1e6 / 70;
+    uint64_t ticks_5;
+    uint64_t ticks_100;
+    uint64_t ticks_200;
+    uint64_t ticks_500;
     uint64_t ticks_all;
 };
 
