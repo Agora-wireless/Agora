@@ -38,13 +38,8 @@
 
 class Sender {
 public:
-#ifdef USE_DPDK
-    static constexpr size_t kTXBufOffset = 22;
-#else
-    static constexpr size_t kTXBufOffset = 0;
-#endif
-    /// Maximum number of network sockets
-    static constexpr size_t kMaxNumSockets = 128;
+    static constexpr size_t kTXBufOffset = kUseDPDK ? 22 : 0;
+    static constexpr size_t kMaxNumSockets = 128; // Max network sockets
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
@@ -63,7 +58,6 @@ public:
     void update_ids(size_t max_ant_id, size_t max_symbol_id);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
-    void preload_tx_buffer();
     void update_tx_buffer(size_t data_ptr);
     void write_stats_to_file(size_t tx_frame_count) const;
 
@@ -86,9 +80,9 @@ private:
     size_t buffer_len_;
     pthread_mutex_t lock_;
 
-    moodycamel::ConcurrentQueue<size_t> task_queue_
+    moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
-    moodycamel::ConcurrentQueue<size_t> message_queue_
+    moodycamel::ConcurrentQueue<size_t> completion_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
