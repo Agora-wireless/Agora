@@ -31,13 +31,13 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     , delay(delay)
 {
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
-    const double freq_ghz = measure_rdtsc_freq();
+    const double ticks_per_sec = measure_rdtsc_freq() * 1e9;
 
-    ticks_all = delay * freq_ghz / 1e6 / 70;
-    ticks_5 = 500000 * freq_ghz / 1e6 / 70;
-    ticks_100 = 150000 * freq_ghz / 1e6 / 70;
-    ticks_200 = 20000 * freq_ghz / 1e6 / 70;
-    ticks_500 = 10000 * freq_ghz / 1e6 / 70;
+    ticks_all = delay * ticks_per_sec / 1e6 / 70;
+    ticks_5 = 500000 * ticks_per_sec / 1e6 / 70;
+    ticks_100 = 150000 * ticks_per_sec / 1e6 / 70;
+    ticks_200 = 20000 * ticks_per_sec / 1e6 / 70;
+    ticks_500 = 10000 * ticks_per_sec / 1e6 / 70;
 
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -48,8 +48,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
         SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM,
         kTXBufOffset + cfg->packet_length, 64);
     init_IQ_from_file();
-    /* preload data to tx buffer */
-    preload_tx_buffer();
+    preload_tx_buffer(); // Preload data to TX buffer
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
         64, thread_num * sizeof(moodycamel::ProducerToken*));
