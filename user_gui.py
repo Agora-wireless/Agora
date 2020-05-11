@@ -95,7 +95,7 @@ class MainWindow(QtGui.QMainWindow):
 
 		
 if __name__ == '__main__':
-    filename = "data/userconfig_512.json"
+    filename = "data/ue-dl-hw.json"
     nusers = 4
     data_len = 52
     mode = ''
