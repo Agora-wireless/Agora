@@ -33,6 +33,12 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
+/// Return true at compile time iff a constant is a power of two
+template <typename T> static constexpr inline bool is_power_of_two(T x)
+{
+    return x && ((x & T(x - 1)) == 0);
+}
+
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
     kPacketRX,
@@ -82,7 +88,7 @@ static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 #define BIGSTATION 0
 #define USE_IPV4 1
 #define CONNECT_UDP 1
-#define EXPORT_CONSTELLATION 0
+static constexpr bool kExportConstellation = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
@@ -197,6 +203,14 @@ static constexpr size_t kMaxStatsBreakdown = 4;
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;
 
+// Number of subcarriers in one cache line, when represented as complex floats
+static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
+
+// Number of subcarriers in a partial transpose block
+static constexpr size_t kTransposeBlockSize = 8;
+static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
+static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
+
 #ifdef USE_LDPC
 static constexpr bool kUseLDPC = true;
 #else
@@ -205,8 +219,4 @@ static constexpr bool kUseLDPC = false;
 
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
-
-static const int MAX_FRAME_ID = 1e4;
-static const int float_num_in_simd256 = 8;
-static const int double_num_in_simd256 = 4;
 #endif

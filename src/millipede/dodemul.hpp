@@ -24,16 +24,15 @@
 using namespace arma;
 class DoDemul : public Doer {
 public:
-    DoDemul(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+    DoDemul(Config* config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& in_data_buffer,
-        Table<complex_float>& in_precoder_buffer,
-        Table<complex_float>& in_ue_spec_pilot_buffer,
-        Table<complex_float>& in_equal_buffer,
-        Table<uint8_t>& in_demul_hard_buffer,
-        Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
+        Table<complex_float>& data_buffer,
+        Table<complex_float>& ul_precoder_buffer,
+        Table<complex_float>& ue_spec_pilot_buffer,
+        Table<complex_float>& equal_buffer, Table<uint8_t>& demul_hard_buffer,
+        Table<int8_t>& demod_soft_buffer, Stats* in_stats_manager);
     ~DoDemul();
 
     /**
@@ -64,33 +63,25 @@ public:
      */
     Event_data launch(size_t tag);
 
-    Event_data DemulSingleSC(size_t offset);
-
 private:
     Table<complex_float>& data_buffer_;
-    Table<complex_float>& precoder_buffer_;
+    Table<complex_float>& ul_precoder_buffer_;
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
     DurationStat* duration_stat;
 
-    /**
-     * Intermediate buffer to gather raw data
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM */
+    /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
+    /// times number of antennas
     complex_float* spm_buffer;
     Table<float> evm_buffer_;
 
-    /**
-     * Intermediate buffers for equalized data
-     * dimension: UE_NUM * demul_block_size */
+    // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
-
     cx_fmat ue_pilot_data;
     cx_fmat ul_gt_mat;
-
     int ue_num_simd256;
 };
 
