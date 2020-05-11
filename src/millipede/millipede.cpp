@@ -534,7 +534,7 @@ void Millipede::handle_event_fft(size_t tag)
         } else if (sym_type == SymbolType::kCalDL
             or sym_type == SymbolType::kCalUL) {
             print_per_symbol_done(PRINT_FFT_CAL, frame_id, symbol_id);
-            if (++fft_stats_.symbol_cal_count[frame_id]
+            if (++fft_stats_.symbol_cal_count[frame_id % TASK_BUFFER_FRAME_NUM]
                 == fft_stats_.max_symbol_cal_count) {
                 print_per_frame_done(PRINT_FFT_CAL, frame_id);
                 // TODO: rc_stats_.max_task_count appears uninitalized
