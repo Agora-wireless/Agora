@@ -22,6 +22,7 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     : cfg(cfg)
+    , freq_ghz(measure_rdtsc_freq())
     , ant_id(0)
     , frame_id(0)
     , symbol_id(0)
@@ -31,7 +32,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     , delay(delay)
 {
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
-    const double ticks_per_sec = measure_rdtsc_freq() * 1e9;
+    const double ticks_per_sec = freq_ghz * 1e9;
 
     ticks_all = delay * ticks_per_sec / 1e6 / 70;
     ticks_5 = 500000 * ticks_per_sec / 1e6 / 70;
@@ -200,11 +201,36 @@ void* Sender::master_thread(int tid)
     exit(0);
 }
 
+void Sender::update_tx_buffer(size_t data_ptr)
+{
+    size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
+    size_t data_index = symbol_id * cfg->BS_ANT_NUM + tx_ant_id;
+    auto* pkt = (Packet*)(tx_buffers_[data_ptr] + kTXBufOffset);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = cfg->getSymbolId(symbol_id);
+    pkt->cell_id = 0;
+    pkt->ant_id = tx_ant_id;
+    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
+        cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
+
+    ant_id++;
+    if (ant_id == cfg->BS_ANT_NUM) {
+        ant_id = 0;
+        symbol_id++;
+        if (symbol_id == get_max_symbol_id()) {
+            symbol_id = 0;
+            frame_id++;
+            if (frame_id == kNumStatsFrames)
+                frame_id = 0;
+        }
+    }
+}
+
 void* Sender::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
-    size_t buffer_length = kTXBufOffset + cfg->packet_length;
+    const size_t buffer_length = kTXBufOffset + cfg->packet_length;
     /* Use mutex to sychronize data receiving across threads */
     pthread_mutex_lock(&mutex);
     printf("Thread %zu: waiting for release\n", (size_t)tid);
@@ -214,8 +240,8 @@ void* Sender::worker_thread(int tid)
     pthread_mutex_unlock(&mutex);
 
     double begin = get_time();
-    size_t packet_count = 0;
     size_t total_tx_packets = 0;
+    size_t total_tx_packets_rolling = 0;
     size_t max_symbol_id = get_max_symbol_id();
     int radio_lo = tid * cfg->nRadios / thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / thread_num;
@@ -225,12 +251,38 @@ void* Sender::worker_thread(int tid)
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     int radio_id = radio_lo;
     while (true) {
-        int data_ptr = dequeue_send(tid, radio_id);
-        if (data_ptr == -1)
+        size_t data_ptr;
+        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
             continue;
-        packet_count++;
+
+        size_t start_tsc_send = rdtsc();
+        // Send a message to the server
+        int ret = 0;
+        if (kUseDPDK or !kConnectUDP) {
+            ret = sendto(socket_[radio_id], tx_buffers_[data_ptr],
+                buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
+                sizeof(servaddr_ipv4[tid]));
+        } else {
+            ret = send(
+                socket_[radio_id], tx_buffers_[data_ptr], buffer_length, 0);
+        }
+        rt_assert(ret >= 0, "Worker: sendto() failed");
+
+        if (kDebugSenderReceiver) {
+            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[data_ptr]);
+            printf("Thread %d transmit frame %d, symbol %d, ant %d, data_ptr: "
+                   "%zu, TX time: %.3f us\n",
+                tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, data_ptr,
+                cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
+        }
+
+        rt_assert(
+            completion_queue_.enqueue(data_ptr), "Completion enqueue failed");
+
+        total_tx_packets_rolling++;
         total_tx_packets++;
-        if (packet_count == ant_num_this_thread * max_symbol_id * 1000) {
+        if (total_tx_packets_rolling
+            == ant_num_this_thread * max_symbol_id * 1000) {
             double end = get_time();
             double byte_len
                 = buffer_length * ant_num_this_thread * max_symbol_id * 1000.f;
@@ -240,42 +292,12 @@ void* Sender::worker_thread(int tid)
                 total_tx_packets / (ant_num_this_thread * max_symbol_id),
                 diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
             begin = get_time();
-            packet_count = 0;
+            total_tx_packets_rolling = 0;
         }
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
     }
-}
-
-int Sender::dequeue_send(int tid, int radio_id)
-{
-    size_t data_ptr;
-    if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
-        return -1;
-
-    size_t buffer_length = kTXBufOffset + cfg->packet_length;
-    double start_time_send = kDebugSenderReceiver ? get_time() : -1.0;
-    /* send a message to the server */
-    int ret = 0;
-    if (kUseDPDK or !kConnectUDP) {
-        ret = sendto(socket_[radio_id], tx_buffers_[data_ptr], buffer_length, 0,
-            (struct sockaddr*)&servaddr_ipv4[tid], sizeof(servaddr_ipv4[tid]));
-    } else {
-        ret = send(socket_[radio_id], tx_buffers_[data_ptr], buffer_length, 0);
-    }
-    rt_assert(ret >= 0, "Socket sendto() failed");
-
-    if (kDebugSenderReceiver) {
-        auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[data_ptr]);
-        printf("Thread %d transmit frame %d, symbol %d, ant %d, data_ptr: "
-               "%zu, tx time: %.3f\n",
-            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, data_ptr,
-            get_time() - start_time_send);
-    }
-
-    rt_assert(completion_queue_.enqueue(data_ptr), "Completion enqueue failed");
-    return data_ptr;
 }
 
 size_t Sender::get_max_symbol_id() const
@@ -323,31 +345,6 @@ void Sender::init_IQ_from_file()
         }
     }
     fclose(fp);
-}
-
-void Sender::update_tx_buffer(size_t data_ptr)
-{
-    size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
-    size_t data_index = symbol_id * cfg->BS_ANT_NUM + tx_ant_id;
-    auto* pkt = (Packet*)(tx_buffers_[data_ptr] + kTXBufOffset);
-    pkt->frame_id = frame_id;
-    pkt->symbol_id = cfg->getSymbolId(symbol_id);
-    pkt->cell_id = 0;
-    pkt->ant_id = tx_ant_id;
-    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-        sizeof(unsigned short) * cfg->OFDM_FRAME_LEN * 2);
-
-    ant_id++;
-    if (ant_id == cfg->BS_ANT_NUM) {
-        ant_id = 0;
-        symbol_id++;
-        if (symbol_id == get_max_symbol_id()) {
-            symbol_id = 0;
-            frame_id++;
-            if (frame_id == kNumStatsFrames)
-                frame_id = 0;
-        }
-    }
 }
 
 void Sender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
