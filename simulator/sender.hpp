@@ -47,7 +47,12 @@ public:
     ~Sender();
 
     void startTX();
+
+    // in_frame_start and in_frame_end must have space for at least
+    // kNumStatsFrames entries
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
+
+private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
     void init_IQ_from_file();
@@ -59,9 +64,21 @@ public:
     void update_tx_buffer(size_t data_ptr);
     void write_stats_to_file(size_t tx_frame_count) const;
 
-private:
     Config* cfg;
-    double freq_ghz; // RDTSC frequency in GHz
+    const double freq_ghz; // RDTSC frequency in GHz
+    const double ticks_per_usec; // RDTSC frequency in GHz
+    const size_t thread_num; // Number of worker threads sending packets
+    const size_t socket_num; // Total network sockets across worker threads
+
+    // The master thread runs on core core_offset. Worker threads use cores
+    // {core_offset + 1, ..., core_offset + thread_num - 1}
+    const size_t core_offset;
+    const size_t delay;
+    const uint64_t ticks_all;
+    const uint64_t ticks_5;
+    const uint64_t ticks_100;
+    const uint64_t ticks_200;
+    const uint64_t ticks_500;
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -76,7 +93,6 @@ private:
     //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
     Table<char> tx_buffers_;
-    size_t buffer_len_;
     pthread_mutex_t lock_;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
@@ -94,24 +110,12 @@ private:
     Table<float> IQ_data;
     Table<ushort> IQ_data_coded;
 
-    size_t thread_num;
-    size_t socket_num;
-
-    size_t core_offset;
-    size_t delay;
-
     // Number of packets transmitted for each symbol in a frame
     size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
     size_t packet_count_per_frame[SOCKET_BUFFER_FRAME_NUM];
 
     double* frame_start;
     double* frame_end;
-
-    uint64_t ticks_5;
-    uint64_t ticks_100;
-    uint64_t ticks_200;
-    uint64_t ticks_500;
-    uint64_t ticks_all;
 };
 
 #endif
