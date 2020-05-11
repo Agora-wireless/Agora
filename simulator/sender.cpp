@@ -48,12 +48,18 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
         SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM,
         kTXBufOffset + cfg->packet_length, 64);
     init_IQ_from_file();
-    preload_tx_buffer(); // Preload data to TX buffer
+
+    // Preload packets to TX buffers
+    const size_t num_packets
+        = SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM;
+    for (size_t i = 0; i < num_packets; i++) {
+        update_tx_buffer(i);
+    }
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
         64, thread_num * sizeof(moodycamel::ProducerToken*));
     for (size_t i = 0; i < thread_num; i++)
-        task_ptok[i] = new moodycamel::ProducerToken(task_queue_);
+        task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
@@ -128,26 +134,26 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
 
 void* Sender::loopMain(int tid)
 {
+    signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
 
-    size_t max_symbol_id = get_max_symbol_id();
-    size_t max_length_
+    const size_t max_symbol_id = get_max_symbol_id();
+    const size_t max_num_packets
         = SOCKET_BUFFER_FRAME_NUM * max_symbol_id * cfg->BS_ANT_NUM;
 
-    /* push tasks of the first symbol into task queue */
+    // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-        rt_assert(task_queue_.enqueue(*task_ptok[i % thread_num], i),
+        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], i),
             "Send task enqueue failed");
     }
 
-    signal(SIGINT, interrupt_handler);
     size_t tx_frame_count = 0;
     frame_start[0] = get_time();
     uint64_t tick_start = rdtsc();
     double start_time = kDebugSenderReceiver ? get_time() : -1.0;
     while (keep_running) {
         size_t data_ptr;
-        int ret = message_queue_.try_dequeue(data_ptr);
+        int ret = completion_queue_.try_dequeue(data_ptr);
         if (!ret)
             continue;
         update_tx_buffer(data_ptr);
@@ -185,9 +191,10 @@ void* Sender::loopMain(int tid)
             }
             packet_count_per_symbol[tx_frame_id][tx_current_symbol_id] = 0;
             size_t next_symbol_ptr
-                = ((tx_total_symbol_id + 1) * cfg->BS_ANT_NUM) % max_length_;
+                = ((tx_total_symbol_id + 1) * cfg->BS_ANT_NUM)
+                % max_num_packets;
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-                rt_assert(task_queue_.enqueue(
+                rt_assert(send_queue_.enqueue(
                               *task_ptok[i % thread_num], i + next_symbol_ptr),
                     "Send task enqueue failed");
             }
@@ -248,7 +255,7 @@ void* Sender::loopSend(int tid)
 int Sender::dequeue_send(int tid, int radio_id)
 {
     size_t data_ptr;
-    if (!task_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
+    if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
         return -1;
 
     size_t buffer_length = kTXBufOffset + cfg->packet_length;
@@ -271,7 +278,7 @@ int Sender::dequeue_send(int tid, int radio_id)
             get_time() - start_time_send);
     }
 
-    rt_assert(message_queue_.enqueue(data_ptr), "Send message enqueue failed");
+    rt_assert(completion_queue_.enqueue(data_ptr), "Completion enqueue failed");
     return data_ptr;
 }
 
@@ -364,16 +371,6 @@ void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
     }
 }
 
-void Sender::preload_tx_buffer()
-{
-    size_t max_symbol_id = get_max_symbol_id();
-    size_t max_length_
-        = SOCKET_BUFFER_FRAME_NUM * max_symbol_id * cfg->BS_ANT_NUM;
-    for (size_t i = 0; i < max_length_; i++) {
-        update_tx_buffer(i);
-    }
-}
-
 void Sender::update_tx_buffer(size_t data_ptr)
 {
     size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
@@ -397,10 +394,7 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
         context->obj_ptr = this;
         context->id = i;
         ret = pthread_create(&thread, NULL, worker, context);
-        if (ret != 0) {
-            perror("task thread create failed");
-            exit(0);
-        }
+        rt_assert(ret == 0, "pthread_create() failed");
     }
 }
 
