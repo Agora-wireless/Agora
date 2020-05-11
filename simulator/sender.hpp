@@ -48,14 +48,13 @@ public:
 
     void startTX();
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
-    void* loopMain(int tid);
-    void* loopSend(int tid);
+    void* master_thread(int tid);
+    void* worker_thread(int tid);
     int dequeue_send(int tid, int radio_id);
     void init_IQ_from_file();
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
-    void update_ids(size_t max_ant_id, size_t max_symbol_id);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void update_tx_buffer(size_t data_ptr);
