@@ -61,8 +61,12 @@ private:
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
-    void update_tx_buffer(size_t data_ptr);
+    void update_tx_buffer(gen_tag_t tag);
     void write_stats_to_file(size_t tx_frame_count) const;
+
+    // Return the TX buffer for a tag. The tag must have frame, symbol, and
+    // antenna fields set
+    inline size_t tag_to_tx_buffers_index(gen_tag_t tag) const;
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
@@ -101,9 +105,9 @@ private:
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
-    size_t ant_id;
-    size_t frame_id;
-    size_t symbol_id;
+    size_t ant_id_;
+    size_t frame_id_;
+    size_t symbol_id_;
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)

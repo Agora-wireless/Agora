@@ -20,6 +20,13 @@ void delay_ticks(uint64_t start, uint64_t ticks)
         _mm_pause();
 }
 
+inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
+{
+    const size_t frame_slot = tag.frame_id % SOCKET_BUFFER_FRAME_NUM;
+    return (frame_slot * (get_max_symbol_id() * cfg->BS_ANT_NUM))
+        + (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
+}
+
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
@@ -33,9 +40,9 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     , ticks_100(150000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ant_id(0)
-    , frame_id(0)
-    , symbol_id(0)
+    , ant_id_(0)
+    , frame_id_(0)
+    , symbol_id_(0)
 {
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
 
@@ -83,7 +90,6 @@ Sender::~Sender()
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         free(packet_count_per_symbol[i]);
     }
-    delete cfg;
     pthread_mutex_destroy(&lock_);
 }
 
@@ -127,19 +133,21 @@ void* Sender::master_thread(int tid)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
-
     const size_t max_symbol_id = get_max_symbol_id();
-    const size_t max_num_packets
-        = SOCKET_BUFFER_FRAME_NUM * max_symbol_id * cfg->BS_ANT_NUM;
 
     // Preload packets to TX buffers
-    for (size_t i = 0; i < max_num_packets; i++) {
-        update_tx_buffer(i);
+    for (size_t frm_i = 0; frm_i < SOCKET_BUFFER_FRAME_NUM; frm_i++) {
+        for (size_t sym_i = 0; sym_i < max_symbol_id; sym_i++) {
+            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+                update_tx_buffer(gen_tag_t::frm_sym_ant(frm_i, sym_i, ant_i));
+            }
+        }
     }
 
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], i),
+        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num],
+                      gen_tag_t::frm_sym_ant(0, 0, i)._tag),
             "Send task enqueue failed");
     }
 
@@ -148,35 +156,36 @@ void* Sender::master_thread(int tid)
     uint64_t tick_start = rdtsc();
     double start_time = get_time();
     while (keep_running) {
-        size_t data_ptr;
-        int ret = completion_queue_.try_dequeue(data_ptr);
+        gen_tag_t ctag(0); // The completion tag
+        int ret = completion_queue_.try_dequeue(ctag._tag);
         if (!ret)
             continue;
-        update_tx_buffer(data_ptr);
-        size_t tx_total_symbol_id = data_ptr / cfg->BS_ANT_NUM;
-        size_t tx_current_symbol_id = tx_total_symbol_id % max_symbol_id;
-        size_t tx_frame_id = tx_total_symbol_id / max_symbol_id;
-        packet_count_per_symbol[tx_frame_id][tx_current_symbol_id]++;
-        if (packet_count_per_symbol[tx_frame_id][tx_current_symbol_id]
+        update_tx_buffer(ctag);
+
+        size_t comp_frame_slot = ctag.frame_id % SOCKET_BUFFER_FRAME_NUM;
+
+        packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
+        if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
             == cfg->BS_ANT_NUM) {
+            packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
             if (kDebugSenderReceiver) {
-                printf("Finished transmit all antennas in frame: %zu, "
-                       "symbol: %zu, in %.5f us\n ",
-                    tx_frame_id, tx_current_symbol_id, get_time() - start_time);
+                printf("Finished transmit all antennas in frame: %u, "
+                       "symbol: %u, in %.5f us\n ",
+                    ctag.frame_id, ctag.symbol_id, get_time() - start_time);
             }
-            packet_count_per_frame[tx_frame_id]++;
+            packet_count_per_frame[comp_frame_slot]++;
             delay_for_symbol(tx_frame_count, tick_start);
             tick_start = rdtsc();
 
-            if (packet_count_per_frame[tx_frame_id] == max_symbol_id) {
+            if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
                 frame_end[tx_frame_count] = get_time();
-                packet_count_per_frame[tx_frame_id] = 0;
+                packet_count_per_frame[comp_frame_slot] = 0;
 
                 delay_for_frame(tx_frame_count, tick_start);
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
                     printf("Finished transmit all antennas in frame: %zu, "
                            "next scheduled: %zu, in %.5f us\n",
-                        tx_frame_count, frame_id, get_time() - start_time);
+                        tx_frame_count, frame_id_, get_time() - start_time);
                     start_time = get_time();
                 }
                 tx_frame_count++;
@@ -185,13 +194,10 @@ void* Sender::master_thread(int tid)
                 frame_start[tx_frame_count] = get_time();
                 tick_start = rdtsc();
             }
-            packet_count_per_symbol[tx_frame_id][tx_current_symbol_id] = 0;
-            size_t next_symbol_ptr
-                = ((tx_total_symbol_id + 1) * cfg->BS_ANT_NUM)
-                % max_num_packets;
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-                rt_assert(send_queue_.enqueue(
-                              *task_ptok[i % thread_num], i + next_symbol_ptr),
+                rt_assert(
+                    send_queue_.enqueue(*task_ptok[i % thread_num],
+                        gen_tag_t::frm_sym_ant(frame_id_, symbol_id_, i)._tag),
                     "Send task enqueue failed");
             }
         }
@@ -200,27 +206,28 @@ void* Sender::master_thread(int tid)
     exit(0);
 }
 
-void Sender::update_tx_buffer(size_t data_ptr)
+void Sender::update_tx_buffer(gen_tag_t tag)
 {
-    size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
-    size_t data_index = symbol_id * cfg->BS_ANT_NUM + tx_ant_id;
-    auto* pkt = (Packet*)(tx_buffers_[data_ptr] + kTXBufOffset);
-    pkt->frame_id = frame_id;
-    pkt->symbol_id = cfg->getSymbolId(symbol_id);
+    auto* pkt
+        = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)] + kTXBufOffset);
+    pkt->frame_id = frame_id_;
+    pkt->symbol_id = cfg->getSymbolId(symbol_id_);
     pkt->cell_id = 0;
-    pkt->ant_id = tx_ant_id;
+    pkt->ant_id = tag.ant_id;
+
+    size_t data_index = symbol_id_ * cfg->BS_ANT_NUM + tag.ant_id;
     memcpy(pkt->data, (char*)IQ_data_coded[data_index],
         cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 
-    ant_id++;
-    if (ant_id == cfg->BS_ANT_NUM) {
-        ant_id = 0;
-        symbol_id++;
-        if (symbol_id == get_max_symbol_id()) {
-            symbol_id = 0;
-            frame_id++;
-            if (frame_id == kNumStatsFrames)
-                frame_id = 0;
+    ant_id_++;
+    if (ant_id_ == cfg->BS_ANT_NUM) {
+        ant_id_ = 0;
+        symbol_id_++;
+        if (symbol_id_ == get_max_symbol_id()) {
+            symbol_id_ = 0;
+            frame_id_++;
+            if (frame_id_ == kNumStatsFrames)
+                frame_id_ = 0; // TODO: Remove this wraparound
         }
     }
 }
@@ -250,33 +257,34 @@ void* Sender::worker_thread(int tid)
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     int radio_id = radio_lo;
     while (true) {
-        size_t data_ptr;
-        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), data_ptr))
+        size_t tag;
+        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag))
             continue;
+        const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
         // Send a message to the server
         int ret = 0;
         if (kUseDPDK or !kConnectUDP) {
-            ret = sendto(socket_[radio_id], tx_buffers_[data_ptr],
+            ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
                 buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
                 sizeof(servaddr_ipv4[tid]));
         } else {
             ret = send(
-                socket_[radio_id], tx_buffers_[data_ptr], buffer_length, 0);
+                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
         }
         rt_assert(ret >= 0, "Worker: sendto() failed");
 
         if (kDebugSenderReceiver) {
-            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[data_ptr]);
-            printf("Thread %d transmit frame %d, symbol %d, ant %d, data_ptr: "
-                   "%zu, TX time: %.3f us\n",
-                tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id, data_ptr,
+            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
+            printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
+                   "TX buffer: %zu, TX time: %.3f us\n",
+                tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
+                pkt->symbol_id, pkt->ant_id, tx_bufs_idx,
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
         }
 
-        rt_assert(
-            completion_queue_.enqueue(data_ptr), "Completion enqueue failed");
+        rt_assert(completion_queue_.enqueue(tag), "Completion enqueue failed");
 
         total_tx_packets_rolling++;
         total_tx_packets++;
