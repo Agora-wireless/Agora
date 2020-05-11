@@ -49,13 +49,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
         kTXBufOffset + cfg->packet_length, 64);
     init_IQ_from_file();
 
-    // Preload packets to TX buffers
-    const size_t num_packets
-        = SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM;
-    for (size_t i = 0; i < num_packets; i++) {
-        update_tx_buffer(i);
-    }
-
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
         64, thread_num * sizeof(moodycamel::ProducerToken*));
     for (size_t i = 0; i < thread_num; i++)
@@ -99,17 +92,16 @@ void Sender::startTX()
     printf("Starting sender\n");
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
-    /* create tx threads */
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::loopSend>, 0, thread_num);
 
-    /* give some time for all threads to lock */
-    sleep(1);
+    // Create worker threads
+    create_threads(
+        pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
+
+    sleep(1); // Give some time for worker threads to lock
     printf("Master: Now releasing the condition\n");
     pthread_cond_broadcast(&cond);
 
-    /* run while loop */
-    loopMain(0);
+    master_thread(0); // Start the master thread
 }
 
 void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
@@ -118,21 +110,20 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
-    /* create tx threads */
+    // Create worker threads
     create_threads(
-        pthread_fun_wrapper<Sender, &Sender::loopSend>, 0, thread_num);
+        pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
 
-    /* give some time for all threads to lock */
-    sleep(1);
+    sleep(1); // Give some time for worker threads to lock
     printf("Master: Now releasing the condition\n");
     pthread_cond_broadcast(&cond);
 
-    /* create main thread */
-    create_threads(pthread_fun_wrapper<Sender, &Sender::loopMain>, thread_num,
-        thread_num + 1);
+    // Create the master thread
+    create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
+        thread_num, thread_num + 1);
 }
 
-void* Sender::loopMain(int tid)
+void* Sender::master_thread(int tid)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
@@ -140,6 +131,11 @@ void* Sender::loopMain(int tid)
     const size_t max_symbol_id = get_max_symbol_id();
     const size_t max_num_packets
         = SOCKET_BUFFER_FRAME_NUM * max_symbol_id * cfg->BS_ANT_NUM;
+
+    // Preload packets to TX buffers
+    for (size_t i = 0; i < max_num_packets; i++) {
+        update_tx_buffer(i);
+    }
 
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
@@ -204,7 +200,7 @@ void* Sender::loopMain(int tid)
     exit(0);
 }
 
-void* Sender::loopSend(int tid)
+void* Sender::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
@@ -321,7 +317,7 @@ void Sender::init_IQ_from_file()
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
         for (size_t j = 0; j < cfg->OFDM_FRAME_LEN * 2; j++) {
-            IQ_data_coded[i][j] = (ushort)(IQ_data[i][j] * 32768);
+            IQ_data_coded[i][j] = (unsigned short)(IQ_data[i][j] * 32768);
             // printf("i:%d, j:%d, Coded: %d, orignal:
             // %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
         }
@@ -329,13 +325,23 @@ void Sender::init_IQ_from_file()
     fclose(fp);
 }
 
-void Sender::update_ids(size_t max_ant_id, size_t max_symbol_id)
+void Sender::update_tx_buffer(size_t data_ptr)
 {
+    size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
+    size_t data_index = symbol_id * cfg->BS_ANT_NUM + tx_ant_id;
+    auto* pkt = (Packet*)(tx_buffers_[data_ptr] + kTXBufOffset);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = cfg->getSymbolId(symbol_id);
+    pkt->cell_id = 0;
+    pkt->ant_id = tx_ant_id;
+    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
+        sizeof(unsigned short) * cfg->OFDM_FRAME_LEN * 2);
+
     ant_id++;
-    if (ant_id == max_ant_id) {
+    if (ant_id == cfg->BS_ANT_NUM) {
         ant_id = 0;
         symbol_id++;
-        if (symbol_id == max_symbol_id) {
+        if (symbol_id == get_max_symbol_id()) {
             symbol_id = 0;
             frame_id++;
             if (frame_id == kNumStatsFrames)
@@ -369,20 +375,6 @@ void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
             delay_ticks(tick_start, cfg->data_symbol_num_perframe * ticks_all);
         }
     }
-}
-
-void Sender::update_tx_buffer(size_t data_ptr)
-{
-    size_t tx_ant_id = data_ptr % cfg->BS_ANT_NUM;
-    size_t data_index = symbol_id * cfg->BS_ANT_NUM + tx_ant_id;
-    auto* pkt = (Packet*)(tx_buffers_[data_ptr] + kTXBufOffset);
-    pkt->frame_id = frame_id;
-    pkt->symbol_id = cfg->getSymbolId(symbol_id);
-    pkt->cell_id = 0;
-    pkt->ant_id = tx_ant_id;
-    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-        sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
-    update_ids(cfg->BS_ANT_NUM, get_max_symbol_id());
 }
 
 void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
