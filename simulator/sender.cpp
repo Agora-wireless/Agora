@@ -23,22 +23,21 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
-    , ant_id(0)
-    , frame_id(0)
-    , symbol_id(0)
+    , ticks_per_usec(freq_ghz * 1e3)
     , thread_num(thread_num)
     , socket_num(cfg->nRadios)
     , core_offset(core_offset)
     , delay(delay)
+    , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_5(500000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_100(150000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ant_id(0)
+    , frame_id(0)
+    , symbol_id(0)
 {
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
-    const double ticks_per_sec = freq_ghz * 1e9;
-
-    ticks_all = delay * ticks_per_sec / 1e6 / 70;
-    ticks_5 = 500000 * ticks_per_sec / 1e6 / 70;
-    ticks_100 = 150000 * ticks_per_sec / 1e6 / 70;
-    ticks_200 = 20000 * ticks_per_sec / 1e6 / 70;
-    ticks_500 = 10000 * ticks_per_sec / 1e6 / 70;
 
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -147,7 +146,7 @@ void* Sender::master_thread(int tid)
     size_t tx_frame_count = 0;
     frame_start[0] = get_time();
     uint64_t tick_start = rdtsc();
-    double start_time = kDebugSenderReceiver ? get_time() : -1.0;
+    double start_time = get_time();
     while (keep_running) {
         size_t data_ptr;
         int ret = completion_queue_.try_dequeue(data_ptr);
@@ -174,7 +173,7 @@ void* Sender::master_thread(int tid)
                 packet_count_per_frame[tx_frame_id] = 0;
 
                 delay_for_frame(tx_frame_count, tick_start);
-                if (kDebugSenderReceiver) {
+                if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
                     printf("Finished transmit all antennas in frame: %zu, "
                            "next scheduled: %zu, in %.5f us\n",
                         tx_frame_count, frame_id, get_time() - start_time);
