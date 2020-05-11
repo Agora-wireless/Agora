@@ -19,8 +19,8 @@
 #include "buffer.hpp"
 #include "comms-lib.h"
 #include "memory_manage.h"
-#include "utils.h"
 #include "modulation.hpp"
+#include "utils.h"
 #include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
@@ -31,7 +31,6 @@ typedef unsigned short ushort;
 
 class Config {
 public:
-    size_t transpose_block_size;
     size_t sampsPerSymbol;
     size_t dl_prefix;
     size_t prefix;
@@ -239,6 +238,8 @@ public:
         Table<complex_float>& precoder_buffers, size_t frame_id,
         size_t sc_id) const
     {
+        if (freq_orthogonal_pilot)
+            sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }

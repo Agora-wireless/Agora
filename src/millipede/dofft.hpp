@@ -71,7 +71,7 @@ public:
      *
      * The fully-transposed matrix after FFT is a subcarriers x antennas matrix
      * that should look like so (using the notation subcarrier/antenna, and
-     * assuming transpose_block_size = 16)
+     * assuming kTransposeBlockSize = 16)
      *
      * 0/0, 0/1, ........................................................., 0/63
      * 1/0, 0/1, ........................................................ , 1/63

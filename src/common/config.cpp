@@ -39,10 +39,7 @@ Config::Config(std::string jsonfile)
         nRadios = tddConf.value("radio_num", BS_ANT_NUM);
 
 #ifdef USE_ARGOS
-    if (nRadios == 0) {
-        printf("Error: no radio exists in Argos mode!\n");
-        exit(0);
-    }
+    rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
 #endif
 
     /* radio configurations */
@@ -79,6 +76,10 @@ Config::Config(std::string jsonfile)
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
+    rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
+        "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
+    rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
+        "Transpose block size must divide number of OFDM data subcarriers");
     OFDM_DATA_START
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     OFDM_DATA_STOP = OFDM_DATA_START + OFDM_DATA_NUM;
@@ -157,20 +158,18 @@ Config::Config(std::string jsonfile)
 
     if (isUE and !freq_orthogonal_pilot
         and UE_ANT_NUM != pilot_symbol_num_perframe) {
-        std::cerr << "Number of Pilot Symbols don't match number of Clients!"
-                  << std::endl;
-        exit(0);
+        rt_assert(false, "Number of pilot symbols doesn't match number of UEs");
     }
     if (!isUE and !freq_orthogonal_pilot
         and tddConf.find("ue_num") == tddConf.end()) {
         UE_NUM = pilot_symbol_num_perframe;
         UE_ANT_NUM = UE_NUM;
     }
+    rt_assert(UE_NUM % 4 == 0, "Number of UEs must be multiple of 4");
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
     core_offset = tddConf.value("core_offset", 18);
-    transpose_block_size = tddConf.value("transpose_block_size", 16);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     fft_thread_num = tddConf.value("fft_thread_num", 4);
@@ -178,6 +177,11 @@ Config::Config(std::string jsonfile)
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
 
     demul_block_size = tddConf.value("demul_block_size", 48);
+    rt_assert(demul_block_size % kSCsPerCacheline == 0,
+        "Demodulation block size must be a multiple of subcarriers per "
+        "cacheline");
+    rt_assert(demul_block_size % kTransposeBlockSize == 0,
+        "Demodulation block size must be a multiple of transpose block size");
     demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
 
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
