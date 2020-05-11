@@ -155,5 +155,4 @@ public:
         return static_cast<uint32_t>(seed >> 32);
     }
 };
-
 #endif
