@@ -7,6 +7,8 @@
 using namespace std;
 
 Millipede::Millipede(Config* cfg)
+    : freq_ghz(measure_rdtsc_freq())
+    , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -23,7 +25,6 @@ Millipede::Millipede(Config* cfg)
         cout << endl;
     }
 
-    freq_ghz = measure_rdtsc_freq();
     printf("Measured RDTSC frequency = %.2f\n", freq_ghz);
 
     pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
@@ -549,16 +550,9 @@ void Millipede::handle_event_fft(size_t tag)
     }
 }
 
-static void pin_worker(ThreadType thread_type, int tid, Config* config_)
-{
-    int socket_rx_thread_num = config_->socket_thread_num;
-    pin_to_core_with_offset(
-        thread_type, config_->core_offset + socket_rx_thread_num + 1, tid);
-}
-
 void* Millipede::worker(int tid)
 {
-    pin_worker(ThreadType::kWorker, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     /* Initialize operators */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
@@ -617,7 +611,7 @@ void* Millipede::worker(int tid)
 
 void* Millipede::worker_fft(int tid)
 {
-    pin_worker(ThreadType::kWorkerFFT, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     /* Initialize IFFT operator */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
@@ -638,7 +632,7 @@ void* Millipede::worker_fft(int tid)
 
 void* Millipede::worker_zf(int tid)
 {
-    pin_worker(ThreadType::kWorkerZF, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
@@ -652,7 +646,7 @@ void* Millipede::worker_zf(int tid)
 
 void* Millipede::worker_demul(int tid)
 {
-    pin_worker(ThreadType::kWorkerDemul, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
