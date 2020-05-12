@@ -215,7 +215,7 @@ void Millipede::start()
                 size_t frame_id = event.tags[0];
                 stats->master_set_tsc(TsType::kRCDone, frame_id);
                 print_per_frame_done(PRINT_RC, frame_id);
-                fft_stats_.symbol_cal_count[frame_id % TASK_BUFFER_FRAME_NUM]
+                fft_stats_.symbol_rc_count[frame_id % TASK_BUFFER_FRAME_NUM]
                     = 0;
                 rc_stats_.last_frame = frame_id;
             } break;
@@ -534,8 +534,8 @@ void Millipede::handle_event_fft(size_t tag)
         } else if (sym_type == SymbolType::kCalDL
             or sym_type == SymbolType::kCalUL) {
             print_per_symbol_done(PRINT_FFT_CAL, frame_id, symbol_id);
-            if (++fft_stats_.symbol_cal_count[frame_id % TASK_BUFFER_FRAME_NUM]
-                == fft_stats_.max_symbol_cal_count) {
+            if (++fft_stats_.symbol_rc_count[frame_id % TASK_BUFFER_FRAME_NUM]
+                == fft_stats_.max_symbol_rc_count) {
                 print_per_frame_done(PRINT_FFT_CAL, frame_id);
                 // TODO: rc_stats_.max_task_count appears uninitalized
                 schedule_task_set(EventType::kRC, rc_stats_.max_task_count,
@@ -879,7 +879,7 @@ void Millipede::print_per_symbol_done(
     case (PRINT_RC):
         printf("Main thread: cal symbol FFT done frame: %zu, symbol: %zu, "
                "num symbols done: %zu\n",
-            frame_id, symbol_id, fft_stats_.symbol_cal_count[frame_id]);
+            frame_id, symbol_id, fft_stats_.symbol_rc_count[frame_id]);
         break;
     case (PRINT_DEMUL):
         printf("Main thread: Demodulation done frame %zu, symbol: %zu, num "
@@ -1044,8 +1044,8 @@ void Millipede::initialize_uplink_buffers()
     fft_stats_.init(cfg->BS_ANT_NUM, cfg->pilot_symbol_num_perframe,
         cfg->symbol_num_perframe);
     fft_stats_.max_symbol_data_count = cfg->ul_data_symbol_num_perframe;
-    fft_stats_.symbol_cal_count.fill(0);
-    fft_stats_.max_symbol_cal_count = cfg->BS_ANT_NUM;
+    fft_stats_.symbol_rc_count.fill(0);
+    fft_stats_.max_symbol_rc_count = cfg->BS_ANT_NUM;
     fft_stats_.cur_frame_for_symbol
         = std::vector<size_t>(cfg->ul_data_symbol_num_perframe, SIZE_MAX);
 

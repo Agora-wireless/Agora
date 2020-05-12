@@ -271,8 +271,8 @@ private:
 class FFT_stats : public Data_stats {
 public:
     size_t max_symbol_data_count;
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_cal_count;
-    size_t max_symbol_cal_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_rc_count;
+    size_t max_symbol_rc_count;
 
     // cur_frame_for_symbol[i] is the current frame for the symbol whose
     // index in the frame's uplink symbols is i
