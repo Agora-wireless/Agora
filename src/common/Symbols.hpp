@@ -87,7 +87,18 @@ static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 
 #define BIGSTATION 0
 #define USE_IPV4 1
-#define CONNECT_UDP 1
+#if USE_IPV4
+static constexpr bool kUseIPv4 = true;
+#else
+static constexpr bool kUseIPv4 = false;
+#endif
+
+#ifdef USE_DPDK
+static constexpr bool kUseDPDK = true;
+#else
+static constexpr bool kUseDPDK = false;
+#endif
+static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 
 #define COMBINE_EQUAL_DECODE 1
