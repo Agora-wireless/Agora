@@ -699,6 +699,14 @@ void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
             print_per_frame_done(PRINT_RX_PILOTS, frame_id);
         }
     }
+    else if (config_->isCalDlPilot(frame_id, symbol_id)
+       		    or config_->isCalUlPilot(frame_id, symbol_id)) {
+        if (++rx_stats_.task_rc_count[frame_slot]
+            == rx_stats_.max_task_rc_count) {
+            rx_stats_.task_rc_count[frame_slot] = 0;
+            stats->master_set_tsc(TsType::kRCAllRX, frame_id);
+        }
+    }
     if (rx_stats_.task_count[frame_slot]++ == 0) {
         stats->master_set_tsc(TsType::kPilotRX, frame_id);
         if (kDebugPrintPerFrameStart) {
@@ -759,7 +767,14 @@ void Millipede::print_per_frame_done(size_t task_type, size_t frame_id)
     case (PRINT_FFT_CAL):
         printf("Main thread: cal frame: %zu, finished FFT for all cal "
                "symbols in %.2f us\n",
-            frame_id, stats->master_get_us_since(TsType::kPilotRX, frame_id));
+            frame_id, stats->master_get_us_since(TsType::kRCAllRX, frame_id));
+        break;
+    case (PRINT_RC):
+        printf("Main thread: Reciprocity Calculation done frame: %zu in "
+               "%.2f us since reciprocity pilots all received\n",
+            frame_id,
+            stats->master_get_delta_us(
+                TsType::kRCDone, TsType::kRCAllRX, frame_id));
         break;
     case (PRINT_ZF):
         printf("Main thread: ZF done frame: %zu, in %.2f us since pilot FFT "
@@ -806,15 +821,6 @@ void Millipede::print_per_frame_done(size_t task_type, size_t frame_id)
                 TsType::kPrecodeDone, TsType::kZFDone, frame_id),
             stats->master_get_delta_us(
                 TsType::kPrecodeDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PRINT_RC):
-        printf("Main thread: Reciprocity Calculation done frame: %zu in "
-               "%.2f us since pilot FFT done, total: %.2f us\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kRCDone, TsType::kFFTDone, frame_id),
-            stats->master_get_delta_us(
-                TsType::kRCDone, TsType::kPilotRX, frame_id));
         break;
     case (PRINT_IFFT):
         printf("Main thread: IFFT done frame: %zu in %.2f us since precode "
@@ -1028,15 +1034,18 @@ void Millipede::initialize_uplink_buffers()
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
     rx_stats_.max_task_pilot_count
         = cfg->BS_ANT_NUM * cfg->pilot_symbol_num_perframe;
+    rx_stats_.max_task_rc_count
+        = cfg->BS_ANT_NUM;
     rx_stats_.task_count.fill(0);
     rx_stats_.task_pilot_count.fill(0);
+    rx_stats_.task_rc_count.fill(0);
 
     fft_created_count = 0;
     fft_stats_.init(cfg->BS_ANT_NUM, cfg->pilot_symbol_num_perframe,
         cfg->symbol_num_perframe);
     fft_stats_.max_symbol_data_count = cfg->ul_data_symbol_num_perframe;
     fft_stats_.symbol_cal_count.fill(0);
-    fft_stats_.max_symbol_cal_count = 2;
+    fft_stats_.max_symbol_cal_count = cfg->BS_ANT_NUM;
     fft_stats_.cur_frame_for_symbol
         = std::vector<size_t>(cfg->ul_data_symbol_num_perframe, SIZE_MAX);
 
