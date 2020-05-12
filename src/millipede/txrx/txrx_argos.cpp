@@ -178,64 +178,58 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
 int PacketTXRX::dequeue_send(int tid)
 {
-    Event_data task_event;
-    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], task_event))
+    auto& c = config_;
+    Event_data event;
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    if (task_event.event_type != EventType::kPacketTX) {
-        printf("Wrong event type!");
-        exit(0);
-    }
+    assert(event.event_type == EventType::kPacketTX);
 
-    int BS_ANT_NUM = config_->BS_ANT_NUM;
-    int data_symbol_num_perframe = config_->data_symbol_num_perframe;
+    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+    size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-    int offset = task_event.tags[0];
-    int ant_id = offset % BS_ANT_NUM;
-    int symbol_id = offset / BS_ANT_NUM % data_symbol_num_perframe;
-    int frame_id = offset / (BS_ANT_NUM * data_symbol_num_perframe);
+    size_t offset
+        = (c->get_total_data_symbol_idx(frame_id, symbol_id) * c->BS_ANT_NUM)
+        + ant_id;
 
-    symbol_id += config_->UE_ANT_NUM;
+    symbol_id += c->UE_ANT_NUM;
     frame_id += TX_FRAME_DELTA;
 
     void* txbuf[2];
-    int nChannels = config_->nChannels;
+    int nChannels = c->nChannels;
     int ch = ant_id % nChannels;
 #if DEBUG_DOWNLINK
-    std::vector<std::complex<int16_t>> zeros(config_->sampsPerSymbol);
-    if (ant_id != (int)config_->ref_ant)
+    std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
+    if (ant_id != c->ref_ant)
         txbuf[ch] = zeros.data();
-    else if (config_->getDownlinkPilotId(frame_id, symbol_id) >= 0)
-        txbuf[ch] = config_->pilot_ci16.data();
+    else if (c->getDownlinkPilotId(frame_id, symbol_id) >= 0)
+        txbuf[ch] = c->pilot_ci16.data();
     else
-        txbuf[ch]
-            = (void*)config_->dl_iq_t[config_->get_dl_symbol_idx(frame_id, symbol_id)
-                - DL_PILOT_SYMS];
+        txbuf[ch] = (void*)c->dl_iq_t[c->get_dl_symbol_idx(frame_id, symbol_id)
+            - c->DL_PILOT_SYMS];
 #else
-    int data_offset = (offset % tx_buffer_frame_num_) * config_->packet_length;
+    int data_offset = (offset % tx_buffer_frame_num_) * c->packet_length;
     char* cur_buffer_ptr = tx_buffer_ + data_offset;
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
     txbuf[ch] = (void*)pkt->data;
 #endif
-    int last = config_->DLSymbols[0].back();
+    size_t last = c->DLSymbols[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
     if (kDebugBSSender) {
-        printf("In TX thread %d: Transmitted frame %d, symbol %d, "
-               "ant %d, offset: %d, msg_queue_length: %zu\n",
+        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+               "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
     }
 
-    Event_data tx_message(EventType::kPacketTX, offset);
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    if (!message_queue_->enqueue(*local_ptok, tx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
-    }
-    return offset;
+    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                  Event_data(EventType::kPacketTX, event.tags[0])),
+        "Socket message enqueue failed\n");
+    return event.tags[0];
 }
