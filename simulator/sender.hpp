@@ -105,10 +105,6 @@ private:
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
-    size_t ant_id_;
-    size_t frame_id_;
-    size_t symbol_id_;
-
     // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
     Table<float> IQ_data;
