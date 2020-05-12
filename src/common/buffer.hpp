@@ -74,6 +74,29 @@ union gen_tag_t {
     {
     }
 
+    // Return a string representation of this tag
+    std::string to_string()
+    {
+        std::ostringstream ret;
+        ret << "[Frame ID " << std::to_string(frame_id) << ", symbol ID "
+            << std::to_string(symbol_id);
+        switch (tag_type) {
+        case kUEs:
+            ret << ", UE ID " << std::to_string(ue_id) << "]";
+            break;
+        case kAntennas:
+            ret << ", antenna ID " << std::to_string(ant_id) << "]";
+            break;
+        case kSubcarriers:
+            ret << ", subcarrier ID " << std::to_string(ue_id) << "]";
+            break;
+        case kNone:
+            ret << "] ";
+            break;
+        }
+        return ret.str();
+    }
+
     // Generate a tag with frame ID, symbol ID, and subcarrier ID bits set and
     // other fields blank
     static gen_tag_t frm_sym_sc(size_t frame_id, size_t symbol_id, size_t sc_id)
