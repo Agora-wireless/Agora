@@ -42,11 +42,12 @@ enum class TsType : size_t {
     kPilotRX, // First pilot packet received
     kProcessingStarted, // Signal processing started on a pilot symbol
     kPilotAllRX, // All pilot packets received
+    kRCAllRX, // All Reciprocity Calibration Symbols received
     kFFTDone, // Completed FFT for this frame
     kZFDone, // Completed zeroforcing for this frame
     kDemulDone, // Completed demodulation for this frame
     kRXDone, // All packets of a frame received
-    kRCDone,
+    kRCDone, // Recirocity Calibration Computation done
     kEncodeDone,
     kDecodeDone,
     kPrecodeDone,

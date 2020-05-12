@@ -184,8 +184,10 @@ class RX_stats {
 public:
     std::array<size_t, TASK_BUFFER_FRAME_NUM> task_count;
     std::array<size_t, TASK_BUFFER_FRAME_NUM> task_pilot_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> task_rc_count;
     size_t max_task_count; // Max packets per frame
     size_t max_task_pilot_count; // Max pilot packets per frame
+    size_t max_task_rc_count; // Max reciprocity packets per frame
 };
 
 class Frame_stats {
