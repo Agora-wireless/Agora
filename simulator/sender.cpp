@@ -160,13 +160,12 @@ void* Sender::master_thread(int tid)
                     ctag.frame_id, ctag.symbol_id, get_time() - start_time);
             }
 
-            const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
-
             packet_count_per_frame[comp_frame_slot]++;
             delay_for_symbol(ctag.frame_id, tick_start);
             tick_start = rdtsc();
 
+            const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
@@ -183,8 +182,8 @@ void* Sender::master_thread(int tid)
                 packet_count_per_frame[comp_frame_slot] = 0;
 
                 delay_for_frame(ctag.frame_id, tick_start);
-                frame_start[next_frame_id] = get_time();
                 tick_start = rdtsc();
+                frame_start[next_frame_id] = get_time();
             } else {
                 next_frame_id = ctag.frame_id;
             }
