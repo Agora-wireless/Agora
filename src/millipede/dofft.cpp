@@ -244,7 +244,7 @@ void DoFFT::partial_transpose(
                     cfg->pilots_sgn_[sc_idx + 1].im,
                     cfg->pilots_sgn_[sc_idx + 1].re,
                     cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
-                // TODO: this is not correct for complex pilots.
+                // FIXME: this is not correct for complex pilots.
                 // Implement complex multiply for __m512 type
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
