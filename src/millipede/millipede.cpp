@@ -189,7 +189,10 @@ void Millipede::start()
 
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
-                assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM);
+                rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
+                    "Error: Received packet for future frame beyond frame "
+                    "window. This can happen if Millipede is running "
+                    "slowly, e.g., in debug mode");
 
                 update_rx_counters(pkt->frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
