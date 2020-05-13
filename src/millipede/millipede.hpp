@@ -211,7 +211,7 @@ private:
 
     Table<complex_float> ue_spec_pilot_buffer_;
 
-    RX_stats rx_stats_;
+    RxCounters rx_counters_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
