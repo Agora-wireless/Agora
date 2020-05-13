@@ -90,39 +90,27 @@ Sender::~Sender()
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         free(packet_count_per_symbol[i]);
     }
-    pthread_mutex_destroy(&lock_);
 }
 
 void Sender::startTX()
 {
-    printf("Starting sender\n");
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
 
     // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-
-    sleep(1); // Give some time for worker threads to lock
-    printf("Master: Now releasing the condition\n");
-    pthread_cond_broadcast(&cond);
-
     master_thread(0); // Start the master thread
 }
 
 void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
 {
-    printf("start sender from simulator\n");
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
     // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-
-    sleep(1); // Give some time for worker threads to lock
-    printf("Master: Now releasing the condition\n");
-    pthread_cond_broadcast(&cond);
 
     // Create the master thread
     create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
@@ -235,15 +223,7 @@ void Sender::update_tx_buffer(gen_tag_t tag)
 void* Sender::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
-
     const size_t buffer_length = kTXBufOffset + cfg->packet_length;
-    /* Use mutex to sychronize data receiving across threads */
-    pthread_mutex_lock(&mutex);
-    printf("Thread %zu: waiting for release\n", (size_t)tid);
-
-    pthread_cond_wait(&cond, &mutex);
-    /* unlock all other threads */
-    pthread_mutex_unlock(&mutex);
 
     double begin = get_time();
     size_t total_tx_packets = 0;

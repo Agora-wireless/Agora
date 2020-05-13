@@ -84,9 +84,6 @@ private:
     const uint64_t ticks_200;
     const uint64_t ticks_500;
 
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-
     sockaddr_in servaddr_ipv4[kMaxNumSockets]; // Server address for IPv4
     sockaddr_in cliaddr_ipv4; // Client address for IPv4
     sockaddr_in6 servaddr_ipv6[kMaxNumSockets]; // Server address for IPv6
@@ -97,7 +94,6 @@ private:
     //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
     Table<char> tx_buffers_;
-    pthread_mutex_t lock_;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
