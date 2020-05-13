@@ -488,24 +488,6 @@ int Config::getSymbolId(size_t symbol_id)
             : ULSymbols[0][symbol_id - pilot_symbol_num_perframe]);
 }
 
-int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
-{
-    std::vector<size_t>::iterator it;
-    size_t fid = frame_id % frames.size();
-    it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
-    if (it != DLSymbols[fid].end()) {
-        int id = it - DLSymbols[fid].begin();
-        if (id < (int)DL_PILOT_SYMS) {
-#ifdef DEBUG3
-            printf("getDownlinkPilotId(%zu, %zu) = %zu\n", frame_id, symbol_id,
-                id);
-#endif
-            return id;
-        }
-    }
-    return -1;
-}
-
 size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
     size_t fid = frame_id % frames.size();

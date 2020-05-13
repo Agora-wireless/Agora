@@ -575,10 +575,11 @@ void Phy_UE::doFFT(int tid, int offset)
     Event_data crop_finish_event;
 
     // If it is pilot part, do CE
-    if (config_->isPilot(frame_id, symbol_id)) {
+    size_t dl_symbol_idx = config_->get_dl_symbol_idx(frame_id, symbol_id);
+    if (dl_symbol_idx < config_->DL_PILOT_SYMS) {
 
         int csi_fftshift_offset = 0;
-        size_t pilot_id = config_->getDownlinkPilotId(frame_id, symbol_id);
+
         cx_float avg_csi(0, 0);
         for (int j = 0; j < non_null_sc_len; j++) {
             // if (j < FFT_LEN / 2)
@@ -587,18 +588,15 @@ void Phy_UE::doFFT(int tid, int offset)
             //    csi_fftshift_offset = -FFT_LEN/2;
             // divide fft output by pilot data to get CSI estimation
             int sc_id = non_null_sc_ind_[j];
-            if (pilot_id == 0) {
+            if (dl_symbol_idx == 0) {
                 csi_buffer_ptr[j] = 0;
             }
             // printf("%.4f+j%.4f  ",cur_fft_buffer_float_output[2*j],
             // cur_fft_buffer_float_output[2*j+1]);
-            // TODO: here it is assumed pilots_ is real-valued (in LTS case it
-            // is), whereas it could be complex
             complex_float p = config_->ue_specific_pilot[ant_id][j];
             csi_buffer_ptr[j]
                 += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * cx_float(p.re, p.im));
-            if (dl_pilot_symbol_perframe > 0
-                && pilot_id == dl_pilot_symbol_perframe - 1) {
+            if (dl_symbol_idx == dl_pilot_symbol_perframe - 1) {
                 csi_buffer_ptr[j] /= dl_pilot_symbol_perframe;
                 avg_csi += csi_buffer_ptr[j];
             }
@@ -608,7 +606,7 @@ void Phy_UE::doFFT(int tid, int offset)
             std::cos(-std::arg(avg_csi)), std::sin(-std::arg(avg_csi)));
 
         crop_finish_event = Event_data(EventType::kFFT, csi_offset);
-    } else if (config_->isDownlink(frame_id, symbol_id)) {
+    } else {
         int eq_buffer_offset
             = generateOffset3d(TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
                 numAntennas, frame_id, dl_symbol_id - dl_pilot_symbol_perframe,
