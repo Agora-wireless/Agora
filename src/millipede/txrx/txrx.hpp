@@ -56,18 +56,17 @@
 #include <rte_udp.h>
 #endif
 
-#define RX_RING_SIZE 8192 * 4
-#define TX_RING_SIZE 8192 * 4
+#define RX_RING_SIZE 2048
+#define TX_RING_SIZE 2048
 
 #define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2)
 #define MBUF_CACHE_SIZE 128
 #define BURST_SIZE 16
 
 #define ETH_HDRLEN 14
 #define IP4_HDRLEN 20
 #define UDP_HDRLEN 8
-#define MAX_JUMBO_FRAME_SIZE 9600 // 9600
+#define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB
 #define EMPTY_MASK 0x0
 #define FULL_MASK 0xffffffff
 
@@ -97,7 +96,7 @@ public:
 #ifdef USE_DPDK
     int nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool);
     int process_arp(
-        struct rte_mbuf* mbuf, struct ether_hdr* eth_h, int len, int tid);
+        struct rte_mbuf* mbuf, struct rte_ether_hdr* eth_h, int len, int tid);
 #endif
 
     /**
@@ -126,7 +125,7 @@ public:
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 #ifdef USE_DPDK
-    static void* loopRecv_DPDK(void* context);
+    void* loopRecv_DPDK(int tid);
 #endif
 
 private:
@@ -141,7 +140,7 @@ private:
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef USE_DPDK
-    struct ether_addr server_eth_addr;
+    struct rte_ether_addr server_eth_addr;
     uint32_t src_addr;
     uint32_t dst_addr;
     int src_port_start = 6000;

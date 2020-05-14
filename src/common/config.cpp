@@ -165,7 +165,7 @@ Config::Config(std::string jsonfile)
         UE_NUM = pilot_symbol_num_perframe;
         UE_ANT_NUM = UE_NUM;
     }
-    rt_assert(UE_NUM % 4 == 0, "Number of UEs must be multiple of 4");
+    rt_assert(BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
