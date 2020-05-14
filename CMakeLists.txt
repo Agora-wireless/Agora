@@ -201,8 +201,6 @@ add_executable(millipede ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${dpdk_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
-add_executable(basicfwd skeleton/basicfwd.c)
-target_link_libraries(basicfwd ${dpdk_LIBRARIES} $ENV{RTE_SDK}/$ENV{RTE_TARGET}/include/rte_config.h )
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES} ${LDPC_SOURCES} ${HEADER_FILES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
