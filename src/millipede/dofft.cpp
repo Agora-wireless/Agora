@@ -201,14 +201,14 @@ Event_data DoFFT::launch(size_t tag)
 void DoFFT::partial_transpose(
     complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const
 {
-    assert(cfg->OFDM_DATA_NUM % kTransposeBlockSize == 0);
+    // We have OFDM_DATA_NUM % kTransposeBlockSize == 0
     const size_t num_blocks = cfg->OFDM_DATA_NUM / kTransposeBlockSize;
 
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset
             = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
-        assert(kTransposeBlockSize % kSCsPerCacheline == 0);
 
+        // We have kTransposeBlockSize % kSCsPerCacheline == 0
         for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
              sc_j += kSCsPerCacheline) {
             const size_t sc_idx = (block_idx * kTransposeBlockSize) + sc_j;
@@ -244,7 +244,7 @@ void DoFFT::partial_transpose(
                     cfg->pilots_sgn_[sc_idx + 1].im,
                     cfg->pilots_sgn_[sc_idx + 1].re,
                     cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
-                // TODO: this is not correct for complex pilots.
+                // FIXME: this is not correct for complex pilots.
                 // Implement complex multiply for __m512 type
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
