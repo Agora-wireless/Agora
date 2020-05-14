@@ -10,8 +10,10 @@ message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
+  set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
@@ -58,6 +60,8 @@ set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
 # DPDK
 if(${USE_DPDK})
+  message(STATUS "RTE_SDK: $ENV{RTE_SDK}")
+  message(STATUS "RTE_TARGET: $ENV{RTE_TARGET}")
   find_package(dpdk)
   if(NOT dpdk_FOUND)
     message(STATUS "DPDK Not Found! Excluding from Compile List")
@@ -66,11 +70,9 @@ if(${USE_DPDK})
     add_definitions(-DUSE_DPDK)
   endif()
   set(TXRX_SOURCES src/millipede/txrx/txrx_DPDK.cpp)
-  set(RTE_SDK /home/argos/Jian/dpdk-stable-18.11.1/)
-  set(RTE_TARGET x86_64-native-linuxapp-gcc)
-  set(DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
-  include_directories(${RTE_SDK}/${RTE_TARGET}/include)
-  link_directories(${RTE_SDK}/${RTE_TARGET}/lib)
+  #set(DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
+  include_directories(${dpdk_INCLUDE_DIRS})
+  link_directories($ENV{RTE_SDK}/$ENV{RTE_TARGET}/lib)
 endif()
 
 # Argos support
@@ -197,7 +199,10 @@ set(SOURCES
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+  ${MKL_LIBS} ${dpdk_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+
+add_executable(basicfwd skeleton/basicfwd.c)
+target_link_libraries(basicfwd ${dpdk_LIBRARIES} $ENV{RTE_SDK}/$ENV{RTE_TARGET}/include/rte_config.h )
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES} ${LDPC_SOURCES} ${HEADER_FILES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
