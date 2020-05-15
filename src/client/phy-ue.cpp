@@ -493,18 +493,18 @@ void Phy_UE::doFFT(int tid, int offset)
     // read info of one frame
     struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id]
         + offset_in_current_buffer * packet_length);
-    int frame_id = pkt->frame_id;
-    int symbol_id = pkt->symbol_id;
+    size_t frame_id = pkt->frame_id;
+    size_t symbol_id = pkt->symbol_id;
     // int cell_id = pkt->cell_id;
-    int ant_id = pkt->ant_id;
-    int buffer_frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
+    size_t ant_id = pkt->ant_id;
+    size_t buffer_frame_id = frame_id % TASK_BUFFER_FRAME_NUM;
 
     if (!config_->isPilot(frame_id, symbol_id)
         && !(config_->isDownlink(frame_id, symbol_id)))
         return;
 
     // remove CP, do FFT
-    int dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
     int FFT_buffer_target_id = generateOffset3d(TASK_BUFFER_FRAME_NUM,
         rx_symbol_perframe, numAntennas, frame_id, dl_symbol_id, ant_id);
 
@@ -527,10 +527,11 @@ void Phy_UE::doFFT(int tid, int offset)
         for (size_t i = sym_offset; i < 2 * sym_offset; i++)
             signal_power += std::pow(std::abs(vec[i]), 2);
         double SNR = 10 * std::log10(signal_power / noise_power);
-        printf("frame %d symbol %d ant %d: corr offset %zu, SNR %2.1f \n",
+        printf("frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
             frame_id, symbol_id, ant_id, sym_offset, SNR);
-        if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250)
+        if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250) {
             record_frame = frame_id;
+        }
         if (frame_id == record_frame) {
             std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
             FILE* f = fopen(fname.c_str(), "wb");
@@ -562,7 +563,7 @@ void Phy_UE::doFFT(int tid, int offset)
         mkl_handle, fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
 
     if (kDebugPrintInTask) {
-        printf("In doCrop thread %d: frame: %d, symbol: %d, ant: %d\n", tid,
+        printf("In doCrop thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
             frame_id % TASK_BUFFER_FRAME_NUM, symbol_id, ant_id);
     }
     int csi_offset = generateOffset2d(TASK_BUFFER_FRAME_NUM, numAntennas,
@@ -575,28 +576,18 @@ void Phy_UE::doFFT(int tid, int offset)
     Event_data crop_finish_event;
 
     // If it is pilot part, do CE
-    size_t dl_symbol_idx = config_->get_dl_symbol_idx(frame_id, symbol_id);
-    if (dl_symbol_idx < config_->DL_PILOT_SYMS) {
-
-        int csi_fftshift_offset = 0;
+    if (dl_symbol_id < config_->DL_PILOT_SYMS) {
 
         cx_float avg_csi(0, 0);
         for (int j = 0; j < non_null_sc_len; j++) {
-            // if (j < FFT_LEN / 2)
-            //    csi_fftshift_offset = FFT_LEN/2;
-            // else
-            //    csi_fftshift_offset = -FFT_LEN/2;
             // divide fft output by pilot data to get CSI estimation
             int sc_id = non_null_sc_ind_[j];
-            if (dl_symbol_idx == 0) {
+            if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
             }
-            // printf("%.4f+j%.4f  ",cur_fft_buffer_float_output[2*j],
-            // cur_fft_buffer_float_output[2*j+1]);
-            complex_float p = config_->ue_specific_pilot[ant_id][j];
-            csi_buffer_ptr[j]
-                += (fft_buffer_ptr[sc_id + csi_fftshift_offset] * cx_float(p.re, p.im));
-            if (dl_symbol_idx == dl_pilot_symbol_perframe - 1) {
+            cx_float* p = (cx_float*)&config_->pilots_sgn_[j];
+            csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] * conj(*p));
+            if (dl_symbol_id == dl_pilot_symbol_perframe - 1) {
                 csi_buffer_ptr[j] /= dl_pilot_symbol_perframe;
                 avg_csi += csi_buffer_ptr[j];
             }
@@ -607,15 +598,12 @@ void Phy_UE::doFFT(int tid, int offset)
 
         crop_finish_event = Event_data(EventType::kFFT, csi_offset);
     } else {
-        int eq_buffer_offset
-            = generateOffset3d(TASK_BUFFER_FRAME_NUM, dl_data_symbol_perframe,
-                numAntennas, frame_id, dl_symbol_id - dl_pilot_symbol_perframe,
-                ant_id); //(frame_id % TASK_BUFFER_FRAME_NUM) *
-        // dl_data_symbol_perframe + dl_data_symbol_id;
+        int eq_buffer_offset = generateOffset3d(TASK_BUFFER_FRAME_NUM,
+            dl_data_symbol_perframe, numAntennas, frame_id,
+            dl_symbol_id - dl_pilot_symbol_perframe, ant_id);
 
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
-        // int csi_fftshift_offset = 0;
         cx_float csi(1, 0);
         cx_float phc(1, 0);
         if (config_->correct_phase_shift)
