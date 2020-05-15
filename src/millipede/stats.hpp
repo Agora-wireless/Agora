@@ -16,24 +16,20 @@
 
 static constexpr size_t kMaxStatBreakdown = 4;
 
-/* Accumulated task duration for all frames in each worker thread */
+// Accumulated task duration for all tracked frames in each worker thread
 struct DurationStat {
     size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
     size_t task_count;
     DurationStat() { memset(this, 0, sizeof(DurationStat)); }
 };
 
-// Duration unit = microseconds
-struct Stats_worker_per_frame {
-    double duration_this_thread[kMaxStatBreakdown];
-    double duration_this_thread_per_task[kMaxStatBreakdown];
+// Temporary summary statistics assembled from per-thread runtime stats
+struct FrameSummary {
+    double us_this_thread[kMaxStatBreakdown];
     size_t count_this_thread = 0;
-    double duration_avg_threads[kMaxStatBreakdown];
+    double us_avg_threads[kMaxStatBreakdown];
     size_t count_all_threads = 0;
-    Stats_worker_per_frame()
-    {
-        memset(this, 0, sizeof(Stats_worker_per_frame));
-    }
+    FrameSummary() { memset(this, 0, sizeof(FrameSummary)); }
 };
 
 // Type of timestamps recorded at the master for a frame
@@ -158,62 +154,53 @@ public:
     Table<size_t> frame_start;
 
 private:
-    void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
-        size_t thread_id, DoerType doer_type);
+    // Fill in running time summary stats for the current frame for this
+    // thread and Doer type
+    void populate_summary(
+        FrameSummary* frame_summary, size_t thread_id, DoerType doer_type);
 
     static void compute_avg_over_threads(
-        Stats_worker_per_frame* stats_per_frame, size_t thread_num,
-        size_t break_down_num);
-    static void print_per_thread_per_task(
-        Stats_worker_per_frame stats_per_frame);
+        FrameSummary* frame_summary, size_t thread_num, size_t break_down_num);
+    static void print_per_thread_per_task(FrameSummary frame_summary);
     static void print_per_frame(
-        const char* doer_string, Stats_worker_per_frame stats_per_frame);
+        const char* doer_string, FrameSummary frame_summary);
 
     size_t get_total_task_count(DoerType doer_type, size_t thread_num);
 
     /* stats for the worker threads */
     void update_stats_in_dofft_bigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, Stats_worker_per_frame* fft_stats_per_frame,
-        Stats_worker_per_frame* csi_stats_per_frame);
+        size_t thread_num_offset, FrameSummary* frame_summary_fft,
+        FrameSummary* frame_summary_csi);
     void update_stats_in_dozf_bigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, Stats_worker_per_frame* zf_stats_per_frame);
+        size_t thread_num_offset, FrameSummary* frame_summary_zf);
     void update_stats_in_dodemul_bigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset,
-        Stats_worker_per_frame* demul_stats_per_frame);
+        size_t thread_num_offset, FrameSummary* frame_summary_demul);
     void update_stats_in_doifft_bigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, Stats_worker_per_frame* ifft_stats_per_frame,
-        Stats_worker_per_frame* csi_stats_per_frame);
+        size_t thread_num_offset, FrameSummary* frame_summary_ifft,
+        FrameSummary* frame_summary_csi);
     void update_stats_in_doprecode_bigstation(size_t frame_id,
         size_t thread_num, size_t thread_num_offset,
-        Stats_worker_per_frame* precode_stats_per_frame);
+        FrameSummary* frame_summary_precode);
 
     void update_stats_in_functions_uplink_bigstation(size_t frame_id,
-        Stats_worker_per_frame* fft_stats_per_frame,
-        Stats_worker_per_frame* csi_stats_per_frame,
-        Stats_worker_per_frame* zf_stats_per_frame,
-        Stats_worker_per_frame* demul_stats_per_frame,
-        Stats_worker_per_frame* decode_stats_per_frame);
+        FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
+        FrameSummary* frame_summary_decode);
 
     void update_stats_in_functions_uplink_millipede(size_t frame_id,
-        Stats_worker_per_frame* fft_stats_per_frame,
-        Stats_worker_per_frame* csi_stats_per_frame,
-        Stats_worker_per_frame* zf_stats_per_frame,
-        Stats_worker_per_frame* demul_stats_per_frame,
-        Stats_worker_per_frame* decode_stats_per_frame);
+        FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
+        FrameSummary* frame_summary_decode);
 
     void update_stats_in_functions_downlink_bigstation(size_t frame_id,
-        Stats_worker_per_frame* ifft_stats_per_frame,
-        Stats_worker_per_frame* csi_stats_per_frame,
-        Stats_worker_per_frame* zf_stats_per_frame,
-        Stats_worker_per_frame* precode_stats_per_frame,
-        Stats_worker_per_frame* encode_stats_per_frame);
+        FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
+        FrameSummary* frame_summary_encode);
 
     void update_stats_in_functions_downlink_millipede(size_t frame_id,
-        Stats_worker_per_frame* ifft_stats_per_frame,
-        Stats_worker_per_frame* csi_stats_per_frame,
-        Stats_worker_per_frame* zf_stats_per_frame,
-        Stats_worker_per_frame* precode_stats_per_frame,
-        Stats_worker_per_frame* encode_stats_per_frame);
+        FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
+        FrameSummary* frame_summary_encode);
 
     Config* config_;
     const size_t task_thread_num;

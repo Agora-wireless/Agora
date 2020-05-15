@@ -42,6 +42,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
+    printf("Server address = %s\n", cfg->rx_addr.c_str());
 
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -228,16 +229,19 @@ void* Sender::worker_thread(int tid)
 
         size_t start_tsc_send = rdtsc();
         // Send a message to the server
-        int ret = 0;
         if (kUseDPDK or !kConnectUDP) {
-            ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
+            int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
                 buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
                 sizeof(servaddr_ipv4[tid]));
+            rt_assert(ret >= 0, "Worker: sendto() failed");
         } else {
-            ret = send(
+            int ret = send(
                 socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
+            if (ret < 0) {
+                fprintf(stderr, "send() failed. Error = %s\n", strerror(errno));
+                exit(-1);
+            }
         }
-        rt_assert(ret >= 0, "Worker: sendto() failed");
 
         if (kDebugSenderReceiver) {
             auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
