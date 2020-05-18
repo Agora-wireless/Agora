@@ -279,42 +279,40 @@ void Config::genData()
 #endif
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
-    auto zc_common_pilot_double
+    auto zc_seq_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
-    auto zc_common_pilot = CommsLib::seqCyclicShift(
-        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
+    auto zc_seq = Utils::double_to_cfloat(zc_seq_double);
+    auto common_pilot = CommsLib::seqCyclicShift(
+        zc_seq, M_PI / 4); // Used in LTE SRS
 
     pilots_ = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float));
     pilots_sgn_ = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float)); // used in CSI estimation
     for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
-        pilots_[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
-        auto zc_pilot_sgn = zc_common_pilot[i]
-            / (float)std::pow(std::abs(zc_common_pilot[i]), 2);
-        pilots_sgn_[i] = { zc_pilot_sgn.real(), zc_pilot_sgn.imag() };
+        pilots_[i] = { common_pilot[i].real(), common_pilot[i].imag() };
+        auto pilot_sgn = common_pilot[i]
+            / (float)std::pow(std::abs(common_pilot[i]), 2);
+        pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
 
     pilotsF.resize(OFDM_DATA_START);
     pilotsF.insert(
-        pilotsF.end(), zc_common_pilot.begin(), zc_common_pilot.end());
+        pilotsF.end(), common_pilot.begin(), common_pilot.end());
     pilotsF.resize(OFDM_CA_NUM);
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP
 
-    std::vector<std::complex<int16_t>> pre_ci16(prefix, 0);
-    std::vector<std::complex<int16_t>> post_ci16(postfix, 0);
     for (size_t i = 0; i < OFDM_CA_NUM + CP_LEN; i++)
         pilot_ci16.push_back(
             std::complex<int16_t>((int16_t)(pilot_cf32[i].real() * 32768),
                 (int16_t)(pilot_cf32[i].imag() * 32768)));
+    std::vector<std::complex<int16_t>> pre_ci16(prefix, 0);
     pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
-    pilot_ci16.insert(pilot_ci16.end(), post_ci16.begin(), post_ci16.end());
-    size_t seq_len = pilot_cf32.size();
+    pilot_ci16.resize(sampsPerSymbol);
 
-    for (size_t i = 0; i < seq_len; i++) { // used for plotting
+    for (size_t i = 0; i < sampsPerSymbol; i++) { // used for correlating
         std::complex<float> cf = pilot_cf32[i];
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
