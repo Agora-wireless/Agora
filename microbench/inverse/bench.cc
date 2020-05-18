@@ -5,7 +5,7 @@
 #include <iostream>
 #include <mkl.h>
 
-static constexpr size_t kNumIters = 1000;
+static constexpr size_t kNumIters = 10000;
 double freq_ghz = -1.0;
 
 DEFINE_uint64(n_rows, 64, "Number of matrix rows");
@@ -38,10 +38,7 @@ arma::cx_float test_arma(const arma::cx_float* _in_mat_arr, PinvMode mode)
             output = pinv(input);
         }
         ret += arma::accu(output);
-        if (iter == 0) {
-            std::cout << arma::accu(output) << std::endl;
-        }
-        out_mat_arr[0] = in_mat_arr[0];
+        in_mat_arr[0] = out_mat_arr[0];
     }
 
     timer.stop();
@@ -80,9 +77,6 @@ std::complex<float> test_eigen(
         }
 
         ret += output.sum();
-        if (iter == 0) {
-            std::cout << output.sum() << std::endl;
-        }
         in_mat_arr[0] = out_mat_arr[0];
     }
 
@@ -111,15 +105,17 @@ int main(int argc, char** argv)
     {
         arma::cx_float ret_1 = test_arma(in_base_mat_arr, PinvMode::kFormula);
         arma::cx_float ret_2 = test_arma(in_base_mat_arr, PinvMode::kSVD);
-        printf("{%.5f, %.5f}, {%.5f, %.5f}\n", ret_1.real(), ret_1.imag(),
-            ret_2.real(), ret_2.imag());
+        printf("Arma: Results = {%.5f, %.5f}, {%.5f, %.5f}\n", ret_1.real(),
+            ret_1.imag(), ret_2.real(), ret_2.imag());
     }
 
+    /*
     {
         std::complex<float> ret_1
             = test_eigen(in_base_mat_arr, PinvMode::kFormula);
         std::complex<float> ret_2 = test_eigen(in_base_mat_arr, PinvMode::kSVD);
-        printf("{%.5f, %.5f}, {%.5f, %.5f}\n", ret_1.real(), ret_1.imag(),
-            ret_2.real(), ret_2.imag());
+        printf("Eigen: Results = {%.5f, %.5f}, {%.5f, %.5f}\n", ret_1.real(),
+            ret_1.imag(), ret_2.real(), ret_2.imag());
     }
+    */
 }
