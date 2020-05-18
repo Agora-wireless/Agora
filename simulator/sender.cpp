@@ -242,7 +242,7 @@ void* Sender::worker_thread(int tid)
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
-        // Send a message to the server
+        // Send a message to the server. We assume that the server is running.
         if (kUseDPDK or !kConnectUDP) {
             int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
                 buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],

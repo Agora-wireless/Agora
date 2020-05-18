@@ -165,7 +165,8 @@ Config::Config(std::string jsonfile)
         UE_NUM = pilot_symbol_num_perframe;
         UE_ANT_NUM = UE_NUM;
     }
-    rt_assert(BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
+    rt_assert(
+        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
@@ -623,7 +624,7 @@ SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
     case 'L':
         return SymbolType::kCalUL;
     }
-    rt_assert(false, "Should not reach here");
+    rt_assert(false, std::string("Should not reach here") + std::to_string(s));
     return SymbolType::kUnknown;
 }
 
