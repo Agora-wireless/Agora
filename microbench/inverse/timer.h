@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <algorithm>
+#include <vector>
 
 /// Return the TSC
 static inline size_t rdtsc() {
@@ -14,7 +16,7 @@ static inline size_t rdtsc() {
 }
 
 /// An alias for rdtsc() to distinguish calls on the critical path
-static const auto &dpath_rdtsc = rdtsc;
+static const auto& dpath_rdtsc = rdtsc;
 
 static void nano_sleep(size_t ns, double freq_ghz) {
   size_t start = rdtsc();
@@ -78,14 +80,14 @@ static double to_nsec(size_t cycles, double freq_ghz) {
 }
 
 /// Return seconds elapsed since timestamp \p t0
-static double sec_since(const struct timespec &t0) {
+static double sec_since(const struct timespec& t0) {
   struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t1);
   return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 }
 
 /// Return nanoseconds elapsed since timestamp \p t0
-static double ns_since(const struct timespec &t0) {
+static double ns_since(const struct timespec& t0) {
   struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t1);
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
@@ -95,31 +97,38 @@ static double ns_since(const struct timespec &t0) {
 class TscTimer {
  public:
   size_t start_tsc = 0;
-  size_t tsc_sum = 0;
-  size_t num_calls = 0;
+  double freq_ghz;
+  std::vector<double> ms_duration_vec;
+
+  TscTimer(size_t n_timestamps, double freq_ghz) : freq_ghz(freq_ghz) {
+    ms_duration_vec.reserve(n_timestamps);
+  }
 
   inline void start() { start_tsc = rdtsc(); }
   inline void stop() {
-    tsc_sum += (rdtsc() - start_tsc);
-    num_calls++;
+    ms_duration_vec.push_back(to_msec(rdtsc() - start_tsc, freq_ghz));
   }
 
-  void reset() {
-    start_tsc = 0;
-    tsc_sum = 0;
-    num_calls = 0;
+  void reset() { ms_duration_vec.clear(); }
+
+  double stddev_msec() {
+    if (ms_duration_vec.empty()) return 0;
+    double sum_ms =
+        std::accumulate(ms_duration_vec.begin(), ms_duration_vec.end(), 0.0);
+    double mean_ms = sum_ms * 1.0 / ms_duration_vec.size();
+    double sq_sum =
+        std::inner_product(ms_duration_vec.begin(), ms_duration_vec.end(),
+                           ms_duration_vec.begin(), 0.0);
+    double var_ms = sq_sum / ms_duration_vec.size() - (mean_ms * mean_ms);
+    if (var_ms < 0) return 0.0;  // This can happen when variance ~ 0
+
+    return std::sqrt(var_ms);
   }
 
-  size_t avg_cycles() const { return tsc_sum / num_calls; }
-  double avg_sec(double freq_ghz) const {
-    return to_sec(avg_cycles(), freq_ghz);
-  }
-
-  double avg_usec(double freq_ghz) const {
-    return to_usec(avg_cycles(), freq_ghz);
-  }
-
-  double avg_nsec(double freq_ghz) const {
-    return to_nsec(avg_cycles(), freq_ghz);
+  double avg_msec() {
+    if (ms_duration_vec.empty()) return 0;
+    double sum_ms =
+        std::accumulate(ms_duration_vec.begin(), ms_duration_vec.end(), 0.0);
+    return sum_ms * 1.0 / ms_duration_vec.size();
   }
 };
