@@ -203,12 +203,26 @@ struct Packet {
     }
 };
 
-class RX_stats {
+class RxCounters {
 public:
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> task_count;
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> task_pilot_count;
-    size_t max_task_count; // Max packets per frame
-    size_t max_task_pilot_count; // Max pilot packets per frame
+    // num_pkt[i] is the total number of packets we've received for frame i
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pkts;
+
+    // num_pilot_pkts[i] is the total number of pilot packets we've received
+    // for frame i
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
+
+    // Number of packets we'll receive per frame on the uplink
+    size_t num_pkts_per_frame;
+
+    // Number of pilot packets we'll receive per frame
+    size_t num_pilot_pkts_per_frame;
+
+    RxCounters()
+    {
+        num_pkts.fill(0);
+        num_pilot_pkts.fill(0);
+    }
 };
 
 class Frame_stats {

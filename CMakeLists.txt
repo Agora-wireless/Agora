@@ -60,6 +60,7 @@ set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
 # DPDK
 if(${USE_DPDK})
+  message(STATUS "DPDK is enabled")
   message(STATUS "RTE_SDK: $ENV{RTE_SDK}")
   message(STATUS "RTE_TARGET: $ENV{RTE_TARGET}")
   find_package(dpdk)
@@ -73,6 +74,8 @@ if(${USE_DPDK})
   #set(DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
   include_directories(${dpdk_INCLUDE_DIRS})
   link_directories($ENV{RTE_SDK}/$ENV{RTE_TARGET}/lib)
+else()
+  message(STATUS "DPDK is disabled")
 endif()
 
 # Argos support
