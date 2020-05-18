@@ -47,8 +47,9 @@ for i in `seq 1 $num_iters`; do
     echo "======================================"
     echo "Running uplink correctness test $i......"
     echo -e "======================================\n"
+    # We sleep before starting the sender to allow the Millipede server to start
     ./millipede data/tddconfig-correctness-test-ul.json &
-    ./sender 4 10 5000 data/tddconfig-correctness-test-ul.json
+    sleep 1; ./sender 4 10 5000 data/tddconfig-correctness-test-ul.json
     wait
 
     echo "==========================================="
@@ -61,7 +62,7 @@ for i in `seq 1 $num_iters`; do
     echo "Running downlink correctness test $i......"
     echo -e "======================================\n"
     ./millipede data/tddconfig-correctness-test-dl.json &
-    ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
+    sleep 1; ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
     echo -e "-------------------------------------------------------\n\n\n"
     wait
   } >> $out_file

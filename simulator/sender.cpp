@@ -8,6 +8,9 @@
 
 bool keep_running = true;
 
+// A spinning barrier to synchronize the start of Sender threads
+std::atomic<size_t> num_threads_ready_atomic;
+
 void interrupt_handler(int)
 {
     std::cout << "Will exit..." << std::endl;
@@ -42,7 +45,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
-
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
     }
@@ -77,6 +79,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
             printf("UDP socket %zu connected\n", i);
         }
     }
+    num_threads_ready_atomic = 0;
 }
 
 Sender::~Sender()
@@ -87,39 +90,27 @@ Sender::~Sender()
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         free(packet_count_per_symbol[i]);
     }
-    pthread_mutex_destroy(&lock_);
 }
 
 void Sender::startTX()
 {
-    printf("Starting sender\n");
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
 
     // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-
-    sleep(1); // Give some time for worker threads to lock
-    printf("Master: Now releasing the condition\n");
-    pthread_cond_broadcast(&cond);
-
     master_thread(0); // Start the master thread
 }
 
 void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
 {
-    printf("start sender from simulator\n");
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
     // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-
-    sleep(1); // Give some time for worker threads to lock
-    printf("Master: Now releasing the condition\n");
-    pthread_cond_broadcast(&cond);
 
     // Create the master thread
     create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
@@ -130,8 +121,14 @@ void* Sender::master_thread(int tid)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
-    const size_t max_symbol_id = get_max_symbol_id();
 
+    // Wait for all Sender threads (including master) to start runnung
+    num_threads_ready_atomic++;
+    while (num_threads_ready_atomic != thread_num + 1) {
+        // Wait
+    }
+
+    const size_t max_symbol_id = get_max_symbol_id();
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
@@ -220,15 +217,13 @@ void* Sender::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
+    // Wait for all Sender threads (including master) to start runnung
+    num_threads_ready_atomic++;
+    while (num_threads_ready_atomic != thread_num + 1) {
+        // Wait
+    }
+
     const size_t buffer_length = kTXBufOffset + cfg->packet_length;
-    /* Use mutex to sychronize data receiving across threads */
-    pthread_mutex_lock(&mutex);
-    printf("Thread %zu: waiting for release\n", (size_t)tid);
-
-    pthread_cond_wait(&cond, &mutex);
-    /* unlock all other threads */
-    pthread_mutex_unlock(&mutex);
-
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
@@ -247,17 +242,22 @@ void* Sender::worker_thread(int tid)
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
-        // Send a message to the server
-        int ret = 0;
+        // Send a message to the server. We assume that the server is running.
         if (kUseDPDK or !kConnectUDP) {
-            ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
+            int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
                 buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
                 sizeof(servaddr_ipv4[tid]));
+            rt_assert(ret >= 0, "Worker: sendto() failed");
         } else {
-            ret = send(
+            int ret = send(
                 socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
+            if (ret < 0) {
+                fprintf(stderr,
+                    "send() failed. Error = %s. Is a server running at %s?\n",
+                    strerror(errno), cfg->rx_addr.c_str());
+                exit(-1);
+            }
         }
-        rt_assert(ret >= 0, "Worker: sendto() failed");
 
         if (kDebugSenderReceiver) {
             auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
