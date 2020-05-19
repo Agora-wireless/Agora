@@ -54,32 +54,27 @@
 #include <rte_pause.h>
 #include <rte_prefetch.h>
 #include <rte_udp.h>
-#endif
 
 #define RX_RING_SIZE 2048
 #define TX_RING_SIZE 2048
 
 #define NUM_MBUFS ((32 * 1024) - 1)
 #define MBUF_CACHE_SIZE 128
-#define BURST_SIZE 16
 
-#define ETH_HDRLEN 14
-#define IP4_HDRLEN 20
-#define UDP_HDRLEN 8
 #define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB
 #define EMPTY_MASK 0x0
 #define FULL_MASK 0xffffffff
+/// Maximum number of packets received in rx_burst
+static constexpr size_t kRxBatchSize = 16;
+static constexpr size_t kTxBatchSize = 1;
+/// Offset to the payload
+static constexpr size_t kPayloadOffset = sizeof(struct rte_ether_hdr)
+    + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr) + 22;
+static_assert(kPayloadOffset == 64, "");
+#endif
 
 typedef unsigned short ushort;
 class PacketTXRX {
-public:
-    //     // use for create pthread
-    //     struct PacketTXRXContext
-    //     {
-    //         PacketTXRX *ptr;
-    //         int tid;
-    //     };
-
 public:
     PacketTXRX(Config* cfg, int COMM_THREAD_NUM = 1, int in_core_offset = 1);
     /**
@@ -95,8 +90,7 @@ public:
 
 #ifdef USE_DPDK
     int nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool);
-    int process_arp(
-        struct rte_mbuf* mbuf, struct rte_ether_hdr* eth_h, int len, int tid);
+    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, int& rx_offset);
 #endif
 
     /**
@@ -124,9 +118,6 @@ public:
 #endif
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
-#ifdef USE_DPDK
-    void* loopRecv_DPDK(int tid);
-#endif
 
 private:
 #if USE_IPV4
@@ -143,8 +134,9 @@ private:
     struct rte_ether_addr server_eth_addr;
     uint32_t src_addr;
     uint32_t dst_addr;
-    int src_port_start = 6000;
-    int dst_port_start = 8000;
+    struct rte_mempool* mbuf_pool;
+    struct rte_mbuf* rx_bufs[kRxBatchSize] __attribute__((aligned(64)));
+    struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
 #endif
 
     Table<char>* buffer_;
@@ -156,7 +148,6 @@ private:
     int* tx_buffer_status_;
     long long tx_buffer_length_;
     int tx_buffer_frame_num_;
-    // float *tx_data_buffer_;
 
     int comm_thread_num_;
 
@@ -168,9 +159,6 @@ private:
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
-
-    // PacketTXRXContext* tx_context;
-    // PacketTXRXContext* rx_context;
 
     Config* config_;
 #ifdef USE_ARGOS
