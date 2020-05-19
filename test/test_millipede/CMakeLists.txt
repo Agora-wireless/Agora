@@ -10,6 +10,7 @@ message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+list(APPEND CMAKE_MODULE_PATH "${SOURCE_DIR}/cmake")
 
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
@@ -61,6 +62,26 @@ set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx.cpp)
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 
+# DPDK
+if(${USE_DPDK})
+  message(STATUS "DPDK is enabled")
+  message(STATUS "RTE_SDK: $ENV{RTE_SDK}")
+  message(STATUS "RTE_TARGET: $ENV{RTE_TARGET}")
+  find_package(dpdk)
+  if(NOT dpdk_FOUND)
+    message(STATUS "DPDK Not Found! Excluding from Compile List")
+    set(USE_DPDK False)
+  else()
+    add_definitions(-DUSE_DPDK)
+  endif()
+  set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx_DPDK.cpp)
+  #set(DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
+  include_directories(${dpdk_INCLUDE_DIRS})
+  link_directories($ENV{RTE_SDK}/$ENV{RTE_TARGET}/lib)
+else()
+  message(STATUS "DPDK is disabled")
+endif()
+
 include_directories(
 	${SOURCE_DIR}/src/common/
   ${SOURCE_DIR}/src/millipede/
@@ -86,7 +107,7 @@ set(MILLIPEDE_SOURCES
   ${SOURCE_DIR}/src/millipede/reciprocity.cpp)
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES})
-target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
 
 # LDPC support
@@ -131,7 +152,7 @@ set(SOURCES
   ${LDPC_SOURCES})
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${dpdk_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 set(SENDER_SOURCES 
   ${SOURCE_DIR}/simulator/sender_cli.cpp
