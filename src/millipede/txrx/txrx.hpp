@@ -40,7 +40,6 @@
 
 #ifdef USE_DPDK
 #include <inttypes.h>
-#include <rte_arp.h>
 #include <rte_byteorder.h>
 #include <rte_cycles.h>
 #include <rte_debug.h>

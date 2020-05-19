@@ -10,7 +10,6 @@ message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
-list(APPEND CMAKE_MODULE_PATH "${SOURCE_DIR}/cmake")
 
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
@@ -65,19 +64,26 @@ find_package(BLAS)
 # DPDK
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled")
-  message(STATUS "RTE_SDK: $ENV{RTE_SDK}")
-  message(STATUS "RTE_TARGET: $ENV{RTE_TARGET}")
-  find_package(dpdk)
-  if(NOT dpdk_FOUND)
-    message(STATUS "DPDK Not Found! Excluding from Compile List")
-    set(USE_DPDK False)
-  else()
-    add_definitions(-DUSE_DPDK)
+
+  find_library(DPDK_LIB dpdk)
+  message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "DPDK library not found")
   endif()
+
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
+  add_definitions(-DUSE_DPDK)
   set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx_DPDK.cpp)
-  #set(DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
-  include_directories(${dpdk_INCLUDE_DIRS})
-  link_directories($ENV{RTE_SDK}/$ENV{RTE_TARGET}/lib)
+  # DPDK include directory. Locating rte_config.h does not work on some systems.
+  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+  # from the real DPDK include directory (/usr/include/dpdk/).
+  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  if (DPDK_INCLUDE_DIR)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  else()
+    message(FATAL_ERROR "DPDK include directory not found")
+  endif()
+  include_directories(${DPDK_INCLUDE_DIR})
 else()
   message(STATUS "DPDK is disabled")
 endif()
@@ -152,7 +158,7 @@ set(SOURCES
   ${LDPC_SOURCES})
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${dpdk_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 set(SENDER_SOURCES 
   ${SOURCE_DIR}/simulator/sender_cli.cpp
