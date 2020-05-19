@@ -6,7 +6,7 @@
 
 DEFINE_uint64(n_rows, 64, "Number of matrix rows");
 DEFINE_uint64(n_cols, 32, "Number of matrix columns");
-DEFINE_double(condition, 1000, "Condition number of input matrix");
+DEFINE_double(condition, 10, "Condition number of input matrix");  // 20 dB
 
 enum class PinvMode { kFormula, kSVD };
 
@@ -49,22 +49,29 @@ arma::cx_fmat gen_matrix_with_condition(double cond_num) {
 int main(int argc, char** argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   mkl_set_num_threads(1);
-  arma::cx_fmat input = gen_matrix_with_condition(FLAGS_condition);
+  const arma::cx_fmat input = gen_matrix_with_condition(FLAGS_condition);
 
   printf("Result matrix {%lldx%lld}: cond number = %.3f\n", input.n_rows,
          input.n_cols, arma::cond(input));
-  input.raw_print();
+
+  auto id_mat = arma::cx_fmat(FLAGS_n_rows, FLAGS_n_rows, arma::fill::zeros);
+  for (size_t i = 0; i < FLAGS_n_rows; i++) id_mat[i] = arma::cx_float(1, 0);
 
   arma::cx_fmat output;
 
-  // Formula mode
+  printf("Formula-based pseudoinverse:");
   arma::cx_fmat A = input.t() * input;
   output = A.i() * input.t();
-  printf("\nResults from pseudoinverse from formula:\n");
-  (input * output).raw_print();
+  printf("  Estimated condition number = %.2f\n",
+         arma::norm(input) * arma::norm(output));
+  printf("  Norm of result's difference from identity: %.2f\n",
+         arma::norm((input * output) - id_mat));
+  printf("\n");
 
-  // SVD mode;
-  printf("\nResults from pseudoinverse from formula:\n");
+  printf("SVD-based pseudoinverse:");
   output = pinv(input);
-  (input * output).raw_print();
+  printf("  Estimated condition number = %.2f\n",
+         arma::norm(input) * arma::norm(output));
+  printf("  Norm of result's difference from identity: %.2f\n",
+         arma::norm((input * output) - id_mat));
 }
