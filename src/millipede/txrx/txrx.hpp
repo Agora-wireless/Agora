@@ -134,8 +134,6 @@ private:
     uint32_t src_addr;
     uint32_t dst_addr;
     struct rte_mempool* mbuf_pool;
-    struct rte_mbuf* rx_bufs[kRxBatchSize] __attribute__((aligned(64)));
-    struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
 #endif
 
     Table<char>* buffer_;

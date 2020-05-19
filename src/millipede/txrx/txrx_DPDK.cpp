@@ -308,7 +308,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
     size_t* rx_frame_start = (*frame_start_)[tid];
     // use token to speed up
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-
+    struct rte_mbuf* rx_bufs[kRxBatchSize] __attribute__((aligned(64)));
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
     if (unlikely(nb_rx == 0))
         return 0;
@@ -376,7 +376,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
 
         // get the position in rx_buffer
         // move ptr & set status to full
-        rx_buffer_status[rx_offset] = 1;
+        // rx_buffer_status[rx_offset] = 1;
 
         // Push kPacketRX event into the queue.
         Event_data rx_message(
@@ -425,6 +425,7 @@ int PacketTXRX::dequeue_send(int tid)
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
 
+    struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
     tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
     struct rte_ether_hdr* eth_hdr
         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
