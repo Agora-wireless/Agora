@@ -92,7 +92,8 @@ void check_correctness_ul(Config* cfg)
     int error_cnt = 0;
     int total_count = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-	if (i < UL_PILOT_SYMS) continue;
+        if (i < UL_PILOT_SYMS)
+            continue;
 #ifdef USE_LDPC
         for (int ue = 0; ue < UE_NUM; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
