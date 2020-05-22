@@ -4,8 +4,8 @@
 #include <iostream>
 #include "timer.h"
 
-DEFINE_uint64(n_rows, 64, "Number of matrix rows");
-DEFINE_uint64(n_cols, 32, "Number of matrix columns");
+DEFINE_uint64(n_ants, 64, "Number of matrix rows");
+DEFINE_uint64(n_users, 32, "Number of matrix columns");
 DEFINE_double(condition, 10, "Condition number of input matrix");  // 20 dB
 
 enum class PinvMode { kFormula, kSVD };
@@ -21,13 +21,13 @@ static inline void rt_assert(bool condition, const char* throw_str) {
 arma::cx_fmat gen_matrix_with_condition(double cond_num) {
   rt_assert(cond_num >= 1.0,
             "Condition number too small for gen_matrix_with_condition()");
-  rt_assert(std::min(FLAGS_n_rows, FLAGS_n_cols) > 1,
+  rt_assert(std::min(FLAGS_n_ants, FLAGS_n_users) > 1,
             "> 1 singular values needed for gen_matrix_with_condition()");
 
-  auto mat = arma::randn<arma::cx_fmat>(FLAGS_n_rows, FLAGS_n_cols);
-  arma::cx_fmat U;  // n_rows x n_rows
-  arma::cx_fmat V;  // n_cols x n_cols
-  arma::fvec s;     // min(n_rows, n_cols)
+  auto mat = arma::randn<arma::cx_fmat>(FLAGS_n_ants, FLAGS_n_users);
+  arma::cx_fmat U;  // n_ants x n_ants
+  arma::cx_fmat V;  // n_users x n_users
+  arma::fvec s;     // min(n_ants, n_users)
   arma::svd(U, s, V, mat);
 
   // Set the singular values to evenly spaced between {cond_num, ..., 1.0}
@@ -35,9 +35,9 @@ arma::cx_fmat gen_matrix_with_condition(double cond_num) {
     s[i] = cond_num - i * ((cond_num - 1) / (s.size() - 1));
   }
 
-  // Turn the singular values into a n_rows x n_rows diagonal matrix
-  auto s_mat = arma::cx_fmat(FLAGS_n_rows, FLAGS_n_cols, arma::fill::zeros);
-  for (size_t i = 0; i < std::min(FLAGS_n_rows, FLAGS_n_cols); i++) {
+  // Turn the singular values into a n_ants x n_ants diagonal matrix
+  auto s_mat = arma::cx_fmat(FLAGS_n_ants, FLAGS_n_users, arma::fill::zeros);
+  for (size_t i = 0; i < std::min(FLAGS_n_ants, FLAGS_n_users); i++) {
     s_mat(i, i) = s[i];
   }
 
@@ -47,31 +47,33 @@ arma::cx_fmat gen_matrix_with_condition(double cond_num) {
 }
 
 int main(int argc, char** argv) {
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
   mkl_set_num_threads(1);
-  const arma::cx_fmat input = gen_matrix_with_condition(FLAGS_condition);
+  arma::arma_rng::set_seed_random();
 
-  printf("Result matrix {%lldx%lld}: cond number = %.3f\n", input.n_rows,
-         input.n_cols, arma::cond(input));
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  rt_assert(FLAGS_n_ants >= FLAGS_n_users, "");
+  const arma::cx_fmat A = gen_matrix_with_condition(FLAGS_condition);
+  arma::cx_fmat A_lpinv;  // Left pseudo-inverse of A
 
-  auto id_mat = arma::cx_fmat(FLAGS_n_rows, FLAGS_n_rows, arma::fill::zeros);
-  for (size_t i = 0; i < FLAGS_n_rows; i++) id_mat[i] = arma::cx_float(1, 0);
+  printf("Result matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows, A.n_cols,
+         arma::cond(A));
 
-  arma::cx_fmat output;
+  auto id_mat = arma::cx_fmat(FLAGS_n_users, FLAGS_n_users, arma::fill::zeros);
+  for (size_t i = 0; i < FLAGS_n_users; i++)
+    id_mat(i, i) = arma::cx_float(1, 0);
 
-  printf("Formula-based pseudoinverse:");
-  arma::cx_fmat A = input.t() * input;
-  output = A.i() * input.t();
-  printf("  Estimated condition number = %.2f\n",
-         arma::norm(input) * arma::norm(output));
-  printf("  Norm of result's difference from identity: %.2f\n",
-         arma::norm((input * output) - id_mat));
+  A_lpinv = (A.t() * A).i() * A.t();
+  printf("\n");
+  arma::abs(A_lpinv * A - id_mat).raw_print();
+
+  printf("Difference of formula-based pinv's difference from identity: %.6f\n",
+         arma::accu(arma::abs(A_lpinv * A - id_mat)));
   printf("\n");
 
-  printf("SVD-based pseudoinverse:");
-  output = pinv(input);
-  printf("  Estimated condition number = %.2f\n",
-         arma::norm(input) * arma::norm(output));
-  printf("  Norm of result's difference from identity: %.2f\n",
-         arma::norm((input * output) - id_mat));
+  A_lpinv = pinv(A);
+  printf("\n");
+  (A_lpinv * A).raw_print();
+  arma::abs(A_lpinv * A - id_mat).raw_print();
+  printf("Difference of SVD-based pinv's difference from identity: %.6f\n",
+         arma::accu(arma::abs(A_lpinv * A - id_mat)));
 }
