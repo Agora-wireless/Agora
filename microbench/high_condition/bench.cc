@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   const arma::cx_fmat A = gen_matrix_with_condition(FLAGS_condition);
   arma::cx_fmat A_lpinv;  // Left pseudo-inverse of A
 
-  printf("Result matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows, A.n_cols,
+  printf("Input matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows, A.n_cols,
          arma::cond(A));
 
   auto id_mat = arma::cx_fmat(FLAGS_n_users, FLAGS_n_users, arma::fill::zeros);
@@ -63,17 +63,10 @@ int main(int argc, char** argv) {
     id_mat(i, i) = arma::cx_float(1, 0);
 
   A_lpinv = (A.t() * A).i() * A.t();
-  printf("\n");
-  arma::abs(A_lpinv * A - id_mat).raw_print();
-
-  printf("Difference of formula-based pinv's difference from identity: %.6f\n",
+  printf("Formula: Sum of absolute differences of (A_pinv * A - I): %.6f\n",
          arma::accu(arma::abs(A_lpinv * A - id_mat)));
-  printf("\n");
 
   A_lpinv = pinv(A);
-  printf("\n");
-  (A_lpinv * A).raw_print();
-  arma::abs(A_lpinv * A - id_mat).raw_print();
-  printf("Difference of SVD-based pinv's difference from identity: %.6f\n",
+  printf("SVD: Sum of absolute differences of (A_pinv * A - I): %.6f\n",
          arma::accu(arma::abs(A_lpinv * A - id_mat)));
 }
