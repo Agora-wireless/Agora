@@ -45,7 +45,6 @@ std::pair<std::vector<arma::cx_fmat>, double> arma_inverses(
 
     if (take_measurement) timer.stop();
     ret.push_back(output);
-    printf("Iter %zu\n", iter);
   }
   return std::pair<std::vector<arma::cx_fmat>, double>(ret, timer.avg_msec());
 }
@@ -122,7 +121,7 @@ int main(int argc, char** argv) {
 
   // Part 1: Test inverse speed
   std::pair<std::vector<arma::cx_fmat>, double> ret_1 =
-      arma_inverses(test_matrices, PinvMode::kSVD);
+      arma_inverses(test_matrices, PinvMode::kFormula);
   std::pair<std::vector<arma::cx_fmat>, double> ret_2 =
       arma_inverses(test_matrices, PinvMode::kSVD);
 
