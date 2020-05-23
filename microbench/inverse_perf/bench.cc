@@ -1,5 +1,6 @@
 #include <gflags/gflags.h>
 #include <mkl.h>
+#define ARMA_DONT_PRINT_ERRORS
 #include <armadillo>
 #include <iostream>
 #include "timer.h"
@@ -30,8 +31,13 @@ std::pair<std::vector<arma::cx_fmat>, double> arma_inverses(
     if (take_measurement) timer.start();
 
     if (mode == PinvMode::kFormula) {
-      arma::cx_fmat A = input.t() * input;
-      output = A.i() * input.t();
+      try {
+        output = arma::inv_sympd(input.t() * input) * input.t();
+      } catch (std::runtime_error) {
+        printf("Failed to invert A. Condition number of input = %.2f\n",
+               arma::cond(input.t() * input));
+        output = arma::pinv(input);
+      }
     } else {
       output = pinv(input);
     }
@@ -47,21 +53,6 @@ std::pair<std::vector<arma::cx_fmat>, double> arma_inverses(
     ret.push_back(output);
   }
   return std::pair<std::vector<arma::cx_fmat>, double>(ret, timer.avg_msec());
-}
-
-std::pair<double, double> arma_norm(
-    const std::vector<arma::cx_fmat>& test_matrices) {
-  TscTimer timer(FLAGS_n_iters, freq_ghz);
-  double norm_sum = 0.0;
-
-  for (size_t iter = 0; iter < FLAGS_n_iters; iter++) {
-    const bool take_measurement = (iter >= FLAGS_n_iters * warmup_fraction);
-    if (take_measurement) timer.start();
-    norm_sum += arma::norm(test_matrices[iter], 1);
-    if (take_measurement) timer.stop();
-  }
-
-  return std::pair<double, double>(norm_sum, timer.avg_msec());
 }
 
 /*
@@ -134,11 +125,4 @@ int main(int argc, char** argv) {
     norm_sum += arma::norm(ret_1.first[i] - ret_2.first[i]);
   }
   fprintf(stderr, "Computation proof = %.2f\n", norm_sum);
-
-  /*
-  // Part 2: Test norm speed
-  std::pair<double, double> ret_3 = arma_norm(test_matrices);
-  printf("Norm of %zux%zu: %.3f ms (computation proof = %.3f)\n", FLAGS_n_rows,
-         FLAGS_n_cols, ret_3.second, ret_3.first);
-         */
 }
