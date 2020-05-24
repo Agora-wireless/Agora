@@ -498,27 +498,16 @@ void Config::genData()
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP
 
-    for (size_t i = 0; i < OFDM_CA_NUM + CP_LEN; i++)
-        pilot_ci16.push_back(
-            std::complex<int16_t>((int16_t)(pilot_cf32[i].real() * 32768),
-                (int16_t)(pilot_cf32[i].imag() * 32768)));
-    std::vector<std::complex<int16_t>> pre_ci16(prefix, 0);
-    pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
-    pilot_ci16.resize(sampsPerSymbol);
-    std::cout << "pilot_ci16:\n";
-    for (size_t i = 0; i < sampsPerSymbol; i++) {
-        std::cout << pilot_ci16[i].real() << "+1i*" << pilot_ci16[i].imag()
-                  << " ";
-    }
-    std::cout << std::endl;
-
     for (size_t i = 0; i < sampsPerSymbol; i++) { // used for correlating
         std::complex<float> cf = pilot_cf32[i];
         pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
     // generate a UINT32 version to write to FPGA buffers
-    pilot = Utils::cint16_to_uint32(pilot_ci16, false, "QI");
+    pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
+    std::vector<uint32_t> pre_uint32(prefix, 0);
+    pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
+    pilot.resize(sampsPerSymbol);
     if (pilot.size() != sampsPerSymbol) {
         std::cout << "generated pilot symbol size does not match configured "
                      "symbol size!"
