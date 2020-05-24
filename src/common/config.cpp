@@ -77,6 +77,7 @@ Config::Config(std::string jsonfile)
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
+    OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
