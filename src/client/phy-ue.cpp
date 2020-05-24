@@ -585,16 +585,11 @@ void Phy_UE::doFFT(int tid, int offset)
             if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
             }
-            cx_float* p = (cx_float*)&config_->pilots_sgn_[j];
-            csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] * conj(*p));
-            if (dl_symbol_id == dl_pilot_symbol_perframe - 1) {
+            complex_float p = config_->ue_specific_pilot[ant_id][j];
+            csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
+            if (dl_symbol_id == dl_pilot_symbol_perframe - 1)
                 csi_buffer_ptr[j] /= dl_pilot_symbol_perframe;
-                avg_csi += csi_buffer_ptr[j];
-            }
         }
-        avg_csi /= non_null_sc_len;
-        phase_shift_buffer_[buffer_frame_id][ant_id] = cx_float(
-            std::cos(-std::arg(avg_csi)), std::sin(-std::arg(avg_csi)));
 
         crop_finish_event = Event_data(EventType::kFFT, csi_offset);
     } else {
@@ -605,22 +600,33 @@ void Phy_UE::doFFT(int tid, int offset)
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
         cx_float csi(1, 0);
-        cx_float phc(1, 0);
-        if (config_->correct_phase_shift)
-            phc = phase_shift_buffer_[buffer_frame_id][ant_id];
 
+        float theta = 0;
         for (int j = 0; j < non_null_sc_len; j++) {
-            // if (j < FFT_LEN / 2)
-            //    csi_fftshift_offset = FFT_LEN/2;
-            // else
-            //    csi_fftshift_offset = -FFT_LEN/2;
-            // divide fft output by pilot data to get CSI estimation
-            int i = non_null_sc_ind_[j];
-            if (dl_pilot_symbol_perframe > 0) {
-                csi = csi_buffer_ptr[j];
+            if (j % config_->OFDM_PILOT_SPACING == 0) {
+                int i = non_null_sc_ind_[j];
+                if (dl_pilot_symbol_perframe > 0) {
+                    csi = csi_buffer_ptr[j];
+                }
+                cx_float y = fft_buffer_ptr[i];
+                equ_buffer_ptr[j] = 0;
+                auto pilot_eq = y / csi;
+                auto p = config_->ue_specific_pilot[ant_id][j];
+                theta += arg(pilot_eq * cx_float(p.re, -p.im));
             }
-            cx_float y = fft_buffer_ptr[i];
-            equ_buffer_ptr[j] = (y * phc) / csi;
+        }
+        theta /= config_->OFDM_PILOT_NUM;
+        auto phc = exp(cx_float(0, -theta));
+        for (int j = 0; j < non_null_sc_len; j++) {
+            if (j % config_->OFDM_PILOT_SPACING != 0) {
+                // divide fft output by pilot data to get CSI estimation
+                int i = non_null_sc_ind_[j];
+                if (dl_pilot_symbol_perframe > 0) {
+                    csi = csi_buffer_ptr[j];
+                }
+                cx_float y = fft_buffer_ptr[i];
+                equ_buffer_ptr[j] = (y / csi) * phc;
+            }
         }
 
         crop_finish_event = Event_data(EventType::kZF, eq_buffer_offset);
