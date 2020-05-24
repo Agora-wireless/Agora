@@ -516,16 +516,16 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
     size_t fft_len = _cfg->OFDM_CA_NUM;
     std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len
               << std::endl;
-    std::vector<std::complex<double>> pilot_cd64;
     std::vector<std::complex<int16_t>> pilot_cs16;
 
     for (size_t i = 0; i < seq_len; i++) {
         std::complex<float> cf = _cfg->pilot_cf32[i];
         pilot_cs16.push_back(std::complex<int16_t>(
             (int16_t)(cf.real() * 32768), (int16_t)(cf.imag() * 32768)));
-        pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
     }
 
+    pilot_cs16.insert(pilot_cs16.begin(), pilot_cs16.end() - _cfg->CP_LEN,
+        pilot_cs16.end()); // add CP
     std::vector<std::complex<int16_t>> pre(_cfg->prefix, 0);
     std::vector<std::complex<int16_t>> post(_cfg->postfix, 0);
     pilot_cs16.insert(pilot_cs16.begin(), pre.begin(), pre.end());
@@ -612,23 +612,23 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
     std::vector<size_t> start_dn(R);
 
     for (size_t i = 0; i < R; i++) {
-        std::vector<std::complex<double>> up(read_len);
-        std::vector<std::complex<double>> dn(read_len);
+        std::vector<std::complex<float>> up(read_len);
+        std::vector<std::complex<float>> dn(read_len);
         std::transform(buff[ref_ant * R + i].begin(),
             buff[ref_ant * R + i].end(), up.begin(),
             [](std::complex<int16_t> ci) {
-                return std::complex<double>(
+                return std::complex<float>(
                     ci.real() / 32768.0, ci.imag() / 32768.0);
             });
         std::transform(buff[i * R + ref_ant].begin(),
             buff[i * R + ref_ant].end(), dn.begin(),
             [](std::complex<int16_t> ci) {
-                return std::complex<double>(
+                return std::complex<float>(
                     ci.real() / 32768.0, ci.imag() / 32768.0);
             });
 
-        size_t peak_up = CommsLib::find_pilot_seq(up, pilot_cd64, seq_len);
-        size_t peak_dn = CommsLib::find_pilot_seq(dn, pilot_cd64, seq_len);
+        size_t peak_up = CommsLib::find_pilot_seq(up, _cfg->pilot_cf32, seq_len);
+        size_t peak_dn = CommsLib::find_pilot_seq(dn, _cfg->pilot_cf32, seq_len);
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
         std::cout << "receive starting position from/to node " << i << ": "

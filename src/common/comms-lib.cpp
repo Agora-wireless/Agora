@@ -21,27 +21,27 @@ IQ samples. Gold IFFT - Total of 128-long complex IQ samples including a
 
 #include "comms-lib.h"
 
-size_t CommsLib::find_pilot_seq(std::vector<std::complex<double>> iq,
-    std::vector<std::complex<double>> pilot, size_t seq_len)
+size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
+    std::vector<std::complex<float>> pilot, size_t seq_len)
 {
 
     size_t best_peak = 0;
 
     // Re-arrange into complex vector, flip, and compute conjugate
-    std::vector<std::complex<double>> pilot_conj;
+    std::vector<std::complex<float>> pilot_conj;
     for (size_t i = 0; i < seq_len; i++) {
         // conjugate
         pilot_conj.push_back(std::conj(pilot[seq_len - i - 1]));
     }
 
     // Equivalent to numpy's sign function
-    std::vector<std::complex<double>> iq_sign = CommsLib::csign(iq);
+    auto iq_sign = CommsLib::csign(iq);
 
     // Convolution
-    std::vector<double> pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
+    auto pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
 
     // Find all peaks
-    double max_peak = 0;
+    float max_peak = 0;
     for (size_t i = 0; i < pilot_corr.size(); i++) {
         if (abs(pilot_corr[i]) > max_peak) {
             max_peak = abs(pilot_corr[i]);
@@ -147,8 +147,9 @@ void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
     }
 }
 
-std::vector<std::complex<double>> CommsLib::csign(
-    std::vector<std::complex<double>> iq)
+template <typename T>
+std::vector<std::complex<T>> CommsLib::csign(
+    std::vector<std::complex<T>> iq)
 {
     /*
      * Return element-wise indication of the sign of a number (for complex
@@ -160,10 +161,10 @@ std::vector<std::complex<double>> CommsLib::csign(
      * where sign(x) is given by
      *     -1 if x < 0, 0 if x==0, 1 if x > 0
      */
-    std::vector<std::complex<double>> iq_sign;
+    std::vector<std::complex<T>> iq_sign;
     for (int i = 0; i < static_cast<int>(iq.size()); i++) {
         // sign(x.real) + 0j if x.real != 0 else sign(x.imag) + 0j
-        std::complex<double> x = iq[i];
+        std::complex<T> x = iq[i];
         if (x.real() != 0) {
             iq_sign.push_back((x.real() > 0) ? 1 : (x.real() < 0) ? -1 : 0);
         } else {
@@ -173,9 +174,10 @@ std::vector<std::complex<double>> CommsLib::csign(
     return iq_sign;
 }
 
-std::vector<double> CommsLib::convolve(
-    std::vector<std::complex<double>> const& f,
-    std::vector<std::complex<double>> const& g)
+template <typename T>
+std::vector<T> CommsLib::convolve(
+    std::vector<std::complex<T>> const& f,
+    std::vector<std::complex<T>> const& g)
 {
     /* Convolution of two vectors
      * Source:
@@ -184,8 +186,8 @@ std::vector<double> CommsLib::convolve(
     int const nf = f.size();
     int const ng = g.size();
     int const n = nf + ng - 1;
-    std::vector<double> out(n, 0);
-    std::vector<std::complex<double>> outc(n, 0);
+    std::vector<T> out(n, 0);
+    std::vector<std::complex<T>> outc(n, 0);
     for (auto i(0); i < n; ++i) {
         int const jmn = (i >= ng - 1) ? i - (ng - 1) : 0;
         int const jmx = (i < nf - 1) ? i : nf - 1;
