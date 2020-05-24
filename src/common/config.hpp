@@ -133,6 +133,7 @@ public:
     size_t UE_ANT_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
+    size_t OFDM_PILOT_SPACING;
     size_t OFDM_DATA_START;
     size_t OFDM_DATA_STOP;
     size_t TX_PREFIX_LEN;
