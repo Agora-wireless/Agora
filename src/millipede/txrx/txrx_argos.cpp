@@ -206,7 +206,7 @@ int PacketTXRX::dequeue_send(int tid)
     if (ant_id != c->ref_ant)
         txbuf[ch] = zeros.data();
     else if (dl_symbol_idx < c->DL_PILOT_SYMS)
-        txbuf[ch] = c->pilot_ci16.data();
+        txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
     else
         txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx
             - c->DL_PILOT_SYMS];
