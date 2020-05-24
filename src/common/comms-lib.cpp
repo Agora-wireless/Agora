@@ -337,20 +337,21 @@ std::vector<std::complex<float>> CommsLib::IFFT(
     DftiComputeBackward(mkl_handle, in.data());
     DftiFreeDescriptor(&mkl_handle);
     if (normalize) {
-        // for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
         float max_val = 0;
-        // int max_ind = 0;
         float scale = 0.5;
         for (int i = 0; i < fftsize; i++) {
             if (std::abs(in[i]) > max_val) {
                 max_val = std::abs(in[i]);
-                // max_ind = i;
             }
         }
         //std::cout << "IFFT output is normalized with "
         //         << std::to_string(max_val) << std::endl;
         for (int i = 0; i < fftsize; i++)
             in[i] /= (max_val / scale);
+    } else {
+        for (int i = 0; i < fftsize; i++) {
+            in[i] /= fftsize;
+        }
     }
     return in;
 }
