@@ -511,22 +511,22 @@ void Phy_UE::doFFT(int tid, int offset)
 #if DEBUG_DL_PILOT
     size_t sym_offset = 0;
     if (config_->isPilot(frame_id, symbol_id)) {
-        std::vector<std::complex<double>> vec;
+        std::vector<std::complex<float>> vec;
         for (size_t i = 0; i < config_->sampsPerSymbol; i++)
-            vec.push_back(std::complex<double>(
+            vec.push_back(std::complex<float>(
                 pkt->data[2 * i] / 32768.0, pkt->data[2 * i + 1] / 32768.0));
-        sym_offset = CommsLib::find_pilot_seq(
-            vec, config_->pilot_cd64, config_->pilot_cd64.size());
+        sym_offset = (size_t)CommsLib::find_pilot_seq(
+            vec, config_->pilot_cf32, config_->pilot_cf32.size());
         sym_offset = sym_offset < config_->pilot_cd64.size()
             ? 0
             : sym_offset - config_->pilot_cd64.size();
-        double noise_power = 0;
+        float noise_power = 0;
         for (size_t i = 0; i < sym_offset; i++)
             noise_power += std::pow(std::abs(vec[i]), 2);
-        double signal_power = 0;
+        float signal_power = 0;
         for (size_t i = sym_offset; i < 2 * sym_offset; i++)
             signal_power += std::pow(std::abs(vec[i]), 2);
-        double SNR = 10 * std::log10(signal_power / noise_power);
+        float SNR = 10 * std::log10(signal_power / noise_power);
         printf("frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
             frame_id, symbol_id, ant_id, sym_offset, SNR);
         if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250) {
