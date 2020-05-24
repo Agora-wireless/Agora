@@ -76,6 +76,7 @@ Config::Config(std::string jsonfile)
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
+    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
@@ -390,11 +391,11 @@ void Config::genData()
         for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
             int k = (j - OFDM_DATA_START);
             int cur_offset = k * UE_ANT_NUM;
-            if (k % (OFDM_DATA_NUM / 16) != 0) {
+            if (k % OFDM_PILOT_SPACING != 0) {
                 dl_iq_f[i][j]
                     = mod_single_uint8(dl_bits[i][cur_offset], qam_table);
             } else
-                dl_iq_f[i][j] = pilots_[k];
+                dl_iq_f[i][j] = ue_specific_pilot[0][k];
         }
 
         CommsLib::IFFT(dl_iq_f[i], OFDM_CA_NUM, false);
