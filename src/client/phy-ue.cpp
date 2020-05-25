@@ -517,9 +517,9 @@ void Phy_UE::doFFT(int tid, int offset)
                 pkt->data[2 * i] / 32768.0, pkt->data[2 * i + 1] / 32768.0));
         sym_offset = (size_t)CommsLib::find_pilot_seq(
             vec, config_->pilot_cf32, config_->pilot_cf32.size());
-        sym_offset = sym_offset < config_->pilot_cd64.size()
+        sym_offset = sym_offset < config_->pilot_cf32.size()
             ? 0
-            : sym_offset - config_->pilot_cd64.size();
+            : sym_offset - config_->pilot_cf32.size();
         float noise_power = 0;
         for (size_t i = 0; i < sym_offset; i++)
             noise_power += std::pow(std::abs(vec[i]), 2);
