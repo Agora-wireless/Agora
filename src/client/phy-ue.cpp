@@ -607,11 +607,11 @@ void Phy_UE::doFFT(int tid, int offset)
         float theta = 0;
         for (int j = 0; j < non_null_sc_len; j++) {
             if (j % config_->OFDM_PILOT_SPACING == 0) {
-                int i = non_null_sc_ind_[j];
+                int sc_id = non_null_sc_ind_[j];
                 if (dl_pilot_symbol_perframe > 0) {
                     csi = csi_buffer_ptr[j];
                 }
-                cx_float y = fft_buffer_ptr[i];
+                cx_float y = fft_buffer_ptr[sc_id];
                 equ_buffer_ptr[j] = 0;
                 auto pilot_eq = y / csi;
                 auto p = config_->ue_specific_pilot[ant_id][j];
@@ -623,13 +623,13 @@ void Phy_UE::doFFT(int tid, int offset)
         for (int j = 0; j < non_null_sc_len; j++) {
             if (j % config_->OFDM_PILOT_SPACING != 0) {
                 // divide fft output by pilot data to get CSI estimation
-                int i = non_null_sc_ind_[j];
+                int sc_id = non_null_sc_ind_[j];
                 if (dl_pilot_symbol_perframe > 0) {
                     csi = csi_buffer_ptr[j];
                 }
-                cx_float y = fft_buffer_ptr[i];
+                cx_float y = fft_buffer_ptr[sc_id];
                 equ_buffer_ptr[j] = (y / csi) * phc;
-                float sym_err = abs(equ_buffer_ptr[j] - dl_iq_f_ptr[j]);
+                float sym_err = abs(equ_buffer_ptr[j] - dl_iq_f_ptr[sc_id]);
                 evm += (sym_err * sym_err);
             }
         }
