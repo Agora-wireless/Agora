@@ -494,16 +494,11 @@ void Config::genData()
     pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM, false);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilot_cf32[i] /= scale;
-
-    for (size_t i = 0; i < sampsPerSymbol; i++) { // used for correlating
-        std::complex<float> cf = pilot_cf32[i];
-        pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
-    }
+    pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
+        pilot_cf32.end()); // add CP
 
     // generate a UINT32 version to write to FPGA buffers
     pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
-    pilot.insert(pilot.begin(), pilot.end() - CP_LEN,
-        pilot.end()); // add CP
 
     std::vector<uint32_t> pre_uint32(prefix, 0);
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());

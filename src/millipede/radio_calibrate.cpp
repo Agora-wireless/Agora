@@ -524,8 +524,6 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
             (int16_t)(cf.real() * 32768), (int16_t)(cf.imag() * 32768)));
     }
 
-    pilot_cs16.insert(pilot_cs16.begin(), pilot_cs16.end() - _cfg->CP_LEN,
-        pilot_cs16.end()); // add CP
     std::vector<std::complex<int16_t>> pre(_cfg->prefix, 0);
     std::vector<std::complex<int16_t>> post(_cfg->postfix, 0);
     pilot_cs16.insert(pilot_cs16.begin(), pre.begin(), pre.end());
