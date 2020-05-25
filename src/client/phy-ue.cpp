@@ -600,7 +600,7 @@ void Phy_UE::doFFT(int tid, int offset)
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
         cx_float csi(1, 0);
-        cx_float* dl_iq_f_ptr 
+        cx_float* dl_iq_f_ptr
             = (cx_float*)&config_->dl_iq_f[dl_symbol_id][ant_id * FFT_LEN];
         float evm = 0;
 
@@ -635,7 +635,8 @@ void Phy_UE::doFFT(int tid, int offset)
         }
         evm /= (config_->OFDM_DATA_NUM - config_->OFDM_PILOT_NUM);
         if (kPrintPhyStats)
-		std::cout << "Frame: " << frame_id << " EVM: " << 100*evm << "%, SNR: " << 10*std::log10(evm) << std::endl;
+            std::cout << "Frame: " << frame_id << " EVM: " << 100 * evm
+                      << "%, SNR: " << 10 * std::log10(evm) << std::endl;
 
         crop_finish_event = Event_data(EventType::kZF, eq_buffer_offset);
         // generateOffset3d(numAntennas, dl_symbol_perframe, frame_id,
