@@ -315,7 +315,7 @@ void Config::genData()
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
             pilot_ifft[i][j + OFDM_DATA_START] = ue_specific_pilot[i][j];
         }
-        CommsLib::IFFT(pilot_ifft[i], OFDM_CA_NUM);
+        CommsLib::IFFT(pilot_ifft[i], OFDM_CA_NUM, false);
     }
 
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
@@ -438,8 +438,8 @@ void Config::genData()
         for (size_t u = 0; u < UE_ANT_NUM; u++) {
             size_t q = u * OFDM_CA_NUM;
             for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-                auto cur_val = std::abs(
-                    std::complex<float>(dl_iq_f[i][q + j].re, dl_iq_f[i][q + j].im));
+                auto cur_val = std::abs(std::complex<float>(
+                    dl_iq_f[i][q + j].re, dl_iq_f[i][q + j].im));
                 if (cur_val > max_val) {
                     max_val = cur_val;
                 }
@@ -462,7 +462,8 @@ void Config::genData()
                 dl_iq_t[i][r + j] = { (int16_t)(sc_data.re * 32768),
                     (int16_t)(sc_data.im * 32768) };
             }
-            memcpy(dl_iq_t[i] + r + prefix, dl_iq_t[i] + r + prefix + OFDM_CA_NUM,
+            memcpy(dl_iq_t[i] + r + prefix,
+                dl_iq_t[i] + r + prefix + OFDM_CA_NUM,
                 CP_LEN * sizeof(short) * 2);
         }
     }
@@ -491,15 +492,21 @@ void Config::genData()
 
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            ue_specific_pilot_t[i][prefix + CP_LEN + j]
-                = std::complex<int16_t>((int16_t)((pilot_ifft[i][j].re / scale) * 32768),
-                    (int16_t)((pilot_ifft[i][j].im / scale) * 32768));
+            ue_specific_pilot_t[i][prefix + CP_LEN + j] = std::complex<int16_t>(
+                (int16_t)((pilot_ifft[i][j].re / scale) * 32768),
+                (int16_t)((pilot_ifft[i][j].im / scale) * 32768));
         }
         for (size_t j = 0; j < CP_LEN; j++) {
             ue_specific_pilot_t[i][prefix + j]
                 = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
         }
     }
+
+    for (size_t i = prefix; i < sampsPerSymbol - postfix; i++) {
+        std::cout << ue_specific_pilot_t[0][i].real() << "+1i*"
+                  << ue_specific_pilot_t[0][i].imag() << " ";
+    }
+    std::cout << std::endl;
     pilot_ifft.free();
 
     pilotsF.resize(OFDM_DATA_START);
