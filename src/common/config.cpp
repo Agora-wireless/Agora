@@ -298,6 +298,10 @@ void Config::genData()
             = common_pilot[i] / (float)std::pow(std::abs(common_pilot[i]), 2);
         pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
+    pilotsF.resize(OFDM_DATA_START);
+    pilotsF.insert(pilotsF.end(), common_pilot.begin(), common_pilot.end());
+    pilotsF.resize(OFDM_CA_NUM);
+    pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
@@ -439,13 +443,31 @@ void Config::genData()
             size_t q = u * OFDM_CA_NUM;
             for (size_t j = 0; j < OFDM_CA_NUM; j++) {
                 auto cur_val = std::abs(std::complex<float>(
-                    dl_iq_f[i][q + j].re, dl_iq_f[i][q + j].im));
+                    dl_iq_ifft[i][q + j].re, dl_iq_ifft[i][q + j].im));
                 if (cur_val > max_val) {
                     max_val = cur_val;
                 }
             }
         }
     }
+
+    for (size_t u = 0; u < UE_ANT_NUM; u++) {
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            auto cur_val = std::abs(std::complex<float>(
+                pilot_ifft[u][j].re, pilot_ifft[u][j].im));
+            if (cur_val > max_val) {
+                max_val = cur_val;
+            }
+        }
+    }
+
+    for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+        auto cur_val = std::abs(pilot_cf32[j]);
+        if (cur_val > max_val) {
+            max_val = cur_val;
+        }
+    }
+
     float scale = 2 * max_val; // additional 2^2 (6dB) power backoff
 
     // Generate time domain symbols for downlink
@@ -509,10 +531,6 @@ void Config::genData()
     std::cout << std::endl;
     pilot_ifft.free();
 
-    pilotsF.resize(OFDM_DATA_START);
-    pilotsF.insert(pilotsF.end(), common_pilot.begin(), common_pilot.end());
-    pilotsF.resize(OFDM_CA_NUM);
-    pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM, false);
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilot_cf32[i] /= scale;
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
