@@ -524,11 +524,6 @@ void Config::genData()
         }
     }
 
-    for (size_t i = prefix; i < sampsPerSymbol - postfix; i++) {
-        std::cout << ue_specific_pilot_t[0][i].real() << "+1i*"
-                  << ue_specific_pilot_t[0][i].imag() << " ";
-    }
-    std::cout << std::endl;
     pilot_ifft.free();
 
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
