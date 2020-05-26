@@ -55,3 +55,4 @@ CTestTestfile.cmake
 /sender
 /sim
 /millipede
+/data_generator
