@@ -6,17 +6,9 @@
 
 Required packages:
 
-	sudo apt-get install liblapack-dev libblas-dev libboost-all-dev
-	sudo apt-get install doxygen nlohmann-json-dev python-numpy
+`sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy`
 
-Install Armadillo:
-
-	wget http://sourceforge.net/projects/arma/files/armadillo-9.300.2.tar.xz .
-	tar xf armadillo-9.300.2.tar.xz
-	cd armadillo-9.300.2
-	cmake .
-	make -j4
-	sudo make install
+Install Armadillo: `./scripts/install_armadillo.sh`
 
 Install the latest version of SoapySDR from https://github.com/pothosware/SoapySDR
 
