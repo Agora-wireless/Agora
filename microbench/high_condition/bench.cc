@@ -62,11 +62,24 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < FLAGS_n_users; i++)
     id_mat(i, i) = arma::cx_float(1, 0);
 
-  A_lpinv = (A.t() * A).i() * A.t();
-  printf("Formula: Sum of absolute differences of (A_pinv * A - I): %.6f\n",
-         arma::accu(arma::abs(A_lpinv * A - id_mat)));
+  A_lpinv = arma::inv(A.t() * A) * A.t();
+  printf(
+      "Formula (without inv_sympd): Sum of absolute differences of "
+      "(A_lpinv * A - I): %.6f\n",
+      arma::accu(arma::abs(A_lpinv * A - id_mat)));
+
+  A_lpinv = arma::inv_sympd(A.t() * A) * A.t();
+  printf(
+      "Formula (with inv_sympd): Sum of absolute differences of "
+      "(A_lpinv * A - I): %.6f\n",
+      arma::accu(arma::abs(A_lpinv * A - id_mat)));
+
+  printf(
+      "Formula (without inv_sympd): Sum of absolute differences of "
+      "(A_pinv * A - I): %.6f\n",
+      arma::accu(arma::abs(A_lpinv * A - id_mat)));
 
   A_lpinv = pinv(A);
-  printf("SVD: Sum of absolute differences of (A_pinv * A - I): %.6f\n",
+  printf("SVD: Sum of absolute differences of (A_lpinv * A - I): %.6f\n",
          arma::accu(arma::abs(A_lpinv * A - id_mat)));
 }
