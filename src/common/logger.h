@@ -114,7 +114,7 @@ static std::string get_formatted_time()
 }
 
 // Output log message header
-static void output_log_header(FILE* stream, int level)
+static inline void output_log_header(FILE* stream, int level)
 {
     std::string formatted_time = get_formatted_time();
 
@@ -147,7 +147,7 @@ static void output_log_header(FILE* stream, int level)
 
 /// Return true if the logging verbosity is reasonable for non-developer users
 /// of Millipede
-static bool is_log_level_reasonable()
+static inline bool is_log_level_reasonable()
 {
     return MLPD_LOG_LEVEL <= MLPD_LOG_LEVEL_INFO;
 }
