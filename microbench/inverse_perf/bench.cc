@@ -51,13 +51,12 @@ int main(int argc, char** argv) {
   arma::arma_rng::set_seed_random();
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   freq_ghz = measure_rdtsc_freq();
-  nano_sleep(100 * 1000 * 1000,
-             freq_ghz);  // Spin 100 ms to trigger turbo
+  nano_sleep(100 * 1000 * 1000, freq_ghz);  // Trigger turbo for 100 ms
 
   std::vector<arma::cx_fmat> test_matrices;
   for (size_t i = 0; i < FLAGS_n_iters; i++) {
     test_matrices.push_back(
-        arma::randu<arma::cx_fmat>(FLAGS_n_rows, FLAGS_n_cols));
+        arma::randn<arma::cx_fmat>(FLAGS_n_rows, FLAGS_n_cols));
   }
 
   // Part 1: Test inverse speed
