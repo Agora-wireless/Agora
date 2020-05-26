@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+#include <vector>
 
 /// Return the TSC
 static inline size_t rdtsc() {
@@ -14,7 +18,7 @@ static inline size_t rdtsc() {
 }
 
 /// An alias for rdtsc() to distinguish calls on the critical path
-static const auto &dpath_rdtsc = rdtsc;
+static const auto& dpath_rdtsc = rdtsc;
 
 static void nano_sleep(size_t ns, double freq_ghz) {
   size_t start = rdtsc();
@@ -78,48 +82,51 @@ static double to_nsec(size_t cycles, double freq_ghz) {
 }
 
 /// Return seconds elapsed since timestamp \p t0
-static double sec_since(const struct timespec &t0) {
+static double sec_since(const struct timespec& t0) {
   struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t1);
   return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 }
 
 /// Return nanoseconds elapsed since timestamp \p t0
-static double ns_since(const struct timespec &t0) {
+static double ns_since(const struct timespec& t0) {
   struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t1);
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
+}
+
+static double stddev(const std::vector<double> in_vec) {
+  if (in_vec.size() == 0) return 0.0;
+  double sum = std::accumulate(in_vec.begin(), in_vec.end(), 0.0);
+  double mean = sum * 1.0 / in_vec.size();
+  double sq_sum =
+      std::inner_product(in_vec.begin(), in_vec.end(), in_vec.begin(), 0.0);
+  return std::sqrt((sq_sum / in_vec.size()) - (mean * mean));
+}
+
+static double mean(const std::vector<double> in_vec) {
+  if (in_vec.empty()) return 0.0;
+  double sum = std::accumulate(in_vec.begin(), in_vec.end(), 0.0);
+  return sum * 1.0 / in_vec.size();
 }
 
 /// Simple time that uses RDTSC
 class TscTimer {
  public:
   size_t start_tsc = 0;
-  size_t tsc_sum = 0;
-  size_t num_calls = 0;
+  double freq_ghz;
+  std::vector<double> ms_duration_vec;
+
+  TscTimer(size_t n_timestamps, double freq_ghz) : freq_ghz(freq_ghz) {
+    ms_duration_vec.reserve(n_timestamps);
+  }
 
   inline void start() { start_tsc = rdtsc(); }
   inline void stop() {
-    tsc_sum += (rdtsc() - start_tsc);
-    num_calls++;
+    ms_duration_vec.push_back(to_msec(rdtsc() - start_tsc, freq_ghz));
   }
 
-  void reset() {
-    start_tsc = 0;
-    tsc_sum = 0;
-    num_calls = 0;
-  }
-
-  size_t avg_cycles() const { return tsc_sum / num_calls; }
-  double avg_sec(double freq_ghz) const {
-    return to_sec(avg_cycles(), freq_ghz);
-  }
-
-  double avg_usec(double freq_ghz) const {
-    return to_usec(avg_cycles(), freq_ghz);
-  }
-
-  double avg_nsec(double freq_ghz) const {
-    return to_nsec(avg_cycles(), freq_ghz);
-  }
+  void reset() { ms_duration_vec.clear(); }
+  double stddev_msec() { return stddev(ms_duration_vec); }
+  double avg_msec() { return mean(ms_duration_vec); }
 };
