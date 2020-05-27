@@ -395,7 +395,7 @@ void Config::genData()
                     dl_iq_f[i][q + j]
                         = mod_single_uint8(dl_bits[i][s], qam_table);
                 } else
-                    dl_iq_f[i][q + j] = ue_specific_pilot[0][k];
+                    dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
                 dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
             }
             CommsLib::IFFT(&dl_iq_ifft[i][q], OFDM_CA_NUM, false);
