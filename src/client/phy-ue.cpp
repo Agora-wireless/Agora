@@ -26,8 +26,10 @@ Phy_UE::Phy_UE(Config* config)
     std::sort(non_null_sc_ind_.begin(), non_null_sc_ind_.end());
     ue_pilot_vec.resize(numAntennas);
     for (size_t i = 0; i < numAntennas; i++) {
-        for (size_t j = prefix_len; j < config_->sampsPerSymbol - postfix_len; j++) {
-            ue_pilot_vec[i].push_back(std::complex<float>(config_->ue_specific_pilot_t[i][j].real() / 32768.0,
+        for (size_t j = prefix_len; j < config_->sampsPerSymbol - postfix_len;
+             j++) {
+            ue_pilot_vec[i].push_back(std::complex<float>(
+                config_->ue_specific_pilot_t[i][j].real() / 32768.0,
                 config_->ue_specific_pilot_t[i][j].imag() / 32768.0));
         }
     }
@@ -519,15 +521,13 @@ void Phy_UE::doFFT(int tid, int offset)
     size_t sym_offset = 0;
     if (config_->isPilot(frame_id, symbol_id)) {
         std::vector<std::complex<float>> vec;
-        size_t seq_len = ue_pilot_vec[ant_id].size(); 
+        size_t seq_len = ue_pilot_vec[ant_id].size();
         for (size_t i = 0; i < config_->sampsPerSymbol; i++)
             vec.push_back(std::complex<float>(
                 pkt->data[2 * i] / 32768.0, pkt->data[2 * i + 1] / 32768.0));
         sym_offset
             = CommsLib::find_pilot_seq(vec, ue_pilot_vec[ant_id], seq_len);
-        sym_offset = sym_offset < seq_len
-            ? 0
-            : sym_offset - seq_len;
+        sym_offset = sym_offset < seq_len ? 0 : sym_offset - seq_len;
         float noise_power = 0;
         for (size_t i = 0; i < sym_offset; i++)
             noise_power += std::pow(std::abs(vec[i]), 2);
@@ -608,8 +608,8 @@ void Phy_UE::doFFT(int tid, int offset)
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
         cx_float csi(1, 0);
-        cx_float* dl_iq_f_ptr
-            = (cx_float*)&config_->dl_iq_f[dl_symbol_id][ant_id * FFT_LEN];
+        cx_float* dl_iq_f_ptr = (cx_float*)&config_->dl_iq_f[dl_symbol_id
+            - dl_pilot_symbol_perframe][ant_id * FFT_LEN];
         float evm = 0;
 
         float theta = 0;
