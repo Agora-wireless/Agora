@@ -589,11 +589,11 @@ void Phy_UE::doFFT(int tid, int offset)
         cx_float avg_csi(0, 0);
         for (int j = 0; j < non_null_sc_len; j++) {
             // divide fft output by pilot data to get CSI estimation
-            int sc_id = non_null_sc_ind_[j];
             if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
             }
             complex_float p = config_->ue_specific_pilot[ant_id][j];
+            int sc_id = non_null_sc_ind_[j];
             csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
             if (dl_symbol_id == dl_pilot_symbol_perframe - 1)
                 csi_buffer_ptr[j] /= dl_pilot_symbol_perframe;
@@ -615,12 +615,12 @@ void Phy_UE::doFFT(int tid, int offset)
         float theta = 0;
         for (int j = 0; j < non_null_sc_len; j++) {
             if (j % config_->OFDM_PILOT_SPACING == 0) {
-                int sc_id = non_null_sc_ind_[j];
+                equ_buffer_ptr[j] = 0;
                 if (dl_pilot_symbol_perframe > 0) {
                     csi = csi_buffer_ptr[j];
                 }
+                int sc_id = non_null_sc_ind_[j];
                 cx_float y = fft_buffer_ptr[sc_id];
-                equ_buffer_ptr[j] = 0;
                 auto pilot_eq = y / csi;
                 auto p = config_->ue_specific_pilot[ant_id][j];
                 theta += arg(pilot_eq * cx_float(p.re, -p.im));
@@ -637,14 +637,13 @@ void Phy_UE::doFFT(int tid, int offset)
                 }
                 cx_float y = fft_buffer_ptr[sc_id];
                 equ_buffer_ptr[j] = (y / csi) * phc;
-                float sym_err = abs(equ_buffer_ptr[j] - dl_iq_f_ptr[sc_id]);
-                evm += (sym_err * sym_err);
+                evm += std::norm(equ_buffer_ptr[j] - dl_iq_f_ptr[sc_id]);
             }
         }
         evm /= (config_->OFDM_DATA_NUM - config_->OFDM_PILOT_NUM);
         if (kPrintPhyStats)
             std::cout << "Frame: " << frame_id << " EVM: " << 100 * evm
-                      << "%, SNR: " << 10 * std::log10(evm) << std::endl;
+                      << "%, SNR: " << -10 * std::log10(evm) << std::endl;
 
         crop_finish_event = Event_data(EventType::kZF, eq_buffer_offset);
         // generateOffset3d(numAntennas, dl_symbol_perframe, frame_id,
