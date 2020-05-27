@@ -69,7 +69,9 @@ if(${USE_DPDK})
 
   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
   add_definitions(-DUSE_DPDK)
-  set(TXRX_SOURCES src/millipede/txrx/txrx_DPDK.cpp)
+  set(TXRX_SOURCES 
+    src/millipede/txrx/txrx_DPDK.cpp
+    src/common/dpdk_transport.cpp)
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
   # from the real DPDK include directory (/usr/include/dpdk/).

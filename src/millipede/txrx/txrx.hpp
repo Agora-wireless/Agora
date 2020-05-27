@@ -29,7 +29,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
 #include <vector>
 
 #ifdef USE_ARGOS
@@ -39,37 +39,7 @@
 #endif
 
 #ifdef USE_DPDK
-#include <inttypes.h>
-#include <rte_byteorder.h>
-#include <rte_cycles.h>
-#include <rte_debug.h>
-#include <rte_distributor.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_ether.h>
-#include <rte_flow.h>
-#include <rte_ip.h>
-#include <rte_malloc.h>
-#include <rte_pause.h>
-#include <rte_prefetch.h>
-#include <rte_udp.h>
-
-#define RX_RING_SIZE 2048
-#define TX_RING_SIZE 2048
-
-#define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_CACHE_SIZE 128
-
-#define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB
-#define EMPTY_MASK 0x0
-#define FULL_MASK 0xffffffff
-/// Maximum number of packets received in rx_burst
-static constexpr size_t kRxBatchSize = 16;
-static constexpr size_t kTxBatchSize = 1;
-/// Offset to the payload
-static constexpr size_t kPayloadOffset = sizeof(struct rte_ether_hdr)
-    + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr) + 22;
-static_assert(kPayloadOffset == 64, "");
+#include "dpdk_transport.hpp"
 #endif
 
 typedef unsigned short ushort;
@@ -88,7 +58,6 @@ public:
     ~PacketTXRX();
 
 #ifdef USE_DPDK
-    int nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool);
     uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, int& rx_offset);
 #endif
 
@@ -130,7 +99,6 @@ private:
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef USE_DPDK
-    struct rte_ether_addr server_eth_addr;
     uint32_t src_addr;
     uint32_t dst_addr;
     struct rte_mempool* mbuf_pool;

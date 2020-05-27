@@ -8,19 +8,6 @@
 
 static constexpr bool kDebugDPDK = false;
 
-inline const struct rte_eth_conf port_conf_default()
-{
-    struct rte_eth_conf port_conf = rte_eth_conf();
-    port_conf.rxmode.max_rx_pkt_len = JUMBO_FRAME_MAX_SIZE;
-    port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
-    return port_conf;
-}
-
-static struct rte_flow* generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
-    uint32_t src_ip, uint32_t src_mask, uint32_t dest_ip, uint32_t dest_mask,
-    uint16_t src_port, uint16_t src_port_mask, uint16_t dst_port,
-    uint16_t dst_port_mask, struct rte_flow_error* error);
-
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
     config_ = cfg;
@@ -60,7 +47,7 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     uint16_t portid;
     RTE_ETH_FOREACH_DEV(portid)
 
-    if (nic_dpdk_init(portid, mbuf_pool) != 0)
+    if (DpdkTransport::nic_init(portid, mbuf_pool, comm_thread_num_) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     unsigned int nb_lcores = rte_lcore_count();
@@ -75,14 +62,18 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     struct rte_flow* flow;
     /* create flow for send packet with */
     for (int i = 0; i < comm_thread_num_; i++) {
+        printf("%d\n", i);
         uint16_t src_port = rte_cpu_to_be_16(config_->ue_tx_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(config_->bs_port + i);
-        flow = generate_ipv4_flow(0, i, src_addr, FULL_MASK, dst_addr,
-            FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
-        // printf("Add rule for src port: %d, dst port: %d, queue: %d\n", src_port,
-        //     dst_port, i);
-        rt_assert(flow, "Error in creating flow" + std::string(error.message));
+        flow = DpdkTransport::generate_ipv4_flow(0, i, src_addr, FULL_MASK,
+            dst_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
+        printf("Add rule for src port: %d, dst port: %d, queue: %d\n", src_port,
+            dst_port, i);
+        if (!flow)
+            rte_exit(
+                EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
     }
+    printf("here\n");
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
@@ -100,107 +91,12 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
 
 PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
 
-int PacketTXRX::nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool)
-{
-    struct rte_eth_conf port_conf = port_conf_default();
-    const uint16_t rxRings = comm_thread_num_, txRings = 2 * comm_thread_num_;
-    int retval;
-    uint16_t q;
-    uint16_t nb_rxd = RX_RING_SIZE;
-    uint16_t nb_txd = TX_RING_SIZE;
-
-    struct rte_eth_dev_info dev_info;
-    struct rte_eth_rxconf rxconf;
-    struct rte_eth_txconf txconf;
-
-    if (rte_eth_dev_count_avail() < port)
-        rte_exit(EXIT_FAILURE, "Not Enough NICs\n");
-
-    if (!rte_eth_dev_is_valid_port(port))
-        rte_exit(EXIT_FAILURE, "NIC ID is invalid\n");
-
-    rte_eth_dev_set_mtu(port, 9000);
-    uint16_t mtu_size = 0;
-    rte_eth_dev_get_mtu(port, &mtu_size);
-    printf("MTU: %d\n", mtu_size);
-
-    int promiscuous_en = rte_eth_promiscuous_get(port);
-    printf("Promiscuous mode: %d\n", promiscuous_en);
-    rte_eth_promiscuous_enable(port);
-    promiscuous_en = rte_eth_promiscuous_get(port);
-    printf("Promiscuous mode: %d\n", promiscuous_en);
-
-    rte_eth_dev_info_get(port, &dev_info);
-    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
-        port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
-
-    port_conf.rxmode.max_rx_pkt_len
-        = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
-    // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
-
-    retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
-    if (retval != 0)
-        return retval;
-    printf("Max packet length: %d, dev max: %d\n",
-        port_conf.rxmode.max_rx_pkt_len, dev_info.max_rx_pktlen);
-    retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
-    if (retval != 0)
-        return retval;
-
-    rxconf = dev_info.default_rxconf;
-    rxconf.offloads = port_conf.rxmode.offloads;
-    uint32_t mbp_buf_size = rte_pktmbuf_data_room_size(mbuf_pool);
-    printf("size of mbuf_pool: %u\n", mbp_buf_size);
-
-    for (q = 0; q < rxRings; q++) {
-        retval = rte_eth_rx_queue_setup(
-            port, q, nb_rxd, rte_eth_dev_socket_id(port), &rxconf, mbuf_pool);
-        if (retval < 0)
-            return retval;
-    }
-
-    txconf = dev_info.default_txconf;
-    txconf.offloads = port_conf.txmode.offloads;
-
-    for (q = 0; q < txRings; q++) {
-        retval = rte_eth_tx_queue_setup(
-            port, q, nb_txd, rte_eth_dev_socket_id(port), &txconf);
-        if (retval < 0)
-            return retval;
-    }
-
-    retval = rte_eth_dev_start(port);
-    if (retval < 0)
-        return retval;
-
-    struct rte_ether_addr addr;
-    rte_eth_macaddr_get(port, &addr);
-    printf("NIC %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-           " %02" PRIx8 " %02" PRIx8 " \n",
-        port, addr.addr_bytes[0], addr.addr_bytes[1], addr.addr_bytes[2],
-        addr.addr_bytes[3], addr.addr_bytes[4], addr.addr_bytes[5]);
-    server_eth_addr = addr;
-
-    struct rte_eth_link link;
-    rte_eth_link_get_nowait(port, &link);
-    while (!link.link_status) {
-        printf("Waiting for link up on NIC %" PRIu16 "\n", port);
-        sleep(1);
-        rte_eth_link_get_nowait(port, &link);
-    }
-    if (!link.link_status) {
-        printf("Link down on NIC %" PRIx16 "\n", port);
-        return 0;
-    }
-
-    return 0;
-}
-
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length,
     Table<size_t>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
     int in_tx_buffer_frame_num, int in_tx_buffer_length)
 {
+
     buffer_ = &in_buffer; // for save data
     buffer_status_ = &in_buffer_status; // for save status
     frame_start_ = &in_frame_start;
@@ -242,47 +138,6 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         worker_id++;
     }
     return true;
-}
-
-static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
-{
-    // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,
-    // %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31),
-    // (intptr_t(pvSrc) & 31) ); assert(nBytes % 32 == 0);
-    // assert((intptr_t(pvDest) & 31) == 0);
-    // assert((intptr_t(pvSrc) & 31) == 0);
-    const __m256i* pSrc = reinterpret_cast<const __m256i*>(pvSrc);
-    __m256i* pDest = reinterpret_cast<__m256i*>(pvDest);
-    int64_t nVects = nBytes / sizeof(*pSrc);
-    for (; nVects > 0; nVects--, pSrc++, pDest++) {
-        const __m256i loaded = _mm256_stream_load_si256(pSrc);
-        _mm256_stream_si256(pDest, loaded);
-    }
-    _mm_sfence();
-}
-
-static void print_pkt(int src_ip, int dst_ip, uint16_t src_port,
-    uint16_t dst_port, int len, int tid)
-{
-    uint8_t b[12];
-    uint16_t sp, dp;
-
-    b[0] = src_ip & 0xFF;
-    b[1] = (src_ip >> 8) & 0xFF;
-    b[2] = (src_ip >> 16) & 0xFF;
-    b[3] = (src_ip >> 24) & 0xFF;
-    b[4] = src_port & 0xFF;
-    b[5] = (src_port >> 8) & 0xFF;
-    sp = ((b[4] << 8) & 0xFF00) | (b[5] & 0x00FF);
-    b[6] = dst_ip & 0xFF;
-    b[7] = (dst_ip >> 8) & 0xFF;
-    b[8] = (dst_ip >> 16) & 0xFF;
-    b[9] = (dst_ip >> 24) & 0xFF;
-    b[10] = dst_port & 0xFF;
-    b[11] = (dst_port >> 8) & 0xFF;
-    dp = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
-    printf("In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n",
-        tid, b[0], b[1], b[2], b[3], sp, b[6], b[7], b[8], b[9], dp, len);
 }
 
 void* PacketTXRX::loopTXRX(int tid)
@@ -332,8 +187,8 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
         if (kDebugDPDK) {
             struct rte_udp_hdr* udp_h = (struct rte_udp_hdr*)((char*)ip_h
                 + sizeof(struct rte_ipv4_hdr));
-            print_pkt(ip_h->src_addr, ip_h->dst_addr, udp_h->src_port,
-                udp_h->dst_port, dpdk_pkt->data_len, tid);
+            DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
+                udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
             printf(
                 "Header type: %d, IPV4: %d\n", eth_type, RTE_ETHER_TYPE_IPV4);
             printf("UDP: %d, %d\n", ip_h->next_proto_id, IPPROTO_UDP);
@@ -360,7 +215,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
 
         struct Packet* pkt
             = (struct Packet*)&rx_buffer[rx_offset * config_->packet_length];
-        fastMemcpy((char*)pkt, payload, config_->packet_length);
+        DpdkTransport::fastMemcpy((char*)pkt, payload, config_->packet_length);
         // rte_memcpy((char*)pkt, payload, c->packet_length);
         rte_pktmbuf_free(rx_bufs[i]);
 
@@ -442,7 +297,7 @@ int PacketTXRX::dequeue_send(int tid)
     udp_h->dst_port = rte_cpu_to_be_16(config_->ue_rx_port + tid);
 
     char* payload = (char*)eth_hdr + kPayloadOffset;
-    fastMemcpy(payload, (char*)pkt, config_->packet_length);
+    DpdkTransport::fastMemcpy(payload, (char*)pkt, config_->packet_length);
 
     // Send data (one OFDM symbol)
     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
@@ -454,87 +309,4 @@ int PacketTXRX::dequeue_send(int tid)
                   Event_data(EventType::kPacketTX, event.tags[0])),
         "Socket message enqueue failed\n");
     return 1;
-}
-
-static struct rte_flow* generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
-    uint32_t src_ip, uint32_t src_mask, uint32_t dest_ip, uint32_t dest_mask,
-    uint16_t src_port, uint16_t src_port_mask, uint16_t dst_port,
-    uint16_t dst_port_mask, struct rte_flow_error* error)
-{
-    struct rte_flow_attr attr;
-    struct rte_flow_item pattern[4];
-    struct rte_flow_action action[2];
-    struct rte_flow* flow = NULL;
-    struct rte_flow_action_queue queue = { .index = rx_q };
-    struct rte_flow_item_ipv4 ip_spec;
-    struct rte_flow_item_ipv4 ip_mask;
-    struct rte_flow_item_udp udp_spec;
-    struct rte_flow_item_udp udp_mask;
-    struct rte_flow_item udp_item;
-    int res;
-    memset(pattern, 0, sizeof(pattern));
-    memset(action, 0, sizeof(action));
-    /*
-     * set the rule attribute.
-     * in this case only ingress packets will be checked.
-     */
-    memset(&attr, 0, sizeof(struct rte_flow_attr));
-    attr.ingress = 1;
-    attr.priority = 0;
-    /*
-     * create the action sequence.
-     * one action only,  move packet to queue
-     */
-    action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
-    action[0].conf = &queue;
-    action[1].type = RTE_FLOW_ACTION_TYPE_END;
-    /*
-     * set the first level of the pattern (ETH).
-     * since in this example we just want to get the
-     * ipv4 we set this level to allow all.
-     */
-    pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
-
-    /* the final level must be always type end */
-    pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
-    /*
-     * setting the second level of the pattern (IP).
-     * in this example this is the level we care about
-     * so we set it according to the parameters.
-     */
-    memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
-    memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
-    // ip_spec.hdr.next_proto_id = IPPROTO_UDP;
-    // ip_mask.hdr.next_proto_id = 0xf; // protocol mask
-
-    ip_spec.hdr.dst_addr = dest_ip; // htonl(dest_ip);
-    ip_mask.hdr.dst_addr = dest_mask;
-    ip_spec.hdr.src_addr = src_ip; // htonl(src_ip);
-    ip_mask.hdr.src_addr = src_mask;
-
-    pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
-    pattern[1].spec = &ip_spec;
-    pattern[1].mask = &ip_mask;
-
-    udp_spec.hdr.src_port = src_port;
-    udp_spec.hdr.dst_port = dst_port;
-    udp_spec.hdr.dgram_len = 0;
-    udp_spec.hdr.dgram_cksum = 0;
-
-    udp_mask.hdr.src_port = src_port_mask;
-    udp_mask.hdr.dst_port = dst_port_mask;
-    udp_mask.hdr.dgram_len = 0;
-    udp_mask.hdr.dgram_cksum = 0;
-
-    udp_item.type = RTE_FLOW_ITEM_TYPE_UDP;
-    udp_item.spec = &udp_spec;
-    udp_item.mask = &udp_mask;
-    udp_item.last = NULL;
-
-    pattern[2] = udp_item;
-
-    res = rte_flow_validate(port_id, &attr, pattern, action, error);
-    if (!res)
-        flow = rte_flow_create(port_id, &attr, pattern, action, error);
-    return flow;
 }
