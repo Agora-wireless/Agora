@@ -318,6 +318,7 @@ private:
     std::vector<int> data_sc_ind_;
     std::vector<int> pilot_sc_ind_;
     std::vector<int> non_null_sc_ind_;
+    std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
 
     /* Concurrent queues */
     /* task queue for uplink FFT */

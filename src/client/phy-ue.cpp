@@ -24,6 +24,13 @@ Phy_UE::Phy_UE(Config* config)
     non_null_sc_ind_.insert(
         non_null_sc_ind_.end(), pilot_sc_ind_.begin(), pilot_sc_ind_.end());
     std::sort(non_null_sc_ind_.begin(), non_null_sc_ind_.end());
+    ue_pilot_vec.resize(numAntennas);
+    for (size_t i = 0; i < numAntennas; i++) {
+        for (size_t j = prefix_len; j < config_->sampsPerSymbol - postfix_len; j++) {
+            ue_pilot_vec[i].push_back(std::complex<float>(config_->ue_specific_pilot_t[i][j].real() / 32768.0,
+                config_->ue_specific_pilot_t[i][j].imag() / 32768.0));
+        }
+    }
 
     task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * rx_symbol_perframe * numAntennas * 36);
@@ -512,14 +519,15 @@ void Phy_UE::doFFT(int tid, int offset)
     size_t sym_offset = 0;
     if (config_->isPilot(frame_id, symbol_id)) {
         std::vector<std::complex<float>> vec;
+        size_t seq_len = ue_pilot_vec[ant_id].size(); 
         for (size_t i = 0; i < config_->sampsPerSymbol; i++)
             vec.push_back(std::complex<float>(
                 pkt->data[2 * i] / 32768.0, pkt->data[2 * i + 1] / 32768.0));
-        sym_offset = (size_t)CommsLib::find_pilot_seq(
-            vec, config_->pilot_cf32, config_->pilot_cf32.size());
-        sym_offset = sym_offset < config_->pilot_cf32.size()
+        sym_offset
+            = CommsLib::find_pilot_seq(vec, ue_pilot_vec[ant_id], seq_len);
+        sym_offset = sym_offset < seq_len
             ? 0
-            : sym_offset - config_->pilot_cf32.size();
+            : sym_offset - seq_len;
         float noise_power = 0;
         for (size_t i = 0; i < sym_offset; i++)
             noise_power += std::pow(std::abs(vec[i]), 2);
