@@ -59,7 +59,9 @@ Running Client App on Server 2:
 * Re-build code with `DEBUG_UPLINK` enabled in `src/common/Symbols.hpp`
 * Modify `data/user-iris-serials.txt` by adding 2 client Iris serials in your setup.
 * Run `./build/user data/ue-ul-hw.json`
+
 Running Millipede on Server 1:
+
 * Re-build code with `kExportConstellation` enabled in `src/common/Symbols.hpp`
 * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding Iris serials in your Faros RRHs.
 * Run `python mm_gui.py data/bs-ul-hw.json`
