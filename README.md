@@ -30,6 +30,7 @@ E.g.,
 
 	source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64
 
+2. Build
 
 Compile Millipede:
 
@@ -39,12 +40,33 @@ Compile Millipede:
 	cmake ..
 	make -j 
 
+* Note: to be able run Millipede with Faros/Iris hardware, set `USE_ARGOS` variable in CMakeLists.txt to `TRUE`.
+
 2. Run
-* First, run "./data_generator data/tddconfig-sim-ul.json" to generate required data files for Millipede
-* In one terminal, run "./millipede data/tddconfig-sim-ul.json" to start Millipede with Uplink configuration 
-* In another terminal, run "./sender 4 2 5000 data/tddconfig-sim-ul.json" to start the sender with Uplink configuration, the four arguments are: # of threads, offset of CPU core index (change the value according to which socket the NIC is installed), frame duration in microseconds, config filename
+
+2.1. Simulation Mode
+
+* First, run `./data_generator data/tddconfig-sim-ul.json` to generate required data files for Millipede
+* In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start Millipede with Uplink configuration 
+* In another terminal, run `./sender 4 2 5000 data/tddconfig-sim-ul.json` to start the sender with Uplink configuration, the four arguments are: # of threads, offset of CPU core index (change the value according to which socket the NIC is installed), frame duration in microseconds, config filename
+
+2.2. Hardware Mode
+
+Uplink Demo:
+
+Running Client App on Server 2:
+
+* Re-build code with `DEBUG_UPLINK` enabled in `src/common/Symbols.hpp`
+* Modify `data/user-iris-serials.txt` by adding 2 client Iris serials in your setup.
+* Run `./build/user data/ue-ul-hw.json`
+Running Millipede on Server 1:
+* Re-build code with `kExportConstellation` enabled in `src/common/Symbols.hpp`
+* Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding Iris serials in your Faros RRHs.
+* Run `python mm_gui.py data/bs-ul-hw.json`
+ 
 
 3. Other information
+
 * millipede.cpp is the file that controls most things (performs FFT, ZF, and demodulation). 
 * Eebug information settings are in Symbols.hpp
 * test/test_millipede is used for correctness test
