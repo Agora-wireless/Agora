@@ -453,8 +453,8 @@ void Config::genData()
 
     for (size_t u = 0; u < UE_ANT_NUM; u++) {
         for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            auto cur_val = std::abs(std::complex<float>(
-                pilot_ifft[u][j].re, pilot_ifft[u][j].im));
+            auto cur_val = std::abs(
+                std::complex<float>(pilot_ifft[u][j].re, pilot_ifft[u][j].im));
             if (cur_val > max_val) {
                 max_val = cur_val;
             }

@@ -454,7 +454,7 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     refRefDev->setFrequency(SOAPY_SDR_RX, channel, "RF", centerRfFreq);
     refRefDev->setFrequency(SOAPY_SDR_RX, channel, "BB",
         -toneBBFreq); // Should this be nagative if we need
-                      // centerRfFreq-toneBBFreq at true center?
+        // centerRfFreq-toneBBFreq at true center?
     refDev->setFrequency(SOAPY_SDR_TX, channel, "RF", centerRfFreq);
     refDev->setFrequency(SOAPY_SDR_TX, channel, "BB", txToneBBFreq);
     refDev->writeSetting(
@@ -481,7 +481,7 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     // refDev->setFrequency(SOAPY_SDR_RX, channel, "RF", centerRfFreq);
     refDev->setFrequency(SOAPY_SDR_RX, channel, "BB",
         -toneBBFreq); // Should this be nagative if we need
-                      // centerRfFreq-toneBBFreq at true center?
+        // centerRfFreq-toneBBFreq at true center?
     for (size_t r = 0; r < radioSize - 1; r++) {
         allButRefDevs[r]->setFrequency(
             SOAPY_SDR_TX, channel, "RF", centerRfFreq);
@@ -625,8 +625,10 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
                     ci.real() / 32768.0, ci.imag() / 32768.0);
             });
 
-        size_t peak_up = CommsLib::find_pilot_seq(up, _cfg->pilot_cf32, seq_len);
-        size_t peak_dn = CommsLib::find_pilot_seq(dn, _cfg->pilot_cf32, seq_len);
+        size_t peak_up
+            = CommsLib::find_pilot_seq(up, _cfg->pilot_cf32, seq_len);
+        size_t peak_dn
+            = CommsLib::find_pilot_seq(dn, _cfg->pilot_cf32, seq_len);
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
         std::cout << "receive starting position from/to node " << i << ": "
