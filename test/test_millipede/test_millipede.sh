@@ -25,12 +25,19 @@ fi
 # Process out_file and print summary of pass/fails stats. This should be called
 # only iff the user supplied out_file
 analyse_out() {
+  max_errs=5
   n_uplink_passed=`cat ${out_file} | grep -i "Passed uplink test" | wc -l`
   n_uplink_failed=`cat ${out_file} | grep -i "Failed uplink test" | wc -l`
   n_downlink_passed=`cat ${out_file} | grep -i "Passed downlink test" | wc -l`
   n_downlink_failed=`cat ${out_file} | grep -i "Failed downlink test" | wc -l`
 
-  >&2 echo "Iteration $i/${num_iters}: Uplink: ${n_uplink_passed} passed, ${n_uplink_failed} failed. Downlink: ${n_downlink_passed} passed, ${n_downlink_failed} failed."
+  >&2 echo "Iteration $i/${num_iters}: Uplink: ${n_uplink_passed} passed,"\
+    "${n_uplink_failed} failed. Downlink: ${n_downlink_passed} passed,"\
+    "${n_downlink_failed} failed. Listing up to ${max_errs} errors:"
+
+  # Print any errors or warnings
+  cat ${out_file} | grep "WARNG" | head -${max_errs}
+  cat ${out_file} | grep "ERROR" | head -${max_errs}
 }
 
 echo "Running tests for $num_iters iterations"
@@ -47,8 +54,9 @@ for i in `seq 1 $num_iters`; do
     echo "======================================"
     echo "Running uplink correctness test $i......"
     echo -e "======================================\n"
+    # We sleep before starting the sender to allow the Millipede server to start
     ./millipede data/tddconfig-correctness-test-ul.json &
-    ./sender 4 10 5000 data/tddconfig-correctness-test-ul.json
+    sleep 1; ./sender 4 10 5000 data/tddconfig-correctness-test-ul.json
     wait
 
     echo "==========================================="
@@ -61,7 +69,7 @@ for i in `seq 1 $num_iters`; do
     echo "Running downlink correctness test $i......"
     echo -e "======================================\n"
     ./millipede data/tddconfig-correctness-test-dl.json &
-    ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
+    sleep 1; ./sender 4 10 5000 data/tddconfig-correctness-test-dl.json
     echo -e "-------------------------------------------------------\n\n\n"
     wait
   } >> $out_file

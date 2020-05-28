@@ -61,6 +61,33 @@ set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx.cpp)
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 
+# DPDK
+if(${USE_DPDK})
+  message(STATUS "DPDK is enabled")
+
+  find_library(DPDK_LIB dpdk)
+  message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "DPDK library not found")
+  endif()
+
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
+  add_definitions(-DUSE_DPDK)
+  set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx_DPDK.cpp)
+  # DPDK include directory. Locating rte_config.h does not work on some systems.
+  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+  # from the real DPDK include directory (/usr/include/dpdk/).
+  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  if (DPDK_INCLUDE_DIR)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  else()
+    message(FATAL_ERROR "DPDK include directory not found")
+  endif()
+  include_directories(${DPDK_INCLUDE_DIR})
+else()
+  message(STATUS "DPDK is disabled")
+endif()
+
 include_directories(
 	${SOURCE_DIR}/src/common/
   ${SOURCE_DIR}/src/millipede/
@@ -86,7 +113,7 @@ set(MILLIPEDE_SOURCES
   ${SOURCE_DIR}/src/millipede/reciprocity.cpp)
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES})
-target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB})
+target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
 
 # LDPC support
@@ -131,7 +158,7 @@ set(SOURCES
   ${LDPC_SOURCES})
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 set(SENDER_SOURCES 
   ${SOURCE_DIR}/simulator/sender_cli.cpp

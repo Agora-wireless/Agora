@@ -675,7 +675,7 @@ SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
     case 'L':
         return SymbolType::kCalUL;
     }
-    rt_assert(false, "Should not reach here");
+    rt_assert(false, std::string("Should not reach here") + std::to_string(s));
     return SymbolType::kUnknown;
 }
 

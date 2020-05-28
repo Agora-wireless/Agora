@@ -40,6 +40,12 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 find_package(Armadillo)
 
+set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
+if(${USE_DPDK})
+  add_definitions(-DUSE_DPDK)
+endif()
+
+
 include_directories(
   ../src/common/)
 

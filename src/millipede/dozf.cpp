@@ -10,6 +10,10 @@
 
 static constexpr bool kUseSIMDGather = true;
 
+// Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
+// This is faster but less accurate than using an SVD-based pseudoinverse.
+static constexpr size_t kUseInverseForZF = true;
+
 DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -54,7 +58,18 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     arma::cx_fmat mat_ul_precoder(
         reinterpret_cast<arma::cx_float*>(precoder_ul), cfg->UE_NUM,
         cfg->BS_ANT_NUM, false);
-    arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
+    if (kUseInverseForZF) {
+        try {
+            mat_ul_precoder
+                = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+        } catch (std::runtime_error) {
+            MLPD_WARN(
+                "Failed to invert channel matrix, falling back to pinv()\n");
+            arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
+        }
+    } else {
+        arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
+    }
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_precoder(

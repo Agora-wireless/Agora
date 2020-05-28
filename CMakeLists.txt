@@ -10,8 +10,9 @@ message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-  set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
+  set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
@@ -58,19 +59,31 @@ set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
 # DPDK
 if(${USE_DPDK})
-  find_package(dpdk)
-  if(NOT dpdk_FOUND)
-    message(STATUS "DPDK Not Found! Excluding from Compile List")
-    set(USE_DPDK False)
-  else()
-    add_definitions(-DUSE_DPDK)
+  message(STATUS "DPDK is enabled")
+
+  find_library(DPDK_LIB dpdk)
+  message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "DPDK library not found")
   endif()
-  set(TXRX_SOURCES src/millipede/txrx/txrx_DPDK.cpp)
-  set(RTE_SDK /home/argos/Jian/dpdk-stable-18.11.1/)
-  set(RTE_TARGET x86_64-native-linuxapp-gcc)
-  set(DPDK_LIB  "-Wl,--whole-archive -ldpdk -lnuma -ldl -Wl,--no-whole-archive" )
-  include_directories(${RTE_SDK}/${RTE_TARGET}/include)
-  link_directories(${RTE_SDK}/${RTE_TARGET}/lib)
+
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
+  add_definitions(-DUSE_DPDK)
+  set(TXRX_SOURCES 
+    src/millipede/txrx/txrx_DPDK.cpp
+    src/common/dpdk_transport.cpp)
+  # DPDK include directory. Locating rte_config.h does not work on some systems.
+  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+  # from the real DPDK include directory (/usr/include/dpdk/).
+  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  if (DPDK_INCLUDE_DIR)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  else()
+    message(FATAL_ERROR "DPDK include directory not found")
+  endif()
+  include_directories(${DPDK_INCLUDE_DIR})
+else()
+  message(STATUS "DPDK is disabled")
 endif()
 
 # Argos support
@@ -197,7 +210,8 @@ set(SOURCES
 			
 add_executable(millipede ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIB} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES} ${LDPC_SOURCES} ${HEADER_FILES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
