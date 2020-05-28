@@ -148,8 +148,7 @@ void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
 }
 
 template <typename T>
-std::vector<std::complex<T>> CommsLib::csign(
-    std::vector<std::complex<T>> iq)
+std::vector<std::complex<T>> CommsLib::csign(std::vector<std::complex<T>> iq)
 {
     /*
      * Return element-wise indication of the sign of a number (for complex
@@ -175,8 +174,7 @@ std::vector<std::complex<T>> CommsLib::csign(
 }
 
 template <typename T>
-std::vector<T> CommsLib::convolve(
-    std::vector<std::complex<T>> const& f,
+std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
     std::vector<std::complex<T>> const& g)
 {
     /* Convolution of two vectors

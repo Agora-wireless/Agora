@@ -640,7 +640,8 @@ void Phy_UE::doFFT(int tid, int offset)
                 evm += std::norm(equ_buffer_ptr[j] - dl_iq_f_ptr[sc_id]);
             }
         }
-        evm = std::sqrt(evm / (config_->OFDM_DATA_NUM - config_->OFDM_PILOT_NUM));
+        evm = std::sqrt(
+            evm / (config_->OFDM_DATA_NUM - config_->OFDM_PILOT_NUM));
         if (kPrintPhyStats)
             std::cout << "Frame: " << frame_id << " EVM: " << 100 * evm
                       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
