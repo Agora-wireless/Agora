@@ -54,6 +54,23 @@ Compile Millipede:
 
 Uplink Demo:
 
+Flash the *client* Iris device with proper image:
+
+* Download the image bundle from https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz
+* Unpack the tarball and the one inside: bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz
+* Copy BOOT.BIN and image.ub files to the SD card of you Iris.
+* Alternatively, you can transfer the files over the network (with Iris on and discoverable):
+
+	scp BOON.BIN image.up sklk@IrisIPAdress:~
+	ssh sklk@IrisIPAddress
+	sudo mount /boot
+	sudo cp BOON.BIN image.ub /boot
+	sudo sync
+	sudo umount /boot
+	sudo reboot
+
+**Note:** Default login password to Iris is `sklk`
+
 Running Client App on Server 2:
 
 * Re-build code with `DEBUG_UPLINK` enabled in `src/common/Symbols.hpp`
