@@ -29,7 +29,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
 #include <vector>
 
 #ifdef USE_ARGOS
@@ -39,48 +39,11 @@
 #endif
 
 #ifdef USE_DPDK
-#include <inttypes.h>
-#include <rte_arp.h>
-#include <rte_byteorder.h>
-#include <rte_cycles.h>
-#include <rte_debug.h>
-#include <rte_distributor.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_ether.h>
-#include <rte_flow.h>
-#include <rte_ip.h>
-#include <rte_malloc.h>
-#include <rte_pause.h>
-#include <rte_prefetch.h>
-#include <rte_udp.h>
+#include "dpdk_transport.hpp"
 #endif
-
-#define RX_RING_SIZE 8192 * 4
-#define TX_RING_SIZE 8192 * 4
-
-#define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2)
-#define MBUF_CACHE_SIZE 128
-#define BURST_SIZE 16
-
-#define ETH_HDRLEN 14
-#define IP4_HDRLEN 20
-#define UDP_HDRLEN 8
-#define MAX_JUMBO_FRAME_SIZE 9600 // 9600
-#define EMPTY_MASK 0x0
-#define FULL_MASK 0xffffffff
 
 typedef unsigned short ushort;
 class PacketTXRX {
-public:
-    //     // use for create pthread
-    //     struct PacketTXRXContext
-    //     {
-    //         PacketTXRX *ptr;
-    //         int tid;
-    //     };
-
 public:
     PacketTXRX(Config* cfg, int COMM_THREAD_NUM = 1, int in_core_offset = 1);
     /**
@@ -95,9 +58,7 @@ public:
     ~PacketTXRX();
 
 #ifdef USE_DPDK
-    int nic_dpdk_init(uint16_t port, struct rte_mempool* mbuf_pool);
-    int process_arp(
-        struct rte_mbuf* mbuf, struct ether_hdr* eth_h, int len, int tid);
+    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, int& rx_offset);
 #endif
 
     /**
@@ -125,9 +86,6 @@ public:
 #endif
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
-#ifdef USE_DPDK
-    static void* loopRecv_DPDK(void* context);
-#endif
 
 private:
 #if USE_IPV4
@@ -141,11 +99,9 @@ private:
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef USE_DPDK
-    struct ether_addr server_eth_addr;
     uint32_t src_addr;
     uint32_t dst_addr;
-    int src_port_start = 6000;
-    int dst_port_start = 8000;
+    struct rte_mempool* mbuf_pool;
 #endif
 
     Table<char>* buffer_;
@@ -157,7 +113,6 @@ private:
     int* tx_buffer_status_;
     long long tx_buffer_length_;
     int tx_buffer_frame_num_;
-    // float *tx_data_buffer_;
 
     int comm_thread_num_;
 
@@ -169,9 +124,6 @@ private:
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
-
-    // PacketTXRXContext* tx_context;
-    // PacketTXRXContext* rx_context;
 
     Config* config_;
 #ifdef USE_ARGOS

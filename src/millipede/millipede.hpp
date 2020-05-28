@@ -132,6 +132,11 @@ private:
         return ret.str();
     }
 
+    const double freq_ghz; // RDTSC frequency in GHz
+
+    // Worker thread i runs on core base_worker_core_offset + i
+    const size_t base_worker_core_offset;
+
     /* lookup table for 16 QAM, real and imag */
     float** qam16_table_;
     Config* config_;
@@ -144,7 +149,6 @@ private:
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
-    double freq_ghz = -1.0; // RDTSC frequency in GHz
 
     /*****************************************************
      * Buffers
@@ -207,7 +211,7 @@ private:
 
     Table<complex_float> ue_spec_pilot_buffer_;
 
-    RX_stats rx_stats_;
+    RxCounters rx_counters_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
     RC_stats rc_stats_;

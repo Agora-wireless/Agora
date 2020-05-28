@@ -7,6 +7,8 @@
 using namespace std;
 
 Millipede::Millipede(Config* cfg)
+    : freq_ghz(measure_rdtsc_freq())
+    , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -23,7 +25,6 @@ Millipede::Millipede(Config* cfg)
         cout << endl;
     }
 
-    freq_ghz = measure_rdtsc_freq();
     printf("Measured RDTSC frequency = %.2f\n", freq_ghz);
 
     pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
@@ -189,7 +190,10 @@ void Millipede::start()
 
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
-                assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM);
+                rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
+                    "Error: Received packet for future frame beyond frame "
+                    "window. This can happen if Millipede is running "
+                    "slowly, e.g., in debug mode");
 
                 update_rx_counters(pkt->frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
@@ -478,7 +482,7 @@ void Millipede::start()
                                 stats->master_set_tsc(
                                     TsType::kProcessingStarted, cur_frame_id);
                             } else if (fft_created_count
-                                == rx_stats_.max_task_count) {
+                                == rx_counters_.num_pkts_per_frame) {
                                 fft_created_count = 0;
                             }
                         }
@@ -533,7 +537,7 @@ void Millipede::handle_event_fft(size_t tag)
                 schedule_subcarriers(
                     EventType::kDemul, frame_id, symbol_idx_ul);
             }
-	}
+        }
     } else if (sym_type == SymbolType::kCalDL
         or sym_type == SymbolType::kCalUL) {
         print_per_symbol_done(PRINT_FFT_CAL, frame_id, symbol_id);
@@ -542,22 +546,14 @@ void Millipede::handle_event_fft(size_t tag)
             print_per_frame_done(PRINT_FFT_CAL, frame_id);
             // TODO: rc_stats_.max_task_count appears uninitalized
             schedule_task_set(EventType::kRC, rc_stats_.max_task_count,
-                frame_id, get_conq(EventType::kRC),
-                get_ptok(EventType::kRC));
+                frame_id, get_conq(EventType::kRC), get_ptok(EventType::kRC));
         }
     }
 }
 
-static void pin_worker(ThreadType thread_type, int tid, Config* config_)
-{
-    int socket_rx_thread_num = config_->socket_thread_num;
-    pin_to_core_with_offset(
-        thread_type, config_->core_offset + socket_rx_thread_num + 1, tid);
-}
-
 void* Millipede::worker(int tid)
 {
-    pin_worker(ThreadType::kWorker, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     /* Initialize operators */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
@@ -589,10 +585,10 @@ void* Millipede::worker(int tid)
 
 #ifdef USE_LDPC
     computeEncoding = new DoEncode(config_, tid, freq_ghz,
-        get_conq(EventType::kEncode), complete_task_queue_,
+        *get_conq(EventType::kEncode), complete_task_queue_,
         worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
     computeDecoding = new DoDecode(config_, tid, freq_ghz,
-        get_conq(EventType::kDecode), complete_task_queue_,
+        *get_conq(EventType::kDecode), complete_task_queue_,
         worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
 #endif
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
@@ -616,7 +612,7 @@ void* Millipede::worker(int tid)
 
 void* Millipede::worker_fft(int tid)
 {
-    pin_worker(ThreadType::kWorkerFFT, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     /* Initialize IFFT operator */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
@@ -637,7 +633,7 @@ void* Millipede::worker_fft(int tid)
 
 void* Millipede::worker_zf(int tid)
 {
-    pin_worker(ThreadType::kWorkerZF, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
@@ -651,7 +647,7 @@ void* Millipede::worker_zf(int tid)
 
 void* Millipede::worker_demul(int tid)
 {
-    pin_worker(ThreadType::kWorkerDemul, tid, config_);
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
@@ -694,22 +690,22 @@ void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
 {
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     if (config_->isPilot(frame_id, symbol_id)) {
-        if (++rx_stats_.task_pilot_count[frame_slot]
-            == rx_stats_.max_task_pilot_count) {
-            rx_stats_.task_pilot_count[frame_slot] = 0;
+        rx_counters_.num_pilot_pkts[frame_slot]++;
+        if (rx_counters_.num_pilot_pkts[frame_slot]
+            == rx_counters_.num_pilot_pkts_per_frame) {
+            rx_counters_.num_pilot_pkts[frame_slot] = 0;
             stats->master_set_tsc(TsType::kPilotAllRX, frame_id);
             print_per_frame_done(PRINT_RX_PILOTS, frame_id);
         }
-    }
-    else if (config_->isCalDlPilot(frame_id, symbol_id)
-       		    or config_->isCalUlPilot(frame_id, symbol_id)) {
-        if (++rx_stats_.task_rc_count[frame_slot]
-            == rx_stats_.max_task_rc_count) {
-            rx_stats_.task_rc_count[frame_slot] = 0;
+    } else if (config_->isCalDlPilot(frame_id, symbol_id)
+        or config_->isCalUlPilot(frame_id, symbol_id)) {
+        if (++rx_counters_.num_reciprocity_pkts[frame_slot]
+            == rx_counters_.num_reciprocity_pkts_per_frame) {
+            rx_counters_.num_reciprocity_pkts[frame_slot] = 0;
             stats->master_set_tsc(TsType::kRCAllRX, frame_id);
         }
     }
-    if (rx_stats_.task_count[frame_slot]++ == 0) {
+    if (rx_counters_.num_pkts[frame_slot] == 0) {
         stats->master_set_tsc(TsType::kPilotRX, frame_id);
         if (kDebugPrintPerFrameStart) {
             const size_t prev_frame_slot
@@ -720,12 +716,15 @@ void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
                 frame_id, symbol_id,
                 stats->master_get_delta_us(
                     TsType::kPilotRX, frame_id, frame_id - 1),
-                rx_stats_.task_count[prev_frame_slot]);
+                rx_counters_.num_pkts[prev_frame_slot]);
         }
-    } else if (rx_stats_.task_count[frame_slot] == rx_stats_.max_task_count) {
+    }
+
+    rx_counters_.num_pkts[frame_slot]++;
+    if (rx_counters_.num_pkts[frame_slot] == rx_counters_.num_pkts_per_frame) {
         stats->master_set_tsc(TsType::kRXDone, frame_id);
         print_per_frame_done(PRINT_RX, frame_id);
-        rx_stats_.task_count[frame_slot] = 0;
+        rx_counters_.num_pkts[frame_slot] = 0;
     }
 }
 
@@ -733,18 +732,17 @@ void Millipede::print_per_frame_done(size_t task_type, size_t frame_id)
 {
     if (!kDebugPrintPerFrameDone)
         return;
-    int dl_data_symbol_num_perframe = config_->dl_data_symbol_num_perframe;
-    int ul_data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
     switch (task_type) {
     case (PRINT_RX): {
         size_t prev_frame_slot = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-        printf("Main thread: received all packets in frame: %zu in %.2f us,"
-               " demul: %zu done, rx in prev frame: %zu\n",
+        printf("Main thread: received all packets in frame: %zu in %.2f us."
+               " Demul: %zu done. RX in prev frame: %zu of %zu.\n",
             frame_id,
             stats->master_get_delta_us(
                 TsType::kRXDone, TsType::kPilotRX, frame_id),
             demul_stats_.get_symbol_count(frame_id),
-            rx_stats_.task_count[prev_frame_slot]);
+            rx_counters_.num_pkts[prev_frame_slot],
+            rx_counters_.num_pkts_per_frame);
     } break;
     case (PRINT_RX_PILOTS):
         printf("Main thread: received all pilots in frame: %zu  in %.2f us\n",
@@ -789,18 +787,18 @@ void Millipede::print_per_frame_done(size_t task_type, size_t frame_id)
             get_conq(EventType::kIFFT)->size_approx());
         break;
     case (PRINT_DEMUL):
-        printf("Main thread: Demodulation done frame: %zu (%d UL symbols) "
+        printf("Main thread: Demodulation done frame: %zu (%zu UL symbols) "
                "in %.2f us since ZF done, total %.2f us\n",
-            frame_id, ul_data_symbol_num_perframe,
+            frame_id, config_->ul_data_symbol_num_perframe,
             stats->master_get_delta_us(
                 TsType::kDemulDone, TsType::kZFDone, frame_id),
             stats->master_get_delta_us(
                 TsType::kDemulDone, TsType::kPilotRX, frame_id));
         break;
     case (PRINT_DECODE):
-        printf("Main thread: Decoding done frame: %zu (%d UL symbols) in "
+        printf("Main thread: Decoding done frame: %zu (%zu UL symbols) in "
                "%.2f us since ZF done, total %.2f us\n",
-            frame_id, ul_data_symbol_num_perframe,
+            frame_id, config_->ul_data_symbol_num_perframe,
             stats->master_get_delta_us(
                 TsType::kDecodeDone, TsType::kZFDone, frame_id),
             stats->master_get_delta_us(
@@ -843,9 +841,9 @@ void Millipede::print_per_frame_done(size_t task_type, size_t frame_id)
                 TsType::kTXProcessedFirst, TsType::kPilotRX, frame_id));
         break;
     case (PRINT_TX):
-        printf("Main thread: TX done frame: %zu (%d DL symbols) in %.2f us "
+        printf("Main thread: TX done frame: %zu (%zu DL symbols) in %.2f us "
                "since ZF done, total: %.2f us\n",
-            frame_id, dl_data_symbol_num_perframe,
+            frame_id, config_->dl_data_symbol_num_perframe,
             stats->master_get_delta_us(
                 TsType::kTXDone, TsType::kZFDone, frame_id),
             stats->master_get_delta_us(
@@ -1032,15 +1030,11 @@ void Millipede::initialize_uplink_buffers()
     decoded_buffer_.calloc(
         task_buffer_symbol_num_ul, num_decoded_bytes * cfg->UE_NUM, 64);
 
-    rx_stats_.max_task_count = cfg->BS_ANT_NUM
+    rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
-    rx_stats_.max_task_pilot_count
+    rx_counters_.num_pilot_pkts_per_frame
         = cfg->BS_ANT_NUM * cfg->pilot_symbol_num_perframe;
-    rx_stats_.max_task_rc_count
-        = cfg->BS_ANT_NUM;
-    rx_stats_.task_count.fill(0);
-    rx_stats_.task_pilot_count.fill(0);
-    rx_stats_.task_rc_count.fill(0);
+    rx_counters_.num_reciprocity_pkts_per_frame = cfg->BS_ANT_NUM;
 
     fft_created_count = 0;
     fft_stats_.init(cfg->BS_ANT_NUM, cfg->pilot_symbol_num_perframe,

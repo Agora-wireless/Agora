@@ -33,23 +33,23 @@
 #include <unistd.h>
 #include <vector>
 
-#if USE_DPDK
-#include <inttypes.h>
-#include <rte_arp.h>
-#include <rte_byteorder.h>
-#include <rte_cycles.h>
-#include <rte_debug.h>
-#include <rte_distributor.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_ether.h>
-#include <rte_flow.h>
-#include <rte_ip.h>
-#include <rte_malloc.h>
-#include <rte_pause.h>
-#include <rte_prefetch.h>
-#include <rte_udp.h>
-#endif
+// #if USE_DPDK
+// #include <inttypes.h>
+// #include <rte_arp.h>
+// #include <rte_byteorder.h>
+// #include <rte_cycles.h>
+// #include <rte_debug.h>
+// #include <rte_distributor.h>
+// #include <rte_eal.h>
+// #include <rte_ethdev.h>
+// #include <rte_ether.h>
+// #include <rte_flow.h>
+// #include <rte_ip.h>
+// #include <rte_malloc.h>
+// #include <rte_pause.h>
+// #include <rte_prefetch.h>
+// #include <rte_udp.h>
+// #endif
 
 #define RX_RING_SIZE 8192 * 4
 #define TX_RING_SIZE 8192 * 4

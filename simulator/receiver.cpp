@@ -37,26 +37,26 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     printf("start Recv thread\n");
     std::vector<pthread_t> created_threads;
 
-#if USE_DPDK
-    unsigned int nb_lcores = rte_lcore_count();
-    printf("Number of DPDK cores: %d\n", nb_lcores);
-    unsigned int lcore_id;
-    int worker_id = 0;
-    // Launch specific task to cores
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
-    {
-        // launch communication and task thread onto specific core
-        if (worker_id < rx_thread_num_) {
-            auto context = new EventHandlerContext<Receiver>;
-            context->obj_ptr = this;
-            context->id = worker_id;
-            rte_eal_remote_launch(
-                (lcore_function_t*)loopRecv_DPDK, context, lcore_id);
-            printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
-        }
-        worker_id++;
-    }
-#else
+// #if USE_DPDK
+//     unsigned int nb_lcores = rte_lcore_count();
+//     printf("Number of DPDK cores: %d\n", nb_lcores);
+//     unsigned int lcore_id;
+//     int worker_id = 0;
+//     // Launch specific task to cores
+//     RTE_LCORE_FOREACH_SLAVE(lcore_id)
+//     {
+//         // launch communication and task thread onto specific core
+//         if (worker_id < rx_thread_num_) {
+//             auto context = new EventHandlerContext<Receiver>;
+//             context->obj_ptr = this;
+//             context->id = worker_id;
+//             rte_eal_remote_launch(
+//                 (lcore_function_t*)loopRecv_DPDK, context, lcore_id);
+//             printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
+//         }
+//         worker_id++;
+//     }
+// #else
     for (size_t i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread_;
         auto context = new EventHandlerContext<Receiver>;
@@ -70,7 +70,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
         }
         created_threads.push_back(recv_thread_);
     }
-#endif
+// #endif
     return created_threads;
 }
 
