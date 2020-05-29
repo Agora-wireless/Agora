@@ -76,6 +76,8 @@ Config::Config(std::string jsonfile)
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
+    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
+    OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
@@ -280,91 +282,50 @@ void Config::genData()
 #endif
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
-    auto zc_common_pilot_double
+    auto zc_seq_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
-    auto zc_common_pilot = CommsLib::seqCyclicShift(
-        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
+    auto zc_seq = Utils::double_to_cfloat(zc_seq_double);
+    auto common_pilot
+        = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
 
     pilots_ = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float));
     pilots_sgn_ = (complex_float*)aligned_alloc(
         64, OFDM_DATA_NUM * sizeof(complex_float)); // used in CSI estimation
     for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
-        pilots_[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
-        auto zc_pilot_sgn = zc_common_pilot[i]
-            / (float)std::pow(std::abs(zc_common_pilot[i]), 2);
-        pilots_sgn_[i] = { zc_pilot_sgn.real(), zc_pilot_sgn.imag() };
+        pilots_[i] = { common_pilot[i].real(), common_pilot[i].imag() };
+        auto pilot_sgn
+            = common_pilot[i] / (float)std::pow(std::abs(common_pilot[i]), 2);
+        pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
-
     pilotsF.resize(OFDM_DATA_START);
-    pilotsF.insert(
-        pilotsF.end(), zc_common_pilot.begin(), zc_common_pilot.end());
+    pilotsF.insert(pilotsF.end(), common_pilot.begin(), common_pilot.end());
     pilotsF.resize(OFDM_CA_NUM);
-    pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM);
-    pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
-        pilot_cf32.end()); // add CP
-
-    std::vector<std::complex<int16_t>> pre_ci16(prefix, 0);
-    std::vector<std::complex<int16_t>> post_ci16(postfix, 0);
-    for (size_t i = 0; i < OFDM_CA_NUM + CP_LEN; i++)
-        pilot_ci16.push_back(
-            std::complex<int16_t>((int16_t)(pilot_cf32[i].real() * 32768),
-                (int16_t)(pilot_cf32[i].imag() * 32768)));
-    pilot_ci16.insert(pilot_ci16.begin(), pre_ci16.begin(), pre_ci16.end());
-    pilot_ci16.insert(pilot_ci16.end(), post_ci16.begin(), post_ci16.end());
-    size_t seq_len = pilot_cf32.size();
-
-    for (size_t i = 0; i < seq_len; i++) { // used for plotting
-        std::complex<float> cf = pilot_cf32[i];
-        pilot_cd64.push_back(std::complex<double>(cf.real(), cf.imag()));
-    }
-
-    // generate a UINT32 version to write to FPGA buffers
-    pilot = Utils::cint16_to_uint32(pilot_ci16, false, "QI");
-    if (pilot.size() != sampsPerSymbol) {
-        std::cout << "generated pilot symbol size does not match configured "
-                     "symbol size!"
-                  << std::endl;
-        exit(1);
-    }
+    pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
+    Table<complex_float> pilot_ifft;
+    pilot_ifft.calloc(UE_ANT_NUM, OFDM_CA_NUM, 64);
     auto zc_ue_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
-    complex_float* pilot_ifft_in;
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
-        alloc_buffer_1d(&pilot_ifft_in, OFDM_CA_NUM, 64, 0);
-        memset(pilot_ifft_in, 0, sizeof(complex_float) * OFDM_DATA_START);
-        memset(pilot_ifft_in + OFDM_DATA_STOP, 0,
-            sizeof(complex_float) * OFDM_DATA_START);
         auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
             zc_ue_pilot, i * (float)M_PI / 6); // LTE DMRS
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
-            pilot_ifft_in[j + OFDM_DATA_START] = ue_specific_pilot[i][j];
+            pilot_ifft[i][j + OFDM_DATA_START] = ue_specific_pilot[i][j];
         }
-        CommsLib::IFFT(pilot_ifft_in, OFDM_CA_NUM);
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            ue_specific_pilot_t[i][prefix + CP_LEN + j]
-                = std::complex<int16_t>((int16_t)(pilot_ifft_in[j].re * 32768),
-                    (int16_t)(pilot_ifft_in[j].im * 32768));
-        }
-        for (size_t j = 0; j < CP_LEN; j++) {
-            ue_specific_pilot_t[i][prefix + j]
-                = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
-        }
-        free_buffer_1d(&pilot_ifft_in);
+        CommsLib::IFFT(pilot_ifft[i], OFDM_CA_NUM, false);
     }
 
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
-    dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM, 64);
+    dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     dl_iq_t.calloc(
-        dl_data_symbol_num_perframe, sampsPerSymbol, 64); // used for debug
+        dl_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
     ul_bits.malloc(ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
     ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     ul_iq_t.calloc(
@@ -418,56 +379,164 @@ void Config::genData()
     Table<float> qam_table;
     init_modulation_table(qam_table, mod_type);
 
-    // Generate freq-domain and time-domain downlink symbols
+    // Generate freq-domain downlink symbols
+    Table<complex_float> dl_iq_ifft;
+    dl_iq_ifft.calloc(
+        dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
-            int cur_offset = (j - OFDM_DATA_START) * UE_ANT_NUM;
-            dl_iq_f[i][j] = mod_single_uint8(dl_bits[i][cur_offset], qam_table);
-        }
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+            size_t p = u * OFDM_DATA_NUM;
+            size_t q = u * OFDM_CA_NUM;
 
-        CommsLib::IFFT(dl_iq_f[i], OFDM_CA_NUM);
-        size_t td_symbol_start = prefix + CP_LEN;
-        for (size_t j = td_symbol_start; j < td_symbol_start + OFDM_CA_NUM;
-             j++) {
-            dl_iq_t[i][j]
-                = { (int16_t)(dl_iq_f[i][j - td_symbol_start].re * 32768),
-                      (int16_t)(dl_iq_f[i][j - td_symbol_start].im * 32768) };
+            for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
+                int k = (j - OFDM_DATA_START);
+                size_t s = p + k;
+                if (k % OFDM_PILOT_SPACING != 0) {
+                    dl_iq_f[i][q + j]
+                        = mod_single_uint8(dl_bits[i][s], qam_table);
+                } else
+                    dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
+                dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
+            }
+            CommsLib::IFFT(&dl_iq_ifft[i][q], OFDM_CA_NUM, false);
         }
-        memcpy(dl_iq_t[i] + prefix, dl_iq_t[i] + prefix + OFDM_CA_NUM,
-            CP_LEN * sizeof(short) * 2);
     }
 
-    // Generate freq-domain and time-domain uplink symbols
-    complex_float* ifft_ul_data_tmp;
-    alloc_buffer_1d(
-        &ifft_ul_data_tmp, sizeof(complex_float) * OFDM_CA_NUM, 64, 1);
+    // Generate freq-domain uplink symbols
+    Table<complex_float> ul_iq_ifft;
+    ul_iq_ifft.calloc(
+        ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t u = 0; u < UE_ANT_NUM; u++) {
 
             size_t p = u * OFDM_DATA_NUM;
             size_t q = u * OFDM_CA_NUM;
-            size_t r = u * sampsPerSymbol;
 
             for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
                 size_t k = j - OFDM_DATA_START;
                 size_t s = p + k;
                 ul_iq_f[i][q + j] = mod_single_uint8(ul_bits[i][s], qam_table);
-                ifft_ul_data_tmp[j] = ul_iq_f[i][q + j];
+                ul_iq_ifft[i][q + j] = ul_iq_f[i][q + j];
             }
 
-            CommsLib::IFFT(ifft_ul_data_tmp, OFDM_CA_NUM);
+            CommsLib::IFFT(&ul_iq_ifft[i][q], OFDM_CA_NUM, false);
+        }
+    }
+
+    // Find normalization factor through searching for max value in IFFT results
+    float max_val = 0;
+    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+            size_t q = u * OFDM_CA_NUM;
+            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+                auto cur_val = std::abs(std::complex<float>(
+                    ul_iq_ifft[i][q + j].re, ul_iq_ifft[i][q + j].im));
+                if (cur_val > max_val) {
+                    max_val = cur_val;
+                }
+            }
+        }
+    }
+
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+            size_t q = u * OFDM_CA_NUM;
+            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+                auto cur_val = std::abs(std::complex<float>(
+                    dl_iq_ifft[i][q + j].re, dl_iq_ifft[i][q + j].im));
+                if (cur_val > max_val) {
+                    max_val = cur_val;
+                }
+            }
+        }
+    }
+
+    for (size_t u = 0; u < UE_ANT_NUM; u++) {
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            auto cur_val = std::abs(
+                std::complex<float>(pilot_ifft[u][j].re, pilot_ifft[u][j].im));
+            if (cur_val > max_val) {
+                max_val = cur_val;
+            }
+        }
+    }
+
+    for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+        auto cur_val = std::abs(pilot_cf32[j]);
+        if (cur_val > max_val) {
+            max_val = cur_val;
+        }
+    }
+
+    float scale = 2 * max_val; // additional 2^2 (6dB) power backoff
+
+    // Generate time domain symbols for downlink
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+
+            size_t q = u * OFDM_CA_NUM;
+            size_t r = u * sampsPerSymbol;
+
             size_t t = prefix + CP_LEN;
             for (size_t j = t; j < t + OFDM_CA_NUM; j++) {
-                ul_iq_t[i][r + j]
-                    = { (int16_t)(ifft_ul_data_tmp[j - t].re * 32768),
-                          (int16_t)(ifft_ul_data_tmp[j - t].im * 32768) };
+                complex_float sc_data = { dl_iq_ifft[i][q + j - t].re / scale,
+                    dl_iq_ifft[i][q + j - t].im / scale };
+                dl_iq_t[i][r + j] = { (int16_t)(sc_data.re * 32768),
+                    (int16_t)(sc_data.im * 32768) };
+            }
+            memcpy(dl_iq_t[i] + r + prefix,
+                dl_iq_t[i] + r + prefix + OFDM_CA_NUM,
+                CP_LEN * sizeof(short) * 2);
+        }
+    }
+
+    // Generate freq-domain uplink symbols
+    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+
+            size_t q = u * OFDM_CA_NUM;
+            size_t r = u * sampsPerSymbol;
+
+            size_t t = prefix + CP_LEN;
+            for (size_t j = t; j < t + OFDM_CA_NUM; j++) {
+                complex_float sc_data = { ul_iq_ifft[i][q + j - t].re / scale,
+                    ul_iq_ifft[i][q + j - t].im / scale };
+                ul_iq_t[i][r + j] = { (int16_t)(sc_data.re * 32768),
+                    (int16_t)(sc_data.im * 32768) };
             }
             memcpy(ul_iq_t[i] + r + prefix,
                 ul_iq_t[i] + r + prefix + OFDM_CA_NUM,
                 CP_LEN * sizeof(short) * 2);
         }
     }
-    free_buffer_1d(&ifft_ul_data_tmp);
+    ul_iq_ifft.free();
+    dl_iq_ifft.free();
+
+    for (size_t i = 0; i < UE_ANT_NUM; i++) {
+        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
+            ue_specific_pilot_t[i][prefix + CP_LEN + j] = std::complex<int16_t>(
+                (int16_t)((pilot_ifft[i][j].re / scale) * 32768),
+                (int16_t)((pilot_ifft[i][j].im / scale) * 32768));
+        }
+        for (size_t j = 0; j < CP_LEN; j++) {
+            ue_specific_pilot_t[i][prefix + j]
+                = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
+        }
+    }
+
+    pilot_ifft.free();
+
+    for (size_t i = 0; i < OFDM_CA_NUM; i++)
+        pilot_cf32[i] /= scale;
+    pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
+        pilot_cf32.end()); // add CP
+
+    // generate a UINT32 version to write to FPGA buffers
+    pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
+
+    std::vector<uint32_t> pre_uint32(prefix, 0);
+    pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
+    pilot.resize(sampsPerSymbol);
 }
 
 Config::~Config()
@@ -487,24 +556,6 @@ int Config::getSymbolId(size_t symbol_id)
     return (symbol_id < pilot_symbol_num_perframe
             ? pilotSymbols[0][symbol_id]
             : ULSymbols[0][symbol_id - pilot_symbol_num_perframe]);
-}
-
-int Config::getDownlinkPilotId(size_t frame_id, size_t symbol_id)
-{
-    std::vector<size_t>::iterator it;
-    size_t fid = frame_id % frames.size();
-    it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
-    if (it != DLSymbols[fid].end()) {
-        int id = it - DLSymbols[fid].begin();
-        if (id < (int)DL_PILOT_SYMS) {
-#ifdef DEBUG3
-            printf("getDownlinkPilotId(%zu, %zu) = %zu\n", frame_id, symbol_id,
-                id);
-#endif
-            return id;
-        }
-    }
-    return -1;
 }
 
 size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const

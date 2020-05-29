@@ -406,10 +406,12 @@ void Stats::save_to_file()
         for (size_t ii = 0; ii < last_frame_id; ii++) {
             fprintf(fp_debug,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-                "%.3f %.3f %.3f",
+                "%.3f %.3f %.3f %.3f %.3f",
                 cycles_to_us(master_get_tsc(TsType::kPilotRX, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kRCAllRX, ii), freq_ghz),
                 cycles_to_us(master_get_tsc(TsType::kRXDone, ii), freq_ghz),
                 cycles_to_us(master_get_tsc(TsType::kFFTDone, ii), freq_ghz),
+                cycles_to_us(master_get_tsc(TsType::kRCDone, ii), freq_ghz),
                 cycles_to_us(master_get_tsc(TsType::kZFDone, ii), freq_ghz),
                 cycles_to_us(
                     master_get_tsc(TsType::kPrecodeDone, ii), freq_ghz),

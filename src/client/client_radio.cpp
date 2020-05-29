@@ -210,7 +210,7 @@ bool ClientRadioConfig::radioStart()
                                and (_cfg->pilotSymbols[0][2 * r] != s
                                        and _cfg->pilotSymbols[0][r * 2 + 1]
                                            != s)))) // TODO: change this for
-                                                    // orthogonal pilots
+                // orthogonal pilots
                 _tddSched[r].replace(s, 1, "G");
             else if (c == 'U')
                 _tddSched[r].replace(s, 1, "T");

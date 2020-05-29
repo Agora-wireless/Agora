@@ -34,7 +34,8 @@ Event_data Reciprocity::launch(size_t offset)
     cx_float* ptr_in = (cx_float*)calib_buffer_[offset % TASK_BUFFER_FRAME_NUM];
     cx_fmat mat_input(ptr_in, OFDM_DATA_NUM, BS_ANT_NUM, false);
     cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant);
-    cx_float* recip_buff = (cx_float*)recip_buffer_[offset % TASK_BUFFER_FRAME_NUM];
+    cx_float* recip_buff
+        = (cx_float*)recip_buffer_[offset % TASK_BUFFER_FRAME_NUM];
     cx_fmat calib_mat = mat_input.each_col() / vec_calib_ref;
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;

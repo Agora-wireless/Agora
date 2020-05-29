@@ -191,12 +191,12 @@ Event_data DoDemul::launch(size_t tag)
                         evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
                         cfg->UE_NUM, 1, false);
                     cur_evm_mat += evm % evm;
-                    if (kDebugPrintInTask && cur_sc_id == 0) {
+                    if (kPrintPhyStats && cur_sc_id == 0) {
                         size_t prev_frame = (frame_id - 1);
                         fmat evm_mat(
                             evm_buffer_[prev_frame % TASK_BUFFER_FRAME_NUM],
                             cfg->UE_NUM, 1, false);
-                        evm_mat /= cfg->OFDM_DATA_NUM;
+                        evm_mat = sqrt(evm_mat) / cfg->OFDM_DATA_NUM;
                         std::stringstream ss;
                         ss << "Frame " << prev_frame << ":\n"
                            << "  EVM " << 100 * evm_mat.st() << ", SNR "
