@@ -202,12 +202,13 @@ int PacketTXRX::dequeue_send(int tid)
     int ch = ant_id % nChannels;
 #if DEBUG_DOWNLINK
     std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
+    size_t dl_symbol_idx = c->get_dl_symbol_idx(frame_id, symbol_id);
     if (ant_id != c->ref_ant)
         txbuf[ch] = zeros.data();
-    else if (c->getDownlinkPilotId(frame_id, symbol_id) >= 0)
-        txbuf[ch] = c->pilot_ci16.data();
+    else if (dl_symbol_idx < c->DL_PILOT_SYMS)
+        txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
     else
-        txbuf[ch] = (void*)c->dl_iq_t[c->get_dl_symbol_idx(frame_id, symbol_id)
+        txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx
             - c->DL_PILOT_SYMS];
 #else
     int data_offset = (offset % tx_buffer_frame_num_) * c->packet_length;

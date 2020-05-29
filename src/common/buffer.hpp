@@ -212,16 +212,24 @@ public:
     // for frame i
     std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
 
+    // num_rc_pkts[i] is the total number of reciprocity pilot packets we've received
+    // for frame i
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_reciprocity_pkts;
+
     // Number of packets we'll receive per frame on the uplink
     size_t num_pkts_per_frame;
 
     // Number of pilot packets we'll receive per frame
     size_t num_pilot_pkts_per_frame;
 
+    // Number of reciprocity pilot packets we'll receive per frame
+    size_t num_reciprocity_pkts_per_frame;
+
     RxCounters()
     {
         num_pkts.fill(0);
         num_pilot_pkts.fill(0);
+        num_reciprocity_pkts.fill(0);
     }
 };
 
@@ -306,8 +314,8 @@ private:
 class FFT_stats : public Data_stats {
 public:
     size_t max_symbol_data_count;
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_cal_count;
-    size_t max_symbol_cal_count;
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_rc_count;
+    size_t max_symbol_rc_count;
 
     // cur_frame_for_symbol[i] is the current frame for the symbol whose
     // index in the frame's uplink symbols is i

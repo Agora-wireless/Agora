@@ -318,6 +318,7 @@ private:
     std::vector<int> data_sc_ind_;
     std::vector<int> pilot_sc_ind_;
     std::vector<int> non_null_sc_ind_;
+    std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
@@ -369,6 +370,6 @@ private:
     int max_equaled_frame = 0;
     // long long* demul_output;
     // float* equal_output;
-    int record_frame = -1;
+    size_t record_frame = -1;
 };
 #endif

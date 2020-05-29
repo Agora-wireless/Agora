@@ -71,7 +71,6 @@ public:
     std::vector<uint32_t> coeffs;
     std::vector<std::complex<int16_t>> pilot_ci16;
     std::vector<std::complex<float>> pilot_cf32;
-    std::vector<std::complex<double>> pilot_cd64;
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     complex_float* pilots_;
@@ -133,6 +132,8 @@ public:
     size_t UE_ANT_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
+    size_t OFDM_PILOT_NUM;
+    size_t OFDM_PILOT_SPACING;
     size_t OFDM_DATA_START;
     size_t OFDM_DATA_STOP;
     size_t TX_PREFIX_LEN;
@@ -174,7 +175,6 @@ public:
 
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
-    int getDownlinkPilotId(size_t, size_t);
 
     // Get the index of this downlink symbol among this frame's downlink symbols
     size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const;

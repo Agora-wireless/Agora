@@ -90,8 +90,12 @@ Event_data DoPrecode::launch(size_t tag)
                         = &dl_raw_data[kUseLDPC ? total_data_symbol_idx
                                                 : symbol_id_in_buffer][cur_sc_id
                             + cfg->OFDM_DATA_NUM * user_id];
-                    data_ptr[user_id] = mod_single_uint8(
-                        (uint8_t) * (raw_data_ptr), qam_table);
+                    if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
+                        data_ptr[user_id]
+                            = cfg->ue_specific_pilot[user_id][cur_sc_id];
+                    else
+                        data_ptr[user_id] = mod_single_uint8(
+                            (uint8_t) * (raw_data_ptr), qam_table);
                 }
             }
 
