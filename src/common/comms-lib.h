@@ -61,12 +61,10 @@ public:
         std::vector<std::complex<float>> pilot, size_t seqLen);
     static int findLTS(std::vector<std::complex<double>> iq, int seqLen);
     template <typename T>
-    static std::vector<T> convolve(
-        std::vector<std::complex<T>> const& f,
+    static std::vector<T> convolve(std::vector<std::complex<T>> const& f,
         std::vector<std::complex<T>> const& g);
     template <typename T>
-    static std::vector<std::complex<T>> csign(
-        std::vector<std::complex<T>> iq);
+    static std::vector<std::complex<T>> csign(std::vector<std::complex<T>> iq);
     static void meshgrid(std::vector<int> x_in, std::vector<int> y_in,
         std::vector<std::vector<int>>& x, std::vector<std::vector<int>>& y);
     static inline int hadamard2(int i, int j)
@@ -91,6 +89,14 @@ public:
         size_t, size_t, bool timeDomain = true);
     static std::vector<std::complex<float>> seqCyclicShift(
         std::vector<std::complex<float>>, float);
+    static float find_max_abs(complex_float*, size_t);
+    static float find_max_abs(Table<complex_float>, size_t, size_t);
+    static void ifft2tx(
+        complex_float*, std::complex<short>*, size_t, size_t, size_t, float);
+    static float abs_cf(complex_float d)
+    {
+        return std::abs(std::complex<float>(d.re, d.im));
+    }
 };
 
 #endif
