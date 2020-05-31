@@ -368,7 +368,8 @@ void Phy_UE::start()
             case EventType::kIFFT: {
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 Event_data task(EventType::kPacketTX, event.tags[0]);
-                try_enqueue_fallback(&tx_queue_, tx_ptoks_ptr[ant_id % rx_thread_num], task);
+                try_enqueue_fallback(
+                    &tx_queue_, tx_ptoks_ptr[ant_id % rx_thread_num], task);
             } break;
 
             case EventType::kPacketTX: {
@@ -655,9 +656,13 @@ void Phy_UE::doTransmit(int tid, size_t tag)
             complex_float* cur_modul_buf
                 = &ifft_buffer_.IFFT_inputs[buff_offset][0];
             if (ul_symbol_id < config_->UL_PILOT_SYMS) {
+                memset(cur_modul_buf, 0,
+                    sizeof(complex_float) * config_->OFDM_DATA_START);
                 memcpy((char*)(cur_modul_buf + config_->OFDM_DATA_START),
                     (char*)config_->ue_specific_pilot[ant_id + ch],
                     config_->OFDM_DATA_NUM * sizeof(complex_float));
+                memset(cur_modul_buf + config_->OFDM_DATA_STOP, 0,
+                    sizeof(complex_float) * config_->OFDM_DATA_START);
             } else {
                 memcpy((void*)cur_modul_buf,
                     (void*)&ul_iq_f[ul_symbol_id][FFT_LEN * (ant_id + ch)],
@@ -688,7 +693,6 @@ void Phy_UE::doTransmit(int tid, size_t tag)
                 CP_LEN, scale);
         }
     }
-    // l2_buffer_status_[offset] = 0; // now empty
 
     Event_data ifft_event(EventType::kIFFT, tag);
 
@@ -700,13 +704,6 @@ void Phy_UE::doTransmit(int tid, size_t tag)
 
 void Phy_UE::initialize_vars_from_cfg(void)
 {
-    // demul_block_size = config_->demul_block_size;
-    // //OFDM_CA_NUM*2/transpose_block_size; demul_block_num = OFDM_DATA_NUM /
-    // demul_block_size + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
-
-    // downlink_mode = config_->downlink_mode;
-    // dl_data_symbol_start = config_->dl_data_symbol_start;
-    // dl_data_symbol_end = config_->dl_data_symbol_end;
     packet_length = config_->packet_length;
 
     symbol_perframe = config_->symbol_num_perframe;
