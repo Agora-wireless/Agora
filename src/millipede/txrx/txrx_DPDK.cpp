@@ -6,7 +6,7 @@
 
 #include "txrx.hpp"
 
-static constexpr bool kDebugDPDK = false;
+static constexpr bool kDebugDPDK = true;
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 {
@@ -18,7 +18,7 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 
     std::string core_list = std::to_string(core_id_) + "-"
         + std::to_string(core_id_ + comm_thread_num_);
-    std::string num_cores = std::to_string(comm_thread_num_ + 1);
+
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
         = { "txrx", "-l", core_list.c_str(), "-w", "0000:84:00.1", NULL };
@@ -44,16 +44,11 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 
     rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
-    uint16_t portid;
-    RTE_ETH_FOREACH_DEV(portid)
+    uint16_t portid = 0;
+    // RTE_ETH_FOREACH_DEV(portid)
 
     if (DpdkTransport::nic_init(portid, mbuf_pool, comm_thread_num_) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
-
-    unsigned int nb_lcores = rte_lcore_count();
-    uint16_t mtu_size = 0;
-    rte_eth_dev_get_mtu(0, &mtu_size);
-    printf("Number of DPDK cores: %d, MTU: %d\n", nb_lcores, mtu_size);
 
     src_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 4));
     dst_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 3));
@@ -73,7 +68,8 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
             rte_exit(
                 EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
     }
-    printf("here\n");
+
+    printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
@@ -97,27 +93,19 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_tx_buffer_frame_num, int in_tx_buffer_length)
 {
 
-    buffer_ = &in_buffer; // for save data
-    buffer_status_ = &in_buffer_status; // for save status
+    buffer_ = &in_buffer;
+    buffer_status_ = &in_buffer_status;
     frame_start_ = &in_frame_start;
 
-    // check length
     buffer_frame_num_ = in_buffer_frame_num;
-    // assert(in_buffer_length == packet_length * buffer_frame_num_); // should
-    // be integer
     buffer_length_ = in_buffer_length;
-    tx_buffer_ = in_tx_buffer; // for save data
-    tx_buffer_status_ = in_tx_buffer_status; // for save status
+    tx_buffer_ = in_tx_buffer;
+    tx_buffer_status_ = in_tx_buffer_status;
     tx_buffer_frame_num_ = in_tx_buffer_frame_num;
-    // assert(in_tx_buffer_length == packet_length * buffer_frame_num_); //
-    // should be integer
     tx_buffer_length_ = in_tx_buffer_length;
 
-    // if (config_->dl_data_symbol_num_perframe == 0) {
-    printf("create RX threads\n");
+    printf("create TXRX threads\n");
 
-    unsigned int nb_lcores = rte_lcore_count();
-    printf("Number of DPDK cores: %d\n", nb_lcores);
     unsigned int lcore_id;
     int worker_id = 0;
     // Launch specific task to cores
@@ -189,8 +177,9 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
                 + sizeof(struct rte_ipv4_hdr));
             DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
                 udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
-            printf(
-                "Header type: %d, IPV4: %d\n", eth_type, RTE_ETHER_TYPE_IPV4);
+            printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
+                dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
+                RTE_ETHER_TYPE_IPV4);
             printf("UDP: %d, %d\n", ip_h->next_proto_id, IPPROTO_UDP);
         }
 
@@ -290,12 +279,15 @@ int PacketTXRX::dequeue_send(int tid)
         = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
     ip_h->src_addr = dst_addr;
     ip_h->dst_addr = src_addr;
+    ip_h->next_proto_id = IPPROTO_UDP;
 
     struct rte_udp_hdr* udp_h
         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
     udp_h->src_port = rte_cpu_to_be_16(config_->bs_port + tid);
     udp_h->dst_port = rte_cpu_to_be_16(config_->ue_rx_port + tid);
 
+    tx_bufs[0]->pkt_len = config_->packet_length + kPayloadOffset;
+    tx_bufs[0]->data_len = config_->packet_length + kPayloadOffset;
     char* payload = (char*)eth_hdr + kPayloadOffset;
     DpdkTransport::fastMemcpy(payload, (char*)pkt, config_->packet_length);
 
