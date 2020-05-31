@@ -65,7 +65,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize IFFT buffer
     size_t ifft_buffer_block_num
-        = antenna_num * ul_symbol_perframe * TASK_BUFFER_FRAME_NUM;
+        = antenna_num * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
     ifft_buffer_.calloc(ifft_buffer_block_num, FFT_LEN, 64);
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
@@ -661,36 +661,27 @@ void Phy_UE::doIFFT(int tid, size_t tag)
     for (size_t ch = 0; ch < config_->nChannels; ch++) {
         //float scale = 0;
         size_t ant_id = ue_id * config_->nChannels + ch;
-        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_symbol_perframe;
+        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
              ul_symbol_id++) {
-            size_t total_ul_symbol_id
-                = frame_slot * ul_symbol_perframe + ul_symbol_id;
+            size_t total_ul_data_symbol_id
+                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
 
-            size_t buff_offset = total_ul_symbol_id * antenna_num + ant_id;
-            complex_float* ifft_buf = ifft_buffer_[buff_offset];
+            size_t buff_offset = total_ul_data_symbol_id * antenna_num + ant_id;
+            complex_float* ifft_buff = ifft_buffer_[buff_offset];
             memset(
-                ifft_buf, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
-            if (ul_symbol_id < config_->UL_PILOT_SYMS) {
-                memcpy((char*)(ifft_buf + config_->OFDM_DATA_START),
-                    (char*)config_->ue_specific_pilot[ant_id],
-                    config_->OFDM_DATA_NUM * sizeof(complex_float));
-            } else {
-                /*memcpy((void*)ifft_buf,
-                    (void*)&ul_iq_f[ul_symbol_id][FFT_LEN * (ant_id)],
-                    FFT_LEN * sizeof(complex_float));*/
-                size_t total_ul_data_symbol_id
-                    = frame_slot * ul_data_symbol_perframe + ul_symbol_id
-                    - config_->UL_PILOT_SYMS;
-                complex_float* modul_buf
-                    = &modul_buffer_[total_ul_data_symbol_id]
-                                    [ant_id * data_sc_len];
-                memcpy((void*)ifft_buf, (void*)modul_buf,
-                    FFT_LEN * sizeof(complex_float));
-            }
-            memset(ifft_buf + config_->OFDM_DATA_STOP, 0,
+                ifft_buff, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
+            /*memcpy((void*)ifft_buf,
+                (void*)&ul_iq_f[ul_symbol_id][FFT_LEN * (ant_id)],
+                FFT_LEN * sizeof(complex_float));*/
+            complex_float* modul_buff
+                = &modul_buffer_[total_ul_data_symbol_id][ant_id * data_sc_len];
+            memcpy((void*)ifft_buff, (void*)modul_buff,
+                FFT_LEN * sizeof(complex_float));
+            memset(ifft_buff + config_->OFDM_DATA_STOP, 0,
                 sizeof(complex_float) * config_->OFDM_DATA_START);
 
-            DftiComputeBackward(mkl_handle, ifft_buf);
+            //DftiComputeBackward(mkl_handle, ifft_buf);
+            CommsLib::IFFT(ifft_buff, FFT_LEN, false);
             //cx_float* ifft_out_buffer = (cx_float*)ifft_buf;
             //cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
             //float max_val = abs(mat_ifft_out).max();
@@ -704,13 +695,24 @@ void Phy_UE::doIFFT(int tid, size_t tag)
                 = frame_slot * ul_symbol_perframe + ul_symbol_id;
 
             size_t buff_offset = total_ul_symbol_id * antenna_num + ant_id;
-            complex_float* ifft_buf = ifft_buffer_[buff_offset];
             size_t tx_offset = buff_offset * packet_length;
             char* cur_tx_buffer = &tx_buffer_[tx_offset];
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
             std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data;
-            CommsLib::ifft2tx(ifft_buf, tx_data_ptr, FFT_LEN, prefix_len,
-                CP_LEN, config_->scale * FFT_LEN);
+            if (ul_symbol_id < config_->UL_PILOT_SYMS) {
+                memcpy(tx_data_ptr, config_->ue_specific_pilot_t[ant_id],
+                    config_->sampsPerSymbol * sizeof(std::complex<short>));
+            } else {
+                size_t total_ul_data_symbol_id
+                    = frame_slot * ul_data_symbol_perframe + ul_symbol_id
+                    - config_->UL_PILOT_SYMS;
+
+                size_t buff_offset
+                    = total_ul_data_symbol_id * antenna_num + ant_id;
+                complex_float* ifft_buff = ifft_buffer_[buff_offset];
+                CommsLib::ifft2tx(ifft_buff, tx_data_ptr, FFT_LEN, prefix_len,
+                    CP_LEN, config_->scale);
+            }
         }
     }
 
