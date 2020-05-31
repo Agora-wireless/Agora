@@ -30,7 +30,8 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
         + (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
 }
 
-Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
+Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
+    bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -60,6 +61,16 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
     for (size_t i = 0; i < thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
+    // Start a thread to update data buffer
+    create_threads(
+        pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
+
+    // Create a separate thread for master thread
+    // when sender is started from simulator
+    if (create_thread_for_master)
+        create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
+            thread_num, thread_num + 1);
+
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -75,7 +86,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay)
             int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
                 sizeof(servaddr_ipv4[i]));
             rt_assert(ret == 0, "UDP socket connect failed");
-        } else {
             printf("UDP socket %zu connected\n", i);
         }
     }
@@ -111,10 +121,6 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-
-    // Create the master thread
-    create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
-        thread_num, thread_num + 1);
 }
 
 void* Sender::master_thread(int tid)
@@ -129,12 +135,21 @@ void* Sender::master_thread(int tid)
     }
 
     const size_t max_symbol_id = get_max_symbol_id();
-    // Push tasks of the first symbol into task queue
-    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-        auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
-        update_tx_buffer(req_tag);
-        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], req_tag._tag),
-            "Send task enqueue failed");
+    // Load data of the first frame
+    for (size_t i = 0; i < max_symbol_id; i++) {
+        for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+            auto req_tag = gen_tag_t::frm_sym_ant(0, i, j);
+            data_update_queue_.try_enqueue(req_tag._tag);
+            // update_tx_buffer(req_tag);
+            // Push tasks of the first symbol into task queue
+            if (i == 0) {
+                // add some delay to ensure data update is finished
+                usleep(100);
+                rt_assert(send_queue_.enqueue(
+                              *task_ptok[j % thread_num], req_tag._tag),
+                    "Send task enqueue failed");
+            }
+        }
     }
 
     frame_start[0] = get_time();
@@ -188,7 +203,10 @@ void* Sender::master_thread(int tid)
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
-                update_tx_buffer(req_tag);
+                auto req_tag_for_data = gen_tag_t::frm_sym_ant(
+                    ctag.frame_id + 1, ctag.symbol_id, i);
+                data_update_queue_.try_enqueue(req_tag_for_data._tag);
+                // update_tx_buffer(req_tag);
                 rt_assert(send_queue_.enqueue(
                               *task_ptok[i % thread_num], req_tag._tag),
                     "Send task enqueue failed");
@@ -197,6 +215,20 @@ void* Sender::master_thread(int tid)
     }
     write_stats_to_file(cfg->frames_to_test);
     exit(0);
+}
+
+void* Sender::data_update_thread(int tid)
+{
+    // Sender get better performance when this thread is not pinned to core
+    // pin_to_core_with_offset(ThreadType::kWorker, 13, 0);
+    printf("Data update thread running on core %d\n", sched_getcpu());
+
+    while (true) {
+        size_t tag = 0;
+        if (!data_update_queue_.try_dequeue(tag))
+            continue;
+        update_tx_buffer(tag);
+    }
 }
 
 void Sender::update_tx_buffer(gen_tag_t tag)
