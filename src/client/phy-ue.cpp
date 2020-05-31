@@ -71,7 +71,7 @@ Phy_UE::Phy_UE(Config* config)
     // initialize IFFT buffer
     size_t IFFT_buffer_block_num
         = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    ifft_buffer_.IFFT_inputs.calloc(IFFT_buffer_block_num, FFT_LEN, 64);
+    ifft_buffer_.calloc(IFFT_buffer_block_num, FFT_LEN, 64);
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
     alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
@@ -87,7 +87,7 @@ Phy_UE::Phy_UE(Config* config)
     // initialize FFT buffer
     size_t FFT_buffer_block_num
         = numAntennas * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    fft_buffer_.FFT_inputs.calloc(FFT_buffer_block_num, FFT_LEN, 64);
+    fft_buffer_.calloc(FFT_buffer_block_num, FFT_LEN, 64);
 
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, FFT_LEN);
@@ -149,8 +149,8 @@ Phy_UE::~Phy_UE()
 {
     DftiFreeDescriptor(&mkl_handle);
     // release FFT_buffer
-    fft_buffer_.FFT_inputs.free();
-    ifft_buffer_.IFFT_inputs.free();
+    fft_buffer_.free();
+    ifft_buffer_.free();
 }
 
 void Phy_UE::schedule_task(Event_data do_task,
@@ -213,7 +213,6 @@ void Phy_UE::start()
     int ret = 0;
     max_equaled_frame = 0;
     size_t frame_id, symbol_id, ant_id;
-    int prev_frame_id = config_->maxFrame;
     while (config_->running && !SignalHandler::gotExitSignal()) {
         // get a bulk of events
         ret = message_queue_.try_dequeue_bulk(
@@ -258,7 +257,6 @@ void Phy_UE::start()
                             frame_id, symbol_id, ant_id / config_->nChannels)
                             ._tag);
                     schedule_task(do_modul_task, &ifft_queue_, ptok_ifft);
-                    prev_frame_id = frame_id;
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -511,14 +509,14 @@ void Phy_UE::doFFT(int tid, size_t tag)
     // transfer ushort to float
     size_t delay_offset = (dl_prefix_len + CP_LEN) * 2;
     float* cur_fft_buffer_float
-        = (float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
+        = (float*)fft_buffer_[FFT_buffer_target_id];
 
     for (size_t i = 0; i < (FFT_LEN)*2; i++)
         cur_fft_buffer_float[i] = pkt->data[delay_offset + i] / 32768.2f;
 
     // perform fft
     DftiComputeForward(
-        mkl_handle, fft_buffer_.FFT_inputs[FFT_buffer_target_id]);
+        mkl_handle, fft_buffer_[FFT_buffer_target_id]);
 
     if (kDebugPrintInTask) {
         printf("In doCrop thread %zu: frame: %zu, symbol: %zu, ant: %zu\n",
@@ -527,7 +525,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     size_t csi_offset = frame_slot * numAntennas + ant_id;
     cx_float* csi_buffer_ptr = (cx_float*)(csi_buffer_[csi_offset].data());
     cx_float* fft_buffer_ptr
-        = (cx_float*)fft_buffer_.FFT_inputs[FFT_buffer_target_id];
+        = (cx_float*)fft_buffer_[FFT_buffer_target_id];
 
     Event_data crop_finish_event;
 
@@ -597,14 +595,9 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
         crop_finish_event = Event_data(EventType::kDemul,
             gen_tag_t::frm_sym_ant(frame_id, symbol_id, ant_id)._tag);
-        // generateOffset3d(numAntennas, dl_symbol_perframe, frame_id,
-        // dl_symbol_id, ant_id);
     }
 
-    // after finish
     rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty
-    // printf("In doCrop: emptied socket buffer frame: %d, symbol: %d, ant: %d,
-    // offset: %d\n",frame_id, symbol_id, ant_id, offset); inform main thread
     if (!message_queue_.enqueue(*task_ptok[tid], crop_finish_event)) {
         printf("crop message enqueue failed\n");
         exit(0);
@@ -654,7 +647,7 @@ void Phy_UE::doTransmit(int tid, size_t tag)
 
             size_t buff_offset = total_ul_symbol_id * numAntennas + ant_id + ch;
             complex_float* cur_modul_buf
-                = &ifft_buffer_.IFFT_inputs[buff_offset][0];
+                = ifft_buffer_[buff_offset];
             if (ul_symbol_id < config_->UL_PILOT_SYMS) {
                 memset(cur_modul_buf, 0,
                     sizeof(complex_float) * config_->OFDM_DATA_START);
@@ -683,7 +676,7 @@ void Phy_UE::doTransmit(int tid, size_t tag)
 
             size_t buff_offset = total_ul_symbol_id * numAntennas + ant_id + ch;
             complex_float* cur_modul_buf
-                = &ifft_buffer_.IFFT_inputs[buff_offset][0];
+                = ifft_buffer_[buff_offset];
             size_t tx_offset = buff_offset * packet_length;
             char* cur_tx_buffer = &tx_buffer_[tx_offset];
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
