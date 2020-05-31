@@ -35,10 +35,10 @@ RU::~RU()
     delete config_;
 }
 
-bool RU::startTXRX(Table<char>& in_buffer,
-    Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length,
-    char* in_tx_buffer, int* in_tx_buffer_status,
-    int in_tx_buffer_frame_num, int in_tx_buffer_length)
+bool RU::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+    int in_buffer_frame_num, int in_buffer_length, char* in_tx_buffer,
+    int* in_tx_buffer_status, int in_tx_buffer_frame_num,
+    int in_tx_buffer_length)
 {
     buffer_frame_num_ = in_buffer_frame_num;
     assert(in_buffer_length
@@ -84,26 +84,25 @@ int RU::dequeue_send(int tid)
     int packet_length = c->packet_length;
 
     Event_data event;
-    if (!task_queue_->try_dequeue_from_producer(
-        *tx_ptoks_[tid], event))
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
     assert(event.event_type == EventType::kPacketTX);
 
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+    size_t ant_id = gen_tag_t(event.tags[0]).ant_id * c->nChannels;
 
-    for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe; symbol_id++) {
+    for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
+         symbol_id++) {
         size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
         size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
-        size_t offset
-            = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id) * c->UE_ANT_NUM)
+        size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
+                            * c->UE_ANT_NUM)
             + ant_id;
 
         void* txbuf[2];
         for (size_t ch = 0; ch < c->nChannels; ++ch) {
-            txbuf[ch] = tx_buffer_
-                + (offset + ch) * packet_length;
+            txbuf[ch] = tx_buffer_ + (offset + ch) * packet_length;
             tx_buffer_status_[offset + ch] = 0;
         }
         long long frameTime
@@ -111,8 +110,7 @@ int RU::dequeue_send(int tid)
         int flags = 1; // HAS_TIME
         if (tx_symbol_id == c->ULSymbols[0].back())
             flags = 2; // HAS_TIME & END_BURST, fixme
-        radio->radioTx(
-            ant_id / c->nChannels, txbuf, flags, frameTime);
+        radio->radioTx(ant_id / c->nChannels, txbuf, flags, frameTime);
     }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
@@ -120,7 +118,6 @@ int RU::dequeue_send(int tid)
         "Socket message enqueue failed\n");
     return event.tags[0];
 }
-
 
 void* RU::loopTXRX(int tid)
 {
@@ -223,21 +220,19 @@ void* RU::loopTXRX(int tid)
 #if DEBUG_UPLINK
         if (c->ul_data_symbol_num_perframe > 0
             && c->get_dl_symbol_idx(frame_id, symbol_id) == 0) {
-            for (size_t tx_symbol_id = 0; tx_symbol_id < c->ul_data_symbol_num_perframe;
+            for (size_t tx_symbol_id = 0;
+                 tx_symbol_id < c->ul_data_symbol_num_perframe;
                  tx_symbol_id++) {
                 int tx_frame_id = frame_id + TX_FRAME_DELTA;
                 size_t tx_symbol = c->ULSymbols[0][tx_symbol_id];
                 void* txbuf[2];
                 for (size_t ch = 0; ch < config_->nChannels; ++ch) {
                     if (tx_symbol_id < c->UL_PILOT_SYMS)
-                        txbuf[ch]
-                            = (void*)
-                                  c->ue_specific_pilot_t[ant_id + ch];
+                        txbuf[ch] = (void*)c->ue_specific_pilot_t[ant_id + ch];
                     else
                         txbuf[ch]
-                            = (void*)&c
-                                  ->ul_iq_t[tx_symbol_id][(ant_id + ch)
-                                      * c->sampsPerSymbol];
+                            = (void*)&c->ul_iq_t[tx_symbol_id][(ant_id + ch)
+                                * c->sampsPerSymbol];
                 }
                 long long frameTime = ((long long)tx_frame_id << 32)
                     | ((long long)tx_symbol << 16);
