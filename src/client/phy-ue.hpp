@@ -80,7 +80,7 @@ public:
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
-    void doTransmit(int tid, int offset, int frame);
+    void doTransmit(int, size_t);
 
     /*****************************************************
      * Uplink
@@ -117,7 +117,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void doFFT(int tid, int offset);
+    void doFFT(int, size_t);
 
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -145,7 +145,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void doDemul(int tid, int offset);
+    void doDemul(int, size_t);
 
     void getDemulData(long long** ptr, int* size);
     void getEqualPCData(float** ptr, int* size, int);
@@ -198,7 +198,6 @@ private:
     FILE *fp, *fd;
     std::vector<myVec> L2_data_aligned;
     complex_float* ul_pilot;
-    char* ul_pilot_aligned;
     Table<int8_t>& ul_bits;
     Table<complex_float>& ul_iq_f;
 
@@ -327,10 +326,14 @@ private:
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
     /* main thread message queue */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
+    moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
+
+    moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 
     // all checkers
     // int cropper_checker_[symbol_num_perframe * TASK_BUFFER_FRAME_NUM];
