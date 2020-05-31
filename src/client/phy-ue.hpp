@@ -235,7 +235,7 @@ private:
      * dl_data_symbol_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
      * OFDM_CA_NUM
      */
-    IFFTBuffer ifft_buffer_;
+    Table<complex_float> ifft_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 
     /**
@@ -279,7 +279,7 @@ private:
      * symbol_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
      * OFDM_CA_NUM
      */
-    FFTBuffer fft_buffer_;
+    Table<complex_float> fft_buffer_;
 
     /**
      * Estimated CSI data
