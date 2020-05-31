@@ -32,7 +32,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
 
     printf("new Sender\n");
     sender_.reset(new Sender(
-        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay));
+        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true));
 
     printf("new Receiver\n");
     receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
