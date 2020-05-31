@@ -17,6 +17,7 @@ class RadioConfig;
 #include <vector>
 
 #include "concurrentqueue.h"
+#include "utils.h"
 #include <fstream> // std::ifstream
 
 class RU {
@@ -32,15 +33,17 @@ public:
     };
 
 public:
-    RU(int n_rx_thread, int n_tx_thread, Config* cfg);
+    RU(Config* cfg, int n_rx_thread, int in_core_id);
     /**
      * N_THREAD: socket thread number
      * mode: tx=1 or rx=0 operation
      * in_queue: message queue to communicate with main thread
      */
-    RU(int n_rx_thread, int n_tx_thread, Config* cfg,
+    RU(Config* cfg, int n_tx_thread, int in_core_id,
         moodycamel::ConcurrentQueue<Event_data>* in_queue,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_task);
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+        moodycamel::ProducerToken** in_rx_ptoks,
+        moodycamel::ProducerToken** in_tx_ptoks);
     ~RU();
 
     /**
@@ -52,23 +55,17 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * N_THREAD - 1}
      */
-    std::vector<pthread_t> startTXRX(Table<char>& in_buffer,
+    bool startTXRX(Table<char>& in_buffer,
         Table<int>& in_buffer_status, int in_buffer_frame_num,
-        int in_buffer_length, int in_core_id = 0);
-    std::vector<pthread_t> startTX(char* in_buffer, char* in_pilot_buffer,
-        int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length,
-        int in_core_id = 0);
+        int in_buffer_length, 
+        char* in_tx_buffer, int* in_tx_buffer_status, 
+        int in_tx_buffer_frame_num, int in_tx_buffer_length);
     /**
      * receive thread
      * context: PackageReceiverContext type
      */
-    static void* sendThread_launch(void* context);
-    void sendThread(int tid);
-    static void* taskThread_launch(void* context);
-    void taskThread(int tid);
-#ifdef USE_ARGOS
-    void startRadios();
-#endif
+    int dequeue_send(int tid);
+    void* loopTXRX(int tid);
 
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -100,8 +97,8 @@ private:
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_;
-    std::vector<std::unique_ptr<moodycamel::ProducerToken>> task_ptok;
-    // std::vector<std::unique_ptr<moodycamel::ConsumerToken>> task_ctok;
+    moodycamel::ProducerToken** rx_ptoks_;
+    moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
 };
