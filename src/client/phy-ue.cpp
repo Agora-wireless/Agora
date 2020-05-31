@@ -292,12 +292,6 @@ void Phy_UE::start()
                 size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
                 size_t modul_status_idx = frame_slot * nUEs + ue_id;
 
-                if (kDebugPrintPerTaskDone) {
-                    printf("Main thread: created Demodulation task for frame: "
-                           "%zu, "
-                           "symbol: %zu\n",
-                        frame_id, symbol_id);
-                }
                 data_checker_[modul_status_idx]++;
                 if (data_checker_[modul_status_idx]
                     == ul_data_symbol_perframe) {
@@ -307,9 +301,9 @@ void Phy_UE::start()
                             ._tag);
                     schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);
                     if (kDebugPrintPerFrameDone)
-                        printf("Main thread: frame: %zu, finished modulting "
-                               "uplink data for auser %zu\n",
-                            frame_id, ant_id);
+                        printf("Main thread: frame: %zu, finished modulating "
+                               "uplink data for user %zu\n",
+                            frame_id, ue_id);
                 }
             } break;
 
