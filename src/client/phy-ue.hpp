@@ -81,7 +81,8 @@ public:
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
-    void doTransmit(int, size_t);
+    void doModul(int, size_t);
+    void doIFFT(int, size_t);
 
     /*****************************************************
      * Uplink
@@ -187,7 +188,7 @@ private:
     size_t FFT_LEN;
     size_t CP_LEN;
     size_t nUEs;
-    size_t numAntennas;
+    size_t antenna_num;
     size_t hdr_size;
     size_t nCPUs;
     size_t core_offset;
@@ -202,10 +203,10 @@ private:
     Table<int8_t>& ul_bits;
     Table<complex_float>& ul_iq_f;
 
-    int pilot_sc_len;
-    int data_sc_len;
-    int data_sc_start;
-    int non_null_sc_len;
+    size_t pilot_sc_len;
+    size_t data_sc_len;
+    size_t data_sc_start;
+    size_t non_null_sc_len;
 
     size_t RX_BUFFER_FRAME_NUM;
     size_t TX_BUFFER_FRAME_NUM;
@@ -251,7 +252,7 @@ private:
      * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    std::vector<myVec> modul_buffer_;
+    Table<complex_float> modul_buffer_;
 
     /*****************************************************
      * Downlink
@@ -306,41 +307,32 @@ private:
     std::vector<myVec> equal_buffer_;
 
     std::vector<std::complex<float>> pilot_sc_val_;
-    std::vector<int> data_sc_ind_;
-    std::vector<int> pilot_sc_ind_;
-    std::vector<int> non_null_sc_ind_;
+    std::vector<size_t> non_null_sc_ind_;
     std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
 
     /* Concurrent queues */
     /* task queue for uplink FFT */
-    moodycamel::ConcurrentQueue<Event_data> task_queue_;
+    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
     /* task queue for uplink demodulation */
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
     /* main thread message queue */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
+    moodycamel::ConcurrentQueue<Event_data> modul_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
+    std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
 
     // all checkers
-    // int cropper_checker_[symbol_num_perframe * TASK_BUFFER_FRAME_NUM];
-    size_t* cropper_checker_;
     size_t csi_checker_[TASK_BUFFER_FRAME_NUM];
     size_t data_checker_[TASK_BUFFER_FRAME_NUM];
 
-    size_t precoder_checker_[TASK_BUFFER_FRAME_NUM];
-    bool precoder_status_[TASK_BUFFER_FRAME_NUM];
-
-    size_t cropper_created_checker_[TASK_BUFFER_FRAME_NUM];
-
     // can possibly remove this checker
-    // int demul_checker_[TASK_BUFFER_FRAME_NUM][(symbol_num_perframe -
-    // UE_NUM)];
     size_t* demul_checker_[TASK_BUFFER_FRAME_NUM];
     size_t demul_status_[TASK_BUFFER_FRAME_NUM];
 
@@ -349,14 +341,8 @@ private:
 
     std::queue<std::tuple<int, int>> taskWaitList;
 
-    int max_queue_delay = 0;
-
-    int debug_count = 0;
-
-    std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
-
-    /* lookup table for 16 QAM, real and imag */
-    float qam16_table[2][16];
+    /* lookup table for QAM, real and imag */
+    Table<float> qam_table;
 
     // for python
     /**
