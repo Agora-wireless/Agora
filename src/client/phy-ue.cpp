@@ -35,15 +35,15 @@ Phy_UE::Phy_UE(Config* config)
     }
 
     task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * rx_symbol_perframe * numAntennas * 36);
+        TASK_BUFFER_FRAME_NUM * dl_symbol_perframe * numAntennas * 36);
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe * numAntennas * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * symbol_perframe * numAntennas * 36);
     ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
+        TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * numAntennas * 36);
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * numAntennas * 36);
+        TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * numAntennas * 36);
 
     for (size_t i = 0; i < rx_thread_num; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
@@ -70,7 +70,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize IFFT buffer
     size_t IFFT_buffer_block_num
-        = numAntennas * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
+        = numAntennas * ul_symbol_perframe * TASK_BUFFER_FRAME_NUM;
     ifft_buffer_.calloc(IFFT_buffer_block_num, FFT_LEN, 64);
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
@@ -98,7 +98,6 @@ Phy_UE::Phy_UE(Config* config)
     for (size_t i = 0; i < csi_buffer_.size(); i++)
         csi_buffer_[i].resize(non_null_sc_len);
 
-    phase_shift_buffer_.calloc(TASK_BUFFER_FRAME_NUM, numAntennas, 64);
     if (dl_data_symbol_perframe > 0) {
         // initialize equalized data buffer
         equal_buffer_.resize(
@@ -249,7 +248,7 @@ void Phy_UE::start()
                 symbol_id = pkt->symbol_id;
                 ant_id = pkt->ant_id;
 
-                if (ul_data_symbol_perframe > 0
+                if (ul_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
                     Event_data do_modul_task(EventType::kIFFT,
@@ -503,7 +502,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
     // remove CP, do FFT
     size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t total_dl_symbol_id = frame_slot * rx_symbol_perframe + dl_symbol_id;
+    size_t total_dl_symbol_id = frame_slot * dl_symbol_perframe + dl_symbol_id;
     size_t FFT_buffer_target_id = total_dl_symbol_id * numAntennas + ant_id;
 
     // transfer ushort to float
@@ -639,11 +638,11 @@ void Phy_UE::doTransmit(int tid, size_t tag)
     const size_t ue_id = gen_tag_t(tag).ant_id;
     size_t ant_id = ue_id * config_->nChannels;
     for (size_t ch = 0; ch < config_->nChannels; ch++) {
-        float scale = 0;
-        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
+        //float scale = 0;
+        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_symbol_perframe;
              ul_symbol_id++) {
             size_t total_ul_symbol_id
-                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
+                = frame_slot * ul_symbol_perframe + ul_symbol_id;
 
             size_t buff_offset = total_ul_symbol_id * numAntennas + ant_id + ch;
             complex_float* cur_modul_buf
@@ -663,16 +662,17 @@ void Phy_UE::doTransmit(int tid, size_t tag)
             }
 
             DftiComputeBackward(mkl_handle, cur_modul_buf);
-            cx_float* ifft_out_buffer = (cx_float*)cur_modul_buf;
-            cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
-            float max_val = abs(mat_ifft_out).max();
-            if (max_val > scale)
-                scale = max_val;
+            //cx_float* ifft_out_buffer = (cx_float*)cur_modul_buf;
+            //cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
+            //float max_val = abs(mat_ifft_out).max();
+            //if (max_val > scale)
+            //    scale = max_val;
         }
-        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
+        //scale *= 4;
+        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_symbol_perframe;
              ul_symbol_id++) {
             size_t total_ul_symbol_id
-                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
+                = frame_slot * ul_symbol_perframe + ul_symbol_id;
 
             size_t buff_offset = total_ul_symbol_id * numAntennas + ant_id + ch;
             complex_float* cur_modul_buf
@@ -680,10 +680,10 @@ void Phy_UE::doTransmit(int tid, size_t tag)
             size_t tx_offset = buff_offset * packet_length;
             char* cur_tx_buffer = &tx_buffer_[tx_offset];
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
-            std::complex<short>* tx_buffer_ptr
+            std::complex<short>* tx_data_ptr
                 = (std::complex<short>*)pkt->data;
-            CommsLib::ifft2tx(cur_modul_buf, tx_buffer_ptr, FFT_LEN, prefix_len,
-                CP_LEN, scale);
+            CommsLib::ifft2tx(cur_modul_buf, tx_data_ptr, FFT_LEN, prefix_len,
+                CP_LEN, config_->scale * FFT_LEN);
         }
     }
 
@@ -701,11 +701,11 @@ void Phy_UE::initialize_vars_from_cfg(void)
 
     symbol_perframe = config_->symbol_num_perframe;
     dl_pilot_symbol_perframe = config_->DL_PILOT_SYMS;
-    ul_pilot_symbol_perframe = config_->pilot_symbol_num_perframe;
-    ul_data_symbol_perframe = config_->ul_data_symbol_num_perframe;
+    ul_pilot_symbol_perframe = config_->UL_PILOT_SYMS;
+    ul_symbol_perframe = config_->ul_data_symbol_num_perframe;
     dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
-    rx_symbol_perframe = dl_symbol_perframe;
+    ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     prefix_len = config_->prefix;
     dl_prefix_len = config_->dl_prefix;
     postfix_len = config_->postfix;
@@ -735,7 +735,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
         ul_data_symbol_perframe, dl_data_symbol_perframe);
 
     tx_buffer_status_size
-        = (ul_data_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
+        = (ul_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);
     tx_buffer_size = packet_length * tx_buffer_status_size;
     rx_buffer_status_size
         = (dl_symbol_perframe * numAntennas * TASK_BUFFER_FRAME_NUM);

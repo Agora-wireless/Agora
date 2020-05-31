@@ -176,8 +176,8 @@ private:
     // static const int empty_symbol_num_perframe;
     size_t ul_data_symbol_perframe;
     size_t dl_data_symbol_perframe;
+    size_t ul_symbol_perframe;
     size_t dl_symbol_perframe;
-    size_t rx_symbol_perframe;
     size_t tx_symbol_perframe;
     size_t symbol_len; // samples in sym without prefix and postfix
     size_t dl_prefix_len;
@@ -304,15 +304,6 @@ private:
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
     std::vector<myVec> equal_buffer_;
-
-    /**
-     * Data after phase correction
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: DATA_CA_NUM * UE_NUM
-     */
-    std::vector<myVec> equal_pc_buffer_;
-
-    Table<cx_float> phase_shift_buffer_;
 
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<int> data_sc_ind_;

@@ -436,7 +436,7 @@ void Config::genData()
     if (cur_max_val > max_val)
         max_val = cur_max_val;
 
-    float scale = 2 * max_val; // additional 2^2 (6dB) power backoff
+    scale = 2 * max_val; // additional 2^2 (6dB) power backoff
 
     // Generate time domain symbols for downlink
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
