@@ -55,11 +55,10 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * N_THREAD - 1}
      */
-    bool startTXRX(Table<char>& in_buffer,
-        Table<int>& in_buffer_status, int in_buffer_frame_num,
-        int in_buffer_length, 
-        char* in_tx_buffer, int* in_tx_buffer_status, 
-        int in_tx_buffer_frame_num, int in_tx_buffer_length);
+    bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+        int in_buffer_frame_num, int in_buffer_length, char* in_tx_buffer,
+        int* in_tx_buffer_status, int in_tx_buffer_frame_num,
+        int in_tx_buffer_length);
     /**
      * receive thread
      * context: PackageReceiverContext type

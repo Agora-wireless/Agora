@@ -5,6 +5,7 @@
 //#include "l2.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
+#include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "mkl_dfti.h"
