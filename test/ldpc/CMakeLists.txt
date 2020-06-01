@@ -30,6 +30,10 @@
 # Cmake 2.8.12 needed for "add_compile_options" command
 cmake_minimum_required(VERSION 2.8.12)
 
+find_program(ICPC_EXISTS "icpc")
+if(NOT ICPC_EXISTS)
+  message(FATAL_ERROR "Intel C++ compiler not found. Exiting.")
+endif()
 set(CMAKE_CXX_COMPILER icpc)  # Intel compiler required
 
 # Set Wireless SDK preprocessor definitions for target ISA
