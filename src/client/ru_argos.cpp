@@ -103,7 +103,9 @@ int RU::dequeue_send(int tid)
 
         void* txbuf[2];
         for (size_t ch = 0; ch < c->nChannels; ++ch) {
-            txbuf[ch] = tx_buffer_ + (offset + ch) * packet_length;
+            struct Packet* pkt
+                = (struct Packet*)(tx_buffer_ + (offset + ch) * packet_length);
+            txbuf[ch] = (void*)pkt->data;
             tx_buffer_status_[offset + ch] = 0;
         }
         long long frameTime
