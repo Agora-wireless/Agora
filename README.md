@@ -73,7 +73,6 @@ Flash the *client* Iris device with proper image:
 
 Running Client App on Server 2:
 
-* Re-build code with `DEBUG_UPLINK` enabled in `src/common/Symbols.hpp`
 * Modify `data/user-iris-serials.txt` by adding 2 client Iris serials in your setup.
 * Run `./build/user data/ue-ul-hw.json`
 

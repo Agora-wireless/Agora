@@ -181,11 +181,9 @@ void* RU::loopTXRX(int tid)
             c->running = false;
             break;
         }
-        // receive data
-#if !DEBUG_UPLINK
+        // transmit data
         if (-1 != dequeue_send(tid))
             continue;
-#endif
         struct Packet* pkt[c->nChannels];
         void* samp[c->nChannels];
         for (size_t ch = 0; ch < c->nChannels; ++ch) {
@@ -220,33 +218,6 @@ void* RU::loopTXRX(int tid)
             cursor %= buffer_frame_num_;
         }
 
-#if DEBUG_UPLINK
-        if (c->ul_data_symbol_num_perframe > 0
-            && c->get_dl_symbol_idx(frame_id, symbol_id) == 0) {
-            for (size_t tx_symbol_id = 0;
-                 tx_symbol_id < c->ul_data_symbol_num_perframe;
-                 tx_symbol_id++) {
-                int tx_frame_id = frame_id + TX_FRAME_DELTA;
-                size_t tx_symbol = c->ULSymbols[0][tx_symbol_id];
-                void* txbuf[2];
-                for (size_t ch = 0; ch < config_->nChannels; ++ch) {
-                    if (tx_symbol_id < c->UL_PILOT_SYMS)
-                        txbuf[ch] = (void*)c->ue_specific_pilot_t[ant_id + ch];
-                    else
-                        txbuf[ch]
-                            = (void*)&c->ul_iq_t[tx_symbol_id][(ant_id + ch)
-                                * c->sampsPerSymbol];
-                }
-                long long frameTime = ((long long)tx_frame_id << 32)
-                    | ((long long)tx_symbol << 16);
-                int flags = (tx_symbol == c->ULSymbols[0].back())
-                    ? 2
-                    : // HAS_TIME & END_BURST
-                    1; // HAS_TIME
-                radio->radioTx(radio_id, txbuf, flags, frameTime);
-            }
-        }
-#endif
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
     }

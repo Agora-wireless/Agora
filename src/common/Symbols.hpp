@@ -103,7 +103,7 @@ static constexpr bool kUseDPDK = false;
 static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
-static constexpr bool kUseL2 = true;
+static constexpr bool kUseL2 = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
@@ -125,7 +125,6 @@ static constexpr bool kDebugBSSender = false;
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
-#define DEBUG_UPLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4
