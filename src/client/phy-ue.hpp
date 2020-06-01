@@ -7,12 +7,13 @@
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
-#include "net.hpp"
 #include "config.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
+#include "net.hpp"
 #include "signalHandler.hpp"
 #include <algorithm>
+#include <armadillo>
 #include <arpa/inet.h>
 #include <ctime>
 #include <fcntl.h>
@@ -28,7 +29,6 @@
 #include <system_error>
 #include <tuple>
 #include <unistd.h>
-#include <armadillo>
 
 // typedef std::vector<complex_float> myVec;
 typedef std::vector<complex_float,
@@ -360,6 +360,5 @@ private:
     struct sockaddr_in6* servaddr_; /* server address */
 #endif
     int* socket_;
-
 };
 #endif
