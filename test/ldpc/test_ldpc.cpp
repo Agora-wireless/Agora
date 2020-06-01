@@ -106,7 +106,7 @@ int main()
             Zc, cbLen, cbCodewLen, BG1_COL_TOTAL * PROC_BYTES, (cbLen + 7) >> 3,
             decoderIter);
 
-        // buffers for encoders
+        // Buffers for encoders
         __declspec(align(PROC_BYTES))
             int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES]
             = { 0 };
@@ -117,7 +117,7 @@ int main()
             int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES]
             = { 0 };
 
-        // randomly generate input
+        // Randomly generate input
         srand(time(NULL));
         for (int n = 0; n < numberCodeblocks; n++) {
             int8_t* p_input = input[n];
@@ -125,9 +125,7 @@ int main()
                 p_input[i] = (int8_t)rand();
         }
 
-        // encoder setup
-        // -----------------------------------------------------------
-
+        // Encoder setup
         int16_t numChannelLlrs = cbCodewLen;
         const int16_t* pShiftMatrix;
         const int16_t* pMatrixNumPerCol;
@@ -212,8 +210,7 @@ int main()
             }
         }
 
-        // decoder setup
-        // --------------------------------------------------------------
+        // Decoder setup
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
         struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
@@ -233,38 +230,19 @@ int main()
         ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
         ldpc_decoder_5gnr_response.varNodes
             = aligned_malloc<int16_t>(buffer_len, 32);
-        // ldpc_decoder_5gnr_response.compactedMessageBytes =
-        // aligned_malloc<uint8_t>(numMsgBytes, 32);
-        // ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
-        // memset(ldpc_decoder_5gnr_response.varNodes, 0, numMsgBytes);
-        // memset(ldpc_decoder_5gnr_response.compactedMessageBytes, 0,
-        // numMsgBytes);
 
-        // decoding
-        // -------------------------------------------------------------------
+        // Decoding
         start_time = get_time();
         for (int n = 0; n < numberCodeblocks; n++) {
-            // printf("decoding-----------------------\n");
             ldpc_decoder_5gnr_request.varNodes = llrs[n];
             ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
-            // t_dec_start = clock();
             bblib_ldpc_decoder_5gnr(
                 &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
-            // t_dec_end = clock();
-
-            // t_decoder[n] = (t_dec_start-t_dec_end)/CLOCKS_PER_SEC*(1e9);
-            // t_dec_total = t_dec_total + t_decoder[n];
-
-            // memcpy(decoded[n],
-            // ldpc_decoder_5gnr_response.compactedMessageBytes, numMsgBytes);
-            // printf("the decoding for the %dth code block took %f nano
-            // seconds\n", n, t_decoder[n]);
         }
         end_time = get_time();
         printf("decoding time: %.3f\n",
             (end_time - start_time) / numberCodeblocks);
-        // results
-        // -----------------------------------------------------------------
+
         printf("results---------------------\n");
         printf("there are %d code blocks in total\n", numberCodeblocks);
 
