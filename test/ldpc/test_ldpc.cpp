@@ -3,8 +3,9 @@
    Intel's decoder
  */
 
-#include "encoder.hpp"
-#include "iobuffer.hpp"
+#include "common/gettime.h"
+#include "encoder/encoder.hpp"
+#include "encoder/iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 #include <bitset>
 #include <fstream>
@@ -18,7 +19,6 @@
 #include <string.h>
 
 #include <time.h>
-#define USE_RDTSC 1
 
 // these values depend on the application
 // uint16_t Zc = 14;
@@ -41,43 +41,9 @@ char* read_binfile(std::string filename, int buffer_size)
     return x;
 }
 
-template <typename T>
-T* aligned_malloc(const int size, const unsigned alignment)
-{
-#ifdef _BBLIB_DPDK_
-    return (T*)rte_malloc(NULL, sizeof(T) * size, alignment);
-#else
-#ifndef _WIN64
-    return (T*)memalign(alignment, sizeof(T) * size);
-#else
-    return (T*)_aligned_malloc(sizeof(T) * size, alignment);
-#endif
-#endif
-}
-
-static inline uint64_t RDTSC()
-{
-    unsigned int hi, lo;
-    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
-    return ((uint64_t)hi << 32) | lo;
-};
-
-static inline double get_time(void)
-{
-#if USE_RDTSC
-    return double(RDTSC()) / 2.3e3;
-#else
-    struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
-#endif
-};
-
 int main()
 {
-
     printf("--------5gnr ldpc test--------\n");
-    clock_t t_enc_start, t_enc_end, t_dec_start, t_dec_end;
     double t_encoder[numberCodeblocks];
     double t_enc_total = 0;
     double t_decoder[numberCodeblocks];
@@ -167,7 +133,6 @@ int main()
 
         double start_time = get_time();
         for (int n = 0; n < numberCodeblocks; n++) {
-            // t_enc_start = clock();
             // read input into z-bit segments
             ldpc_adapter_func(input[n], internalBuffer0, Zc, cbLen, 1);
             // encode
@@ -183,12 +148,6 @@ int main()
                 internalBuffer1, cbEncLen / Zc * PROC_BYTES);
 
             ldpc_adapter_func(encoded[n], internalBuffer2, Zc, cbCodewLen, 0);
-
-            // t_encoder[n] = (t_enc_start-t_enc_end)/CLOCKS_PER_SEC*(1e9);
-            // t_enc_total = t_enc_total + t_encoder[n];
-
-            // printf("the encoding for the %dth code block took %f nano
-            // seconds\n", n, t_encoder[n]);
         }
         double end_time = get_time();
         printf("encoding time: %.3f\n",
@@ -197,7 +156,7 @@ int main()
         // replace this with channel output
         int8_t* llrs[numberCodeblocks];
         for (int n = 0; n < numberCodeblocks; n++) {
-            llrs[n] = aligned_malloc<int8_t>(cbCodewLen * sizeof(int8_t), 32);
+            llrs[n] = reinterpret_cast<int8_t*>(memalign(32, cbCodewLen));
         }
 
         for (int n = 0; n < numberCodeblocks; n++) {
@@ -228,8 +187,8 @@ int main()
         int numMsgBits = cbLen - numFillerBits;
         int numMsgBytes = (numMsgBits + 7) / 8;
         ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
-        ldpc_decoder_5gnr_response.varNodes
-            = aligned_malloc<int16_t>(buffer_len, 32);
+        ldpc_decoder_5gnr_response.varNodes = reinterpret_cast<int16_t*>(
+            memalign(32, buffer_len * sizeof(int16_t)));
 
         // Decoding
         start_time = get_time();
