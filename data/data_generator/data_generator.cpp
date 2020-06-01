@@ -148,6 +148,7 @@ int main(int argc, char* argv[])
     int OFDM_CA_NUM = config_->OFDM_CA_NUM;
     int OFDM_DATA_NUM = config_->OFDM_DATA_NUM;
     int OFDM_DATA_START = config_->OFDM_DATA_START;
+    int OFDM_PILOT_SPACING = config_->OFDM_PILOT_SPACING;
     int symbol_num_perframe = config_->symbol_num_perframe;
     int data_symbol_num_perframe = config_->data_symbol_num_perframe;
     int pilot_symbol_num_perframe = config_->pilot_symbol_num_perframe;
@@ -506,9 +507,11 @@ int main(int argc, char* argv[])
                     dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START]
                         = ue_specific_pilot[j][sc_id];
             } else {
-                memcpy(dl_mod_data[i] + j * OFDM_CA_NUM + OFDM_DATA_START,
-                    mod_output[i * UE_NUM + j],
-                    OFDM_DATA_NUM * sizeof(complex_float));
+                for (int sc_id = 0; sc_id < OFDM_DATA_NUM; sc_id++)
+                    dl_mod_data[i][j * OFDM_CA_NUM + sc_id + OFDM_DATA_START]
+                        = (sc_id % OFDM_PILOT_SPACING == 0)
+                        ? ue_specific_pilot[j][sc_id]
+                        : mod_output[i * UE_NUM + j][sc_id];
             }
         }
     }

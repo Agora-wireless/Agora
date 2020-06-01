@@ -52,6 +52,7 @@ enum class EventType : int {
     kEncode,
     kRC,
     kRXSymbol,
+    kModul
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kRXSymbol) + 1;
