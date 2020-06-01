@@ -59,7 +59,7 @@ include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/test/phy/common
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
-  ../../src/encoder)
+  ../../src)
 
 set(SOURCES 
   ../../src/encoder/cyclic_shift.cpp
