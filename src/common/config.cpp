@@ -224,6 +224,9 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
 
+    data_bytes_num_persymbol = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
+    data_bytes_num_perframe = data_bytes_num_persymbol * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
+
     running = true;
     std::cout << "Config: "
               << "BS_ANT_NUM " << BS_ANT_NUM << ", UE_ANT_NUM " << UE_ANT_NUM

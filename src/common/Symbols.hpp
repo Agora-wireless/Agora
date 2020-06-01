@@ -52,7 +52,8 @@ enum class EventType : int {
     kEncode,
     kRC,
     kRXSymbol,
-    kModul
+    kModul,
+    kMap
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kRXSymbol) + 1;
@@ -102,6 +103,7 @@ static constexpr bool kUseDPDK = false;
 static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
+static constexpr bool kUseL2 = true;
 
 #define COMBINE_EQUAL_DECODE 1
 

@@ -7,12 +7,13 @@
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
+#include "net.hpp"
 #include "config.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
 #include "signalHandler.hpp"
 #include <algorithm>
-#include <armadillo>
+#include <arpa/inet.h>
 #include <ctime>
 #include <fcntl.h>
 #include <immintrin.h>
@@ -21,9 +22,13 @@
 #include <pthread.h>
 #include <queue>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <system_error>
 #include <tuple>
 #include <unistd.h>
+#include <armadillo>
 
 // typedef std::vector<complex_float> myVec;
 typedef std::vector<complex_float,
@@ -81,6 +86,7 @@ public:
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
+    void doMapBits(int, size_t);
     void doModul(int, size_t);
     void doIFFT(int, size_t);
 
@@ -198,10 +204,6 @@ private:
     size_t packet_length;
     size_t tx_packet_length;
     FILE *fp, *fd;
-    std::vector<myVec> L2_data_aligned;
-    complex_float* ul_pilot;
-    Table<int8_t>& ul_bits;
-    Table<complex_float>& ul_iq_f;
 
     size_t pilot_sc_len;
     size_t data_sc_len;
@@ -244,8 +246,7 @@ private:
      * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    std::vector<complex_float> l2_data_buffer_;
-    std::vector<int> l2_buffer_status_;
+    Table<int8_t> ul_bits_buffer_;
 
     /**
      * Data after modulation
@@ -320,6 +321,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
     moodycamel::ConcurrentQueue<Event_data> modul_queue_;
+    moodycamel::ConcurrentQueue<Event_data> map_queue_;
 
     pthread_t task_threads[TASK_THREAD_NUM];
 
@@ -352,5 +354,12 @@ private:
     // long long* demul_output;
     // float* equal_output;
     size_t record_frame = -1;
+#if USE_IPV4
+    struct sockaddr_in* servaddr_; /* server address */
+#else
+    struct sockaddr_in6* servaddr_; /* server address */
+#endif
+    int* socket_;
+
 };
 #endif
