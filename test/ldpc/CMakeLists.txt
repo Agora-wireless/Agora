@@ -34,7 +34,9 @@ find_program(ICPC_EXISTS "icpc")
 if(NOT ICPC_EXISTS)
   message(FATAL_ERROR "Intel C++ compiler not found. Exiting.")
 endif()
+
 set(CMAKE_CXX_COMPILER icpc)  # Intel compiler required
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mavx2 -mavx")
 
 # Set Wireless SDK preprocessor definitions for target ISA
 if(${ISA_SSE4_2})
@@ -49,8 +51,7 @@ if(RTE_SDK)
   add_definitions("-D_BBLIB_DPDK_")
 endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mavx2 -mavx")
-set(FLEXRAN_FEC_SDK_DIR "/home/anuj/FlexRAN-FEC-SDK-19-04/sdk")
+set(FLEXRAN_FEC_SDK_DIR "/opt/FlexRAN-FEC-SDK-19-04/sdk")
 set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
 
 include_directories(
@@ -60,18 +61,12 @@ include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
   ../../src/encoder)
 
-set(HEADER_FILES 
-  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h
-  ../../src/encoder/cyclic_shift.hpp
-  ../../src/encoder/encoder.hpp
-  ../../src/encoder/iobuffer.hpp)
-
 set(SOURCES 
   ../../src/encoder/cyclic_shift.cpp
   ../../src/encoder/encoder.cpp
   ../../src/encoder/iobuffer.cpp)
 
-add_executable(test_ldpc test_ldpc.cpp ${SOURCES} ${HEADER_FILES})
+add_executable(test_ldpc test_ldpc.cpp ${SOURCES})
 target_link_libraries (test_ldpc
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
@@ -79,7 +74,7 @@ target_link_libraries (test_ldpc
 add_definitions(-DUSE_LDPC)
 set(MOD_SOURCES ../../src/common/modulation.cpp)
 include_directories(../../src/common)
-add_executable(test_mod_ldpc test_mod_ldpc.cpp ${SOURCES} ${MOD_SOURCES} ${HEADER_FILES})
+add_executable(test_mod_ldpc test_mod_ldpc.cpp ${SOURCES} ${MOD_SOURCES})
 target_link_libraries(test_mod_ldpc
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
