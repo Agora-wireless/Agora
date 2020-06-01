@@ -90,12 +90,13 @@ int RU::dequeue_send(int tid)
     assert(event.event_type == EventType::kPacketTX);
 
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t ant_id = gen_tag_t(event.tags[0]).ant_id * c->nChannels;
+    size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
 
     for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
          symbol_id++) {
         size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
         size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
+        size_t ant_id = ue_id * c->nChannels;
         size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
                             * c->UE_ANT_NUM)
             + ant_id;
@@ -110,7 +111,7 @@ int RU::dequeue_send(int tid)
         int flags = 1; // HAS_TIME
         if (tx_symbol_id == c->ULSymbols[0].back())
             flags = 2; // HAS_TIME & END_BURST, fixme
-        radio->radioTx(ant_id / c->nChannels, txbuf, flags, frameTime);
+        radio->radioTx(ue_id, txbuf, flags, frameTime);
     }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],

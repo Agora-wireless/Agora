@@ -1,8 +1,6 @@
 #include "phy-ue.hpp"
 
 Phy_UE::Phy_UE(Config* config)
-    : ul_bits(config->ul_bits)
-    , ul_iq_f(config->ul_iq_f)
 {
     srand(time(NULL));
 
@@ -34,12 +32,17 @@ Phy_UE::Phy_UE(Config* config)
         TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe * antenna_num * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * symbol_perframe * antenna_num * 36);
+    map_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
     modul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * antenna_num * 36);
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
+        //TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
     ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
+        //TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
+        //TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
 
     for (size_t i = 0; i < rx_thread_num; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
@@ -58,6 +61,8 @@ Phy_UE::Phy_UE(Config* config)
     // initialize ul data buffer
     // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
     // ul_data_symbol_perframe);
+    ul_bits_buffer_.calloc(TASK_BUFFER_FRAME_NUM * antenna_num,
+        ul_data_symbol_perframe * data_sc_len, 64); 
 
     // initialize modulation buffer
     modul_buffer_.calloc(ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM,
@@ -120,6 +125,30 @@ Phy_UE::Phy_UE(Config* config)
             memset(
                 demul_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
         }
+    }
+
+    // l2 sockets setup
+    socket_ = new int[antenna_num];
+#if USE_IPV4
+    servaddr_ = new struct sockaddr_in[antenna_num];
+#else
+    servaddr_ = new struct sockaddr_in6[antenna_num];
+#endif
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+    for (size_t user_id = 0; user_id < antenna_num; ++user_id) {
+        int local_port_id = config_->bs_port + user_id;
+#if USE_IPV4
+        socket_[user_id]
+            = setup_socket_ipv4(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(&servaddr_[user_id],
+            config_->ue_rx_port + user_id, config_->tx_addr.c_str());
+#else
+        socket_[user_id]
+            = setup_socket_ipv6(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv6(&servaddr_[user_id],
+            config_->ue_rx_port + user_id, config_->tx_addr.c_str());
+#endif
+        fcntl(socket_[user_id], F_SETFL, O_NONBLOCK);
     }
 
     // create task thread
@@ -190,6 +219,7 @@ void Phy_UE::start()
     moodycamel::ProducerToken ptok_modul(modul_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
+    moodycamel::ProducerToken ptok_map(map_queue_);
     // moodycamel::ProducerToken ptok_tx(tx_queue_);
 
     // for message_queue, main thread is a consumer, it is multiple producers
@@ -245,6 +275,13 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
+                    if (kUseL2) {
+                        Event_data do_map_task(EventType::kMap,
+                            gen_tag_t::frm_sym_ant(
+                                frame_id, symbol_id, ant_id / config_->nChannels)
+                                ._tag);
+                        schedule_task(do_map_task, &map_queue_, ptok_map);
+                    } else {
                     /*Event_data do_ifft_task(EventType::kIFFT,
                         gen_tag_t::frm_sym_ant(
                             frame_id, symbol_id, ant_id / config_->nChannels)
@@ -255,6 +292,7 @@ void Phy_UE::start()
                             frame_id, symbol_id, ant_id / config_->nChannels)
                             ._tag);
                     schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+                    }
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -285,17 +323,22 @@ void Phy_UE::start()
 
             } break;
 
+            case EventType::kMap: {
+                Event_data do_modul_task(EventType::kModul,
+                        event.tags[0]);
+                schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+            } break;
+
             case EventType::kModul: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
-                size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-                size_t modul_status_idx = frame_slot * nUEs + ue_id;
+                //size_t modul_status_idx = frame_slot * nUEs + ue_id;
 
-                data_checker_[modul_status_idx]++;
-                if (data_checker_[modul_status_idx]
-                    == ul_data_symbol_perframe) {
-                    data_checker_[modul_status_idx] = 0;
+                //data_checker_[modul_status_idx]++;
+                //if (data_checker_[modul_status_idx]
+                //    == ul_data_symbol_perframe) {
+                //    data_checker_[modul_status_idx] = 0;
                     Event_data do_ifft_task(EventType::kIFFT,
                         gen_tag_t::frm_sym_ant(frame_id, symbol_id, ue_id)
                             ._tag);
@@ -304,7 +347,7 @@ void Phy_UE::start()
                         printf("Main thread: frame: %zu, finished modulating "
                                "uplink data for user %zu\n",
                             frame_id, ue_id);
-                }
+                //}
             } break;
 
             case EventType::kDemul: {
@@ -352,9 +395,10 @@ void Phy_UE::start()
 
             case EventType::kIFFT: {
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-                Event_data task(EventType::kPacketTX, event.tags[0]);
-                try_enqueue_fallback(
-                    &tx_queue_, tx_ptoks_ptr[ant_id % rx_thread_num], task);
+                Event_data do_tx_task(EventType::kPacketTX, event.tags[0]);
+                schedule_task(do_tx_task, &tx_queue_, *tx_ptoks_ptr[ant_id % rx_thread_num]);
+                //try_enqueue_fallback(
+                //    &tx_queue_, tx_ptoks_ptr[ant_id % rx_thread_num], task);
             } break;
 
             case EventType::kPacketTX: {
@@ -418,6 +462,8 @@ void Phy_UE::taskThread(int tid)
             doIFFT(tid, event.tags[0]);
         if (modul_queue_.try_dequeue(event))
             doModul(tid, event.tags[0]);
+        if (map_queue_.try_dequeue(event))
+            doMapBits(tid, event.tags[0]);
         else if (fft_queue_.try_dequeue(event))
             doFFT(tid, event.tags[0]);
     }
@@ -618,6 +664,48 @@ void Phy_UE::doDemul(int tid, size_t tag)
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
 
+void Phy_UE::doMapBits(int tid, size_t tag)
+{
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t user_id = gen_tag_t(tag).ant_id;
+    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    size_t packet_length = config_->data_bytes_num_perframe; 
+
+    for (size_t ch = 0; ch < config_->nChannels; ch++) {
+        size_t ant_id = user_id * config_->nChannels + ch;
+        char* tx_packet = (char*)aligned_alloc(64, packet_length);
+        if (-1 == recv(socket_[ant_id], (char*)tx_packet, packet_length, 0)) {
+            if (errno != EAGAIN) {
+                perror("recv failed");
+                //exit(0);
+                return;
+            }
+        }
+        else
+            printf("Received L2 data for frame %zu and antenna %zu\n", frame_id, ant_id);
+        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
+             ul_symbol_id++) {
+            size_t total_ant_id
+                = frame_slot * antenna_num + ant_id;
+            uint8_t* bits_buff
+                = (uint8_t*)&ul_bits_buffer_[total_ant_id][ul_symbol_id * data_sc_len];
+            for (size_t sc = 0; sc < config_->data_bytes_num_persymbol; sc++) {
+                size_t offset = ul_symbol_id * config_->data_bytes_num_persymbol;
+                uint8_t byte = (uint8_t)tx_packet[offset + sc];
+                // FIXME: this only works for 16QAM
+                bits_buff[2 * sc] = byte % config_->mod_type;
+                bits_buff[2 * sc + 1] = byte / config_->mod_type;
+            }
+        }
+    }
+
+    Event_data bitmap_event(EventType::kMap, tag);
+    if (!message_queue_.enqueue(*task_ptok[tid], bitmap_event)) {
+        printf("Muliplexing message enqueue failed\n");
+        exit(0);
+    }
+}
+
 void Phy_UE::doModul(int tid, size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
@@ -631,8 +719,12 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
+            size_t total_ant_id
+                = frame_slot * antenna_num + ant_id;
             int8_t* ul_bits
-                = &config_->ul_bits[ul_symbol_id][ant_id * data_sc_len];
+                = kUseL2
+                  ? &ul_bits_buffer_[total_ant_id][ul_symbol_id * data_sc_len]
+                  : &config_->ul_bits[ul_symbol_id][ant_id * data_sc_len];
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
@@ -694,8 +786,10 @@ void Phy_UE::doIFFT(int tid, size_t tag)
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
             std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data;
             if (ul_symbol_id < config_->UL_PILOT_SYMS) {
-                memcpy(tx_data_ptr, config_->ue_specific_pilot_t[ant_id],
-                    config_->sampsPerSymbol * sizeof(std::complex<short>));
+                for (size_t i = 0; i < config_->sampsPerSymbol; i++)
+                    tx_data_ptr[i] = config_->ue_specific_pilot_t[ant_id][i];
+                //memcpy(tx_data_ptr, config_->ue_specific_pilot_t[ant_id],
+                //    config_->sampsPerSymbol * sizeof(std::complex<short>));
             } else {
                 size_t total_ul_data_symbol_id
                     = frame_slot * ul_data_symbol_perframe + ul_symbol_id
