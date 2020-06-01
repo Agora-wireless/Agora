@@ -6,7 +6,7 @@
 
 Required packages:
 
-`sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy`
+`sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5`
 
 Install Armadillo: `./scripts/install_armadillo.sh`
 

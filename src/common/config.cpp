@@ -298,16 +298,17 @@ void Config::genData()
             = common_pilot[i] / (float)std::pow(std::abs(common_pilot[i]), 2);
         pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
-    pilotsF.resize(OFDM_DATA_START);
-    pilotsF.insert(pilotsF.end(), common_pilot.begin(), common_pilot.end());
-    pilotsF.resize(OFDM_CA_NUM);
-    pilot_cf32 = CommsLib::IFFT(pilotsF, OFDM_CA_NUM, false);
+    complex_float* pilot_ifft;
+    alloc_buffer_1d(&pilot_ifft, OFDM_CA_NUM, 64, 1);
+    for (size_t j = 0; j < OFDM_DATA_NUM; j++)
+        pilot_ifft[j + OFDM_DATA_START] = pilots_[j];
+    CommsLib::IFFT(pilot_ifft, OFDM_CA_NUM, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
     ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
     ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
-    Table<complex_float> pilot_ifft;
-    pilot_ifft.calloc(UE_ANT_NUM, OFDM_CA_NUM, 64);
+    Table<complex_float> ue_pilot_ifft;
+    ue_pilot_ifft.calloc(UE_ANT_NUM, OFDM_CA_NUM, 64);
     auto zc_ue_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
@@ -317,9 +318,9 @@ void Config::genData()
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
-            pilot_ifft[i][j + OFDM_DATA_START] = ue_specific_pilot[i][j];
+            ue_pilot_ifft[i][j + OFDM_DATA_START] = ue_specific_pilot[i][j];
         }
-        CommsLib::IFFT(pilot_ifft[i], OFDM_CA_NUM, false);
+        CommsLib::IFFT(ue_pilot_ifft[i], OFDM_CA_NUM, false);
     }
 
     dl_bits.malloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 64);
@@ -424,110 +425,48 @@ void Config::genData()
     }
 
     // Find normalization factor through searching for max value in IFFT results
-    float max_val = 0;
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (size_t u = 0; u < UE_ANT_NUM; u++) {
-            size_t q = u * OFDM_CA_NUM;
-            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-                auto cur_val = std::abs(std::complex<float>(
-                    ul_iq_ifft[i][q + j].re, ul_iq_ifft[i][q + j].im));
-                if (cur_val > max_val) {
-                    max_val = cur_val;
-                }
-            }
-        }
-    }
+    float max_val = CommsLib::find_max_abs(ul_iq_ifft, ul_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
+    float cur_max_val = CommsLib::find_max_abs(dl_iq_ifft, dl_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
+    if (cur_max_val > max_val)
+        max_val = cur_max_val;
+    cur_max_val = CommsLib::find_max_abs(ue_pilot_ifft, UE_ANT_NUM, OFDM_CA_NUM);
+    if (cur_max_val > max_val)
+        max_val = cur_max_val;
+    cur_max_val = CommsLib::find_max_abs(pilot_ifft, OFDM_CA_NUM);
+    if (cur_max_val > max_val)
+        max_val = cur_max_val;
 
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t u = 0; u < UE_ANT_NUM; u++) {
-            size_t q = u * OFDM_CA_NUM;
-            for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-                auto cur_val = std::abs(std::complex<float>(
-                    dl_iq_ifft[i][q + j].re, dl_iq_ifft[i][q + j].im));
-                if (cur_val > max_val) {
-                    max_val = cur_val;
-                }
-            }
-        }
-    }
-
-    for (size_t u = 0; u < UE_ANT_NUM; u++) {
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            auto cur_val = std::abs(
-                std::complex<float>(pilot_ifft[u][j].re, pilot_ifft[u][j].im));
-            if (cur_val > max_val) {
-                max_val = cur_val;
-            }
-        }
-    }
-
-    for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-        auto cur_val = std::abs(pilot_cf32[j]);
-        if (cur_val > max_val) {
-            max_val = cur_val;
-        }
-    }
-
-    float scale = 2 * max_val; // additional 2^2 (6dB) power backoff
+    scale = 2 * max_val; // additional 2^2 (6dB) power backoff
 
     // Generate time domain symbols for downlink
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t u = 0; u < UE_ANT_NUM; u++) {
-
             size_t q = u * OFDM_CA_NUM;
             size_t r = u * sampsPerSymbol;
-
-            size_t t = prefix + CP_LEN;
-            for (size_t j = t; j < t + OFDM_CA_NUM; j++) {
-                complex_float sc_data = { dl_iq_ifft[i][q + j - t].re / scale,
-                    dl_iq_ifft[i][q + j - t].im / scale };
-                dl_iq_t[i][r + j] = { (int16_t)(sc_data.re * 32768),
-                    (int16_t)(sc_data.im * 32768) };
-            }
-            memcpy(dl_iq_t[i] + r + prefix,
-                dl_iq_t[i] + r + prefix + OFDM_CA_NUM,
-                CP_LEN * sizeof(short) * 2);
+            CommsLib::ifft2tx(&dl_iq_ifft[i][q], &dl_iq_t[i][r], OFDM_CA_NUM,
+                prefix, CP_LEN, scale);
         }
     }
 
-    // Generate freq-domain uplink symbols
+    // Generate time domain uplink symbols
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t u = 0; u < UE_ANT_NUM; u++) {
-
             size_t q = u * OFDM_CA_NUM;
             size_t r = u * sampsPerSymbol;
-
-            size_t t = prefix + CP_LEN;
-            for (size_t j = t; j < t + OFDM_CA_NUM; j++) {
-                complex_float sc_data = { ul_iq_ifft[i][q + j - t].re / scale,
-                    ul_iq_ifft[i][q + j - t].im / scale };
-                ul_iq_t[i][r + j] = { (int16_t)(sc_data.re * 32768),
-                    (int16_t)(sc_data.im * 32768) };
-            }
-            memcpy(ul_iq_t[i] + r + prefix,
-                ul_iq_t[i] + r + prefix + OFDM_CA_NUM,
-                CP_LEN * sizeof(short) * 2);
+            CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t[i][r], OFDM_CA_NUM,
+                prefix, CP_LEN, scale);
         }
     }
-    ul_iq_ifft.free();
-    dl_iq_ifft.free();
 
+    // Generate time domain ue-specific pilot symbols
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
-        for (size_t j = 0; j < OFDM_CA_NUM; j++) {
-            ue_specific_pilot_t[i][prefix + CP_LEN + j] = std::complex<int16_t>(
-                (int16_t)((pilot_ifft[i][j].re / scale) * 32768),
-                (int16_t)((pilot_ifft[i][j].im / scale) * 32768));
-        }
-        for (size_t j = 0; j < CP_LEN; j++) {
-            ue_specific_pilot_t[i][prefix + j]
-                = ue_specific_pilot_t[i][prefix + OFDM_CA_NUM + j];
-        }
+        CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
+            prefix, CP_LEN, scale);
     }
-
-    pilot_ifft.free();
 
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
-        pilot_cf32[i] /= scale;
+        pilot_cf32.push_back(std::complex<float>(
+            pilot_ifft[i].re / scale, pilot_ifft[i].im / scale));
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
         pilot_cf32.end()); // add CP
 
@@ -537,6 +476,11 @@ void Config::genData()
     std::vector<uint32_t> pre_uint32(prefix, 0);
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
     pilot.resize(sampsPerSymbol);
+
+    ul_iq_ifft.free();
+    dl_iq_ifft.free();
+    ue_pilot_ifft.free();
+    free_buffer_1d(&pilot_ifft);
 }
 
 Config::~Config()
