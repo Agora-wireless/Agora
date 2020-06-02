@@ -334,7 +334,6 @@ void Phy_UE::start()
 
             case EventType::kMap: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
 
                 Event_data do_modul_task(EventType::kModul, event.tags[0]);
@@ -681,22 +680,11 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t user_id = gen_tag_t(tag).ant_id;
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-    size_t packet_length = config_->data_bytes_num_perframe;
     bool rx = false;
     for (size_t ch = 0; ch < config_->nChannels; ch++) {
         size_t ant_id = user_id * config_->nChannels + ch;
         if (ul_bits_buffer_status_[ant_id][frame_slot] == 0)
             continue;
-        //char* tx_packet = (char*)aligned_alloc(64, packet_length);
-        //if (-1 == recv(socket_[ant_id], (char*)tx_packet, packet_length, 0)) {
-        //    if (errno != EAGAIN) {
-        //        perror("recv failed");
-        //        //exit(0);
-        //    }
-        //    return;
-        //} else
-        //    printf("Received L2 data for frame %zu and antenna %zu\n", frame_id,
-        //        ant_id);
         for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
              ul_symbol_id++) {
             size_t total_ul_symbol_id
@@ -709,8 +697,8 @@ void Phy_UE::doMapBits(int tid, size_t tag)
             for (size_t sc = 0; sc < config_->data_bytes_num_persymbol; sc++) {
                 uint8_t byte = (uint8_t)bits_buff[sc];
                 // FIXME: this only works for 16QAM
-                syms_buff[2 * sc] = byte % config_->mod_type;
-                syms_buff[2 * sc + 1] = byte / config_->mod_type;
+                syms_buff[2 * sc] = byte & 0xF;
+                syms_buff[2 * sc + 1] = (uint8_t)(byte >> 4);
             }
         }
         rx = true;

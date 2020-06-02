@@ -49,8 +49,7 @@ MACSender::MACSender(Config* cfg, size_t core_offset, size_t delay)
     }
     memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
-    tx_buffers_.malloc(
-        SOCKET_BUFFER_FRAME_NUM * cfg->UE_ANT_NUM,
+    tx_buffers_.malloc(SOCKET_BUFFER_FRAME_NUM * cfg->UE_ANT_NUM,
         cfg->data_bytes_num_perframe, 64);
     //init_data_from_file();
 
@@ -64,6 +63,9 @@ MACSender::MACSender(Config* cfg, size_t core_offset, size_t delay)
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
             setup_sockaddr_remote_ipv4(
                 &servaddr_ipv4[i], cfg->bs_port + i, cfg->rx_addr.c_str());
+            printf("Set up UDP socket client listening to port %zu"
+                   " with remote address %s:%zu  \n",
+                cfg->ue_tx_port + i, cfg->rx_addr.c_str(), cfg->bs_port + i);
         } else {
             socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
             setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
@@ -74,6 +76,7 @@ MACSender::MACSender(Config* cfg, size_t core_offset, size_t delay)
             int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
                 sizeof(servaddr_ipv4[i]));
             rt_assert(ret == 0, "UDP socket connect failed");
+            printf("UDP socket %zu connect() call ret %d\n", i, ret);
         } else {
             printf("UDP socket %zu connected\n", i);
         }
@@ -97,8 +100,8 @@ void MACSender::startTX()
     frame_end = new double[kNumStatsFrames]();
 
     // Create worker threads
-    create_threads(
-        pthread_fun_wrapper<MACSender, &MACSender::worker_thread>, 0, thread_num);
+    create_threads(pthread_fun_wrapper<MACSender, &MACSender::worker_thread>, 0,
+        thread_num);
     master_thread(0); // Start the master thread
 }
 
@@ -108,8 +111,8 @@ void MACSender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_end = in_frame_end;
 
     // Create worker threads
-    create_threads(
-        pthread_fun_wrapper<MACSender, &MACSender::worker_thread>, 0, thread_num);
+    create_threads(pthread_fun_wrapper<MACSender, &MACSender::worker_thread>, 0,
+        thread_num);
 
     // Create the master thread
     create_threads(pthread_fun_wrapper<MACSender, &MACSender::master_thread>,
@@ -127,11 +130,11 @@ void* MACSender::master_thread(int tid)
         // Wait
     }
 
-    const size_t max_symbol_id = get_max_symbol_id();
+    //const size_t max_symbol_id = get_max_symbol_id();
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
-        //update_tx_buffer(req_tag);
+        update_tx_buffer(req_tag);
         rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], req_tag._tag),
             "Send task enqueue failed");
     }
@@ -172,14 +175,12 @@ void* MACSender::master_thread(int tid)
         }
 
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
-            auto req_tag
-                = gen_tag_t::frm_sym_ant(next_frame_id, 0, i);
-            //update_tx_buffer(req_tag);
-            rt_assert(send_queue_.enqueue(
-                          *task_ptok[i % thread_num], req_tag._tag),
+            auto req_tag = gen_tag_t::frm_sym_ant(next_frame_id, 0, i);
+            update_tx_buffer(req_tag);
+            rt_assert(
+                send_queue_.enqueue(*task_ptok[i % thread_num], req_tag._tag),
                 "Send task enqueue failed");
         }
-
     }
     write_stats_to_file(cfg->frames_to_test);
     exit(0);
@@ -187,16 +188,17 @@ void* MACSender::master_thread(int tid)
 
 void MACSender::update_tx_buffer(gen_tag_t tag)
 {
-    auto* pkt
-        = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)] + kTXBufOffset);
-    pkt->frame_id = tag.frame_id;
-    pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
-    pkt->cell_id = 0;
-    pkt->ant_id = tag.ant_id;
+    // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
+    std::random_device r;
+    std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+    std::mt19937 eng(seed); // a source of random data
 
-    size_t data_index = (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
-    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
-        cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
+    std::uniform_int_distribution<char> dist;
+    std::vector<char> v(cfg->data_bytes_num_perframe);
+
+    generate(begin(v), end(v), bind(dist, eng));
+    char* pkt = tx_buffers_[tag_to_tx_buffers_index(tag)];
+    memcpy(pkt, (char*)v.data(), cfg->data_bytes_num_perframe);
 }
 
 void* MACSender::worker_thread(int tid)
@@ -216,9 +218,9 @@ void* MACSender::worker_thread(int tid)
     size_t max_symbol_id = 1; //get_max_symbol_id();
     int radio_lo = 0; // tid * cfg->nRadios / thread_num;
     int radio_hi = cfg->UE_ANT_NUM; //(tid + 1) * cfg->nRadios / thread_num;
-    size_t ant_num_this_thread = 1; 
-        // cfg->BS_ANT_NUM / thread_num
-        // + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
+    size_t ant_num_this_thread = 1;
+    // cfg->BS_ANT_NUM / thread_num
+    // + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     int radio_id = radio_lo;
@@ -228,7 +230,7 @@ void* MACSender::worker_thread(int tid)
             continue;
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
-        size_t start_tsc_send = rdtsc();
+        //size_t start_tsc_send = rdtsc();
         // Send a message to the server. We assume that the server is running.
         if (kUseDPDK or !kConnectUDP) {
             int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
@@ -240,8 +242,10 @@ void* MACSender::worker_thread(int tid)
                 socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
             if (ret < 0) {
                 fprintf(stderr,
-                    "send() failed. Error = %s. Is a server running at %s?\n",
-                    strerror(errno), cfg->rx_addr.c_str());
+                    "send() failed. Error = %s. Is a server running at "
+                    "%s:%d?\n",
+                    strerror(errno), cfg->rx_addr.c_str(),
+                    cfg->bs_port + radio_id);
                 exit(-1);
             }
         }
@@ -343,7 +347,8 @@ void MACSender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
     }
 }
 
-void MACSender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
+void MACSender::create_threads(
+    void* (*worker)(void*), int tid_start, int tid_end)
 {
     int ret;
     for (int i = tid_start; i < tid_end; i++) {
