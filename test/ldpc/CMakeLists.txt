@@ -58,6 +58,7 @@ include_directories(
   /opt/intel/mkl/include
   ${FLEXRAN_FEC_SDK_DIR}/test/phy/common
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
   ../../src)
 

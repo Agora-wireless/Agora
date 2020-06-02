@@ -4,9 +4,8 @@
  */
 
 #include "common/gettime.h"
-#include "encoder/encoder.hpp"
-#include "encoder/iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "phy_ldpc_encoder_5gnr_internal.h"
 #include <bitset>
 #include <fstream>
 #include <immintrin.h>
@@ -36,6 +35,12 @@ char* read_binfile(std::string filename, size_t buffer_size)
     infile.close();
     return x;
 }
+
+static_assert(BG1_ROW_TOTAL == 46, "");
+static_assert(BG1_COL_TOTAL == 68, "");
+static_assert(BG2_ROW_TOTAL == 42, "");
+static_assert(BG2_COL_TOTAL == 52, "");
+static_assert(PROC_BYTES == 64, "");
 
 int main()
 {
@@ -122,7 +127,8 @@ int main()
 
         printf("Encoding\n");
         LDPC_ADAPTER_P ldpc_adapter_func = ldpc_select_adapter_func(zc);
-        LDPC_ENCODER ldpc_encoder_func = ldpc_select_encoder_func(kBaseGraph);
+        auto ldpc_encoder_func
+            = kBaseGraph == 1 ? ldpc_encoder_bg1 : ldpc_encoder_bg2;
 
         double start_time_us = get_time();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
