@@ -10,5 +10,5 @@
  "antenna_num": 8,
  "modulation": "16QAM",
  "downlink_mode" : true,
- "tx_frame_num":1
+ "frames_to_test":1
 }

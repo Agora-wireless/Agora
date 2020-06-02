@@ -1,0 +1,24 @@
+{
+ "irises" : "data/user-iris-serials.txt",
+ "cells" : 1,
+ "channel" : "A",
+ "frequency" : 3.56e9,
+ "rxgainA" : 20,
+ "txgainA" : 40,
+ "rate" : 5e6,
+ "symbol_size" : 1,
+ "ofdm_ca_num" : 512,
+ "ofdm_data_num" : 304,
+ "prefix" : 160,
+ "postfix" : 160,
+ "dl_prefix" : 240,
+ "cp_len" : 32,
+ "frames" : [
+     "BGGGGGPGGGDDDG"
+ ],
+ "UE" : true,
+ "client_dl_pilot_syms": 2,
+ "modulation" : "QPSK",
+ "worker_thread_num" : 12,
+ "demul_block_size" : 48
+}

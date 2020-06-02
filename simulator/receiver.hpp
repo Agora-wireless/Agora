@@ -33,51 +33,8 @@
 #include <unistd.h>
 #include <vector>
 
-#if USE_DPDK
-#include <inttypes.h>
-#include <rte_arp.h>
-#include <rte_byteorder.h>
-#include <rte_cycles.h>
-#include <rte_debug.h>
-#include <rte_distributor.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_ether.h>
-#include <rte_flow.h>
-#include <rte_ip.h>
-#include <rte_malloc.h>
-#include <rte_pause.h>
-#include <rte_prefetch.h>
-#include <rte_udp.h>
-#endif
-
-#define RX_RING_SIZE 8192 * 4
-#define TX_RING_SIZE 8192 * 4
-
-#define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_SIZE 128 + (sizeof(int) * 16 + sizeof(ushort) * OFDM_FRAME_LEN * 2)
-#define MBUF_CACHE_SIZE 128
-#define BURST_SIZE 16
-
-#define ETH_HDRLEN 14
-#define IP4_HDRLEN 20
-#define UDP_HDRLEN 8
-#define MAX_JUMBO_FRAME_SIZE 9600 // 9600
-#define EMPTY_MASK 0x0
-#define FULL_MASK 0xffffffff
-
 typedef unsigned short ushort;
 class Receiver {
-    // public:
-    //     // use for create pthread
-    //     struct ReceiverContext {
-    //         Receiver* ptr;
-    //         int tid;
-    // #ifdef USE_ARGOS
-    //         int radios;
-    // #endif
-    //     };
-
 public:
     Receiver(Config* cfg, size_t rx_thread_num = 1, size_t core_offset = 1);
 

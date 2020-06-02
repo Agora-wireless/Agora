@@ -7,6 +7,7 @@
 #define MEMORY_MANAGE
 #include <cstdlib>
 #include <cstring>
+#include <random>
 #include <stdio.h>
 
 template <typename T> class Table {
@@ -30,6 +31,20 @@ public:
     {
         malloc(dim1, dim2, aligned_bytes);
         memset(data, 0, dim1 * dimension);
+    }
+
+    // Allocate the table and fill it with random floating point values between
+    // -1.0 and 1.0
+    void rand_alloc_float(size_t dim1, size_t dim2, size_t aligned_bytes)
+    {
+        std::default_random_engine generator;
+        std::uniform_real_distribution<float> distribution(-1.0, 1.0);
+
+        malloc(dim1, dim2, aligned_bytes);
+        auto* base = reinterpret_cast<float*>(data);
+        for (size_t i = 0; i < dim1 * dim2; i++) {
+            base[i] = distribution(generator);
+        }
     }
     void free(void)
     {

@@ -37,26 +37,6 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     printf("start Recv thread\n");
     std::vector<pthread_t> created_threads;
 
-#if USE_DPDK
-    unsigned int nb_lcores = rte_lcore_count();
-    printf("Number of DPDK cores: %d\n", nb_lcores);
-    unsigned int lcore_id;
-    int worker_id = 0;
-    // Launch specific task to cores
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
-    {
-        // launch communication and task thread onto specific core
-        if (worker_id < rx_thread_num_) {
-            auto context = new EventHandlerContext<Receiver>;
-            context->obj_ptr = this;
-            context->id = worker_id;
-            rte_eal_remote_launch(
-                (lcore_function_t*)loopRecv_DPDK, context, lcore_id);
-            printf("RX: launched thread %d on core %d\n", worker_id, lcore_id);
-        }
-        worker_id++;
-    }
-#else
     for (size_t i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread_;
         auto context = new EventHandlerContext<Receiver>;
@@ -70,7 +50,6 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
         }
         created_threads.push_back(recv_thread_);
     }
-#endif
     return created_threads;
 }
 
@@ -94,9 +73,6 @@ void* Receiver::loopRecv(int tid)
 #endif
 
     /* use token to speed up */
-    // moodycamel::ProducerToken local_ptok(*message_queue_);
-    // moodycamel::ProducerToken *local_ptok = new
-    // moodycamel::ProducerToken(*message_queue_);
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
 
     char* buffer_ptr = (*buffer_)[tid];
@@ -135,24 +111,21 @@ void* Receiver::loopRecv(int tid)
             exit(0);
         }
 
-#if MEASURE_TIME
-        // read information from received packet
-        struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+        // Read information from received packet
+        auto* pkt = (struct Packet*)cur_buffer_ptr;
         int frame_id = pkt->frame_id;
-#if DEBUG_SENDER
-        printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
-            frame_id, pkt->symbol_id, pkt->ant_id);
-#endif
-        if (frame_id > prev_frame_id) {
-            *(frame_start + frame_id) = get_time();
-            prev_frame_id = frame_id;
-            if (frame_id % 512 == 200) {
-                _mm_prefetch(
-                    (char*)(frame_start + frame_id + 512), _MM_HINT_T0);
-                // double temp = frame_start[frame_id+3];
+
+        if (kDebugSenderReceiver) {
+            printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
+                frame_id, pkt->symbol_id, pkt->ant_id);
+        }
+
+        if (kIsWorkerTimingEnabled) {
+            if (frame_id > prev_frame_id) {
+                frame_start[frame_id] = get_time();
+                prev_frame_id = frame_id;
             }
         }
-#endif
         /* get the position in buffer */
         offset = cur_buffer_status_ptr - buffer_status_ptr;
         cur_buffer_status_ptr[0] = 1;

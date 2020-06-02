@@ -21,33 +21,25 @@ IQ samples. Gold IFFT - Total of 128-long complex IQ samples including a
 
 #include "comms-lib.h"
 
-size_t CommsLib::find_pilot_seq(std::vector<std::complex<double>> iq,
-    std::vector<std::complex<double>> pilot, size_t seq_len)
+size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
+    std::vector<std::complex<float>> pilot, size_t seq_len)
 {
 
-    size_t best_peak = 0;
-
     // Re-arrange into complex vector, flip, and compute conjugate
-    std::vector<std::complex<double>> pilot_conj;
+    std::vector<std::complex<float>> pilot_conj;
     for (size_t i = 0; i < seq_len; i++) {
         // conjugate
         pilot_conj.push_back(std::conj(pilot[seq_len - i - 1]));
     }
 
     // Equivalent to numpy's sign function
-    std::vector<std::complex<double>> iq_sign = CommsLib::csign(iq);
+    auto iq_sign = CommsLib::csign(iq);
 
     // Convolution
-    std::vector<double> pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
+    auto pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
 
     // Find all peaks
-    double max_peak = 0;
-    for (size_t i = 0; i < pilot_corr.size(); i++) {
-        if (abs(pilot_corr[i]) > max_peak) {
-            max_peak = abs(pilot_corr[i]);
-            best_peak = i;
-        }
-    }
+    auto best_peak = *std::max_element(pilot_corr.begin(), pilot_corr.end());
     return best_peak;
 }
 
@@ -82,17 +74,16 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     }
 
     // Equivalent to numpy's sign function
-    std::vector<std::complex<double>> iq_sign = CommsLib::csign(iq);
+    auto iq_sign = CommsLib::csign(iq);
 
     // Convolution
-    std::vector<double> lts_corr = CommsLib::convolve(iq_sign, lts_sym_conj);
+    auto lts_corr = CommsLib::convolve(iq_sign, lts_sym_conj);
+    auto lts_peak = *std::max_element(lts_corr.begin(), lts_corr.end());
 
     // Find all peaks
     std::vector<int> peaks;
     for (size_t i = 0; i < lts_corr.size(); i++) {
-        if (lts_corr[i]
-            > (lts_thresh
-                  * *std::max_element(lts_corr.begin(), lts_corr.end()))) {
+        if (std::abs(lts_corr[i]) > (lts_thresh * lts_peak)) {
             // Index of valid peaks
             peaks.push_back(i);
         }
@@ -122,6 +113,30 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     return best_peak;
 }
 
+float CommsLib::find_max_abs(Table<complex_float> in, size_t dim1, size_t dim2)
+{
+    float max_val = 0;
+    for (size_t i = 0; i < dim1; i++) {
+        float cur_max_val
+            = CommsLib::find_max_abs(in[i], dim2);
+        if (cur_max_val > max_val)
+            max_val = cur_max_val;
+    }
+    return max_val;
+}
+
+float CommsLib::find_max_abs(complex_float* in, size_t len)
+{
+    float max_val = 0;
+    for (size_t j = 0; j < len; j++) {
+        auto cur_val = CommsLib::abs_cf(in[j]);
+        if (cur_val > max_val) {
+            max_val = cur_val;
+        }
+    }
+    return max_val;
+}
+
 void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
     std::vector<std::vector<int>>& x, std::vector<std::vector<int>>& y)
 {
@@ -147,8 +162,8 @@ void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
     }
 }
 
-std::vector<std::complex<double>> CommsLib::csign(
-    std::vector<std::complex<double>> iq)
+template <typename T>
+std::vector<std::complex<T>> CommsLib::csign(std::vector<std::complex<T>> iq)
 {
     /*
      * Return element-wise indication of the sign of a number (for complex
@@ -160,10 +175,10 @@ std::vector<std::complex<double>> CommsLib::csign(
      * where sign(x) is given by
      *     -1 if x < 0, 0 if x==0, 1 if x > 0
      */
-    std::vector<std::complex<double>> iq_sign;
+    std::vector<std::complex<T>> iq_sign;
     for (int i = 0; i < static_cast<int>(iq.size()); i++) {
         // sign(x.real) + 0j if x.real != 0 else sign(x.imag) + 0j
-        std::complex<double> x = iq[i];
+        std::complex<T> x = iq[i];
         if (x.real() != 0) {
             iq_sign.push_back((x.real() > 0) ? 1 : (x.real() < 0) ? -1 : 0);
         } else {
@@ -173,9 +188,9 @@ std::vector<std::complex<double>> CommsLib::csign(
     return iq_sign;
 }
 
-std::vector<double> CommsLib::convolve(
-    std::vector<std::complex<double>> const& f,
-    std::vector<std::complex<double>> const& g)
+template <typename T>
+std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
+    std::vector<std::complex<T>> const& g)
 {
     /* Convolution of two vectors
      * Source:
@@ -184,8 +199,8 @@ std::vector<double> CommsLib::convolve(
     int const nf = f.size();
     int const ng = g.size();
     int const n = nf + ng - 1;
-    std::vector<double> out(n, 0);
-    std::vector<std::complex<double>> outc(n, 0);
+    std::vector<T> out(n, 0);
+    std::vector<std::complex<T>> outc(n, 0);
     for (auto i(0); i < n; ++i) {
         int const jmn = (i >= ng - 1) ? i - (ng - 1) : 0;
         int const jmx = (i < nf - 1) ? i : nf - 1;
@@ -220,7 +235,7 @@ std::vector<float> CommsLib::magnitudeFFT(
     }
     std::reverse(
         fftMag.begin(), fftMag.end()); // not sure why we need reverse here, but
-                                       // this seems to give the right spectrum
+    // this seems to give the right spectrum
     return fftMag;
 }
 
@@ -337,22 +352,21 @@ std::vector<std::complex<float>> CommsLib::IFFT(
     DftiComputeBackward(mkl_handle, in.data());
     DftiFreeDescriptor(&mkl_handle);
     if (normalize) {
-        // for (int i = 0; i < fftsize; i++) out[i] /= fftsize;
         float max_val = 0;
-        // int max_ind = 0;
         float scale = 0.5;
         for (int i = 0; i < fftsize; i++) {
             if (std::abs(in[i]) > max_val) {
                 max_val = std::abs(in[i]);
-                // max_ind = i;
             }
         }
-        std::cout << "IFFT output is normalized with "
-                  << std::to_string(max_val) << std::endl;
-        // std::cout << "max sample is " << std::to_string(out[max_ind].real())
-        // << "+1j*" << std::to_string(out[max_ind].imag()) << std::endl;
+        //std::cout << "IFFT output is normalized with "
+        //         << std::to_string(max_val) << std::endl;
         for (int i = 0; i < fftsize; i++)
             in[i] /= (max_val / scale);
+    } else {
+        for (int i = 0; i < fftsize; i++) {
+            in[i] /= fftsize;
+        }
     }
     return in;
 }
@@ -379,6 +393,22 @@ void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize)
     DftiComputeBackward(mkl_handle, in);
     DftiFreeDescriptor(&mkl_handle);
     if (normalize) {
+        float max_val = 0;
+        // int max_ind = 0;
+        float scale = 0.5;
+        for (int i = 0; i < fftsize; i++) {
+            float sc_abs = std::abs(std::complex<float>(in[i].re, in[i].im));
+            if (sc_abs > max_val) {
+                max_val = sc_abs;
+                // max_ind = i;
+            }
+        }
+        //std::cout << "IFFT output is normalized with "
+        //         << std::to_string(max_val) << std::endl;
+        for (int i = 0; i < fftsize; i++)
+            in[i] = { in[i].re / (max_val / scale),
+                in[i].im / (max_val / scale) };
+    } else {
         for (int i = 0; i < fftsize; i++) {
             in[i].re /= fftsize;
             in[i].im /= fftsize;
@@ -399,18 +429,35 @@ void CommsLib::FFT(complex_float* in, int fftsize)
 
 std::vector<std::complex<float>> CommsLib::composeRefSymbol(
     std::vector<std::complex<float>> pilot, size_t offset, size_t period,
-    size_t fftSize, bool timeDomain)
+    size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,
+    bool timeDomain)
 {
     std::vector<std::complex<float>> fft_in(fftSize, 0);
-    size_t pilotNum = fftSize / period;
+    size_t pilotNum = dataSize / period;
     for (size_t i = 0; i < pilotNum; i++) {
-        size_t index = i * period + offset;
+        size_t index = i * period + offset + dataStart;
         fft_in[index] = pilot[index];
     }
-    if (timeDomain)
-        return CommsLib::IFFT(fft_in, fftSize);
-    else
+    if (timeDomain) {
+        auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
+        pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
+            pilot_cf32.end()); // add CP
+        return pilot_cf32;
+    } else
         return fft_in;
+}
+
+void CommsLib::ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
+    size_t prefix, size_t cp, float scale)
+{
+    for (size_t j = 0; j < N; j++) {
+        out[prefix + cp + j]
+            = std::complex<int16_t>((int16_t)((in[j].re / scale) * 32768),
+                (int16_t)((in[j].im / scale) * 32768));
+    }
+    for (size_t j = 0; j < cp; j++) {
+        out[prefix + j] = out[prefix + N + j];
+    }
 }
 
 std::vector<std::complex<float>> CommsLib::modulate(
@@ -473,6 +520,16 @@ std::vector<std::complex<float>> CommsLib::modulate(
         // Not Supported
         std::cout << "Modulation Type " << type << " not supported!"
                   << std::endl;
+    }
+    return out;
+}
+
+std::vector<std::complex<float>> CommsLib::seqCyclicShift(
+    std::vector<std::complex<float>> in, float alpha)
+{
+    std::vector<std::complex<float>> out(in.size(), 0);
+    for (size_t i = 0; i < in.size(); i++) {
+        out[i] = in[i] * std::exp(std::complex<float>(0, i * alpha));
     }
     return out;
 }
@@ -641,63 +698,53 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
             matrix[j] = a;
         }
     } else if (type == LTE_ZADOFF_CHU) {
-        // LTE Zadoff Chu Sequence: Generate the 25th root length-63 Zadoff-Chu
-        // sequence
+        // https://www.etsi.org/deliver/etsi_ts/136200_136299/136211/10.01.00_60/ts_136211v100100p.pdf
+        // ETSI TS 136 211 V10.1.0 (sec. 5.5)
         matrix.resize(2);
-
-        double lts_re[63] = { 1.0, -0.7971325072229225, 0.3653410243663958,
-            -0.7330518718298251, 0.9801724878485435, 0.955572805786141,
-            -0.49999999999999617, 0.7660444431189757, -0.222520933956311,
-            0.6234898018587135, 0.4562106573531701, 0.3653410243663966,
-            0.9555728057861371, 0.7660444431189751, -0.49999999999995753,
-            -0.7330518718298601, 0.9801724878485425, -0.22252093395630812,
-            0.6234898018586816, -0.7971325072229237, -0.5000000000000849,
-            -0.5000000000000051, -0.7971325072228729, -0.9888308262251311,
-            0.9555728057861521, 0.9801724878485374, -0.22252093395631578, 1.0,
-            0.7660444431189537, -0.7330518718300307, -0.9888308262251518,
-            0.4562106573531763, -0.9888308262251305, -0.733051871829836,
-            0.76604444311897, 1.0, -0.22252093395601577, 0.9801724878485049,
-            0.9555728057861584, -0.988830826225147, -0.797132507222964,
-            -0.4999999999997504, -0.4999999999996758, -0.7971325072227249,
-            0.6234898018583583, -0.2225209339562393, 0.9801724878485397,
-            -0.7330518718300426, -0.5000000000003123, 0.7660444431190734,
-            0.9555728057861007, 0.3653410243666958, 0.4562106573529356,
-            0.6234898018587859, -0.22252093395649927, 0.7660444431189057,
-            -0.5000000000002512, 0.9555728057860857, 0.9801724878483727,
-            -0.7330518718292615, 0.3653410243664768, -0.797132507222648, 1.0 };
-
-        double lts_im[63] = { 0.0, -0.6038044103254774, -0.9308737486442039,
-            -0.6801727377709207, 0.1981461431993993, 0.2947551744109033,
-            -0.8660254037844408, -0.642787609686542, -0.9749279121818244,
-            0.7818314824680458, 0.8898718088114649, -0.9308737486442037,
-            0.294755174410916, -0.6427876096865428, 0.8660254037844631,
-            0.680172737770883, 0.19814614319940435, 0.9749279121818251,
-            0.7818314824680712, -0.6038044103254757, -0.8660254037843896,
-            0.8660254037844357, -0.6038044103255429, 0.1490422661761573,
-            -0.2947551744108673, 0.19814614319942933, -0.9749279121818233,
-            -6.273657903199343e-14, -0.6427876096865683, 0.6801727377706992,
-            0.14904226617601968, 0.8898718088114618, 0.14904226617616118,
-            0.6801727377709089, -0.6427876096865488, -6.666535247945037e-14,
-            -0.9749279121818918, 0.1981461431995907, -0.2947551744108467,
-            0.14904226617605265, -0.6038044103254225, 0.8660254037845827,
-            -0.8660254037846258, -0.6038044103257382, 0.781831482468329,
-            0.9749279121818407, 0.19814614319941776, 0.6801727377706862,
-            0.8660254037842583, -0.6427876096864258, 0.29475517441103394,
-            -0.9308737486440862, 0.8898718088115852, 0.7818314824679881,
-            -0.9749279121817814, -0.6427876096866254, -0.8660254037842936,
-            0.2947551744110826, 0.19814614320024387, -0.6801727377715282,
-            -0.9308737486441722, -0.6038044103258398, 1.021155254707157e-12 };
-
-        for (int j = 0; j < 2; j++) {
-            std::vector<double> a;
-            for (int i = 0; i < 63; i++) {
-                if (j == 0) {
-                    a.push_back(lts_re[i]);
-                } else {
-                    a.push_back(lts_im[i]);
-                }
+        double u = 1; // Cell ID 1
+        double v = 0;
+        int prime[309] = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43,
+            47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113,
+            127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191,
+            193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263,
+            269, 271, 277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347,
+            349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421,
+            431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499,
+            503, 509, 521, 523, 541, 547, 557, 563, 569, 571, 577, 587, 593,
+            599, 601, 607, 613, 617, 619, 631, 641, 643, 647, 653, 659, 661,
+            673, 677, 683, 691, 701, 709, 719, 727, 733, 739, 743, 751, 757,
+            761, 769, 773, 787, 797, 809, 811, 821, 823, 827, 829, 839, 853,
+            857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929, 937, 941,
+            947, 953, 967, 971, 977, 983, 991, 997, 1009, 1013, 1019, 1021,
+            1031, 1033, 1039, 1049, 1051, 1061, 1063, 1069, 1087, 1091, 1093,
+            1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181,
+            1187, 1193, 1201, 1213, 1217, 1223, 1229, 1231, 1237, 1249, 1259,
+            1277, 1279, 1283, 1289, 1291, 1297, 1301, 1303, 1307, 1319, 1321,
+            1327, 1361, 1367, 1373, 1381, 1399, 1409, 1423, 1427, 1429, 1433,
+            1439, 1447, 1451, 1453, 1459, 1471, 1481, 1483, 1487, 1489, 1493,
+            1499, 1511, 1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579,
+            1583, 1597, 1601, 1607, 1609, 1613, 1619, 1621, 1627, 1637, 1657,
+            1663, 1667, 1669, 1693, 1697, 1699, 1709, 1721, 1723, 1733, 1741,
+            1747, 1753, 1759, 1777, 1783, 1787, 1789, 1801, 1811, 1823, 1831,
+            1847, 1861, 1867, 1871, 1873, 1877, 1879, 1889, 1901, 1907, 1913,
+            1931, 1933, 1949, 1951, 1973, 1979, 1987, 1993, 1997, 1999, 2003,
+            2011, 2017, 2027, 2029, 2039 };
+        int M = prime[308];
+        for (int j = 0; j < 308; j++) {
+            if (prime[j] < N && prime[j + 1] > N) {
+                M = prime[j];
+                break;
             }
-            matrix[j] = a;
+        }
+        double qh = M * (u + 1) / 31;
+        double q = std::floor(qh + 0.5) + v * std::pow(-1, std::floor(2 * qh));
+        std::vector<double> a;
+        for (int i = 0; i < N; i++) {
+            int m = i % M;
+            double a_re = std::cos(-M_PI * q * m * (m + 1) / M);
+            double a_im = std::sin(-M_PI * q * m * (m + 1) / M);
+            matrix[0].push_back(a_re);
+            matrix[1].push_back(a_im);
         }
     } else if (type == GOLD_IFFT) {
         // Gold IFFT Sequence - seq_length=128, cp=32, upsample=1

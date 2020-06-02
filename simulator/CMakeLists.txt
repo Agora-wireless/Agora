@@ -40,6 +40,64 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 find_package(Armadillo)
 
+set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
+set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
+
+if(${USE_DPDK})
+  message(STATUS "DPDK is enabled for BS")
+  add_definitions(-DUSE_DPDK)
+else()
+  set(USE_DPDK_SENDER False)
+  message(STATUS "DPDK is disabled")
+endif()
+
+
+# DPDK
+if(${USE_DPDK_SENDER})
+  message(STATUS "DPDK is enabled for Millipede")
+
+  find_library(DPDK_LIB dpdk)
+  message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+  if(NOT DPDK_LIB)
+    message(FATAL_ERROR "DPDK library not found")
+  endif()
+
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
+
+  set(TXRX_SOURCES 
+    ../src/millipede/txrx/txrx_DPDK.cpp
+    ../src/common/dpdk_transport.cpp)
+
+  # DPDK include directory. Locating rte_config.h does not work on some systems.
+  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+  # from the real DPDK include directory (/usr/include/dpdk/).
+  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  if (DPDK_INCLUDE_DIR)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  else()
+    message(FATAL_ERROR "DPDK include directory not found")
+  endif()
+  include_directories(${DPDK_INCLUDE_DIR})
+  
+  message(STATUS "DPDK is enabled for sender")
+  add_definitions(-DUSE_DPDK_SENDER)
+  set(SENDER_TXRX_SOURCES 
+    sender_dpdk.cpp
+    ../src/common/dpdk_transport.cpp)
+endif()
+
+if (NOT ${USE_DPDK_SENDER})
+  message(STATUS "DPDK is disabled for sender")
+  set(USE_DPDK_SENDER False)
+  set(SENDER_TXRX_SOURCES sender.cpp)
+endif()
+
+message(STATUS "USE_DPDK: ${USE_DPDK}")
+message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
+
+
+
+
 include_directories(
   ../src/common/)
 
@@ -54,19 +112,19 @@ set(COMMON_SOURCES
 
 set(SENDER_SOURCES 
   sender_cli.cpp
-  sender.cpp 
+  ${SENDER_TXRX_SOURCES}
   ${COMMON_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender -lpthread ${MKL_LIBS})
+target_link_libraries(sender -lpthread ${MKL_LIBS} ${DPDK_LIBRARIES})
 
 
 set(SIMULATOR_SOURCES 
   main.cpp
   simulator.cpp
-  sender.cpp
+  ${SENDER_TXRX_SOURCES}
   receiver.cpp 
   ${COMMON_SOURCES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
-target_link_libraries(sim -lpthread ${MKL_LIBS})
+target_link_libraries(sim -lpthread ${MKL_LIBS} ${DPDK_LIBRARIES})

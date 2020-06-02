@@ -57,14 +57,14 @@ public:
         std::vector<std::complex<float>>, int, bool scale = true);
     static void FFT(complex_float*, int);
     static void IFFT(complex_float*, int, bool normalize = true);
-    static size_t find_pilot_seq(std::vector<std::complex<double>> iq,
-        std::vector<std::complex<double>> pilot, size_t seqLen);
+    static size_t find_pilot_seq(std::vector<std::complex<float>> iq,
+        std::vector<std::complex<float>> pilot, size_t seqLen);
     static int findLTS(std::vector<std::complex<double>> iq, int seqLen);
-    static std::vector<double> convolve(
-        std::vector<std::complex<double>> const& f,
-        std::vector<std::complex<double>> const& g);
-    static std::vector<std::complex<double>> csign(
-        std::vector<std::complex<double>> iq);
+    template <typename T>
+    static std::vector<T> convolve(std::vector<std::complex<T>> const& f,
+        std::vector<std::complex<T>> const& g);
+    template <typename T>
+    static std::vector<std::complex<T>> csign(std::vector<std::complex<T>> iq);
     static void meshgrid(std::vector<int> x_in, std::vector<int> y_in,
         std::vector<std::vector<int>>& x, std::vector<std::vector<int>>& y);
     static inline int hadamard2(int i, int j)
@@ -85,17 +85,18 @@ public:
         std::vector<float> const&, double, double, size_t,
         const size_t delta = 10);
     static std::vector<std::complex<float>> composeRefSymbol(
-        std::vector<std::complex<float>>, size_t, size_t, size_t,
-        bool timeDomain = true);
-    // private:
-    //    static inline float** init_qpsk();
-    //    static inline float** init_qam16();
-    //    static inline float** init_qam64();
-
-    // private:
-    //    static inline float** init_qpsk();
-    //    static inline float** init_qam16();
-    //    static inline float** init_qam64();
+        std::vector<std::complex<float>>, size_t, size_t, size_t, size_t,
+        size_t, size_t, bool timeDomain = true);
+    static std::vector<std::complex<float>> seqCyclicShift(
+        std::vector<std::complex<float>>, float);
+    static float find_max_abs(complex_float*, size_t);
+    static float find_max_abs(Table<complex_float>, size_t, size_t);
+    static void ifft2tx(
+        complex_float*, std::complex<short>*, size_t, size_t, size_t, float);
+    static float abs_cf(complex_float d)
+    {
+        return std::abs(std::complex<float>(d.re, d.im));
+    }
 };
 
 #endif

@@ -25,7 +25,6 @@ class readDataThread(QtCore.QThread):
     def run(self):
         samps = np.zeros((self.userNum, self.FFT_len), np.complex64)
         while self.parent.running:
-            print("update()")
             for ue_id in range(self.userNum):
                 if self.mode == 'pc':
                     [equalData,datalen] = self.userClass.getEqualPCData(ue_id)
@@ -95,7 +94,7 @@ class MainWindow(QtGui.QMainWindow):
 
 		
 if __name__ == '__main__':
-    filename = "data/userconfig_512.json"
+    filename = "data/ue-dl-hw.json"
     nusers = 4
     data_len = 52
     mode = ''

@@ -29,16 +29,18 @@
 
 class DoEncode : public Doer {
 public:
-    DoEncode(Config* in_config, int in_tid,
+    DoEncode(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<int8_t>& in_raw_data_buffer,
-        Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Stats* in_stats_manager);
     ~DoEncode();
 
     /**
      * Do Encode task for one code block
      */
-    Event_data launch(int offset);
+    Event_data launch(size_t offset);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -46,8 +48,7 @@ private:
     Table<int8_t>& encoded_buffer_;
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
     };
-    Table<double>& Encode_task_duration;
-    int* Encode_task_count;
+    DurationStat* duration_stat;
     const int16_t* pShiftMatrix;
     const int16_t* pMatrixNumPerCol;
     const int16_t* pAddr;
@@ -69,22 +70,23 @@ private:
 
 class DoDecode : public Doer {
 public:
-    DoDecode(Config* in_config, int in_tid,
+    DoDecode(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<int8_t>& in_demod_buffer,
-        Table<uint8_t>& in_decoded_buffer, Stats* in_stats_manager);
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Stats* in_stats_manager);
     ~DoDecode();
 
     /**
      * Do Decode task for one code block
      */
-    Event_data launch(int offset);
+    Event_data launch(size_t offset);
 
 private:
     Table<int8_t>& llr_buffer_;
     Table<uint8_t>& decoded_buffer_;
-    Table<double>& Decode_task_duration;
-    int* Decode_task_count;
+    DurationStat* duration_stat;
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {

@@ -21,15 +21,18 @@
 #include <vector>
 // #include "mkl_dfti.h"
 
+using namespace arma;
 class DoDemul : public Doer {
 public:
-    DoDemul(Config* in_config, int in_tid,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_data_buffer,
-        Table<complex_float>& in_precoder_buffer,
-        Table<complex_float>& in_equal_buffer,
-        Table<uint8_t>& in_demul_hard_buffer,
-        Table<int8_t>& in_demod_soft_buffer, Stats* in_stats_manager);
+    DoDemul(Config* config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<complex_float>& data_buffer,
+        Table<complex_float>& ul_precoder_buffer,
+        Table<complex_float>& ue_spec_pilot_buffer,
+        Table<complex_float>& equal_buffer, Table<uint8_t>& demul_hard_buffer,
+        Table<int8_t>& demod_soft_buffer, Stats* in_stats_manager);
     ~DoDemul();
 
     /**
@@ -41,7 +44,7 @@ public:
      * equal_buffer_, demod_hard_buffer_ Input buffer: data_buffer_,
      * precoder_buffer_ Output buffer: demod_hard_buffer_ Intermediate buffer:
      * spm_buffer, equal_buffer_ Offsets: data_buffer_: dim1: frame index * # of
-     * data subframes per frame + data subframe index dim2: transpose block
+     * data symbols per frame + data symbol index dim2: transpose block
      * index * block size * # of antennas + antenna index * block size
      *     spm_buffer:
      *         dim1: task thread index
@@ -49,7 +52,7 @@ public:
      *     precoder_buffer_:
      *         dim1: frame index * FFT size + subcarrier index in the current
      * frame equal_buffer_, demul_buffer: dim1: frame index * # of data
-     * subframes per frame + data subframe index dim2: subcarrier index * # of
+     * symbols per frame + data symbol index dim2: subcarrier index * # of
      * users Event offset: offset Description:
      *     1. for each subcarrier in the block, block-wisely copy data from
      * data_buffer_ to spm_buffer_
@@ -58,32 +61,27 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(int offset);
-
-    void DemulSingleSC(int offset);
+    Event_data launch(size_t tag);
 
 private:
     Table<complex_float>& data_buffer_;
-    Table<complex_float>& precoder_buffer_;
+    Table<complex_float>& ul_precoder_buffer_;
+    Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;
     Table<int8_t>& demod_soft_buffer_;
+    DurationStat* duration_stat;
 
-    Table<double>& Demul_task_duration;
-    int* Demul_task_count;
-
-    /**
-     * Intermediate buffer to gather raw data
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM */
+    /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
+    /// times number of antennas
     complex_float* spm_buffer;
+    Table<float> evm_buffer_;
 
-    /**
-     * Intermediate buffers for equalized data
-     * dimension: UE_NUM * demul_block_size */
+    // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
-
+    cx_fmat ue_pilot_data;
+    cx_fmat ul_gt_mat;
     int ue_num_simd256;
 };
 
