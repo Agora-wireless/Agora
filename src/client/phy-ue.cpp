@@ -49,6 +49,11 @@ Phy_UE::Phy_UE(Config* config)
     ru_.reset(new RU(config_, rx_thread_num, config_->core_offset + 1,
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
+    if (kUseL2)
+        mac_receiver_.reset(new PacketTXRX(config_, rx_thread_num,
+            config_->core_offset + 1 + rx_thread_num, &message_queue_,
+            &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
+
     printf("initializing buffers...\n");
 
     //////////////////////////////////////
@@ -58,8 +63,13 @@ Phy_UE::Phy_UE(Config* config)
     // initialize ul data buffer
     // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
     // ul_data_symbol_perframe);
-    ul_bits_buffer_.calloc(TASK_BUFFER_FRAME_NUM * antenna_num,
-        ul_data_symbol_perframe * data_sc_len, 64);
+    ul_bits_buffer_size_
+        = TASK_BUFFER_FRAME_NUM * config_->data_bytes_num_perframe;
+    ul_bits_buffer_.malloc(antenna_num, ul_bits_buffer_size_, 64);
+    ul_bits_buffer_status_.calloc(antenna_num, TASK_BUFFER_FRAME_NUM, 64);
+    ul_syms_buffer_size_
+        = TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * data_sc_len;
+    ul_syms_buffer_.calloc(antenna_num, ul_syms_buffer_size_, 64);
 
     // initialize modulation buffer
     modul_buffer_.calloc(ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM,
@@ -206,6 +216,13 @@ void Phy_UE::start()
         return;
     }
 
+    if (kUseL2
+        && !mac_receiver_->startTXRX(ul_bits_buffer_, ul_bits_buffer_status_,
+               TASK_BUFFER_FRAME_NUM, ul_bits_buffer_size_, NULL, NULL, 0, 0)) {
+        this->stop();
+        return;
+    }
+
     // for task_queue, main thread is producer, it is single-procuder & multiple
     // consumer for task queue uplink
 
@@ -316,8 +333,16 @@ void Phy_UE::start()
             } break;
 
             case EventType::kMap: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
+
                 Event_data do_modul_task(EventType::kModul, event.tags[0]);
                 schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+                if (kDebugPrintPerFrameDone)
+                    printf("Main thread: frame: %zu, finished mapping "
+                           "uplink data for user %zu\n",
+                        frame_id, ue_id);
             } break;
 
             case EventType::kModul: {
@@ -424,7 +449,8 @@ void Phy_UE::taskThread(int tid)
     // attach task threads to specific cores
     // Note: cores 0-17, 36-53 are on the same socket
 #ifdef ENABLE_CPU_ATTACH
-    size_t offset_id = core_offset + rx_thread_num + 1;
+    size_t offset_id
+        = core_offset + rx_thread_num + 1 + (kUseL2 ? rx_thread_num : 0);
     size_t tar_core_id = tid + offset_id;
     if (tar_core_id >= nCPUs) // FIXME: read the number of cores
         tar_core_id = (tar_core_id - nCPUs) + 2 * nCPUs;
@@ -656,36 +682,41 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     const size_t user_id = gen_tag_t(tag).ant_id;
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     size_t packet_length = config_->data_bytes_num_perframe;
-
+    bool rx = false;
     for (size_t ch = 0; ch < config_->nChannels; ch++) {
         size_t ant_id = user_id * config_->nChannels + ch;
-        char* tx_packet = (char*)aligned_alloc(64, packet_length);
-        if (-1 == recv(socket_[ant_id], (char*)tx_packet, packet_length, 0)) {
-            if (errno != EAGAIN) {
-                perror("recv failed");
-                //exit(0);
-                return;
-            }
-        } else
-            printf("Received L2 data for frame %zu and antenna %zu\n", frame_id,
-                ant_id);
+        if (ul_bits_buffer_status_[ant_id][frame_slot] == 0)
+            continue;
+        //char* tx_packet = (char*)aligned_alloc(64, packet_length);
+        //if (-1 == recv(socket_[ant_id], (char*)tx_packet, packet_length, 0)) {
+        //    if (errno != EAGAIN) {
+        //        perror("recv failed");
+        //        //exit(0);
+        //    }
+        //    return;
+        //} else
+        //    printf("Received L2 data for frame %zu and antenna %zu\n", frame_id,
+        //        ant_id);
         for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
              ul_symbol_id++) {
-            size_t total_ant_id = frame_slot * antenna_num + ant_id;
-            uint8_t* bits_buff
-                = (uint8_t*)&ul_bits_buffer_[total_ant_id]
-                                            [ul_symbol_id * data_sc_len];
+            size_t total_ul_symbol_id
+                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
+            char* bits_buff = &ul_bits_buffer_[ant_id][total_ul_symbol_id
+                * config_->data_bytes_num_persymbol];
+            uint8_t* syms_buff
+                = (uint8_t*)&ul_syms_buffer_[ant_id]
+                                            [total_ul_symbol_id * data_sc_len];
             for (size_t sc = 0; sc < config_->data_bytes_num_persymbol; sc++) {
-                size_t offset
-                    = ul_symbol_id * config_->data_bytes_num_persymbol;
-                uint8_t byte = (uint8_t)tx_packet[offset + sc];
+                uint8_t byte = (uint8_t)bits_buff[sc];
                 // FIXME: this only works for 16QAM
-                bits_buff[2 * sc] = byte % config_->mod_type;
-                bits_buff[2 * sc + 1] = byte / config_->mod_type;
+                syms_buff[2 * sc] = byte % config_->mod_type;
+                syms_buff[2 * sc + 1] = byte / config_->mod_type;
             }
         }
+        rx = true;
     }
-
+    if (!rx)
+        return;
     Event_data bitmap_event(EventType::kMap, tag);
     if (!message_queue_.enqueue(*task_ptok[tid], bitmap_event)) {
         printf("Muliplexing message enqueue failed\n");
@@ -706,9 +737,9 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
-            size_t total_ant_id = frame_slot * antenna_num + ant_id;
             int8_t* ul_bits = kUseL2
-                ? &ul_bits_buffer_[total_ant_id][ul_symbol_id * data_sc_len]
+                ? (int8_t*)&ul_syms_buffer_[ant_id]
+                                           [total_ul_symbol_id * data_sc_len]
                 : &config_->ul_bits[ul_symbol_id][ant_id * data_sc_len];
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]

@@ -108,7 +108,9 @@ if(${USE_ARGOS})
     src/common/modulation.cpp
     src/client/client_radio.cpp
     src/client/ru_argos.cpp
-    src/client/phy-ue.cpp)
+    src/client/phy-ue.cpp
+    src/client/txrx_mac.cpp
+  )
   set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
   add_definitions(-DTHREADED_INIT)
 endif()
@@ -234,6 +236,12 @@ if(${USE_ARGOS})
        ${COMMON_SOURCES}
        ${ARGOS_SOURCES})
   target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+
+  add_executable(macuser 
+       src/client/sender_main.cpp
+       src/client/mac_sender.cpp
+       ${COMMON_SOURCES})
+  target_link_libraries(macuser -larmadillo ${MKL_LIBS})
 else()
   set(SENDER_SOURCES
     simulator/sender_cli.cpp

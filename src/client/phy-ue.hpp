@@ -12,6 +12,7 @@
 #include "modulation.hpp"
 #include "net.hpp"
 #include "signalHandler.hpp"
+#include "txrx_mac.hpp"
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
@@ -246,8 +247,12 @@ private:
      * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    Table<int8_t> ul_bits_buffer_;
+    Table<char> ul_bits_buffer_;
+    Table<int> ul_bits_buffer_status_;
+    int ul_bits_buffer_size_;
 
+    Table<uint8_t> ul_syms_buffer_;
+    int ul_syms_buffer_size_;
     /**
      * Data after modulation
      * First dimension: data_symbol_num_perframe (40-4) *
@@ -260,6 +265,7 @@ private:
      *****************************************************/
 
     std::unique_ptr<RU> ru_;
+    std::unique_ptr<PacketTXRX> mac_receiver_;
 
     /**
      * received data
