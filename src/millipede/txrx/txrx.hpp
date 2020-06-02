@@ -47,8 +47,7 @@ class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset = 1);
     /**
-     * COMM_THREAD_NUM: socket thread number
-     * in_queue: message queue to communicate with main thread
+     * queue_message: message queue to communicate with main thread
      */
     PacketTXRX(Config* cfg, size_t core_offset,
         moodycamel::ConcurrentQueue<Event_data>* queue_message,
@@ -63,32 +62,27 @@ public:
 
     /**
      * called in main threads to start the socket threads
-     * in_buffer: ring buffer to save packets
-     * in_buffer_status: record the status of each memory block (0: empty, 1:
-     * full) in_buffer_frame_num: number of packets the ring buffer could hold
-     * in_buffer_length: size of ring buffer
-     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
-     * COMM_THREAD_NUM - 1}
+     * buffer: ring buffer to save packets
+     * buffer_status: record the status of each memory block (0: empty, 1:
+     * full) 
+     * packet_num_in_buffer : number of packets the ring buffer could hold
+     * core_offset: attach socket threads to {core_offset, ..., core_offset +
+     * socket_thread_num - 1}
      */
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
         char* tx_buffer);
     /**
-     * receive thread
+     * TXRX thread that runs a while loop to do both tx and rx
      */
     void* loopTXRX(int tid);
-#if USE_IPV4
-    typedef struct sockaddr_in sockaddr_t;
-#else
-    typedef struct sockaddr_in6 sockaddr_t;
-#endif
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
 private:
     Config* cfg;
-    size_t core_offset;
-    size_t socket_thread_num;
+    const size_t core_offset;
+    const size_t socket_thread_num;
     Table<char>* buffer_;
     Table<int>* buffer_status_;
     size_t packet_num_in_buffer_;
