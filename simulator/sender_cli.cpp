@@ -8,7 +8,7 @@
 int main(int argc, char* argv[])
 {
     std::string confFile;
-    int thread_num, core_offset, delay;
+    size_t thread_num, core_offset, delay;
     if (argc == 5) {
         thread_num = strtol(argv[1], NULL, 10);
         core_offset = strtol(argv[2], NULL, 10);
