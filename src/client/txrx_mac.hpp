@@ -71,8 +71,7 @@ public:
      * COMM_THREAD_NUM - 1}
      */
     bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
-        int in_buffer_frame_num, long long in_buffer_length,
-        char* in_tx_buffer,
+        int in_buffer_frame_num, long long in_buffer_length, char* in_tx_buffer,
         int* in_tx_buffer_status, int in_tx_buffer_frame_num,
         int in_tx_buffer_length);
     /**
@@ -85,7 +84,7 @@ public:
     typedef struct sockaddr_in6 sockaddr_t;
 #endif
     int dequeue_send(int tid);
-    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    char* recv_enqueue(int tid, int radio_id, int rx_offset);
 
 private:
 #if USE_IPV4

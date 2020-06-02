@@ -85,7 +85,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 void* PacketTXRX::loopTXRX(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
-    int rx_offset = 0;
+    std::vector<int> rx_offset(config_->UE_ANT_NUM, 0);
     int radio_lo = tid * config_->UE_ANT_NUM / comm_thread_num_;
     int radio_hi = (tid + 1) * config_->UE_ANT_NUM / comm_thread_num_;
     printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
@@ -97,26 +97,29 @@ void* PacketTXRX::loopTXRX(int tid)
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            config_->ue_rx_port + radio_id, config_->tx_addr.c_str());
+            config_->ue_tx_port + radio_id, config_->tx_addr.c_str());
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
-            config_->ue_rx_port + radio_id, config_->tx_addr.c_str());
+            config_->ue_tx_port + radio_id, config_->tx_addr.c_str());
 #endif
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
+        printf("Set up UDP socket server listening to port %d"
+               " with remote address %s:%d  \n",
+            local_port_id, config_->tx_addr.c_str(),
+            config_->ue_tx_port + radio_id);
     }
 
-    int prev_frame_id = -1;
     int radio_id = radio_lo;
     while (config_->running) {
         //if (-1 != dequeue_send(tid))
         //    continue;
         // receive data
-        struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
+        char* pkt = recv_enqueue(tid, radio_id, rx_offset[radio_id]);
         if (pkt == NULL)
             continue;
-        rx_offset = (rx_offset + 1) % buffer_frame_num_;
+        rx_offset[radio_id] = (rx_offset[radio_id] + 1) % buffer_frame_num_;
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
@@ -124,22 +127,22 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
+char* PacketTXRX::recv_enqueue(UNUSED int tid, int radio_id, int rx_offset)
 {
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    //moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[radio_id];
     int* rx_buffer_status = (*buffer_status_)[radio_id];
     int packet_length = config_->data_bytes_num_perframe;
 
     // if rx_buffer is full, exit
-    if (rx_buffer_status[rx_offset] == 1) {
-        printf(
-            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-        //config_->running = false;
-        //return (NULL);
-    }
-    struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
-    if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
+    //if (rx_buffer_status[rx_offset] == 1) {
+    //    printf(
+    //        "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+    //    //config_->running = false;
+    //    //return (NULL);
+    //}
+    char* pkt = &rx_buffer[rx_offset * packet_length];
+    if (-1 == recv(socket_[radio_id], pkt, packet_length, 0)) {
         if (errno != EAGAIN && config_->running) {
             perror("recv failed");
             exit(0);
@@ -151,13 +154,12 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     // move ptr & set status to full
     rx_buffer_status[rx_offset]
         = 1; // has data, after it is read, it is set to 0
-
     // Push kPacketRX event into the queue.
-    Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
-    if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
-    }
+    //Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
+    //if (!message_queue_->enqueue(*local_ptok, rx_message)) {
+    //    printf("socket message enqueue failed\n");
+    //    exit(0);
+    //}
     return pkt;
 }
 
