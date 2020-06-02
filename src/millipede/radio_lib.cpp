@@ -300,7 +300,7 @@ bool RadioConfig::radioStart()
             "TX_SW_DELAY", "30"); // experimentally good value for dev front-end
         baStn[i]->writeSetting("TDD_MODE", "true");
         std::vector<std::string> tddSched;
-        for (size_t f = 0; f < _cfg->framePeriod; f++) {
+        for (size_t f = 0; f < _cfg->frames.size(); f++) {
             std::string sched = _cfg->frames[f];
             size_t schedSize = sched.size();
             for (size_t s = 0; s < schedSize; s++) {
@@ -349,13 +349,28 @@ bool RadioConfig::radioStart()
                 // exclude reference board from beamforming
             } else {
                 std::vector<std::complex<float>> recipCalDlPilot;
-                recipCalDlPilot = CommsLib::composeRefSymbol(
-                    _cfg->pilotsF, 2 * i, this->_radioNum, _cfg->OFDM_CA_NUM);
+                std::vector<std::complex<float>> pre(_cfg->prefix, 0);
+                std::vector<std::complex<float>> post(_cfg->postfix, 0);
+                recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
+                    _cfg->nChannels * i, _cfg->BS_ANT_NUM, _cfg->OFDM_CA_NUM,
+                    _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START, _cfg->CP_LEN);
+                recipCalDlPilot.insert(
+                    recipCalDlPilot.begin(), pre.begin(), pre.end());
+                recipCalDlPilot.insert(
+                    recipCalDlPilot.end(), post.begin(), post.end());
+                if (kDebugPrintPilot) {
+                    std::cout << "recipCalPilot[" << i << "]: ";
+                    for (auto const& calP : recipCalDlPilot)
+                        std::cout << real(calP) << ", ";
+                    std::cout << std::endl;
+                }
                 baStn[i]->writeRegisters("TX_RAM_A", 0,
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
                     recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
-                        2 * i + 1, this->_radioNum, _cfg->OFDM_CA_NUM);
+                        2 * i + 1, _cfg->BS_ANT_NUM, _cfg->OFDM_CA_NUM,
+                        _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START,
+                        _cfg->CP_LEN);
                     baStn[i]->writeRegisters("TX_RAM_B", 0,
                         Utils::cfloat32_to_uint32(
                             recipCalDlPilot, false, "QI"));

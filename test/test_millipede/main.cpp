@@ -36,7 +36,7 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
 }
 
 void read_from_file_dl(
-    std::string filename, Table<float>& data, int ofdm_size, Config* cfg)
+    std::string filename, Table<short>& data, int ofdm_size, Config* cfg)
 {
     int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
     size_t BS_ANT_NUM = cfg->BS_ANT_NUM;
@@ -47,7 +47,7 @@ void read_from_file_dl(
     }
     for (size_t i = 0; i < data_symbol_num_perframe * BS_ANT_NUM; i++) {
         if ((unsigned)ofdm_size * 2
-            != fread(data[i], sizeof(float), ofdm_size * 2, fp)) {
+            != fread(data[i], sizeof(short), ofdm_size * 2, fp)) {
             printf("read file failed: %s\n", filename.c_str());
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
@@ -60,6 +60,7 @@ void check_correctness_ul(Config* cfg)
     int UE_NUM = cfg->UE_NUM;
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int UL_PILOT_SYMS = cfg->UL_PILOT_SYMS;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
@@ -91,6 +92,8 @@ void check_correctness_ul(Config* cfg)
     int error_cnt = 0;
     int total_count = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
+        if (i < UL_PILOT_SYMS)
+            continue;
 #ifdef USE_LDPC
         for (int ue = 0; ue < UE_NUM; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
@@ -132,51 +135,51 @@ void check_correctness_dl(Config* cfg)
     int BS_ANT_NUM = cfg->BS_ANT_NUM;
     int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
     int OFDM_CA_NUM = cfg->OFDM_CA_NUM;
+    int sampsPerSymbol = cfg->sampsPerSymbol;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
-    std::string raw_data_filename = cur_directory
-        + "/data/LDPC_dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM)
+    std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
 #else
-    std::string raw_data_filename = cur_directory
-        + "/data/dl_ifft_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+    std::string raw_data_filename = cur_directory + "/data/dl_tx_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
+        + ".bin";
 #endif
-    std::string ifft_data_filename = cur_directory + "/data/ifft_data.bin";
-    Table<float> raw_data;
-    Table<float> ifft_data;
-    raw_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, OFDM_CA_NUM * 2, 64);
-    ifft_data.calloc(
-        data_symbol_num_perframe * BS_ANT_NUM, OFDM_CA_NUM * 2, 64);
+    std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
+    Table<short> raw_data;
+    Table<short> tx_data;
+    raw_data.calloc(
+        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
+    tx_data.calloc(
+        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
 
-    read_from_file_dl(raw_data_filename, raw_data, OFDM_CA_NUM, cfg);
-    read_from_file_dl(ifft_data_filename, ifft_data, OFDM_CA_NUM, cfg);
+    read_from_file_dl(raw_data_filename, raw_data, sampsPerSymbol, cfg);
+    read_from_file_dl(tx_data_filename, tx_data, sampsPerSymbol, cfg);
 
     int error_cnt = 0;
     int total_count = 0;
     float sum_diff = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        if (i != DL_PILOT_SYMS - 1) {
-            for (int ant = 0; ant < BS_ANT_NUM; ant++) {
-                // printf("symbol %d, antenna %d\n", i, ant);
-                sum_diff = 0;
-                total_count++;
-                for (int sc = 0; sc < OFDM_CA_NUM * 2; sc++) {
-                    int offset = BS_ANT_NUM * i + ant;
-                    float diff
-                        = fabs(raw_data[offset][sc] - ifft_data[offset][sc]);
-                    sum_diff += diff;
-                    // if (i == 0)
-                    // printf("symbol %d ant %d sc %d, (%.3f, %.3f) diff:
-                    // %.3f\n",
-                    //     i, ant, sc / 2, raw_data[offset][sc],
-                    //     ifft_data[offset][sc], diff);
-                }
-                printf(
-                    "symbol %d, ant %d, total diff %.3f\n", i, ant, sum_diff);
-                if (sum_diff > OFDM_CA_NUM * 10)
-                    error_cnt++;
+        for (int ant = 0; ant < BS_ANT_NUM; ant++) {
+            // printf("symbol %d, antenna %d\n", i, ant);
+            sum_diff = 0;
+            total_count++;
+            for (int sc = 0; sc < sampsPerSymbol * 2; sc++) {
+                int offset = BS_ANT_NUM * i + ant;
+                float diff = fabs(
+                    (raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
+                sum_diff += diff;
+                // if (i == 0)
+                // printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
+                //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
             }
+            float avg_diff = sum_diff / sampsPerSymbol;
+            printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
+                avg_diff);
+            if (avg_diff > 0.03)
+                error_cnt++;
         }
     }
     printf("======================\n");
@@ -188,7 +191,7 @@ void check_correctness_dl(Config* cfg)
             total_count);
     printf("======================\n\n");
     raw_data.free();
-    ifft_data.free();
+    tx_data.free();
 }
 
 int main(int argc, char* argv[])

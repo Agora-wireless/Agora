@@ -43,7 +43,7 @@ static double bench_ZF_warmup(unsigned Nx, unsigned Ny, unsigned iterations)
     // __itt_resume();
     double start_time = test_get_time();
     for (unsigned i = 0; i < iterations; i++) {
-        pinv(mat_output, mat_input, 1e-1, "dc");
+        pinv(mat_output, mat_input, 1e-2, "dc");
     }
     double end_time = test_get_time();
     // __itt_pause();
@@ -64,7 +64,7 @@ static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
     // __itt_resume();
     double start_time = test_get_time();
     for (unsigned i = 0; i < iterations; i++) {
-        pinv(mat_output, mat_input, 1e-1, "dc");
+        pinv(mat_output, mat_input, 1e-2, "dc");
     }
     double end_time = test_get_time();
     // __itt_pause();
@@ -244,7 +244,7 @@ int main(int argc, char* argv[])
     // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
     // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
     //           << std::endl;
-    putenv("MKL_VERBOSE=1");
+    // putenv("MKL_VERBOSE=1");
     if (argc != 5) {
         fprintf(stderr, "Usage: %s [iterations] [Nx] [Ny] mode\n", argv[0]);
         return 1;

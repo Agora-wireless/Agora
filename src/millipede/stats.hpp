@@ -1,7 +1,6 @@
 /**
  * Author: Jian Ding
  * Email: jianding17@gmail.com
- *
  */
 
 #ifndef STATS
@@ -12,311 +11,233 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
+#include <stdio.h>
+#include <string.h>
 
-struct Stats_worker {
-    /* accumulated task duration for all frames in each worker thread*/
-    Table<double> task_duration;
-    /* accumulated task count for all frames in each worker thread*/
-    int* task_count;
+static constexpr size_t kMaxStatBreakdown = 4;
+
+// Accumulated task duration for all tracked frames in each worker thread
+struct DurationStat {
+    size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
+    size_t task_count;
+    DurationStat() { memset(this, 0, sizeof(DurationStat)); }
 };
 
-struct Stats_worker_per_frame {
-    double* duration_this_thread;
-    double* duration_this_thread_per_task;
-    int count_this_thread = 0;
-    double* duration_avg_threads;
-    int count_all_threads = 0;
+// Temporary summary statistics assembled from per-thread runtime stats
+struct FrameSummary {
+    double us_this_thread[kMaxStatBreakdown];
+    size_t count_this_thread = 0;
+    double us_avg_threads[kMaxStatBreakdown];
+    size_t count_all_threads = 0;
+    FrameSummary() { memset(this, 0, sizeof(FrameSummary)); }
 };
+
+// Type of timestamps recorded at the master for a frame
+// TODO: Add definitions of what each event means
+enum class TsType : size_t {
+    kPilotRX, // First pilot packet received
+    kProcessingStarted, // Signal processing started on a pilot symbol
+    kPilotAllRX, // All pilot packets received
+    kRCAllRX, // All Reciprocity Calibration Symbols received
+    kFFTDone, // Completed FFT for this frame
+    kZFDone, // Completed zeroforcing for this frame
+    kDemulDone, // Completed demodulation for this frame
+    kRXDone, // All packets of a frame received
+    kRCDone, // Recirocity Calibration Computation done
+    kEncodeDone,
+    kDecodeDone,
+    kPrecodeDone,
+    kIFFTDone,
+    kTXProcessedFirst,
+    kTXDone,
+};
+static constexpr size_t kNumTimestampTypes
+    = static_cast<size_t>(TsType::kTXDone) + 1;
 
 class Stats {
 public:
-    Stats(Config* cfg, int in_break_down_num, int in_task_thread_num,
-        int in_fft_thread_num, int in_zf_thread_num, int in_demul_thread_num);
+    Stats(Config* cfg, size_t break_down_num, size_t task_thread_num,
+        size_t fft_thread_num, size_t zf_thread_num, size_t demul_thread_num,
+        double freq_ghz);
     ~Stats();
 
-    void init_stats_worker(
-        Stats_worker* stats_in_worker, int thread_num, int break_down_num);
-    void init_stats_worker_per_frame(
-        Stats_worker_per_frame* stats_in_worker, int break_down_num);
-    void free_stats_worker(Stats_worker* stats_in_worker, int thread_num);
-    void free_stats_worker_per_frame(Stats_worker_per_frame* stats_in_worker);
-    void reset_stats_worker_per_frame(
-        Stats_worker_per_frame* stats_in_worker, int break_down_num);
-    void update_stats_for_breakdowns(Stats_worker_per_frame* stats_per_frame,
-        Stats_worker stats_in_worker, Stats_worker* stats_in_worker_old,
-        int thread_id, int break_down_num);
-    void compute_avg_over_threads(Stats_worker_per_frame* stats_per_frame,
-        int thread_num, int break_down_num);
-    void print_per_thread_per_task(Stats_worker_per_frame stats_per_frame);
-    void print_per_frame(Stats_worker_per_frame stats_per_frame);
+    /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all uplink Doer types. Else return immediately.
+    void update_stats_in_functions_uplink(size_t frame_id);
 
-    void update_stats_in_functions_uplink(int frame_id);
-    void update_stats_in_functions_uplink_bigstation(int frame_id);
-    void update_stats_in_functions_uplink_millipede(int frame_id);
-    void update_stats_in_functions_downlink(int frame_id);
-    void update_stats_in_functions_downlink_bigstation(int frame_id);
-    void update_stats_in_functions_downlink_millipede(int frame_id);
-    void save_to_file(size_t last_frame_id);
-    void save_to_file_details(size_t last_frame_id);
+    /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all downlink Doer types. Else return immediately.
+    void update_stats_in_functions_downlink(size_t frame_id);
 
-    int compute_total_count(Stats_worker stats_in_worker, int thread_num);
-    double compute_count_percentage(
-        Stats_worker stats_in_worker, int total_count, int thread_id);
-    void print_summary(size_t last_frame_id);
+    /// Save master timestamps to a file. If worker stats collection is enabled,
+    /// also save detailed worker timing info to a file.
+    void save_to_file();
+
+    /// If worker stats collection is enabled, prsize_t a summary of stats
+    void print_summary();
 
     size_t last_frame_id;
 
-    /* stats for the master thread */
-    void update_pilot_received(int frame_id)
+    /// From the master, set the RDTSC timestamp for a frame ID and timestamp
+    /// type
+    void master_set_tsc(TsType timestamp_type, size_t frame_id)
     {
-        pilot_received[frame_id % 10000] = get_time();
-    };
-    double get_pilot_received(int frame_id)
-    {
-        return pilot_received[frame_id % 10000];
-    };
+        master_timestamps[static_cast<size_t>(timestamp_type)]
+                         [frame_id % kNumStatsFrames]
+            = rdtsc();
+    }
 
-    void update_pilot_all_received(int frame_id)
+    /// From the master, get the RDTSC timestamp for a frame ID and timestamp
+    /// type
+    size_t master_get_tsc(TsType timestamp_type, size_t frame_id)
     {
-        pilot_all_received[frame_id % 10000] = get_time();
-    };
-    double get_pilot_all_received(int frame_id)
-    {
-        return pilot_all_received[frame_id % 10000];
-    };
+        return master_timestamps[static_cast<size_t>(timestamp_type)]
+                                [frame_id % kNumStatsFrames];
+    }
 
-    void update_processing_started(int frame_id)
+    /// From the master, get the microseconds elapsed since the timestamp of
+    /// timestamp_type was taken for frame_id
+    double master_get_us_since(TsType timestamp_type, size_t frame_id)
     {
-        processing_started[frame_id % 10000] = get_time();
-    };
-    double get_processing_started(int frame_id)
-    {
-        return processing_started[frame_id % 10000];
-    };
+        return cycles_to_us(
+            rdtsc() - master_get_tsc(timestamp_type, frame_id), freq_ghz);
+    }
 
-    void update_rx_processed(int frame_id)
+    /// From the master, get the microseconds between when the timestamp of
+    /// timestamp_type was taken for frame_id, and reference_tsc
+    double master_get_us_from_ref(
+        TsType timestamp_type, size_t frame_id, size_t reference_tsc)
     {
-        rx_processed[frame_id % 10000] = get_time();
-    };
-    double get_rx_processed(int frame_id)
-    {
-        return rx_processed[frame_id % 10000];
-    };
+        return cycles_to_us(
+            master_get_tsc(timestamp_type, frame_id) - reference_tsc, freq_ghz);
+    }
 
-    void update_fft_processed(int frame_id)
+    /// From the master, for a frame ID, get the microsecond difference
+    /// between two timestamp types
+    double master_get_delta_us(
+        TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id)
     {
-        fft_processed[frame_id % 10000] = get_time();
-    };
-    double get_fft_processed(int frame_id)
-    {
-        return fft_processed[frame_id % 10000];
-    };
+        return cycles_to_us(master_get_tsc(timestamp_type_1, frame_id)
+                - master_get_tsc(timestamp_type_2, frame_id),
+            freq_ghz);
+    }
 
-    void update_demul_processed(int frame_id)
+    /// From the master, get the microsecond difference between the times that
+    /// a timestamp type was taken for two frames
+    double master_get_delta_us(
+        TsType timestamp_type, size_t frame_id_1, size_t frame_id_2)
     {
-        demul_processed[frame_id % 10000] = get_time();
-    };
-    double get_demul_processed(int frame_id)
-    {
-        return demul_processed[frame_id % 10000];
-    };
+        return cycles_to_us(master_get_tsc(timestamp_type, frame_id_1)
+                - master_get_tsc(timestamp_type, frame_id_2),
+            freq_ghz);
+    }
 
-    void update_zf_processed(int frame_id)
+    /// Get the DurationStat object used by thread thread_id for DoerType
+    /// doer_type
+    DurationStat* get_duration_stat(DoerType doer_type, size_t thread_id)
     {
-        zf_processed[frame_id % 10000] = get_time();
-    };
-    double get_zf_processed(int frame_id)
-    {
-        return zf_processed[frame_id % 10000];
-    };
+        return &worker_durations[thread_id]
+                    .duration_stat[static_cast<size_t>(doer_type)];
+    }
 
-    void update_rc_processed(int frame_id)
+    /// The master thread uses a stale copy of DurationStats to compute
+    /// differences. This gets the DurationStat object for thread thread_id
+    /// for DoerType doer_type.
+    DurationStat* get_duration_stat_old(DoerType doer_type, size_t thread_id)
     {
-        rc_processed[frame_id % 10000] = get_time();
-    };
-    double get_rc_processed(int frame_id)
-    {
-        return rc_processed[frame_id % 10000];
-    };
+        return &worker_durations_old[thread_id]
+                    .duration_stat[static_cast<size_t>(doer_type)];
+    }
 
-    void update_decode_processed(int frame_id)
-    {
-        decode_processed[frame_id % 10000] = get_time();
-    };
-    double get_decode_processed(int frame_id)
-    {
-        return decode_processed[frame_id % 10000];
-    };
-
-    void update_encode_processed(int frame_id)
-    {
-        encode_processed[frame_id % 10000] = get_time();
-    };
-    double get_encode_processed(int frame_id)
-    {
-        return encode_processed[frame_id % 10000];
-    };
-
-    void update_precode_processed(int frame_id)
-    {
-        precode_processed[frame_id % 10000] = get_time();
-    };
-    double get_precode_processed(int frame_id)
-    {
-        return precode_processed[frame_id % 10000];
-    };
-
-    void update_ifft_processed(int frame_id)
-    {
-        ifft_processed[frame_id % 10000] = get_time();
-    };
-    double get_ifft_processed(int frame_id)
-    {
-        return ifft_processed[frame_id % 10000];
-    };
-
-    void update_tx_processed_first(int frame_id)
-    {
-        tx_processed_first[frame_id % 10000] = get_time();
-    };
-    double get_tx_processed_first(int frame_id)
-    {
-        return tx_processed_first[frame_id % 10000];
-    };
-
-    void update_tx_processed(int frame_id)
-    {
-        tx_processed[frame_id % 10000] = get_time();
-    };
-    double get_tx_processed(int frame_id)
-    {
-        return tx_processed[frame_id % 10000];
-    };
-
-    /* stats for the worker threads */
-    void update_stats_in_dofft(
-        int frame_id, int thread_num, int thread_num_offset);
-    double get_csi_time_in_dofft(int frame_id)
-    {
-        return csi_time_in_function[frame_id % 10000];
-    };
-
-    // void update_fft_in_function(int frame_id);
-    double get_fft_time_in_dofft(int frame_id)
-    {
-        return fft_time_in_function[frame_id % 10000];
-    };
-
-    void update_stats_in_dozf(
-        int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_dozf(int frame_id)
-    {
-        return zf_time_in_function[frame_id % 10000];
-    };
-
-    void update_stats_in_dodemul(
-        int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_dodemul(int frame_id)
-    {
-        return demul_time_in_function[frame_id % 10000];
-    };
-
-    void update_stats_in_doifft(
-        int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_doifft(int frame_id)
-    {
-        return ifft_time_in_function[frame_id % 10000];
-    };
-
-    void update_stats_in_doprecode(
-        int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_doprecode(int frame_id)
-    {
-        return precode_time_in_function[frame_id % 10000];
-    };
-
-    void update_stats_in_rc(
-        int frame_id, int thread_num, int thread_num_offset);
-    double get_time_in_rc(int frame_id)
-    {
-        return zf_time_in_function[frame_id % 10000];
-    };
-
-    /* accumulated task duration for all frames in each worker thread*/
-    Stats_worker csi_stats_worker;
-    Stats_worker fft_stats_worker;
-    Stats_worker zf_stats_worker;
-    Stats_worker demul_stats_worker;
-    Stats_worker decode_stats_worker;
-    Stats_worker encode_stats_worker;
-    Stats_worker ifft_stats_worker;
-    Stats_worker precode_stats_worker;
-    Stats_worker rc_stats_worker;
-    Table<double> frame_start;
+    /// Dimensions = number of packet RX threads x kNumStatsFrames.
+    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
+    /// starts receiving frame j.
+    Table<size_t> frame_start;
 
 private:
+    // Fill in running time summary stats for the current frame for this
+    // thread and Doer type
+    void populate_summary(
+        FrameSummary* frame_summary, size_t thread_id, DoerType doer_type);
+
+    static void compute_avg_over_threads(
+        FrameSummary* frame_summary, size_t thread_num, size_t break_down_num);
+    static void print_per_thread_per_task(FrameSummary frame_summary);
+    static void print_per_frame(
+        const char* doer_string, FrameSummary frame_summary);
+
+    size_t get_total_task_count(DoerType doer_type, size_t thread_num);
+
+    /* stats for the worker threads */
+    void update_stats_in_dofft_bigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* frame_summary_fft,
+        FrameSummary* frame_summary_csi);
+    void update_stats_in_dozf_bigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* frame_summary_zf);
+    void update_stats_in_dodemul_bigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* frame_summary_demul);
+    void update_stats_in_doifft_bigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* frame_summary_ifft,
+        FrameSummary* frame_summary_csi);
+    void update_stats_in_doprecode_bigstation(size_t frame_id,
+        size_t thread_num, size_t thread_num_offset,
+        FrameSummary* frame_summary_precode);
+
+    void update_stats_in_functions_uplink_bigstation(size_t frame_id,
+        FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
+        FrameSummary* frame_summary_decode);
+
+    void update_stats_in_functions_uplink_millipede(size_t frame_id,
+        FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
+        FrameSummary* frame_summary_decode);
+
+    void update_stats_in_functions_downlink_bigstation(size_t frame_id,
+        FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
+        FrameSummary* frame_summary_encode);
+
+    void update_stats_in_functions_downlink_millipede(size_t frame_id,
+        FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
+        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
+        FrameSummary* frame_summary_encode);
+
     Config* config_;
+    const size_t task_thread_num;
+    const size_t fft_thread_num;
+    const size_t zf_thread_num;
+    const size_t demul_thread_num;
+    const size_t break_down_num;
+    const double freq_ghz;
+    const size_t creation_tsc; // TSC at which this object was created
 
-    int task_thread_num;
-    int fft_thread_num;
-    int zf_thread_num;
-    int demul_thread_num;
-    int break_down_num;
+    /// Timestamps taken by the master thread at different points in a frame's
+    /// processing
+    double master_timestamps[kNumTimestampTypes][kNumStatsFrames];
 
-    double pilot_received[10000] __attribute__((aligned(4096)));
-    double pilot_all_received[10000] __attribute__((aligned(4096)));
-    double processing_started[10000] __attribute__((aligned(4096)));
-    double rx_processed[10000] __attribute__((aligned(4096)));
-    double fft_processed[10000] __attribute__((aligned(4096)));
-    double demul_processed[10000] __attribute__((aligned(4096)));
-    double zf_processed[10000] __attribute__((aligned(4096)));
-    double decode_processed[10000] __attribute__((aligned(4096)));
+    /// Running time duration statistics. Each worker thread has one
+    /// DurationStat object for every Doer type. The master thread keeps stale
+    /// ("old") copies of all DurationStat objects.
+    struct {
+        DurationStat duration_stat[kNumDoerTypes];
+        uint8_t false_sharing_padding[64];
+    } worker_durations[kMaxThreads], worker_durations_old[kMaxThreads];
 
-    double encode_processed[10000] __attribute__((aligned(4096)));
-    double precode_processed[10000] __attribute__((aligned(4096)));
-    double ifft_processed[10000] __attribute__((aligned(4096)));
-    double tx_processed_first[10000] __attribute__((aligned(4096)));
-    double tx_processed[10000] __attribute__((aligned(4096)));
-    double rc_processed[10000] __attribute__((aligned(4096)));
+    double fft_us[kNumStatsFrames];
+    double csi_us[kNumStatsFrames];
+    double zf_us[kNumStatsFrames];
+    double demul_us[kNumStatsFrames];
+    double ifft_us[kNumStatsFrames];
+    double precode_us[kNumStatsFrames];
+    double decode_us[kNumStatsFrames];
+    double encode_us[kNumStatsFrames];
+    double rc_us[kNumStatsFrames];
 
-    double csi_time_in_function[10000] __attribute__((aligned(4096)));
-    double fft_time_in_function[10000] __attribute__((aligned(4096)));
-    double zf_time_in_function[10000] __attribute__((aligned(4096)));
-    double demul_time_in_function[10000] __attribute__((aligned(4096)));
-    double ifft_time_in_function[10000] __attribute__((aligned(4096)));
-    double precode_time_in_function[10000] __attribute__((aligned(4096)));
-    double decode_time_in_function[10000] __attribute__((aligned(4096)));
-    double encode_time_in_function[10000] __attribute__((aligned(4096)));
-    double rc_time_in_function[10000] __attribute__((aligned(4096)));
-
-#if DEBUG_UPDATE_STATS_DETAILED
-    Table<double> csi_time_in_function_details;
-    Table<double> fft_time_in_function_details;
-    Table<double> zf_time_in_function_details;
-    Table<double> demul_time_in_function_details;
-#endif
-
-    Stats_worker csi_stats_worker_old;
-    Stats_worker fft_stats_worker_old;
-    Stats_worker zf_stats_worker_old;
-    Stats_worker demul_stats_worker_old;
-    Stats_worker decode_stats_worker_old;
-    Stats_worker encode_stats_worker_old;
-    Stats_worker ifft_stats_worker_old;
-    Stats_worker precode_stats_worker_old;
-    Stats_worker rc_stats_worker_old;
-
-    Stats_worker_per_frame csi_stats_per_frame;
-    Stats_worker_per_frame fft_stats_per_frame;
-    Stats_worker_per_frame zf_stats_per_frame;
-    Stats_worker_per_frame demul_stats_per_frame;
-    Stats_worker_per_frame decode_stats_per_frame;
-    Stats_worker_per_frame encode_stats_per_frame;
-    Stats_worker_per_frame ifft_stats_per_frame;
-    Stats_worker_per_frame precode_stats_per_frame;
-    Stats_worker_per_frame rc_stats_per_frame;
+    double fft_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
+    double csi_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
+    double zf_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
+    double demul_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
 };
 
 #endif

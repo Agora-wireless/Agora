@@ -8,13 +8,6 @@
 
 #define ENABLE_CPU_ATTACH
 
-#ifdef USE_ARGOS
-#ifndef GENERATE_DATA
-#define GENERATE_DATA
-#endif
-#define GENERATE_PILOT
-#endif
-
 #define ARMA_ALLOW_FAKE_GCC
 
 #define SEPARATE_TX_RX_UE 0
@@ -37,17 +30,21 @@
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
 
-#define DL_PILOT_SYMS 2
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
+/// Return true at compile time iff a constant is a power of two
+template <typename T> static constexpr inline bool is_power_of_two(T x)
+{
+    return x && ((x & T(x - 1)) == 0);
+}
+
+// TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
     kPacketRX,
     kFFT,
     kZF,
     kDemul,
-    kPred,
-    kModul,
     kIFFT,
     kPrecode,
     kPacketTX,
@@ -55,8 +52,26 @@ enum class EventType : int {
     kEncode,
     kRC,
     kRXSymbol,
-    kInvalid
+    kModul,
+    kPacketFromMac,
+    kPacketToMac
 };
+static constexpr size_t kNumEventTypes
+    = static_cast<size_t>(EventType::kPacketToMac) + 1;
+
+// Types of Millipede Doers
+enum class DoerType : size_t {
+    kFFT,
+    kCSI,
+    kZF,
+    kDemul,
+    kDecode,
+    kEncode,
+    kIFFT,
+    kPrecode,
+    kRC
+};
+static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 
 #define PRINT_RX_PILOTS 0
 #define PRINT_RX 1
@@ -75,39 +90,45 @@ enum class EventType : int {
 
 #define BIGSTATION 0
 #define USE_IPV4 1
-#define CONNECT_UDP 1
-#define USE_RDTSC 1
-#define EXPORT_CONSTELLATION 0
+#if USE_IPV4
+static constexpr bool kUseIPv4 = true;
+#else
+static constexpr bool kUseIPv4 = false;
+#endif
+
+#ifdef USE_DPDK
+static constexpr bool kUseDPDK = true;
+#else
+static constexpr bool kUseDPDK = false;
+#endif
+
+#ifdef ENABLE_MAC
+static constexpr bool kEnableMac = true;
+#else
+static constexpr bool kEnableMac = false;
+#endif
+
+static constexpr bool kConnectUDP = true;
+static constexpr bool kExportConstellation = false;
+static constexpr bool kPrintPhyStats = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
 #define DO_PREDICTION 0
 #define INIT_FRAME_NUM 10
 
-#define DEBUG_PRINT_PER_FRAME_DONE 1
-#define DEBUG_PRINT_PER_SUBFRAME_DONE 0
-#define DEBUG_PRINT_PER_TASK_DONE 0
-#define DEBUG_PRINT_SUMMARY_100_FRAMES 0
+static constexpr bool kDebugPrintPerFrameDone = true;
+static constexpr bool kDebugPrintPerFrameStart = false;
+static constexpr bool kDebugPrintPerSymbolDone = false;
+static constexpr bool kDebugPrintPerTaskDone = false;
+static constexpr bool kDebugPrintStatsPerThread = false;
+static constexpr bool kDebugPrintInTask = false;
+static constexpr bool kDebugPrintPilot = false;
+static constexpr bool kDebugBSSender = false;
 
-#define DEBUG_PRINT_PER_FRAME_ENTER_QUEUE 0
-#define DEBUG_PRINT_PER_SUBFRAME_ENTER_QUEUE 0
-#define DEBUG_PRINT_PER_TASK_ENTER_QUEUE 0
-
-#define DEBUG_PRINT_PER_FRAME_START 1
-
-#define DEBUG_PRINT_STATS_PER_THREAD 0
-#define DEBUG_UPDATE_STATS 1
-#define DEBUG_UPDATE_STATS_DETAILED 1
-#define DEBUG_PRINT_PILOT 0
-#define DEBUG_DL_PILOT 1
+#define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
-#define MEASURE_TIME 1
-
-#define DEBUG_PRINT_IN_TASK 0
-#define DEBUG_SENDER 0
 #define DEBUG_RECV 0
-#define DEBUG_BS_SENDER 0
-// #define WRITE_DEMUL 0
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
@@ -180,7 +201,44 @@ struct LDPCconfig {
 
 typedef struct LDPCconfig LDPCconfig;
 
-static const int MAX_FRAME_ID = 1e4;
-static const int float_num_in_simd256 = 8;
-static const int double_num_in_simd256 = 4;
+// Maximum number of symbols per frame allowed by Millipede
+static constexpr size_t kMaxSymbolsPerFrame = 1400;
+
+// Maximum number of OFDM subcarriers in the 5G spec
+static constexpr size_t k5GMaxSubcarriers = 3300;
+
+// Maximum number of antennas supported by Millipede
+static constexpr size_t kMaxAntennas = 64;
+
+// Maximum number of UEs supported by Millipede
+static constexpr size_t kMaxUEs = 1000;
+
+// Number of cellular frames tracked by Millipede stats
+static constexpr size_t kNumStatsFrames = 10000;
+
+// If true, enable timing measurements in workers
+static constexpr bool kIsWorkerTimingEnabled = true;
+
+// Maximum breakdown of a statistic (e.g., timing)
+static constexpr size_t kMaxStatsBreakdown = 4;
+
+// Maximum number of hardware threads on one machine
+static constexpr size_t kMaxThreads = 128;
+
+// Number of subcarriers in one cache line, when represented as complex floats
+static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
+
+// Number of subcarriers in a partial transpose block
+static constexpr size_t kTransposeBlockSize = 8;
+static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
+static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
+
+#ifdef USE_LDPC
+static constexpr bool kUseLDPC = true;
+#else
+static constexpr bool kUseLDPC = false;
+#endif
+
+// Enable debugging for sender and receiver applications
+static constexpr bool kDebugSenderReceiver = false;
 #endif

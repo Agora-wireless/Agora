@@ -22,12 +22,14 @@
 
 class Reciprocity : public Doer {
 public:
-    Reciprocity(Config* cfg, int in_tid,
+    Reciprocity(Config* cfg, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        Consumer& in_consumer, Table<complex_float>& in_calib_buffer,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<complex_float>& in_calib_buffer,
         Table<complex_float>& in_recip_buffer, Stats* in_stats_manager);
     ~Reciprocity();
-    Event_data launch(int offset);
+    Event_data launch(size_t offset);
 
 private:
     int BS_ANT_NUM;
@@ -35,15 +37,7 @@ private:
 
     Table<complex_float> calib_buffer_;
     Table<complex_float> recip_buffer_;
-
-    Table<double>* RC_task_duration;
-    int* RC_task_count;
-
-    /**
-     * Intermediate buffer to gather CSI
-     * First dimension: TASK_THREAD_NUM
-     * Second dimension: BS_ANT_NUM * UE_NUM */
-    complex_float* calib_gather_buffer;
+    DurationStat* duration_stat;
 };
 
 #endif
