@@ -137,7 +137,7 @@ void Millipede::schedule_subcarriers(
     }
 }
 
-void Millipede::schedule_cbs(
+void Millipede::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
     assert(
@@ -278,7 +278,7 @@ void Millipede::start()
                         // If downlink data transmission is enabled, schedule
                         // downlink encode/modulation for the first data symbol
                         if (kUseLDPC) {
-                            schedule_cbs(EventType::kEncode, frame_id,
+                            schedule_codeblocks(EventType::kEncode, frame_id,
                                 cfg->dl_data_symbol_start);
                         } else {
                             schedule_subcarriers(EventType::kPrecode, frame_id,
@@ -298,7 +298,7 @@ void Millipede::start()
                 /* If this symbol is ready */
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
                     if (kUseLDPC) {
-                        schedule_cbs(
+                        schedule_codeblocks(
                             EventType::kDecode, frame_id, symbol_idx_ul);
                     }
                     print_per_symbol_done(PRINT_DEMUL, frame_id, symbol_idx_ul);
@@ -387,7 +387,7 @@ void Millipede::start()
                         EventType::kIFFT, frame_id, data_symbol_idx);
                     if (data_symbol_idx < cfg->dl_data_symbol_end - 1) {
                         if (kUseLDPC) {
-                            schedule_cbs(EventType::kEncode, frame_id,
+                            schedule_codeblocks(EventType::kEncode, frame_id,
                                 data_symbol_idx + 1);
                         } else {
                             schedule_subcarriers(EventType::kPrecode, frame_id,
