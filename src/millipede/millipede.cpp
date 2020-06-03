@@ -137,6 +137,21 @@ void Millipede::schedule_subcarriers(
     }
 }
 
+void Millipede::schedule_cbs(
+    EventType event_type, size_t frame_id, size_t symbol_id)
+{
+    assert(
+        event_type == EventType::kEncode or event_type == EventType::kDecode);
+    auto base_tag = gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0);
+
+    for (size_t i = 0;
+         i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
+        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+            Event_data(event_type, base_tag._tag));
+        base_tag.cb_id++;
+    }
+}
+
 void Millipede::start()
 {
     auto& cfg = config_;
@@ -152,8 +167,8 @@ void Millipede::start()
     // if (kEnableMac) {
     //     /* start mac txrx receiver */
     //     if (!mac_receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
-    //             socket_buffer_status_size_,
-    //             stats->frame_start, dl_socket_buffer_)) {
+    //             socket_buffer_status_size_, stats->frame_start,
+    //             dl_socket_buffer_)) {
     //         this->stop();
     //         return;
     //     }
@@ -263,13 +278,8 @@ void Millipede::start()
                         // If downlink data transmission is enabled, schedule
                         // downlink encode/modulation for the first data symbol
                         if (kUseLDPC) {
-                            schedule_task_set(EventType::kEncode,
-                                config_->LDPC_config.nblocksInSymbol
-                                    * cfg->UE_NUM,
-                                config_->get_total_data_symbol_idx(
-                                    frame_id, cfg->dl_data_symbol_start),
-                                get_conq(EventType::kEncode),
-                                get_ptok(EventType::kEncode));
+                            schedule_cbs(EventType::kEncode, frame_id,
+                                cfg->dl_data_symbol_start);
                         } else {
                             schedule_subcarriers(EventType::kPrecode, frame_id,
                                 cfg->dl_data_symbol_start);
@@ -288,12 +298,8 @@ void Millipede::start()
                 /* If this symbol is ready */
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
                     if (kUseLDPC) {
-                        schedule_task_set(EventType::kDecode,
-                            config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-                            config_->get_total_data_symbol_idx_ul(
-                                frame_id, symbol_idx_ul),
-                            get_conq(EventType::kDecode),
-                            get_ptok(EventType::kDecode));
+                        schedule_cbs(
+                            EventType::kDecode, frame_id, symbol_idx_ul);
                     }
                     print_per_symbol_done(PRINT_DEMUL, frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
@@ -328,16 +334,12 @@ void Millipede::start()
             } break;
 
             case EventType::kDecode: {
-                int num_code_blocks = decode_stats_.max_task_count;
-                int total_data_symbol_id = event.tags[0] / num_code_blocks;
-                size_t frame_id
-                    = total_data_symbol_id / cfg->ul_data_symbol_num_perframe;
-                int data_symbol_id
-                    = total_data_symbol_id % cfg->ul_data_symbol_num_perframe;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
 
-                if (decode_stats_.last_task(frame_id, data_symbol_id)) {
+                if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
                     print_per_symbol_done(
-                        PRINT_DECODE, frame_id, data_symbol_id);
+                        PRINT_DECODE, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {
                         assert(cur_frame_id == frame_id);
                         cur_frame_id++;
@@ -353,23 +355,19 @@ void Millipede::start()
                 // case EventType::kPacketToMac: {
                 //     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 //     size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-                //     size_t base_sc_id = gen_tag_t(event.tags[0]).sc_id;
+                //     size_t cb_id = gen_tag_t(event.tags[0]).cb_id;
+
                 // } break;
 
             case EventType::kEncode: {
-                int offset = event.tags[0];
-                int num_code_blocks = encode_stats_.max_task_count;
-                int total_data_symbol_id = offset / num_code_blocks;
-                size_t frame_id
-                    = total_data_symbol_id / cfg->data_symbol_num_perframe;
-                int data_symbol_id
-                    = total_data_symbol_id % cfg->data_symbol_num_perframe;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
-                if (encode_stats_.last_task(frame_id, data_symbol_id)) {
+                if (encode_stats_.last_task(frame_id, data_symbol_idx)) {
                     schedule_subcarriers(
-                        EventType::kPrecode, frame_id, data_symbol_id);
+                        EventType::kPrecode, frame_id, data_symbol_idx);
                     print_per_symbol_done(
-                        PRINT_ENCODE, frame_id, data_symbol_id);
+                        PRINT_ENCODE, frame_id, data_symbol_idx);
                     if (encode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kEncodeDone, frame_id);
                         print_per_frame_done(PRINT_ENCODE, frame_id);
@@ -382,10 +380,6 @@ void Millipede::start()
                 size_t sc_id = gen_tag_t(event.tags[0]).sc_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
-                size_t total_data_symbol_id
-                    = (frame_id * cfg->data_symbol_num_perframe)
-                    + data_symbol_idx;
-
                 print_per_task_done(
                     PRINT_PRECODE, frame_id, data_symbol_idx, sc_id);
                 if (precode_stats_.last_task(frame_id, data_symbol_idx)) {
@@ -393,12 +387,8 @@ void Millipede::start()
                         EventType::kIFFT, frame_id, data_symbol_idx);
                     if (data_symbol_idx < cfg->dl_data_symbol_end - 1) {
                         if (kUseLDPC) {
-                            schedule_task_set(EventType::kEncode,
-                                config_->LDPC_config.nblocksInSymbol
-                                    * cfg->UE_NUM,
-                                total_data_symbol_id + 1,
-                                get_conq(EventType::kEncode),
-                                get_ptok(EventType::kEncode));
+                            schedule_cbs(EventType::kEncode, frame_id,
+                                data_symbol_idx + 1);
                         } else {
                             schedule_subcarriers(EventType::kPrecode, frame_id,
                                 data_symbol_idx + 1);

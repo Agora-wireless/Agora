@@ -94,6 +94,7 @@ public:
     void schedule_users(EventType task_type, gen_tag_t base_tag);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_cbs(EventType task_type, size_t frame_id, size_t symbol_id);
 
     void initialize_queues();
     void initialize_uplink_buffers();

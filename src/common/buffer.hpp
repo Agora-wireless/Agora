@@ -62,7 +62,7 @@ union gen_tag_t {
         uint16_t symbol_id : 14;
         TagType tag_type : 2;
         union {
-            uint16_t ue_id;
+            uint16_t cb_id; // code block
             uint16_t ant_id;
             uint16_t sc_id;
         };
@@ -82,13 +82,13 @@ union gen_tag_t {
             << std::to_string(symbol_id);
         switch (tag_type) {
         case kUEs:
-            ret << ", UE ID " << std::to_string(ue_id) << "]";
+            ret << ", code block ID " << std::to_string(cb_id) << "]";
             break;
         case kAntennas:
             ret << ", antenna ID " << std::to_string(ant_id) << "]";
             break;
         case kSubcarriers:
-            ret << ", subcarrier ID " << std::to_string(ue_id) << "]";
+            ret << ", subcarrier ID " << std::to_string(sc_id) << "]";
             break;
         case kNone:
             ret << "] ";
