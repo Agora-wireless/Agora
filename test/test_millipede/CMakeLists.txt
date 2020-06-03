@@ -48,10 +48,12 @@ find_package(Armadillo)
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
+message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 
 set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx.cpp)
@@ -87,6 +89,11 @@ if(${USE_DPDK})
 else()
   message(STATUS "DPDK is disabled")
 endif()
+
+if(${ENABLE_MAC})
+  add_definitions(-DENABLE_MAC)
+endif()
+set(MAC_TX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx_mac.cpp)
 
 include_directories(
 	${SOURCE_DIR}/src/common/
@@ -149,16 +156,18 @@ foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
 endforeach()
 
-set(SOURCES 
-  main.cpp 
+set(SOURCES
   ${MILLIPEDE_SOURCES}
-	${TXRX_SOURCES}
+  ${TXRX_SOURCES}
+  ${MAC_TX_SOURCES}
   ${COMMON_SOURCES}
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
-			
-add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+      
+add_executable(millipede main.cpp ${SOURCES} ${HEADER_FILES})
+target_link_libraries(millipede -larmadillo
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+
 
 set(SENDER_SOURCES 
   ${SOURCE_DIR}/simulator/sender_cli.cpp

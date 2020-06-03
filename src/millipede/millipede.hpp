@@ -40,6 +40,7 @@
 #include "gettime.h"
 #include "reciprocity.hpp"
 #include "txrx.hpp"
+#include "txrx_mac.hpp"
 
 #ifdef USE_LDPC
 #include "docoding.hpp"
@@ -83,10 +84,10 @@ public:
 
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id);
-    void print_per_frame_done(size_t task_type, size_t frame_id);
+    void print_per_frame_done(PrintType print_type, size_t frame_id);
     void print_per_symbol_done(
-        size_t task_type, size_t frame_id, size_t symbol_id);
-    void print_per_task_done(size_t task_type, size_t frame_id,
+        PrintType print_type, size_t frame_id, size_t symbol_id);
+    void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
     void schedule_subcarriers(
@@ -95,6 +96,7 @@ public:
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -145,7 +147,7 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    // std::unique_ptr<MacPacketTXRX> mac_receiver_;
+    std::unique_ptr<MacPacketTXRX> mac_receiver_;
     Stats* stats;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];

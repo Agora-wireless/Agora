@@ -50,10 +50,12 @@ set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
+message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
@@ -105,6 +107,12 @@ endif()
 
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
+
+
+if(${ENABLE_MAC})
+  add_definitions(-DENABLE_MAC)
+endif()
+set(MAC_TX_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
 if(${USE_ARGOS})
@@ -221,19 +229,19 @@ foreach(dir ${dirs})
 endforeach()
 
 set(SOURCES
-  src/millipede/main.cpp 
   ${MILLIPEDE_SOURCES}
   ${TXRX_SOURCES}
+  ${MAC_TX_SOURCES}
   ${COMMON_SOURCES}
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
 			
-add_executable(millipede ${SOURCES} ${HEADER_FILES})
+add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 
-add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES} ${LDPC_SOURCES} ${HEADER_FILES})
+add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_executable(data_generator 
