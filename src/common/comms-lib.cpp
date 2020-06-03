@@ -25,8 +25,6 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
     std::vector<std::complex<float>> pilot, size_t seq_len)
 {
 
-    size_t best_peak = 0;
-
     // Re-arrange into complex vector, flip, and compute conjugate
     std::vector<std::complex<float>> pilot_conj;
     for (size_t i = 0; i < seq_len; i++) {
@@ -41,13 +39,7 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
     auto pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
 
     // Find all peaks
-    float max_peak = 0;
-    for (size_t i = 0; i < pilot_corr.size(); i++) {
-        if (abs(pilot_corr[i]) > max_peak) {
-            max_peak = abs(pilot_corr[i]);
-            best_peak = i;
-        }
-    }
+    auto best_peak = *std::max_element(pilot_corr.begin(), pilot_corr.end());
     return best_peak;
 }
 
@@ -82,17 +74,16 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     }
 
     // Equivalent to numpy's sign function
-    std::vector<std::complex<double>> iq_sign = CommsLib::csign(iq);
+    auto iq_sign = CommsLib::csign(iq);
 
     // Convolution
-    std::vector<double> lts_corr = CommsLib::convolve(iq_sign, lts_sym_conj);
+    auto lts_corr = CommsLib::convolve(iq_sign, lts_sym_conj);
+    auto lts_peak = *std::max_element(lts_corr.begin(), lts_corr.end());
 
     // Find all peaks
     std::vector<int> peaks;
     for (size_t i = 0; i < lts_corr.size(); i++) {
-        if (lts_corr[i]
-            > (lts_thresh
-                  * *std::max_element(lts_corr.begin(), lts_corr.end()))) {
+        if (std::abs(lts_corr[i]) > (lts_thresh * lts_peak)) {
             // Index of valid peaks
             peaks.push_back(i);
         }
@@ -120,6 +111,30 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     }
 
     return best_peak;
+}
+
+float CommsLib::find_max_abs(Table<complex_float> in, size_t dim1, size_t dim2)
+{
+    float max_val = 0;
+    for (size_t i = 0; i < dim1; i++) {
+        float cur_max_val
+            = CommsLib::find_max_abs(in[i], dim2);
+        if (cur_max_val > max_val)
+            max_val = cur_max_val;
+    }
+    return max_val;
+}
+
+float CommsLib::find_max_abs(complex_float* in, size_t len)
+{
+    float max_val = 0;
+    for (size_t j = 0; j < len; j++) {
+        auto cur_val = CommsLib::abs_cf(in[j]);
+        if (cur_val > max_val) {
+            max_val = cur_val;
+        }
+    }
+    return max_val;
 }
 
 void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
@@ -430,6 +445,19 @@ std::vector<std::complex<float>> CommsLib::composeRefSymbol(
         return pilot_cf32;
     } else
         return fft_in;
+}
+
+void CommsLib::ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
+    size_t prefix, size_t cp, float scale)
+{
+    for (size_t j = 0; j < N; j++) {
+        out[prefix + cp + j]
+            = std::complex<int16_t>((int16_t)((in[j].re / scale) * 32768),
+                (int16_t)((in[j].im / scale) * 32768));
+    }
+    for (size_t j = 0; j < cp; j++) {
+        out[prefix + j] = out[prefix + N + j];
+    }
 }
 
 std::vector<std::complex<float>> CommsLib::modulate(

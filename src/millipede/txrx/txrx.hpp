@@ -45,49 +45,55 @@
 typedef unsigned short ushort;
 class PacketTXRX {
 public:
-    PacketTXRX(Config* cfg, int COMM_THREAD_NUM = 1, int in_core_offset = 1);
+    PacketTXRX(Config* cfg, size_t in_core_offset = 1);
     /**
-     * COMM_THREAD_NUM: socket thread number
-     * in_queue: message queue to communicate with main thread
+     * queue_message: message queue to communicate with main thread
      */
-    PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
-        moodycamel::ProducerToken** in_rx_ptoks,
-        moodycamel::ProducerToken** in_tx_ptoks);
+    PacketTXRX(Config* cfg, size_t core_offset,
+        moodycamel::ConcurrentQueue<Event_data>* queue_message,
+        moodycamel::ConcurrentQueue<Event_data>* queue_task,
+        moodycamel::ProducerToken** rx_ptoks,
+        moodycamel::ProducerToken** tx_ptoks);
     ~PacketTXRX();
 
 #ifdef USE_DPDK
-    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, int& rx_offset);
+    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, size_t& rx_offset);
 #endif
 
     /**
      * called in main threads to start the socket threads
-     * in_buffer: ring buffer to save packets
-     * in_buffer_status: record the status of each memory block (0: empty, 1:
-     * full) in_buffer_frame_num: number of packets the ring buffer could hold
-     * in_buffer_length: size of ring buffer
-     * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
-     * COMM_THREAD_NUM - 1}
+     * buffer: ring buffer to save packets
+     * buffer_status: record the status of each memory block (0: empty, 1:
+     * full) 
+     * packet_num_in_buffer : number of packets the ring buffer could hold
+     * core_offset: attach socket threads to {core_offset, ..., core_offset +
+     * socket_thread_num - 1}
      */
-    bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
-        int in_buffer_frame_num, long long in_buffer_length,
-        Table<size_t>& in_frame_start, char* in_tx_buffer,
-        int* in_tx_buffer_status, int in_tx_buffer_frame_num,
-        int in_tx_buffer_length);
+    bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
+        size_t packet_num_in_buffer, Table<size_t>& frame_start,
+        char* tx_buffer);
     /**
-     * receive thread
+     * TXRX thread that runs a while loop to do both tx and rx
      */
     void* loopTXRX(int tid);
-#if USE_IPV4
-    typedef struct sockaddr_in sockaddr_t;
-#else
-    typedef struct sockaddr_in6 sockaddr_t;
-#endif
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
 private:
+    Config* cfg;
+    const size_t core_offset;
+    const size_t socket_thread_num;
+    Table<char>* buffer_;
+    Table<int>* buffer_status_;
+    size_t packet_num_in_buffer_;
+    char* tx_buffer_;
+    Table<size_t>* frame_start_;
+    // pointer of message_queue_
+    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
+    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+    moodycamel::ProducerToken** rx_ptoks_;
+    moodycamel::ProducerToken** tx_ptoks_;
+
 #if USE_IPV4
     struct sockaddr_in* servaddr_; /* server address */
 #else
@@ -104,28 +110,6 @@ private:
     struct rte_mempool* mbuf_pool;
 #endif
 
-    Table<char>* buffer_;
-    Table<int>* buffer_status_;
-    long long buffer_length_;
-    int buffer_frame_num_;
-
-    char* tx_buffer_;
-    int* tx_buffer_status_;
-    long long tx_buffer_length_;
-    int tx_buffer_frame_num_;
-
-    int comm_thread_num_;
-
-    Table<size_t>* frame_start_;
-    // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
-    moodycamel::ProducerToken** rx_ptoks_;
-    moodycamel::ProducerToken** tx_ptoks_;
-    int core_id_;
-    int tx_core_id_;
-
-    Config* config_;
 #ifdef USE_ARGOS
     RadioConfig* radioconfig_;
 #endif

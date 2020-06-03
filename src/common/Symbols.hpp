@@ -52,9 +52,12 @@ enum class EventType : int {
     kEncode,
     kRC,
     kRXSymbol,
+    kModul,
+    kPacketFromMac,
+    kPacketToMac
 };
 static constexpr size_t kNumEventTypes
-    = static_cast<size_t>(EventType::kRXSymbol) + 1;
+    = static_cast<size_t>(EventType::kPacketToMac) + 1;
 
 // Types of Millipede Doers
 enum class DoerType : size_t {
@@ -98,6 +101,13 @@ static constexpr bool kUseDPDK = true;
 #else
 static constexpr bool kUseDPDK = false;
 #endif
+
+#ifdef ENABLE_MAC
+static constexpr bool kEnableMac = true;
+#else
+static constexpr bool kEnableMac = false;
+#endif
+
 static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
