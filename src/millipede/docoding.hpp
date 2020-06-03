@@ -40,7 +40,7 @@ public:
     /**
      * Do Encode task for one code block
      */
-    Event_data launch(size_t offset);
+    Event_data launch(size_t tag);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -81,7 +81,7 @@ public:
     /**
      * Do Decode task for one code block
      */
-    Event_data launch(size_t offset);
+    Event_data launch(size_t tag);
 
 private:
     Table<int8_t>& llr_buffer_;
