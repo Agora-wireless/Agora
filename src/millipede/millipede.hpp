@@ -144,6 +144,7 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
+    // std::unique_ptr<MacPacketTXRX> mac_receiver_;
     Stats* stats;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
@@ -221,6 +222,8 @@ private:
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
+    Data_stats tomac_stats_;
+    Data_stats frommac_stats_;
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
@@ -258,8 +261,6 @@ private:
      */
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
-    long long dl_socket_buffer_size_;
-    int dl_socket_buffer_status_size_;
 
     struct sched_info_t {
         moodycamel::ConcurrentQueue<Event_data> concurrent_q;
@@ -275,6 +276,8 @@ private:
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* rx_ptoks_mac_ptr[kMaxThreads];
+    moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 };
 
