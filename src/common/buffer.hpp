@@ -49,20 +49,21 @@ using fft_req_tag_t = rx_tag_t;
 // A generic tag type for Millipede tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
 union gen_tag_t {
-    static constexpr size_t kInvalidSymbolId = (1ull << 14) - 1;
-    static_assert(kMaxSymbolsPerFrame < ((1ull << 14) - 1), "");
+    static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
+    static_assert(kMaxSymbolsPerFrame < ((1ull << 13) - 1), "");
     static_assert(kMaxUEs < UINT16_MAX, "");
     static_assert(kMaxAntennas < UINT16_MAX, "");
     static_assert(k5GMaxSubcarriers < UINT16_MAX, "");
 
-    enum TagType { kUEs, kAntennas, kSubcarriers, kNone };
+    enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 
     struct {
         uint32_t frame_id;
-        uint16_t symbol_id : 14;
-        TagType tag_type : 2;
+        uint16_t symbol_id : 13;
+        TagType tag_type : 3;
         union {
             uint16_t cb_id; // code block
+            uint16_t ue_id;
             uint16_t ant_id;
             uint16_t sc_id;
         };
@@ -81,8 +82,11 @@ union gen_tag_t {
         ret << "[Frame ID " << std::to_string(frame_id) << ", symbol ID "
             << std::to_string(symbol_id);
         switch (tag_type) {
-        case kUEs:
+        case kCodeblocks:
             ret << ", code block ID " << std::to_string(cb_id) << "]";
+            break;
+        case kUsers:
+            ret << ", user ID " << std::to_string(ue_id) << "]";
             break;
         case kAntennas:
             ret << ", antenna ID " << std::to_string(ant_id) << "]";
@@ -95,6 +99,30 @@ union gen_tag_t {
             break;
         }
         return ret.str();
+    }
+
+    // Generate a tag with code block ID, frame ID, and symbol ID bits set and
+    // other fields blank
+    static gen_tag_t frm_sym_cb(size_t frame_id, size_t symbol_id, size_t cb_id)
+    {
+        gen_tag_t ret(0);
+        ret.frame_id = frame_id;
+        ret.symbol_id = symbol_id;
+        ret.tag_type = TagType::kCodeblocks;
+        ret.cb_id = cb_id;
+        return ret;
+    }
+
+    // Generate a tag with user ID, frame ID, and symbol ID bits set and
+    // other fields blank
+    static gen_tag_t frm_sym_ue(size_t frame_id, size_t symbol_id, size_t ue_id)
+    {
+        gen_tag_t ret(0);
+        ret.frame_id = frame_id;
+        ret.symbol_id = symbol_id;
+        ret.tag_type = TagType::kUsers;
+        ret.ue_id = ue_id;
+        return ret;
     }
 
     // Generate a tag with frame ID, symbol ID, and subcarrier ID bits set and
