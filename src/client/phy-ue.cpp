@@ -49,7 +49,7 @@ Phy_UE::Phy_UE(Config* config)
     ru_.reset(new RU(config_, rx_thread_num, config_->core_offset + 1,
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
-    if (kUseL2)
+    if (kEnableMac)
         mac_receiver_.reset(new PacketTXRX(config_, rx_thread_num,
             config_->core_offset + 1 + rx_thread_num, &message_queue_,
             &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
@@ -216,7 +216,7 @@ void Phy_UE::start()
         return;
     }
 
-    if (kUseL2
+    if (kEnableMac
         && !mac_receiver_->startTXRX(ul_bits_buffer_, ul_bits_buffer_status_,
                TASK_BUFFER_FRAME_NUM, ul_bits_buffer_size_, NULL, NULL, 0, 0)) {
         this->stop();
@@ -289,7 +289,7 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    if (kUseL2) {
+                    if (kEnableMac) {
                         Event_data do_map_task(EventType::kPacketFromMac,
                             gen_tag_t::frm_sym_ant(frame_id, symbol_id,
                                 ant_id / config_->nChannels)
@@ -449,7 +449,7 @@ void Phy_UE::taskThread(int tid)
     // Note: cores 0-17, 36-53 are on the same socket
 #ifdef ENABLE_CPU_ATTACH
     size_t offset_id
-        = core_offset + rx_thread_num + 1 + (kUseL2 ? rx_thread_num : 0);
+        = core_offset + rx_thread_num + 1 + (kEnableMac ? rx_thread_num : 0);
     size_t tar_core_id = tid + offset_id;
     if (tar_core_id >= nCPUs) // FIXME: read the number of cores
         tar_core_id = (tar_core_id - nCPUs) + 2 * nCPUs;
@@ -725,7 +725,7 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
-            int8_t* ul_bits = kUseL2
+            int8_t* ul_bits = kEnableMac
                 ? (int8_t*)&ul_syms_buffer_[ant_id]
                                            [total_ul_symbol_id * data_sc_len]
                 : &config_->ul_bits[ul_symbol_id][ant_id * data_sc_len];

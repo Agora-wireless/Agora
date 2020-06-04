@@ -115,7 +115,6 @@ static constexpr bool kEnableMac = false;
 static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
-static constexpr bool kUseL2 = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
