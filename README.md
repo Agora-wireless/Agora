@@ -73,7 +73,7 @@ Uplink Demo:
 
 Running Client App on Server 2:
 
-* Enable `kUseL2` and disable `kConnectUDP` in `src/common/Symbols.hpp`
+* Disable `kConnectUDP` in `src/common/Symbols.hpp`
 * Modify `data/user-iris-serials.txt` by adding 2 client Iris serials in your setup.
 * Run `./data_generator data/ue-ul-hw.json` to generate required data files
 * Run `./build/user data/ue-ul-hw.json`
