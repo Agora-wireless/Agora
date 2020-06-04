@@ -56,7 +56,6 @@ void read_from_file_dl(
 
 void check_correctness_ul(Config* cfg)
 {
-    int BS_ANT_NUM = cfg->BS_ANT_NUM;
     int UE_NUM = cfg->UE_NUM;
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
@@ -65,11 +64,11 @@ void check_correctness_ul(Config* cfg)
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string raw_data_filename = cur_directory
-        + "/data/LDPC_orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+        + "/data/LDPC_orig_data_2048_ant" + std::to_string(UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 #else
     std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+        + std::to_string(UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/demul_data.bin";
 #endif
 
