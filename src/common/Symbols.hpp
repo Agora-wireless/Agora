@@ -92,21 +92,6 @@ enum class PrintType : int {
     kPacketToMac
 };
 
-// #define PRINT_RX_PILOTS 0
-// #define PRINT_RX 1
-// #define PRINT_FFT_PILOTS 2
-// #define PRINT_FFT_DATA 3
-// #define PRINT_ZF 4
-// #define PRINT_DEMUL 5
-// #define PRINT_PRECODE 6
-// #define PRINT_IFFT 7
-// #define PRINT_TX_FIRST 8
-// #define PRINT_TX 9
-// #define PRINT_DECODE 10
-// #define PRINT_ENCODE 11
-// #define PRINT_RC 12
-// #define PRINT_FFT_CAL 13
-
 #define BIGSTATION 0
 #define USE_IPV4 1
 #if USE_IPV4
@@ -173,6 +158,7 @@ enum class ThreadType {
     kWorkerRX,
     kWorkerTX,
     kWorkerTXRX,
+    kWorkerMacTXRX,
     kMasterRX,
     kMasterTX,
 };
@@ -196,6 +182,8 @@ static inline std::string thread_type_str(ThreadType thread_type)
         return "TX";
     case ThreadType::kWorkerTXRX:
         return "TXRX";
+    case ThreadType::kWorkerMacTXRX:
+        return "MAC TXRX";
     case ThreadType::kMasterRX:
         return "Master (RX)";
     case ThreadType::kMasterTX:

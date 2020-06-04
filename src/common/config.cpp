@@ -66,7 +66,7 @@ Config::Config(std::string jsonfile)
     bs_port = tddConf.value("bs_port", 8000);
     ue_rx_port = tddConf.value("ue_rx_port", 7000);
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
-    mac_rx_port = tddConf.value("mac_rx_port", 7000);
+    mac_rx_port = tddConf.value("mac_rx_port", 5000);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
@@ -428,11 +428,14 @@ void Config::genData()
     }
 
     // Find normalization factor through searching for max value in IFFT results
-    float max_val = CommsLib::find_max_abs(ul_iq_ifft, ul_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
-    float cur_max_val = CommsLib::find_max_abs(dl_iq_ifft, dl_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
+    float max_val = CommsLib::find_max_abs(
+        ul_iq_ifft, ul_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
+    float cur_max_val = CommsLib::find_max_abs(
+        dl_iq_ifft, dl_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
     if (cur_max_val > max_val)
         max_val = cur_max_val;
-    cur_max_val = CommsLib::find_max_abs(ue_pilot_ifft, UE_ANT_NUM, OFDM_CA_NUM);
+    cur_max_val
+        = CommsLib::find_max_abs(ue_pilot_ifft, UE_ANT_NUM, OFDM_CA_NUM);
     if (cur_max_val > max_val)
         max_val = cur_max_val;
     cur_max_val = CommsLib::find_max_abs(pilot_ifft, OFDM_CA_NUM);

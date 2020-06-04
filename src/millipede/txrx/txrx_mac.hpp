@@ -56,25 +56,26 @@ public:
      * core_offset: attach socket threads to {core_offset, ..., core_offset +
      * socket_thread_num - 1}
      */
-    bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-        size_t packet_num_in_buffer, Table<size_t>& frame_start,
-        char* tx_buffer);
+    bool startTXRX(Table<int8_t>& dl_bits_buffer,
+        Table<int>& dl_bits_buffer_status, size_t packet_num_in_buffer,
+        Table<uint8_t>& ul_bits_buffer);
     /**
      * TXRX thread that runs a while loop to do both tx and rx
      */
     void* loopTXRX(int tid);
     int dequeue_send(int tid);
-    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    struct MacPacket* recv_enqueue(int tid, int radio_id);
 
 private:
     Config* cfg;
     const size_t core_offset;
     const size_t mac_thread_num;
-    Table<char>* buffer_;
-    Table<int>* buffer_status_;
+    Table<int8_t>* dl_bits_buffer_;
+    Table<int>* dl_bits_buffer_status_;
     size_t packet_num_in_buffer_;
-    char* tx_buffer_;
-    Table<size_t>* frame_start_;
+    Table<uint8_t>* ul_bits_buffer_;
+    Table<char> rx_buffer_;
+    Table<char> tx_buffer_;
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_;
