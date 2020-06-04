@@ -12,11 +12,14 @@ MacPacketTXRX::MacPacketTXRX(Config* cfg, size_t core_offset)
     , mac_thread_num(cfg->mac_socket_thread_num)
 {
 
-    socket_ = new int[cfg->nRadios];
+    socket_ = new int[cfg->UE_NUM];
+    rx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM, 64);
+    tx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM, 64);
+
 #if USE_IPV4
-    servaddr_ = new struct sockaddr_in[cfg->nRadios];
+    servaddr_ = new struct sockaddr_in[cfg->UE_NUM];
 #else
-    servaddr_ = new struct sockaddr_in6[cfg->nRadios];
+    servaddr_ = new struct sockaddr_in6[cfg->UE_NUM];
 #endif
 }
 
@@ -38,15 +41,15 @@ MacPacketTXRX::~MacPacketTXRX()
     delete[] servaddr_;
 }
 
-bool MacPacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
+bool MacPacketTXRX::startTXRX(Table<int8_t>& dl_bits_buffer,
+    Table<int>& dl_bits_buffer_status, size_t packet_num_in_buffer,
+    Table<uint8_t>& ul_bits_buffer)
 {
-    buffer_ = &buffer;
-    buffer_status_ = &buffer_status;
-    frame_start_ = &frame_start;
+    dl_bits_buffer_ = &dl_bits_buffer;
+    dl_bits_buffer_status_ = &dl_bits_buffer_status;
 
     packet_num_in_buffer_ = packet_num_in_buffer;
-    tx_buffer_ = tx_buffer;
+    ul_bits_buffer_ = &ul_bits_buffer;
 
     printf("create MAC TXRX threads\n");
     for (size_t i = 0; i < mac_thread_num; i++) {
@@ -67,16 +70,15 @@ bool MacPacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 
 void* MacPacketTXRX::loopTXRX(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
-    size_t* rx_frame_start = (*frame_start_)[tid];
-    int rx_offset = 0;
-    int radio_lo = tid * cfg->nRadios / mac_thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / mac_thread_num;
+    pin_to_core_with_offset(ThreadType::kWorkerMacTXRX, core_offset, tid);
+    // int rx_offset = 0;
+    int radio_lo = tid * cfg->UE_NUM / mac_thread_num;
+    int radio_hi = (tid + 1) * cfg->UE_NUM / mac_thread_num;
     printf("MAC receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-        int local_port_id = cfg->bs_port + radio_id;
+        int local_port_id = cfg->mac_rx_port + radio_id;
 #if USE_IPV4
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
@@ -88,27 +90,19 @@ void* MacPacketTXRX::loopTXRX(int tid)
         setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
             cfg->mac_rx_port + radio_id, cfg->tx_addr_to_mac.c_str());
 #endif
-        // fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
+        fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
-    int prev_frame_id = -1;
+    // int prev_frame_id = -1;
     int radio_id = radio_lo;
     while (cfg->running) {
         if (-1 != dequeue_send(tid))
             continue;
         // receive data
-        struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
+        struct MacPacket* pkt = recv_enqueue(tid, radio_id);
         if (pkt == NULL)
             continue;
-        rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
-
-        if (kIsWorkerTimingEnabled) {
-            int frame_id = pkt->frame_id;
-            if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id] = rdtsc();
-                prev_frame_id = frame_id;
-            }
-        }
+        // rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
@@ -116,37 +110,52 @@ void* MacPacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* MacPacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
+struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    char* rx_buffer = (*buffer_)[tid];
-    int* rx_buffer_status = (*buffer_status_)[tid];
-    int packet_length = cfg->packet_length;
+    char* rx_buffer = rx_buffer_[tid];
+    // int* dl_bits_buffer_status = *dl_bits_buffer_status_;
+    int packet_length = kUseLDPC
+        ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
+        : cfg->OFDM_DATA_NUM;
 
-    // if rx_buffer is full, exit
-    if (rx_buffer_status[rx_offset] == 1) {
-        printf(
-            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-        cfg->running = false;
-        return (NULL);
-    }
-    struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
-    if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
+    struct MacPacket* pkt = (struct MacPacket*)rx_buffer;
+    // int ret = recv(socket_[radio_id], (char*)pkt, packet_length, 0);
+    socklen_t addrlen = sizeof(servaddr_[radio_id]);
+    int ret = recvfrom(socket_[radio_id], (char*)pkt, packet_length, 0,
+        (struct sockaddr*)&servaddr_[radio_id], &addrlen);
+    if (ret == -1) {
         if (errno != EAGAIN && cfg->running) {
             perror("recv failed");
             exit(0);
         }
         return (NULL);
     }
+    printf("received data %d\n", ret);
+    printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
+    printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
 
-    // get the position in rx_buffer
-    // move ptr & set status to full
-    rx_buffer_status[rx_offset]
-        = 1; // has data, after it is read, it is set to 0
+    size_t total_symbol_idx
+        = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
+    int rx_offset
+        = total_symbol_idx * (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
+    if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
+        printf("MAC Receive thread %d dl_bits_buffer full, offset: %d\n", tid,
+            rx_offset);
+        cfg->running = false;
+        return (NULL);
+    } else {
+        for (int i = 0; i < (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
+             i++)
+            (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
+        memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
+                                  [pkt->ue_id * cfg->OFDM_DATA_NUM],
+            pkt->data, packet_length);
+    }
 
     // Push kPacketRX event into the queue.
-    Event_data rx_message(
-        EventType::kPacketFromMac, rx_tag_t(tid, rx_offset)._tag);
+    Event_data rx_message(EventType::kPacketFromMac,
+        gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)._tag);
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
         printf("socket message enqueue failed\n");
         exit(0);
@@ -156,42 +165,44 @@ struct Packet* MacPacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
 int MacPacketTXRX::dequeue_send(int tid)
 {
-    auto& c = cfg;
     Event_data event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
+    // printf("mac queue length: %zu\n", task_queue_->size_approx());
+    assert(event.event_type == EventType::kPacketToMac);
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type == EventType::kPacketTX);
-
-    size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+    size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+    size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
 
-    size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
-                        * c->BS_ANT_NUM)
-        + ue_id;
+    int packet_length = kUseLDPC
+        ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
+        : cfg->OFDM_DATA_NUM;
 
-    if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ue %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, data_symbol_idx, ue_id,
-            gen_tag_t(event.tags[0])._tag, offset,
-            message_queue_->size_approx());
-    }
-
-    size_t socket_symbol_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-              * c->BS_ANT_NUM);
-    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
-    auto* pkt = (Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ue_id);
+    size_t total_symbol_idx
+        = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_id);
+    uint8_t* ul_data_ptr
+        = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * cfg->OFDM_DATA_NUM];
+    auto* pkt = (MacPacket*)ul_data_ptr;
+    new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = symbol_id;
+    pkt->ue_id = ue_id;
+    memcpy(pkt->data, ul_data_ptr, packet_length);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ue_id % cfg->socket_thread_num],
-        cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-        sizeof(servaddr_[tid]));
+    ssize_t ret
+        = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, packet_length, 0,
+            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
+
+    if (kDebugPrintInTask) {
+        printf("In MAC TX thread %d: Transmitted frame %zu, symbol %zu, "
+               "ue %zu, tag %s, msg_queue_length: %zu\n",
+            tid, frame_id, symbol_id, ue_id,
+            gen_tag_t(event.tags[0]).to_string().c_str(),
+            message_queue_->size_approx());
+    }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketToMac, event.tags[0])),

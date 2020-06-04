@@ -231,6 +231,31 @@ struct Packet {
     }
 };
 
+// TODO: merge Packet and MacPacket into one struct
+struct MacPacket {
+    uint32_t frame_id;
+    uint32_t symbol_id;
+    uint32_t cell_id;
+    uint32_t ue_id;
+    uint32_t fill[12]; // Padding for 64-byte alignment needed for SIMD
+    short data[]; // Elements sent by antennae are two bytes (I/Q samples)
+    MacPacket(int f, int s, int c, int a) // TODO: Should be unsigned integers
+        : frame_id(f)
+        , symbol_id(s)
+        , cell_id(c)
+        , ue_id(a)
+    {
+    }
+
+    std::string to_string()
+    {
+        std::ostringstream ret;
+        ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
+            << ", cell ID " << cell_id << ", user ID " << ue_id << "]";
+        return ret.str();
+    }
+};
+
 class RxCounters {
 public:
     // num_pkt[i] is the total number of packets we've received for frame i

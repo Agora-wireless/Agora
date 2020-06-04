@@ -36,21 +36,22 @@ Millipede::Millipede(Config* cfg)
         initialize_downlink_buffers();
     }
 
-    stats = new Stats(config_, kMaxStatBreakdown, cfg->worker_thread_num,
+    stats = new Stats(cfg, kMaxStatBreakdown, cfg->worker_thread_num,
         cfg->fft_thread_num, cfg->zf_thread_num, cfg->demul_thread_num,
         freq_ghz);
 
     /* Initialize TXRX threads */
-    receiver_.reset(
-        new PacketTXRX(config_, cfg->core_offset + 1, &message_queue_,
-            get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
+    receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
+        get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
 
     if (kEnableMac) {
         /* Initialize TXRX threads for communication with MAC layer*/
-        mac_receiver_.reset(new MacPacketTXRX(config_,
-            cfg->core_offset + cfg->socket_thread_num + cfg->worker_thread_num,
+        mac_receiver_.reset(new MacPacketTXRX(cfg,
+            cfg->core_offset + cfg->socket_thread_num + cfg->worker_thread_num
+                + 1,
             &message_queue_, get_conq(EventType::kPacketToMac),
-            rx_ptoks_mac_ptr, tx_ptoks_mac_ptr));
+            rx_ptoks_ptr + cfg->socket_thread_num,
+            tx_ptoks_ptr + cfg->socket_thread_num));
     }
 
     /* Create worker threads */
@@ -148,7 +149,7 @@ void Millipede::schedule_codeblocks(
          i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
         try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
             Event_data(event_type, base_tag._tag));
-        base_tag.ue_id++;
+        base_tag.cb_id++;
     }
 }
 
@@ -159,9 +160,11 @@ void Millipede::schedule_users(
     auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
 
     for (size_t i = 0; i < config_->UE_NUM; i++) {
-        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        try_enqueue_fallback(get_conq(event_type),
+            tx_ptoks_ptr[config_->socket_thread_num
+                + i % config_->mac_socket_thread_num],
             Event_data(event_type, base_tag._tag));
-        base_tag.cb_id++;
+        base_tag.ue_id++;
     }
 }
 
@@ -179,9 +182,9 @@ void Millipede::start()
 
     if (kEnableMac) {
         /* start mac txrx receiver */
-        if (!mac_receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
-                socket_buffer_status_size_, stats->frame_start,
-                dl_socket_buffer_)) {
+        if (!mac_receiver_->startTXRX(dl_bits_buffer_, dl_bits_buffer_status_,
+                socket_buffer_status_size_,
+                kUseLDPC ? decoded_buffer_ : demod_hard_buffer_)) {
             this->stop();
             return;
         }
@@ -199,22 +202,23 @@ void Millipede::start()
     double tx_begin = get_time_us();
 
     bool is_turn_to_dequeue_from_io = true;
-    const size_t max_events_needed
-        = std::max(kDequeueBulkSizeWorker * cfg->socket_thread_num,
-            kDequeueBulkSizeTXRX * cfg->worker_thread_num);
+    const size_t max_events_needed = std::max(kDequeueBulkSizeWorker
+            * (cfg->socket_thread_num + cfg->mac_socket_thread_num),
+        kDequeueBulkSizeTXRX * cfg->worker_thread_num);
     Event_data events_list[max_events_needed];
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* Get a batch of events */
         size_t num_events = 0;
         if (is_turn_to_dequeue_from_io) {
-            for (size_t i = 0; i < config_->socket_thread_num; i++) {
+            for (size_t i = 0;
+                 i < cfg->socket_thread_num + cfg->mac_socket_thread_num; i++) {
                 num_events += message_queue_.try_dequeue_bulk_from_producer(
                     *(rx_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeTXRX);
             }
         } else {
-            for (size_t i = 0; i < config_->worker_thread_num; i++) {
+            for (size_t i = 0; i < cfg->worker_thread_num; i++) {
                 num_events
                     += complete_task_queue_.try_dequeue_bulk_from_producer(
                         *(worker_ptoks_ptr[i]), events_list + num_events,
@@ -1025,17 +1029,19 @@ void Millipede::initialize_queues()
         s.ptok = new moodycamel::ProducerToken(s.concurrent_q);
     }
 
-    for (size_t i = 0; i < config_->socket_thread_num; i++) {
+    for (size_t i = 0;
+         i < config_->socket_thread_num + config_->mac_socket_thread_num; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
-        tx_ptoks_ptr[i]
-            = new moodycamel::ProducerToken(*get_conq(EventType::kPacketTX));
+        tx_ptoks_ptr[i] = new moodycamel::ProducerToken(*get_conq(
+            i < config_->socket_thread_num ? EventType::kPacketTX
+                                           : EventType::kPacketToMac));
     }
 
-    for (size_t i = 0; i < config_->mac_socket_thread_num; i++) {
-        rx_ptoks_mac_ptr[i] = new moodycamel::ProducerToken(message_queue_);
-        tx_ptoks_mac_ptr[i]
-            = new moodycamel::ProducerToken(*get_conq(EventType::kPacketToMac));
-    }
+    // for (size_t i = 0; i < config_->mac_socket_thread_num; i++) {
+    //     rx_ptoks_mac_ptr[i] = new moodycamel::ProducerToken(message_queue_);
+    //     tx_ptoks_mac_ptr[i]
+    //         = new moodycamel::ProducerToken(*get_conq(EventType::kPacketToMac));
+    // }
 
     for (size_t i = 0; i < config_->worker_thread_num; i++)
         worker_ptoks_ptr[i]
@@ -1125,6 +1131,13 @@ void Millipede::initialize_downlink_buffers()
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size, 64, 1);
 
+    dl_bits_buffer_.calloc(
+        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    size_t dl_bits_buffer_status_size = task_buffer_symbol_num * kUseLDPC
+        ? cfg->LDPC_config.nblocksInSymbol
+        : 1;
+    dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
+
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
     dl_precoder_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
@@ -1135,6 +1148,7 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(
         task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
     encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
