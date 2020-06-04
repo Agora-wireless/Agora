@@ -94,19 +94,19 @@ void check_correctness_ul(Config* cfg)
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         if (i < UL_PILOT_SYMS)
             continue;
-#ifdef USE_LDPC
+        // #ifdef USE_LDPC
         for (int ue = 0; ue < UE_NUM; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
                 total_count++;
                 int offset_in_raw = num_bytes_per_ue * ue + j;
                 int offset_in_output = num_bytes_per_ue * ue + j;
-#else
-        for (int j = 0; j < num_bytes_per_ue; j++) {
-            for (int ue = 0; ue < UE_NUM; ue++) {
-                total_count++;
-                int offset_in_raw = num_bytes_per_ue * ue + j;
-                int offset_in_output = UE_NUM * j + ue;
-#endif
+                // #else
+                //         for (int j = 0; j < num_bytes_per_ue; j++) {
+                //             for (int ue = 0; ue < UE_NUM; ue++) {
+                //                 total_count++;
+                //                 int offset_in_raw = num_bytes_per_ue * ue + j;
+                //                 int offset_in_output = UE_NUM * j + ue;
+                // #endif
                 // if (i == 0)
                 //     printf("(%d, %u, %u) ", j, raw_data[i][offset_in_raw],
                 //     output_data[i][offset_in_output]);
