@@ -6,19 +6,17 @@
 
 #include "txrx.hpp"
 
-static constexpr bool kDebugDPDK = false;
+static constexpr bool kDebugDPDK = true;
 
-PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
+    : cfg(cfg)
+    , core_offset(core_offset)
+    , socket_thread_num(cfg->socket_thread_num)
 {
-    config_ = cfg;
-    comm_thread_num_ = COMM_THREAD_NUM;
 
-    core_id_ = in_core_offset - 1;
-    // tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
+    std::string core_list = std::to_string(core_offset) + "-"
+        + std::to_string(core_offset + socket_thread_num);
 
-    std::string core_list = std::to_string(core_id_) + "-"
-        + std::to_string(core_id_ + comm_thread_num_);
-    std::string num_cores = std::to_string(comm_thread_num_ + 1);
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
         = { "txrx", "-l", core_list.c_str(), "-w", "0000:84:00.1", NULL };
@@ -44,16 +42,11 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
 
     rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
-    uint16_t portid;
-    RTE_ETH_FOREACH_DEV(portid)
+    uint16_t portid = 0;
+    // RTE_ETH_FOREACH_DEV(portid)
 
-    if (DpdkTransport::nic_init(portid, mbuf_pool, comm_thread_num_) != 0)
+    if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
-
-    unsigned int nb_lcores = rte_lcore_count();
-    uint16_t mtu_size = 0;
-    rte_eth_dev_get_mtu(0, &mtu_size);
-    printf("Number of DPDK cores: %d, MTU: %d\n", nb_lcores, mtu_size);
 
     src_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 4));
     dst_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 3));
@@ -61,70 +54,55 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     struct rte_flow_error error;
     struct rte_flow* flow;
     /* create flow for send packet with */
-    for (int i = 0; i < comm_thread_num_; i++) {
-        printf("%d\n", i);
-        uint16_t src_port = rte_cpu_to_be_16(config_->ue_tx_port + i);
-        uint16_t dst_port = rte_cpu_to_be_16(config_->bs_port + i);
+    for (size_t i = 0; i < socket_thread_num; i++) {
+        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
+        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, src_addr, FULL_MASK,
             dst_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
-        printf("Add rule for src port: %d, dst port: %d, queue: %d\n", src_port,
-            dst_port, i);
+        printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
+            src_port, dst_port, i);
         if (!flow)
             rte_exit(
                 EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
     }
-    printf("here\n");
+
+    printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
-PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
-    moodycamel::ProducerToken** in_rx_ptoks,
-    moodycamel::ProducerToken** in_tx_ptoks)
-    : PacketTXRX(cfg, COMM_THREAD_NUM, in_core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
+    moodycamel::ConcurrentQueue<Event_data>* queue_message,
+    moodycamel::ConcurrentQueue<Event_data>* queue_task,
+    moodycamel::ProducerToken** rx_ptoks, moodycamel::ProducerToken** tx_ptoks)
+    : PacketTXRX(cfg, core_offset)
 {
-    message_queue_ = in_queue_message;
-    task_queue_ = in_queue_task;
-    rx_ptoks_ = in_rx_ptoks;
-    tx_ptoks_ = in_tx_ptoks;
+    message_queue_ = queue_message;
+    task_queue_ = queue_task;
+    rx_ptoks_ = rx_ptoks;
+    tx_ptoks_ = tx_ptoks;
 }
 
 PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
 
-bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
-    int in_buffer_frame_num, long long in_buffer_length,
-    Table<size_t>& in_frame_start, char* in_tx_buffer, int* in_tx_buffer_status,
-    int in_tx_buffer_frame_num, int in_tx_buffer_length)
+bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
+    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
 {
 
-    buffer_ = &in_buffer; // for save data
-    buffer_status_ = &in_buffer_status; // for save status
-    frame_start_ = &in_frame_start;
+    buffer_ = &buffer;
+    buffer_status_ = &buffer_status;
+    frame_start_ = &frame_start;
 
-    // check length
-    buffer_frame_num_ = in_buffer_frame_num;
-    // assert(in_buffer_length == packet_length * buffer_frame_num_); // should
-    // be integer
-    buffer_length_ = in_buffer_length;
-    tx_buffer_ = in_tx_buffer; // for save data
-    tx_buffer_status_ = in_tx_buffer_status; // for save status
-    tx_buffer_frame_num_ = in_tx_buffer_frame_num;
-    // assert(in_tx_buffer_length == packet_length * buffer_frame_num_); //
-    // should be integer
-    tx_buffer_length_ = in_tx_buffer_length;
+    packet_num_in_buffer_ = packet_num_in_buffer;
+    tx_buffer_ = tx_buffer;
 
-    // if (config_->dl_data_symbol_num_perframe == 0) {
-    printf("create RX threads\n");
+    printf("create TXRX threads\n");
 
-    unsigned int nb_lcores = rte_lcore_count();
-    printf("Number of DPDK cores: %d\n", nb_lcores);
     unsigned int lcore_id;
-    int worker_id = 0;
+    size_t worker_id = 0;
     // Launch specific task to cores
     RTE_LCORE_FOREACH_SLAVE(lcore_id)
     {
         // launch communication and task thread onto specific core
-        if (worker_id < comm_thread_num_) {
+        if (worker_id < socket_thread_num) {
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
@@ -132,7 +110,7 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>,
                 context, lcore_id);
-            printf("DPDK TXRX thread %d: pinned to core %d\n", worker_id,
+            printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
                 lcore_id);
         }
         worker_id++;
@@ -142,10 +120,10 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 
 void* PacketTXRX::loopTXRX(int tid)
 {
-    int rx_offset = 0;
+    size_t rx_offset = 0;
     int prev_frame_id = -1;
 
-    while (config_->running) {
+    while (cfg->running) {
         if (-1 != dequeue_send(tid))
             continue;
         uint16_t nb_rx = dpdk_recv_enqueue(tid, prev_frame_id, rx_offset);
@@ -156,7 +134,7 @@ void* PacketTXRX::loopTXRX(int tid)
 }
 
 uint16_t PacketTXRX::dpdk_recv_enqueue(
-    int tid, int& prev_frame_id, int& rx_offset)
+    int tid, int& prev_frame_id, size_t& rx_offset)
 {
     char* rx_buffer = (*buffer_)[tid];
     int* rx_buffer_status = (*buffer_status_)[tid];
@@ -171,9 +149,9 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
     for (int i = 0; i < nb_rx; i++) {
         // if buffer is full, exit
         if (rx_buffer_status[rx_offset] == 1) {
-            printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
+            printf("Receive thread %d rx_buffer full, offset: %zu\n", tid,
                 rx_offset);
-            config_->running = false;
+            cfg->running = false;
             return 0;
         }
 
@@ -189,8 +167,9 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
                 + sizeof(struct rte_ipv4_hdr));
             DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
                 udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
-            printf(
-                "Header type: %d, IPV4: %d\n", eth_type, RTE_ETHER_TYPE_IPV4);
+            printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
+                dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
+                RTE_ETHER_TYPE_IPV4);
             printf("UDP: %d, %d\n", ip_h->next_proto_id, IPPROTO_UDP);
         }
 
@@ -214,8 +193,8 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
         char* payload = (char*)eth_hdr + kPayloadOffset;
 
         struct Packet* pkt
-            = (struct Packet*)&rx_buffer[rx_offset * config_->packet_length];
-        DpdkTransport::fastMemcpy((char*)pkt, payload, config_->packet_length);
+            = (struct Packet*)&rx_buffer[rx_offset * cfg->packet_length];
+        DpdkTransport::fastMemcpy((char*)pkt, payload, cfg->packet_length);
         // rte_memcpy((char*)pkt, payload, c->packet_length);
         rte_pktmbuf_free(rx_bufs[i]);
 
@@ -241,7 +220,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
             exit(0);
         }
 
-        rx_offset = (rx_offset + 1) % buffer_frame_num_;
+        rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
     }
     return nb_rx;
 }
@@ -249,7 +228,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
 // TODO: check correctness of this funcion
 int PacketTXRX::dequeue_send(int tid)
 {
-    auto& c = config_;
+    auto& c = cfg;
     Event_data event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
@@ -290,14 +269,17 @@ int PacketTXRX::dequeue_send(int tid)
         = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
     ip_h->src_addr = dst_addr;
     ip_h->dst_addr = src_addr;
+    ip_h->next_proto_id = IPPROTO_UDP;
 
     struct rte_udp_hdr* udp_h
         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-    udp_h->src_port = rte_cpu_to_be_16(config_->bs_port + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(config_->ue_rx_port + tid);
+    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+    udp_h->dst_port = rte_cpu_to_be_16(cfg->ue_rx_port + tid);
 
+    tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
+    tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
     char* payload = (char*)eth_hdr + kPayloadOffset;
-    DpdkTransport::fastMemcpy(payload, (char*)pkt, config_->packet_length);
+    DpdkTransport::fastMemcpy(payload, (char*)pkt, cfg->packet_length);
 
     // Send data (one OFDM symbol)
     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);

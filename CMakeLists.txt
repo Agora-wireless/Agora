@@ -47,19 +47,21 @@ add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
+set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 
-message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
+message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
 # DPDK
 if(${USE_DPDK})
-  message(STATUS "DPDK is enabled")
+  message(STATUS "DPDK is enabled for Millipede")
 
   find_library(DPDK_LIB dpdk)
   message(STATUS "DPDK_LIB: ${DPDK_LIB}")
@@ -68,10 +70,11 @@ if(${USE_DPDK})
   endif()
 
   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
-  add_definitions(-DUSE_DPDK)
+
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
+
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
   # from the real DPDK include directory (/usr/include/dpdk/).
@@ -82,9 +85,34 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
   include_directories(${DPDK_INCLUDE_DIR})
+
+  add_definitions(-DUSE_DPDK)
+  if (${USE_DPDK_SENDER})
+    message(STATUS "DPDK is enabled for sender")
+    add_definitions(-DUSE_DPDK_SENDER)
+    set(SENDER_TXRX_SOURCES 
+      simulator/sender_dpdk.cpp
+      src/common/dpdk_transport.cpp)
+  endif()
 else()
+  set(USE_DPDK_SENDER False)
   message(STATUS "DPDK is disabled")
 endif()
+
+if (NOT ${USE_DPDK_SENDER})
+  message(STATUS "DPDK is disabled for sender")
+  set(USE_DPDK_SENDER False)
+  set(SENDER_TXRX_SOURCES simulator/sender.cpp)
+endif()
+
+message(STATUS "USE_DPDK: ${USE_DPDK}")
+message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
+
+
+if(${ENABLE_MAC})
+  add_definitions(-DENABLE_MAC)
+endif()
+set(MAC_TX_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
 if(${USE_ARGOS})
@@ -203,19 +231,19 @@ foreach(dir ${dirs})
 endforeach()
 
 set(SOURCES
-  src/millipede/main.cpp 
   ${MILLIPEDE_SOURCES}
   ${TXRX_SOURCES}
+  ${MAC_TX_SOURCES}
   ${COMMON_SOURCES}
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
 			
-add_executable(millipede ${SOURCES} ${HEADER_FILES})
+add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 
-add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES} ${LDPC_SOURCES} ${HEADER_FILES})
+add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_executable(data_generator 
@@ -245,11 +273,11 @@ if(${USE_ARGOS})
 else()
   set(SENDER_SOURCES
     simulator/sender_cli.cpp
-    simulator/sender.cpp 
-    ${COMMON_SOURCES})
+    ${COMMON_SOURCES}
+    ${SENDER_TXRX_SOURCES})
 
   add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender ${MKL_LIBS})
+  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES})
 
   set(SIMULATOR_SOURCES
     simulator/main.cpp

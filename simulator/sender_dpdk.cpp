@@ -71,24 +71,44 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
             thread_num, thread_num + 1);
 
-    for (size_t i = 0; i < socket_num; i++) {
-        if (kUseIPv4) {
-            socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
-            setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->bs_port + i, cfg->rx_addr.c_str());
-        } else {
-            socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
-            setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
-                "fe80::f436:d735:b04a:864a");
-        }
+    // DPDK setup
+    std::string core_list = std::to_string(core_offset) + "-"
+        + std::to_string(core_offset + thread_num);
+    // n: channels, m: maximum memory in megabytes
+    const char* rte_argv[]
+        = { "txrx", "-l", core_list.c_str(), "-w", "0000:84:00.1", NULL };
+    int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
-        if (!kUseDPDK && kConnectUDP) {
-            int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
-                sizeof(servaddr_ipv4[i]));
-            rt_assert(ret == 0, "UDP socket connect failed");
-            printf("UDP socket %zu connected\n", i);
-        }
+    printf("rte_eal_init argv: ");
+    for (int i = 0; i < rte_argc; i++) {
+        printf("%s, ", rte_argv[i]);
     }
+    printf("\n");
+
+    // Initialize DPDK environment
+    int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
+    rt_assert(ret >= 0, "Failed to initialize DPDK");
+
+    unsigned int nb_ports = rte_eth_dev_count_avail();
+    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
+
+    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+        MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
+
+    rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+
+    uint16_t portid = 0;
+    // RTE_ETH_FOREACH_DEV(portid)
+
+    if (DpdkTransport::nic_init(portid, mbuf_pool, thread_num) != 0)
+        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+
+    src_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 4));
+    dst_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 3));
+
+    printf("Number of DPDK cores: %d\n", rte_lcore_count());
+
     num_threads_ready_atomic = 0;
 }
 
@@ -108,9 +128,11 @@ void Sender::startTX()
     frame_end = new double[kNumStatsFrames]();
 
     // Create worker threads
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
+    create_dpdk_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>);
     master_thread(0); // Start the master thread
+    // // Start a thread to update data buffer
+    // create_threads(
+    //     pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
 }
 
 void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
@@ -119,8 +141,7 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_end = in_frame_end;
 
     // Create worker threads
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
+    create_dpdk_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>);
 }
 
 void* Sender::master_thread(int tid)
@@ -136,20 +157,20 @@ void* Sender::master_thread(int tid)
 
     const size_t max_symbol_id = get_max_symbol_id();
     // Load data of the first frame
-    // Schedule one task for all antennas to avoid queue overflow
     for (size_t i = 0; i < max_symbol_id; i++) {
-        auto req_tag = gen_tag_t::frm_sym(0, i);
-        data_update_queue_.try_enqueue(req_tag._tag);
-        // update_tx_buffer(req_tag);
-    }
-
-    // add some delay to ensure data update is finished
-    sleep(1);
-    // Push tasks of the first symbol into task queue
-    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-        auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
-        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], req_tag._tag),
-            "Send task enqueue failed");
+        for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+            auto req_tag = gen_tag_t::frm_sym_ant(0, i, j);
+            data_update_queue_.try_enqueue(req_tag._tag);
+            // update_tx_buffer(req_tag);
+            // Push tasks of the first symbol into task queue
+            if (i == 0) {
+                // add some delay to ensure data update is finished
+                usleep(100);
+                rt_assert(send_queue_.enqueue(
+                              *task_ptok[j % thread_num], req_tag._tag),
+                    "Send task enqueue failed");
+            }
+        }
     }
 
     frame_start[0] = get_time();
@@ -203,13 +224,14 @@ void* Sender::master_thread(int tid)
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
+                auto req_tag_for_data = gen_tag_t::frm_sym_ant(
+                    ctag.frame_id + 1, ctag.symbol_id, i);
+                data_update_queue_.try_enqueue(req_tag_for_data._tag);
+                // update_tx_buffer(req_tag);
                 rt_assert(send_queue_.enqueue(
                               *task_ptok[i % thread_num], req_tag._tag),
                     "Send task enqueue failed");
             }
-            auto req_tag_for_data
-                = gen_tag_t::frm_sym(ctag.frame_id + 1, ctag.symbol_id);
-            data_update_queue_.try_enqueue(req_tag_for_data._tag);
         }
     }
     write_stats_to_file(cfg->frames_to_test);
@@ -226,18 +248,13 @@ void* Sender::data_update_thread(int tid)
         size_t tag = 0;
         if (!data_update_queue_.try_dequeue(tag))
             continue;
-        for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-            auto tag_for_ant = gen_tag_t::frm_sym_ant(
-                ((gen_tag_t)tag).frame_id, ((gen_tag_t)tag).symbol_id, i);
-            update_tx_buffer(tag_for_ant);
-        }
+        update_tx_buffer(tag);
     }
 }
 
 void Sender::update_tx_buffer(gen_tag_t tag)
 {
-    auto* pkt
-        = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)] + kTXBufOffset);
+    auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
     pkt->frame_id = tag.frame_id;
     pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
     pkt->cell_id = 0;
@@ -250,15 +267,13 @@ void Sender::update_tx_buffer(gen_tag_t tag)
 
 void* Sender::worker_thread(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
-
     // Wait for all Sender threads (including master) to start runnung
     num_threads_ready_atomic++;
     while (num_threads_ready_atomic != thread_num + 1) {
         // Wait
     }
 
-    const size_t buffer_length = kTXBufOffset + cfg->packet_length;
+    const size_t buffer_length = cfg->packet_length;
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
@@ -271,27 +286,43 @@ void* Sender::worker_thread(int tid)
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     int radio_id = radio_lo;
     while (true) {
-        size_t tag;
+        size_t tag = 0;
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag))
             continue;
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
+
+        struct rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
+        tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+
+        struct rte_ether_hdr* eth_hdr
+            = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+        eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+
+        struct rte_ipv4_hdr* ip_h = (struct rte_ipv4_hdr*)((char*)eth_hdr
+            + sizeof(struct rte_ether_hdr));
+        ip_h->src_addr = src_addr;
+        ip_h->dst_addr = dst_addr;
+        ip_h->next_proto_id = IPPROTO_UDP;
+
+        struct rte_udp_hdr* udp_h
+            = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
+        udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
+        udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+
+        tx_bufs[0]->pkt_len = buffer_length + kPayloadOffset;
+        tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
+        char* payload = (char*)eth_hdr + kPayloadOffset;
+        // DpdkTransport::fastMemcpy(
+        //     payload, tx_buffers_[tx_bufs_idx], buffer_length);
+        rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+
         // Send a message to the server. We assume that the server is running.
-        if (kUseDPDK or !kConnectUDP) {
-            int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
-                buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
-                sizeof(servaddr_ipv4[tid]));
-            rt_assert(ret >= 0, "Worker: sendto() failed");
-        } else {
-            int ret = send(
-                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
-            if (ret < 0) {
-                fprintf(stderr,
-                    "send() failed. Error = %s. Is a server running at %s?\n",
-                    strerror(errno), cfg->rx_addr.c_str());
-                exit(-1);
-            }
+        size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+        if (unlikely(nb_tx_new != 1)) {
+            printf("rte_eth_tx_burst() failed\n");
+            exit(0);
         }
 
         if (kDebugSenderReceiver) {
@@ -301,6 +332,13 @@ void* Sender::worker_thread(int tid)
                 tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
                 pkt->symbol_id, pkt->ant_id, tx_bufs_idx,
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
+
+            DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
+                udp_h->src_port, udp_h->dst_port, tx_bufs[0]->data_len, tid);
+            // printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
+            //     tx_bufs[0]->pkt_len, tx_bufs[0]->nb_segs,
+            //     rte_be_to_cpu_16(eth_hdr->ether_type), RTE_ETHER_TYPE_IPV4);
+            // printf("UDP: %d, %d\n", ip_h->next_proto_id, IPPROTO_UDP);
         }
 
         rt_assert(completion_queue_.enqueue(tag), "Completion enqueue failed");
@@ -397,6 +435,26 @@ void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
         } else {
             delay_ticks(tick_start, cfg->data_symbol_num_perframe * ticks_all);
         }
+    }
+}
+
+void Sender::create_dpdk_threads(void* (*worker)(void*))
+{
+    size_t lcore_id;
+    size_t worker_id = 0;
+    // Launch specific task to cores
+    RTE_LCORE_FOREACH_SLAVE(lcore_id)
+    {
+        // launch communication and task thread onto specific core
+        if (worker_id < thread_num) {
+            auto context = new EventHandlerContext<Sender>;
+            context->obj_ptr = this;
+            context->id = worker_id;
+            rte_eal_remote_launch((lcore_function_t*)worker, context, lcore_id);
+            printf("DPDK TXRX thread %zu: pinned to core %zu\n", worker_id,
+                lcore_id);
+        }
+        worker_id++;
     }
 }
 

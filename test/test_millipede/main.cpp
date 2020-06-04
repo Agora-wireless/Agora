@@ -56,7 +56,6 @@ void read_from_file_dl(
 
 void check_correctness_ul(Config* cfg)
 {
-    int BS_ANT_NUM = cfg->BS_ANT_NUM;
     int UE_NUM = cfg->UE_NUM;
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
@@ -65,11 +64,11 @@ void check_correctness_ul(Config* cfg)
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
     std::string raw_data_filename = cur_directory
-        + "/data/LDPC_orig_data_2048_ant" + std::to_string(BS_ANT_NUM) + ".bin";
+        + "/data/LDPC_orig_data_2048_ant" + std::to_string(UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 #else
     std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant"
-        + std::to_string(BS_ANT_NUM) + ".bin";
+        + std::to_string(UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/demul_data.bin";
 #endif
 
@@ -94,19 +93,19 @@ void check_correctness_ul(Config* cfg)
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         if (i < UL_PILOT_SYMS)
             continue;
-#ifdef USE_LDPC
+        // #ifdef USE_LDPC
         for (int ue = 0; ue < UE_NUM; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
                 total_count++;
                 int offset_in_raw = num_bytes_per_ue * ue + j;
                 int offset_in_output = num_bytes_per_ue * ue + j;
-#else
-        for (int j = 0; j < num_bytes_per_ue; j++) {
-            for (int ue = 0; ue < UE_NUM; ue++) {
-                total_count++;
-                int offset_in_raw = num_bytes_per_ue * ue + j;
-                int offset_in_output = UE_NUM * j + ue;
-#endif
+                // #else
+                //         for (int j = 0; j < num_bytes_per_ue; j++) {
+                //             for (int ue = 0; ue < UE_NUM; ue++) {
+                //                 total_count++;
+                //                 int offset_in_raw = num_bytes_per_ue * ue + j;
+                //                 int offset_in_output = UE_NUM * j + ue;
+                // #endif
                 // if (i == 0)
                 //     printf("(%d, %u, %u) ", j, raw_data[i][offset_in_raw],
                 //     output_data[i][offset_in_output]);

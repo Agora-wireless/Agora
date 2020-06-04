@@ -290,7 +290,7 @@ void Phy_UE::start()
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
                     if (kUseL2) {
-                        Event_data do_map_task(EventType::kMap,
+                        Event_data do_map_task(EventType::kPacketFromMac,
                             gen_tag_t::frm_sym_ant(frame_id, symbol_id,
                                 ant_id / config_->nChannels)
                                 ._tag);
@@ -332,7 +332,7 @@ void Phy_UE::start()
 
             } break;
 
-            case EventType::kMap: {
+            case EventType::kPacketFromMac: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
 
@@ -705,7 +705,7 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     }
     if (!rx)
         return;
-    Event_data bitmap_event(EventType::kMap, tag);
+    Event_data bitmap_event(EventType::kPacketFromMac, tag);
     if (!message_queue_.enqueue(*task_ptok[tid], bitmap_event)) {
         printf("Muliplexing message enqueue failed\n");
         exit(0);
