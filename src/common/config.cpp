@@ -62,9 +62,11 @@ Config::Config(std::string jsonfile)
 
     rx_addr = tddConf.value("rx_addr", "127.0.0.1");
     tx_addr = tddConf.value("tx_addr", "127.0.0.1");
+    tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
     bs_port = tddConf.value("bs_port", 8000);
     ue_rx_port = tddConf.value("ue_rx_port", 7000);
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
+    mac_rx_port = tddConf.value("mac_rx_port", 5000);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
@@ -175,6 +177,7 @@ Config::Config(std::string jsonfile)
     core_offset = tddConf.value("core_offset", 18);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
+    mac_socket_thread_num = tddConf.value("socket_thread_num", 1);
     fft_thread_num = tddConf.value("fft_thread_num", 4);
     demul_thread_num = tddConf.value("demul_thread_num", 11);
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
@@ -428,11 +431,14 @@ void Config::genData()
     }
 
     // Find normalization factor through searching for max value in IFFT results
-    float max_val = CommsLib::find_max_abs(ul_iq_ifft, ul_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
-    float cur_max_val = CommsLib::find_max_abs(dl_iq_ifft, dl_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
+    float max_val = CommsLib::find_max_abs(
+        ul_iq_ifft, ul_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
+    float cur_max_val = CommsLib::find_max_abs(
+        dl_iq_ifft, dl_data_symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM);
     if (cur_max_val > max_val)
         max_val = cur_max_val;
-    cur_max_val = CommsLib::find_max_abs(ue_pilot_ifft, UE_ANT_NUM, OFDM_CA_NUM);
+    cur_max_val
+        = CommsLib::find_max_abs(ue_pilot_ifft, UE_ANT_NUM, OFDM_CA_NUM);
     if (cur_max_val > max_val)
         max_val = cur_max_val;
     cur_max_val = CommsLib::find_max_abs(pilot_ifft, OFDM_CA_NUM);

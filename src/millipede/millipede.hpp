@@ -40,6 +40,7 @@
 #include "gettime.h"
 #include "reciprocity.hpp"
 #include "txrx.hpp"
+#include "txrx_mac.hpp"
 
 #ifdef USE_LDPC
 #include "docoding.hpp"
@@ -83,17 +84,19 @@ public:
 
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id);
-    void print_per_frame_done(size_t task_type, size_t frame_id);
+    void print_per_frame_done(PrintType print_type, size_t frame_id);
     void print_per_symbol_done(
-        size_t task_type, size_t frame_id, size_t symbol_id);
-    void print_per_task_done(size_t task_type, size_t frame_id,
+        PrintType print_type, size_t frame_id, size_t symbol_id);
+    void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
-    void schedule_users(EventType task_type, gen_tag_t base_tag);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_codeblocks(
+        EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -144,6 +147,7 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
+    std::unique_ptr<MacPacketTXRX> mac_receiver_;
     Stats* stats;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
@@ -221,6 +225,8 @@ private:
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
+    Data_stats tomac_stats_;
+    Data_stats frommac_stats_;
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
@@ -248,6 +254,16 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> dl_encoded_buffer_;
 
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
+    Table<int8_t> dl_bits_buffer_;
+
+    // 1st dimension: number of UEs
+    // 2nd dimension: number of OFDM data subcarriers * TASK_BUFFER_FRAME_NUM
+    //                * number of DL data symbols per frame
+    // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
+    Table<int> dl_bits_buffer_status_;
+
     /**
      * Data for transmission
      * First dimension of buffer (type: char): symbol_num_perframe *
@@ -258,8 +274,6 @@ private:
      */
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
-    long long dl_socket_buffer_size_;
-    int dl_socket_buffer_status_size_;
 
     struct sched_info_t {
         moodycamel::ConcurrentQueue<Event_data> concurrent_q;
@@ -275,6 +289,8 @@ private:
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+    // moodycamel::ProducerToken* rx_ptoks_mac_ptr[kMaxThreads];
+    // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 };
 

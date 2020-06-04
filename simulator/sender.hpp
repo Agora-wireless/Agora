@@ -36,6 +36,10 @@
 #include "net.hpp"
 #include "utils.h"
 
+#ifdef USE_DPDK_SENDER
+#include "dpdk_transport.hpp"
+#endif
+
 class Sender {
 public:
     static constexpr size_t kTXBufOffset = kUseDPDK ? 22 : 0;
@@ -43,7 +47,7 @@ public:
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
-        size_t delay = 0);
+        size_t delay = 0, bool create_thread_for_master = false);
     ~Sender();
 
     void startTX();
@@ -54,11 +58,15 @@ public:
 
 private:
     void* master_thread(int tid);
+    void* data_update_thread(int tid);
     void* worker_thread(int tid);
     void init_IQ_from_file();
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+#ifdef USE_DPDK_SENDER
+    void create_dpdk_threads(void* (*worker)(void*));
+#endif
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void update_tx_buffer(gen_tag_t tag);
@@ -99,6 +107,8 @@ private:
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ConcurrentQueue<size_t> completion_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
+    moodycamel::ConcurrentQueue<size_t> data_update_queue_
+        = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
@@ -112,6 +122,12 @@ private:
 
     double* frame_start;
     double* frame_end;
+
+#ifdef USE_DPDK_SENDER
+    uint32_t src_addr;
+    uint32_t dst_addr;
+    struct rte_mempool* mbuf_pool;
+#endif
 };
 
 #endif

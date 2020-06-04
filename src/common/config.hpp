@@ -112,6 +112,7 @@ public:
     size_t core_offset;
     size_t worker_thread_num;
     size_t socket_thread_num;
+    size_t mac_socket_thread_num;
     size_t fft_thread_num;
     size_t demul_thread_num;
     size_t zf_thread_num;
@@ -158,11 +159,18 @@ public:
     size_t data_bytes_num_perframe;
     size_t sym_packet_length;
 
+    // IP address at Millipde side
     std::string rx_addr;
+    // IP address at sender side
     std::string tx_addr;
+    std::string tx_addr_to_mac;
+    // Port ID at Millipede side
     int bs_port;
+    // Port IDs at sender side
     int ue_rx_port;
     int ue_tx_port;
+    // Port ID at MAC layer side
+    int mac_rx_port;
 
     // Number of frames sent by sender during testing = number of frames
     // processed by Millipede before exiting.
@@ -213,6 +221,14 @@ public:
         return ((frame_id % TASK_BUFFER_FRAME_NUM)
                    * ul_data_symbol_num_perframe)
             + symbol_idx_ul;
+    }
+
+    inline size_t get_total_data_symbol_idx_dl(
+        size_t frame_id, size_t symbol_idx_dl) const
+    {
+        return ((frame_id % TASK_BUFFER_FRAME_NUM)
+                   * dl_data_symbol_num_perframe)
+            + symbol_idx_dl;
     }
 
     /// Fetch the channel state information buffer for this frame and symbol ID.

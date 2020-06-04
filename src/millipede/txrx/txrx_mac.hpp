@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef PACKETTXRX
-#define PACKETTXRX
+#ifndef MACPACKETTXRX
+#define MACPACKETTXRX
 
 #include "Symbols.hpp"
 #include "buffer.hpp"
@@ -23,42 +23,29 @@
 #include <netinet/in.h>
 #include <numeric>
 #include <pthread.h>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 // #include <unistd.h>
+#include "config.hpp"
 #include <vector>
 
-#ifdef USE_ARGOS
-#include "radio_lib.hpp"
-#else
-#include "config.hpp"
-#endif
-
-#ifdef USE_DPDK
-#include "dpdk_transport.hpp"
-#endif
-
 typedef unsigned short ushort;
-class PacketTXRX {
+class MacPacketTXRX {
 public:
-    PacketTXRX(Config* cfg, size_t in_core_offset = 1);
+    MacPacketTXRX(Config* cfg, size_t core_offset = 1);
     /**
      * queue_message: message queue to communicate with main thread
      */
-    PacketTXRX(Config* cfg, size_t core_offset,
+    MacPacketTXRX(Config* cfg, size_t core_offset,
         moodycamel::ConcurrentQueue<Event_data>* queue_message,
-        moodycamel::ConcurrentQueue<Event_data>* queue_task,
-        moodycamel::ProducerToken** rx_ptoks,
-        moodycamel::ProducerToken** tx_ptoks);
-    ~PacketTXRX();
-
-#ifdef USE_DPDK
-    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, size_t& rx_offset);
-#endif
+        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+        moodycamel::ProducerToken** in_rx_ptoks,
+        moodycamel::ProducerToken** in_tx_ptoks);
+    ~MacPacketTXRX();
 
     /**
      * called in main threads to start the socket threads
@@ -69,25 +56,26 @@ public:
      * core_offset: attach socket threads to {core_offset, ..., core_offset +
      * socket_thread_num - 1}
      */
-    bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-        size_t packet_num_in_buffer, Table<size_t>& frame_start,
-        char* tx_buffer);
+    bool startTXRX(Table<int8_t>& dl_bits_buffer,
+        Table<int>& dl_bits_buffer_status, size_t packet_num_in_buffer,
+        Table<uint8_t>& ul_bits_buffer);
     /**
      * TXRX thread that runs a while loop to do both tx and rx
      */
     void* loopTXRX(int tid);
     int dequeue_send(int tid);
-    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    struct MacPacket* recv_enqueue(int tid, int radio_id);
 
 private:
     Config* cfg;
     const size_t core_offset;
-    const size_t socket_thread_num;
-    Table<char>* buffer_;
-    Table<int>* buffer_status_;
+    const size_t mac_thread_num;
+    Table<int8_t>* dl_bits_buffer_;
+    Table<int>* dl_bits_buffer_status_;
     size_t packet_num_in_buffer_;
-    char* tx_buffer_;
-    Table<size_t>* frame_start_;
+    Table<uint8_t>* ul_bits_buffer_;
+    Table<char> rx_buffer_;
+    Table<char> tx_buffer_;
     // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_;
@@ -103,16 +91,6 @@ private:
 
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-
-#ifdef USE_DPDK
-    uint32_t src_addr;
-    uint32_t dst_addr;
-    struct rte_mempool* mbuf_pool;
-#endif
-
-#ifdef USE_ARGOS
-    RadioConfig* radioconfig_;
-#endif
 };
 
 #endif
