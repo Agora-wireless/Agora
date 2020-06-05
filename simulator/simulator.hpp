@@ -62,7 +62,7 @@ public:
     void update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
         size_t symbol_id, size_t ant_id);
     void print_per_frame_done(
-        size_t task_type, size_t frame_id, size_t frame_id_in_buffer);
+        PrintType print_type, size_t frame_id, size_t frame_id_in_buffer);
 
     void initialize_vars_from_cfg(Config* cfg);
     void initialize_queues();

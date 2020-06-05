@@ -220,6 +220,14 @@ public:
             + symbol_idx_ul;
     }
 
+    inline size_t get_total_data_symbol_idx_dl(
+        size_t frame_id, size_t symbol_idx_dl) const
+    {
+        return ((frame_id % TASK_BUFFER_FRAME_NUM)
+                   * dl_data_symbol_num_perframe)
+            + symbol_idx_dl;
+    }
+
     /// Fetch the channel state information buffer for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
     inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,

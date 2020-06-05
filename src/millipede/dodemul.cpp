@@ -77,7 +77,7 @@ Event_data DoDemul::launch(size_t tag)
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-        size_t start_tsc1 = worker_rdtsc();
+        size_t start_tsc0 = worker_rdtsc();
 
         // Step 1: Populate spm_buffer as a row-major matrix with
         // kSCsPerCacheline rows and BS_ANT_NUM columns
@@ -118,11 +118,12 @@ Event_data DoDemul::launch(size_t tag)
                 }
             }
         }
-        duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
+        duration_stat->task_duration[1] += worker_rdtsc() - start_tsc0;
 
         // Step 2: For each subcarrier, perform equalization by multiplying the
         // subcarrier's data from each antenna with the subcarrier's precoder
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
+            // size_t start_tsc1 = worker_rdtsc();
             const size_t cur_sc_id = base_sc_id + i + j;
             const cx_fmat mat_data(
                 reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]),
@@ -146,6 +147,7 @@ Event_data DoDemul::launch(size_t tag)
             // Equalization
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
             size_t start_tsc2 = worker_rdtsc();
+            // duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
             mat_equaled = mat_precoder * mat_data;
 
             if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // calc new phase shift
@@ -210,53 +212,54 @@ Event_data DoDemul::launch(size_t tag)
             size_t start_tsc3 = worker_rdtsc();
             duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
 
-            if (!kUseLDPC) {
-                // Decode with hard decision
-                uint8_t* demul_ptr
-                    = (&demod_hard_buffer_[total_data_symbol_idx_ul]
-                                          [cur_sc_id * cfg->UE_NUM]);
-                demod_16qam_hard_avx2(
-                    (float*)equal_ptr, demul_ptr, cfg->UE_NUM);
-                // cout<< "Demuled data:";
-                // for (int ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++)
-                //     cout<<+*(demul_ptr+ue_idx)<<" ";
-                // cout<<endl;
-                // cout<<endl;
-            }
+            // if (!kUseLDPC) {
+            //     // Decode with hard decision
+            //     uint8_t* demul_ptr
+            //         = (&demod_hard_buffer_[total_data_symbol_idx_ul]
+            //                               [cur_sc_id * cfg->UE_NUM]);
+            //     demod_16qam_hard_avx2(
+            //         (float*)equal_ptr, demul_ptr, cfg->UE_NUM);
+            //     // cout<< "Demuled data:";
+            //     // for (int ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++)
+            //     //     cout<<+*(demul_ptr+ue_idx)<<" ";
+            //     // cout<<endl;
+            //     // cout<<endl;
+            //     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
+            // }
 
-            duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
             duration_stat->task_count++;
         }
     }
 
-    if (kUseLDPC) {
-        __m256i index2 = _mm256_setr_epi32(0, 1, cfg->UE_NUM * 2,
-            cfg->UE_NUM * 2 + 1, cfg->UE_NUM * 4, cfg->UE_NUM * 4 + 1,
-            cfg->UE_NUM * 6, cfg->UE_NUM * 6 + 1);
-        float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        for (size_t i = 0; i < cfg->UE_NUM; i++) {
-            float* equal_ptr = (float*)(equaled_buffer_temp + i);
+    // if (kUseLDPC) {
+    size_t start_tsc3 = worker_rdtsc();
+    __m256i index2 = _mm256_setr_epi32(0, 1, cfg->UE_NUM * 2,
+        cfg->UE_NUM * 2 + 1, cfg->UE_NUM * 4, cfg->UE_NUM * 4 + 1,
+        cfg->UE_NUM * 6, cfg->UE_NUM * 6 + 1);
+    float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
+    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        float* equal_ptr = (float*)(equaled_buffer_temp + i);
+        size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
+        for (size_t j = 0; j < max_sc_ite / kNumDoubleInSIMD256; j++) {
+            __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
+            _mm256_store_ps(equal_T_ptr, equal_T_temp);
+            equal_T_ptr += 8;
+            equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
+        }
+        equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
+        if (kUseLDPC) {
             int8_t* demul_ptr
                 = (&demod_soft_buffer_[total_data_symbol_idx_ul]
                                       [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                           * cfg->mod_type]);
-            size_t kNumDoubleInSIMD256
-                = sizeof(__m256) / sizeof(double); // == 4
-            for (size_t j = 0; j < max_sc_ite / kNumDoubleInSIMD256; j++) {
-                __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
-                _mm256_store_ps(equal_T_ptr, equal_T_temp);
-                equal_T_ptr += 8;
-                equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
-            }
-            int num_sc_avx2 = (max_sc_ite / 16) * 16;
-            int rest = max_sc_ite % 16;
-            demod_16qam_soft_avx2(
-                (equal_T_ptr - max_sc_ite * 2), demul_ptr, num_sc_avx2);
-            if (rest > 0)
-                demod_16qam_soft_sse(
-                    (equal_T_ptr - max_sc_ite * 2 + num_sc_avx2 * 2),
-                    demul_ptr + cfg->mod_type * num_sc_avx2, rest);
-            /*
+            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+        } else {
+            uint8_t* demul_ptr
+                = (&demod_hard_buffer_[total_data_symbol_idx_ul]
+                                      [cfg->OFDM_DATA_NUM * i + base_sc_id]);
+            demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+        }
+        /*
             printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
                 tid, frame_id, current_data_symbol_id, sc_id);
             cout << "Demuled data : \n ";
@@ -265,8 +268,9 @@ Event_data DoDemul::launch(size_t tag)
                 printf("%i ", demul_ptr[k]);
             cout << endl;
             */
-        }
     }
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
+    // }
 
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     // if (duration > 500)
