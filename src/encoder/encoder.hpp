@@ -70,8 +70,8 @@
 namespace avx2enc {
 static constexpr size_t I_LS_NUM = 8;
 
-// This encoder supports Zc up to 256 (= AVX2 register size in bits)
-static constexpr size_t ZC_MAX = 256;
+// This encoder supports Zc up to 255 (= AVX2 register size in bits - 1)
+static constexpr size_t ZC_MAX = 255;
 
 static constexpr size_t PROC_BYTES = 32;
 static constexpr size_t BG1_COL_TOTAL = 68;
