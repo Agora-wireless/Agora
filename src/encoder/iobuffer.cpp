@@ -6,6 +6,7 @@
 #include "iobuffer.hpp"
 #include "encoder.hpp"
 
+namespace avx2enc {
 void scatter_slow(
     uint8_t* dst, const uint8_t* src, unsigned num_bits, uint8_t src_offbits)
 {
@@ -204,3 +205,4 @@ LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize)
     else
         return adapter_288to384;
 }
+} // namespace avx2en
