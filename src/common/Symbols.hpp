@@ -129,6 +129,7 @@ static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugBSSender = false;
+static constexpr bool kDebugBSReceiver = true;
 
 #define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
