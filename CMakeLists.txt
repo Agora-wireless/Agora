@@ -111,8 +111,14 @@ message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
 
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
+  set(MAC_CLIENT_SOURCES
+	  src/mac/simple_mac_client.cpp
+	  src/mac/mac_client_main.cpp)
+  set(MAC_BS_SOURCES
+	  src/mac/simple_mac_bs.cpp
+	  src/mac/mac_bs_main.cpp)
 endif()
-set(MAC_TX_SOURCES src/millipede/txrx/txrx_mac.cpp)
+set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
 if(${USE_ARGOS})
@@ -233,7 +239,7 @@ endforeach()
 set(SOURCES
   ${MILLIPEDE_SOURCES}
   ${TXRX_SOURCES}
-  ${MAC_TX_SOURCES}
+  ${TXRX_MAC_SOURCES}
   ${COMMON_SOURCES}
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
@@ -265,11 +271,17 @@ if(${USE_ARGOS})
        ${ARGOS_SOURCES})
   target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
-  add_executable(macuser 
-       src/client/sender_main.cpp
-       src/client/mac_sender.cpp
+  if(${ENABLE_MAC})
+  add_executable(macuser
+       ${MAC_CLIENT_SOURCES}
        ${COMMON_SOURCES})
   target_link_libraries(macuser -larmadillo ${MKL_LIBS})
+
+  add_executable(macbs
+       ${MAC_BS_SOURCES}
+       ${COMMON_SOURCES})
+  target_link_libraries(macbs -larmadillo ${MKL_LIBS})
+  endif()
 else()
   set(SENDER_SOURCES
     simulator/sender_cli.cpp

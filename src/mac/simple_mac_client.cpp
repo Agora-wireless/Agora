@@ -3,12 +3,12 @@
  * Email: jianding17@gmail.com
  *
  */
-#include "mac_sender.hpp"
+#include "simple_mac_client.hpp"
 #include <thread>
 
 bool keep_running = true;
 
-// A spinning barrier to synchronize the start of MACSender threads
+// A spinning barrier to synchronize the start of SimpleClientMac threads
 std::atomic<size_t> num_threads_ready_atomic;
 
 void interrupt_handler(int)
@@ -23,13 +23,13 @@ void delay_ticks(uint64_t start, uint64_t ticks)
         _mm_pause();
 }
 
-inline size_t MACSender::tag_to_tx_buffers_index(gen_tag_t tag) const
+inline size_t SimpleClientMac::tag_to_tx_buffers_index(gen_tag_t tag) const
 {
     const size_t frame_slot = tag.frame_id % SOCKET_BUFFER_FRAME_NUM;
     return (frame_slot * cfg->UE_ANT_NUM) + tag.ant_id;
 }
 
-MACSender::MACSender(Config* cfg, size_t core_offset, size_t delay)
+SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -84,7 +84,7 @@ MACSender::MACSender(Config* cfg, size_t core_offset, size_t delay)
     num_threads_ready_atomic = 0;
 }
 
-MACSender::~MACSender()
+SimpleClientMac::~SimpleClientMac()
 {
     IQ_data_coded.free();
     IQ_data.free();
@@ -94,37 +94,41 @@ MACSender::~MACSender()
     }
 }
 
-void MACSender::startTX()
+void SimpleClientMac::startTX()
 {
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
 
     // Create worker threads
-    create_threads(pthread_fun_wrapper<MACSender, &MACSender::worker_thread>, 0,
-        thread_num);
+    create_threads(
+        pthread_fun_wrapper<SimpleClientMac, &SimpleClientMac::worker_thread>,
+        0, thread_num);
     master_thread(0); // Start the master thread
 }
 
-void MACSender::startTXfromMain(double* in_frame_start, double* in_frame_end)
+void SimpleClientMac::startTXfromMain(
+    double* in_frame_start, double* in_frame_end)
 {
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
     // Create worker threads
-    create_threads(pthread_fun_wrapper<MACSender, &MACSender::worker_thread>, 0,
-        thread_num);
+    create_threads(
+        pthread_fun_wrapper<SimpleClientMac, &SimpleClientMac::worker_thread>,
+        0, thread_num);
 
     // Create the master thread
-    create_threads(pthread_fun_wrapper<MACSender, &MACSender::master_thread>,
+    create_threads(
+        pthread_fun_wrapper<SimpleClientMac, &SimpleClientMac::master_thread>,
         thread_num, thread_num + 1);
 }
 
-void* MACSender::master_thread(int tid)
+void* SimpleClientMac::master_thread(int tid)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
 
-    // Wait for all MACSender threads (including master) to start runnung
+    // Wait for all SimpleClientMac threads (including master) to start runnung
     num_threads_ready_atomic++;
     while (num_threads_ready_atomic != thread_num + 1) {
         // Wait
@@ -186,7 +190,7 @@ void* MACSender::master_thread(int tid)
     exit(0);
 }
 
-void MACSender::update_tx_buffer(gen_tag_t tag)
+void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 {
     // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
     std::random_device r;
@@ -201,11 +205,11 @@ void MACSender::update_tx_buffer(gen_tag_t tag)
     memcpy(pkt, (char*)v.data(), cfg->data_bytes_num_perframe);
 }
 
-void* MACSender::worker_thread(int tid)
+void* SimpleClientMac::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
-    // Wait for all MACSender threads (including master) to start runnung
+    // Wait for all SimpleClientMac threads (including master) to start runnung
     num_threads_ready_atomic++;
     while (num_threads_ready_atomic != thread_num + 1) {
         // Wait
@@ -273,7 +277,7 @@ void* MACSender::worker_thread(int tid)
     }
 }
 
-size_t MACSender::get_max_symbol_id() const
+size_t SimpleClientMac::get_max_symbol_id() const
 {
     size_t max_symbol_id = cfg->downlink_mode
         ? cfg->ul_data_symbol_num_perframe
@@ -281,7 +285,7 @@ size_t MACSender::get_max_symbol_id() const
     return max_symbol_id;
 }
 
-void MACSender::init_data_from_file()
+void SimpleClientMac::init_data_from_file()
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
     IQ_data.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
@@ -320,7 +324,8 @@ void MACSender::init_data_from_file()
     fclose(fp);
 }
 
-void MACSender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
+void SimpleClientMac::delay_for_symbol(
+    size_t tx_frame_count, uint64_t tick_start)
 {
     if (tx_frame_count <= 5) {
         delay_ticks(tick_start, ticks_5);
@@ -335,7 +340,8 @@ void MACSender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
     }
 }
 
-void MACSender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
+void SimpleClientMac::delay_for_frame(
+    size_t tx_frame_count, uint64_t tick_start)
 {
     if (cfg->downlink_mode) {
         if (tx_frame_count < 500) {
@@ -347,13 +353,13 @@ void MACSender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
     }
 }
 
-void MACSender::create_threads(
+void SimpleClientMac::create_threads(
     void* (*worker)(void*), int tid_start, int tid_end)
 {
     int ret;
     for (int i = tid_start; i < tid_end; i++) {
         pthread_t thread;
-        auto context = new EventHandlerContext<MACSender>;
+        auto context = new EventHandlerContext<SimpleClientMac>;
         context->obj_ptr = this;
         context->id = i;
         ret = pthread_create(&thread, NULL, worker, context);
@@ -361,7 +367,7 @@ void MACSender::create_threads(
     }
 }
 
-void MACSender::write_stats_to_file(size_t tx_frame_count) const
+void SimpleClientMac::write_stats_to_file(size_t tx_frame_count) const
 {
     printf("Printing sender results to file...\n");
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);

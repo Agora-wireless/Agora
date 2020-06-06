@@ -36,15 +36,14 @@
 #include "net.hpp"
 #include "utils.h"
 
-class MACSender {
+class SimpleClientMac {
 public:
     static constexpr size_t kTXBufOffset = kUseDPDK ? 22 : 0;
     static constexpr size_t kMaxNumSockets = 128; // Max network sockets
 
 public:
-    MACSender(Config* config, size_t core_offset = 30,
-        size_t delay = 0);
-    ~MACSender();
+    SimpleClientMac(Config* config, size_t core_offset = 30, size_t delay = 0);
+    ~SimpleClientMac();
 
     void startTX();
 

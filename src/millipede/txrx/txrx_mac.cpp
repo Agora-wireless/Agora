@@ -78,12 +78,15 @@ void* MacPacketTXRX::loopTXRX(int tid)
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-        int local_port_id = cfg->mac_rx_port + radio_id;
+        int local_port_id = cfg->mac_tx_port + radio_id;
 #if USE_IPV4
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
             cfg->mac_rx_port + radio_id, cfg->tx_addr_to_mac.c_str());
+        printf("Set up UDP socket server listening to port %d"
+               " with remote address %s:%d  \n",
+            local_port_id, cfg->tx_addr_to_mac.c_str(), cfg->mac_rx_port + tid);
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
@@ -99,9 +102,9 @@ void* MacPacketTXRX::loopTXRX(int tid)
         if (-1 != dequeue_send(tid))
             continue;
         // receive data
-        struct MacPacket* pkt = recv_enqueue(tid, radio_id);
-        if (pkt == NULL)
-            continue;
+        //struct MacPacket* pkt = recv_enqueue(tid, radio_id);
+        //if (pkt == NULL)
+        //    continue;
         // rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         if (++radio_id == radio_hi)
