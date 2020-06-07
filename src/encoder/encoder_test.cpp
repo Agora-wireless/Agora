@@ -46,12 +46,12 @@ void run_test(size_t base_graph, size_t zc)
 
     int8_t* reference[kNumCodeBlocks];
     for (int i = 0; i < kNumCodeBlocks; i++) {
-        // For the input bits, we need to allocate one additional byte at the
-        // end because of how the encoder's scatter function is implemented
-        req.input[i] = (int8_t*)read_binfile(
-            input_filename, bits_to_bytes(num_information_bits) + 1);
-
-        resp.output[i] = new int8_t[bits_to_bytes(num_parity_bits)];
+        // We add avx2enc::PROC_BYTES as padding for the encoder's scatter (for
+        // input) and gather (for output) functions.
+        req.input[i] = (int8_t*)read_binfile(input_filename,
+            bits_to_bytes(num_information_bits) + avx2enc::PROC_BYTES);
+        resp.output[i]
+            = new int8_t[bits_to_bytes(num_parity_bits) + avx2enc::PROC_BYTES];
         reference[i] = (int8_t*)read_binfile(
             reference_filename, bits_to_bytes(num_parity_bits));
     }
