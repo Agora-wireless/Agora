@@ -39,6 +39,7 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
+    '-DUSE_LDPC=true',
     '-I' + str(home_dir) + '/Millipede/src/millipede',
     '-I' + str(home_dir) + '/Millipede/src/common',
     '-I' + str(home_dir) + '/Millipede/src/millipede/txrx',

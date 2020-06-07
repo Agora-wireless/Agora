@@ -15,7 +15,7 @@ char* read_binfile(std::string filename, int buffer_size)
         exit(-1);
     }
 
-    auto* x = (char*)malloc(buffer_size * sizeof(char));
+    auto* x = new char[buffer_size]();
     infile.read((char*)x, buffer_size * sizeof(char));
     infile.close();
     return x;
@@ -46,10 +46,12 @@ void run_test(size_t base_graph, size_t zc)
 
     int8_t* reference[kNumCodeBlocks];
     for (int i = 0; i < kNumCodeBlocks; i++) {
+        // For the input bits, we need to allocate one additional byte at the
+        // end because of how the encoder's scatter function is implemented
         req.input[i] = (int8_t*)read_binfile(
-            input_filename, bits_to_bytes(num_information_bits));
-        resp.output[i] = (int8_t*)malloc(
-            avx2enc::BG1_COL_TOTAL * avx2enc::PROC_BYTES * sizeof(int8_t));
+            input_filename, bits_to_bytes(num_information_bits) + 1);
+
+        resp.output[i] = new int8_t[bits_to_bytes(num_parity_bits)];
         reference[i] = (int8_t*)read_binfile(
             reference_filename, bits_to_bytes(num_parity_bits));
     }
@@ -65,15 +67,22 @@ void run_test(size_t base_graph, size_t zc)
             printf("Passed for Zc = %zu, base graph = %zu\n", zc, base_graph);
         }
     }
+
+    for (int i = 0; i < kNumCodeBlocks; i++) {
+        delete[] req.input[i];
+        delete[] resp.output[i];
+        delete[] reference[i];
+    }
 }
 
 int main()
 {
     // All possible expansion factors Zc in 5G NR
-    const std::vector<size_t> zc_all_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3,
-        6, 12, 24, 48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56,
-        112, 224, 9, 18, 36, 72, 144, 288, 11, 22, 44, 88, 176, 352, 13, 26, 52,
-        104, 208, 15, 30, 60, 120, 240 };
+    std::vector<size_t> zc_all_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3, 6, 12,
+        24, 48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56, 112,
+        224, 9, 18, 36, 72, 144, 288, 11, 22, 44, 88, 176, 352, 13, 26, 52, 104,
+        208, 15, 30, 60, 120, 240 };
+    std::sort(zc_all_vec.begin(), zc_all_vec.end());
 
     // For some expansion factors, we don't have input and reference files
     const std::vector<size_t> zc_nofiles_vec = { 2, 3, 4, 5, 6, 9, 13 };

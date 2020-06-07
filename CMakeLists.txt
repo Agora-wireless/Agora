@@ -12,15 +12,18 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+  message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
+  message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+  message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_CXX_STANDARD 14)
 else()
   set(CMAKE_CXX_STANDARD 11)
@@ -202,19 +205,20 @@ if(${USE_LDPC})
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
-  set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
-  set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-                ${LIB_DIR}/test/phy/common/utility.a
-                ${LIB_DIR}/source/phy/lib_common/libcommon.a)
+  set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
+  set(FLEXRAN_LIB_DIR ${SDK_DIR}/build-avx2-icc)
+  set(FLEXRAN_LDPC_LIBS
+    ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+    ${FLEXRAN_LIB_DIR}/test/phy/common/utility.a
+    ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   include_directories(
-    ${SDK_DIR}/test/phy/common
-    ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-    ${SDK_DIR}/source/phy/lib_common
+    ${FLEXRAN_SDK_DIR}/test/phy/common
+    ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+    ${FLEXRAN_SDK_DIR}/source/phy/lib_common
     ${SOURCE_DIR}/src/encoder)
 
-  set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
+  set(HEADER_FILES ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
 
   set(LDPC_SOURCES
     src/encoder/cyclic_shift.cpp
@@ -238,16 +242,16 @@ set(SOURCES
 			
 add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
 
 
 add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
-target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
 
 add_executable(data_generator 
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
   ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
-target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
+target_link_libraries(data_generator -larmadillo ${FLEXRAN_LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 if(${USE_ARGOS})
