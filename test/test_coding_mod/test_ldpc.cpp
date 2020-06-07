@@ -21,7 +21,7 @@
 #include <time.h>
 #include <vector>
 
-static constexpr size_t kNumCodeBlocks = 1;
+static constexpr size_t kNumCodeBlocks = 2;
 static constexpr size_t kBaseGraph = 1;
 static constexpr bool kEnableEarlyTermination = true;
 static constexpr size_t kNumFillerBits = 0;
@@ -29,13 +29,6 @@ static constexpr size_t kMaxDecoderIters = 20;
 static constexpr size_t k5GNRNumPunctured = 2;
 
 static size_t bits_to_bytes(size_t num_bits) { return (num_bits + 7) / 8; };
-
-template <uint64_t power_of_two_number, typename T>
-static constexpr inline T round_up(T x)
-{
-    return ((x) + T(power_of_two_number - 1)) & (~T(power_of_two_number - 1));
-}
-
 char* read_binfile(std::string filename, size_t buffer_size)
 {
     std::ifstream infile;
@@ -49,13 +42,11 @@ char* read_binfile(std::string filename, size_t buffer_size)
 
 int main()
 {
+    double freq_ghz = measure_rdtsc_freq();
     int8_t* input[kNumCodeBlocks];
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
     uint8_t* decoded[kNumCodeBlocks];
-
-    double encode_total_us = 0; // Total microseconds spent in encode
-    double decode_total_us = 0; // Total microseconds spent in decode
 
     std::vector<size_t> zc_vec = { 8, 12, 16, 20, 32, 64, 96, 144, 192 };
     for (const size_t& zc : zc_vec) {
@@ -68,7 +59,7 @@ int main()
             * (kBaseGraph == 1 ? avx2enc::BG1_COL_INF_NUM
                                : avx2enc::BG2_COL_INF_NUM);
 
-        // Number of rows of the non-expanded base graph used
+        // Number of rows of the (non-expanded) base graph used
         const size_t num_rows_bg = (kBaseGraph == 1 ? avx2enc::BG1_ROW_TOTAL
                                                     : avx2enc::BG2_ROW_TOTAL);
         const size_t num_parity_bits = zc * num_rows_bg;
@@ -78,14 +69,14 @@ int main()
                                : (avx2enc::BG2_COL_TOTAL - k5GNRNumPunctured));
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
-            input[i] = new int8_t[round_up<avx2enc::PROC_BYTES>(
-                bits_to_bytes(num_input_bits))]();
-            parity[i] = new int8_t[round_up<avx2enc::PROC_BYTES>(
-                bits_to_bytes(num_parity_bits))]();
-            encoded[i] = new int8_t[round_up<avx2enc::PROC_BYTES>(
-                bits_to_bytes(num_encoded_bits))]();
-            decoded[i] = new uint8_t[round_up<avx2enc::PROC_BYTES>(
-                bits_to_bytes(num_encoded_bits))]();
+            input[i] = new int8_t[bits_to_bytes(num_input_bits)
+                + avx2enc::PROC_BYTES]();
+            parity[i] = new int8_t[bits_to_bytes(num_parity_bits)
+                + avx2enc::PROC_BYTES]();
+            encoded[i] = new int8_t[bits_to_bytes(num_encoded_bits)
+                + avx2enc::PROC_BYTES]();
+            decoded[i] = new uint8_t[bits_to_bytes(num_encoded_bits)
+                + avx2enc::PROC_BYTES]();
         }
 
         // Randomly generate input
@@ -105,12 +96,13 @@ int main()
             resp.output[n] = parity[n];
         }
 
-        double start_time_us = get_time();
+        size_t encoding_start_tsc = rdtsc();
         avx2enc::ldpc_encoder_avx2(&req, &resp);
-        double end_time_us = get_time();
-
-        printf("Encoding time: %.3f us per code block\n",
-            (end_time_us - start_time_us) / kNumCodeBlocks);
+        double encoding_us
+            = cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
+        printf("Encoding: %.3f Mbps wrt input bits (%.3f us per code block)\n",
+            num_input_bits * kNumCodeBlocks / encoding_us,
+            encoding_us / kNumCodeBlocks);
 
         // Generate the encoded output
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
@@ -124,13 +116,10 @@ int main()
                 bits_to_bytes(num_parity_bits));
         }
 
-        // Generate llrs (replace this with channel output)
+        // Generate log-likelihood ratios, one byte per input bit
         int8_t* llrs[kNumCodeBlocks];
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             llrs[n] = reinterpret_cast<int8_t*>(memalign(32, num_encoded_bits));
-        }
-
-        for (size_t n = 0; n < kNumCodeBlocks; n++) {
             for (size_t i = 0; i < num_encoded_bits; i++) {
                 uint8_t bit_i = (encoded[n][i / 8] >> (i % 8)) & 1;
                 llrs[n][i] = (bit_i == 1 ? -127 : 127);
@@ -156,19 +145,21 @@ int main()
             memalign(32, buffer_len * sizeof(int16_t)));
 
         // Decoding
-        start_time_us = get_time_us();
+        size_t decoding_start_tsc = rdtsc();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             ldpc_decoder_5gnr_request.varNodes = llrs[n];
             ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
             bblib_ldpc_decoder_5gnr(
                 &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
         }
-        end_time_us = get_time_us();
-        printf("Decoding time: %.3f us per code block\n",
-            (end_time_us - start_time_us) / kNumCodeBlocks);
-        decode_total_us += (end_time_us - start_time_us);
 
-        printf("Results for %zu code blocks: \n", kNumCodeBlocks);
+        double decoding_us
+            = cycles_to_us(rdtsc() - decoding_start_tsc, freq_ghz);
+        printf("Decoding: %.3f Mbps wrt output bits (%.3f us per code block)\n",
+            num_input_bits * kNumCodeBlocks / decoding_us,
+            decoding_us / kNumCodeBlocks);
+
+        // Check for errors
         size_t err_cnt = 0;
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             uint8_t* input_buffer = (uint8_t*)input[n];
@@ -184,18 +175,14 @@ int main()
             }
         }
 
-        double ber = (double)err_cnt / (kNumCodeBlocks * num_input_bits);
-        printf("BER = %.3f\n", ber);
-        printf("Encoder: %.2f MB/sec\n",
-            (num_input_bits / 8.0) * kNumCodeBlocks / encode_total_us);
-        printf("Decoder: %.2f MB/sec\n",
-            (num_input_bits / 8.0) * kNumCodeBlocks / decode_total_us);
+        printf("Number of bit errors = %zu, BER = %.3f\n", err_cnt,
+            err_cnt * 1.0 / (kNumCodeBlocks * num_input_bits));
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
-            free(input[i]);
-            free(parity[i]);
-            free(encoded[i]);
-            free(decoded[i]);
+            delete[] input[i];
+            delete[] parity[i];
+            delete[] encoded[i];
+            delete[] decoded[i];
             free(llrs[i]);
         }
     }
