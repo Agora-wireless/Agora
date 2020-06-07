@@ -36,7 +36,7 @@ if(NOT ICPC_EXISTS)
 endif()
 
 set(CMAKE_CXX_COMPILER icpc)  # Intel compiler required
-set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mavx2 -mavx")
+set(CMAKE_CXX_FLAGS "-std=c++11 -g -mavx2 -mavx -fsanitize=address")
 
 # Set Wireless SDK preprocessor definitions for target ISA
 if(${ISA_SSE4_2})
@@ -51,16 +51,16 @@ if(RTE_SDK)
   add_definitions("-D_BBLIB_DPDK_")
 endif()
 
-set(FLEXRAN_FEC_SDK_DIR "/opt/FlexRAN-FEC-SDK-19-04/sdk")
+set(FLEXRAN_FEC_SDK_DIR "/home/anuj/sandbox/FlexRAN-FEC-SDK-19-04/sdk")
 set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
 
 include_directories(
   /opt/intel/mkl/include
   ${FLEXRAN_FEC_SDK_DIR}/test/phy/common
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
-  ../../src)
+  ../../src
+  ../../src/encoder)
 
 set(SOURCES 
   ../../src/encoder/cyclic_shift.cpp
@@ -71,11 +71,11 @@ add_executable(test_ldpc test_ldpc.cpp ${SOURCES})
 target_link_libraries (test_ldpc
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
-
 add_definitions(-DUSE_LDPC)
-set(MOD_SOURCES ../../src/common/modulation.cpp)
-include_directories(../../src/common)
-add_executable(test_mod_ldpc test_mod_ldpc.cpp ${SOURCES} ${MOD_SOURCES})
-target_link_libraries(test_mod_ldpc
-  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
+
+#set(MOD_SOURCES ../../src/common/modulation.cpp)
+#include_directories(../../src/common)
+#add_executable(test_mod_ldpc test_mod_ldpc.cpp ${SOURCES} ${MOD_SOURCES})
+#target_link_libraries(test_mod_ldpc
+#  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+#  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)

@@ -209,13 +209,6 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
 void ldpc_encoder_avx2(struct bblib_ldpc_encoder_5gnr_request* request,
     struct bblib_ldpc_encoder_5gnr_response* response)
 {
-    ALIGNED_(PROC_BYTES)
-    int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
-    ALIGNED_(PROC_BYTES)
-    int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
-    ALIGNED_(PROC_BYTES)
-    int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
-
     // input -----------------------------------------------------------
     // these values depend on the application
     uint16_t Zc = request->Zc;
@@ -273,20 +266,26 @@ void ldpc_encoder_avx2(struct bblib_ldpc_encoder_5gnr_request* request,
         pAddr = Bg2Address;
     }
 
+    ALIGNED_(PROC_BYTES)
+    int8_t input_internal_buffer[BG1_COL_TOTAL * PROC_BYTES] = { 0 };
+    ALIGNED_(PROC_BYTES)
+    int8_t parity_internal_buffer[BG1_ROW_TOTAL * PROC_BYTES] = { 0 };
+
     LDPC_ADAPTER_P ldpc_adapter_func = ldpc_select_adapter_func(Zc);
     auto ldpc_encoder_func = (Bg == 1 ? ldpc_encoder_bg1 : ldpc_encoder_bg2);
 
     for (int n = 0; n < numberCodeblocks; n++) {
         // Scatter Zc-bit chunks of the input into PROC_BYTES-sized chunks
-        // of internalBuffer0
-        ldpc_adapter_func(input[n], internalBuffer0, Zc, cbLen, 1);
+        // of input_internal_buffer
+        ldpc_adapter_func(input[n], input_internal_buffer, Zc, cbLen, 1);
 
-        // Encode into internalBuffer1
-        ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol,
-            pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
+        // Encode into parity_internal_buffer
+        ldpc_encoder_func(input_internal_buffer, parity_internal_buffer,
+            pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
 
-        // Gather parity bits from PROC_BYTES-sized chunks of internalBuffer1
-        ldpc_adapter_func(parity[n], internalBuffer1, Zc, cbEncLen, 0);
+        // Gather parity bits from PROC_BYTES-sized chunks of
+        // parity_internal_buffer
+        ldpc_adapter_func(parity[n], parity_internal_buffer, Zc, cbEncLen, 0);
     }
 }
 } // namespace avx2enc

@@ -130,7 +130,7 @@ if(${USE_LDPC})
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  set(SDK_DIR /home/argos/Jian/FlexRAN-FEC-SDK-19-04/FlexRAN-FEC-SDK-19-04/sdk/)
+  set(SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
   set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
   set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
                 ${LIB_DIR}/test/phy/common/utility.a
