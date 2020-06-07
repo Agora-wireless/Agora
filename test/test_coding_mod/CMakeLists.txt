@@ -36,7 +36,7 @@ if(NOT ICPC_EXISTS)
 endif()
 
 set(CMAKE_CXX_COMPILER icpc)  # Intel compiler required
-set(CMAKE_CXX_FLAGS "-std=c++11 -g -mavx2 -mavx -fsanitize=address")
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mavx2 -mavx")
 
 # Set Wireless SDK preprocessor definitions for target ISA
 if(${ISA_SSE4_2})
@@ -51,7 +51,7 @@ if(RTE_SDK)
   add_definitions("-D_BBLIB_DPDK_")
 endif()
 
-set(FLEXRAN_FEC_SDK_DIR "/home/anuj/sandbox/FlexRAN-FEC-SDK-19-04/sdk")
+set(FLEXRAN_FEC_SDK_DIR "/opt/FlexRAN-FEC-SDK-19-04/sdk")
 set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
 
 include_directories(
