@@ -208,19 +208,15 @@ if(${USE_LDPC})
   endif()
   add_definitions(-DUSE_LDPC)
   set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
-  set(FLEXRAN_LIB_DIR ${SDK_DIR}/build-avx2-icc)
+  set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
   set(FLEXRAN_LDPC_LIBS
     ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-    ${FLEXRAN_LIB_DIR}/test/phy/common/utility.a
     ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   include_directories(
-    ${FLEXRAN_SDK_DIR}/test/phy/common
     ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
     ${FLEXRAN_SDK_DIR}/source/phy/lib_common
     ${SOURCE_DIR}/src/encoder)
-
-  set(HEADER_FILES ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
 
   set(LDPC_SOURCES
     src/encoder/cyclic_shift.cpp
