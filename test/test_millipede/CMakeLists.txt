@@ -99,8 +99,9 @@ include_directories(
 	${SOURCE_DIR}/src/common/
   ${SOURCE_DIR}/src/millipede/
   ${SOURCE_DIR}/src/millipede/txrx/
-  ${SOURCE_DIR}/src/client/
-	)
+  ${SOURCE_DIR}/src/client/)
+
+include_directories(SYSTEM ${SOURCE_DIR}/src/third_party)
 
 set(COMMON_SOURCES 
   ${SOURCE_DIR}/src/common/config.cpp
