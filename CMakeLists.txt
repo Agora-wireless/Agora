@@ -69,7 +69,7 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lnuma -Wl,--no-whole-archive dl)
 
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
@@ -246,7 +246,9 @@ target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${
 
 add_executable(data_generator 
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
-  ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
+  ${LDPC_SOURCES} 
+  ${COMMON_SOURCES} 
+  ${HEADER_FILES})
 target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
@@ -254,35 +256,48 @@ if(${USE_ARGOS})
   add_executable(user 
        src/client/user-main.cpp
        ${CLIENT_SOURCES}
-       ${COMMON_SOURCES})
-  target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+       ${COMMON_SOURCES}
+       ${LDPC_SOURCES}
+       ${HEADER_FILES})
+  target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
   add_library(ue_phy MODULE 
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
-       ${ARGOS_SOURCES})
-  target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+       ${ARGOS_SOURCES}
+       ${LDPC_SOURCES}
+       ${HEADER_FILES})
+  target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 else()
   set(SENDER_SOURCES
     simulator/sender_cli.cpp
     ${COMMON_SOURCES}
-    ${SENDER_TXRX_SOURCES})
+    ${SENDER_TXRX_SOURCES}
+    ${LDPC_SOURCES}
+    ${HEADER_FILES})
 
   add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES})
+  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS})
 
   set(SIMULATOR_SOURCES
     simulator/main.cpp
     simulator/simulator.cpp
     simulator/sender.cpp
     simulator/receiver.cpp 
-    ${COMMON_SOURCES})
+    ${COMMON_SOURCES}
+    ${LDPC_SOURCES}
+    ${HEADER_FILES})
 
   add_executable(sim ${SIMULATOR_SOURCES})
-  target_link_libraries(sim ${MKL_LIBS})
+  target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
 endif()
 
 # The tests to run using ctest
-add_executable(test_zf test/test_zf.cc ${COMMON_SOURCES} src/millipede/stats.cpp src/millipede/dozf.cpp)
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo)
+add_executable(test_zf test/test_zf.cc 
+  ${COMMON_SOURCES} 
+  src/millipede/stats.cpp 
+  src/millipede/dozf.cpp
+  ${LDPC_SOURCES}
+  ${HEADER_FILES})
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)

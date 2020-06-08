@@ -22,6 +22,9 @@
 #include "modulation.hpp"
 #include "utils.h"
 #include <nlohmann/json.hpp>
+#ifdef USE_LDPC
+#include "utils_ldpc.hpp"
+#endif
 //#include <itpp/itbase.h>
 // using namespace itpp;
 using json = nlohmann::json;
