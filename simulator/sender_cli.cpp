@@ -4,35 +4,24 @@
  *
  */
 #include "sender.hpp"
+#include <gflags/gflags.h>
+
+DEFINE_uint64(num_threads, 4, "Number of sender threads");
+DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
+DEFINE_uint64(delay, 5000, "Delay (?) in microseconds");
+DEFINE_string(conf_file, "/data/tddconfig-sim-dl.json", "Config filename");
 
 int main(int argc, char* argv[])
 {
-    std::string confFile;
-    size_t thread_num, core_offset, delay;
-    if (argc == 5) {
-        thread_num = strtol(argv[1], NULL, 10);
-        core_offset = strtol(argv[2], NULL, 10);
-        delay = strtol(argv[3], NULL, 10);
-        confFile = std::string("/") + std::string(argv[4]);
-    } else {
-        confFile = "/data/tddconfig-sim-dl.json";
-        thread_num = 4;
-        core_offset = 22;
-        delay = 5000;
-        printf("Wrong arguments (requires 4 arguments: 1. number of tx "
-               "threads, 2. "
-               "core offset, 3. frame duration, 4. config file)\n");
-        printf("Arguments set to default: 4, 22, 5000, %s\n", confFile.c_str());
-    }
-
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
+    std::string filename = cur_directory + "/" + FLAGS_conf_file;
     auto* cfg = new Config(filename.c_str());
     cfg->genData();
-    auto* sender = new Sender(cfg, thread_num, core_offset, delay);
 
-    printf("Start sender\n");
+    printf("Starting sender\n");
+    auto* sender
+        = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset, FLAGS_delay);
     sender->startTX();
-
     return 0;
 }
