@@ -1,11 +1,8 @@
 /*
-    accuracy and performance test for ldpc encoder implemented with AVX256 and
-   Intel's decoder
+    Data generator to generate binary files as inputs to Millipede, sender and correctness tests
  */
 #ifdef USE_LDPC
-#include "encoder.hpp"
-#include "iobuffer.hpp"
-#include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 #endif
 #include <armadillo>
 #include <bitset>
@@ -29,81 +26,6 @@
 using namespace arma;
 
 static const float NOISE_LEVEL = 1.0 / 200;
-
-template <typename T>
-T* aligned_malloc(const int size, const unsigned alignment)
-{
-#ifdef _BBLIB_DPDK_
-    return (T*)rte_malloc(NULL, sizeof(T) * size, alignment);
-#else
-#ifndef _WIN64
-    return (T*)memalign(alignment, sizeof(T) * size);
-#else
-    return (T*)_aligned_malloc(sizeof(T) * size, alignment);
-#endif
-#endif
-}
-
-#ifdef USE_LDPC
-#ifndef __has_builtin
-#define __has_builtin(x) 0
-#endif
-
-static inline uint8_t bitreverse8(uint8_t x)
-{
-#if __has_builtin(__builtin_bireverse8)
-    return (__builtin_bitreverse8(x));
-#else
-    x = (x << 4) | (x >> 4);
-    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
-    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
-    return (x);
-#endif
-}
-
-/*
- * Copy packed, bit-reversed m-bit fields (m == mod_type) stored in
- * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
- * at least 8*len/m bytes.
- */
-static void adapt_bits_for_mod(
-    int8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
-{
-    int bits_avail = 0;
-    uint16_t bits = 0;
-    for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
-        bits_avail += 8;
-        while (bits_avail >= mod_type) {
-            *vec_out++ = bits >> (16 - mod_type);
-            bits <<= mod_type;
-            bits_avail -= mod_type;
-        }
-    }
-}
-
-uint8_t select_base_matrix_entry(uint16_t Zc)
-{
-    uint8_t i_LS;
-    if ((Zc % 15) == 0)
-        i_LS = 7;
-    else if ((Zc % 13) == 0)
-        i_LS = 6;
-    else if ((Zc % 11) == 0)
-        i_LS = 5;
-    else if ((Zc % 9) == 0)
-        i_LS = 4;
-    else if ((Zc % 7) == 0)
-        i_LS = 3;
-    else if ((Zc % 5) == 0)
-        i_LS = 2;
-    else if ((Zc % 3) == 0)
-        i_LS = 1;
-    else
-        i_LS = 0;
-    return i_LS;
-}
-#endif
 
 float rand_float(float min, float max)
 {
@@ -180,9 +102,14 @@ int main(int argc, char* argv[])
     int8_t* input[numberCodeblocks];
     int8_t* encoded[numberCodeblocks];
 
-    int input_lenth = ((cbLen + 7) >> 3);
+    size_t input_length = ((cbLen + 7) >> 3);
+    size_t num_empty_bits = (input_length << 3) - cbLen;
+    uint8_t mask = 0xff >> num_empty_bits;
+    printf("input_lengh %zu, num_empty_bits %zu, %x\n", input_length,
+        num_empty_bits, mask);
+
     for (int i = 0; i < numberCodeblocks; i++) {
-        input[i] = (int8_t*)malloc(input_lenth * sizeof(int8_t));
+        input[i] = (int8_t*)malloc(input_length * sizeof(int8_t));
         encoded[i]
             = (int8_t*)malloc(BG1_COL_TOTAL * PROC_BYTES * sizeof(int8_t));
     }
@@ -199,8 +126,12 @@ int main(int argc, char* argv[])
         = { 0 };
 
     for (int n = 0; n < numberCodeblocks; n++) {
-        for (int i = 0; i < input_lenth; i++)
+        for (size_t i = 0; i < input_length; i++) {
             input[n][i] = (int8_t)rand();
+            if ((i == input_length - 1) and (num_empty_bits > 0)) {
+                input[n][i] = input[n][i] & mask;
+            }
+        }
     }
 
     // printf("Raw input\n");
@@ -209,7 +140,7 @@ int main(int argc, char* argv[])
     //         printf("symbol %d\n", n / UE_NUM);
     //     }
     //     printf("ue %d\n", n % UE_NUM);
-    //     for (int i = 0; i < input_lenth; i++)
+    //     for (size_t i = 0; i < input_length; i++)
     //         // std::cout << std::bitset<8>(input[n][i]) << " ";
     //         printf("%u ", (uint8_t)input[n][i]);
     //     printf("\n");
@@ -302,7 +233,7 @@ int main(int argc, char* argv[])
     FILE* fp_input = fopen(filename_input.c_str(), "wb");
     for (int i = 0; i < numberCodeblocks; i++) {
         uint8_t* ptr = (uint8_t*)input[i];
-        fwrite(ptr, input_lenth, sizeof(uint8_t), fp_input);
+        fwrite(ptr, input_length, sizeof(uint8_t), fp_input);
     }
     fclose(fp_input);
 #else

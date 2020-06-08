@@ -9,22 +9,25 @@
 void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     int num_bytes_per_ue, Config* cfg)
 {
-    int data_symbol_num_perframe = cfg->data_symbol_num_perframe;
+    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     size_t UE_NUM = cfg->UE_NUM;
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
+    } else {
+        printf("opening file %s\n", filename.c_str());
     }
     int expect_num_bytes = num_bytes_per_ue * UE_NUM;
     // printf("read data of %d byptes\n", expect_num_bytes);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
         // if (i == 0) {
-        //     for(int j = 0; j < num_bytes; j++) {
-        //         printf("%u ", data[i][j]);
-        //     }
-        //     printf("\n");
+        // printf("i: %d\n", i);
+        // for (int j = 0; j < num_bytes; j++) {
+        //     printf("%u ", data[i][j]);
+        // }
+        // printf("\n");
         // }
         if (expect_num_bytes != num_bytes) {
             printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
@@ -63,12 +66,14 @@ void check_correctness_ul(Config* cfg)
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 #ifdef USE_LDPC
-    std::string raw_data_filename = cur_directory
-        + "/data/LDPC_orig_data_2048_ant" + std::to_string(UE_NUM) + ".bin";
+    std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_"
+        + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
+        + std::to_string(cfg->UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 #else
-    std::string raw_data_filename = cur_directory + "/data/orig_data_2048_ant"
-        + std::to_string(UE_NUM) + ".bin";
+    std::string raw_data_filename = cur_directory + "/data/orig_data_"
+        + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
+        + std::to_string(cfg->UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/demul_data.bin";
 #endif
 
@@ -85,6 +90,8 @@ void check_correctness_ul(Config* cfg)
 #else
     num_bytes_per_ue = OFDM_DATA_NUM;
 #endif
+    printf("num_bytes_per_ue: %d\n", num_bytes_per_ue);
+
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
@@ -107,11 +114,15 @@ void check_correctness_ul(Config* cfg)
                 //                 int offset_in_output = UE_NUM * j + ue;
                 // #endif
                 // if (i == 0)
-                //     printf("(%d, %u, %u) ", j, raw_data[i][offset_in_raw],
+                // printf("(%d, %d, %u, %u)\n", i, j, raw_data[i][offset_in_raw],
                 //     output_data[i][offset_in_output]);
                 if (raw_data[i][offset_in_raw]
-                    != output_data[i][offset_in_output])
+                    != output_data[i][offset_in_output]) {
                     error_cnt++;
+                    printf("(%d, %d, %u, %u)\n", i, j,
+                        raw_data[i][offset_in_raw],
+                        output_data[i][offset_in_output]);
+                }
             }
             // if (i == 0)
             //     printf("\n");
