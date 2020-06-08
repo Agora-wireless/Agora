@@ -225,7 +225,7 @@ Config::Config(std::string jsonfile)
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
-    packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
+    packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
 
     running = true;
     std::cout << "Config: "
@@ -516,7 +516,7 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     if (it != DLSymbols[fid].end())
         return it - DLSymbols[fid].begin();
     else
-        return -1;
+        return SIZE_MAX;
 }
 
 size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
@@ -531,7 +531,7 @@ size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
 #endif
         return it - pilotSymbols[fid].begin();
     } else
-        return -1;
+        return SIZE_MAX;
 }
 
 size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
@@ -546,7 +546,7 @@ size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
 #endif
         return it - ULSymbols[fid].begin();
     } else
-        return -1;
+        return SIZE_MAX;
 }
 
 bool Config::isPilot(size_t frame_id, size_t symbol_id)
