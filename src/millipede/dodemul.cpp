@@ -47,6 +47,9 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     ul_gt_mat = ul_iq_f_mat.st();
     ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
     evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+
+    // BER calculation data
+    // ber_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 }
 
 DoDemul::~DoDemul()
@@ -238,7 +241,13 @@ Event_data DoDemul::launch(size_t tag)
         cfg->UE_NUM * 6, cfg->UE_NUM * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        float* equal_ptr = (float*)(equaled_buffer_temp + i);
+        float* equal_ptr = nullptr;
+        if (kExportConstellation) {
+            equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                               [base_sc_id * cfg->UE_NUM + i]);
+        } else {
+            equal_ptr = (float*)(equaled_buffer_temp + i);
+        }
         size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
         for (size_t j = 0; j < max_sc_ite / kNumDoubleInSIMD256; j++) {
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
@@ -253,21 +262,19 @@ Event_data DoDemul::launch(size_t tag)
                                       [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                           * cfg->mod_type]);
             demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
+            //     tid, frame_id, symbol_idx_ul, base_sc_id);
+            // cout << "Demuled data : \n ";
+            // cout << " UE " << i << ": ";
+            // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
+            //     printf("%i ", demul_ptr[k]);
+            // cout << endl;
         } else {
             uint8_t* demul_ptr
                 = (&demod_hard_buffer_[total_data_symbol_idx_ul]
                                       [cfg->OFDM_DATA_NUM * i + base_sc_id]);
             demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
         }
-        /*
-            printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
-                tid, frame_id, current_data_symbol_id, sc_id);
-            cout << "Demuled data : \n ";
-            cout << " UE " << i << ": ";
-            for (int k = 0; k < max_sc_ite * cfg->mod_order; k++)
-                printf("%i ", demul_ptr[k]);
-            cout << endl;
-            */
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     // }
