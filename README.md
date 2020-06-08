@@ -40,7 +40,8 @@ Compile Millipede:
 	cmake ..
 	make -j 
 
-* Note: to be able run Millipede with Faros/Iris hardware, set `USE_ARGOS` variable in CMakeLists.txt to `TRUE`.
+* Note 1 : to run Millipede with Faros/Iris hardware, set `USE_ARGOS` variable in CMakeLists.txt to `True`.
+* Note 2 : to run Client with Iris Hardware, set `ENABLE_MAC` in CMakeLists.txt to `True`.
 
 2. Run
 
