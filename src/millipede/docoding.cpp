@@ -5,8 +5,47 @@
  */
 #include "docoding.hpp"
 #include "concurrent_queue_wrapper.hpp"
+#include "encoder.hpp"
+#include "phy_ldpc_decoder_5gnr.h"
 
 using namespace arma;
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+static inline uint8_t bitreverse8(uint8_t x)
+{
+#if __has_builtin(__builtin_bireverse8)
+    return (__builtin_bitreverse8(x));
+#else
+    x = (x << 4) | (x >> 4);
+    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
+    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
+    return (x);
+#endif
+}
+
+/*
+ * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
+ * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
+ * at least 8*len/m bytes.
+ */
+static void adapt_bits_for_mod(
+    int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
+{
+    int bits_avail = 0;
+    uint16_t bits = 0;
+    for (int i = 0; i < len; i++) {
+        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
+        bits_avail += 8;
+        while (bits_avail >= mod_order) {
+            *vec_out++ = bits >> (16 - mod_order);
+            bits <<= mod_order;
+            bits_avail -= mod_order;
+        }
+    }
+}
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
@@ -23,22 +62,6 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
-    LDPCconfig LDPC_config = cfg->LDPC_config;
-    uint16_t Zc = LDPC_config.Zc;
-    i_LS = select_base_matrix_entry(Zc);
-
-    if (LDPC_config.Bg == 1) {
-        pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
-        pMatrixNumPerCol = Bg1MatrixNumPerCol;
-        pAddr = Bg1Address;
-    } else {
-        pShiftMatrix = Bg2HShiftMatrix + i_LS * BG2_NONZERO_NUM;
-        pMatrixNumPerCol = Bg2MatrixNumPerCol;
-        pAddr = Bg2Address;
-    }
-
-    ldpc_adapter_func = ldpc_select_adapter_func(LDPC_config.Zc);
-    ldpc_encoder_func = ldpc_select_encoder_func(LDPC_config.Bg);
 }
 
 DoEncode::~DoEncode()
@@ -65,7 +88,7 @@ Event_data DoEncode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
+    int cbLenBytes = (LDPC_config.cbLen + 7) / 8;
     int input_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
         + cbLenBytes * cur_cb_id;
     int symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
@@ -73,12 +96,19 @@ Event_data DoEncode::launch(size_t tag)
         = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
     int8_t* output_ptr = encoded_buffer_temp;
 
+    avx2enc::bblib_ldpc_encoder_5gnr_request request;
+    request.Zc = LDPC_config.Zc;
+    request.baseGraph = LDPC_config.Bg;
+    request.numberCodeblocks = 1;
+    request.input[0] = input_ptr;
+    avx2enc::bblib_ldpc_encoder_5gnr_response response;
+    response.output[0] = output_ptr;
+
+    /*
     ldpc_adapter_func(
         input_ptr, internalBuffer0, LDPC_config.Zc, LDPC_config.cbLen, 1);
     ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr,
         pShiftMatrix, (int16_t)LDPC_config.Zc, i_LS);
-    /* scatter the output back to compacted
-     * combine the input sequence and the parity bits into codeword outputs */
     memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
         (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES);
     memcpy(
@@ -93,6 +123,7 @@ Event_data DoEncode::launch(size_t tag)
         = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
     adapt_bits_for_mod(output_ptr, final_output_ptr,
         (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
+        */
 
     // printf("Encoded data\n");
     // int mod_type = cfg->mod_type;

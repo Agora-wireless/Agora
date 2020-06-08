@@ -17,16 +17,14 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
+#include <stdio.h>
+#include <string.h>
 #include <vector>
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
-
-// #include "mkl_dfti.h"
 
 class DoEncode : public Doer {
 public:
@@ -38,9 +36,6 @@ public:
         Stats* in_stats_manager);
     ~DoEncode();
 
-    /**
-     * Do Encode task for one code block
-     */
     Event_data launch(size_t tag);
 
 private:
@@ -50,23 +45,6 @@ private:
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
     };
     DurationStat* duration_stat;
-    const int16_t* pShiftMatrix;
-    const int16_t* pMatrixNumPerCol;
-    const int16_t* pAddr;
-    uint8_t i_LS; // i_Ls decides the base matrix entries
-    LDPC_ADAPTER_P ldpc_adapter_func;
-    LDPC_ENCODER ldpc_encoder_func;
-
-    // buffers for encoders
-    __attribute__((aligned(64)))
-    int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES]
-        = { 0 };
-    __attribute__((aligned(64)))
-    int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES]
-        = { 0 };
-    __attribute__((aligned(64)))
-    int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES]
-        = { 0 };
 };
 
 class DoDecode : public Doer {
