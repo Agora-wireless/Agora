@@ -181,6 +181,8 @@ include_directories(
   src/millipede/txrx/
   src/client/)
 
+include_directories(SYSTEM src/third_party)
+
 set(COMMON_SOURCES
   src/common/config.cpp
   src/common/utils.cpp

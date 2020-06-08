@@ -208,6 +208,8 @@ struct Event_data {
 static_assert(sizeof(Event_data) == 64, "");
 
 struct Packet {
+    static constexpr size_t kOffsetOfData = 64;
+
     uint32_t frame_id;
     uint32_t symbol_id;
     uint32_t cell_id;
@@ -325,7 +327,7 @@ public:
     void init(int max_tasks)
     {
         Frame_stats::init(max_tasks);
-        coded_frame = -1;
+        coded_frame = SIZE_MAX;
     }
 };
 
