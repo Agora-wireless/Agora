@@ -24,6 +24,7 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 
 // #include "mkl_dfti.h"
 
