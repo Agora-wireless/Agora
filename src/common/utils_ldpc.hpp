@@ -98,4 +98,7 @@ static uint8_t select_base_matrix_entry(uint16_t Zc)
     return i_LS;
 }
 
+// Return the number of bytes needed to store n_bits bits
+static inline size_t bits_to_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
+
 #endif

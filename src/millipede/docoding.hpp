@@ -40,7 +40,7 @@ public:
 
 private:
     Table<int8_t>& raw_data_buffer_;
-    int8_t* encoded_buffer_temp;
+    int8_t* parity_buffer; // Intermediate buffer to hold parity
     Table<int8_t>& encoded_buffer_;
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
     };
