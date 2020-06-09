@@ -277,7 +277,7 @@ else()
     ${HEADER_FILES})
 
   add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS})
+  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
 
   set(SIMULATOR_SOURCES
     simulator/main.cpp
