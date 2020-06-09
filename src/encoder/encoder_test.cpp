@@ -1,3 +1,4 @@
+#include "../common/utils_ldpc.hpp"
 #include "encoder.hpp"
 #include <algorithm>
 #include <fstream>
@@ -21,8 +22,6 @@ char* read_binfile(std::string filename, int buffer_size)
     return x;
 }
 
-static size_t bits_to_bytes(size_t num_bits) { return (num_bits + 7) / 8; };
-
 void run_test(size_t base_graph, size_t zc)
 {
     const std::string bg_string = base_graph == 1 ? "BG1" : "BG2";
@@ -32,34 +31,26 @@ void run_test(size_t base_graph, size_t zc)
     const std::string reference_filename = std::string("test_vectors/output_")
         + bg_string + "_" + zc_string + ".bin";
 
-    avx2enc::bblib_ldpc_encoder_5gnr_request req;
-    req.Zc = zc;
-    req.baseGraph = base_graph;
-    req.numberCodeblocks = kNumCodeBlocks;
-    avx2enc::bblib_ldpc_encoder_5gnr_response resp;
-
-    size_t num_information_bits = zc
-        * (base_graph == 1 ? avx2enc::BG1_COL_INF_NUM
-                           : avx2enc::BG2_COL_INF_NUM);
-    size_t num_parity_bits = zc
-        * (base_graph == 1 ? avx2enc::BG1_ROW_TOTAL : avx2enc::BG2_ROW_TOTAL);
-
-    int8_t* reference[kNumCodeBlocks];
-    for (int i = 0; i < kNumCodeBlocks; i++) {
+    int8_t* input[kNumCodeBlocks];
+    int8_t* parity[kNumCodeBlocks];
+    int8_t* encoded[kNumCodeBlocks];
+    int8_t* parity_reference[kNumCodeBlocks];
+    for (int n = 0; n < kNumCodeBlocks; n++) {
         // We add avx2enc::PROC_BYTES as padding for the encoder's scatter (for
         // input) and gather (for output) functions.
-        req.input[i] = (int8_t*)read_binfile(input_filename,
-            bits_to_bytes(num_information_bits) + avx2enc::PROC_BYTES);
-        resp.output[i]
-            = new int8_t[bits_to_bytes(num_parity_bits) + avx2enc::PROC_BYTES];
-        reference[i] = (int8_t*)read_binfile(
-            reference_filename, bits_to_bytes(num_parity_bits));
+        input[n] = (int8_t*)read_binfile(
+            input_filename, ldpc_encoding_input_buf_size(base_graph, zc));
+        parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
+        encoded[n] = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)];
+        parity_reference[n] = (int8_t*)read_binfile(
+            reference_filename, ldpc_encoding_parity_buf_size(base_graph, zc));
+
+        ldpc_encode_helper(base_graph, zc, encoded[n], parity[n], input[n]);
     }
 
-    avx2enc::ldpc_encoder_avx2(&req, &resp);
-
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-        if (memcmp(resp.output[n], reference[n], bits_to_bytes(num_parity_bits))
+        if (memcmp(parity[n], parity_reference[n],
+                bits_to_bytes(ldpc_num_parity_bits(base_graph, zc)))
             != 0) {
             fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n", zc,
                 base_graph);
@@ -68,10 +59,11 @@ void run_test(size_t base_graph, size_t zc)
         }
     }
 
-    for (int i = 0; i < kNumCodeBlocks; i++) {
-        delete[] req.input[i];
-        delete[] resp.output[i];
-        delete[] reference[i];
+    for (int n = 0; n < kNumCodeBlocks; n++) {
+        delete[] input[n];
+        delete[] parity[n];
+        delete[] encoded[n];
+        delete[] parity_reference[n];
     }
 }
 
@@ -84,10 +76,12 @@ int main()
         208, 15, 30, 60, 120, 240 };
     std::sort(zc_all_vec.begin(), zc_all_vec.end());
 
-    // For some expansion factors, we don't have input and reference files
+    // For some expansion factors, we don't have input and reference files yet
     const std::vector<size_t> zc_nofiles_vec = { 2, 3, 4, 5, 6, 9, 13 };
 
     for (const auto& zc : zc_all_vec) {
+        if (zc % 4 != 0)
+            continue;
         const bool no_files = std::find(std::begin(zc_nofiles_vec),
                                   std::end(zc_nofiles_vec), zc)
             != std::end(zc_nofiles_vec);

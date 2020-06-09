@@ -4,9 +4,9 @@
 #ifdef USE_LDPC
 #include "encoder.hpp"
 #include "iobuffer.hpp"
-#include "phy_ldpc_decoder_5gnr.h"
 #endif
 
+#include "Symbols.hpp"
 #include <assert.h>
 #include <malloc.h>
 
@@ -102,33 +102,96 @@ static uint8_t select_base_matrix_entry(uint16_t Zc)
 // Return the number of bytes needed to store n_bits bits
 static inline size_t bits_to_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
 
-// Copy punctured input bits from the encoding request, and parity bits from
-// the encoding response into encoded_buffer
-static void generate_encoded_buffer(int8_t* encoded_buffer,
-    avx2enc::bblib_ldpc_encoder_5gnr_request* req,
-    avx2enc::bblib_ldpc_encoder_5gnr_response* resp, size_t cb_index = 0)
+// Return the number of input information bits per code block with this base
+// graph and expansion factor
+static size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
 {
+    return zc
+        * (base_graph == 1 ? avx2enc::BG1_COL_INF_NUM
+                           : avx2enc::BG2_COL_INF_NUM);
+}
+
+// Return the number of parity bits per code block with this base graph and
+// expansion factor
+static size_t ldpc_num_parity_bits(size_t base_graph, size_t zc)
+{
+    // Number of rows of the (non-expanded) base graph used
+    const size_t num_rows_bg
+        = (base_graph == 1 ? avx2enc::BG1_ROW_TOTAL : avx2enc::BG2_ROW_TOTAL);
+    return zc * num_rows_bg;
+}
+
+// Return the number of total bits per code block with this base graph and
+// expansion factor
+static size_t ldpc_num_encoded_bits(size_t base_graph, size_t zc)
+{
+    static size_t num_punctured_cols = 2;
+    return zc
+        * (base_graph == 1 ? (avx2enc::BG1_COL_TOTAL - num_punctured_cols)
+                           : (avx2enc::BG2_COL_TOTAL - num_punctured_cols));
+}
+
+// Return the number of bytes required in the input buffer used for LDPC
+// encoding
+static size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
+{
+    // We add avx2enc::PROC_BYTES as padding for the encoder's scatter function
+    return bits_to_bytes(ldpc_num_input_bits(base_graph, zc))
+        + avx2enc::PROC_BYTES;
+}
+
+// Return the number of bytes required in the parity buffer used for LDPC
+// encoding
+static size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
+{
+    // We add avx2enc::PROC_BYTES as padding for the encoder's gather function
+    return bits_to_bytes(ldpc_num_parity_bits(base_graph, zc))
+        + avx2enc::PROC_BYTES;
+}
+
+// Return the number of bytes required in the output encoded codeword buffer
+// used for LDPC encoding
+static size_t ldpc_encoding_encoded_buf_size(size_t base_graph, size_t zc)
+{
+    // We add avx2enc::PROC_BYTES as padding for the encoder's gather function
+    return bits_to_bytes(ldpc_num_encoded_bits(base_graph, zc))
+        + avx2enc::PROC_BYTES;
+}
+
+// Generate the codeword output and parity buffer for this input buffer
+static void ldpc_encode_helper(size_t base_graph, size_t zc,
+    int8_t* encoded_buffer, int8_t* parity_buffer, const int8_t* input_buffer)
+{
+    const size_t num_input_bits = ldpc_num_input_bits(base_graph, zc);
+    const size_t num_parity_bits = ldpc_num_parity_bits(base_graph, zc);
+    const size_t num_encoded_bits = ldpc_num_encoded_bits(base_graph, zc);
+
+    avx2enc::bblib_ldpc_encoder_5gnr_request req;
+    avx2enc::bblib_ldpc_encoder_5gnr_response resp;
+    req.baseGraph = base_graph;
+    req.Zc = zc;
+    req.numberCodeblocks = 1;
+    req.input[0] = const_cast<int8_t*>(input_buffer);
+    resp.output[0] = parity_buffer;
+
+    avx2enc::ldpc_encoder_avx2(&req, &resp);
+
+    // Copy punctured input bits from the encoding request, and parity bits from
+    // the encoding response into encoded_buffer
+
     // This ensures that the input bits after puncturing are byte-aligned.
     // Else we'd have to paste the parity bits at a byte-misaligned start
     // address, which isn't implemented yet.
-    assert(req->Zc % 4 == 0);
+    assert(req.Zc % 4 == 0);
 
-    const size_t num_input_bits = req->Zc
-        * (req->baseGraph == 1 ? avx2enc::BG1_COL_INF_NUM
-                               : avx2enc::BG2_COL_INF_NUM);
-
-    // Number of rows of the (non-expanded) base graph used
-    const size_t num_rows_bg = (req->baseGraph == 1 ? avx2enc::BG1_ROW_TOTAL
-                                                    : avx2enc::BG2_ROW_TOTAL);
-    const size_t num_parity_bits = req->Zc * num_rows_bg;
-    const size_t num_punctured_bytes
-        = bits_to_bytes(req->Zc * 2 /* number of punctured columns */);
-    const size_t num_input_bytes_copied
+    static size_t num_punctured_cols = 2;
+    const size_t num_punctured_bytes = bits_to_bytes(zc * num_punctured_cols);
+    const size_t num_input_bytes_to_copy
         = bits_to_bytes(num_input_bits) - num_punctured_bytes;
 
-    memcpy(encoded_buffer, req->input[cb_index] + num_punctured_bytes,
-        num_input_bytes_copied);
-    memcpy(encoded_buffer + num_input_bytes_copied, resp->output[cb_index],
+    memcpy(encoded_buffer, input_buffer + num_punctured_bytes,
+        num_input_bytes_to_copy);
+    memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
         bits_to_bytes(num_parity_bits));
 }
 
