@@ -8,6 +8,7 @@
  */
 
 #include "common/gettime.h"
+#include "common/utils_ldpc.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 #include <assert.h>
@@ -28,7 +29,6 @@ static constexpr size_t kNumFillerBits = 0;
 static constexpr size_t kMaxDecoderIters = 20;
 static constexpr size_t k5GNRNumPunctured = 2;
 
-static size_t bits_to_bytes(size_t num_bits) { return (num_bits + 7) / 8; };
 char* read_binfile(std::string filename, size_t buffer_size)
 {
     std::ifstream infile;
@@ -104,16 +104,8 @@ int main()
             num_input_bits * kNumCodeBlocks / encoding_us,
             encoding_us / kNumCodeBlocks);
 
-        // Generate the encoded output
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            const size_t num_punctured_bytes
-                = bits_to_bytes(zc * k5GNRNumPunctured);
-            const size_t num_input_bytes_copied
-                = bits_to_bytes(num_input_bits) - num_punctured_bytes;
-            memcpy(encoded[n], input[n] + num_punctured_bytes,
-                num_input_bytes_copied);
-            memcpy(encoded[n] + num_input_bytes_copied, parity[n],
-                bits_to_bytes(num_parity_bits));
+            generate_encoded_buffer(encoded[n], &req, &resp, n);
         }
 
         // Generate log-likelihood ratios, one byte per input bit

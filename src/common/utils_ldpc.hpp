@@ -7,6 +7,7 @@
 #include "phy_ldpc_decoder_5gnr.h"
 #endif
 
+#include <assert.h>
 #include <malloc.h>
 
 template <typename T>
@@ -100,5 +101,35 @@ static uint8_t select_base_matrix_entry(uint16_t Zc)
 
 // Return the number of bytes needed to store n_bits bits
 static inline size_t bits_to_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
+
+// Copy punctured input bits from the encoding request, and parity bits from
+// the encoding response into encoded_buffer
+static void generate_encoded_buffer(int8_t* encoded_buffer,
+    avx2enc::bblib_ldpc_encoder_5gnr_request* req,
+    avx2enc::bblib_ldpc_encoder_5gnr_response* resp, size_t cb_index = 0)
+{
+    // This ensures that the input bits after puncturing are byte-aligned.
+    // Else we'd have to paste the parity bits at a byte-misaligned start
+    // address, which isn't implemented yet.
+    assert(req->Zc % 4 == 0);
+
+    const size_t num_input_bits = req->Zc
+        * (req->baseGraph == 1 ? avx2enc::BG1_COL_INF_NUM
+                               : avx2enc::BG2_COL_INF_NUM);
+
+    // Number of rows of the (non-expanded) base graph used
+    const size_t num_rows_bg = (req->baseGraph == 1 ? avx2enc::BG1_ROW_TOTAL
+                                                    : avx2enc::BG2_ROW_TOTAL);
+    const size_t num_parity_bits = req->Zc * num_rows_bg;
+    const size_t num_punctured_bytes
+        = bits_to_bytes(req->Zc * 2 /* number of punctured columns */);
+    const size_t num_input_bytes_copied
+        = bits_to_bytes(num_input_bits) - num_punctured_bytes;
+
+    memcpy(encoded_buffer, req->input[cb_index] + num_punctured_bytes,
+        num_input_bytes_copied);
+    memcpy(encoded_buffer + num_input_bytes_copied, resp->output[cb_index],
+        bits_to_bytes(num_parity_bits));
+}
 
 #endif
