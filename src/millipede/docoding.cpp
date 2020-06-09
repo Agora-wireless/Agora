@@ -60,13 +60,13 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
+    parity_buffer = (int8_t*)memalign(
+        64, bits_to_bytes(cfg->LDPC_config.cbEncLen) + avx2enc::PROC_BYTES);
 }
 
 DoEncode::~DoEncode()
 {
-    free_buffer_1d(&encoded_buffer_temp);
+    free(&parity_buffer);
     free_buffer_1d(&ldpc_decoder_5gnr_response.varNodes);
 }
 
@@ -92,38 +92,36 @@ Event_data DoEncode::launch(size_t tag)
     int input_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
         + cbLenBytes * cur_cb_id;
     int symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
-    int8_t* input_ptr
-        = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
-    int8_t* output_ptr = encoded_buffer_temp;
 
     avx2enc::bblib_ldpc_encoder_5gnr_request request;
     request.Zc = LDPC_config.Zc;
     request.baseGraph = LDPC_config.Bg;
     request.numberCodeblocks = 1;
-    request.input[0] = input_ptr;
+    request.input[0]
+        = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
     avx2enc::bblib_ldpc_encoder_5gnr_response response;
-    response.output[0] = output_ptr;
+    response.output[0] = parity_buffer;
 
-    /*
-    ldpc_adapter_func(
-        input_ptr, internalBuffer0, LDPC_config.Zc, LDPC_config.cbLen, 1);
-    ldpc_encoder_func(internalBuffer0, internalBuffer1, pMatrixNumPerCol, pAddr,
-        pShiftMatrix, (int16_t)LDPC_config.Zc, i_LS);
-    memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
-        (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES);
-    memcpy(
-        internalBuffer2 + (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES,
-        internalBuffer1, LDPC_config.cbEncLen / LDPC_config.Zc * PROC_BYTES);
+    avx2enc::ldpc_encoder_avx2(&request, &response);
 
-    ldpc_adapter_func(
-        output_ptr, internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
+    // Generate the encoded output
     int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
     int output_offset = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
-    int8_t* final_output_ptr
+    int8_t* encoded_buffer
         = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
-    adapt_bits_for_mod(output_ptr, final_output_ptr,
-        (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
-        */
+
+    // This ensures that the input bits after puncturing are byte-aligned.
+    // Else we'd have to paste the parity bits at a byte-misaligned start
+    // address, which isn't implemented yet.
+    rt_assert(cfg->LDPC_config.Zc % 4 == 0);
+
+    const size_t num_punctured_bytes = bits_to_bytes(LDPC_config.Zc * 2);
+    const size_t num_input_bytes_copied
+        = bits_to_bytes(LDPC_config.cbLen) - num_punctured_bytes;
+    memcpy(encoded_buffer, request.input[0] + num_punctured_bytes,
+        num_input_bytes_copied);
+    memcpy(encoded_buffer + num_input_bytes_copied, parity_buffer,
+        bits_to_bytes(LDPC_config.cbEncLen));
 
     // printf("Encoded data\n");
     // int mod_type = cfg->mod_type;
