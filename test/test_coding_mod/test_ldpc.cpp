@@ -7,6 +7,7 @@
  * FlexRAN's decoder, which supports AVX2.
  */
 
+#include "common/Symbols.hpp"
 #include "common/gettime.h"
 #include "common/utils_ldpc.hpp"
 #include "encoder.hpp"
@@ -55,28 +56,18 @@ int main()
         // address, which isn't implemented yet.
         assert(zc % 4 == 0);
 
-        const size_t num_input_bits = zc
-            * (kBaseGraph == 1 ? avx2enc::BG1_COL_INF_NUM
-                               : avx2enc::BG2_COL_INF_NUM);
-
-        // Number of rows of the (non-expanded) base graph used
-        const size_t num_rows_bg = (kBaseGraph == 1 ? avx2enc::BG1_ROW_TOTAL
-                                                    : avx2enc::BG2_ROW_TOTAL);
-        const size_t num_parity_bits = zc * num_rows_bg;
-
-        const size_t num_encoded_bits = zc
-            * (kBaseGraph == 1 ? (avx2enc::BG1_COL_TOTAL - k5GNRNumPunctured)
-                               : (avx2enc::BG2_COL_TOTAL - k5GNRNumPunctured));
+        const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
+        const size_t num_parity_bits = ldpc_num_parity_bits(kBaseGraph, zc);
+        const size_t num_encoded_bits = ldpc_num_encoded_bits(kBaseGraph, zc);
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
-            input[i] = new int8_t[bits_to_bytes(num_input_bits)
-                + avx2enc::PROC_BYTES]();
-            parity[i] = new int8_t[bits_to_bytes(num_parity_bits)
-                + avx2enc::PROC_BYTES]();
-            encoded[i] = new int8_t[bits_to_bytes(num_encoded_bits)
-                + avx2enc::PROC_BYTES]();
-            decoded[i] = new uint8_t[bits_to_bytes(num_encoded_bits)
-                + avx2enc::PROC_BYTES]();
+            input[i] = new int8_t[ldpc_encoding_input_buf_size(kBaseGraph, zc)];
+            parity[i]
+                = new int8_t[ldpc_encoding_parity_buf_size(kBaseGraph, zc)];
+            encoded[i]
+                = new int8_t[ldpc_encoding_encoded_buf_size(kBaseGraph, zc)];
+            decoded[i]
+                = new uint8_t[ldpc_encoding_encoded_buf_size(kBaseGraph, zc)];
         }
 
         // Randomly generate input
@@ -86,29 +77,17 @@ int main()
                 input[n][i] = (int8_t)rand();
         }
 
-        avx2enc::bblib_ldpc_encoder_5gnr_request req;
-        avx2enc::bblib_ldpc_encoder_5gnr_response resp;
-        req.baseGraph = kBaseGraph;
-        req.Zc = zc;
-        req.numberCodeblocks = kNumCodeBlocks;
-        for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            req.input[n] = input[n];
-            resp.output[n] = parity[n];
-        }
-
         size_t encoding_start_tsc = rdtsc();
-        avx2enc::ldpc_encoder_avx2(&req, &resp);
+        for (size_t n = 0; n < kNumCodeBlocks; n++) {
+            ldpc_encode_helper(kBaseGraph, zc, encoded[n], parity[n], input[n]);
+        }
         double encoding_us
             = cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
         printf("Encoding: %.3f Mbps wrt input bits (%.3f us per code block)\n",
             num_input_bits * kNumCodeBlocks / encoding_us,
             encoding_us / kNumCodeBlocks);
 
-        for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            generate_encoded_buffer(encoded[n], &req, &resp, n);
-        }
-
-        // Generate log-likelihood ratios, one byte per input bit
+        // For decoding, generate log-likelihood ratios, one byte per input bit
         int8_t* llrs[kNumCodeBlocks];
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             llrs[n] = reinterpret_cast<int8_t*>(memalign(32, num_encoded_bits));
@@ -128,7 +107,7 @@ int main()
             = kEnableEarlyTermination;
         ldpc_decoder_5gnr_request.Zc = zc;
         ldpc_decoder_5gnr_request.baseGraph = kBaseGraph;
-        ldpc_decoder_5gnr_request.nRows = num_rows_bg;
+        ldpc_decoder_5gnr_request.nRows = num_parity_bits / zc;
 
         const size_t buffer_len = 1024 * 1024;
         size_t numMsgBits = num_input_bits - kNumFillerBits;
