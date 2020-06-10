@@ -315,40 +315,52 @@ void* RU::loopSYNC_TXRX(int tid)
     while (c->running) {
 
         // recv corresponding to symbol_id = 0 (Beacon)
-        radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
+        int r = radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
+        if (r != num_samps) {
+            std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time " << rxTime << std::endl;
+        }
+        if (r < 0) {
+            c->running = false;
+            break;
+        }
         if (frame_id == 0) {
             time0 = rxTime;
         }
 
-        // transmit data
+        // schedule transmit symbols
         Event_data event;
         while (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
 
             assert(event.event_type == EventType::kPacketTX);
 
-            size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+            size_t tx_frame_id = gen_tag_t(event.tags[0]).frame_id;
             size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
 
             // transmit pilot
             size_t ant_id = ue_id * c->nChannels;
             assert(ant_id < c->pilotSymbols[0].size());
-            size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
+            size_t next_tx_frame_id = tx_frame_id + TX_FRAME_DELTA;
             size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
-            txTime = time0 + tx_frame_id * frm_num_samps
+            txTime = time0 + next_tx_frame_id * frm_num_samps
                 + pilot_symbol_id * num_samps - c->cl_tx_advance;
-            radio->radioTx(ue_id, pilotbuffA.data(), num_samps, 2, txTime);
+            r = radio->radioTx(ue_id, pilotbuffA.data(), num_samps, 2, txTime);
+            if (r < num_samps)
+                std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps << std::endl;
             if (c->nChannels == 2) {
                 pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
-                txTime = time0 + tx_frame_id * frm_num_samps
+                txTime = time0 + next_tx_frame_id * frm_num_samps
                     + pilot_symbol_id * num_samps - c->cl_tx_advance;
-                radio->radioTx(ue_id, pilotbuffB.data(), num_samps, 2, txTime);
+                r = radio->radioTx(ue_id, pilotbuffB.data(), num_samps, 2, txTime);
+                if (r < num_samps)
+                    std::cout << "BAD Write (PILOT): " << r << "/" << num_samps << std::endl;
             }
+            // transmit data
             for (size_t symbol_id = 0;
                  symbol_id < c->ul_data_symbol_num_perframe; symbol_id++) {
                 size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
 
                 size_t offset
-                    = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
+                    = (c->get_total_data_symbol_idx_ul(tx_frame_id, symbol_id)
                           * c->UE_ANT_NUM)
                     + ant_id;
 
@@ -359,12 +371,14 @@ void* RU::loopSYNC_TXRX(int tid)
                     txbuf[ch] = (void*)pkt->data;
                     tx_buffer_status_[offset + ch] = 0;
                 }
-                txTime = time0 + tx_frame_id * frm_num_samps
+                txTime = time0 + next_tx_frame_id * frm_num_samps
                     + tx_symbol_id * num_samps - c->cl_tx_advance;
                 int flags = 1; // HAS_TIME
                 if (tx_symbol_id == c->ULSymbols[0].back())
                     flags = 2; // HAS_TIME & END_BURST, fixme
-                radio->radioTx(ue_id, txbuf, num_samps, flags, txTime);
+                r = radio->radioTx(ue_id, txbuf, num_samps, flags, txTime);
+                if (r < num_samps)
+                    std::cout << "BAD Write (UL): " << r << "/" << num_samps << std::endl;
             }
             rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                           Event_data(EventType::kPacketTX, event.tags[0])),
@@ -373,9 +387,22 @@ void* RU::loopSYNC_TXRX(int tid)
 
         // receive the remaining of the frame
         for (size_t symbol_id = 1; symbol_id < c->symbol_num_perframe; symbol_id++) {
-            if (!c->isDownlink(frame_id, symbol_id))
+            if (!config_->isPilot(frame_id, symbol_id)
+                && !(config_->isDownlink(frame_id, symbol_id))) {
                 radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
-            else {
+                if (r != num_samps) {
+                    std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time " << rxTime << std::endl;
+                }
+                if (r < 0) {
+                    c->running = false;
+                    break;
+                }
+#if DEBUG_RECV
+                printf("idle receive: thread %d, frame_id %d, symbol_id %d, radio_id %d "
+                       "rxtime %llx\n",
+                    tid, frame_id, symbol_id, radio_id, rxTime);
+#endif
+            } else {
                 // if buffer is full, exit
                 if (buffer_status[cursor] == 1) {
                     printf(
@@ -400,6 +427,12 @@ void* RU::loopSYNC_TXRX(int tid)
                     std::cerr << "BAD Receive(" << r << "/" << num_samps
                               << ") at Time " << rxTime << std::endl;
                 int ant_id = radio_id * c->nChannels;
+                assert((rxTime - time0) / frm_num_samps == frame_id);
+#if DEBUG_RECV
+                printf("downlink receive: thread %d, frame_id %d, symbol_id %d, radio_id %d "
+                       "rxtime %llx\n",
+                    tid, frame_id, symbol_id, radio_id, rxTime);
+#endif
                 for (size_t ch = 0; ch < c->nChannels; ++ch) {
                     new (pkt[ch])
                         Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
