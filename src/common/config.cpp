@@ -405,8 +405,8 @@ void Config::genData()
 
         int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
             LDPC_config.Bg, LDPC_config.Zc)];
-        for (int i = 0; i < ul_data_symbol_num_perframe; i++) {
-            for (int j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+        for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     ul_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
@@ -417,7 +417,7 @@ void Config::genData()
             ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
             for (size_t j = 0; j < UE_NUM; j++) {
-                for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         ul_encoded_bits[i * num_blocks_per_symbol
                             + j * LDPC_config.nblocksInSymbol + k],
@@ -434,8 +434,8 @@ void Config::genData()
             encoded_bytes_per_block, 64);
 
         // Encode downlink bits
-        for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
-            for (int j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+        for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     dl_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
@@ -446,7 +446,7 @@ void Config::genData()
             dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
             for (size_t j = 0; j < UE_NUM; j++) {
-                for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         dl_encoded_bits[i * num_blocks_per_symbol
                             + j * LDPC_config.nblocksInSymbol + k],
