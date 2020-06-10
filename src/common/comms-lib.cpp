@@ -117,8 +117,7 @@ float CommsLib::find_max_abs(Table<complex_float> in, size_t dim1, size_t dim2)
 {
     float max_val = 0;
     for (size_t i = 0; i < dim1; i++) {
-        float cur_max_val
-            = CommsLib::find_max_abs(in[i], dim2);
+        float cur_max_val = CommsLib::find_max_abs(in[i], dim2);
         if (cur_max_val > max_val)
             max_val = cur_max_val;
     }

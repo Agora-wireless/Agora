@@ -66,6 +66,9 @@ public:
     // frames[i]
     std::vector<std::vector<size_t>> DLCalSymbols;
 
+    bool hw_framer;
+
+    std::vector<std::complex<float>> gold_cf32;
     std::vector<std::complex<int16_t>> beacon_ci16;
     std::vector<std::vector<uint32_t>> beacon_weights;
     std::vector<uint32_t> coeffs;

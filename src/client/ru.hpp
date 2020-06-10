@@ -65,6 +65,7 @@ public:
      */
     int dequeue_send(int tid);
     void* loopTXRX(int tid);
+    void* loopSYNC_TXRX(int tid);
 
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
