@@ -214,8 +214,6 @@ add_executable(millipede main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
-
-
 set(SENDER_SOURCES 
   ${SOURCE_DIR}/simulator/sender_cli.cpp
   ${SOURCE_DIR}/simulator/sender.cpp 
@@ -224,8 +222,7 @@ set(SENDER_SOURCES
   ${HEADER_FILES})
 
 add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender -lpthread ${MKL_LIBS} ${LDPC_LIBS})
-
+target_link_libraries(sender -lpthread gflags ${MKL_LIBS} ${LDPC_LIBS})
 
 set(SIMULATOR_SOURCES 
   ${SOURCE_DIR}/simulator/main.cpp
