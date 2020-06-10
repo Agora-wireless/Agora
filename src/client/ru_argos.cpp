@@ -305,7 +305,7 @@ void* RU::loopSYNC_TXRX(int tid)
     int cursor = 0;
     while (c->running) {
 
-        // recv corresponding to sf = 0 (Beacon)
+        // recv corresponding to symbol_id = 0 (Beacon)
         radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
         if (frame_id == 0) {
             time0 = rxTime;
@@ -350,8 +350,8 @@ void* RU::loopSYNC_TXRX(int tid)
         }
 
         // receive the remaining of the frame
-        for (size_t sf = 1; sf < c->symbol_num_perframe; sf++) {
-            if (c->frames[0].at(sf) != 'R')
+        for (size_t symbol_id = 1; symbol_id < c->symbol_num_perframe; symbol_id++) {
+            if (!c->isDownlink(frame_id, symbol_id))
                 radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
             else {
                 // if buffer is full, exit
@@ -380,7 +380,7 @@ void* RU::loopSYNC_TXRX(int tid)
                 int ant_id = radio_id * c->nChannels;
                 for (size_t ch = 0; ch < c->nChannels; ++ch) {
                     new (pkt[ch])
-                        Packet(frame_id, sf, 0 /* cell_id */, ant_id + ch);
+                        Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
                     Event_data rx_message(
                         EventType::kPacketRX, rx_tag_t(tid, cursor + ch)._tag);
