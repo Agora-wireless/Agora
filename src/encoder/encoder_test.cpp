@@ -35,7 +35,7 @@ void run_test(size_t base_graph, size_t zc)
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
     int8_t* parity_reference[kNumCodeBlocks];
-    for (int n = 0; n < kNumCodeBlocks; n++) {
+    for (size_t n = 0; n < kNumCodeBlocks; n++) {
         // We add avx2enc::PROC_BYTES as padding for the encoder's scatter (for
         // input) and gather (for output) functions.
         input[n] = (int8_t*)read_binfile(
@@ -59,7 +59,7 @@ void run_test(size_t base_graph, size_t zc)
         }
     }
 
-    for (int n = 0; n < kNumCodeBlocks; n++) {
+    for (size_t n = 0; n < kNumCodeBlocks; n++) {
         delete[] input[n];
         delete[] parity[n];
         delete[] encoded[n];
