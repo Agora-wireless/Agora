@@ -198,31 +198,37 @@ set(MILLIPEDE_SOURCES
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
-  src/millipede/reciprocity.cpp)
+  src/millipede/reciprocity.cpp
+  src/encoder/cyclic_shift.cpp
+  src/encoder/encoder.cpp
+  src/encoder/iobuffer.cpp)
 
-# LDPC support
+# LDPC headers and sources that do not require an Intel compiler
+set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
+include_directories(
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_common
+  ${SOURCE_DIR}/src/encoder)
+
+set(LDPC_SOURCES
+  src/encoder/encoder.cpp
+  src/encoder/cyclic_shift.cpp
+  src/encoder/iobuffer.cpp)
+
+# LDPC sources that require an Intel compiler
 if(${USE_LDPC})
+  message(STATUS "LDPC is enabled")
   if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
     message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
   set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
   set(FLEXRAN_LDPC_LIBS
     ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
     ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-  include_directories(
-    ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-    ${FLEXRAN_SDK_DIR}/source/phy/lib_common
-    ${SOURCE_DIR}/src/encoder)
-
-  set(LDPC_SOURCES
-    src/encoder/cyclic_shift.cpp
-    src/encoder/encoder.cpp
-    src/encoder/iobuffer.cpp
-    src/millipede/docoding.cpp)
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
 endif()
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
