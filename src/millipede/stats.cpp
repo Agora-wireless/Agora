@@ -62,7 +62,7 @@ void Stats::print_per_thread_per_task(FrameSummary s)
 
 void Stats::print_per_frame(const char* doer_string, FrameSummary frame_summary)
 {
-    printf("%s (%zu tasks): %.2f ms (~ %.2f + %.2f + %.2f ms), ", doer_string,
+    printf("%s (%zu tasks): %.2f ms (~ %.4f + %.3f + %.4f ms), ", doer_string,
         frame_summary.count_all_threads,
         frame_summary.us_avg_threads[0] / 1000.0,
         frame_summary.us_avg_threads[1] / 1000.0,
