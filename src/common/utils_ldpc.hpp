@@ -42,13 +42,13 @@ static inline uint8_t bitreverse8(uint8_t x)
  * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
  * at least 8*len/m bytes.
  */
-static void adapt_bits_for_mod(
+static inline void adapt_bits_for_mod(
     int8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
 {
     int bits_avail = 0;
     uint16_t bits = 0;
     for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
+        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
         bits_avail += 8;
         while (bits_avail >= mod_type) {
             *vec_out++ = bits >> (16 - mod_type);
@@ -58,13 +58,13 @@ static void adapt_bits_for_mod(
     }
 }
 
-static void adapt_bits_for_mod(
+static inline void adapt_bits_for_mod(
     int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
 {
     int bits_avail = 0;
     uint16_t bits = 0;
     for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
+        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
         bits_avail += 8;
         while (bits_avail >= mod_type) {
             *vec_out++ = bits >> (16 - mod_type);
@@ -74,7 +74,7 @@ static void adapt_bits_for_mod(
     }
 }
 
-static uint8_t select_base_matrix_entry(uint16_t Zc)
+static inline uint8_t select_base_matrix_entry(uint16_t Zc)
 {
     uint8_t i_LS;
     if ((Zc % 15) == 0)
@@ -101,7 +101,7 @@ static inline size_t bits_to_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
 
 // Return the number of input information bits per code block with this base
 // graph and expansion factor
-static size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
+static inline size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
 {
     return zc
         * (base_graph == 1 ? avx2enc::BG1_COL_INF_NUM
@@ -110,7 +110,7 @@ static size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
 
 // Return the number of parity bits per code block with this base graph and
 // expansion factor
-static size_t ldpc_num_parity_bits(size_t base_graph, size_t zc)
+static inline size_t ldpc_num_parity_bits(size_t base_graph, size_t zc)
 {
     // Number of rows of the (non-expanded) base graph used
     const size_t num_rows_bg
@@ -120,7 +120,7 @@ static size_t ldpc_num_parity_bits(size_t base_graph, size_t zc)
 
 // Return the number of total bits per code block with this base graph and
 // expansion factor
-static size_t ldpc_num_encoded_bits(size_t base_graph, size_t zc)
+static inline size_t ldpc_num_encoded_bits(size_t base_graph, size_t zc)
 {
     static size_t num_punctured_cols = 2;
     return zc
@@ -130,7 +130,7 @@ static size_t ldpc_num_encoded_bits(size_t base_graph, size_t zc)
 
 // Return the number of bytes required in the input buffer used for LDPC
 // encoding
-static size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
+static inline size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
 {
     // We add avx2enc::PROC_BYTES as padding for the encoder's scatter function
     return bits_to_bytes(ldpc_num_input_bits(base_graph, zc))
@@ -139,7 +139,7 @@ static size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
 
 // Return the number of bytes required in the parity buffer used for LDPC
 // encoding
-static size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
+static inline size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
 {
     // We add avx2enc::PROC_BYTES as padding for the encoder's gather function
     return bits_to_bytes(ldpc_num_parity_bits(base_graph, zc))
@@ -148,7 +148,8 @@ static size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
 
 // Return the number of bytes required in the output encoded codeword buffer
 // used for LDPC encoding
-static size_t ldpc_encoding_encoded_buf_size(size_t base_graph, size_t zc)
+static inline size_t ldpc_encoding_encoded_buf_size(
+    size_t base_graph, size_t zc)
 {
     // We add avx2enc::PROC_BYTES as padding for the encoder's gather function
     return bits_to_bytes(ldpc_num_encoded_bits(base_graph, zc))
@@ -156,12 +157,11 @@ static size_t ldpc_encoding_encoded_buf_size(size_t base_graph, size_t zc)
 }
 
 // Generate the codeword output and parity buffer for this input buffer
-static void ldpc_encode_helper(size_t base_graph, size_t zc,
+static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     int8_t* encoded_buffer, int8_t* parity_buffer, const int8_t* input_buffer)
 {
     const size_t num_input_bits = ldpc_num_input_bits(base_graph, zc);
     const size_t num_parity_bits = ldpc_num_parity_bits(base_graph, zc);
-    const size_t num_encoded_bits = ldpc_num_encoded_bits(base_graph, zc);
 
     avx2enc::bblib_ldpc_encoder_5gnr_request req;
     avx2enc::bblib_ldpc_encoder_5gnr_response resp;

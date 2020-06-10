@@ -69,7 +69,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     if (1 == direct) {
         /* parsing the input
         p_buff_0 is the input, p_buff_1 is the buffer for barrel shifter */
-        for (int16_t i = 0; i < cbLen / zcSize; i++) {
+        for (size_t i = 0; i < cbLen / zcSize; i++) {
 
             scatter_slow(
                 (uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
@@ -81,7 +81,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     } else {
         /* storing encoded bits into output buffer
         p_buff_0 is the output, p_buff_1 is the buffer for processing data*/
-        for (int16_t i = 0; i < cbLen / zcSize; i++) {
+        for (size_t i = 0; i < cbLen / zcSize; i++) {
             gather_slow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
                 dst_offbits);
             uint8_t byteOffset = (dst_offbits + zcSize) >> 3;
@@ -139,7 +139,7 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 
     // scatter
     if (1 == direct) {
-        for (int16_t i = 0; i < cbLen / zcSize; i++) {
+        for (size_t i = 0; i < cbLen / zcSize; i++) {
             x0 = _mm256_loadu_si256((__m256i*)(p_buff_0 + i * byte_num));
             x1 = _mm256_and_si256(x0, bit_mask);
             _mm256_storeu_si256((__m256i*)p_buff_1, x1);
@@ -152,7 +152,7 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     }
     // gather
     else {
-        for (int16_t i = 0; i < cbLen / zcSize; i++) {
+        for (size_t i = 0; i < cbLen / zcSize; i++) {
             x0 = _mm256_loadu_si256((__m256i*)p_buff_1);
             x1 = _mm256_and_si256(x0, bit_mask);
             _mm256_storeu_si256((__m256i*)p_buff_0, x1);
@@ -181,7 +181,7 @@ void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
         -(xtra_byte_num - 11), -(xtra_byte_num - 7), -1);
 
     if (1 == direct) {
-        for (int16_t i = 0; i < cbLen / zcSize; i++) {
+        for (size_t i = 0; i < cbLen / zcSize; i++) {
             // read the first 256 bits
             x0 = _mm256_loadu_si256((__m256i*)p_buff_in);
             _mm256_storeu_si256((__m256i*)p_buff_out, x0);

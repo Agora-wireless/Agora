@@ -10,11 +10,11 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
     const int16_t *pTempAddr, *pTempMatrix;
     int8_t *pTempIn, *pTempOut;
     int16_t addrOffset = 0;
-    int32_t i = 0;
+    size_t i = 0;
     __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
     CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
 
-    for (int32_t j = 0; j < BG1_ROW_TOTAL; j++) {
+    for (size_t j = 0; j < BG1_ROW_TOTAL; j++) {
         _mm256_storeu_si256(
             (__m256i*)(pDataOut + j * PROC_BYTES), _mm256_set1_epi8(0));
     }
@@ -114,11 +114,11 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
     const int16_t *pTempAddr, *pTempMatrix;
     int8_t *pTempIn, *pTempOut;
     int16_t addrOffset = 0;
-    int32_t i = 0;
+    size_t i = 0;
     __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
     CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
 
-    for (int32_t j = 0; j < BG2_ROW_TOTAL; j++) {
+    for (size_t j = 0; j < BG2_ROW_TOTAL; j++) {
         _mm256_storeu_si256(
             (__m256i*)(pDataOut + j * PROC_BYTES), _mm256_set1_epi8(0));
     }
@@ -224,8 +224,6 @@ void ldpc_encoder_avx2(struct bblib_ldpc_encoder_5gnr_request* request,
     int nRows = (Bg == 1) ? BG1_ROW_TOTAL : BG2_ROW_TOTAL;
     uint32_t cbEncLen = nRows * Zc;
     uint32_t cbLen = (Bg == 1) ? Zc * BG1_COL_INF_NUM : Zc * BG2_COL_INF_NUM;
-    uint32_t cbCodewLen
-        = (Bg == 1) ? Zc * (BG1_COL_TOTAL - 2) : Zc * (BG2_COL_TOTAL - 2);
 
     int8_t* input[numberCodeblocks];
     int8_t* parity[numberCodeblocks];
