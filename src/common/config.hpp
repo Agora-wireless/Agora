@@ -147,6 +147,7 @@ public:
     size_t OFDM_SYM_LEN;
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
+    int cl_tx_advance;
     float scale; // scaling factor for all transmit symbols
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
