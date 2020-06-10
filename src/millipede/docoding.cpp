@@ -14,39 +14,6 @@ using namespace arma;
 #define __has_builtin(x) 0
 #endif
 
-static inline uint8_t bitreverse8(uint8_t x)
-{
-#if __has_builtin(__builtin_bireverse8)
-    return (__builtin_bitreverse8(x));
-#else
-    x = (x << 4) | (x >> 4);
-    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
-    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
-    return (x);
-#endif
-}
-
-/*
- * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
- * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
- * at least 8*len/m bytes.
- */
-static void adapt_bits_for_mod(
-    int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
-{
-    int bits_avail = 0;
-    uint16_t bits = 0;
-    for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
-        bits_avail += 8;
-        while (bits_avail >= mod_order) {
-            *vec_out++ = bits >> (16 - mod_order);
-            bits <<= mod_order;
-            bits_avail -= mod_order;
-        }
-    }
-}
-
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -87,41 +54,22 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     int cbLenBytes = (LDPC_config.cbLen + 7) / 8;
     int input_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
         + cbLenBytes * cur_cb_id;
     int symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
 
-    avx2enc::bblib_ldpc_encoder_5gnr_request request;
-    request.Zc = LDPC_config.Zc;
-    request.baseGraph = LDPC_config.Bg;
-    request.numberCodeblocks = 1;
-    request.input[0]
+    const auto* input_buffer
         = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
-    avx2enc::bblib_ldpc_encoder_5gnr_response response;
-    response.output[0] = parity_buffer;
-
-    avx2enc::ldpc_encoder_avx2(&request, &response);
 
     // Generate the encoded output
     int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
-    int output_offset = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
+    int output_offset = cfg->OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
     int8_t* encoded_buffer
         = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
 
-    // This ensures that the input bits after puncturing are byte-aligned.
-    // Else we'd have to paste the parity bits at a byte-misaligned start
-    // address, which isn't implemented yet.
-    rt_assert(cfg->LDPC_config.Zc % 4 == 0);
-
-    const size_t num_punctured_bytes = bits_to_bytes(LDPC_config.Zc * 2);
-    const size_t num_input_bytes_copied
-        = bits_to_bytes(LDPC_config.cbLen) - num_punctured_bytes;
-    memcpy(encoded_buffer, request.input[0] + num_punctured_bytes,
-        num_input_bytes_copied);
-    memcpy(encoded_buffer + num_input_bytes_copied, parity_buffer,
-        bits_to_bytes(LDPC_config.cbEncLen));
+    ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, encoded_buffer,
+        parity_buffer, input_buffer);
 
     // printf("Encoded data\n");
     // int mod_type = cfg->mod_type;
