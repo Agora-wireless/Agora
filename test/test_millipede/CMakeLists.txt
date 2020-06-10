@@ -118,13 +118,32 @@ set(MILLIPEDE_SOURCES
   ${SOURCE_DIR}/src/millipede/dozf.cpp
   ${SOURCE_DIR}/src/millipede/dodemul.cpp
   ${SOURCE_DIR}/src/millipede/doprecode.cpp
-  ${SOURCE_DIR}/src/millipede/reciprocity.cpp)
+  ${SOURCE_DIR}/src/millipede/reciprocity.cpp
+  ${SOURCE_DIR}/src/encoder/cyclic_shift.cpp
+  ${SOURCE_DIR}/src/encoder/encoder.cpp
+  ${SOURCE_DIR}/src/encoder/iobuffer.cpp)
+
+set(LDPC_SOURCES
+  ${SOURCE_DIR}/src/encoder/encoder.cpp
+  ${SOURCE_DIR}/src/encoder/cyclic_shift.cpp
+  ${SOURCE_DIR}/src/encoder/iobuffer.cpp)
+
+# LDPC headers and sources that do not require an Intel compiler
+set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
+include_directories(
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_common
+  ${SOURCE_DIR}/src/encoder)
+
+set(LDPC_SOURCES
+  ${SOURCE_DIR}/src/encoder/encoder.cpp
+  ${SOURCE_DIR}/src/encoder/cyclic_shift.cpp
+  ${SOURCE_DIR}/src/encoder/iobuffer.cpp)
 
 add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES})
 target_link_libraries(comp -lpthread -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
 
-
-# LDPC support
+# LDPC sources that require an Intel compiler
 if(${USE_LDPC})
   if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
     message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
@@ -134,7 +153,6 @@ if(${USE_LDPC})
   set(SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
   set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
   set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-                ${LIB_DIR}/test/phy/common/utility.a
                 ${LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   include_directories(
@@ -144,12 +162,7 @@ if(${USE_LDPC})
     ${SOURCE_DIR}/src/encoder)
 
   set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
-
-  set(LDPC_SOURCES  
-    ${SOURCE_DIR}/src/encoder/cyclic_shift.cpp
-    ${SOURCE_DIR}/src/encoder/encoder.cpp
-    ${SOURCE_DIR}/src/encoder/iobuffer.cpp
-    ${SOURCE_DIR}/src/millipede/docoding.cpp)
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} ${SOURCE_DIR}/src/millipede/docoding.cpp)
 endif()
 
 
