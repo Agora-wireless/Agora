@@ -263,8 +263,8 @@ void* RU::loopSYNC_TXRX(int tid)
 
     int num_samps = c->sampsPerSymbol;
     int frm_num_samps = num_samps * c->symbol_num_perframe;
-    std::vector<std::complex<float>> frmbuff0(frm_num_samps, 0);
-    std::vector<std::complex<float>> frmbuff1(frm_num_samps, 0);
+    std::vector<std::complex<int16_t>> frmbuff0(frm_num_samps, 0);
+    std::vector<std::complex<int16_t>> frmbuff1(frm_num_samps, 0);
     std::vector<void*> frmrxbuff(2);
     frmrxbuff[0] = frmbuff0.data();
 
@@ -282,7 +282,13 @@ void* RU::loopSYNC_TXRX(int tid)
                       << ") at Time " << rxTime << std::endl;
             continue;
         }
-        sync_index = CommsLib::find_beacon_avx(frmbuff0, c->gold_cf32);
+
+        // convert data to complex float for sync detection
+        std::vector<std::complex<float>> syncbuff;
+        for (int i = 0; i < frm_num_samps; i++)
+            syncbuff.push_back(std::complex<float>(
+                frmbuff0[i].real() / 32768.0, frmbuff0[i].imag() / 32768.0));
+        sync_index = CommsLib::find_beacon_avx(syncbuff, c->gold_cf32);
         if (sync_index < 0)
             continue;
         std::cout << "Beacon detected at Time " << rxTime
