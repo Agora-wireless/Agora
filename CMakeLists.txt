@@ -190,6 +190,7 @@ set(COMMON_SOURCES
   src/common/config.cpp
   src/common/utils.cpp
   src/common/comms-lib.cpp
+  src/common/comms-lib-avx.cpp
   src/common/signalHandler.cpp
   src/common/modulation.cpp
   src/common/net.cpp)

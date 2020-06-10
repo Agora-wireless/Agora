@@ -94,6 +94,7 @@ Config::Config(std::string jsonfile)
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
     UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
+    hw_framer = tddConf.value("hw_framer", false);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
@@ -228,8 +229,10 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
 
-    data_bytes_num_persymbol = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
-    data_bytes_num_perframe = data_bytes_num_persymbol * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
+    data_bytes_num_persymbol
+        = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
+    data_bytes_num_perframe = data_bytes_num_persymbol
+        * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
 
     running = true;
     std::cout << "Config: "
@@ -256,6 +259,10 @@ void Config::genData()
         = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
     std::vector<std::complex<int16_t>> gold_ifft_ci16
         = Utils::double_to_cint16(gold_ifft);
+    for (size_t i = 0; i < 128; i++) {
+        gold_cf32.push_back(
+            std::complex<float>(gold_ifft[0][i], gold_ifft[1][i]));
+    }
 
     std::vector<std::vector<double>> sts_seq
         = CommsLib::getSequence(0, CommsLib::STS_SEQ);
