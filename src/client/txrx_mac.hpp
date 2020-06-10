@@ -84,7 +84,7 @@ public:
     typedef struct sockaddr_in6 sockaddr_t;
 #endif
     int dequeue_send(int tid);
-    char* recv_enqueue(int tid, int radio_id, int rx_offset);
+    struct MacPacket* recv_enqueue(int tid, int radio_id, int rx_offset);
 
 private:
 #if USE_IPV4

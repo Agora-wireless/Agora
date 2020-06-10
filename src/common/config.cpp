@@ -228,8 +228,18 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
 
-    data_bytes_num_persymbol = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
-    data_bytes_num_perframe = data_bytes_num_persymbol * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
+    data_bytes_num_persymbol
+        = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
+    data_bytes_num_perframe = data_bytes_num_persymbol
+        * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
+    mac_data_bytes_num_perframe = data_bytes_num_perframe;
+    mac_packet_length = offsetof(Packet, data) + mac_data_bytes_num_perframe;
+    num_frames_per_mac_packet
+        = mac_data_bytes_num_perframe / data_bytes_num_perframe;
+    // The current implementation only supports the case when  MAC packet size
+    // is multiples of data_bytes_num_perframe
+    rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
+        "MAC packet size need to be multiples of data_bytes_num_perframe!");
 
     running = true;
     std::cout << "Config: "

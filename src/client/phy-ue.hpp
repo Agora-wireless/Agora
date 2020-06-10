@@ -326,15 +326,18 @@ private:
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
+    moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
     moodycamel::ConcurrentQueue<Event_data> modul_queue_;
     moodycamel::ConcurrentQueue<Event_data> map_queue_;
 
-    pthread_t task_threads[TASK_THREAD_NUM];
+    pthread_t task_threads[kMaxThreads];
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
-    std::unique_ptr<moodycamel::ProducerToken> task_ptok[TASK_THREAD_NUM];
+    moodycamel::ProducerToken* mac_rx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* mac_tx_ptoks_ptr[kMaxThreads];
+    // moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* task_ptok[kMaxThreads];
 
     // all checkers
     size_t csi_checker_[TASK_BUFFER_FRAME_NUM];
