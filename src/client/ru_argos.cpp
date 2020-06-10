@@ -268,6 +268,15 @@ void* RU::loopSYNC_TXRX(int tid)
     std::vector<void*> frmrxbuff(2);
     frmrxbuff[0] = frmbuff0.data();
 
+    std::vector<void*> pilotbuffA(2);
+    std::vector<void*> pilotbuffB(2);
+    pilotbuffA[0] = c->pilot_ci16.data();
+    if (c->nChannels == 2) {
+        pilotbuffA[1] = std::vector<std::complex<float>>(num_samps, 0).data();
+        pilotbuffB[1] = c->pilot_ci16.data();
+        pilotbuffB[0] = std::vector<std::complex<float>>(num_samps, 0).data();
+    }
+
     long long rxTime(0);
     long long txTime(0);
     int radio_id = radio_lo;
@@ -293,7 +302,7 @@ void* RU::loopSYNC_TXRX(int tid)
             continue;
         std::cout << "Beacon detected at Time " << rxTime
                   << ", sync_index: " << sync_index << std::endl;
-        rx_offset = sync_index - config_->beacon_len - c->prefix;
+        rx_offset = sync_index - c->beacon_len - c->prefix;
     }
 
     // Read rx_offset to align with the begining of a frame
@@ -310,6 +319,7 @@ void* RU::loopSYNC_TXRX(int tid)
         if (frame_id == 0) {
             time0 = rxTime;
         }
+
         // transmit data
         Event_data event;
         while (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
@@ -319,12 +329,24 @@ void* RU::loopSYNC_TXRX(int tid)
             size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
             size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
 
+            // transmit pilot
+            size_t ant_id = ue_id * c->nChannels;
+            assert(ant_id < c->pilotSymbols[0].size());
+            size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
+            size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
+            txTime = time0 + tx_frame_id * frm_num_samps
+                + pilot_symbol_id * num_samps - c->cl_tx_advance;
+            radio->radioTx(ue_id, pilotbuffA.data(), num_samps, 2, txTime);
+            if (c->nChannels == 2) {
+                pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
+                txTime = time0 + tx_frame_id * frm_num_samps
+                    + pilot_symbol_id * num_samps - c->cl_tx_advance;
+                radio->radioTx(ue_id, pilotbuffB.data(), num_samps, 2, txTime);
+            }
             for (size_t symbol_id = 0;
                  symbol_id < c->ul_data_symbol_num_perframe; symbol_id++) {
-                size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
                 size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
 
-                size_t ant_id = ue_id * c->nChannels;
                 size_t offset
                     = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
                           * c->UE_ANT_NUM)
@@ -338,7 +360,7 @@ void* RU::loopSYNC_TXRX(int tid)
                     tx_buffer_status_[offset + ch] = 0;
                 }
                 txTime = time0 + tx_frame_id * frm_num_samps
-                    + tx_symbol_id * num_samps - 100;
+                    + tx_symbol_id * num_samps - c->cl_tx_advance;
                 int flags = 1; // HAS_TIME
                 if (tx_symbol_id == c->ULSymbols[0].back())
                     flags = 2; // HAS_TIME & END_BURST, fixme
@@ -394,6 +416,7 @@ void* RU::loopSYNC_TXRX(int tid)
                 }
             }
         }
+        std::cout << "End of Frame " << frame_id << std::endl;
         frame_id++;
         if (++radio_id == radio_hi)
             radio_id = radio_lo;

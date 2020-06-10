@@ -94,6 +94,7 @@ Config::Config(std::string jsonfile)
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
     UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
+    cl_tx_advance = tddConf.value("tx_advance", 100);
     hw_framer = tddConf.value("hw_framer", true);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
@@ -480,6 +481,10 @@ void Config::genData()
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
             prefix, CP_LEN, scale);
     }
+
+    pilot_ci16.resize(sampsPerSymbol, 0);
+    CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)pilot_ci16.data(), OFDM_CA_NUM,
+        prefix, CP_LEN, scale);
 
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilot_cf32.push_back(std::complex<float>(
