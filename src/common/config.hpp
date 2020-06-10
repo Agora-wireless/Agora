@@ -157,6 +157,9 @@ public:
     size_t packet_length;
     size_t data_bytes_num_persymbol;
     size_t data_bytes_num_perframe;
+    size_t mac_data_bytes_num_perframe;
+    size_t mac_packet_length;
+    size_t num_frames_per_mac_packet;
     size_t sym_packet_length;
 
     // IP address at Millipde side

@@ -84,15 +84,15 @@ bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 
 void* PacketTXRX::loopTXRX(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerMacTXRX, core_id_, tid);
     std::vector<int> rx_offset(config_->UE_ANT_NUM, 0);
     int radio_lo = tid * config_->UE_ANT_NUM / comm_thread_num_;
     int radio_hi = (tid + 1) * config_->UE_ANT_NUM / comm_thread_num_;
-    printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    printf("MAC TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-        int local_port_id = config_->bs_port + radio_id;
+        int local_port_id = config_->mac_rx_port + radio_id;
 #if USE_IPV4
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
@@ -116,7 +116,8 @@ void* PacketTXRX::loopTXRX(int tid)
         //if (-1 != dequeue_send(tid))
         //    continue;
         // receive data
-        char* pkt = recv_enqueue(tid, radio_id, rx_offset[radio_id]);
+        struct MacPacket* pkt
+            = recv_enqueue(tid, radio_id, rx_offset[radio_id]);
         if (pkt == NULL)
             continue;
         rx_offset[radio_id] = (rx_offset[radio_id] + 1) % buffer_frame_num_;
@@ -127,12 +128,13 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-char* PacketTXRX::recv_enqueue(UNUSED int tid, int radio_id, int rx_offset)
+struct MacPacket* PacketTXRX::recv_enqueue(
+    UNUSED int tid, int radio_id, int rx_offset)
 {
-    //moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[radio_id];
     int* rx_buffer_status = (*buffer_status_)[radio_id];
-    int packet_length = config_->data_bytes_num_perframe;
+    int packet_length = config_->mac_packet_length;
 
     // if rx_buffer is full, exit
     //if (rx_buffer_status[rx_offset] == 1) {
@@ -141,25 +143,37 @@ char* PacketTXRX::recv_enqueue(UNUSED int tid, int radio_id, int rx_offset)
     //    //config_->running = false;
     //    //return (NULL);
     //}
-    char* pkt = &rx_buffer[rx_offset * packet_length];
-    if (-1 == recv(socket_[radio_id], pkt, packet_length, 0)) {
+    struct MacPacket* pkt
+        = (struct MacPacket*)&rx_buffer[rx_offset * packet_length];
+    // if (-1 == recv(socket_[radio_id], pkt->data, packet_length, 0)) {
+
+    socklen_t addrlen = sizeof(servaddr_[radio_id]);
+    int ret = recvfrom(socket_[radio_id], (char*)pkt, packet_length, 0,
+        (struct sockaddr*)&servaddr_[radio_id], &addrlen);
+    if (ret == -1) {
         if (errno != EAGAIN && config_->running) {
             perror("recv failed");
             exit(0);
         }
         return (NULL);
     }
+    // printf("received data %d\n", ret);
+    // printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
+    // printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
+
+    // printf("In MAC TXRX thread %d: received frame %d, ue %d\n", tid,
+    //     pkt->frame_id, pkt->ue_id);
 
     // get the position in rx_buffer
     // move ptr & set status to full
-    rx_buffer_status[rx_offset]
-        = 1; // has data, after it is read, it is set to 0
-    // Push kPacketRX event into the queue.
-    //Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
-    //if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-    //    printf("socket message enqueue failed\n");
-    //    exit(0);
-    //}
+    rx_buffer_status[rx_offset] = 1;
+
+    Event_data rx_message(
+        EventType::kPacketFromMac, rx_tag_t(radio_id, rx_offset)._tag);
+    if (!message_queue_->enqueue(*local_ptok, rx_message)) {
+        printf("MAC socket message enqueue failed\n");
+        exit(0);
+    }
     return pkt;
 }
 

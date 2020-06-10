@@ -54,6 +54,7 @@ public:
 private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
+    void* data_update_thread(int tid);
     void init_data_from_file();
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
@@ -97,6 +98,8 @@ private:
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ConcurrentQueue<size_t> completion_queue_
+        = moodycamel::ConcurrentQueue<size_t>(1024);
+    moodycamel::ConcurrentQueue<size_t> data_update_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
