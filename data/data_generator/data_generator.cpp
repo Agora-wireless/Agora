@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
         const size_t base_graph = LDPC_config.Bg;
         const size_t zc = LDPC_config.Zc;
 
-        for (int i = 0; i < numberCodeblocks; i++) {
+        for (size_t i = 0; i < numberCodeblocks; i++) {
             input[i] = new int8_t[ldpc_encoding_input_buf_size(base_graph, zc)];
             parity[i]
                 = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
 
         const size_t num_input_bytes
             = bits_to_bytes(ldpc_num_input_bits(base_graph, zc));
-        for (int n = 0; n < numberCodeblocks; n++) {
+        for (size_t n = 0; n < numberCodeblocks; n++) {
             for (size_t i = 0; i < num_input_bytes; i++) {
                 input[n][i] = (int8_t)rand();
             }
@@ -113,11 +113,11 @@ int main(int argc, char* argv[])
 
         if (kVerbose) {
             printf("Raw input\n");
-            for (int n = 0; n < numberCodeblocks; n++) {
+            for (size_t n = 0; n < numberCodeblocks; n++) {
                 if (n % UE_NUM == 0) {
-                    printf("Symbol %d\n", n / UE_NUM);
+                    printf("Symbol %zu\n", n / UE_NUM);
                 }
-                printf("UE %d\n", n % UE_NUM);
+                printf("UE %zu\n", n % UE_NUM);
 
                 for (size_t i = 0; i < num_input_bytes; i++) {
                     // std::cout << std::bitset<8>(input[n][i]) << " ";
@@ -128,8 +128,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        double start_time = get_time();
-        for (int n = 0; n < numberCodeblocks; n++) {
+        for (size_t n = 0; n < numberCodeblocks; n++) {
             ldpc_encode_helper(base_graph, zc, encoded[n], parity[n], input[n]);
         }
     }
@@ -141,14 +140,14 @@ int main(int argc, char* argv[])
     Table<float> mod_table;
     init_modulation_table(mod_table, mod_type);
 
-    for (int n = 0; n < numberCodeblocks; n++) {
+    for (size_t n = 0; n < numberCodeblocks; n++) {
         if (kUseLDPC) {
             adapt_bits_for_mod(encoded[n], mod_input[n],
                 bits_to_bytes(
                     ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc)),
                 mod_type);
         } else {
-            for (int i = 0; i < num_mod; i++)
+            for (size_t i = 0; i < num_mod; i++)
                 mod_input[n][i] = (uint8_t)(rand() % config_->mod_order);
             // printf("symbol %d ue %d\n", n / UE_NUM, n % UE_NUM );
             // for (int i = 0; i < num_mod; i++)
@@ -167,7 +166,7 @@ int main(int argc, char* argv[])
             + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_NUM)
             + ".bin";
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
-        for (int i = 0; i < numberCodeblocks; i++) {
+        for (size_t i = 0; i < numberCodeblocks; i++) {
             uint8_t* ptr = (uint8_t*)input[i];
             const size_t num_input_bytes = bits_to_bytes(
                 ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc));
@@ -179,7 +178,7 @@ int main(int argc, char* argv[])
             + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_NUM)
             + ".bin";
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
-        for (int i = 0; i < numberCodeblocks; i++) {
+        for (size_t i = 0; i < numberCodeblocks; i++) {
             uint8_t* ptr = (uint8_t*)mod_input[i];
             fwrite(ptr, OFDM_DATA_NUM, sizeof(uint8_t), fp_input);
         }
