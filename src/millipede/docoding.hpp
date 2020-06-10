@@ -23,7 +23,6 @@
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"
-#include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
 
 class DoEncode : public Doer {
@@ -42,8 +41,6 @@ private:
     Table<int8_t>& raw_data_buffer_;
     int8_t* parity_buffer; // Intermediate buffer to hold parity
     Table<int8_t>& encoded_buffer_;
-    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
-    };
     DurationStat* duration_stat;
 };
 
@@ -57,19 +54,13 @@ public:
         Stats* in_stats_manager);
     ~DoDecode();
 
-    /**
-     * Do Decode task for one code block
-     */
     Event_data launch(size_t tag);
 
 private:
+    int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
     Table<uint8_t>& decoded_buffer_;
     DurationStat* duration_stat;
-    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
-    };
-    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
-    };
 };
 
 #endif

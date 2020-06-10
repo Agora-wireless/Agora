@@ -1,12 +1,9 @@
 #ifndef UTILS_LDPC
 #define UTILS_LDPC
 
-#ifdef USE_LDPC
+#include "Symbols.hpp"
 #include "encoder.hpp"
 #include "iobuffer.hpp"
-#endif
-
-#include "Symbols.hpp"
 #include <assert.h>
 #include <malloc.h>
 

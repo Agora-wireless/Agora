@@ -13,15 +13,8 @@
 #include <vector>
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
-#include <boost/align/aligned_allocator.hpp>
-#ifdef USE_LDPC
 #include "common_typedef_sdk.h"
-#else
-struct complex_float {
-    float re;
-    float im;
-};
-#endif
+#include <boost/align/aligned_allocator.hpp>
 
 // Event data tag for RX events
 union rx_tag_t {
