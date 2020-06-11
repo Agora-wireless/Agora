@@ -722,8 +722,10 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     rt_assert((size_t)pkt->ue_id == ue_id,
         "UE index in tag does not match that in received packet!");
 
-    for (size_t i = 0; i < config_->num_frames_per_mac_packet; i++) {
-        size_t frame_id = mac_frame_id * config_->num_frames_per_mac_packet + i;
+    size_t num_frames_per_mac_packet
+        = config_->mac_data_bytes_num_perframe / config_->data_bytes_num_perframe;
+    for (size_t i = 0; i < num_frames_per_mac_packet; i++) {
+        size_t frame_id = mac_frame_id * num_frames_per_mac_packet + i;
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
              ul_symbol_id++) {
