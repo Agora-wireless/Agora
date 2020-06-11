@@ -26,11 +26,19 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
-    parity_buffer = (int8_t*)memalign(
-        64, bits_to_bytes(cfg->LDPC_config.cbEncLen) + avx2enc::PROC_BYTES);
+    parity_buffer = (int8_t*)memalign(64,
+        ldpc_encoding_parity_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+    encoded_buffer_temp = (int8_t*)memalign(64,
+        ldpc_encoding_encoded_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 }
 
-DoEncode::~DoEncode() { free(&parity_buffer); }
+DoEncode::~DoEncode()
+{
+    free(parity_buffer);
+    free(encoded_buffer_temp);
+}
 
 Event_data DoEncode::launch(size_t tag)
 {
@@ -49,30 +57,31 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    int cbLenBytes = (LDPC_config.cbLen + 7) / 8;
+    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
     int input_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
         + cbLenBytes * cur_cb_id;
     int symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
-
-    const auto* input_buffer
+    int8_t* input_ptr
         = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
+    int8_t* output_ptr = encoded_buffer_temp;
 
-    // Generate the encoded output
+    ldpc_encode_helper(
+        LDPC_config.Bg, LDPC_config.Zc, output_ptr, parity_buffer, input_ptr);
     int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
-    int output_offset = cfg->OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
-    int8_t* encoded_buffer
+    int output_offset = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
+    int8_t* final_output_ptr
         = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
+    adapt_bits_for_mod(output_ptr, final_output_ptr,
+        (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
 
-    ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, encoded_buffer,
-        parity_buffer, input_buffer);
-
-    if (kPrintEncodedData) {
-        printf("Encoded data\n");
-        for (size_t i = 0; i < cbLenBytes; i++) {
-            printf("%u ", encoded_buffer[i]);
-        }
-        printf("\n");
-    }
+    // printf("Encoded data\n");
+    // int mod_type = cfg->mod_type;
+    // int num_mod = LDPC_config.cbCodewLen / mod_type;
+    // for(int i = 0; i < num_mod; i++) {
+    //     printf("%u ", *(final_output_ptr + i));
+    // }
+    // printf("\n");
 
     double duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
