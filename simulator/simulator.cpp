@@ -157,18 +157,19 @@ void Simulator::update_rx_counters(
     } else if (rx_counter_packets_[frame_id_in_buffer]
         == max_packet_num_per_frame) {
         frame_end_receive[frame_id] = get_time();
-        print_per_frame_done(PRINT_RX, frame_id, frame_id_in_buffer);
+        print_per_frame_done(
+            PrintType::kPacketRX, frame_id, frame_id_in_buffer);
         rx_counter_packets_[frame_id_in_buffer] = 0;
     }
 }
 
 void Simulator::print_per_frame_done(
-    size_t task_type, size_t frame_id, size_t frame_id_in_buffer)
+    PrintType print_type, size_t frame_id, size_t frame_id_in_buffer)
 {
     if (!kDebugPrintPerFrameDone)
         return;
-    switch (task_type) {
-    case (PRINT_RX): {
+    switch (print_type) {
+    case (PrintType::kPacketRX): {
         printf(
             "Main thread: received all packets in frame: %zu, in %.2f us since "
             "tx, in %.2f us since rx, tx duration: %.2f us\n",

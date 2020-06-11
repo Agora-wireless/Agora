@@ -1,4 +1,5 @@
 #include "net.hpp"
+#include "errno.h"
 
 void set_socket_buf_size(int socket_local, int sock_buf_size)
 {
@@ -34,7 +35,7 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
-        printf("socket bind failed\n");
+        fprintf(stderr, "Socket bind failed: %s", strerror(errno));
         exit(0);
     }
     return socket_local;
@@ -59,7 +60,7 @@ int setup_socket_ipv6(int port_id, bool set_sock_size, int sock_buf_size)
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
-        printf("socket bind failed\n");
+        fprintf(stderr, "Socket bind failed: %s", strerror(errno));
         exit(0);
     }
     return socket_local;

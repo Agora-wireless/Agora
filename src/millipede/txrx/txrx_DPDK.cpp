@@ -6,7 +6,7 @@
 
 #include "txrx.hpp"
 
-static constexpr bool kDebugDPDK = true;
+static constexpr bool kDebugDPDK = false;
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
@@ -14,8 +14,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
 
-    std::string core_list = std::to_string(core_offset) + "-"
-        + std::to_string(core_offset + socket_thread_num);
+    std::string core_list = std::to_string(core_offset - 1) + "-"
+        + std::to_string(core_offset - 1 + socket_thread_num);
 
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
@@ -86,7 +86,6 @@ PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
 {
-
     buffer_ = &buffer;
     buffer_status_ = &buffer_status;
     frame_start_ = &frame_start;

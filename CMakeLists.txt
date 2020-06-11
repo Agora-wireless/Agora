@@ -50,10 +50,12 @@ set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
+message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
@@ -67,7 +69,7 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lm -lnuma -Wl,--no-whole-archive dl)
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lnuma -Wl,--no-whole-archive dl)
 
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
@@ -106,6 +108,18 @@ endif()
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
 
+
+if(${ENABLE_MAC})
+  add_definitions(-DENABLE_MAC)
+  set(MAC_CLIENT_SOURCES
+	  src/mac/simple_mac_client.cpp
+	  src/mac/mac_client_main.cpp)
+  set(MAC_BS_SOURCES
+	  src/mac/simple_mac_bs.cpp
+	  src/mac/mac_bs_main.cpp)
+endif()
+set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
+
 # Argos support
 if(${USE_ARGOS})
   find_package(SoapySDR "0.7" CONFIG)
@@ -128,7 +142,9 @@ if(${USE_ARGOS})
     src/common/modulation.cpp
     src/client/client_radio.cpp
     src/client/ru_argos.cpp
-    src/client/phy-ue.cpp)
+    src/client/phy-ue.cpp
+    src/client/txrx_mac.cpp
+  )
   set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
   add_definitions(-DTHREADED_INIT)
 endif()
@@ -174,6 +190,7 @@ set(COMMON_SOURCES
   src/common/config.cpp
   src/common/utils.cpp
   src/common/comms-lib.cpp
+  src/common/comms-lib-avx.cpp
   src/common/signalHandler.cpp
   src/common/modulation.cpp
   src/common/net.cpp)
@@ -221,24 +238,26 @@ foreach(dir ${dirs})
 endforeach()
 
 set(SOURCES
-  src/millipede/main.cpp 
   ${MILLIPEDE_SOURCES}
   ${TXRX_SOURCES}
+  ${TXRX_MAC_SOURCES}
   ${COMMON_SOURCES}
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
 			
-add_executable(millipede ${SOURCES} ${HEADER_FILES})
+add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 
-add_library(comp MODULE ${MILLIPEDE_SOURCES} ${TXRX_SOURCES} ${COMMON_SOURCES} ${ARGOS_SOURCES} ${LDPC_SOURCES} ${HEADER_FILES})
+add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_executable(data_generator 
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
-  ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
+  ${LDPC_SOURCES} 
+  ${COMMON_SOURCES} 
+  ${HEADER_FILES})
 target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
@@ -246,35 +265,60 @@ if(${USE_ARGOS})
   add_executable(user 
        src/client/user-main.cpp
        ${CLIENT_SOURCES}
-       ${COMMON_SOURCES})
-  target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+       ${COMMON_SOURCES}
+       ${LDPC_SOURCES}
+       ${HEADER_FILES})
+  target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
   add_library(ue_phy MODULE 
        ${CLIENT_SOURCES}
        ${COMMON_SOURCES}
-       ${ARGOS_SOURCES})
-  target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB})
+       ${ARGOS_SOURCES}
+       ${LDPC_SOURCES}
+       ${HEADER_FILES})
+  target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+
+  if(${ENABLE_MAC})
+  add_executable(macuser
+       ${MAC_CLIENT_SOURCES}
+       ${COMMON_SOURCES})
+  target_link_libraries(macuser -larmadillo ${MKL_LIBS})
+
+  add_executable(macbs
+       ${MAC_BS_SOURCES}
+       ${COMMON_SOURCES})
+  target_link_libraries(macbs -larmadillo ${MKL_LIBS})
+  endif()
 else()
   set(SENDER_SOURCES
     simulator/sender_cli.cpp
     ${COMMON_SOURCES}
-    ${SENDER_TXRX_SOURCES})
+    ${SENDER_TXRX_SOURCES}
+    ${LDPC_SOURCES}
+    ${HEADER_FILES})
 
   add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES})
+  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
 
   set(SIMULATOR_SOURCES
     simulator/main.cpp
     simulator/simulator.cpp
     simulator/sender.cpp
     simulator/receiver.cpp 
-    ${COMMON_SOURCES})
+    ${COMMON_SOURCES}
+    ${LDPC_SOURCES}
+    ${HEADER_FILES})
 
   add_executable(sim ${SIMULATOR_SOURCES})
-  target_link_libraries(sim ${MKL_LIBS})
+  target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
 endif()
 
 # The tests to run using ctest
-add_executable(test_zf test/test_zf.cc ${COMMON_SOURCES} src/millipede/stats.cpp src/millipede/dozf.cpp)
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo)
+add_executable(test_zf test/test_zf.cc 
+  ${COMMON_SOURCES} 
+  src/millipede/stats.cpp 
+  src/millipede/dozf.cpp
+  ${LDPC_SOURCES}
+  ${HEADER_FILES})
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)

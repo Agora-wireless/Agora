@@ -157,20 +157,20 @@ void* Sender::master_thread(int tid)
 
     const size_t max_symbol_id = get_max_symbol_id();
     // Load data of the first frame
+    // Schedule one task for all antennas to avoid queue overflow
     for (size_t i = 0; i < max_symbol_id; i++) {
-        for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-            auto req_tag = gen_tag_t::frm_sym_ant(0, i, j);
-            data_update_queue_.try_enqueue(req_tag._tag);
-            // update_tx_buffer(req_tag);
-            // Push tasks of the first symbol into task queue
-            if (i == 0) {
-                // add some delay to ensure data update is finished
-                usleep(100);
-                rt_assert(send_queue_.enqueue(
-                              *task_ptok[j % thread_num], req_tag._tag),
-                    "Send task enqueue failed");
-            }
-        }
+        auto req_tag = gen_tag_t::frm_sym(0, i);
+        data_update_queue_.try_enqueue(req_tag._tag);
+        // update_tx_buffer(req_tag);
+    }
+
+    // add some delay to ensure data update is finished
+    sleep(1);
+    // Push tasks of the first symbol into task queue
+    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+        auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
+        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], req_tag._tag),
+            "Send task enqueue failed");
     }
 
     frame_start[0] = get_time();
@@ -224,14 +224,13 @@ void* Sender::master_thread(int tid)
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
-                auto req_tag_for_data = gen_tag_t::frm_sym_ant(
-                    ctag.frame_id + 1, ctag.symbol_id, i);
-                data_update_queue_.try_enqueue(req_tag_for_data._tag);
-                // update_tx_buffer(req_tag);
                 rt_assert(send_queue_.enqueue(
                               *task_ptok[i % thread_num], req_tag._tag),
                     "Send task enqueue failed");
             }
+            auto req_tag_for_data
+                = gen_tag_t::frm_sym(ctag.frame_id + 1, ctag.symbol_id);
+            data_update_queue_.try_enqueue(req_tag_for_data._tag);
         }
     }
     write_stats_to_file(cfg->frames_to_test);
@@ -248,7 +247,11 @@ void* Sender::data_update_thread(int tid)
         size_t tag = 0;
         if (!data_update_queue_.try_dequeue(tag))
             continue;
-        update_tx_buffer(tag);
+        for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+            auto tag_for_ant = gen_tag_t::frm_sym_ant(
+                ((gen_tag_t)tag).frame_id, ((gen_tag_t)tag).symbol_id, i);
+            update_tx_buffer(tag_for_ant);
+        }
     }
 }
 
@@ -261,7 +264,7 @@ void Sender::update_tx_buffer(gen_tag_t tag)
     pkt->ant_id = tag.ant_id;
 
     size_t data_index = (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
-    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
+    DpdkTransport::fastMemcpy(pkt->data, (char*)IQ_data_coded[data_index],
         cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 }
 
