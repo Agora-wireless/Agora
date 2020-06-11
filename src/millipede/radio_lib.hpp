@@ -36,7 +36,6 @@ public:
 private:
     struct RadioConfigContext {
         RadioConfig* brs;
-        std::atomic_int* threadCount;
         size_t tid;
     };
     static void* initBSRadio_launch(void* in_context);
