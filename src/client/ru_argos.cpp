@@ -312,19 +312,57 @@ void* RU::loopSYNC_TXRX(int tid)
     int frame_id = 0;
 
     int cursor = 0;
+    bool resync = false;
+    int resync_retry_cnt(0);
+    int resync_retry_max(100);
+    rx_offset = 0;
     while (c->running) {
 
         // recv corresponding to symbol_id = 0 (Beacon)
-        int r = radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
-        if (r != num_samps) {
-            std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time " << rxTime << std::endl;
+        int r = radio->radioRx(
+            radio_id, frmrxbuff.data(), num_samps + rx_offset, rxTime);
+        if (r != num_samps + rx_offset) {
+            std::cerr << "BAD Beacon Receive(" << r << "/" << num_samps
+                      << ") at Time " << rxTime << std::endl;
         }
         if (r < 0) {
+            std::cerr << "Receive error! Stopping... " << std::endl;
             c->running = false;
             break;
         }
         if (frame_id == 0) {
             time0 = rxTime;
+        }
+
+        // resync every X=1000 frames:
+        // TODO: X should be a function of sample rate and max CFO
+        if (frame_id / 1000 > 0 && frame_id % 1000 == 0) {
+            resync = true;
+        }
+        rx_offset = 0;
+        if (resync) {
+            // convert data to complex float for sync detection
+            std::vector<std::complex<float>> syncbuff;
+            for (int i = 0; i < num_samps; i++)
+                syncbuff.push_back(
+                    std::complex<float>(frmbuff0[i].real() / 32768.0,
+                        frmbuff0[i].imag() / 32768.0));
+            sync_index = CommsLib::find_beacon_avx(syncbuff, c->gold_cf32);
+            if (sync_index >= 0) {
+                rx_offset = sync_index - c->beacon_len - c->prefix;
+                time0 += rx_offset;
+                resync = false;
+                resync_retry_cnt = 0;
+                std::cout << "Re-syncing with offset " << rx_offset << " after "
+                          << resync_retry_cnt + 1 << " tries\n";
+            } else
+                resync_retry_cnt++;
+        }
+        if (resync && resync_retry_cnt > resync_retry_max) {
+            std::cerr << "Exceeded resync retry limit (" << resync_retry_max
+                      << "). Stopping..." << std::endl;
+            c->running = false;
+            break;
         }
 
         // schedule transmit symbols
@@ -345,14 +383,17 @@ void* RU::loopSYNC_TXRX(int tid)
                 + pilot_symbol_id * num_samps - c->cl_tx_advance;
             r = radio->radioTx(ue_id, pilotbuffA.data(), num_samps, 2, txTime);
             if (r < num_samps)
-                std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps << std::endl;
+                std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
+                          << std::endl;
             if (c->nChannels == 2) {
                 pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
                 txTime = time0 + next_tx_frame_id * frm_num_samps
                     + pilot_symbol_id * num_samps - c->cl_tx_advance;
-                r = radio->radioTx(ue_id, pilotbuffB.data(), num_samps, 2, txTime);
+                r = radio->radioTx(
+                    ue_id, pilotbuffB.data(), num_samps, 2, txTime);
                 if (r < num_samps)
-                    std::cout << "BAD Write (PILOT): " << r << "/" << num_samps << std::endl;
+                    std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
+                              << std::endl;
             }
             // transmit data
             for (size_t symbol_id = 0;
@@ -378,7 +419,8 @@ void* RU::loopSYNC_TXRX(int tid)
                     flags = 2; // HAS_TIME & END_BURST, fixme
                 r = radio->radioTx(ue_id, txbuf, num_samps, flags, txTime);
                 if (r < num_samps)
-                    std::cout << "BAD Write (UL): " << r << "/" << num_samps << std::endl;
+                    std::cout << "BAD Write (UL): " << r << "/" << num_samps
+                              << std::endl;
             }
             rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                           Event_data(EventType::kPacketTX, event.tags[0])),
@@ -386,19 +428,23 @@ void* RU::loopSYNC_TXRX(int tid)
         }
 
         // receive the remaining of the frame
-        for (size_t symbol_id = 1; symbol_id < c->symbol_num_perframe; symbol_id++) {
+        for (size_t symbol_id = 1; symbol_id < c->symbol_num_perframe;
+             symbol_id++) {
             if (!config_->isPilot(frame_id, symbol_id)
                 && !(config_->isDownlink(frame_id, symbol_id))) {
                 radio->radioRx(radio_id, frmrxbuff.data(), num_samps, rxTime);
                 if (r != num_samps) {
-                    std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time " << rxTime << std::endl;
+                    std::cerr << "BAD Receive(" << r << "/" << num_samps
+                              << ") at Time " << rxTime << std::endl;
                 }
                 if (r < 0) {
+                    std::cerr << "Receive error! Stopping... " << std::endl;
                     c->running = false;
                     break;
                 }
 #if DEBUG_RECV
-                printf("idle receive: thread %d, frame_id %d, symbol_id %d, radio_id %d "
+                printf("idle receive: thread %d, frame_id %d, symbol_id %d, "
+                       "radio_id %d "
                        "rxtime %llx\n",
                     tid, frame_id, symbol_id, radio_id, rxTime);
 #endif
@@ -426,16 +472,22 @@ void* RU::loopSYNC_TXRX(int tid)
                 if (r < num_samps)
                     std::cerr << "BAD Receive(" << r << "/" << num_samps
                               << ") at Time " << rxTime << std::endl;
+                if (r < 0) {
+                    std::cerr << "Receive error! Stopping... " << std::endl;
+                    c->running = false;
+                    break;
+                }
                 int ant_id = radio_id * c->nChannels;
                 assert((rxTime - time0) / frm_num_samps == frame_id);
 #if DEBUG_RECV
-                printf("downlink receive: thread %d, frame_id %d, symbol_id %d, radio_id %d "
+                printf("downlink receive: thread %d, frame_id %d, symbol_id "
+                       "%d, radio_id %d "
                        "rxtime %llx\n",
                     tid, frame_id, symbol_id, radio_id, rxTime);
 #endif
                 for (size_t ch = 0; ch < c->nChannels; ++ch) {
-                    new (pkt[ch])
-                        Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
+                    new (pkt[ch]) Packet(
+                        frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
                     Event_data rx_message(
                         EventType::kPacketRX, rx_tag_t(tid, cursor + ch)._tag);
@@ -449,7 +501,6 @@ void* RU::loopSYNC_TXRX(int tid)
                 }
             }
         }
-        std::cout << "End of Frame " << frame_id << std::endl;
         frame_id++;
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
