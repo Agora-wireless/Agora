@@ -237,12 +237,11 @@ Config::Config(std::string jsonfile)
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
     mac_packet_length = offsetof(Packet, data) + mac_data_bytes_num_perframe;
-    num_frames_per_mac_packet
-        = mac_data_bytes_num_perframe / data_bytes_num_perframe;
     // The current implementation only supports the case when  MAC packet size
     // is multiples of data_bytes_num_perframe
-    rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
-        "MAC packet size need to be multiples of data_bytes_num_perframe!");
+    if (data_bytes_num_perframe != 0)
+        rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
+            "MAC packet size need to be multiples of data_bytes_num_perframe!");
 
     running = true;
     std::cout << "Config: "
@@ -627,8 +626,8 @@ void Config::genData()
     }
 
     pilot_ci16.resize(sampsPerSymbol, 0);
-    CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)pilot_ci16.data(), OFDM_CA_NUM,
-        prefix, CP_LEN, scale);
+    CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)pilot_ci16.data(),
+        OFDM_CA_NUM, prefix, CP_LEN, scale);
 
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilot_cf32.push_back(std::complex<float>(
