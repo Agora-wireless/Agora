@@ -69,6 +69,9 @@ public:
     // frames[i]
     std::vector<std::vector<size_t>> DLCalSymbols;
 
+    bool hw_framer;
+
+    std::vector<std::complex<float>> gold_cf32;
     std::vector<std::complex<int16_t>> beacon_ci16;
     std::vector<std::vector<uint32_t>> beacon_weights;
     std::vector<uint32_t> coeffs;
@@ -147,6 +150,7 @@ public:
     size_t OFDM_SYM_LEN;
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
+    int cl_tx_advance;
     float scale; // scaling factor for all transmit symbols
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
@@ -158,6 +162,12 @@ public:
     bool correct_phase_shift;
 
     size_t packet_length;
+    size_t data_bytes_num_persymbol;
+    size_t data_bytes_num_perframe;
+    size_t mac_data_bytes_num_perframe;
+    size_t mac_packet_length;
+    size_t num_frames_per_mac_packet;
+    size_t sym_packet_length;
 
     // IP address at Millipde side
     std::string rx_addr;
@@ -171,6 +181,7 @@ public:
     int ue_tx_port;
     // Port ID at MAC layer side
     int mac_rx_port;
+    int mac_tx_port;
 
     // Number of frames sent by sender during testing = number of frames
     // processed by Millipede before exiting.

@@ -1133,9 +1133,8 @@ void Millipede::initialize_downlink_buffers()
 
     dl_bits_buffer_.calloc(
         task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t dl_bits_buffer_status_size = task_buffer_symbol_num * kUseLDPC
-        ? cfg->LDPC_config.nblocksInSymbol
-        : 1;
+    size_t dl_bits_buffer_status_size = task_buffer_symbol_num
+        * (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
     dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
 
     dl_ifft_buffer_.calloc(
