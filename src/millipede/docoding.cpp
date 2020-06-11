@@ -8,43 +8,6 @@
 
 using namespace arma;
 
-#ifndef __has_builtin
-#define __has_builtin(x) 0
-#endif
-
-static inline uint8_t bitreverse8(uint8_t x)
-{
-#if __has_builtin(__builtin_bireverse8)
-    return (__builtin_bitreverse8(x));
-#else
-    x = (x << 4) | (x >> 4);
-    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
-    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
-    return (x);
-#endif
-}
-
-/*
- * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
- * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
- * at least 8*len/m bytes.
- */
-static void adapt_bits_for_mod(
-    int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
-{
-    int bits_avail = 0;
-    uint16_t bits = 0;
-    for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
-        bits_avail += 8;
-        while (bits_avail >= mod_order) {
-            *vec_out++ = bits >> (16 - mod_order);
-            bits <<= mod_order;
-            bits_avail -= mod_order;
-        }
-    }
-}
-
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -61,23 +24,8 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     alloc_buffer_1d(&encoded_buffer_temp, OFDM_DATA_NUM * 16, 32, 1);
     LDPCconfig LDPC_config = cfg->LDPC_config;
-    int Zc = LDPC_config.Zc;
-    if ((Zc % 15) == 0)
-        i_LS = 7;
-    else if ((Zc % 13) == 0)
-        i_LS = 6;
-    else if ((Zc % 11) == 0)
-        i_LS = 5;
-    else if ((Zc % 9) == 0)
-        i_LS = 4;
-    else if ((Zc % 7) == 0)
-        i_LS = 3;
-    else if ((Zc % 5) == 0)
-        i_LS = 2;
-    else if ((Zc % 3) == 0)
-        i_LS = 1;
-    else
-        i_LS = 0;
+    uint16_t Zc = LDPC_config.Zc;
+    i_LS = select_base_matrix_entry(Zc);
 
     if (LDPC_config.Bg == 1) {
         pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
@@ -210,25 +158,26 @@ Event_data DoDecode::launch(size_t tag)
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
     size_t cb_id = gen_tag_t(tag).cb_id;
-    size_t symbol_offset = cfg->get_total_data_symbol_idx(frame_id, symbol_id);
+    size_t symbol_offset
+        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
     size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
     size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
     if (kDebugPrintInTask) {
-        printf(
-            "In doDecode thread %d: frame: %zu, symbol: %zu, code block %zu\n",
-            tid, frame_id, symbol_id, cur_cb_id);
+        printf("In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
+               "%zu ue:  "
+               "%zu\n",
+            tid, frame_id, symbol_id, cur_cb_id, ue_id);
     }
 
     size_t start_tsc = worker_rdtsc();
 
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    int input_offset
-        = OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
-    int llr_buffer_offset = input_offset * cfg->mod_type;
+    size_t input_offset
+        = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+    size_t llr_buffer_offset = input_offset * cfg->mod_type;
     ldpc_decoder_5gnr_request.varNodes
         = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
-    int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
-    int output_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
+    size_t cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
+    size_t output_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
         + cbLenBytes * cur_cb_id;
     ldpc_decoder_5gnr_response.compactedMessageBytes
         = (uint8_t*)decoded_buffer_[symbol_offset] + output_offset;
@@ -236,11 +185,17 @@ Event_data DoDecode::launch(size_t tag)
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
+    // printf("LLR data, symbol_offset: %zu, input offset: %zu\n", symbol_offset,
+    //     input_offset);
+    // for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
+    //     // printf("%u ", *(ldpc_decoder_5gnr_response.compactedMessageBytes + i));
+    //     printf("%d ", *(llr_buffer_[symbol_offset] + llr_buffer_offset + i));
+    // }
+    // printf("\n");
     // printf("Decode data\n");
-    // for(int i = 0; i < LDPC_config.cbLen >> 3; i++) {
-    //     // printf("%u ", *(ldpc_decoder_5gnr_response.compactedMessageBytes +
-    //     i)); printf("%u ", *(decoded_buffer_[symbol_offset] + output_offset +
-    //     i));
+    // for (int i = 0; i<LDPC_config.cbLen>> 3; i++) {
+    //     // printf("%u ", *(ldpc_decoder_5gnr_response.compactedMessageBytes + i));
+    //     printf("%u ", *(decoded_buffer_[symbol_offset] + output_offset + i));
     // }
     // printf("\n");
 

@@ -241,7 +241,7 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
-#ifdef USE_LDPC
+#if defined USE_LDPC || defined USE_LDPC_SENDER
 static constexpr bool kUseLDPC = true;
 #else
 static constexpr bool kUseLDPC = false;
