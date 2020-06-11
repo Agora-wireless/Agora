@@ -97,6 +97,34 @@ public:
     {
         return std::abs(std::complex<float>(d.re, d.im));
     }
+    static int find_beacon_avx(const std::vector<std::complex<float>>& iq,
+        const std::vector<std::complex<float>>& seq);
+    static std::vector<float> correlate_avx_s(
+        std::vector<float> const& f, std::vector<float> const& g);
+    static std::vector<int16_t> correlate_avx_si(
+        std::vector<int16_t> const& f, std::vector<int16_t> const& g);
+    static std::vector<float> abs2_avx(
+        std::vector<std::complex<float>> const& f);
+    static std::vector<int32_t> abs2_avx(
+        std::vector<std::complex<int16_t>> const& f);
+    static std::vector<std::complex<float>> auto_corr_mult_avx(
+        std::vector<std::complex<float>> const& f, const int dly,
+        const bool conj = true);
+    static std::vector<std::complex<int16_t>> auto_corr_mult_avx(
+        std::vector<std::complex<int16_t>> const& f, const int dly,
+        const bool conj = true);
+    static std::vector<std::complex<float>> correlate_avx(
+        std::vector<std::complex<float>> const& f,
+        std::vector<std::complex<float>> const& g);
+    static std::vector<std::complex<float>> complex_mult_avx(
+        std::vector<std::complex<float>> const& f,
+        std::vector<std::complex<float>> const& g, const bool conj);
+    static std::vector<std::complex<int16_t>> complex_mult_avx(
+        std::vector<std::complex<int16_t>> const& f,
+        std::vector<std::complex<int16_t>> const& g, const bool conj);
+    static std::vector<std::complex<int16_t>> correlate_avx(
+        std::vector<std::complex<int16_t>> const& f,
+        std::vector<std::complex<int16_t>> const& g);
 };
 
 #endif
