@@ -227,41 +227,49 @@ bool ClientRadioConfig::radioStart()
     int sf_start = clTrigOffset / _cfg->sampsPerSymbol;
     int sp_start = clTrigOffset % _cfg->sampsPerSymbol;
     for (size_t i = 0; i < this->_radioNum; i++) {
-        json conf;
-        conf["tdd_enabled"] = true;
-        conf["frame_mode"] = "continuous_resync";
-        int max_frame_ = (int)(2.0
-            / ((_cfg->sampsPerSymbol * _cfg->symbol_num_perframe)
-                  / _cfg->rate));
-        conf["max_frame"] = max_frame_;
-        conf["dual_pilot"] = (_cfg->nChannels == 2);
-        std::vector<std::string> jframes;
-        jframes.push_back(_tddSched[i]);
-        conf["frames"] = jframes;
-        conf["symbol_size"] = _cfg->sampsPerSymbol;
-        std::string confString = conf.dump();
-        clStn[i]->writeSetting("TDD_CONFIG", confString);
-        clStn[i]->setHardwareTime(
-            SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, _cfg->rate),
-            "TRIGGER");
-        clStn[i]->writeSetting(
-            "TX_SW_DELAY", "30"); // experimentally good value for dev front-end
-        clStn[i]->writeSetting("TDD_MODE", "true");
-        for (char const& c : _cfg->channel) {
-            std::string tx_ram = "TX_RAM_";
-            clStn[i]->writeRegisters(tx_ram + c, 0, pilot);
+        if (_cfg->hw_framer) {
+            json conf;
+            conf["tdd_enabled"] = true;
+            conf["frame_mode"] = "continuous_resync";
+            int max_frame_ = (int)(2.0
+                / ((_cfg->sampsPerSymbol * _cfg->symbol_num_perframe)
+                      / _cfg->rate));
+            conf["max_frame"] = max_frame_;
+            conf["dual_pilot"] = (_cfg->nChannels == 2);
+            std::vector<std::string> jframes;
+            jframes.push_back(_tddSched[i]);
+            conf["frames"] = jframes;
+            conf["symbol_size"] = _cfg->sampsPerSymbol;
+            std::string confString = conf.dump();
+            clStn[i]->writeSetting("TDD_CONFIG", confString);
+            clStn[i]->setHardwareTime(
+                SoapySDR::ticksToTimeNs(
+                    (sf_start << 16) | sp_start, _cfg->rate),
+                "TRIGGER");
+            clStn[i]->writeSetting("TX_SW_DELAY",
+                "30"); // experimentally good value for dev front-end
+            clStn[i]->writeSetting("TDD_MODE", "true");
+            for (char const& c : _cfg->channel) {
+                std::string tx_ram = "TX_RAM_";
+                clStn[i]->writeRegisters(tx_ram + c, 0, pilot);
+            }
+            clStn[i]->activateStream(this->rxStreams[i], flags, 0);
+            clStn[i]->activateStream(this->txStreams[i]);
+
+            std::string corrConfString
+                = "{\"corr_enabled\":true,\"corr_threshold\":"
+                + std::to_string(1) + "}";
+            clStn[i]->writeSetting("CORR_CONFIG", corrConfString);
+            clStn[i]->writeRegisters("CORR_COE", 0, _cfg->coeffs);
+
+            clStn[i]->writeSetting(
+                "CORR_START", (_cfg->channel == "B") ? "B" : "A");
+        } else {
+            clStn[i]->setHardwareTime(0, "TRIGGER");
+            clStn[i]->activateStream(this->rxStreams[i], flags, 0);
+            clStn[i]->activateStream(this->txStreams[i]);
+            clStn[i]->writeSetting("TRIGGER_GEN", "");
         }
-        clStn[i]->activateStream(this->rxStreams[i], flags, 0);
-        clStn[i]->activateStream(this->txStreams[i]);
-
-        std::string corrConfString
-            = "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1)
-            + "}";
-        clStn[i]->writeSetting("CORR_CONFIG", corrConfString);
-        clStn[i]->writeRegisters("CORR_COE", 0, _cfg->coeffs);
-
-        clStn[i]->writeSetting(
-            "CORR_START", (_cfg->channel == "B") ? "B" : "A");
     }
 
     std::cout << "radio start done!" << std::endl;
@@ -279,27 +287,23 @@ void ClientRadioConfig::go()
     }
 }
 
-void ClientRadioConfig::radioTx(void** buffs)
-{
-    int flags = 0;
-    long long frameTime(0);
-    for (size_t i = 0; i < this->_radioNum; i++) {
-        clStn[i]->writeStream(this->txStreams[i], buffs, _cfg->sampsPerSymbol,
-            flags, frameTime, 1000000);
-    }
-}
-
-int ClientRadioConfig::radioTx(
-    size_t r /*radio id*/, void** buffs, int flags, long long& frameTime)
+int ClientRadioConfig::radioTx(size_t r /*radio id*/, void** buffs,
+    size_t num_samps, int flags, long long& frameTime)
 {
     int txFlags = 0;
     if (flags == 1)
         txFlags = SOAPY_SDR_HAS_TIME;
     else if (flags == 2)
         txFlags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
-    // long long frameTime(0);
-    int w = clStn[r]->writeStream(this->txStreams[r], buffs,
-        _cfg->sampsPerSymbol, txFlags, frameTime, 1000000);
+    int w(0);
+    if (_cfg->hw_framer) {
+        w = clStn[r]->writeStream(
+            this->txStreams[r], buffs, num_samps, txFlags, frameTime, 1000000);
+    } else {
+        long long frameTimeNs = SoapySDR::ticksToTimeNs(frameTime, _cfg->rate);
+        w = clStn[r]->writeStream(this->txStreams[r], buffs, num_samps, txFlags,
+            frameTimeNs, 1000000);
+    }
 #if DEBUG_RADIO_TX
     size_t chanMask;
     long timeoutUs(0);
@@ -312,28 +316,23 @@ int ClientRadioConfig::radioTx(
     return w;
 }
 
-void ClientRadioConfig::radioRx(void** buffs)
-{
-    int flags = 0;
-    long long frameTime(0);
-    for (size_t i = 0; i < this->_radioNum; i++) {
-        void** buff = buffs + (i * 2);
-        clStn[i]->readStream(this->rxStreams[i], buff, _cfg->sampsPerSymbol,
-            flags, frameTime, 1000000);
-    }
-}
-
 int ClientRadioConfig::radioRx(
-    size_t r /*radio id*/, void** buffs, long long& frameTime)
+    size_t r /*radio id*/, void** buffs, size_t num_samps, long long& frameTime)
 {
-    int flags = 0;
+    int flags(0);
     if (r < this->_radioNum) {
-        long long frameTimeNs = 0;
-        int ret = clStn[r]->readStream(this->rxStreams[r], buffs,
-            _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
-        frameTime = frameTimeNs; // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
+        int ret(0);
+        if (_cfg->hw_framer) {
+            ret = clStn[r]->readStream(this->rxStreams[r], buffs, num_samps,
+                flags, frameTime, 1000000);
+        } else {
+            long long frameTimeNs = 0;
+            ret = clStn[r]->readStream(this->rxStreams[r], buffs, num_samps,
+                flags, frameTimeNs, 1000000);
+            frameTime = SoapySDR::timeNsToTicks(frameTimeNs, _cfg->rate);
+        }
 #if DEBUG_RADIO_RX
-        if (ret != (int)_cfg->sampsPerSymbol)
+        if (ret != (int)num_samps)
             std::cout << "invalid return " << ret << " from radio " << r
                       << std::endl;
         else
@@ -401,15 +400,16 @@ void ClientRadioConfig::readSensors()
 
 void ClientRadioConfig::radioStop()
 {
-    std::vector<uint32_t> zeros(4096, 0);
     std::string corrConfStr = "{\"corr_enabled\":false}";
     std::string tddConfStr = "{\"tdd_enabled\":false}";
     for (size_t i = 0; i < this->_radioNum; i++) {
         clStn[i]->deactivateStream(this->rxStreams[i]);
         clStn[i]->deactivateStream(this->txStreams[i]);
-        clStn[i]->writeSetting("TDD_MODE", "false");
-        clStn[i]->writeSetting("TDD_CONFIG", tddConfStr);
-        clStn[i]->writeSetting("CORR_CONFIG", corrConfStr);
+        if (_cfg->hw_framer) {
+            clStn[i]->writeSetting("TDD_MODE", "false");
+            clStn[i]->writeSetting("TDD_CONFIG", tddConfStr);
+            clStn[i]->writeSetting("CORR_CONFIG", corrConfStr);
+        }
     }
 }
 

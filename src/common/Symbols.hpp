@@ -46,6 +46,7 @@ enum class EventType : int {
     kZF,
     kDemul,
     kIFFT,
+    kMapBits,
     kPrecode,
     kPacketTX,
     kDecode,
@@ -129,6 +130,7 @@ static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugBSSender = false;
+static constexpr bool kDebugBSReceiver = true;
 
 #define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
@@ -136,7 +138,6 @@ static constexpr bool kDebugBSSender = false;
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
-#define DEBUG_UPLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4

@@ -1,6 +1,9 @@
 #include "radio_lib.hpp"
 #include "comms-lib.h"
 
+std::atomic<size_t> num_radios_initialized;
+std::atomic<size_t> num_radios_configured;
+
 RadioConfig::RadioConfig(Config* cfg)
     : _cfg(cfg)
 {
@@ -24,12 +27,12 @@ RadioConfig::RadioConfig(Config* cfg)
     baStn.resize(_radioNum);
     txStreams.resize(_radioNum);
     rxStreams.resize(_radioNum);
-    std::atomic_int threadCount = ATOMIC_VAR_INIT((int)_radioNum);
+
+    std::vector<RadioConfigContext> radio_config_ctx_vec(this->_radioNum);
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
-        auto* context = new RadioConfigContext;
+        auto* context = &radio_config_ctx_vec[i];
         context->brs = this;
-        context->threadCount = &threadCount;
         context->tid = i;
         pthread_t init_thread_;
         if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context)
@@ -42,8 +45,18 @@ RadioConfig::RadioConfig(Config* cfg)
 #endif
     }
 
-    while (threadCount > 0)
-        ;
+    // Block until all radios are initialized
+    size_t num_checks = 0;
+    while (num_radios_initialized != this->_radioNum) {
+        size_t _num_radios_initialized = num_radios_initialized;
+        num_checks++;
+        if (num_checks > 1e9) {
+            printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
+                   "ready\n",
+                _num_radios_initialized, this->_radioNum);
+            num_checks = 0;
+        }
+    }
 
     // Perform DC Offset & IQ Imbalance Calibration
     if (_cfg->imbalanceCalEn) {
@@ -53,12 +66,10 @@ RadioConfig::RadioConfig(Config* cfg)
             dciqCalibrationProc(1);
     }
 
-    threadCount = (int)_radioNum;
     for (size_t i = 0; i < this->_radioNum; i++) {
 #ifdef THREADED_INIT
-        auto* context = new RadioConfigContext;
+        auto* context = &radio_config_ctx_vec[i];
         context->brs = this;
-        context->threadCount = &threadCount;
         context->tid = i;
         pthread_t configure_thread_;
         if (pthread_create(&configure_thread_, NULL,
@@ -72,8 +83,17 @@ RadioConfig::RadioConfig(Config* cfg)
 #endif
     }
 
-    while (threadCount > 0)
-        ;
+    // Block until all radios are configured
+    while (num_radios_configured != this->_radioNum) {
+        size_t _num_radios_configured = num_radios_configured;
+        num_checks++;
+        if (num_checks > 1e9) {
+            printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
+                   "ready\n",
+                _num_radios_configured, this->_radioNum);
+            num_checks = 0;
+        }
+    }
 
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end "
@@ -148,18 +168,14 @@ RadioConfig::RadioConfig(Config* cfg)
 
 void* RadioConfig::initBSRadio_launch(void* in_context)
 {
-    RadioConfigContext* context = (RadioConfigContext*)in_context;
-    RadioConfig* brs = context->brs;
-    brs->initBSRadio(context);
+    auto* context = (RadioConfigContext*)in_context;
+    context->brs->initBSRadio(context);
     return 0;
 }
 
 void RadioConfig::initBSRadio(RadioConfigContext* context)
 {
     size_t i = context->tid;
-    std::atomic_int* threadCount = context->threadCount;
-    delete context;
-
     auto channels = Utils::strToChannels(_cfg->channel);
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
@@ -175,8 +191,7 @@ void RadioConfig::initBSRadio(RadioConfigContext* context)
         = baStn[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
     txStreams[i]
         = baStn[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
-
-    (*threadCount)--;
+    num_radios_initialized++;
 }
 
 void* RadioConfig::configureBSRadio_launch(void* in_context)
@@ -190,8 +205,6 @@ void* RadioConfig::configureBSRadio_launch(void* in_context)
 void RadioConfig::configureBSRadio(RadioConfigContext* context)
 {
     size_t i = context->tid;
-    std::atomic_int* threadCount = context->threadCount;
-    delete context;
 
     // load channels
     auto channels = Utils::strToChannels(_cfg->channel);
@@ -250,7 +263,7 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
         baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
     }
-    (*threadCount)--;
+    num_radios_configured++;
 }
 
 bool RadioConfig::radioStart()
