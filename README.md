@@ -40,7 +40,8 @@ Compile Millipede:
 	cmake ..
 	make -j 
 
-* Note: to be able run Millipede with Faros/Iris hardware, set `USE_ARGOS` variable in CMakeLists.txt to `TRUE`.
+* Note 1 : to run Millipede with Faros/Iris hardware, set `USE_ARGOS` variable in CMakeLists.txt to `True`.
+* Note 2 : to run Client with Iris Hardware, set `ENABLE_MAC` in CMakeLists.txt to `True`.
 
 2. Run
 
@@ -54,12 +55,12 @@ Compile Millipede:
 
 Uplink Demo:
 
-Flash the *client* Iris device with proper image:
+* Flash the *client* Iris device with proper image:
 
-* Download the image bundle from https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz
-* Unpack the tarball and the one inside: bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz
-* Copy BOOT.BIN and image.ub files to the SD card of you Iris.
-* Alternatively, you can transfer the files over the network (with Iris on and discoverable):
+  * Download the image bundle from `https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz`
+  * Unpack the tarball and the one inside: `bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz`
+  * Copy `BOOT.BIN` and `image.ub` files to the SD card of you Iris.
+  * Alternatively, you can transfer the files over the network (with Iris on and discoverable):
 
 	scp BOON.BIN image.up sklk@IrisIPAdress:~
 	ssh sklk@IrisIPAddress
@@ -73,14 +74,17 @@ Flash the *client* Iris device with proper image:
 
 Running Client App on Server 2:
 
-* Re-build code with `DEBUG_UPLINK` enabled in `src/common/Symbols.hpp`
+* Disable `kConnectUDP` in `src/common/Symbols.hpp`
 * Modify `data/user-iris-serials.txt` by adding 2 client Iris serials in your setup.
+* Run `./data_generator data/ue-ul-hw.json` to generate required data files
 * Run `./build/user data/ue-ul-hw.json`
+* Run `./build/macuser 2 5000 data/ue-ul-hw.json`
 
 Running Millipede on Server 1:
 
 * Re-build code with `kExportConstellation` enabled in `src/common/Symbols.hpp`
 * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding Iris serials in your Faros RRHs.
+* scp over the generated file `data/orig_data_512_ant2.bin` from server 2 to `data` directory.
 * Run `python mm_gui.py data/bs-ul-hw.json`
  
 
