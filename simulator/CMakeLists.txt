@@ -15,7 +15,7 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
@@ -42,6 +42,11 @@ find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
+set(USE_LDPC_SENDER False CACHE STRING "USE_LDPC defaulting to 'False'")
+
+if(${USE_LDPC_SENDER})
+  add_definitions(-DUSE_LDPC_SENDER)
+endif()
 
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled for BS")
@@ -94,6 +99,7 @@ endif()
 
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
+message(STATUS "USE_LDPC_SENDER: ${USE_LDPC_SENDER}")
 
 
 

@@ -46,6 +46,7 @@ enum class EventType : int {
     kZF,
     kDemul,
     kIFFT,
+    kMapBits,
     kPrecode,
     kPacketTX,
     kDecode,
@@ -73,20 +74,24 @@ enum class DoerType : size_t {
 };
 static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 
-#define PRINT_RX_PILOTS 0
-#define PRINT_RX 1
-#define PRINT_FFT_PILOTS 2
-#define PRINT_FFT_DATA 3
-#define PRINT_ZF 4
-#define PRINT_DEMUL 5
-#define PRINT_PRECODE 6
-#define PRINT_IFFT 7
-#define PRINT_TX_FIRST 8
-#define PRINT_TX 9
-#define PRINT_DECODE 10
-#define PRINT_ENCODE 11
-#define PRINT_RC 12
-#define PRINT_FFT_CAL 13
+enum class PrintType : int {
+    kPacketRXPilots,
+    kPacketRX,
+    kFFTPilots,
+    kFFTData,
+    kFFTCal,
+    kZF,
+    kDemul,
+    kIFFT,
+    kPrecode,
+    kPacketTXFirst,
+    kPacketTX,
+    kDecode,
+    kEncode,
+    kRC,
+    kPacketFromMac,
+    kPacketToMac
+};
 
 #define BIGSTATION 0
 #define USE_IPV4 1
@@ -125,6 +130,7 @@ static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugBSSender = false;
+static constexpr bool kDebugBSReceiver = true;
 
 #define DEBUG_DL_PILOT 0
 #define DEBUG_PLOT 0
@@ -132,7 +138,6 @@ static constexpr bool kDebugBSSender = false;
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
 #define DEBUG_DOWNLINK 0
-#define DEBUG_UPLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4
@@ -154,6 +159,7 @@ enum class ThreadType {
     kWorkerRX,
     kWorkerTX,
     kWorkerTXRX,
+    kWorkerMacTXRX,
     kMasterRX,
     kMasterTX,
 };
@@ -177,6 +183,8 @@ static inline std::string thread_type_str(ThreadType thread_type)
         return "TX";
     case ThreadType::kWorkerTXRX:
         return "TXRX";
+    case ThreadType::kWorkerMacTXRX:
+        return "MAC TXRX";
     case ThreadType::kMasterRX:
         return "Master (RX)";
     case ThreadType::kMasterTX:
@@ -233,7 +241,7 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
-#ifdef USE_LDPC
+#if defined USE_LDPC || defined USE_LDPC_SENDER
 static constexpr bool kUseLDPC = true;
 #else
 static constexpr bool kUseLDPC = false;

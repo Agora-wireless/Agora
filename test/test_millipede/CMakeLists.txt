@@ -48,10 +48,12 @@ find_package(Armadillo)
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
+set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
+message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 
 set(TXRX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx.cpp)
@@ -87,6 +89,11 @@ if(${USE_DPDK})
 else()
   message(STATUS "DPDK is disabled")
 endif()
+
+if(${ENABLE_MAC})
+  add_definitions(-DENABLE_MAC)
+endif()
+set(MAC_TX_SOURCES ${SOURCE_DIR}/src/millipede/txrx/txrx_mac.cpp)
 
 include_directories(
 	${SOURCE_DIR}/src/common/
@@ -144,40 +151,76 @@ if(${USE_LDPC})
     ${SOURCE_DIR}/src/millipede/docoding.cpp)
 endif()
 
+
+# Argos support
+if(${USE_ARGOS})
+  find_package(SoapySDR "0.7" CONFIG)
+  if(NOT SoapySDR_FOUND)
+    message(STATUS "SoapySDR development files not found")
+    set(USE_ARGOS False)
+  else()
+    add_definitions(-DUSE_ARGOS)
+  endif()
+  message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+  find_package(PythonLibs REQUIRED)
+  message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+  message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
+  message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
+  include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
+  set(SOAPY_LIB ${SoapySDR_LIBRARIES})
+  set(ARGOS_SOURCES 
+    ${SOURCE_DIR}/src/millipede/radio_lib.cpp 
+    ${SOURCE_DIR}/src/millipede/radio_calibrate.cpp)
+  set(TXRX_SOURCES 
+    ${SOURCE_DIR}/src/millipede/txrx/txrx_argos.cpp)
+  set(CLIENT_SOURCES
+    ${SOURCE_DIR}/src/common/modulation.cpp
+    ${SOURCE_DIR}/src/client/client_radio.cpp
+    ${SOURCE_DIR}/src/client/ru_argos.cpp
+    ${SOURCE_DIR}/src/client/phy-ue.cpp)
+  set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
+  add_definitions(-DTHREADED_INIT)
+endif()
+
+
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
 endforeach()
 
-set(SOURCES 
-  main.cpp 
+set(SOURCES
   ${MILLIPEDE_SOURCES}
-	${TXRX_SOURCES}
+  ${TXRX_SOURCES}
+  ${MAC_TX_SOURCES}
   ${COMMON_SOURCES}
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
-			
-add_executable(millipede ${SOURCES} ${HEADER_FILES})
-target_link_libraries(millipede -lpthread -larmadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+      
+add_executable(millipede main.cpp ${SOURCES} ${HEADER_FILES})
+target_link_libraries(millipede -larmadillo
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 set(SENDER_SOURCES 
   ${SOURCE_DIR}/simulator/sender_cli.cpp
   ${SOURCE_DIR}/simulator/sender.cpp 
-  ${COMMON_SOURCES})
+  ${COMMON_SOURCES}
+  ${LDPC_SOURCES}
+  ${HEADER_FILES})
 
 add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender -lpthread ${MKL_LIBS})
-
+target_link_libraries(sender -lpthread gflags ${MKL_LIBS} ${LDPC_LIBS})
 
 set(SIMULATOR_SOURCES 
   ${SOURCE_DIR}/simulator/main.cpp
   ${SOURCE_DIR}/simulator/simulator.cpp
   ${SOURCE_DIR}/simulator/sender.cpp
   ${SOURCE_DIR}/simulator/receiver.cpp 
-  ${COMMON_SOURCES})
+  ${COMMON_SOURCES}
+  ${LDPC_SOURCES}
+  ${HEADER_FILES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
-target_link_libraries(sim -lpthread ${MKL_LIBS})
+target_link_libraries(sim -lpthread ${MKL_LIBS} ${LDPC_LIBS})
 
 add_executable(data_generator 
   ${SOURCE_DIR}/data/data_generator/data_generator.cpp 

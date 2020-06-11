@@ -24,6 +24,7 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 
 // #include "mkl_dfti.h"
 
@@ -40,7 +41,7 @@ public:
     /**
      * Do Encode task for one code block
      */
-    Event_data launch(size_t offset);
+    Event_data launch(size_t tag);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -81,7 +82,7 @@ public:
     /**
      * Do Decode task for one code block
      */
-    Event_data launch(size_t offset);
+    Event_data launch(size_t tag);
 
 private:
     Table<int8_t>& llr_buffer_;
