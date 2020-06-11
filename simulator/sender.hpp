@@ -82,7 +82,7 @@ private:
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t thread_num; // Number of worker threads sending packets
     const size_t socket_num; // Total network sockets across worker threads
-    const bool enable_slow_start; // Enable sender slow-start until it hits target delay.
+    const bool enable_slow_start; // Send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}
