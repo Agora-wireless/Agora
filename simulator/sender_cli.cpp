@@ -10,8 +10,7 @@ DEFINE_uint64(num_threads, 4, "Number of sender threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
 DEFINE_uint64(delay, 5000, "Delay (?) in microseconds");
 DEFINE_string(conf_file, "/data/tddconfig-sim-dl.json", "Config filename");
-DEFINE_bool(
-    enable_slow_start, true, "Enable sender slow-start until target delay.");
+DEFINE_bool(enable_slow_start, true, "Send frames slowly at first.");
 
 int main(int argc, char* argv[])
 {
