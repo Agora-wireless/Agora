@@ -39,7 +39,10 @@ public:
 
 private:
     Table<int8_t>& raw_data_buffer_;
-    int8_t* parity_buffer; // Intermediate buffer to hold parity
+    int8_t* parity_buffer; // Intermediate buffer to hold LDPC encoding parity
+
+    // Intermediate buffer to hold LDPC encoding output
+    int8_t* encoded_buffer_temp;
     Table<int8_t>& encoded_buffer_;
     DurationStat* duration_stat;
 };
