@@ -210,6 +210,10 @@ Config::Config(std::string jsonfile)
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
     LDPC_config.Zc = tddConf.value("Zc", 72);
+    // This ensures that the input bits after puncturing are byte-aligned.
+    // Else we'd have to paste the parity bits at a byte-misaligned start
+    // address, which isn't implemented yet.
+    rt_assert(LDPC_config.Zc % 4 == 0, "Currently, Zc must be a multiple of 4");
     LDPC_config.nRows = (LDPC_config.Bg == 1) ? 46 : 42;
     LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
     LDPC_config.cbLen
