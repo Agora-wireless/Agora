@@ -25,9 +25,9 @@
 #include <netinet/in.h>
 #include <numeric>
 #include <pthread.h>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
