@@ -279,15 +279,15 @@ if(${USE_ARGOS})
   target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
   if(${ENABLE_MAC})
-  add_executable(macuser
-       ${MAC_CLIENT_SOURCES}
-       ${COMMON_SOURCES})
-  target_link_libraries(macuser -larmadillo ${MKL_LIBS})
+    add_executable(macuser
+         ${MAC_CLIENT_SOURCES}
+         ${COMMON_SOURCES})
+    target_link_libraries(macuser -larmadillo ${MKL_LIBS})
 
-  add_executable(macbs
-       ${MAC_BS_SOURCES}
-       ${COMMON_SOURCES})
-  target_link_libraries(macbs -larmadillo ${MKL_LIBS})
+    add_executable(macbs
+         ${MAC_BS_SOURCES}
+         ${COMMON_SOURCES})
+    target_link_libraries(macbs -larmadillo ${MKL_LIBS})
   endif()
 else()
   set(SENDER_SOURCES
@@ -311,6 +311,12 @@ else()
 
   add_executable(sim ${SIMULATOR_SOURCES})
   target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
+  if(${ENABLE_MAC})
+    add_executable(macbs
+         ${MAC_BS_SOURCES}
+         ${COMMON_SOURCES})
+    target_link_libraries(macbs -larmadillo ${MKL_LIBS})
+  endif()
 endif()
 
 # The tests to run using ctest

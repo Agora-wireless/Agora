@@ -181,7 +181,7 @@ Config::Config(std::string jsonfile)
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     mac_socket_thread_num
-        = tddConf.value("socket_thread_num", kEnableMac ? 1 : 0);
+        = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
     fft_thread_num = tddConf.value("fft_thread_num", 4);
     demul_thread_num = tddConf.value("demul_thread_num", 11);
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
