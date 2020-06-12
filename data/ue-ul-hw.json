@@ -16,8 +16,11 @@
  "frames" : [
      "GGDDGGPPGGUUUG"
  ],
+ "hw_framer": false,
+ "tx_advance" : 78,
  "UE" : true,
  "client_ul_pilot_syms" : 2,
+ "client_dl_pilot_syms" : 2,
  "modulation" : "16QAM",
  "worker_thread_num" : 12,
  "demul_block_size" : 48

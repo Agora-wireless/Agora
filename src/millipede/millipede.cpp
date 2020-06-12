@@ -383,7 +383,7 @@ void Millipede::start()
                         assert(cur_frame_id == frame_id);
                         cur_frame_id++;
                         // stats->master_set_tsc(TsType::kMacTXDone, frame_id);
-                        // print_per_frame_done(PrintType::kPacketToMac, frame_id);
+                        print_per_frame_done(PrintType::kPacketToMac, frame_id);
                         stats->update_stats_in_functions_uplink(frame_id);
                         if (stats->last_frame_id == cfg->frames_to_test - 1)
                             goto finish;
@@ -897,6 +897,10 @@ void Millipede::print_per_frame_done(PrintType print_type, size_t frame_id)
             stats->master_get_delta_us(
                 TsType::kTXDone, TsType::kPilotRX, frame_id));
         break;
+    case (PrintType::kPacketToMac):
+        printf("Main thread: MAC TX done frame: %zu, in %.2f us\n", frame_id,
+            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+        break;
     default:
         printf("Wrong task type in frame done print!");
     }
@@ -1133,9 +1137,8 @@ void Millipede::initialize_downlink_buffers()
 
     dl_bits_buffer_.calloc(
         task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t dl_bits_buffer_status_size = task_buffer_symbol_num * kUseLDPC
-        ? cfg->LDPC_config.nblocksInSymbol
-        : 1;
+    size_t dl_bits_buffer_status_size = task_buffer_symbol_num
+        * (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
     dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
 
     dl_ifft_buffer_.calloc(

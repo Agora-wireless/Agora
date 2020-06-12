@@ -74,6 +74,27 @@ static inline void adapt_bits_for_mod(
     }
 }
 
+/*
+ * Copy packed, bit-reversed 8-bit fields stored in
+ * vec_in[0..len-1] into unpacked m-bit vec_out (m == mod_type). 
+ * Storage at vec_out must be at least (m*len+7)/8 bytes.
+ */
+static inline void adapt_bits_from_mod(
+    int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
+{
+    int bits_avail = 0;
+    uint16_t bits = 0;
+    for (int i = 0; i < len; i++) {
+        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
+        bits_avail += mod_type;
+        while (bits_avail >= 8) {
+            *vec_out++ = bits >> 8;
+            bits <<= 8;
+            bits_avail -= 8;
+        }
+    }
+}
+
 static inline uint8_t select_base_matrix_entry(uint16_t Zc)
 {
     uint8_t i_LS;

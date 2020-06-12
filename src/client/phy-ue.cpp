@@ -1,8 +1,43 @@
 #include "phy-ue.hpp"
 
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+static inline uint8_t bitreverse8(uint8_t x)
+{
+#if __has_builtin(__builtin_bireverse8)
+    return (__builtin_bitreverse8(x));
+#else
+    x = (x << 4) | (x >> 4);
+    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
+    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
+    return (x);
+#endif
+}
+
+/*
+ * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
+ * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
+ * at least 8*len/m bytes.
+ */
+static void adapt_bits_for_mod(
+    int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
+{
+    int bits_avail = 0;
+    uint16_t bits = 0;
+    for (int i = 0; i < len; i++) {
+        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
+        bits_avail += 8;
+        while (bits_avail >= mod_order) {
+            *vec_out++ = bits >> (16 - mod_order);
+            bits <<= mod_order;
+            bits_avail -= mod_order;
+        }
+    }
+}
+
 Phy_UE::Phy_UE(Config* config)
-    : ul_bits(config->ul_bits)
-    , ul_iq_f(config->ul_iq_f)
 {
     srand(time(NULL));
 
@@ -34,20 +69,39 @@ Phy_UE::Phy_UE(Config* config)
         TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe * antenna_num * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * symbol_perframe * antenna_num * 36);
+    map_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
     modul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * antenna_num * 36);
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
     ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * ul_symbol_perframe * antenna_num * 36);
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
+    to_mac_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
 
     for (size_t i = 0; i < rx_thread_num; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
         tx_ptoks_ptr[i] = new moodycamel::ProducerToken(tx_queue_);
     }
 
+    for (size_t i = 0; i < rx_thread_num; i++) {
+        mac_rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
+        mac_tx_ptoks_ptr[i] = new moodycamel::ProducerToken(to_mac_queue_);
+    }
+
+    for (size_t i = 0; i < worker_thread_num; i++) {
+        task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
+        ;
+    }
+
     ru_.reset(new RU(config_, rx_thread_num, config_->core_offset + 1,
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
+
+    if (kEnableMac)
+        mac_receiver_.reset(new PacketTXRX(config_, rx_thread_num,
+            config_->core_offset + 1 + rx_thread_num, &message_queue_,
+            &to_mac_queue_, mac_rx_ptoks_ptr, mac_tx_ptoks_ptr));
 
     printf("initializing buffers...\n");
 
@@ -58,6 +112,12 @@ Phy_UE::Phy_UE(Config* config)
     // initialize ul data buffer
     // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
     // ul_data_symbol_perframe);
+    ul_bits_buffer_size_ = TASK_BUFFER_FRAME_NUM * config_->mac_packet_length;
+    ul_bits_buffer_.malloc(antenna_num, ul_bits_buffer_size_, 64);
+    ul_bits_buffer_status_.calloc(antenna_num, TASK_BUFFER_FRAME_NUM, 64);
+    ul_syms_buffer_size_
+        = TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe * data_sc_len;
+    ul_syms_buffer_.calloc(antenna_num, ul_syms_buffer_size_, 64);
 
     // initialize modulation buffer
     modul_buffer_.calloc(ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM,
@@ -65,7 +125,7 @@ Phy_UE::Phy_UE(Config* config)
 
     // initialize IFFT buffer
     size_t ifft_buffer_block_num
-        = antenna_num * ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM;
+        = antenna_num * ul_symbol_perframe * TASK_BUFFER_FRAME_NUM;
     ifft_buffer_.calloc(ifft_buffer_block_num, FFT_LEN, 64);
 
     alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
@@ -120,6 +180,30 @@ Phy_UE::Phy_UE(Config* config)
             memset(
                 demul_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
         }
+    }
+
+    // l2 sockets setup
+    socket_ = new int[antenna_num];
+#if USE_IPV4
+    servaddr_ = new struct sockaddr_in[antenna_num];
+#else
+    servaddr_ = new struct sockaddr_in6[antenna_num];
+#endif
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+    for (size_t user_id = 0; user_id < antenna_num; ++user_id) {
+        int local_port_id = config_->bs_port + user_id;
+#if USE_IPV4
+        socket_[user_id]
+            = setup_socket_ipv4(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(&servaddr_[user_id],
+            config_->ue_rx_port + user_id, config_->tx_addr.c_str());
+#else
+        socket_[user_id]
+            = setup_socket_ipv6(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv6(&servaddr_[user_id],
+            config_->ue_rx_port + user_id, config_->tx_addr.c_str());
+#endif
+        fcntl(socket_[user_id], F_SETFL, O_NONBLOCK);
     }
 
     // create task thread
@@ -180,6 +264,13 @@ void Phy_UE::start()
         return;
     }
 
+    if (kEnableMac
+        && !mac_receiver_->startTXRX(ul_bits_buffer_, ul_bits_buffer_status_,
+               TASK_BUFFER_FRAME_NUM, ul_bits_buffer_size_, NULL, NULL, 0, 0)) {
+        this->stop();
+        return;
+    }
+
     // for task_queue, main thread is producer, it is single-procuder & multiple
     // consumer for task queue uplink
 
@@ -190,6 +281,7 @@ void Phy_UE::start()
     moodycamel::ProducerToken ptok_modul(modul_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
+    moodycamel::ProducerToken ptok_map(map_queue_);
     // moodycamel::ProducerToken ptok_tx(tx_queue_);
 
     // for message_queue, main thread is a consumer, it is multiple producers
@@ -245,16 +337,13 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    /*Event_data do_ifft_task(EventType::kIFFT,
-                        gen_tag_t::frm_sym_ant(
-                            frame_id, symbol_id, ant_id / config_->nChannels)
-                            ._tag);
-                    schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);*/
+                    // if (!kEnableMac) {
                     Event_data do_modul_task(EventType::kModul,
-                        gen_tag_t::frm_sym_ant(
+                        gen_tag_t::frm_sym_ue(
                             frame_id, symbol_id, ant_id / config_->nChannels)
                             ._tag);
                     schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+                    // }
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -285,26 +374,39 @@ void Phy_UE::start()
 
             } break;
 
+            case EventType::kPacketFromMac: {
+                // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                // size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
+
+                Event_data do_map_modul_task(EventType::kModul, event.tags[0]);
+                schedule_task(do_map_modul_task, &map_queue_, ptok_map);
+                // if (kDebugPrintPerFrameDone)
+                //     printf("Main thread: frame: %zu, finished mapping "
+                //            "uplink data for user %zu\n",
+                //         frame_id, ue_id);
+            } break;
+
+            case EventType::kMapBits: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                if (kDebugPrintPerFrameDone)
+                    printf("Main thread: MAC data ready for frame: %zu \n",
+                        frame_id);
+            } break;
+
             case EventType::kModul: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
-                size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-                size_t modul_status_idx = frame_slot * nUEs + ue_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
 
-                data_checker_[modul_status_idx]++;
-                if (data_checker_[modul_status_idx]
-                    == ul_data_symbol_perframe) {
-                    data_checker_[modul_status_idx] = 0;
-                    Event_data do_ifft_task(EventType::kIFFT,
-                        gen_tag_t::frm_sym_ant(frame_id, symbol_id, ue_id)
-                            ._tag);
-                    schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);
-                    if (kDebugPrintPerFrameDone)
-                        printf("Main thread: frame: %zu, finished modulating "
-                               "uplink data for user %zu\n",
-                            frame_id, ue_id);
-                }
+                Event_data do_ifft_task(EventType::kIFFT,
+                    gen_tag_t::frm_sym_ue(frame_id, symbol_id, ue_id)._tag);
+                schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);
+                if (kDebugPrintPerSymbolDone)
+                    printf("Main thread: frame: %zu, symbol: %zu, finished "
+                           "modulating "
+                           "uplink data for user %zu\n",
+                        frame_id, symbol_id, ue_id);
+                //}
             } break;
 
             case EventType::kDemul: {
@@ -351,20 +453,26 @@ void Phy_UE::start()
             } break;
 
             case EventType::kIFFT: {
-                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-                Event_data task(EventType::kPacketTX, event.tags[0]);
-                try_enqueue_fallback(
-                    &tx_queue_, tx_ptoks_ptr[ant_id % rx_thread_num], task);
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+                Event_data do_tx_task(EventType::kPacketTX, event.tags[0]);
+                schedule_task(do_tx_task, &tx_queue_,
+                    *tx_ptoks_ptr[ue_id % rx_thread_num]);
+                // if (kDebugPrintPerTaskDone)
+                printf("Main thread: frame: %zu, symbol: %zu finished IFFT of "
+                       "uplink data for user %zu\n",
+                    frame_id, symbol_id, ue_id);
             } break;
 
             case EventType::kPacketTX: {
                 if (kDebugPrintPerSymbolDone) {
                     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                    size_t symbol_id = gen_tag_t(event.tags[0]).frame_id;
-                    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+                    size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                    size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
                     printf("Main thread: finished TX for frame %zu, symbol "
-                           "%zu, ant %zu\n",
-                        frame_id, symbol_id, ant_id);
+                           "%zu, user %zu\n",
+                        frame_id, symbol_id, ue_id);
                 }
             } break;
 
@@ -390,25 +498,11 @@ void* Phy_UE::taskThread_launch(void* in_context)
 void Phy_UE::taskThread(int tid)
 {
     // printf("task thread %d starts\n", tid);
+    pin_to_core_with_offset(ThreadType::kWorker,
+        core_offset + rx_thread_num + 1 + (kEnableMac ? rx_thread_num : 0),
+        tid);
 
-    // attach task threads to specific cores
-    // Note: cores 0-17, 36-53 are on the same socket
-#ifdef ENABLE_CPU_ATTACH
-    size_t offset_id = core_offset + rx_thread_num + 1;
-    size_t tar_core_id = tid + offset_id;
-    if (tar_core_id >= nCPUs) // FIXME: read the number of cores
-        tar_core_id = (tar_core_id - nCPUs) + 2 * nCPUs;
-    if (pin_to_core(tar_core_id) != 0) {
-        printf("Task thread: pinning thread %d to core %zu failed\n", tid,
-            tar_core_id);
-        exit(0);
-    } else {
-        printf("Task thread: pinning thread %d to core %zu succeeded\n", tid,
-            tar_core_id);
-    }
-#endif
-
-    task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
+    // task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 
     Event_data event;
     while (config_->running) {
@@ -418,6 +512,8 @@ void Phy_UE::taskThread(int tid)
             doIFFT(tid, event.tags[0]);
         if (modul_queue_.try_dequeue(event))
             doModul(tid, event.tags[0]);
+        if (map_queue_.try_dequeue(event))
+            doMapBits(tid, event.tags[0]);
         else if (fft_queue_.try_dequeue(event))
             doFFT(tid, event.tags[0]);
     }
@@ -429,9 +525,6 @@ void Phy_UE::taskThread(int tid)
 
 void Phy_UE::doFFT(int tid, size_t tag)
 {
-    //int buffer_frame_num = rx_buffer_status_size;
-    //int rx_thread_id = offset / buffer_frame_num;
-    //int offset_in_current_buffer = offset % buffer_frame_num;
 
     size_t rx_thread_id = fft_req_tag_t(tag).tid;
     size_t offset_in_current_buffer = fft_req_tag_t(tag).offset;
@@ -618,10 +711,58 @@ void Phy_UE::doDemul(int tid, size_t tag)
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
 
+void Phy_UE::doMapBits(int tid, size_t tag)
+{
+    size_t ue_id = rx_tag_t(tag).tid;
+    size_t offset_in_current_buffer = rx_tag_t(tag).offset;
+
+    struct MacPacket* pkt = (struct MacPacket*)(ul_bits_buffer_[ue_id]
+        + offset_in_current_buffer * config_->mac_packet_length);
+    size_t mac_frame_id = pkt->frame_id;
+    rt_assert((size_t)pkt->ue_id == ue_id,
+        "UE index in tag does not match that in received packet!");
+
+    size_t num_frames_per_mac_packet
+        = config_->mac_data_bytes_num_perframe / config_->data_bytes_num_perframe;
+    for (size_t i = 0; i < num_frames_per_mac_packet; i++) {
+        size_t frame_id = mac_frame_id * num_frames_per_mac_packet + i;
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
+             ul_symbol_id++) {
+            char* raw_bits_ptr = ((char*)pkt->data)
+                + config_->data_bytes_num_persymbol
+                    * (i * ul_data_symbol_perframe + ul_symbol_id);
+            size_t total_ul_symbol_id
+                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
+            int8_t* bits_for_mod_ptr
+                = (int8_t*)&ul_syms_buffer_[ue_id]
+                                           [total_ul_symbol_id * data_sc_len];
+            adapt_bits_for_mod((int8_t*)raw_bits_ptr, bits_for_mod_ptr,
+                config_->data_bytes_num_persymbol, config_->mod_type);
+
+            // complex_float* modul_buf
+            //     = &modul_buffer_[total_ul_symbol_id][ue_id * data_sc_len];
+            // for (size_t sc = 0; sc < data_sc_len; sc++) {
+            //     modul_buf[sc] = mod_single_uint8(
+            //         (uint8_t)bits_for_mod_ptr[sc], qam_table);
+            // }
+        }
+        // Send a message to the master thread after one frame is done
+        Event_data map_event(EventType::kMapBits,
+            gen_tag_t::frm_sym_ue(frame_id, 0, ue_id)._tag);
+
+        if (!message_queue_.enqueue(*task_ptok[tid], map_event)) {
+            printf("Muliplexing message enqueue failed\n");
+            exit(0);
+        }
+    }
+    ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
+}
+
 void Phy_UE::doModul(int tid, size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
-    const size_t ue_id = gen_tag_t(tag).ant_id;
+    const size_t ue_id = gen_tag_t(tag).ue_id;
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     for (size_t ch = 0; ch < config_->nChannels; ch++) {
         size_t ant_id = ue_id * config_->nChannels + ch;
@@ -631,8 +772,11 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
-            int8_t* ul_bits
-                = &config_->ul_bits[ul_symbol_id][ant_id * data_sc_len];
+            int8_t* ul_bits = kEnableMac
+                ? (int8_t*)&ul_syms_buffer_[ant_id]
+                                           [total_ul_symbol_id * data_sc_len]
+                : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
+                                   [ant_id * data_sc_len];
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
@@ -651,62 +795,43 @@ void Phy_UE::doIFFT(int tid, size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-    const size_t ue_id = gen_tag_t(tag).ant_id;
+    const size_t ue_id = gen_tag_t(tag).ue_id;
     for (size_t ch = 0; ch < config_->nChannels; ch++) {
-        //float scale = 0;
         size_t ant_id = ue_id * config_->nChannels + ch;
-        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
-             ul_symbol_id++) {
-            size_t total_ul_data_symbol_id
-                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
-
-            size_t buff_offset = total_ul_data_symbol_id * antenna_num + ant_id;
-            complex_float* ifft_buff = ifft_buffer_[buff_offset];
-            memset(
-                ifft_buff, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
-            /*memcpy((void*)ifft_buf,
-                (void*)&ul_iq_f[ul_symbol_id][FFT_LEN * (ant_id)],
-                FFT_LEN * sizeof(complex_float));*/
-            complex_float* modul_buff
-                = &modul_buffer_[total_ul_data_symbol_id][ant_id * data_sc_len];
-            memcpy((void*)ifft_buff, (void*)modul_buff,
-                FFT_LEN * sizeof(complex_float));
-            memset(ifft_buff + config_->OFDM_DATA_STOP, 0,
-                sizeof(complex_float) * config_->OFDM_DATA_START);
-
-            //DftiComputeBackward(mkl_handle, ifft_buf);
-            CommsLib::IFFT(ifft_buff, FFT_LEN, false);
-            //cx_float* ifft_out_buffer = (cx_float*)ifft_buf;
-            //cx_fmat mat_ifft_out(ifft_out_buffer, FFT_LEN, 1, false);
-            //float max_val = abs(mat_ifft_out).max();
-            //if (max_val > scale)
-            //    scale = max_val;
-        }
-        //scale *= 4;
         for (size_t ul_symbol_id = 0; ul_symbol_id < ul_symbol_perframe;
              ul_symbol_id++) {
+
             size_t total_ul_symbol_id
                 = frame_slot * ul_symbol_perframe + ul_symbol_id;
-
             size_t buff_offset = total_ul_symbol_id * antenna_num + ant_id;
-            size_t tx_offset = buff_offset * packet_length;
-            char* cur_tx_buffer = &tx_buffer_[tx_offset];
-            struct Packet* pkt = (struct Packet*)cur_tx_buffer;
-            std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data;
+            complex_float* ifft_buff = ifft_buffer_[buff_offset];
+
+            memset(
+                ifft_buff, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
             if (ul_symbol_id < config_->UL_PILOT_SYMS) {
-                memcpy(tx_data_ptr, config_->ue_specific_pilot_t[ant_id],
-                    config_->sampsPerSymbol * sizeof(std::complex<short>));
+                memcpy(ifft_buff + config_->OFDM_DATA_START,
+                    config_->ue_specific_pilot[ant_id],
+                    data_sc_len * sizeof(complex_float));
             } else {
                 size_t total_ul_data_symbol_id
                     = frame_slot * ul_data_symbol_perframe + ul_symbol_id
                     - config_->UL_PILOT_SYMS;
-
-                size_t buff_offset
-                    = total_ul_data_symbol_id * antenna_num + ant_id;
-                complex_float* ifft_buff = ifft_buffer_[buff_offset];
-                CommsLib::ifft2tx(ifft_buff, tx_data_ptr, FFT_LEN, prefix_len,
-                    CP_LEN, config_->scale);
+                complex_float* modul_buff
+                    = &modul_buffer_[total_ul_data_symbol_id]
+                                    [ant_id * data_sc_len];
+                memcpy(ifft_buff + config_->OFDM_DATA_START, modul_buff,
+                    data_sc_len * sizeof(complex_float));
             }
+            memset(ifft_buff + config_->OFDM_DATA_STOP, 0,
+                sizeof(complex_float) * config_->OFDM_DATA_START);
+
+            CommsLib::IFFT(ifft_buff, FFT_LEN, false);
+            size_t tx_offset = buff_offset * packet_length;
+            char* cur_tx_buffer = &tx_buffer_[tx_offset];
+            struct Packet* pkt = (struct Packet*)cur_tx_buffer;
+            std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data;
+            CommsLib::ifft2tx(ifft_buff, tx_data_ptr, FFT_LEN, prefix_len,
+                CP_LEN, config_->scale);
         }
     }
 
@@ -744,14 +869,14 @@ void Phy_UE::initialize_vars_from_cfg(void)
     rx_thread_num = std::min(nUEs, config_->socket_thread_num);
     worker_thread_num = config_->worker_thread_num;
     core_offset = config_->core_offset;
-#ifdef ENABLE_CPU_ATTACH
-    size_t max_core = 1 + rx_thread_num + worker_thread_num + core_offset;
-    if (max_core >= nCPUs) {
-        printf("Cannot allocate cores: max_core %zu, available cores %zu\n",
-            max_core, nCPUs);
-        exit(1);
-    }
-#endif
+    // #ifdef ENABLE_CPU_ATTACH
+    // size_t max_core = 1 + rx_thread_num + worker_thread_num + core_offset;
+    // if (max_core >= nCPUs) {
+    //     printf("Cannot allocate cores: max_core %zu, available cores %zu\n",
+    //         max_core, nCPUs);
+    //     exit(1);
+    // }
+    // #endif
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data "
            "symbols, %zu DL data symbols\n",
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe,
