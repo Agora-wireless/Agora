@@ -47,7 +47,8 @@ public:
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
-        size_t delay = 0, bool create_thread_for_master = false);
+        size_t delay = 0, bool enable_slow_start = true, 
+        bool create_thread_for_master = false);
     ~Sender();
 
     void startTX();
@@ -81,6 +82,7 @@ private:
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t thread_num; // Number of worker threads sending packets
     const size_t socket_num; // Total network sockets across worker threads
+    const bool enable_slow_start; // Send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}
