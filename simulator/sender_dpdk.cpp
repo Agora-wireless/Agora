@@ -31,12 +31,13 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
 }
 
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
-    bool create_thread_for_master)
+    bool enable_slow_start, bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
     , thread_num(thread_num)
     , socket_num(cfg->nRadios)
+    , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
     , delay(delay)
     , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
@@ -416,14 +417,18 @@ void Sender::init_IQ_from_file()
 
 void Sender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
 {
-    if (tx_frame_count <= 5) {
-        delay_ticks(tick_start, ticks_5);
-    } else if (tx_frame_count < 100) {
-        delay_ticks(tick_start, ticks_100);
-    } else if (tx_frame_count < 200) {
-        delay_ticks(tick_start, ticks_200);
-    } else if (tx_frame_count < 500) {
-        delay_ticks(tick_start, ticks_500);
+    if (enable_slow_start) {
+        if (tx_frame_count <= 5) {
+            delay_ticks(tick_start, ticks_5);
+        } else if (tx_frame_count < 100) {
+            delay_ticks(tick_start, ticks_100);
+        } else if (tx_frame_count < 200) {
+            delay_ticks(tick_start, ticks_200);
+        } else if (tx_frame_count < 500) {
+            delay_ticks(tick_start, ticks_500);
+        } else {
+            delay_ticks(tick_start, ticks_all);
+        }
     } else {
         delay_ticks(tick_start, ticks_all);
     }
