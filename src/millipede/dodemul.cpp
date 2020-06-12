@@ -269,8 +269,8 @@ Event_data DoDemul::launch(size_t tag)
                 demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
                 break;
             default:
-                printf("Demodulation: modulation type %s not supported!",
-                    cfg->modulation);
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
             }
             // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
             //     tid, frame_id, symbol_idx_ul, base_sc_id);
@@ -291,8 +291,8 @@ Event_data DoDemul::launch(size_t tag)
                 demod_64qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
                 break;
             default:
-                printf("Demodulation: modulation type %s not supported!",
-                    cfg->modulation);
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
             }
         }
     }
