@@ -12,6 +12,7 @@
 #include "common/utils_ldpc.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include <algorithm>
 #include <assert.h>
 #include <bitset>
 #include <fstream>
@@ -49,13 +50,17 @@ int main()
     int8_t* encoded[kNumCodeBlocks];
     uint8_t* decoded[kNumCodeBlocks];
 
-    std::vector<size_t> zc_vec = { 8, 12, 16, 20, 32, 64, 96, 144, 192 };
+    std::vector<size_t> zc_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3, 6, 12, 24,
+        48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56, 112, 224,
+        9, 18, 36, 72, 144, 288, 11, 22, 44, 88, 176, 352, 13, 26, 52, 104, 208,
+        15, 30, 60, 120, 240 };
+    std::sort(zc_vec.begin(), zc_vec.end());
     for (const size_t& zc : zc_vec) {
-        // This ensures that the input bits after puncturing are byte-aligned.
-        // Else we'd have to paste the parity bits at a byte-misaligned start
-        // address, which isn't implemented yet.
-        assert(zc % 4 == 0);
-
+        if (zc > avx2enc::ZC_MAX) {
+            fprintf(stderr,
+                "Zc value %zu not supported by avx2enc. Skipping.\n", zc);
+            continue;
+        }
         const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
         const size_t num_parity_bits = ldpc_num_parity_bits(kBaseGraph, zc);
         const size_t num_encoded_bits = ldpc_num_encoded_bits(kBaseGraph, zc);
@@ -83,8 +88,9 @@ int main()
         }
         double encoding_us
             = cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
-        printf("Encoding: %.3f Mbps wrt input bits (%.3f us per code block)\n",
-            num_input_bits * kNumCodeBlocks / encoding_us,
+        printf("Zc = %zu, encoding: %.2f Mbps wrt input bits (%.2f us per code "
+               "block)\n",
+            zc, num_input_bits * kNumCodeBlocks / encoding_us,
             encoding_us / kNumCodeBlocks);
 
         // For decoding, generate log-likelihood ratios, one byte per input bit
@@ -126,8 +132,9 @@ int main()
 
         double decoding_us
             = cycles_to_us(rdtsc() - decoding_start_tsc, freq_ghz);
-        printf("Decoding: %.3f Mbps wrt output bits (%.3f us per code block)\n",
-            num_input_bits * kNumCodeBlocks / decoding_us,
+        printf("Zc = %zu, decoding: %.2f Mbps wrt output bits (%.2f us per "
+               "code block)\n",
+            zc, num_input_bits * kNumCodeBlocks / decoding_us,
             decoding_us / kNumCodeBlocks);
 
         // Check for errors
@@ -146,8 +153,8 @@ int main()
             }
         }
 
-        printf("Number of bit errors = %zu, BER = %.3f\n", err_cnt,
-            err_cnt * 1.0 / (kNumCodeBlocks * num_input_bits));
+        printf("Zc = %zu, number of bit errors = %zu, BER = %.3f\n", zc,
+            err_cnt, err_cnt * 1.0 / (kNumCodeBlocks * num_input_bits));
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
             delete[] input[i];
