@@ -82,16 +82,12 @@ int main()
                 input[n][i] = (int8_t)rand();
         }
 
-        size_t encoding_start_tsc = rdtsc();
+        const size_t encoding_start_tsc = rdtsc();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             ldpc_encode_helper(kBaseGraph, zc, encoded[n], parity[n], input[n]);
         }
-        double encoding_us
+        const double encoding_us
             = cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
-        printf("Zc = %zu, encoding: %.2f Mbps wrt input bits (%.2f us per code "
-               "block)\n",
-            zc, num_input_bits * kNumCodeBlocks / encoding_us,
-            encoding_us / kNumCodeBlocks);
 
         // For decoding, generate log-likelihood ratios, one byte per input bit
         int8_t* llrs[kNumCodeBlocks];
@@ -116,13 +112,13 @@ int main()
         ldpc_decoder_5gnr_request.nRows = num_parity_bits / zc;
 
         const size_t buffer_len = 1024 * 1024;
-        size_t numMsgBits = num_input_bits - kNumFillerBits;
+        const size_t numMsgBits = num_input_bits - kNumFillerBits;
         ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
         ldpc_decoder_5gnr_response.varNodes = reinterpret_cast<int16_t*>(
             memalign(32, buffer_len * sizeof(int16_t)));
 
         // Decoding
-        size_t decoding_start_tsc = rdtsc();
+        const size_t decoding_start_tsc = rdtsc();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             ldpc_decoder_5gnr_request.varNodes = llrs[n];
             ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
@@ -130,12 +126,8 @@ int main()
                 &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
         }
 
-        double decoding_us
+        const double decoding_us
             = cycles_to_us(rdtsc() - decoding_start_tsc, freq_ghz);
-        printf("Zc = %zu, decoding: %.2f Mbps wrt output bits (%.2f us per "
-               "code block)\n",
-            zc, num_input_bits * kNumCodeBlocks / decoding_us,
-            decoding_us / kNumCodeBlocks);
 
         // Check for errors
         size_t err_cnt = 0;
@@ -147,14 +139,21 @@ int main()
                 // output_buffer[i]);
                 uint8_t error = input_buffer[i] ^ output_buffer[i];
                 for (size_t j = 0; j < 8; j++) {
+                    if (i * 8 + j >= num_input_bits) {
+                        continue; // Don't compare beyond end of input bits
+                    }
                     err_cnt += error & 1;
                     error >>= 1;
                 }
             }
         }
 
-        printf("Zc = %zu, number of bit errors = %zu, BER = %.3f\n", zc,
-            err_cnt, err_cnt * 1.0 / (kNumCodeBlocks * num_input_bits));
+        printf("Zc = %zu, {encoding, decoding}: {%.2f, %.2f} Mbps, {%.2f, "
+               "%.2f} us per code block. Bit errors = %zu, BER = %.3f\n",
+            zc, num_input_bits * kNumCodeBlocks / encoding_us,
+            num_input_bits * kNumCodeBlocks / decoding_us,
+            encoding_us / kNumCodeBlocks, decoding_us / kNumCodeBlocks, err_cnt,
+            err_cnt * 1.0 / (kNumCodeBlocks * num_input_bits));
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
             delete[] input[i];
