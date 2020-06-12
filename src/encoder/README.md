@@ -7,7 +7,7 @@ Bao Nguyen, Tuy Nguyen Tan, Hanho Lee.
 
 ## Compilation
 
-`icpc -std=c++11 encoder_test.cpp encoder.cpp cyclic_shift.cpp iobuffer.cpp -o test`
+`./compile_encoder.sh`
 
 ## Note
 

@@ -80,8 +80,6 @@ int main()
     const std::vector<size_t> zc_nofiles_vec = { 2, 3, 4, 5, 6, 9, 13 };
 
     for (const auto& zc : zc_all_vec) {
-        if (zc % 4 != 0)
-            continue;
         const bool no_files = std::find(std::begin(zc_nofiles_vec),
                                   std::end(zc_nofiles_vec), zc)
             != std::end(zc_nofiles_vec);
