@@ -1,6 +1,6 @@
 
-#ifndef RU_HEADER
-#define RU_HEADER
+#ifndef RadioTXRX_HEADER
+#define RadioTXRX_HEADER
 
 #ifdef USE_ARGOS
 class RadioConfig;
@@ -20,31 +20,31 @@ class RadioConfig;
 #include "utils.h"
 #include <fstream> // std::ifstream
 
-class RU {
+class RadioTXRX {
 public:
     // static const int OFDM_FRAME_LEN = SYMBOL_LEN; //OFDM_CA_NUM +
     // OFDM_PREFIX_LEN + OFDM_POSTFIX_LEN; header 4 int for: frame_id,
     // symbol_id, cell_id, ant_id ushort for: I/Q samples static const int
     // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     // use for create pthread
-    struct RUContext {
-        RU* ptr;
+    struct RadioTXRXContext {
+        RadioTXRX* ptr;
         int tid;
     };
 
 public:
-    RU(Config* cfg, int n_rx_thread, int in_core_id);
+    RadioTXRX(Config* cfg, int n_rx_thread, int in_core_id);
     /**
      * N_THREAD: socket thread number
      * mode: tx=1 or rx=0 operation
      * in_queue: message queue to communicate with main thread
      */
-    RU(Config* cfg, int n_tx_thread, int in_core_id,
+    RadioTXRX(Config* cfg, int n_tx_thread, int in_core_id,
         moodycamel::ConcurrentQueue<Event_data>* in_queue,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks,
         moodycamel::ProducerToken** in_tx_ptoks);
-    ~RU();
+    ~RadioTXRX();
 
     /**
      * called in main threads to start the socket threads
