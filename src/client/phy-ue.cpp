@@ -95,7 +95,7 @@ Phy_UE::Phy_UE(Config* config)
         ;
     }
 
-    ru_.reset(new RU(config_, rx_thread_num, config_->core_offset + 1,
+    ru_.reset(new RadioTXRX(config_, rx_thread_num, config_->core_offset + 1,
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     if (kEnableMac)

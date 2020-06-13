@@ -1,9 +1,8 @@
 
 #include "config.hpp"
-#include "ru.hpp"
-//#include "radio_lib.hpp"
+#include "txrx.hpp"
 
-RU::RU(Config* cfg, int n_threads, int in_core_id)
+RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
 {
     config_ = cfg;
     radioconfig_ = new ClientRadioConfig(config_);
@@ -15,12 +14,12 @@ RU::RU(Config* cfg, int n_threads, int in_core_id)
     srand(time(NULL));
 }
 
-RU::RU(Config* config, int n_threads, int in_core_id,
+RadioTXRX::RadioTXRX(Config* config, int n_threads, int in_core_id,
     moodycamel::ConcurrentQueue<Event_data>* in_message_queue,
     moodycamel::ConcurrentQueue<Event_data>* in_task_queue,
     moodycamel::ProducerToken** in_rx_ptoks,
     moodycamel::ProducerToken** in_tx_ptoks)
-    : RU(config, n_threads, in_core_id)
+    : RadioTXRX(config, n_threads, in_core_id)
 {
     message_queue_ = in_message_queue;
     task_queue_ = in_task_queue;
@@ -28,14 +27,14 @@ RU::RU(Config* config, int n_threads, int in_core_id,
     tx_ptoks_ = in_tx_ptoks;
 }
 
-RU::~RU()
+RadioTXRX::~RadioTXRX()
 {
     radioconfig_->radioStop();
     delete radioconfig_;
     delete config_;
 }
 
-bool RU::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, int in_buffer_length, char* in_tx_buffer,
     int* in_tx_buffer_status, int in_tx_buffer_frame_num,
     int in_tx_buffer_length)
@@ -58,20 +57,20 @@ bool RU::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     for (int i = 0; i < thread_num_; i++) {
         pthread_t txrx_thread;
         // record the thread id
-        auto context = new EventHandlerContext<RU>;
+        auto context = new EventHandlerContext<RadioTXRX>;
         context->obj_ptr = this;
         context->id = i;
         // start socket thread
         if (config_->hw_framer) {
             if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<RU, &RU::loopTXRX>, context)
+                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopTXRX>, context)
                 != 0) {
                 perror("socket thread create failed");
                 exit(0);
             }
         } else {
             if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<RU, &RU::loopSYNC_TXRX>, context)
+                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopSYNC_TXRX>, context)
                 != 0) {
                 perror("socket thread create failed");
                 exit(0);
@@ -86,7 +85,7 @@ bool RU::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     return true;
 }
 
-int RU::dequeue_send(int tid)
+int RadioTXRX::dequeue_send(int tid)
 {
     auto& c = config_;
     auto& radio = radioconfig_;
@@ -131,7 +130,7 @@ int RU::dequeue_send(int tid)
     return event.tags[0];
 }
 
-void* RU::loopTXRX(int tid)
+void* RadioTXRX::loopTXRX(int tid)
 {
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
@@ -233,7 +232,7 @@ void* RU::loopTXRX(int tid)
     return 0;
 }
 
-void* RU::loopSYNC_TXRX(int tid)
+void* RadioTXRX::loopSYNC_TXRX(int tid)
 {
     // FIXME: This only works when there is 1 radio per thread.
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
