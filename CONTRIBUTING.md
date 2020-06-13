@@ -32,8 +32,11 @@
       `static`.
     * Eligible classes should have corresponding tests.
 
-  * Avoid macros unless necessary. For example, macros are acceptable to disable
-    compilation of files that depend on proprietary libraries. So instead of:
+  * Avoid macros unless absolutely
+    [necessary](https://google.github.io/styleguide/cppguide.html#Preprocessor_Macros).
+    For example, macros are acceptable to disable compilation of files that
+    depend on proprietary libraries. So instead of:
+
 
     ```
     #ifdef USE_LDPC
@@ -86,7 +89,17 @@
 
   * Use `size_t` as the integer type unless negative integers are needed.
 
-  * Mark elgible function arguments and implementation variables as `const`
+  * Mark elgible function arguments and implementation variables as `const`.
 
   * Use C++-style casts with `static_cast` and `reinterpret_cast` instead of
     C-style casts.
+
+  * Use auto type deduction when the type is clear. So instead of:
+    ```
+    struct Packet *pkt = new struct Packet[kNumPackets];
+    ```
+
+    prefer:
+    ```
+    auto *pkt = new Packet[kNumPackets];
+    ```
