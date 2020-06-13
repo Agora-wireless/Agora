@@ -10,8 +10,10 @@
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
+#include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
+#include "utils_ldpc.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cassert>
@@ -29,8 +31,6 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-// #include <unistd.h>
-#include "config.hpp"
 #include <vector>
 
 typedef unsigned short ushort;

@@ -9,14 +9,18 @@ int main(int argc, char* argv[])
 {
     std::string confFile;
     int core_offset;
-    if (argc == 3) {
-        core_offset = strtol(argv[1], NULL, 10);
-        confFile = std::string("/") + std::string(argv[2]);
+    int thread_num;
+    if (argc == 4) {
+        thread_num = strtol(argv[1], NULL, 10);
+        core_offset = strtol(argv[2], NULL, 10);
+        confFile = std::string("/") + std::string(argv[3]);
     } else {
         confFile = "/data/tddconfig-sim-dl.json";
+        thread_num = 1;
         core_offset = 22;
-        printf("Wrong arguments (requires 2 arguments: 1. number of tx "
-               "core offset, 2. config file)\n");
+        printf(
+            "Wrong arguments (requires 2 arguments: 1. number of threads, 2. "
+            "core offset, 3. config file)\n");
         printf("Arguments set to default: 22, %s\n", confFile.c_str());
     }
 
@@ -30,7 +34,7 @@ int main(int argc, char* argv[])
 
         // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
-        auto* receiver_ = new SimpleBSMac(cfg, 1, core_offset);
+        auto* receiver_ = new SimpleBSMac(cfg, thread_num, core_offset);
         receiver_->startRecv();
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
@@ -39,5 +43,5 @@ int main(int argc, char* argv[])
     }
     delete cfg;
 
-    return 0;
+    return ret;
 }
