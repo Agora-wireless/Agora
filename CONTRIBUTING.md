@@ -3,11 +3,12 @@
 
 ## Before creating a pull request
 
- * Ensure that the code compiles without warnings and all tests pass
+  * Ensure that the code compiles without warnings and all tests pass.
 
- * Format the source code using `clang-format`. Running `clang-format -i *.cpp
-   *.hpp` for a newly modified file will format it to match Millipede's code
-   style.
+  * Format the source code using `clang-format`. Running `clang-format -i *.cc
+    *.h` will format source and header files in the current directory to match
+    Millipede's code style. There are also
+    [plugins](https://github.com/google/vim_codefmt).
 
 
 ## Code style
@@ -21,15 +22,15 @@
   * [Naming](https://google.github.io/styleguide/cppguide.html#Naming):
     * `lower_camel_case` for variable names.
     * `UpperCamelCase` for class, struct, and function names.
-    * `kConstant` for constants
-    * Source file names should end in `.cc`, header file names in `.h`
+    * `kConstant` for constants.
+    * Source file names should end in `.cc`, header file names in `.h`.
 
   * Classes:
     * Cass members and functions should have documentation comments in the
-      class header file
+      class header file.
     * Mark eligible class functions and members as `const`, `private`, or
-      `static`
-    * Eligible classes should have corresponding tests
+      `static`.
+    * Eligible classes should have corresponding tests.
 
   * Avoid macros unless necessary. For example, macros are acceptable to disable
     compilation of files that depend on proprietary libraries. So instead of:
@@ -51,7 +52,7 @@
 
   * Avoid magic numbers. Instead of:
     ```
-    n_rows = (ldpc_config.bg == 1) ? 46 : 42
+    n_rows = (ldpc_config.bg == 1) ? 46 : 42;
     ```
 
     prefer:
@@ -75,13 +76,15 @@
 		```
 
   * Add newlines between distinct blocks of code. See the vertical whitespace
-    [section](https://google.github.io/styleguide/cppguide.html#Vertical_Whitespace)
+    [section](https://google.github.io/styleguide/cppguide.html#Vertical_Whitespace).
 
-  * Comments ([link](https://google.github.io/styleguide/cppguide.html#Comments)):
-    * Use proper grammar, ideally with complete sentences
-    * Add comments for non-obvious code blocks
-    * Avoid commented-out block of code. For example, if the block of code is
-      needed for debugging, wrap it inside a boolean flag (e.g., `kVerbose`)
+  * Comments
+    ([link](https://google.github.io/styleguide/cppguide.html#Comments)):
+    * Use proper grammar.
+    * Add comments for non-obvious blocks of code.
+    * Avoid commented-out block of code in committed files. For example, if the
+      block of code is needed for debugging, wrap it inside a boolean flag
+      (e.g., `kVerbose`).
 
   * Use C++-style casts with `static_cast` and `reinterpret_cast` instead of
-    C-style casts
+    C-style casts.
