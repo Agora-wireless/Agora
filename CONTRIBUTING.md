@@ -26,7 +26,7 @@
     * Source file names should end in `.cc`, header file names in `.h`.
 
   * Classes:
-    * Cass members and functions should have documentation comments in the
+    * Class members and functions should have documentation comments in the
       class header file.
     * Mark eligible class functions and members as `const`, `private`, or
       `static`.
@@ -47,8 +47,6 @@
     ```
     std::string raw_data_filename = kUseLDPC ? x : y;
     ```
-
-  * Use `size_t` as the integer type unless negative integers are needed.
 
   * Avoid magic numbers. Instead of:
     ```
@@ -85,6 +83,10 @@
     * Avoid commented-out block of code in committed files. For example, if the
       block of code is needed for debugging, wrap it inside a boolean flag
       (e.g., `kVerbose`).
+
+  * Use `size_t` as the integer type unless negative integers are needed.
+
+  * Mark elgible function arguments and implementation variables as `const`
 
   * Use C++-style casts with `static_cast` and `reinterpret_cast` instead of
     C-style casts.
