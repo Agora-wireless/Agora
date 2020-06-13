@@ -59,7 +59,7 @@
     ```
 
   * Avoid variable copies. Instead of `size_t fft_thread_num =
-    cfg->fft_thread_num);`, prefer using `cfg->fft_thread_num`` directly.
+    cfg->fft_thread_num);`, prefer using `cfg->fft_thread_num` directly.
 
   * Use enum classes instead of enums or macros. So instead of:
 
