@@ -275,6 +275,7 @@ void* RU::loopSYNC_TXRX(int tid)
         pilotbuffA[1] = std::vector<std::complex<float>>(num_samps, 0).data();
         pilotbuffB[1] = c->pilot_ci16.data();
         pilotbuffB[0] = std::vector<std::complex<float>>(num_samps, 0).data();
+        frmrxbuff[1] = frmbuff1.data();
     }
 
     long long rxTime(0);
