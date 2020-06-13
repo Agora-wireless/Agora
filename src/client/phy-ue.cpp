@@ -298,6 +298,7 @@ void Phy_UE::start()
     int ret = 0;
     max_equaled_frame = 0;
     size_t frame_id, symbol_id, ant_id;
+    size_t cur_frame_id = 0;
     while (config_->running && !SignalHandler::gotExitSignal()) {
         // get a bulk of events
         ret = message_queue_.try_dequeue_bulk(
@@ -333,17 +334,19 @@ void Phy_UE::start()
                 frame_id = pkt->frame_id;
                 symbol_id = pkt->symbol_id;
                 ant_id = pkt->ant_id;
+                rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
+                    "Error: Received packet for future frame beyond frame "
+                    "window. This can happen if Millipede is running "
+                    "slowly, e.g., in debug mode");
 
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    // if (!kEnableMac) {
                     Event_data do_modul_task(EventType::kModul,
                         gen_tag_t::frm_sym_ue(
                             frame_id, symbol_id, ant_id / config_->nChannels)
                             ._tag);
                     schedule_task(do_modul_task, &modul_queue_, ptok_modul);
-                    // }
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -401,7 +404,7 @@ void Phy_UE::start()
                 Event_data do_ifft_task(EventType::kIFFT,
                     gen_tag_t::frm_sym_ue(frame_id, symbol_id, ue_id)._tag);
                 schedule_task(do_ifft_task, &ifft_queue_, ptok_ifft);
-                if (kDebugPrintPerSymbolDone)
+                if (kDebugPrintPerTaskDone)
                     printf("Main thread: frame: %zu, symbol: %zu, finished "
                            "modulating "
                            "uplink data for user %zu\n",
@@ -454,18 +457,18 @@ void Phy_UE::start()
 
             case EventType::kIFFT: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
                 Event_data do_tx_task(EventType::kPacketTX, event.tags[0]);
                 schedule_task(do_tx_task, &tx_queue_,
                     *tx_ptoks_ptr[ue_id % rx_thread_num]);
-                // if (kDebugPrintPerTaskDone)
-                printf("Main thread: frame: %zu, symbol: %zu finished IFFT of "
-                       "uplink data for user %zu\n",
-                    frame_id, symbol_id, ue_id);
+                if (kDebugPrintPerTaskDone)
+                    printf("Main thread: frame: %zu, finished IFFT of "
+                           "uplink data for user %zu\n",
+                        frame_id, ue_id);
             } break;
 
             case EventType::kPacketTX: {
+                cur_frame_id++;
                 if (kDebugPrintPerSymbolDone) {
                     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
@@ -722,8 +725,8 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     rt_assert((size_t)pkt->ue_id == ue_id,
         "UE index in tag does not match that in received packet!");
 
-    size_t num_frames_per_mac_packet
-        = config_->mac_data_bytes_num_perframe / config_->data_bytes_num_perframe;
+    size_t num_frames_per_mac_packet = config_->mac_data_bytes_num_perframe
+        / config_->data_bytes_num_perframe;
     for (size_t i = 0; i < num_frames_per_mac_packet; i++) {
         size_t frame_id = mac_frame_id * num_frames_per_mac_packet + i;
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -866,17 +869,11 @@ void Phy_UE::initialize_vars_from_cfg(void)
     nUEs = config_->UE_NUM;
     antenna_num = config_->UE_ANT_NUM;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = std::min(nUEs, config_->socket_thread_num);
+    rx_thread_num = config_->hw_framer
+        ? std::min(nUEs, config_->socket_thread_num)
+        : nUEs;
     worker_thread_num = config_->worker_thread_num;
     core_offset = config_->core_offset;
-    // #ifdef ENABLE_CPU_ATTACH
-    // size_t max_core = 1 + rx_thread_num + worker_thread_num + core_offset;
-    // if (max_core >= nCPUs) {
-    //     printf("Cannot allocate cores: max_core %zu, available cores %zu\n",
-    //         max_core, nCPUs);
-    //     exit(1);
-    // }
-    // #endif
     printf("ofdm_syms %zu, %zu symbols, %zu pilot symbols, %zu UL data "
            "symbols, %zu DL data symbols\n",
         ofdm_syms, symbol_perframe, ul_pilot_symbol_perframe,
