@@ -21,10 +21,8 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
-#include <nlohmann/json.hpp>
-#ifdef USE_LDPC
 #include "utils_ldpc.hpp"
-#endif
+#include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
 using json = nlohmann::json;
