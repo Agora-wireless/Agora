@@ -508,10 +508,10 @@ void Stats::print_summary()
         = get_total_task_count(DoerType::kDemul, task_thread_num);
     size_t num_decode_tasks = kUseLDPC
         ? get_total_task_count(DoerType::kDecode, task_thread_num)
-        : -1;
+        : 0;
     size_t num_encode_tasks = kUseLDPC
         ? get_total_task_count(DoerType::kEncode, task_thread_num)
-        : -1;
+        : 0;
     size_t num_ifft_tasks
         = get_total_task_count(DoerType::kIFFT, task_thread_num);
     size_t num_precode_tasks

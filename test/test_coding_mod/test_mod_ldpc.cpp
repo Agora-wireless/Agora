@@ -3,8 +3,11 @@
    Intel's decoder
  */
 
-#include "encoder.hpp"
-#include "iobuffer.hpp"
+#include "common/gettime.h"
+#include "common/memory_manage.h"
+#include "common/modulation.hpp"
+#include "encoder/encoder.hpp"
+#include "encoder/iobuffer.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 #include <bitset>
 #include <fstream>
@@ -16,10 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "memory_manage.h"
-#include "modulation.hpp"
-
 #include <time.h>
 
 // these values depend on the application
