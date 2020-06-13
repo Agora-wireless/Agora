@@ -7,9 +7,8 @@
 
   * Format the source code using `clang-format`. Running `clang-format -i *.cc
     *.h` will format source and header files in the current directory to match
-    Millipede's code style. There are also
-    [plugins](https://github.com/google/vim_codefmt).
-
+    Millipede's code style. There are also editor plugins for `clang-format`
+    ([example](https://github.com/google/vim_codefmt)).
 
 ## Code style
 
