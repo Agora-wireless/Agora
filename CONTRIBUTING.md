@@ -1,16 +1,26 @@
 # Contributing 
 
+
+## Before creating a pull request
+
+ * Ensure that the code compiles without warnings and all tests pass
+
+ * Format the source code using `clang-format`. Running `clang-format -i *.cpp
+   *.hpp` for a newly modified file will format it to match Millipede's code
+   style.
+
+
 ## Code style
 
   * Currently the code is not fully consistent with these style guidelines. It
     is a work in progress.
 
-  * At a high level, we aim to follow [Google's C++ style guide]
-    (https://google.github.io/styleguide/cppguide.html)
+  * At a high level, we aim to follow Google's C++ style
+    [guide](https://google.github.io/styleguide/cppguide.html).
 
   * [Naming](https://google.github.io/styleguide/cppguide.html#Naming):
-    * `lower_camel_case` for variable names
-    * `UpperCamelCase` for class, struct, and function names
+    * `lower_camel_case` for variable names.
+    * `UpperCamelCase` for class, struct, and function names.
     * `kConstant` for constants
     * Source file names should end in `.cc`, header file names in `.h`
 
@@ -26,7 +36,7 @@
 
     ```
     #ifdef USE_LDPC
-		    std::string raw_data_filename = x;
+        std::string raw_data_filename = x;
     #else
         std::string raw_data_filename = y;
     #endif
@@ -39,11 +49,18 @@
 
   * Use `size_t` as the integer type unless negative integers are needed.
 
-  * Avoid magic numbers. Instead of `n_rows = (ldpc_config.bg == 1) ? 46 : 42`,
-    prefer `n_rows = (ldpc_config.bg == 1) ? kBg1RowTotal : kBg2RowTotal`. 
+  * Avoid magic numbers. Instead of:
+    ```
+    n_rows = (ldpc_config.bg == 1) ? 46 : 42
+    ```
 
-  * Avoid variable copies. Instead of `size_t FFT_THREAD_NUM =
-    cfg->fft_thread_num)`, prefer using `cfg->fft_thread_num`` directly.
+    prefer:
+    ```
+    n_rows = (ldpc_config.bg == 1) ? kBg1RowTotal : kBg2RowTotal;
+    ```
+
+  * Avoid variable copies. Instead of `size_t fft_thread_num =
+    cfg->fft_thread_num);`, prefer using `cfg->fft_thread_num`` directly.
 
   * Use enum classes instead of enums or macros. So instead of:
 
@@ -57,11 +74,10 @@
 		enum class PrintType {kRXPilots, kRX};
 		```
 
-  * Add newlines between distinct blocks of code. See the [vertical whitespace
-    section]
-    (https://google.github.io/styleguide/cppguide.html#Vertical_Whitespace)
+  * Add newlines between distinct blocks of code. See the vertical whitespace
+    [section](https://google.github.io/styleguide/cppguide.html#Vertical_Whitespace)
 
-  * Comments [link](https://google.github.io/styleguide/cppguide.html#Comments):
+  * Comments ([link](https://google.github.io/styleguide/cppguide.html#Comments)):
     * Use proper grammar, ideally with complete sentences
     * Add comments for non-obvious code blocks
     * Avoid commented-out block of code. For example, if the block of code is
@@ -69,11 +85,3 @@
 
   * Use C++-style casts with `static_cast` and `reinterpret_cast` instead of
     C-style casts
-
-## Before creating a pull request
-
- * Ensure that the code compiles without warnings and all tests pass
-
- * Format the source code using `clang-format`. Running `clang-format -i *.cpp
-   *.hpp` for a newly modified file will format it to match Millipede's code
-   style.
