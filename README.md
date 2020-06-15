@@ -26,7 +26,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     ./test_millipede.sh 100 out % Runs the test for 100 iterations
     ```
 
- * Build Millipede:
+ * Build Millipede
     ```
     cd Millipede
     mkdir build
@@ -35,29 +35,29 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     make -j
     ```
 
- * Run with simulated client traffic
-   * First, run `./data_generator data/tddconfig-sim-ul.json` to generate
-     data files
-   * In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start 
-     Millipede with uplink configuration 
+ * Run Millipede with simulated client traffic
+   * First, run `./data_generator data/tddconfig-sim-ul.json` to generate data
+     files.
+   * In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start
+     Millipede with uplink configuration.
    * In another terminal, run  `./sender --num_threads=2 --core_offset=0
      --delay=5000 --enable_slow_start=false
-     --conf_file=data/tddconfig-sim-ul.json` to start the sender with uplink
-     configuration
+     --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
+     sender with uplink configuration.
 
- * Run with real traffic from Faros/Iris hardware UEs: See the "Hardware mode"
-   section below
+ * To run with real wireless traffic from Faros/Iris hardware UEs, see the
+   "Hardware mode" section below.
 
- * Before contributing, please go over CONTRIBUTING.md.
+ * Before contributing, please go over CONTRIBUTING.md
 
-## Hardware mode
+## Running with hardware UEs
 
 This section provides instructions for generating and processing real wireless
 traffic with hardware UEs (e.g., Iris devices)
 
 ### Prepare the Iris UE devices
 
- * Flash the client Iris UE device with the proper image:
+ * Flash the client Iris UE device with the proper image
    * Download the image
      [bundle]https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz
    * Unpack the tarball `bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz` and
@@ -68,7 +68,7 @@ traffic with hardware UEs (e.g., Iris devices)
    * The IPv6 address of the Iris looks like `fe80::3b3b:21ee:fd81:687%2`.
      Default username and password to Iris devices is {`sklk`, `sklk`}.
 
-   * In the Iris UE device:
+   * In the Iris UE device
     ```
       scp BOOT.BIN image.up sklk@IrisIPAdress:~
       ssh sklk@IrisIPAddress
@@ -81,8 +81,8 @@ traffic with hardware UEs (e.g., Iris devices)
 
 ### Run the uplink demo
 
- * Run the client on a machine connected to the Iris UEs:
-   * Rebuild the code:
+ * Run the client on a machine connected to the Iris UEs
+   * Rebuild the code
      * Set `kConnectUDP = false` in `src/common/Symbols.hpp`
      * Pass `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
@@ -91,10 +91,10 @@ traffic with hardware UEs (e.g., Iris devices)
    * Run `./build/user data/ue-ul-hw.json`
    * Run `./build/macuser 2 5000 data/ue-ul-hw.json`
 
- * Running Millipede on the server
+ * Run Millipede on the server
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
-   * Rebuild the code:
+   * Rebuild the code
      * Set `kExportConstellation = true` in `src/common/Symbols.hpp`
      * Pass `-DUSE_ARGOS=on` to cmake
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
