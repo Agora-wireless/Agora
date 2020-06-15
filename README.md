@@ -58,17 +58,17 @@ traffic with hardware UEs (e.g., Iris devices)
 ### Prepare the Iris UE devices
 
  * Flash the client Iris UE device with the proper image:
-  * Download the image
-    [bundle]https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz
-  * Unpack the tarball `bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz` and
-    the one inside: 
-  * Copy `BOOT.BIN` and `image.ub` files to the SD card of you Iris.
-    Alternatively, you can transfer the files over the network with Iris on and
-    discoverable.
-  * The IPv6 address of the Iris looks like `fe80::3b3b:21ee:fd81:687%2`.
-    Default username and password to Iris devices is {`sklk`, `sklk`}.
+   * Download the image
+     [bundle]https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz
+   * Unpack the tarball `bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz` and
+     the one inside.
+   * Copy `BOOT.BIN` and `image.ub` files to the SD card of you Iris.
+     Alternatively, you can transfer the files over the network with Iris on
+     and discoverable.
+   * The IPv6 address of the Iris looks like `fe80::3b3b:21ee:fd81:687%2`.
+     Default username and password to Iris devices is {`sklk`, `sklk`}.
 
-  * In the Iris UE device:
+   * In the Iris UE device:
     ```
       scp BOOT.BIN image.up sklk@IrisIPAdress:~
       ssh sklk@IrisIPAddress
