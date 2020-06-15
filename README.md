@@ -45,15 +45,15 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      --conf_file=data/tddconfig-sim-ul.json` to start the sender with uplink
      configuration
 
- * Run with real traffic from Faros/Iris hardware UEs: See the Hardware Mode
+ * Run with real traffic from Faros/Iris hardware UEs: See the "Hardware mode"
    section below
 
  * Before contributing, please go over CONTRIBUTING.md.
 
-## Hardware Mode
+## Hardware mode
 
- * To run Millipede with Faros/Iris hardware, run cmake with `-DUSE_ARGOS=on`
- * To run Client with Iris Hardware, set run cmake with `-DENABLE_MAC=on`
+This section provides instructions for generating and processing real wireless
+traffic with hardware UEs (e.g., Iris devices)
 
 ### Prepare the Iris UE devices
 
@@ -82,7 +82,9 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
 ### Run the uplink demo
 
  * Run the client on a machine connected to the Iris UEs:
-   * Rebuild the code with `kConnectUDP = false` in `src/common/Symbols.hpp`
+   * Rebuild the code:
+     * Set `kConnectUDP = false` in `src/common/Symbols.hpp`
+     * Pass `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
    * Run `./data_generator data/ue-ul-hw.json` to generate required data files
@@ -92,9 +94,10 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
  * Running Millipede on the server
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
-   * Rebuild the code with `kExportConstellation` enabled in
-     `src/common/Symbols.hpp`
-  * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
+   * Rebuild the code:
+     * Set `kExportConstellation = true` in `src/common/Symbols.hpp`
+     * Pass `-DUSE_ARGOS=on` to cmake
+   * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
     serials of your RRU Irises and hub, respectively. Iris serials in your
     Faros RRHs.
-  * Run `python mm_gui.py data/bs-ul-hw.json`
+   * Run `python mm_gui.py data/bs-ul-hw.json`
