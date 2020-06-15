@@ -1,68 +1,62 @@
-# Millipede
+Millipede is a high-performance system for massive-MIMO baseband processing.
 
-## Instruction:
-
-1. Installation
-
-Required packages:
-
-`sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
-
-Install Armadillo: `./scripts/install_armadillo.sh`
-
-Install the latest version of SoapySDR from 
-https://github.com/pothosware/SoapySDR
-
-Intel MKL and compiler can be installed by installing Parallel Studio XE:
-
-* Available at https://software.intel.com/en-us/parallel-studio-xe/choose-download/student-linux-fortran
-
-Install Intel FlexRAN (optional, only used for LDPC):
-
-* Available at https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules
-* Requires gtest Google Test 1.7.0: 
-https://github.com/google/googletest/releases/tag/release-1.7.0
+## Requirements
+ * Toolchain: A C++11 compiler and CMake 2.8+. Enabling LDPC decoding requires
+   an Intel C++ compiler (`icpc`).
+ * Required packages
+   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
+   * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing_intel_free_libs_and_python_apt_repo.html))
+   * Install Armadillo: `./scripts/install_armadillo.sh`
+   * Install the latest version of SoapySDR from https://github.com/pothosware/SoapySDR
+   * Download Intel FlexRAN to `/opt` (does not need to be compiled)
+     * Download [link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
+   * Optional: Install Intel compiler
+     * Intel MKL and compiler can be installed by installing Parallel Studio XE
+     * Set environment vairables by sourcing `compilervars.sh`, e.g.,
+     `source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64`
 
 
-Set environment vairables for Intel libraries before compiling:
+## Millipede quickstart
 
-	source path_to/compilervars.sh intel64
+ * Run the tests
+    ```
+    cd test/test_millipede
+    cmake .
+    make -j
+    ./test_millipede.sh 100 out % Runs the test for 100 iterations
+    ```
 
-E.g., 
+ * Build Millipede:
+    ```
+    cd Millipede
+    mkdir build
+    cd build
+    cmake ..
+    make -j
+    ```
 
-	source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64
+ * Run with simulated client traffic
+   * First, run `./data_generator data/tddconfig-sim-ul.json` to generate
+     data files
+   * In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start 
+     Millipede with uplink configuration 
+   * In another terminal, run  `./sender --num_threads=2 --core_offset=0
+     --delay=5000 --enable_slow_start=false
+     --conf_file=data/tddconfig-sim-ul.json` to start the sender with uplink
+     configuration
 
-2. Build
+ * Run with real traffic from Faros/Iris hardware UEs: See the Hardware Mode
+   section below
 
-Compile Millipede:
+ * Before contributing, please go over CONTRIBUTING.md.
 
-	cd Millipede
-	mkdir build
-	cd build
-	cmake ..
-	make -j 
+2.2. Hardware Mode
+
 
 * Note 1 : to run Millipede with Faros/Iris hardware, set `USE_ARGOS` variable 
 in CMakeLists.txt to `True`.
 * Note 2 : to run Client with Iris Hardware, set `ENABLE_MAC` in CMakeLists.txt 
 to `True`.
-
-2. Run
-
-2.1. Simulation Mode
-
-* First, run `./data_generator data/tddconfig-sim-ul.json` to generate required 
-data files for Millipede
-* In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start 
-Millipede with Uplink configuration 
-* In another terminal, run 
-`./sender --num_threads=2 --core_offset=0 --delay=5000 --enable_slow_start=false --conf_file=data/tddconfig-sim-ul.json` 
-to start the sender with Uplink configuration, the four arguments are: # of 
-threads, offset of CPU core index (change the value according to which socket 
-the NIC is installed), frame duration in microseconds, whether sender should 
-increase transmission rate slowly, config filename
-
-2.2. Hardware Mode
 
 Uplink Demo:
 
@@ -114,22 +108,3 @@ demodulation).
   * The sender sends 1 frame, Millipede processes it and compares results with 
   ground truth data.
   * Gound truth data is produced by MATLAB file generate_data_dl.m. 
-
-To compile and run Millipede test:
-
-	cd test/test_millipede
-	cmake .
-	make -j
-	./test_millipede.sh
-
-* test_matrix.cpp is for unit tests of matrix operations (inversion and 
-multiplication)
-* test_mufft.c is for unit tests of FFT and IFFT
-
-To compile test_matrix.cpp:
-
-	g++ -o test_matrix test_matrix.cpp cpu_attach.cpp -std=c++11 -w -O3 -mavx2 -g -larmadillo -lpthread -lm -ldl 
-
-To compile test_mufft.c:
-
-	gcc -o test_mufft ../test_mufft.c /usr/local/lib/libmufft.a -lm -Wl,-no-undefined
