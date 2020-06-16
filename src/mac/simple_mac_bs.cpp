@@ -66,7 +66,7 @@ void* SimpleBSMac::loopRecv(int tid)
     int packet_length = kUseLDPC
         ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
         : (cfg->OFDM_DATA_NUM + 7) >> 3;
-    packet_length += offsetof(MacPacket, data);
+    packet_length += MacPacket::kOffsetOfData;
     char* rx_buffer = (char*)malloc(packet_length);
     while (true) {
         auto* pkt = (struct MacPacket*)rx_buffer;
