@@ -123,7 +123,7 @@ struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
     int packet_length = kUseLDPC ? (bits_to_bytes(cfg->LDPC_config.cbLen)
                                        * cfg->LDPC_config.nblocksInSymbol)
                                  : bits_to_bytes(cfg->OFDM_DATA_NUM);
-    packet_length += offsetof(MacPacket, data);
+    packet_length += MacPacket::kOffsetOfData;
 
     struct MacPacket* pkt = (struct MacPacket*)rx_buffer;
     // int ret = recv(socket_[radio_id], (char*)pkt, packet_length, 0);
@@ -184,7 +184,7 @@ int MacPacketTXRX::dequeue_send(int tid)
     int packet_length = kUseLDPC ? (bits_to_bytes(cfg->LDPC_config.cbLen)
                                        * cfg->LDPC_config.nblocksInSymbol)
                                  : bits_to_bytes(cfg->OFDM_DATA_NUM);
-    packet_length += offsetof(MacPacket, data);
+    packet_length += MacPacket::kOffsetOfData;
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_id);

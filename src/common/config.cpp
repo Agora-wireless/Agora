@@ -237,7 +237,7 @@ Config::Config(std::string jsonfile)
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = offsetof(Packet, data) + mac_data_bytes_num_perframe;
+    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
     // The current implementation only supports the case when  MAC packet size
     // is multiples of data_bytes_num_perframe
     if (data_bytes_num_perframe != 0)
