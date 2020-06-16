@@ -237,7 +237,7 @@ Config::Config(std::string jsonfile)
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = offsetof(Packet, data) + mac_data_bytes_num_perframe;
+    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
     // The current implementation only supports the case when  MAC packet size
     // is multiples of data_bytes_num_perframe
     if (data_bytes_num_perframe != 0)
@@ -375,15 +375,10 @@ void Config::genData()
     }
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
-#ifdef USE_LDPC
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+    std::string filename1 = cur_directory1
+        + (kUseLDPC ? "/data/LDPC_orig_data_" : "/data/orig_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
         + ".bin";
-#else
-    std::string filename1 = cur_directory1 + "/data/orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
-        + ".bin";
-#endif
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
         printf("open antenna file %s failed.\n", filename1.c_str());
@@ -493,13 +488,9 @@ void Config::genData()
                 int k = j - OFDM_DATA_START;
                 size_t s = p + k;
                 if (k % OFDM_PILOT_SPACING != 0) {
-#ifdef USE_LDPC
-                    dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_mod_input[i][s], qam_table);
-#else
-                    dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_bits[i][s], qam_table);
-#endif
+                    dl_iq_f[i][q + j] = mod_single_uint8(
+                        kUseLDPC ? dl_mod_input[i][s] : dl_bits[i][s],
+                        qam_table);
                 } else
                     dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
                 dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
@@ -521,12 +512,8 @@ void Config::genData()
             for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
                 size_t k = j - OFDM_DATA_START;
                 size_t s = p + k;
-#ifdef USE_LDPC
-                ul_iq_f[i][q + j]
-                    = mod_single_uint8(ul_mod_input[i][s], qam_table);
-#else
-                ul_iq_f[i][q + j] = mod_single_uint8(ul_bits[i][s], qam_table);
-#endif
+                ul_iq_f[i][q + j] = mod_single_uint8(
+                    kUseLDPC ? ul_mod_input[i][s] : ul_bits[i][s], qam_table);
                 ul_iq_ifft[i][q + j] = ul_iq_f[i][q + j];
             }
 
