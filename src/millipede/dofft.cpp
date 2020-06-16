@@ -225,67 +225,62 @@ void DoFFT::partial_transpose(
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline
-            if (0) {
-                // AVX-512. Disabled for now because we don't have a working
-                // complex multiply for __m512 type.
-                __m512 fft_result
-                    = _mm512_load_ps(reinterpret_cast<const float*>(src));
-                if (symbol_type == SymbolType::kPilot) {
-                    __m512 pilot_tx
-                        = _mm512_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                            cfg->pilots_sgn_[sc_idx + 7].re,
-                            cfg->pilots_sgn_[sc_idx + 6].im,
-                            cfg->pilots_sgn_[sc_idx + 6].re,
-                            cfg->pilots_sgn_[sc_idx + 5].im,
-                            cfg->pilots_sgn_[sc_idx + 5].re,
-                            cfg->pilots_sgn_[sc_idx + 4].im,
-                            cfg->pilots_sgn_[sc_idx + 4].re,
-                            cfg->pilots_sgn_[sc_idx + 3].im,
-                            cfg->pilots_sgn_[sc_idx + 3].re,
-                            cfg->pilots_sgn_[sc_idx + 2].im,
-                            cfg->pilots_sgn_[sc_idx + 2].re,
-                            cfg->pilots_sgn_[sc_idx + 1].im,
-                            cfg->pilots_sgn_[sc_idx + 1].re,
-                            cfg->pilots_sgn_[sc_idx].im,
-                            cfg->pilots_sgn_[sc_idx].re);
-                    fft_result = _mm512_mul_ps(fft_result, pilot_tx);
-                }
-                _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
-            } else {
-                // AVX2
-                __m256 fft_result0
-                    = _mm256_load_ps(reinterpret_cast<const float*>(src));
-                __m256 fft_result1
-                    = _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
-                if (symbol_type == SymbolType::kPilot) {
-                    __m256 pilot_tx0
-                        = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 3].im,
-                            cfg->pilots_sgn_[sc_idx + 3].re,
-                            cfg->pilots_sgn_[sc_idx + 2].im,
-                            cfg->pilots_sgn_[sc_idx + 2].re,
-                            cfg->pilots_sgn_[sc_idx + 1].im,
-                            cfg->pilots_sgn_[sc_idx + 1].re,
-                            cfg->pilots_sgn_[sc_idx].im,
-                            cfg->pilots_sgn_[sc_idx].re);
-                    fft_result0 = __m256_complex_cf32_mult(
-                        fft_result0, pilot_tx0, true);
-
-                    __m256 pilot_tx1
-                        = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                            cfg->pilots_sgn_[sc_idx + 7].re,
-                            cfg->pilots_sgn_[sc_idx + 6].im,
-                            cfg->pilots_sgn_[sc_idx + 6].re,
-                            cfg->pilots_sgn_[sc_idx + 5].im,
-                            cfg->pilots_sgn_[sc_idx + 5].re,
-                            cfg->pilots_sgn_[sc_idx + 4].im,
-                            cfg->pilots_sgn_[sc_idx + 4].re);
-                    fft_result1 = __m256_complex_cf32_mult(
-                        fft_result1, pilot_tx1, true);
-                }
-                _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
-                _mm256_stream_ps(
-                    reinterpret_cast<float*>(dst + 4), fft_result1);
+#ifdef __AVX512F__
+            // AVX-512. Disabled for now because we don't have a working
+            // complex multiply for __m512 type.
+            __m512 fft_result
+                = _mm512_load_ps(reinterpret_cast<const float*>(src));
+            if (symbol_type == SymbolType::kPilot) {
+                __m512 pilot_tx = _mm512_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
+                    cfg->pilots_sgn_[sc_idx + 7].re,
+                    cfg->pilots_sgn_[sc_idx + 6].im,
+                    cfg->pilots_sgn_[sc_idx + 6].re,
+                    cfg->pilots_sgn_[sc_idx + 5].im,
+                    cfg->pilots_sgn_[sc_idx + 5].re,
+                    cfg->pilots_sgn_[sc_idx + 4].im,
+                    cfg->pilots_sgn_[sc_idx + 4].re,
+                    cfg->pilots_sgn_[sc_idx + 3].im,
+                    cfg->pilots_sgn_[sc_idx + 3].re,
+                    cfg->pilots_sgn_[sc_idx + 2].im,
+                    cfg->pilots_sgn_[sc_idx + 2].re,
+                    cfg->pilots_sgn_[sc_idx + 1].im,
+                    cfg->pilots_sgn_[sc_idx + 1].re,
+                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
+            _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
+#else
+            __m256 fft_result0
+                = _mm256_load_ps(reinterpret_cast<const float*>(src));
+            __m256 fft_result1
+                = _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
+            if (symbol_type == SymbolType::kPilot) {
+                __m256 pilot_tx0 = _mm256_set_ps(
+                    cfg->pilots_sgn_[sc_idx + 3].im,
+                    cfg->pilots_sgn_[sc_idx + 3].re,
+                    cfg->pilots_sgn_[sc_idx + 2].im,
+                    cfg->pilots_sgn_[sc_idx + 2].re,
+                    cfg->pilots_sgn_[sc_idx + 1].im,
+                    cfg->pilots_sgn_[sc_idx + 1].re,
+                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                fft_result0
+                    = __m256_complex_cf32_mult(fft_result0, pilot_tx0, true);
+
+                __m256 pilot_tx1
+                    = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
+                        cfg->pilots_sgn_[sc_idx + 7].re,
+                        cfg->pilots_sgn_[sc_idx + 6].im,
+                        cfg->pilots_sgn_[sc_idx + 6].re,
+                        cfg->pilots_sgn_[sc_idx + 5].im,
+                        cfg->pilots_sgn_[sc_idx + 5].re,
+                        cfg->pilots_sgn_[sc_idx + 4].im,
+                        cfg->pilots_sgn_[sc_idx + 4].re);
+                fft_result1
+                    = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
+            }
+            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
+            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
+#endif
         }
     }
 }
