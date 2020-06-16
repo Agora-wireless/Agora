@@ -374,6 +374,7 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
             assert(ant_id < c->pilotSymbols[0].size());
             size_t next_tx_frame_id = tx_frame_id + TX_FRAME_DELTA;
             size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
+
             txTime = time0 + next_tx_frame_id * frm_num_samps
                 + pilot_symbol_id * num_samps - c->cl_tx_advance;
             r = radio->radioTx(ue_id, pilot_buff0.data(), num_samps, 2, txTime);
@@ -448,10 +449,6 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 if (buffer_status[cursor] == 1) {
                     printf(
                         "RX thread %d at cursor %d buffer full\n", tid, cursor);
-                    // exit(0);
-                    for (int i = 0; i < buffer_frame_num_; i++)
-                        printf("%d ", buffer_status[cursor]);
-                    printf("\n");
                     c->running = false;
                     break;
                 }
@@ -459,7 +456,7 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 struct Packet* pkt[c->nChannels];
                 void* samp[c->nChannels];
                 for (size_t ch = 0; ch < c->nChannels; ++ch) {
-                    pkt[ch] = (struct Packet*)&buffer[(cursor + ch)
+                    pkt[ch] = (struct Packet*)&buffer[((cursor + ch) % buffer_frame_num_)
                         * config_->packet_length];
                     samp[ch] = pkt[ch]->data;
                 }
@@ -485,7 +482,7 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                         frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
                     Event_data rx_message(
-                        EventType::kPacketRX, rx_tag_t(tid, cursor + ch)._tag);
+                        EventType::kPacketRX, rx_tag_t(tid, cursor)._tag);
 
                     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
                         printf("socket message enqueue failed\n");
