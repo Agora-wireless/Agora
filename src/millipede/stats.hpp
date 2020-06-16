@@ -78,6 +78,18 @@ public:
 
     size_t last_frame_id;
 
+    /// Set buffer size
+    void master_set_buffer_size(size_t frame_id, size_t size)
+    {
+        buffer_size[frame_id] = size;
+    }
+
+    /// Get buffer size
+    size_t master_get_buffer_size(size_t frame_id)
+    {
+        return buffer_size[frame_id];
+    }
+
     /// From the master, set the RDTSC timestamp for a frame ID and timestamp
     /// type
     void master_set_tsc(TsType timestamp_type, size_t frame_id)
@@ -211,6 +223,9 @@ private:
     const size_t break_down_num;
     const double freq_ghz;
     const size_t creation_tsc; // TSC at which this object was created
+
+    /// Track buffer status as each frame gets processed.
+    size_t buffer_size[kNumStatsFrames];
 
     /// Timestamps taken by the master thread at different points in a frame's
     /// processing

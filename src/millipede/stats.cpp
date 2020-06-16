@@ -118,7 +118,8 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
         if (kUseLDPC) {
             print_per_frame("Decode", decode_frame_summary);
         }
-        printf("Total: %.2f ms\n", sum_us_this_frame / 1000);
+        printf("Total: %.2f ms, Buffer: %zu frames\n", sum_us_this_frame / 1000,
+            master_get_buffer_size(frame_id));
     }
 }
 

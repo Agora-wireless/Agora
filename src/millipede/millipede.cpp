@@ -244,6 +244,10 @@ void Millipede::start()
                     "window. This can happen if Millipede is running "
                     "slowly, e.g., in debug mode");
 
+                // Record buffer size.
+                stats->master_set_buffer_size(
+                    pkt->frame_id, pkt->frame_id - cur_frame_id);
+
                 update_rx_counters(pkt->frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
                     /* In BigStation, schedule FFT whenever a packet is RX */
