@@ -307,15 +307,10 @@ int main(int argc, char* argv[])
     }
 
     printf("saving rx data...\n");
-#ifdef USE_LDPC
-    std::string filename_rx = cur_directory + "/data/LDPC_rx_data_"
+    std::string filename_rx = cur_directory
+        + (kUseLDPC ? "/data/LDPC_rx_data_" : "/data/rx_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
-#else
-    std::string filename_rx = cur_directory + "/data/rx_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
-        + ".bin";
-#endif
     FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
     for (int i = 0; i < symbol_num_perframe; i++) {
         float* ptr = (float*)rx_data_all_symbols[i];
@@ -449,15 +444,10 @@ int main(int argc, char* argv[])
     }
 
     printf("saving dl tx data...\n");
-#ifdef USE_LDPC
-    std::string filename_dl_tx = cur_directory + "/data/LDPC_dl_tx_data_"
+    std::string filename_dl_tx = cur_directory
+        + (kUseLDPC ? "/data/LDPC_dl_tx_data_" : "/data/dl_tx_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
-#else
-    std::string filename_dl_tx = cur_directory + "/data/dl_tx_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
-        + ".bin";
-#endif
 
     FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
     for (int i = 0; i < dl_data_symbol_num_perframe; i++) {

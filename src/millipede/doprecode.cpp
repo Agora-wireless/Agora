@@ -14,21 +14,13 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_precoder_buffer,
     Table<complex_float>& in_dl_ifft_buffer,
-#ifdef USE_LDPC
-    Table<int8_t>& in_dl_encoded_data,
-#else
-    Table<int8_t>& in_dl_raw_data,
-#endif
+    Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , precoder_buffer_(in_precoder_buffer)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
-#ifdef USE_LDPC
-    , dl_raw_data(in_dl_encoded_data)
-#else
-    , dl_raw_data(in_dl_raw_data)
-#endif
+    , dl_raw_data(dl_encoded_or_raw_data)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
