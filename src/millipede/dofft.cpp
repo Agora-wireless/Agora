@@ -225,7 +225,8 @@ void DoFFT::partial_transpose(
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline
-#ifdef __AVX512F__
+
+#if 0
             // AVX-512. Disabled for now because we don't have a working
             // complex multiply for __m512 type.
             __m512 fft_result
