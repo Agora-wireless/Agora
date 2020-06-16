@@ -202,9 +202,9 @@ void Millipede::start()
     double tx_begin = get_time_us();
 
     bool is_turn_to_dequeue_from_io = true;
-    const size_t max_events_needed = std::max(kDequeueBulkSizeWorker
+    const size_t max_events_needed = std::max(kDequeueBulkSizeTXRX
             * (cfg->socket_thread_num + cfg->mac_socket_thread_num),
-        kDequeueBulkSizeTXRX * cfg->worker_thread_num);
+        kDequeueBulkSizeWorker * cfg->worker_thread_num);
     Event_data events_list[max_events_needed];
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
