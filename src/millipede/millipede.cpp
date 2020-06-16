@@ -190,9 +190,8 @@ void Millipede::start()
         }
     }
 
-    // Millipede processes a frame after completing processing for previous
-    // frames is complete. cur_frame_id is the frame that is currently being
-    // processed.
+    // Millipede processes a frame after processing for previous frames is
+    // complete. cur_frame_id is the frame that is currently being processed.
     size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
