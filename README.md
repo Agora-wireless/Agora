@@ -8,8 +8,16 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html))
    * Install Armadillo: `./scripts/install_armadillo.sh`
    * Install the latest version of SoapySDR from https://github.com/pothosware/SoapySDR
-   * Download Intel FlexRAN to `/opt` (does not need to be compiled)
+   * Download Intel FlexRAN's LDPC SDK to `/opt` (does not need to be compiled)
      * Download [link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
+     * Compile FlexRAN's LDPC SDK:
+     ```
+     % First, change ownership of /opt/FlexRAN_FEC_SDK_19_04 to your Linux user
+     cd /opt/FlexRAN_FEC_SDK_19_04/sdk/
+     ./create-makefiles-linux.sh
+     cd build-avx512-icc % or build-avx2-icc
+     make
+     ```
    * Optional: Install Intel compiler
      * Intel MKL and compiler can be installed by installing Parallel Studio XE
      * Set environment vairables by sourcing `compilervars.sh`, e.g.,
