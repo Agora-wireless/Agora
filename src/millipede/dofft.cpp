@@ -176,7 +176,7 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        partial_transpose(cfg->get_csi_buf(csi_buffer_, frame_id, symbol_id),
+        partial_transpose(cfg->get_csi_mat(csi_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
         partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),

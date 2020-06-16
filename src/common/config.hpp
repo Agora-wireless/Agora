@@ -240,9 +240,9 @@ public:
             + symbol_idx_dl;
     }
 
-    /// Fetch the channel state information buffer for this frame and symbol ID.
+    /// Fetch the channel state information matrix for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
-    inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
+    inline complex_float* get_csi_mat(Table<complex_float>& csi_buffers,
         size_t frame_id, size_t symbol_id) const
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -262,8 +262,8 @@ public:
         return data_buffers[symbol_offset];
     }
 
-    /// Get the precoder buffer for this frame and subcarrier ID
-    inline complex_float* get_precoder_buf(
+    /// Return a pointer to the precoder matrix for this frame and subcarrier ID
+    inline complex_float* get_precoder_mat(
         Table<complex_float>& precoder_buffers, size_t frame_id,
         size_t sc_id) const
     {
@@ -271,6 +271,18 @@ public:
             sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+    }
+
+    /// Return a pointer to the equalization matrix for this frame and
+    /// subcarrier ID
+    inline complex_float* get_equalizer_mat(
+        Table<complex_float>& equalizer_buffers, size_t frame_id,
+        size_t sc_id) const
+    {
+        if (freq_orthogonal_pilot)
+            sc_id -= (sc_id % UE_NUM);
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        return equalizer_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
