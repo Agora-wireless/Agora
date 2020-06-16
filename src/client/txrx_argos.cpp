@@ -216,7 +216,7 @@ void* RadioTXRX::loopTXRX(int tid)
                 Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
             Event_data rx_message(
-                EventType::kPacketRX, rx_tag_t(tid, cursor + ch)._tag);
+                EventType::kPacketRX, rx_tag_t(tid, cursor)._tag);
 
             if (!message_queue_->enqueue(*local_ptok, rx_message)) {
                 printf("socket message enqueue failed\n");
