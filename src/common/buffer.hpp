@@ -201,6 +201,7 @@ struct Event_data {
 static_assert(sizeof(Event_data) == 64, "");
 
 struct Packet {
+    // The packet's data starts at kOffsetOfData bytes from the start
     static constexpr size_t kOffsetOfData = 64;
 
     uint32_t frame_id;
@@ -228,6 +229,9 @@ struct Packet {
 
 // TODO: merge Packet and MacPacket into one struct
 struct MacPacket {
+    // The packet's data starts at kOffsetOfData bytes from the start
+    static constexpr size_t kOffsetOfData = 64;
+
     uint32_t frame_id;
     uint32_t symbol_id;
     uint32_t cell_id;
