@@ -261,7 +261,17 @@ Event_data DoDemul::launch(size_t tag)
                 = (&demod_soft_buffer_[total_data_symbol_idx_ul]
                                       [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                           * cfg->mod_type]);
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            switch (cfg->mod_type) {
+            case (CommsLib::QAM16):
+                demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            case (CommsLib::QAM64):
+                demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            default:
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
+            }
             // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
             //     tid, frame_id, symbol_idx_ul, base_sc_id);
             // cout << "Demuled data : \n ";
@@ -273,7 +283,17 @@ Event_data DoDemul::launch(size_t tag)
             uint8_t* demul_ptr
                 = (&demod_hard_buffer_[total_data_symbol_idx_ul]
                                       [cfg->OFDM_DATA_NUM * i + base_sc_id]);
-            demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            switch (cfg->mod_type) {
+            case (CommsLib::QAM16):
+                demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            case (CommsLib::QAM64):
+                demod_64qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            default:
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
+            }
         }
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
