@@ -221,6 +221,9 @@ Config::Config(std::string jsonfile)
         = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+    rt_assert(LDPC_config.nblocksInSymbol > 0,
+        "LDPC expansion factor is too large for number of OFDM data "
+        "subcarriers.");
 
     printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, "
            "encoded block len: %d, decoder iterations: %d\n",
