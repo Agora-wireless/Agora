@@ -30,11 +30,7 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& in_precoder_buffer,
         Table<complex_float>& in_dl_ifft_buffer,
-#ifdef USE_LDPC
-        Table<int8_t>& in_dl_encoded_data,
-#else
-        Table<int8_t>& in_dl_raw_data,
-#endif
+        Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
         Stats* in_stats_manager);
     ~DoPrecode();
 
