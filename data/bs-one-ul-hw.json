@@ -1,0 +1,32 @@
+{
+ "hubs" : "data/bs-hub-serial.txt",
+ "irises" : "data/bs-iris-serials.txt",
+ "cells" : 1,
+ "channel" : "AB",
+ "frequency" : 3.56e9,
+ "rxgainA" : 20,
+ "txgainA" : 25,
+ "rxgainB" : 20,
+ "txgainB" : 25,
+ "rate" : 5e6,
+ "symbol_size" : 1,
+ "prefix" : 160,
+ "postfix" : 160,
+ "ofdm_ca_num" : 512,
+ "ofdm_data_num" : 304,
+ "cp_len" : 32,
+ "tx_prefix_len" : 160,
+ "ofdm_prefix_len" : 220,
+ "beamsweep" : true,
+ "beacon_antenna" : 0,
+ "sample_calibrate" : false,
+ "calTxGainA" : 30,
+ "calTxGainB" : 30,
+ "frames" : [
+     "BGGGGGPGGGUUUG"
+ ],
+ "downlink_mode": false,
+ "client_ul_pilot_syms" : 2,
+ "worker_thread_num" : 25,
+ "demul_block_size" : 48
+}
