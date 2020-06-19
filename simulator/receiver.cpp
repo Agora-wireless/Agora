@@ -62,12 +62,12 @@ void* Receiver::loopRecv(int tid)
 #if USE_IPV4
     struct sockaddr_in remote_addr;
     int socket_local
-        = setup_socket_ipv4(cfg->ue_client_port + tid, true, sock_buf_size);
+        = setup_socket_ipv4(cfg->ue_rx_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv4(
         &remote_addr, cfg->bs_port + tid, cfg->server_addr.c_str());
 #else
     int socket_local
-        = setup_socket_ipv6(cfg->ue_client_port + tid, true, sock_buf_size);
+        = setup_socket_ipv6(cfg->ue_rx_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv6(
         &remote_addr, cfg->bs_port + tid, "fe80::f436:d735:b04a:864a");
 #endif

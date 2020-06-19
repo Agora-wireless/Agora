@@ -54,7 +54,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
-        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_server_port + i);
+        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, client_addr, FULL_MASK,
             server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
@@ -272,7 +272,7 @@ int PacketTXRX::dequeue_send(int tid)
     struct rte_udp_hdr* udp_h
         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
     udp_h->src_port = rte_cpu_to_be_16(cfg->bs_port + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(cfg->ue_client_port + tid);
+    udp_h->dst_port = rte_cpu_to_be_16(cfg->ue_rx_port + tid);
 
     tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
     tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
