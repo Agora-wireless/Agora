@@ -28,8 +28,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& data_buffer,
-        Table<complex_float>& equalizer_buffer,
+        Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer, Table<uint8_t>& demul_hard_buffer,
         Table<int8_t>& demod_soft_buffer, Stats* in_stats_manager);
@@ -65,7 +64,7 @@ public:
 
 private:
     Table<complex_float>& data_buffer_;
-    Table<complex_float>& equalizer_buffer;
+    Table<complex_float>& ul_zf_buffer_;
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<uint8_t>& demod_hard_buffer_;

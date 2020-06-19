@@ -273,16 +273,15 @@ public:
         return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
 
-    /// Return a pointer to the equalization matrix for this frame and
+    /// Return a pointer to the uplink zeroforcing matrix for this frame and
     /// subcarrier ID
-    inline complex_float* get_equalizer_mat(
-        Table<complex_float>& equalizer_buffers, size_t frame_id,
-        size_t sc_id) const
+    inline complex_float* get_ul_zf_mat(Table<complex_float>& ul_zf_buffers,
+        size_t frame_id, size_t sc_id) const
     {
         if (freq_orthogonal_pilot)
             sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return equalizer_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+        return ul_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID

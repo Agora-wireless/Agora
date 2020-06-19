@@ -25,7 +25,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
-        Table<complex_float>& equalizer_buffer,
+        Table<complex_float>& ul_zf_buffer,
         Table<complex_float>& precoder_buffer, Stats* stats_manager);
     ~DoZF();
 
@@ -53,7 +53,7 @@ private:
     /// Compute equalization matrix and/or precoder using this CSI matrix and
     /// calibration buffer as input
     void compute_precoder(const arma::cx_fmat& mat_csi,
-        const complex_float* recip_buf, complex_float* mat_equalizer,
+        const complex_float* recip_buf, complex_float* mat_ul_zf,
         complex_float* mat_precoder);
 
     void ZF_freq_orthogonal(size_t tag);
@@ -85,7 +85,7 @@ private:
     Table<complex_float> csi_buffer_;
     complex_float* pred_csi_buffer;
     Table<complex_float> recip_buffer_;
-    Table<complex_float> equalizer_buffer_;
+    Table<complex_float> ul_zf_buffer_;
     Table<complex_float> precoder_buffer_;
     DurationStat* duration_stat;
 
