@@ -334,10 +334,11 @@ void Phy_UE::start()
                 frame_id = pkt->frame_id;
                 symbol_id = pkt->symbol_id;
                 ant_id = pkt->ant_id;
-                rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
-                    "Error: Received packet for future frame beyond frame "
-                    "window. This can happen if Millipede is running "
-                    "slowly, e.g., in debug mode");
+                 rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
+                     "Error: Received packet for future frame beyond frame "
+                     "window. This can happen if Millipede is running "
+                     "slowly, e.g., in debug mode");
+                // Mani commented above to make one client code run well
 
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()

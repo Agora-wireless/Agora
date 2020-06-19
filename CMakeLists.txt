@@ -48,7 +48,7 @@ find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
-set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
+set(USE_ARGOS True CACHE STRING "USE_ARGOS defaulting to 'False'") #Mani: setting it to true
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
