@@ -75,11 +75,11 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
-            socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
+            socket_[i] = setup_socket_ipv4(cfg->ue_server_port + i, false, 0);
             setup_sockaddr_remote_ipv4(
                 &servaddr_ipv4[i], cfg->bs_port + i, cfg->server_addr.c_str());
         } else {
-            socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
+            socket_[i] = setup_socket_ipv6(cfg->ue_server_port + i, false, 0);
             setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
                 "fe80::f436:d735:b04a:864a");
         }

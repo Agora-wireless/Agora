@@ -177,9 +177,10 @@ public:
     // Port IDs at sender side
     int ue_rx_port; // UDP port used by UE to receive data
     int ue_tx_port; // UDP port used by UE to transmit data
+
     // Port ID at MAC layer side
-    int mac_rx_port;
-    int mac_tx_port;
+    int mac_client_port;
+    int mac_server_port;
 
     // Number of frames sent by sender during testing = number of frames
     // processed by Millipede before exiting.
