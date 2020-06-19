@@ -630,15 +630,15 @@ void* Millipede::worker(int tid)
 
     Doer* computeEncoding = nullptr;
     Doer* computeDecoding = nullptr;
+    if (kUseLDPC) {
+        computeEncoding = new DoEncode(config_, tid, freq_ghz,
+            *get_conq(EventType::kEncode), complete_task_queue_,
+            worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
+        computeDecoding = new DoDecode(config_, tid, freq_ghz,
+            *get_conq(EventType::kDecode), complete_task_queue_,
+            worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
+    }
 
-#ifdef USE_LDPC
-    computeEncoding = new DoEncode(config_, tid, freq_ghz,
-        *get_conq(EventType::kEncode), complete_task_queue_,
-        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
-    computeDecoding = new DoDecode(config_, tid, freq_ghz,
-        *get_conq(EventType::kDecode), complete_task_queue_,
-        worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
-#endif
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
         *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
         calib_buffer_, recip_buffer_, stats);
