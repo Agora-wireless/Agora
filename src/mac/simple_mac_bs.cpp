@@ -62,19 +62,15 @@ void* SimpleBSMac::loopRecv(int tid)
 #endif
 
     // loop recv
-    socklen_t addrlen = sizeof(remote_addr);
     int packet_length = kUseLDPC
         ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
         : cfg->OFDM_DATA_NUM;
     packet_length += offsetof(MacPacket, data);
     char* cur_buffer = (char*)malloc(packet_length);
-    int count = 0;
     while (true) {
 
         int recvlen = -1;
         if ((recvlen = recv(socket_local, (char*)cur_buffer, packet_length, 0))
-            //(struct sockaddr*)&remote_addr,
-            //&addrlen))
             < 0) {
             perror("recv failed");
             //exit(0);
