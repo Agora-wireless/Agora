@@ -20,7 +20,7 @@ TEST(TestZF, Perf)
     auto comp_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
     auto ptok = new moodycamel::ProducerToken(comp_queue);
 
-    Table<complex_float> csi_buffer, equalizer_buffer, precoder_buffer,
+    Table<complex_float> csi_buffer, ul_zf_buffer, precoder_buffer,
         recip_buffer;
     csi_buffer.rand_alloc_float(
         cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
@@ -37,7 +37,7 @@ TEST(TestZF, Perf)
         freq_ghz);
 
     auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffer, recip_buffer, equalizer_buffer, precoder_buffer, stats);
+        csi_buffer, recip_buffer, ul_zf_buffer, precoder_buffer, stats);
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();

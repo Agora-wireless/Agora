@@ -178,10 +178,10 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated equalizer matrices
+    // Calculated uplink zeroforcing detection matrices
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
     // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> equalizer_buffer_;
+    Table<complex_float> ul_zf_buffer_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
