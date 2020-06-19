@@ -339,8 +339,6 @@ void* Sender::worker_thread(int tid)
         tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
         tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
         auto* payload = (char*)eth_hdr + kPayloadOffset;
-        // DpdkTransport::fastMemcpy(
-        //     payload, tx_buffers_[tx_bufs_idx], buffer_length);
         rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
 
         // Send a message to the server. We assume that the server is running.

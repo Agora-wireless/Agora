@@ -51,7 +51,6 @@ public:
         size_t delay = 0, bool enable_slow_start = true,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
-
     ~Sender();
 
     void startTX();
@@ -129,13 +128,13 @@ private:
     double* frame_end;
 
 #ifdef USE_DPDK_SENDER
-    uint32_t client_addr; // IPv4 address of this data sender
-    uint32_t
-        server_addr; // IPv4 address of the Millipede server that we send data to
     struct rte_mempool* mbuf_pool;
+    uint32_t client_addr; // IPv4 address of this data sender
+    uint32_t server_addr; // IPv4 address of the remote target Millipede server
     rte_ether_addr client_mac_addr; // MAC address of this data sender
-    rte_ether_addr
-        server_mac_addr; // MAC address of the Millipede server that we send data to
+
+    // MAC address of the remote target Millipede server
+    rte_ether_addr server_mac_addr;
 #endif
 };
 

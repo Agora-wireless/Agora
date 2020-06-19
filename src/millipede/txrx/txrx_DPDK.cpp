@@ -13,8 +13,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
-    // core_list: cores used in DPDK
-    // Use one core to allocate socket threads, and use one core to run each socket thread
+    // Use one core to allocate launch threads, and use one core to run each
+    // socket thread
     std::string core_list = std::to_string(core_offset - 1) + "-"
         + std::to_string(core_offset - 1 + socket_thread_num);
 
