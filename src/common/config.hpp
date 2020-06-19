@@ -168,18 +168,18 @@ public:
     size_t sym_packet_length;
 
     // IP address at Millipde side
-    std::string rx_addr;
+    std::string client_addr;
     // IP address at sender side
-    std::string tx_addr;
-    std::string tx_addr_to_mac;
+    std::string server_addr;
+    std::string server_addr_to_mac;
     // Port ID at Millipede side
     int bs_port;
     // Port IDs at sender side
-    int ue_rx_port;
-    int ue_tx_port;
+    int ue_client_port;
+    int ue_server_port;
     // Port ID at MAC layer side
-    int mac_rx_port;
-    int mac_tx_port;
+    int mac_client_port;
+    int mac_server_port;
 
     // Number of frames sent by sender during testing = number of frames
     // processed by Millipede before exiting.
