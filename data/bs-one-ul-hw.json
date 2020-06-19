@@ -4,10 +4,10 @@
  "cells" : 1,
  "channel" : "AB",
  "frequency" : 3.56e9,
- "rxgainA" : 10,
- "txgainA" : 40,
- "rxgainB" : 10,
- "txgainB" : 40,
+ "rxgainA" : 20,
+ "txgainA" : 35,
+ "rxgainB" : 20,
+ "txgainB" : 35,
  "rate" : 5e6,
  "symbol_size" : 1,
  "prefix" : 160,
@@ -23,7 +23,7 @@
  "calTxGainA" : 30,
  "calTxGainB" : 30,
  "frames" : [
-     "BGGGGGPPGGUUUG"
+     "BGGGGGPGGGUUUG"
  ],
  "downlink_mode": false,
  "client_ul_pilot_syms" : 2,

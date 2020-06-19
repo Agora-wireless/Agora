@@ -6,7 +6,8 @@
 
 #define EXPORT __attribute__((visibility("default")))
 
-#define ENABLE_CPU_ATTACH
+// #define ENABLE_CPU_ATTACH
+// Mani: disabling above statement to disable ENABLE_CPU_ATTACH
 
 #define ARMA_ALLOW_FAKE_GCC
 
@@ -114,7 +115,7 @@ static constexpr bool kEnableMac = false;
 #endif
 
 static constexpr bool kConnectUDP = true;
-static constexpr bool kExportConstellation = false;
+static constexpr bool kExportConstellation = true;
 static constexpr bool kPrintPhyStats = false;
 
 #define COMBINE_EQUAL_DECODE 1

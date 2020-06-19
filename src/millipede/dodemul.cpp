@@ -147,6 +147,7 @@ Event_data DoDemul::launch(size_t tag)
                     = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
                         * cfg->UE_NUM]);
             }
+            //cout << "buffer: " << +*(equal_ptr) << "; " << +*(equal_ptr) << endl;
             // Equalization
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
             size_t start_tsc2 = worker_rdtsc();
