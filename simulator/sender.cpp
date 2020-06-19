@@ -31,7 +31,7 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
 }
 
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
-    bool enable_slow_start, bool create_thread_for_master)
+    bool enable_slow_start, std::string client_mac_addr_str, bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -74,11 +74,11 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
-            socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
+            socket_[i] = setup_socket_ipv4(cfg->ue_server_port + i, false, 0);
             setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->bs_port + i, cfg->rx_addr.c_str());
+                &servaddr_ipv4[i], cfg->bs_port + i, cfg->client_addr.c_str());
         } else {
-            socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
+            socket_[i] = setup_socket_ipv6(cfg->ue_server_port + i, false, 0);
             setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
                 "fe80::f436:d735:b04a:864a");
         }
@@ -290,7 +290,7 @@ void* Sender::worker_thread(int tid)
             if (ret < 0) {
                 fprintf(stderr,
                     "send() failed. Error = %s. Is a server running at %s?\n",
-                    strerror(errno), cfg->rx_addr.c_str());
+                    strerror(errno), cfg->client_addr.c_str());
                 exit(-1);
             }
         }

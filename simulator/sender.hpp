@@ -38,6 +38,7 @@
 
 #ifdef USE_DPDK_SENDER
 #include "dpdk_transport.hpp"
+#include <netinet/ether.h>
 #endif
 
 class Sender {
@@ -47,8 +48,9 @@ public:
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
-        size_t delay = 0, bool enable_slow_start = true, 
+        size_t delay = 0, bool enable_slow_start = true, std::string client_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
+
     ~Sender();
 
     void startTX();
@@ -129,6 +131,8 @@ private:
     uint32_t src_addr;
     uint32_t dst_addr;
     struct rte_mempool* mbuf_pool;
+    rte_ether_addr server_mac_addr;
+    rte_ether_addr client_mac_addr;
 #endif
 };
 
