@@ -61,14 +61,14 @@ Config::Config(std::string jsonfile)
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "16QAM");
 
-    rx_addr = tddConf.value("rx_addr", "127.0.0.1");
-    tx_addr = tddConf.value("tx_addr", "127.0.0.1");
+    server_addr = tddConf.value("server_addr", "127.0.0.1");
+    client_addr = tddConf.value("client_addr", "127.0.0.1");
     tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
     bs_port = tddConf.value("bs_port", 8000);
     ue_rx_port = tddConf.value("ue_rx_port", 7000);
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
-    mac_tx_port = tddConf.value("mac_rx_port", 4000);
+    mac_tx_port = tddConf.value("mac_tx_port", 4000);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);

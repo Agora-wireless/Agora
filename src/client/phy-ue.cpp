@@ -196,12 +196,12 @@ Phy_UE::Phy_UE(Config* config)
         socket_[user_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->tx_addr.c_str());
+            config_->ue_rx_port + user_id, config_->client_addr.c_str());
 #else
         socket_[user_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv6(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->tx_addr.c_str());
+            config_->ue_rx_port + user_id, config_->client_addr.c_str());
 #endif
         fcntl(socket_[user_id], F_SETFL, O_NONBLOCK);
     }
@@ -722,8 +722,8 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     rt_assert((size_t)pkt->ue_id == ue_id,
         "UE index in tag does not match that in received packet!");
 
-    size_t num_frames_per_mac_packet
-        = config_->mac_data_bytes_num_perframe / config_->data_bytes_num_perframe;
+    size_t num_frames_per_mac_packet = config_->mac_data_bytes_num_perframe
+        / config_->data_bytes_num_perframe;
     for (size_t i = 0; i < num_frames_per_mac_packet; i++) {
         size_t frame_id = mac_frame_id * num_frames_per_mac_packet + i;
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;

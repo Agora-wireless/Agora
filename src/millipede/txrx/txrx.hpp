@@ -105,8 +105,9 @@ private:
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef USE_DPDK
-    uint32_t src_addr;
-    uint32_t dst_addr;
+    uint32_t
+        client_addr; // IPv4 address of the data sender that sends data to Millipede
+    uint32_t server_addr; // IPv4 address of the Millipede server
     struct rte_mempool* mbuf_pool;
 #endif
 
