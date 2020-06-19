@@ -614,7 +614,7 @@ void* Millipede::worker(int tid)
 
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_zf_buffer_, precoder_buffer_, stats);
+        ul_zf_buffer_, dl_zf_buffer_, stats);
 
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
@@ -624,7 +624,7 @@ void* Millipede::worker(int tid)
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
-        worker_ptoks_ptr[tid], precoder_buffer_, dl_ifft_buffer_,
+        worker_ptoks_ptr[tid], dl_zf_buffer_, dl_ifft_buffer_,
         kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits, stats);
 
     Doer* computeEncoding = nullptr;
@@ -685,7 +685,7 @@ void* Millipede::worker_zf(int tid)
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_zf_buffer_, precoder_buffer_, stats);
+        ul_zf_buffer_, dl_zf_buffer_, stats);
 
     while (true) {
         computeZF->try_launch();
@@ -705,7 +705,7 @@ void* Millipede::worker_demul(int tid)
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
-        worker_ptoks_ptr[tid], precoder_buffer_, dl_ifft_buffer_,
+        worker_ptoks_ptr[tid], dl_zf_buffer_, dl_ifft_buffer_,
         kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits, stats);
 
     while (true) {
@@ -1142,7 +1142,7 @@ void Millipede::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    precoder_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    dl_zf_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
@@ -1188,7 +1188,7 @@ void Millipede::free_downlink_buffers()
     dl_ifft_buffer_.free();
     recip_buffer_.free();
     calib_buffer_.free();
-    precoder_buffer_.free();
+    dl_zf_buffer_.free();
     dl_encoded_buffer_.free();
 
     encode_stats_.fini();
