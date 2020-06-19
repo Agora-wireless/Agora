@@ -54,7 +54,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end "
                   << clStn[i]->getHardwareInfo()["frontend"] << std::endl;
-        for (size_t c = 0; c < _cfg->nChannels; c++) {
+        for (auto c : channels) {
             if (c < clStn[i]->getNumChannels(SOAPY_SDR_RX)) {
                 printf("RX Channel %zu\n", c);
                 printf("Actual RX sample rate: %fMSps...\n",
@@ -83,7 +83,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
             }
         }
 
-        for (size_t c = 0; c < _cfg->nChannels; c++) {
+        for (auto c : channels) {
             if (c < clStn[i]->getNumChannels(SOAPY_SDR_TX)) {
                 printf("TX Channel %zu\n", c);
                 printf("Actual TX sample rate: %fMSps...\n",
@@ -195,11 +195,6 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
         // clStn[i]->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
         // clStn[i]->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
         clStn[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
-    }
-
-    if (cfg->nChannels == 1) {
-        clStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
-        clStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
     }
 
     num_client_radios_initialized++;
