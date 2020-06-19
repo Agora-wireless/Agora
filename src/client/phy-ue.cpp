@@ -301,13 +301,11 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    // if (!kEnableMac) {
                     Event_data do_modul_task(EventType::kModul,
                         gen_tag_t::frm_sym_ue(
                             frame_id, symbol_id, ant_id / config_->nChannels)
                             ._tag);
                     schedule_task(do_modul_task, &modul_queue_, ptok_modul);
-                    // }
                 }
 
                 if (dl_data_symbol_perframe > 0
