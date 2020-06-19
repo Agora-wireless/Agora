@@ -30,10 +30,10 @@ RadioConfig::RadioConfig(Config* cfg)
 
     std::vector<RadioConfigContext> radio_config_ctx_vec(this->_radioNum);
     for (size_t i = 0; i < this->_radioNum; i++) {
-#ifdef THREADED_INIT
         auto* context = &radio_config_ctx_vec[i];
         context->brs = this;
         context->tid = i;
+#ifdef THREADED_INIT
         pthread_t init_thread_;
         if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context)
             != 0) {
@@ -41,7 +41,7 @@ RadioConfig::RadioConfig(Config* cfg)
             exit(0);
         }
 #else
-        initBSRadio(i);
+        initBSRadio(context);
 #endif
     }
 
@@ -67,10 +67,10 @@ RadioConfig::RadioConfig(Config* cfg)
     }
 
     for (size_t i = 0; i < this->_radioNum; i++) {
-#ifdef THREADED_INIT
         auto* context = &radio_config_ctx_vec[i];
         context->brs = this;
         context->tid = i;
+#ifdef THREADED_INIT
         pthread_t configure_thread_;
         if (pthread_create(&configure_thread_, NULL,
                 RadioConfig::configureBSRadio_launch, context)
@@ -79,7 +79,7 @@ RadioConfig::RadioConfig(Config* cfg)
             exit(0);
         }
 #else
-        configureBSRadio(i);
+        configureBSRadio(context);
 #endif
     }
 
