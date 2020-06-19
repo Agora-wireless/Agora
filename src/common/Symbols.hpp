@@ -113,6 +113,12 @@ static constexpr bool kEnableMac = true;
 static constexpr bool kEnableMac = false;
 #endif
 
+#ifdef USE_ARGOS
+static constexpr bool kUseArgos = true;
+#else
+static constexpr bool kUseArgos = false;
+#endif
+
 static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;

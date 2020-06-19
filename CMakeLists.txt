@@ -62,6 +62,10 @@ message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
 
+if(${USE_ARGOS})
+  add_definitions(-DUSE_ARGOS)
+endif()
+
 # DPDK
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled for Millipede")
@@ -114,43 +118,39 @@ message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
 
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
-  set(MAC_CLIENT_SOURCES
-	  src/mac/simple_mac_client.cpp
-	  src/mac/mac_client_main.cpp)
-  set(MAC_BS_SOURCES
-	  src/mac/simple_mac_bs.cpp
-	  src/mac/mac_bs_main.cpp)
 endif()
+
+set(MAC_CLIENT_SOURCES
+  src/mac/simple_mac_client.cpp
+  src/mac/mac_client_main.cpp)
+set(MAC_BS_SOURCES
+  src/mac/simple_mac_bs.cpp
+  src/mac/mac_bs_main.cpp)
 set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
-if(${USE_ARGOS})
-  find_package(SoapySDR "0.7" CONFIG)
-  if(NOT SoapySDR_FOUND)
-    message(STATUS "SoapySDR development files not found")
-    set(USE_ARGOS False)
-  else()
-    add_definitions(-DUSE_ARGOS)
-  endif()
-  message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-  find_package(PythonLibs REQUIRED)
-  message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
-  message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
-  message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-  include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
-  set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-  set(ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
-  set(TXRX_SOURCES src/millipede/txrx/txrx_argos.cpp)
-  set(CLIENT_SOURCES
-    src/common/modulation.cpp
-    src/client/client_radio.cpp
-    src/client/ru_argos.cpp
-    src/client/phy-ue.cpp
-    src/client/txrx_mac.cpp
-  )
-  set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
-  add_definitions(-DTHREADED_INIT)
+find_package(SoapySDR "0.7" CONFIG)
+if(NOT SoapySDR_FOUND)
+  message(FATAL_ERROR "SoapySDR development files not found")
 endif()
+message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+find_package(PythonLibs REQUIRED)
+message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
+message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
+include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
+set(SOAPY_LIB ${SoapySDR_LIBRARIES})
+set(ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
+set(TXRX_SOURCES src/millipede/txrx/txrx_argos.cpp)
+set(CLIENT_SOURCES
+  src/common/modulation.cpp
+  src/client/client_radio.cpp
+  src/client/ru_argos.cpp
+  src/client/phy-ue.cpp
+  src/client/txrx_mac.cpp
+)
+set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
+add_definitions(-DTHREADED_INIT)
 
 # Intel MKL
 set(BLA_VENDOR Intel10_64lp)
@@ -255,7 +255,7 @@ set(SOURCES
 			
 add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
 
 
 add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
@@ -269,62 +269,58 @@ add_executable(data_generator
 target_link_libraries(data_generator -larmadillo ${FLEXRAN_LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
-if(${USE_ARGOS})
-  add_executable(user 
-       src/client/user-main.cpp
-       ${CLIENT_SOURCES}
-       ${COMMON_SOURCES}
-       ${LDPC_SOURCES}
-       ${HEADER_FILES})
-  target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+add_executable(user 
+     src/client/user-main.cpp
+     ${CLIENT_SOURCES}
+     ${COMMON_SOURCES}
+     ${LDPC_SOURCES}
+     ${HEADER_FILES})
+target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
-  add_library(ue_phy MODULE 
-       ${CLIENT_SOURCES}
-       ${COMMON_SOURCES}
-       ${ARGOS_SOURCES}
-       ${LDPC_SOURCES}
-       ${HEADER_FILES})
-  target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+add_library(ue_phy MODULE 
+     ${CLIENT_SOURCES}
+     ${COMMON_SOURCES}
+     ${ARGOS_SOURCES}
+     ${LDPC_SOURCES}
+     ${HEADER_FILES})
+target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
-  if(${ENABLE_MAC})
-    add_executable(macuser
-         ${MAC_CLIENT_SOURCES}
-         ${COMMON_SOURCES})
-    target_link_libraries(macuser -larmadillo ${MKL_LIBS})
+add_executable(macuser
+     ${MAC_CLIENT_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macuser -larmadillo ${MKL_LIBS})
 
-    add_executable(macbs
-         ${MAC_BS_SOURCES}
-         ${COMMON_SOURCES})
-    target_link_libraries(macbs -larmadillo ${MKL_LIBS})
-  endif()
-else()
-  set(SENDER_SOURCES
-    simulator/sender_cli.cpp
-    ${COMMON_SOURCES}
-    ${SENDER_TXRX_SOURCES}
-    ${LDPC_SOURCES}
-    ${HEADER_FILES})
+add_executable(macbs
+     ${MAC_BS_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macbs -larmadillo ${MKL_LIBS})
 
-  add_executable(sender ${SENDER_SOURCES})
-  target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
+set(SENDER_SOURCES
+  simulator/sender_cli.cpp
+  ${COMMON_SOURCES}
+  ${SENDER_TXRX_SOURCES}
+  ${LDPC_SOURCES}
+  ${HEADER_FILES})
 
-  set(SIMULATOR_SOURCES
-    simulator/main.cpp
-    simulator/simulator.cpp
-    simulator/sender.cpp
-    simulator/receiver.cpp 
-    ${COMMON_SOURCES}
-    ${LDPC_SOURCES}
-    ${HEADER_FILES})
+add_executable(sender ${SENDER_SOURCES})
+target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
 
-  add_executable(sim ${SIMULATOR_SOURCES})
-  target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
-  if(${ENABLE_MAC})
-    add_executable(macbs
-         ${MAC_BS_SOURCES}
-         ${COMMON_SOURCES})
-    target_link_libraries(macbs -larmadillo ${MKL_LIBS})
-  endif()
+set(SIMULATOR_SOURCES
+  simulator/main.cpp
+  simulator/simulator.cpp
+  simulator/sender.cpp
+  simulator/receiver.cpp 
+  ${COMMON_SOURCES}
+  ${LDPC_SOURCES}
+  ${HEADER_FILES})
+
+add_executable(sim ${SIMULATOR_SOURCES})
+target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
+if(${ENABLE_MAC})
+  add_executable(macbs
+       ${MAC_BS_SOURCES}
+       ${COMMON_SOURCES})
+  target_link_libraries(macbs -larmadillo ${MKL_LIBS})
 endif()
 
 # The tests to run using ctest

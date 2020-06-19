@@ -2,23 +2,19 @@
 #ifndef RU_HEADER
 #define RU_HEADER
 
-#ifdef USE_ARGOS
-class RadioConfig;
 #include "client_radio.hpp"
-#else
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#endif
-
-#include <complex>
-#include <pthread.h>
-#include <vector>
-
 #include "concurrentqueue.h"
 #include "utils.h"
-#include <fstream> // std::ifstream
+#include <arpa/inet.h>
+#include <complex>
+#include <fstream>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <vector>
+
+class RadioConfig;
 
 class RU {
 public:
@@ -71,15 +67,12 @@ private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     Config* config_;
-#ifdef USE_ARGOS
-    ClientRadioConfig* radioconfig_;
-#else
+    ClientRadioConfig* radioconfig_; // Used only in Argos mode
     struct sockaddr_in servaddr_[10]; /* server address */
     struct sockaddr_in servaddr_tx_[10]; /* server address for tx*/
     struct sockaddr_in cliaddr_[10]; /* client address */
     int* rx_socket_;
     int* tx_socket_;
-#endif
 
     Table<char>* buffer_;
     Table<int>* buffer_status_;
