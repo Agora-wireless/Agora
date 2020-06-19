@@ -20,14 +20,13 @@ TEST(TestZF, Perf)
     auto comp_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
     auto ptok = new moodycamel::ProducerToken(comp_queue);
 
-    Table<complex_float> csi_buffer, ul_zf_buffer, precoder_buffer,
-        recip_buffer;
+    Table<complex_float> csi_buffer, ul_zf_buffer, dl_zf_buffer, recip_buffer;
     csi_buffer.rand_alloc_float(
         cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
-    precoder_buffer.rand_alloc_float(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    ul_zf_buffer.rand_alloc_float(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-    precoder_buffer.rand_alloc_float(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    dl_zf_buffer.rand_alloc_float(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer.rand_alloc_float(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
@@ -37,7 +36,7 @@ TEST(TestZF, Perf)
         freq_ghz);
 
     auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffer, recip_buffer, ul_zf_buffer, precoder_buffer, stats);
+        csi_buffer, recip_buffer, ul_zf_buffer, dl_zf_buffer, stats);
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();
