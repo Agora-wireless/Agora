@@ -39,16 +39,12 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
-    '-DUSE_LDPC=true',
-    '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_decoder_5gnr',
-    '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_common',
-    '-I' + str(home_dir) + '/Millipede/src/third_party',
-    '-I' + str(home_dir) + '/Millipede/src/millipede',
-    '-I' + str(home_dir) + '/Millipede/src/common',
+    '-I' + str(home_dir) + '/Millipede/src',
     '-I' + str(home_dir) + '/Millipede/src/encoder',
-    '-I' + str(home_dir) + '/Millipede/src/millipede/txrx',
-    '-Wall',
-    '-Wsign-compare',
+    '-I', '/opt/FlexRAN-FEC-SDK-19-04/sdk/test/phy/common',
+    '-I', '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_decoder_5gnr',
+    '-I', '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_common',
+    '-Wall -Wsign-compare',
     '-std=c++11',
 ]
 

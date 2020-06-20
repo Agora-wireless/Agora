@@ -190,9 +190,8 @@ void Millipede::start()
         }
     }
 
-    // Millipede processes a frame after completing processing for previous
-    // frames is complete. cur_frame_id is the frame that is currently being
-    // processed.
+    // Millipede processes a frame after processing for previous frames is
+    // complete. cur_frame_id is the frame that is currently being processed.
     size_t cur_frame_id = 0;
 
     /* Counters for printing summary */
@@ -202,9 +201,9 @@ void Millipede::start()
     double tx_begin = get_time_us();
 
     bool is_turn_to_dequeue_from_io = true;
-    const size_t max_events_needed = std::max(kDequeueBulkSizeWorker
+    const size_t max_events_needed = std::max(kDequeueBulkSizeTXRX
             * (cfg->socket_thread_num + cfg->mac_socket_thread_num),
-        kDequeueBulkSizeTXRX * cfg->worker_thread_num);
+        kDequeueBulkSizeWorker * cfg->worker_thread_num);
     Event_data events_list[max_events_needed];
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
@@ -383,7 +382,7 @@ void Millipede::start()
                         assert(cur_frame_id == frame_id);
                         cur_frame_id++;
                         // stats->master_set_tsc(TsType::kMacTXDone, frame_id);
-                        // print_per_frame_done(PrintType::kPacketToMac, frame_id);
+                        print_per_frame_done(PrintType::kPacketToMac, frame_id);
                         stats->update_stats_in_functions_uplink(frame_id);
                         if (stats->last_frame_id == cfg->frames_to_test - 1)
                             goto finish;
@@ -615,30 +614,30 @@ void* Millipede::worker(int tid)
 
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_precoder_buffer_, dl_precoder_buffer_, stats);
+        ul_zf_buffer_, dl_zf_buffer_, stats);
 
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_precoder_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
             demod_hard_buffer_, demod_soft_buffer_, stats);
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
-        worker_ptoks_ptr[tid], dl_precoder_buffer_, dl_ifft_buffer_,
+        worker_ptoks_ptr[tid], dl_zf_buffer_, dl_ifft_buffer_,
         kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits, stats);
 
     Doer* computeEncoding = nullptr;
     Doer* computeDecoding = nullptr;
+    if (kUseLDPC) {
+        computeEncoding = new DoEncode(config_, tid, freq_ghz,
+            *get_conq(EventType::kEncode), complete_task_queue_,
+            worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
+        computeDecoding = new DoDecode(config_, tid, freq_ghz,
+            *get_conq(EventType::kDecode), complete_task_queue_,
+            worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
+    }
 
-#ifdef USE_LDPC
-    computeEncoding = new DoEncode(config_, tid, freq_ghz,
-        *get_conq(EventType::kEncode), complete_task_queue_,
-        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
-    computeDecoding = new DoDecode(config_, tid, freq_ghz,
-        *get_conq(EventType::kDecode), complete_task_queue_,
-        worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
-#endif
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
         *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
         calib_buffer_, recip_buffer_, stats);
@@ -686,7 +685,7 @@ void* Millipede::worker_zf(int tid)
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_precoder_buffer_, dl_precoder_buffer_, stats);
+        ul_zf_buffer_, dl_zf_buffer_, stats);
 
     while (true) {
         computeZF->try_launch();
@@ -700,13 +699,13 @@ void* Millipede::worker_demul(int tid)
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_precoder_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
             demod_hard_buffer_, demod_soft_buffer_, stats);
 
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
-        worker_ptoks_ptr[tid], dl_precoder_buffer_, dl_ifft_buffer_,
+        worker_ptoks_ptr[tid], dl_zf_buffer_, dl_ifft_buffer_,
         kUseLDPC ? dl_encoded_buffer_ : config_->dl_bits, stats);
 
     while (true) {
@@ -897,6 +896,10 @@ void Millipede::print_per_frame_done(PrintType print_type, size_t frame_id)
             stats->master_get_delta_us(
                 TsType::kTXDone, TsType::kPilotRX, frame_id));
         break;
+    case (PrintType::kPacketToMac):
+        printf("Main thread: MAC TX done frame: %zu, in %.2f us\n", frame_id,
+            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+        break;
     default:
         printf("Wrong task type in frame done print!");
     }
@@ -1073,7 +1076,7 @@ void Millipede::initialize_uplink_buffers()
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    ul_precoder_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    ul_zf_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 
     equal_buffer_.malloc(
@@ -1139,7 +1142,7 @@ void Millipede::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    dl_precoder_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    dl_zf_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
@@ -1166,7 +1169,7 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
     csi_buffer_.free();
     data_buffer_.free();
-    ul_precoder_buffer_.free();
+    ul_zf_buffer_.free();
     equal_buffer_.free();
     demod_hard_buffer_.free();
     demod_soft_buffer_.free();
@@ -1185,7 +1188,7 @@ void Millipede::free_downlink_buffers()
     dl_ifft_buffer_.free();
     recip_buffer_.free();
     calib_buffer_.free();
-    dl_precoder_buffer_.free();
+    dl_zf_buffer_.free();
     dl_encoded_buffer_.free();
 
     encode_stats_.fini();

@@ -13,14 +13,14 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& data_buffer, Table<complex_float>& ul_precoder_buffer,
+    Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
     Table<int8_t>& demod_soft_buffer, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
-    , ul_precoder_buffer_(ul_precoder_buffer)
+    , ul_zf_buffer_(ul_zf_buffer)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
     , demod_hard_buffer_(demod_hard_buffer)
@@ -132,9 +132,9 @@ Event_data DoDemul::launch(size_t tag)
                 reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]),
                 cfg->BS_ANT_NUM, 1, false);
 
-            const cx_fmat mat_precoder(
-                reinterpret_cast<cx_float*>(cfg->get_precoder_buf(
-                    ul_precoder_buffer_, frame_id, cur_sc_id)),
+            const cx_fmat mat_ul_zf(
+                reinterpret_cast<cx_float*>(
+                    cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id)),
                 cfg->UE_NUM, cfg->BS_ANT_NUM, false);
 
             cx_float* equal_ptr = nullptr;
@@ -151,9 +151,9 @@ Event_data DoDemul::launch(size_t tag)
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
             size_t start_tsc2 = worker_rdtsc();
             // duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
-            mat_equaled = mat_precoder * mat_data;
+            mat_equaled = mat_ul_zf * mat_data;
 
-            if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // calc new phase shift
+            if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
                     // Reset previous frame
                     cx_float* phase_shift_ptr
@@ -261,7 +261,17 @@ Event_data DoDemul::launch(size_t tag)
                 = (&demod_soft_buffer_[total_data_symbol_idx_ul]
                                       [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                           * cfg->mod_type]);
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            switch (cfg->mod_type) {
+            case (CommsLib::QAM16):
+                demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            case (CommsLib::QAM64):
+                demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            default:
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
+            }
             // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
             //     tid, frame_id, symbol_idx_ul, base_sc_id);
             // cout << "Demuled data : \n ";
@@ -273,7 +283,17 @@ Event_data DoDemul::launch(size_t tag)
             uint8_t* demul_ptr
                 = (&demod_hard_buffer_[total_data_symbol_idx_ul]
                                       [cfg->OFDM_DATA_NUM * i + base_sc_id]);
-            demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            switch (cfg->mod_type) {
+            case (CommsLib::QAM16):
+                demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            case (CommsLib::QAM64):
+                demod_64qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            default:
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
+            }
         }
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;

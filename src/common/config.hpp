@@ -21,10 +21,8 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
-#include <nlohmann/json.hpp>
-#ifdef USE_LDPC
 #include "utils_ldpc.hpp"
-#endif
+#include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
 using json = nlohmann::json;
@@ -242,9 +240,9 @@ public:
             + symbol_idx_dl;
     }
 
-    /// Fetch the channel state information buffer for this frame and symbol ID.
+    /// Fetch the channel state information matrix for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
-    inline complex_float* get_csi_buf(Table<complex_float>& csi_buffers,
+    inline complex_float* get_csi_mat(Table<complex_float>& csi_buffers,
         size_t frame_id, size_t symbol_id) const
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -264,15 +262,26 @@ public:
         return data_buffers[symbol_offset];
     }
 
-    /// Get the precoder buffer for this frame and subcarrier ID
-    inline complex_float* get_precoder_buf(
-        Table<complex_float>& precoder_buffers, size_t frame_id,
-        size_t sc_id) const
+    /// Return a pointer to the downlink zeroforcing precoding matrix for this
+    /// frame and subcarrier ID
+    inline complex_float* get_dl_zf_mat(Table<complex_float>& dl_zf_buffers,
+        size_t frame_id, size_t sc_id) const
     {
         if (freq_orthogonal_pilot)
             sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return precoder_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+        return dl_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+    }
+
+    /// Return a pointer to the uplink zeroforcing detection matrix for this
+    /// frame and subcarrier ID
+    inline complex_float* get_ul_zf_mat(Table<complex_float>& ul_zf_buffers,
+        size_t frame_id, size_t sc_id) const
+    {
+        if (freq_orthogonal_pilot)
+            sc_id -= (sc_id % UE_NUM);
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        return ul_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID

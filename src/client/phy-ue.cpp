@@ -1,41 +1,5 @@
 #include "phy-ue.hpp"
-
-#ifndef __has_builtin
-#define __has_builtin(x) 0
-#endif
-
-static inline uint8_t bitreverse8(uint8_t x)
-{
-#if __has_builtin(__builtin_bireverse8)
-    return (__builtin_bitreverse8(x));
-#else
-    x = (x << 4) | (x >> 4);
-    x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
-    x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
-    return (x);
-#endif
-}
-
-/*
- * Copy packed, bit-reversed m-bit fields (m == mod_order) stored in
- * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
- * at least 8*len/m bytes.
- */
-static void adapt_bits_for_mod(
-    int8_t* vec_in, int8_t* vec_out, int len, int mod_order)
-{
-    int bits_avail = 0;
-    uint16_t bits = 0;
-    for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << 8 - bits_avail;
-        bits_avail += 8;
-        while (bits_avail >= mod_order) {
-            *vec_out++ = bits >> (16 - mod_order);
-            bits <<= mod_order;
-            bits_avail -= mod_order;
-        }
-    }
-}
+#include "utils_ldpc.hpp"
 
 Phy_UE::Phy_UE(Config* config)
 {

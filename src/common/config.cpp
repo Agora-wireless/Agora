@@ -1,5 +1,6 @@
 
 #include "config.hpp"
+#include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
 
 Config::Config(std::string jsonfile)
@@ -181,7 +182,7 @@ Config::Config(std::string jsonfile)
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     mac_socket_thread_num
-        = tddConf.value("socket_thread_num", kEnableMac ? 1 : 0);
+        = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
     fft_thread_num = tddConf.value("fft_thread_num", 4);
     demul_thread_num = tddConf.value("demul_thread_num", 11);
     zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
@@ -220,6 +221,9 @@ Config::Config(std::string jsonfile)
         = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+    rt_assert(LDPC_config.nblocksInSymbol > 0,
+        "LDPC expansion factor is too large for number of OFDM data "
+        "subcarriers.");
 
     printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, "
            "encoded block len: %d, decoder iterations: %d\n",
@@ -229,14 +233,14 @@ Config::Config(std::string jsonfile)
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
-    packet_length = offsetof(Packet, data) + sizeof(short) * sampsPerSymbol * 2;
+    packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
 
     data_bytes_num_persymbol
         = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = offsetof(Packet, data) + mac_data_bytes_num_perframe;
+    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
     // The current implementation only supports the case when  MAC packet size
     // is multiples of data_bytes_num_perframe
     if (data_bytes_num_perframe != 0)
@@ -374,15 +378,10 @@ void Config::genData()
     }
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
-#ifdef USE_LDPC
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+    std::string filename1 = cur_directory1
+        + (kUseLDPC ? "/data/LDPC_orig_data_" : "/data/orig_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
         + ".bin";
-#else
-    std::string filename1 = cur_directory1 + "/data/orig_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
-        + ".bin";
-#endif
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
         printf("open antenna file %s failed.\n", filename1.c_str());
@@ -405,125 +404,76 @@ void Config::genData()
     fclose(fd);
 #endif
 
-#ifdef USE_LDPC
-    // TODO: Wrapping encoding into a function
-    // buffers for encoders
-
-    __declspec(align(PROC_BYTES))
-        int8_t internalBuffer0[BG1_ROW_TOTAL * PROC_BYTES]
-        = { 0 };
-    __declspec(align(PROC_BYTES))
-        int8_t internalBuffer1[BG1_ROW_TOTAL * PROC_BYTES]
-        = { 0 };
-    __declspec(align(PROC_BYTES))
-        int8_t internalBuffer2[BG1_COL_TOTAL * PROC_BYTES]
-        = { 0 };
-
-    const int16_t* pShiftMatrix;
-    const int16_t* pMatrixNumPerCol;
-    const int16_t* pAddr;
-
-    // i_Ls decides the base matrix entries
-    uint8_t i_LS = select_base_matrix_entry(LDPC_config.Zc);
-
-    if (LDPC_config.Bg == 1) {
-        pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
-        pMatrixNumPerCol = Bg1MatrixNumPerCol;
-        pAddr = Bg1Address;
-    } else {
-        pShiftMatrix = Bg2HShiftMatrix + i_LS * BG2_NONZERO_NUM;
-        pMatrixNumPerCol = Bg2MatrixNumPerCol;
-        pAddr = Bg2Address;
-    }
-
-    /* encoding
-     * --------------------------------------------------------------- */
-    printf("encoding----------------------\n");
-    LDPC_ADAPTER_P ldpc_adapter_func = ldpc_select_adapter_func(LDPC_config.Zc);
-    LDPC_ENCODER ldpc_encoder_func = ldpc_select_encoder_func(LDPC_config.Bg);
-
-    size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
-    size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
-    size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_NUM;
-    Table<int8_t> ul_encoded_bits;
-    ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block, 64);
-    printf("ul_encoded_bits size: %zu x %zu\n",
-        ul_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block);
-
-    Table<int8_t> dl_encoded_bits;
-    dl_encoded_bits.malloc(dl_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block, 64);
-
-    // Encode uplink bits
-    for (int i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (int j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
-            ldpc_adapter_func(ul_bits[i] + j * bytes_per_block, internalBuffer0,
-                LDPC_config.Zc, LDPC_config.cbLen, 1);
-            ldpc_encoder_func(internalBuffer0, internalBuffer1,
-                pMatrixNumPerCol, pAddr, pShiftMatrix, LDPC_config.Zc, i_LS);
-            memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
-                (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES);
-            memcpy(internalBuffer2
-                    + (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES,
-                internalBuffer1,
-                LDPC_config.cbEncLen / LDPC_config.Zc * PROC_BYTES);
-
-            ldpc_adapter_func(ul_encoded_bits[i * num_blocks_per_symbol + j],
-                internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
-        }
-    }
-
     Table<uint8_t> ul_mod_input;
-    ul_mod_input.calloc(
-        ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < UE_NUM; j++) {
-            for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
-                adapt_bits_for_mod(ul_encoded_bits[i * num_blocks_per_symbol
-                                       + j * LDPC_config.nblocksInSymbol + k],
-                    ul_mod_input[i] + j * OFDM_DATA_NUM
-                        + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_type);
-            }
-        }
-    }
-
-    // Encode downlink bits
-    for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (int j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
-            ldpc_adapter_func(dl_bits[i] + j * bytes_per_block, internalBuffer0,
-                LDPC_config.Zc, LDPC_config.cbLen, 1);
-            ldpc_encoder_func(internalBuffer0, internalBuffer1,
-                pMatrixNumPerCol, pAddr, pShiftMatrix, LDPC_config.Zc, i_LS);
-            memcpy(internalBuffer2, internalBuffer0 + 2 * PROC_BYTES,
-                (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES);
-            memcpy(internalBuffer2
-                    + (LDPC_config.cbLen / LDPC_config.Zc - 2) * PROC_BYTES,
-                internalBuffer1,
-                LDPC_config.cbEncLen / LDPC_config.Zc * PROC_BYTES);
-
-            ldpc_adapter_func(dl_encoded_bits[i * num_blocks_per_symbol + j],
-                internalBuffer2, LDPC_config.Zc, LDPC_config.cbCodewLen, 0);
-        }
-    }
-
     Table<uint8_t> dl_mod_input;
-    dl_mod_input.calloc(
-        dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < UE_NUM; j++) {
-            for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
-                adapt_bits_for_mod(dl_encoded_bits[i * num_blocks_per_symbol
-                                       + j * LDPC_config.nblocksInSymbol + k],
-                    dl_mod_input[i] + j * OFDM_DATA_NUM
-                        + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_type);
+    if (kUseLDPC) {
+        size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
+        size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
+        size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_NUM;
+
+        // Encode uplink bits
+        Table<int8_t> ul_encoded_bits;
+        ul_encoded_bits.malloc(
+            ul_data_symbol_num_perframe * num_blocks_per_symbol,
+            encoded_bytes_per_block, 64);
+        printf("Size of ul_encoded_bits: %zu x %zu\n",
+            ul_data_symbol_num_perframe * num_blocks_per_symbol,
+            encoded_bytes_per_block);
+
+        int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
+            LDPC_config.Bg, LDPC_config.Zc)];
+        for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+                ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                    ul_encoded_bits[i * num_blocks_per_symbol + j],
+                    temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
+            }
+        }
+
+        ul_mod_input.calloc(
+            ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
+        for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < UE_NUM; j++) {
+                for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                    adapt_bits_for_mod(
+                        ul_encoded_bits[i * num_blocks_per_symbol
+                            + j * LDPC_config.nblocksInSymbol + k],
+                        ul_mod_input[i] + j * OFDM_DATA_NUM
+                            + k * encoded_bytes_per_block,
+                        encoded_bytes_per_block, mod_type);
+                }
+            }
+        }
+
+        Table<int8_t> dl_encoded_bits;
+        dl_encoded_bits.malloc(
+            dl_data_symbol_num_perframe * num_blocks_per_symbol,
+            encoded_bytes_per_block, 64);
+
+        // Encode downlink bits
+        for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+                ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                    dl_encoded_bits[i * num_blocks_per_symbol + j],
+                    temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
+            }
+        }
+
+        dl_mod_input.calloc(
+            dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
+        for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < UE_NUM; j++) {
+                for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                    adapt_bits_for_mod(
+                        dl_encoded_bits[i * num_blocks_per_symbol
+                            + j * LDPC_config.nblocksInSymbol + k],
+                        dl_mod_input[i] + j * OFDM_DATA_NUM
+                            + k * encoded_bytes_per_block,
+                        encoded_bytes_per_block, mod_type);
+                }
             }
         }
     }
-#endif
 
     Table<float> qam_table;
     init_modulation_table(qam_table, mod_type);
@@ -541,13 +491,9 @@ void Config::genData()
                 int k = j - OFDM_DATA_START;
                 size_t s = p + k;
                 if (k % OFDM_PILOT_SPACING != 0) {
-#ifdef USE_LDPC
-                    dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_mod_input[i][s], qam_table);
-#else
-                    dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_bits[i][s], qam_table);
-#endif
+                    dl_iq_f[i][q + j] = mod_single_uint8(
+                        kUseLDPC ? dl_mod_input[i][s] : dl_bits[i][s],
+                        qam_table);
                 } else
                     dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
                 dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
@@ -569,12 +515,8 @@ void Config::genData()
             for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
                 size_t k = j - OFDM_DATA_START;
                 size_t s = p + k;
-#ifdef USE_LDPC
-                ul_iq_f[i][q + j]
-                    = mod_single_uint8(ul_mod_input[i][s], qam_table);
-#else
-                ul_iq_f[i][q + j] = mod_single_uint8(ul_bits[i][s], qam_table);
-#endif
+                ul_iq_f[i][q + j] = mod_single_uint8(
+                    kUseLDPC ? ul_mod_input[i][s] : ul_bits[i][s], qam_table);
                 ul_iq_ifft[i][q + j] = ul_iq_f[i][q + j];
             }
 
@@ -675,7 +617,7 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     if (it != DLSymbols[fid].end())
         return it - DLSymbols[fid].begin();
     else
-        return -1;
+        return SIZE_MAX;
 }
 
 size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
@@ -690,7 +632,7 @@ size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
 #endif
         return it - pilotSymbols[fid].begin();
     } else
-        return -1;
+        return SIZE_MAX;
 }
 
 size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
@@ -705,7 +647,7 @@ size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
 #endif
         return it - ULSymbols[fid].begin();
     } else
-        return -1;
+        return SIZE_MAX;
 }
 
 bool Config::isPilot(size_t frame_id, size_t symbol_id)

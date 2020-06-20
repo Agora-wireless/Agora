@@ -7,50 +7,40 @@
 #ifndef MILLIPEDE_HEAD
 #define MILLIPEDE_HEAD
 
-#include <fcntl.h>
-#include <iostream>
-#include <memory>
-#include <pthread.h>
-#include <queue>
-#include <system_error>
-#include <unistd.h>
-#include <vector>
-// #include <complex.h>
-#include <algorithm>
-#include <armadillo>
-#include <emmintrin.h>
-#include <immintrin.h>
-#include <math.h>
-#include <signal.h>
-#include <stdint.h>
-#include <tuple>
-// #include <aff3ct.hpp>
-#include "mkl_dfti.h"
-// #include <hpctoolkit.h>
-// #include <cblas.h>
-// #include <stdio.h>
-// #include "cpu_attach.hpp"
 #include "buffer.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
+#include "config.hpp"
+#include "docoding.hpp"
 #include "dodemul.hpp"
 #include "dofft.hpp"
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
-#include "reciprocity.hpp"
-#include "txrx.hpp"
-#include "txrx_mac.hpp"
-
-#ifdef USE_LDPC
-#include "docoding.hpp"
-#endif
-
-#include "config.hpp"
 #include "memory_manage.h"
+#include "mkl_dfti.h"
+#include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
+#include "txrx.hpp"
+#include "txrx_mac.hpp"
 #include "utils.h"
+#include <algorithm>
+#include <armadillo>
+#include <emmintrin.h>
+#include <fcntl.h>
+#include <immintrin.h>
+#include <iostream>
+#include <math.h>
+#include <memory>
+#include <pthread.h>
+#include <queue>
+#include <signal.h>
+#include <stdint.h>
+#include <system_error>
+#include <tuple>
+#include <unistd.h>
+#include <vector>
 
 class Millipede {
 public:
@@ -188,10 +178,10 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated precoder
+    // Calculated uplink zeroforcing detection matrices
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
     // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> ul_precoder_buffer_;
+    Table<complex_float> ul_zf_buffer_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -238,9 +228,10 @@ private:
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
 
+    // Calculated zeroforcing precoders for downlink beamforming
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
     // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> dl_precoder_buffer_;
+    Table<complex_float> dl_zf_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas

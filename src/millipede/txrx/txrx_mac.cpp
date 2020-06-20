@@ -13,8 +13,8 @@ MacPacketTXRX::MacPacketTXRX(Config* cfg, size_t core_offset)
 {
 
     socket_ = new int[cfg->UE_NUM];
-    rx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM, 64);
-    tx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM, 64);
+    rx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM + 64, 64);
+    tx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM + 64, 64);
 
 #if USE_IPV4
     servaddr_ = new struct sockaddr_in[cfg->UE_NUM];
@@ -51,7 +51,7 @@ bool MacPacketTXRX::startTXRX(Table<int8_t>& dl_bits_buffer,
     packet_num_in_buffer_ = packet_num_in_buffer;
     ul_bits_buffer_ = &ul_bits_buffer;
 
-    printf("create MAC TXRX threads\n");
+    printf("create %zu MAC TXRX threads\n", mac_thread_num);
     for (size_t i = 0; i < mac_thread_num; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<MacPacketTXRX>;
@@ -84,9 +84,11 @@ void* MacPacketTXRX::loopTXRX(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
             cfg->mac_rx_port + radio_id, cfg->tx_addr_to_mac.c_str());
-        printf("Set up UDP socket server listening to port %d"
-               " with remote address %s:%d  \n",
-            local_port_id, cfg->tx_addr_to_mac.c_str(), cfg->mac_rx_port + tid);
+        printf(
+            "MAC TXRX thread %d: set up UDP socket server listening to port %d"
+            " with remote address %s:%d  \n",
+            tid, local_port_id, cfg->tx_addr_to_mac.c_str(),
+            cfg->mac_rx_port + tid);
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
@@ -118,9 +120,10 @@ struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = rx_buffer_[tid];
     // int* dl_bits_buffer_status = *dl_bits_buffer_status_;
-    int packet_length = kUseLDPC
-        ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
-        : cfg->OFDM_DATA_NUM;
+    int packet_length = kUseLDPC ? (bits_to_bytes(cfg->LDPC_config.cbLen)
+                                       * cfg->LDPC_config.nblocksInSymbol)
+                                 : bits_to_bytes(cfg->OFDM_DATA_NUM);
+    packet_length += MacPacket::kOffsetOfData;
 
     struct MacPacket* pkt = (struct MacPacket*)rx_buffer;
     // int ret = recv(socket_[radio_id], (char*)pkt, packet_length, 0);
@@ -134,9 +137,9 @@ struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
         }
         return (NULL);
     }
-    printf("received data %d\n", ret);
-    printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
-    printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
+    // printf("received data %d\n", ret);
+    // printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
+    // printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
@@ -178,25 +181,26 @@ int MacPacketTXRX::dequeue_send(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
     size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
 
-    int packet_length = kUseLDPC
-        ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
-        : cfg->OFDM_DATA_NUM;
+    int packet_length = kUseLDPC ? (bits_to_bytes(cfg->LDPC_config.cbLen)
+                                       * cfg->LDPC_config.nblocksInSymbol)
+                                 : bits_to_bytes(cfg->OFDM_DATA_NUM);
+    packet_length += MacPacket::kOffsetOfData;
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_id);
     uint8_t* ul_data_ptr
         = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * cfg->OFDM_DATA_NUM];
-    auto* pkt = (MacPacket*)ul_data_ptr;
+    auto* pkt = (MacPacket*)tx_buffer_[tid];
     new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
     pkt->frame_id = frame_id;
     pkt->symbol_id = symbol_id;
     pkt->ue_id = ue_id;
-    memcpy(pkt->data, ul_data_ptr, packet_length);
+    adapt_bits_from_mod(
+        (int8_t*)ul_data_ptr, (int8_t*)pkt->data, packet_length, cfg->mod_type);
 
     // Send data (one OFDM symbol)
-    ssize_t ret
-        = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, packet_length, 0,
-            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+    size_t ret = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, packet_length,
+        0, (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
     if (kDebugPrintInTask) {

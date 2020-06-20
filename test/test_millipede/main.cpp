@@ -65,31 +65,21 @@ void check_correctness_ul(Config* cfg)
     int UL_PILOT_SYMS = cfg->UL_PILOT_SYMS;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-#ifdef USE_LDPC
-    std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_"
+    std::string raw_data_filename = cur_directory
+        + (kUseLDPC ? "/data/LDPC_orig_data_" : "/data/orig_data_")
         + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
         + std::to_string(cfg->UE_NUM) + ".bin";
-    std::string output_data_filename = cur_directory + "/data/decode_data.bin";
-#else
-    std::string raw_data_filename = cur_directory + "/data/orig_data_"
-        + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
-        + std::to_string(cfg->UE_NUM) + ".bin";
-    std::string output_data_filename = cur_directory + "/data/demul_data.bin";
-#endif
+    std::string output_data_filename = cur_directory
+        + (kUseLDPC ? "/data/decode_data.bin" : "/data/demul_data.bin");
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
     raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
     output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
 
-    int num_bytes_per_ue;
-#ifdef USE_LDPC
-    LDPCconfig LDPC_config = cfg->LDPC_config;
-    num_bytes_per_ue
-        = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
-#else
-    num_bytes_per_ue = OFDM_DATA_NUM;
-#endif
+    int num_bytes_per_ue = kUseLDPC
+        ? (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol
+        : OFDM_DATA_NUM;
     printf("num_bytes_per_ue: %d\n", num_bytes_per_ue);
 
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
@@ -100,22 +90,11 @@ void check_correctness_ul(Config* cfg)
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         if (i < UL_PILOT_SYMS)
             continue;
-        // #ifdef USE_LDPC
         for (int ue = 0; ue < UE_NUM; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
                 total_count++;
                 int offset_in_raw = num_bytes_per_ue * ue + j;
                 int offset_in_output = num_bytes_per_ue * ue + j;
-                // #else
-                //         for (int j = 0; j < num_bytes_per_ue; j++) {
-                //             for (int ue = 0; ue < UE_NUM; ue++) {
-                //                 total_count++;
-                //                 int offset_in_raw = num_bytes_per_ue * ue + j;
-                //                 int offset_in_output = UE_NUM * j + ue;
-                // #endif
-                // if (i == 0)
-                // printf("(%d, %d, %u, %u)\n", i, j, raw_data[i][offset_in_raw],
-                //     output_data[i][offset_in_output]);
                 if (raw_data[i][offset_in_raw]
                     != output_data[i][offset_in_output]) {
                     error_cnt++;
@@ -124,8 +103,6 @@ void check_correctness_ul(Config* cfg)
                         output_data[i][offset_in_output]);
                 }
             }
-            // if (i == 0)
-            //     printf("\n");
         }
     }
     printf("======================\n");
@@ -148,15 +125,10 @@ void check_correctness_dl(Config* cfg)
     int sampsPerSymbol = cfg->sampsPerSymbol;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-#ifdef USE_LDPC
-    std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_"
+    std::string raw_data_filename = cur_directory
+        + (kUseLDPC ? "/data/LDPC_dl_tx_data_" : "/data/dl_tx_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
-#else
-    std::string raw_data_filename = cur_directory + "/data/dl_tx_data_"
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
-        + ".bin";
-#endif
     std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
     Table<short> raw_data;
     Table<short> tx_data;

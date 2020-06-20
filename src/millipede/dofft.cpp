@@ -176,7 +176,7 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        partial_transpose(cfg->get_csi_buf(csi_buffer_, frame_id, symbol_id),
+        partial_transpose(cfg->get_csi_mat(csi_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
         partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
@@ -225,7 +225,10 @@ void DoFFT::partial_transpose(
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline
-#ifdef __AVX512F__
+
+#if 0
+            // AVX-512. Disabled for now because we don't have a working
+            // complex multiply for __m512 type.
             __m512 fft_result
                 = _mm512_load_ps(reinterpret_cast<const float*>(src));
             if (symbol_type == SymbolType::kPilot) {
@@ -244,8 +247,6 @@ void DoFFT::partial_transpose(
                     cfg->pilots_sgn_[sc_idx + 1].im,
                     cfg->pilots_sgn_[sc_idx + 1].re,
                     cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
-                // FIXME: this is not correct for complex pilots.
-                // Implement complex multiply for __m512 type
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
             _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);

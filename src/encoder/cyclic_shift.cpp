@@ -5,6 +5,7 @@
 
 #include "cyclic_shift.hpp"
 
+namespace avx2enc {
 inline __m256i cycle_bit_shift_2to64(
     __m256i data, int16_t cyc_shift, int16_t zc)
 {
@@ -52,7 +53,7 @@ inline __m256i cycle_bit_shift_72to128(
             5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }, // 128
     };
 
-    __m256i x0, x1, x2, bit_mask, shift_mask0;
+    __m256i x0, x2, bit_mask, shift_mask0;
     int64_t e0;
     int zc_in_bytes = zc >> 3;
     uint8_t* p_out = (uint8_t*)&x2;
@@ -93,7 +94,7 @@ inline __m256i cycle_bit_shift_144to256(
 {
     /* zc in this range is always a multiple of 16 */
 
-    __m256i x0, x1, x2, x3, bit_mask;
+    __m256i x0, x1, x2, bit_mask;
     int64_t e0, e1;
     cyc_shift = cyc_shift % zc;
     int packed_shift = cyc_shift >> 4;
@@ -163,3 +164,4 @@ CYCLIC_BIT_SHIFT ldpc_select_shift_func(int16_t zcSize)
         throw std::invalid_argument(
             "cyclic shifter for zc larger than 256 has not been implemented");
 }
+} // namespace avx2enc
