@@ -89,7 +89,7 @@ if(${USE_DPDK})
   else()
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
-  include_directories(${DPDK_INCLUDE_DIR})
+  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
   add_definitions(-DUSE_DPDK)
   if (${USE_DPDK_SENDER})
@@ -197,7 +197,10 @@ set(COMMON_SOURCES
   src/common/comms-lib-avx.cpp
   src/common/signalHandler.cpp
   src/common/modulation.cpp
-  src/common/net.cpp)
+  src/common/net.cpp
+  src/encoder/cyclic_shift.cpp
+  src/encoder/encoder.cpp
+  src/encoder/iobuffer.cpp)
 
 set(MILLIPEDE_SOURCES 
   src/millipede/millipede.cpp
@@ -206,10 +209,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
-  src/millipede/reciprocity.cpp
-  src/encoder/cyclic_shift.cpp
-  src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/millipede/reciprocity.cpp)
 
 # LDPC headers and sources that do not require an Intel compiler
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)

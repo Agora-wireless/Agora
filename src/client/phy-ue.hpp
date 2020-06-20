@@ -362,7 +362,7 @@ private:
     int max_equaled_frame = 0;
     // long long* demul_output;
     // float* equal_output;
-    size_t record_frame = -1;
+    size_t record_frame = SIZE_MAX;
 #if USE_IPV4
     struct sockaddr_in* servaddr_; /* server address */
 #else
