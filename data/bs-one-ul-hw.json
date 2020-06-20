@@ -17,6 +17,7 @@
  "cp_len" : 32,
  "tx_prefix_len" : 160,
  "ofdm_prefix_len" : 220,
+ "Zc" : 18,
  "beamsweep" : true,
  "beacon_antenna" : 0,
  "sample_calibrate" : false,
