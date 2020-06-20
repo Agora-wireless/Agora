@@ -60,11 +60,9 @@ message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
-set(TXRX_SOURCES src/millipede/txrx/txrx.cpp)
-
-if(${USE_ARGOS})
-  add_definitions(-DUSE_ARGOS)
-endif()
+set(TXRX_SOURCES
+  src/millipede/txrx/txrx.cpp
+  src/millipede/txrx/txrx_argos.cpp)
 
 # DPDK
 if(${USE_DPDK})
@@ -115,7 +113,6 @@ endif()
 message(STATUS "USE_DPDK: ${USE_DPDK}")
 message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
 
-
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
 endif()
@@ -129,6 +126,9 @@ set(MAC_BS_SOURCES
 set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
+if(${USE_ARGOS})
+  add_definitions(-DUSE_ARGOS)
+endif()
 find_package(SoapySDR "0.7" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
@@ -141,7 +141,6 @@ message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
 set(ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
-set(TXRX_SOURCES src/millipede/txrx/txrx_argos.cpp)
 set(CLIENT_SOURCES
   src/common/modulation.cpp
   src/client/client_radio.cpp

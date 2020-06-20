@@ -143,7 +143,6 @@ static constexpr bool kDebugBSReceiver = true;
 #define DEBUG_RECV 0
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
-#define DEBUG_DOWNLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4
