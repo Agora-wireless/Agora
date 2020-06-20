@@ -24,7 +24,7 @@
  "calTxGainA" : 30,
  "calTxGainB" : 30,
  "frames" : [
-     "BGGGGGPPGGUUUG"
+     "BGGGGGPGGGUUUG"
  ],
  "downlink_mode": false,
  "client_ul_pilot_syms" : 2,
