@@ -144,7 +144,7 @@ if(${USE_ARGOS})
   set(CLIENT_SOURCES
     src/common/modulation.cpp
     src/client/client_radio.cpp
-    src/client/ru_argos.cpp
+    src/client/txrx_argos.cpp
     src/client/phy-ue.cpp
     src/client/txrx_mac.cpp
   )
