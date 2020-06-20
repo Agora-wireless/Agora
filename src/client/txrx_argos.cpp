@@ -63,14 +63,16 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         // start socket thread
         if (config_->hw_framer) {
             if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopTXRX>, context)
+                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopTXRX>,
+                    context)
                 != 0) {
                 perror("socket thread create failed");
                 exit(0);
             }
         } else {
             if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopSYNC_TXRX>, context)
+                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopSYNC_TXRX>,
+                    context)
                 != 0) {
                 perror("socket thread create failed");
                 exit(0);
@@ -264,11 +266,13 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
 
     std::vector<void*> pilot_buff0(2);
     std::vector<void*> pilot_buff1(2);
+    Table<std::complex<int16_t>> zeros;
+    zeros.calloc(2, c->sampsPerSymbol, 64);
     pilot_buff0[0] = c->pilot_ci16.data();
     if (c->nChannels == 2) {
-        pilot_buff0[1] = std::vector<std::complex<float>>(num_samps, 0).data();
+        pilot_buff0[1] = zeros[0];
+        pilot_buff1[0] = zeros[1];
         pilot_buff1[1] = c->pilot_ci16.data();
-        pilot_buff1[0] = std::vector<std::complex<float>>(num_samps, 0).data();
         frm_rx_buff[1] = frm_buff1.data();
     }
 
@@ -456,7 +460,8 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 struct Packet* pkt[c->nChannels];
                 void* samp[c->nChannels];
                 for (size_t ch = 0; ch < c->nChannels; ++ch) {
-                    pkt[ch] = (struct Packet*)&buffer[((cursor + ch) % buffer_frame_num_)
+                    pkt[ch] = (struct Packet*)&buffer[((cursor + ch)
+                                                          % buffer_frame_num_)
                         * config_->packet_length];
                     samp[ch] = pkt[ch]->data;
                 }
