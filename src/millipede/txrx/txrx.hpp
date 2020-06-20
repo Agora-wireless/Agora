@@ -38,6 +38,20 @@
 #endif
 
 typedef unsigned short ushort;
+
+/**
+ * @brief Implementations of this class provide packet I/O for Millipede.
+ *
+ * In the vanilla mode, this class provides socket or DPDK-based packet I/O to
+ * Millipede (running on the base station server or client) for communicating
+ * with simulated peers.
+ *
+ * In the "Argos" mode, this class provides SoapySDR-based communication for
+ * Millipede (running on the base station server or client) for communicating
+ * with real wireless hardware peers (antenna hubs for the server, UE devices
+ * for the client).
+ */
+
 class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset = 1);
@@ -67,14 +81,16 @@ public:
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
         char* tx_buffer);
-    /**
-     * TXRX thread that runs a while loop to do both tx and rx
-     */
-    void* loopTXRX(int tid);
+
+private:
+    void* loop_tx_rx(int tid); // The TX/RX event loop
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
-private:
+    void* loop_tx_rx_argos(int tid);
+    int dequeue_send_argos(int tid);
+    struct Packet* recv_enqueue_argos(int tid, int radio_id, int rx_offset);
+
     Config* cfg;
     const size_t core_offset;
     const size_t socket_thread_num;
@@ -90,14 +106,11 @@ private:
     moodycamel::ProducerToken** tx_ptoks_;
 
 #if USE_IPV4
-    struct sockaddr_in* servaddr_; /* server address */
+    std::vector<struct sockaddr_in> servaddr_; /* server address */
 #else
-    struct sockaddr_in6* servaddr_; /* server address */
+    std::vector<struct sockaddr_in6> servaddr_; /* server address */
 #endif
-    int* socket_;
-
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+    std::vector<int> socket_;
 
 #ifdef USE_DPDK
     uint32_t src_addr;
