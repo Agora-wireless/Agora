@@ -19,14 +19,14 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
-    Table<complex_float>& ul_precoder_buffer,
-    Table<complex_float>& dl_precoder_buffer, Stats* stats_manager)
+    Table<complex_float>& ul_zf_buffer, Table<complex_float>& dl_zf_buffer,
+    Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , csi_buffer_(csi_buffer)
     , recip_buffer_(recip_buffer)
-    , ul_precoder_buffer_(ul_precoder_buffer)
-    , dl_precoder_buffer_(dl_precoder_buffer)
+    , ul_zf_buffer_(ul_zf_buffer)
+    , dl_zf_buffer_(dl_zf_buffer)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
@@ -52,38 +52,35 @@ Event_data DoZF::launch(size_t tag)
 }
 
 void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
-    const complex_float* recip_ptr, complex_float* precoder_ul,
-    complex_float* precoder_dl)
+    const complex_float* recip_ptr, complex_float* _mat_ul_zf,
+    complex_float* _mat_dl_zf)
 {
-    arma::cx_fmat mat_ul_precoder(
-        reinterpret_cast<arma::cx_float*>(precoder_ul), cfg->UE_NUM,
-        cfg->BS_ANT_NUM, false);
+    arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
+        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
     if (kUseInverseForZF) {
         try {
-            mat_ul_precoder
-                = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+            mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
         } catch (std::runtime_error) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
-            arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
+            arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
         }
     } else {
-        arma::pinv(mat_ul_precoder, mat_csi, 1e-2, "dc");
+        arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
     }
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
-        arma::cx_fmat mat_dl_precoder(
-            reinterpret_cast<arma::cx_float*>(precoder_dl), cfg->UE_NUM,
-            cfg->BS_ANT_NUM, false);
+        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
+            cfg->UE_NUM, cfg->BS_ANT_NUM, false);
         if (cfg->recipCalEn) {
             auto* _recip_ptr = const_cast<arma::cx_float*>(
                 reinterpret_cast<const arma::cx_float*>(recip_ptr));
             arma::cx_fvec vec_calib(_recip_ptr, cfg->BS_ANT_NUM, false);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
-            mat_dl_precoder = mat_ul_precoder * arma::inv(mat_calib);
+            mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
-            mat_dl_precoder = mat_ul_precoder;
+            mat_dl_zf = mat_ul_zf;
     }
 }
 
@@ -157,8 +154,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         // cout<<mat_input.st()<<endl;
         compute_precoder(mat_csi,
             cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id),
-            cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, cur_sc_id),
-            cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, cur_sc_id));
+            cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id),
+            cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, cur_sc_id));
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -236,8 +233,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     // cout<<mat_input.st()<<endl;
     compute_precoder(mat_csi,
         cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
-        cfg->get_precoder_buf(ul_precoder_buffer_, frame_id, base_sc_id),
-        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id, base_sc_id));
+        cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, base_sc_id),
+        cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, base_sc_id));
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -272,6 +269,6 @@ void DoZF::Predict(size_t tag)
     // for the next frame
     compute_precoder(mat_input,
         cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
-        cfg->get_precoder_buf(ul_precoder_buffer_, frame_id + 1, base_sc_id),
-        cfg->get_precoder_buf(dl_precoder_buffer_, frame_id + 1, base_sc_id));
+        cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
+        cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
 }
