@@ -1,7 +1,7 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
 #include "config.hpp"
-#include "ru.hpp"
+#include "txrx.hpp"
 //#include "l2.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
@@ -264,7 +264,7 @@ private:
      * Downlink
      *****************************************************/
 
-    std::unique_ptr<RU> ru_;
+    std::unique_ptr<RadioTXRX> ru_;
     std::unique_ptr<PacketTXRX> mac_receiver_;
 
     /**

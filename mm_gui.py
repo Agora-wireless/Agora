@@ -65,12 +65,12 @@ class MainWindow(QtGui.QMainWindow):
         thread = readDataThread(self)
         thread.dataChanged.connect(self.update_plot)
         thread.start()
-        num_cols = 1
+        num_cols = max(self.userNum/4, 1)
         num_rows = 1
         plt_scale = .6
         self.win = pg.GraphicsWindow()
         self.win.setWindowTitle('Uplink demo')
-        self.win.resize(500,300*self.userNum)
+        #self.win.resize(500,300*self.userNum)
 
         self.Const_plots = [None]*self.userNum
         self.Const_data = [None]*self.userNum

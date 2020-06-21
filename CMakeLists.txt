@@ -129,6 +129,7 @@ set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
 endif()
+
 find_package(SoapySDR "0.7" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
@@ -144,7 +145,6 @@ set(ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
 set(CLIENT_SOURCES
   src/common/modulation.cpp
   src/client/client_radio.cpp
-  src/client/ru_argos.cpp
   src/client/phy-ue.cpp
   src/client/txrx_mac.cpp
 )
