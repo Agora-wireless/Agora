@@ -1,8 +1,8 @@
 
-#include "ru.hpp"
+#include "txrx.hpp"
 #include "config.hpp"
 
-RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
+RadioTXRX::RadioTXRX(int n_rx_thread, int n_tx_thread, Config* cfg)
 {
     config_ = cfg;
     rx_socket_ = new int[n_rx_thread];
@@ -64,10 +64,10 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
     srand(time(NULL));
 }
 
-RU::RU(int n_rx_thread, int n_tx_thread, Config* config,
+RadioTXRX::RadioTXRX(int n_rx_thread, int n_tx_thread, Config* config,
     moodycamel::ConcurrentQueue<Event_data>* in_message_queue,
     moodycamel::ConcurrentQueue<Event_data>* in_task_queue)
-    : RU(n_rx_thread, n_tx_thread, config)
+    : RadioTXRX(n_rx_thread, n_tx_thread, config)
 {
     message_queue_ = in_message_queue;
     task_queue_ = in_task_queue;
@@ -76,14 +76,14 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* config,
         task_ptok[i].reset(new moodycamel::ProducerToken(*task_queue_));
 }
 
-RU::~RU()
+RadioTXRX::~RadioTXRX()
 {
     delete[] rx_socket_;
     delete[] tx_socket_;
     delete config_;
 }
 
-std::vector<pthread_t> RU::startTXRX(Table<char>& in_buffer,
+std::vector<pthread_t> RadioTXRX::startTXRX(Table<char>& in_buffer,
     Table<int>& in_buffer_status, int in_buffer_frame_num, int in_buffer_length,
     int in_core_id)
 {
@@ -101,7 +101,7 @@ std::vector<pthread_t> RU::startTXRX(Table<char>& in_buffer,
     for (int i = 0; i < thread_num_; i++) {
         pthread_t proc_thread_;
         // record the thread id
-        auto* context = new RUContext;
+        auto* context = new RadioTXRXContext;
         context->ptr = this;
         context->tid = i;
         // start socket thread
@@ -110,7 +110,7 @@ std::vector<pthread_t> RU::startTXRX(Table<char>& in_buffer,
             perror("socket thread create failed");
             exit(0);
         } else {
-            printf("RU thread: thread %d created\n", i);
+            printf("RadioTXRX thread: thread %d created\n", i);
         }
         created_threads.push_back(proc_thread_);
     }
@@ -122,7 +122,7 @@ std::vector<pthread_t> RU::startTXRX(Table<char>& in_buffer,
     return created_threads;
 }
 
-std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer,
+std::vector<pthread_t> RadioTXRX::startTX(char* in_buffer, char* in_pilot_buffer,
     int* in_buffer_status, int in_buffer_frame_num, int in_buffer_length,
     int in_core_id)
 {
@@ -139,7 +139,7 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer,
 #if SEPARATE_TX_RX_CLIENT
     printf("start Transmit thread\n");
     for (int i = 0; i < tx_thread_num_; i++) {
-        auto* context = new RUContext;
+        auto* context = new RadioTXRXContext;
         context->ptr = this;
         context->tid = i;
 
@@ -158,17 +158,17 @@ std::vector<pthread_t> RU::startTX(char* in_buffer, char* in_pilot_buffer,
 
 /*****  transmit threads   *****/
 
-void* RU::sendThread_launch(void* in_context)
+void* RadioTXRX::sendThread_launch(void* in_context)
 {
-    RUContext* context = (RUContext*)in_context;
-    RU* me = context->ptr;
+    RadioTXRXContext* context = (RadioTXRXContext*)in_context;
+    RadioTXRX* me = context->ptr;
     int tid = context->tid;
     delete context;
     me->sendThread(tid);
     return 0;
 }
 
-void RU::sendThread(int tid)
+void RadioTXRX::sendThread(int tid)
 {
     printf("packet sender thread %d start\n", tid);
 
@@ -263,17 +263,17 @@ void RU::sendThread(int tid)
 
 /*****  Receive threads   *****/
 
-void* RU::taskThread_launch(void* in_context)
+void* RadioTXRX::taskThread_launch(void* in_context)
 {
-    RUContext* context = (RUContext*)in_context;
-    RU* me = context->ptr;
+    RadioTXRXContext* context = (RadioTXRXContext*)in_context;
+    RadioTXRX* me = context->ptr;
     int tid = context->tid;
     delete context;
     me->taskThread(tid);
     return 0;
 }
 
-void RU::taskThread(int tid)
+void RadioTXRX::taskThread(int tid)
 {
     // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
 #ifdef ENABLE_CPU_ATTACH
