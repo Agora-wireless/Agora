@@ -13,7 +13,6 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
-#include "radio_lib.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cassert>
@@ -120,7 +119,6 @@ private:
     int tx_core_id_;
 
     Config* config_;
-    RadioConfig* radioconfig_; // Used only in Argos mode
 };
 
 #endif
