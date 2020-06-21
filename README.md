@@ -7,7 +7,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
    * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html))
    * Install Armadillo: `./scripts/install_armadillo.sh`
-   * Install the latest version of SoapySDR from https://github.com/pothosware/SoapySDR
+   * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`
    * Download Intel FlexRAN's LDPC SDK to `/opt` (does not need to be compiled)
      * Download [link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
      * Compile FlexRAN's LDPC SDK:
