@@ -146,6 +146,7 @@ set(CLIENT_SOURCES
   src/common/modulation.cpp
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
+  src/client/txrx_client.cpp
   src/client/txrx_mac.cpp
 )
 set(PYTHON_LIB ${PYTHON_LIBRARIES}) 

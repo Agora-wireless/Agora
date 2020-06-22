@@ -1,6 +1,6 @@
 
 #include "config.hpp"
-#include "txrx.hpp"
+#include "txrx_client.hpp"
 
 RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
 {

@@ -1,7 +1,7 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
 #include "config.hpp"
-#include "txrx.hpp"
+#include "txrx_client.hpp"
 //#include "l2.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
