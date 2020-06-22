@@ -251,7 +251,7 @@ if(${USE_ERPC})
     message(FATAL_ERROR "eRPC library not found")
   endif()
   set(ERPC_LIBRARIES ${ERPC_LIBRARIES} -Wl,--whole-archive erpc -libverbs)
-  include_directories($ENV{ERPC_INCLUDE_PATH})
+  include_directories(SYSTEM $ENV{ERPC_INCLUDE_PATH})
 endif()
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
