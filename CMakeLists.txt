@@ -55,6 +55,7 @@ set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+set(USE_ERPC True CACHE STRING "USE_ERPC defaulting to 'True'")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
@@ -240,6 +241,19 @@ if(${USE_LDPC})
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
 endif()
 
+if(${USE_ERPC})
+  message(STATUS "eRPC is enabled")
+  add_definitions(-DUSE_ERPC)
+  add_definitions(-DERPC_INFINIBAND=true)
+  find_library(ERPC_LIB erpc PATHS $ENV{ERPC_LIB_PATH})
+  message(STATUS "ERPC_LIB: ${ERPC_LIB}")
+  if(NOT ERPC_LIB)
+    message(FATAL_ERROR "eRPC library not found")
+  endif()
+  set(ERPC_LIBRARIES ${ERPC_LIBRARIES} -Wl,--whole-archive erpc -libverbs)
+  include_directories($ENV{ERPC_INCLUDE_PATH})
+endif()
+
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})
   message(STATUS "dir='${dir}'")
@@ -255,7 +269,7 @@ set(SOURCES
 			
 add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
 target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
+	${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} ${ERPC_LIBRARIES})
 
 
 add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
