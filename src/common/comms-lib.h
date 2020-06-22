@@ -101,8 +101,6 @@ public:
         const std::vector<std::complex<float>>& seq);
     static std::vector<float> correlate_avx_s(
         std::vector<float> const& f, std::vector<float> const& g);
-    static std::vector<int16_t> correlate_avx_si(
-        std::vector<int16_t> const& f, std::vector<int16_t> const& g);
     static std::vector<float> abs2_avx(
         std::vector<std::complex<float>> const& f);
     static std::vector<int32_t> abs2_avx(
