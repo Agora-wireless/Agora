@@ -1,6 +1,6 @@
 
 #include "config.hpp"
-#include "txrx.hpp"
+#include "txrx_client.hpp"
 
 RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
 {
@@ -281,6 +281,7 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
     int radio_id = tid;
     int sync_index(-1);
     int rx_offset = 0;
+    std::stringstream sout;
     while (c->running && sync_index < 0) {
         int r = radio->radioRx(
             radio_id, frm_rx_buff.data(), frm_num_samps, rxTime);
@@ -299,8 +300,10 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
         sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32);
         if (sync_index < 0)
             continue;
-        std::cout << "Beacon detected at Time " << rxTime
-                  << ", sync_index: " << sync_index << std::endl;
+        sout << "Client " << radio_id << ": Beacon detected at Time " << rxTime
+             << ", sync_index: " << sync_index << std::endl;
+        std::cout << sout.str();
+        sout.str(std::string()); // clear stringstream after print
         rx_offset = sync_index - c->beacon_len - c->prefix;
     }
 
@@ -352,14 +355,19 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 time0 += rx_offset;
                 resync = false;
                 resync_retry_cnt = 0;
-                std::cout << "Re-syncing with offset " << rx_offset << " after "
-                          << resync_retry_cnt + 1 << " tries\n";
+                sout << "Client " << radio_id << ": Re-syncing with offset "
+                     << rx_offset << " after " << resync_retry_cnt + 1
+                     << " tries\n";
+                std::cout << sout.str();
+                sout.str(std::string()); // clear stringstream after print
             } else
                 resync_retry_cnt++;
         }
         if (resync && resync_retry_cnt > resync_retry_max) {
-            std::cerr << "Exceeded resync retry limit (" << resync_retry_max
-                      << "). Stopping..." << std::endl;
+            sout << "Client " << radio_id << ": Exceeded resync retry limit ("
+                 << resync_retry_max << "). Stopping..." << std::endl;
+            std::cerr << sout.str();
+            sout.str(std::string()); // clear stringstream after print
             c->running = false;
             break;
         }
