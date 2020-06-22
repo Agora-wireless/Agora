@@ -15,6 +15,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      % First, change ownership of /opt/FlexRAN_FEC_SDK_19_04 to your Linux user
      cd /opt/FlexRAN_FEC_SDK_19_04/sdk/
      ./create-makefiles-linux.sh
+     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
      cd build-avx512-icc % or build-avx2-icc
      make
      ```
