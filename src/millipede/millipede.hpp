@@ -205,6 +205,9 @@ private:
 
     Table<complex_float> ue_spec_pilot_buffer_;
 
+    Table<int> decoded_bits_count_;
+    Table<int> error_bits_count_;
+
     RxCounters rx_counters_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
