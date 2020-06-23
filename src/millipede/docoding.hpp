@@ -54,6 +54,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+        Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
         Stats* in_stats_manager);
     ~DoDecode();
 
@@ -63,6 +64,8 @@ private:
     int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
     Table<uint8_t>& decoded_buffer_;
+    Table<int> decoded_bits_count_;
+    Table<int> error_bits_count_;
     DurationStat* duration_stat;
 };
 
