@@ -73,29 +73,32 @@ Millipede::Millipede(Config* cfg)
 
     /* Create eRPC server/client */
     if (cfg->rpc_thread_id == 0) {
-        rpc_server = new RPCServer();
-        size_t pid;
-        int ret;
-        auto context = new EventHandlerContext<RPCServer>;
-        context->obj_ptr = rpc_server;
-        context->id = 0;
-        ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCServer, &RPCServer::Launch>, context);
-        if (ret != 0) {
-            perror("eRPC server thread create failed");
-            exit(0);
-        }
+        // rpc_server = new RPCServer();
+        // size_t pid;
+        // int ret;
+        // auto context = new EventHandlerContext<RPCServer>;
+        // context->obj_ptr = rpc_server;
+        // context->id = 0;
+        // printf("pivot!\n");
+        // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCServer, &RPCServer::Launch>, context);
+        // if (ret != 0) {
+        //     perror("eRPC server thread create failed");
+        //     exit(0);
+        // }
+        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_server>, 0, 1);
     } else {
-        rpc_client = new RPCClient();
-        size_t pid;
-        int ret;
-        auto context = new EventHandlerContext<RPCClient>;
-        context->obj_ptr = rpc_client;
-        context->id = cfg->rpc_thread_id;
-        ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCClient, &RPCClient::Launch>, context);
-        if (ret != 0) {
-            perror("eRPC client thread create failed");
-            exit(0);
-        }
+        // rpc_client = new RPCClient();
+        // size_t pid;
+        // int ret;
+        // auto context = new EventHandlerContext<RPCClient>;
+        // context->obj_ptr = rpc_client;
+        // context->id = cfg->rpc_thread_id;
+        // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCClient, &RPCClient::Launch>, context);
+        // if (ret != 0) {
+        //     perror("eRPC client thread create failed");
+        //     exit(0);
+        // }
+        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_client>, 0, 1);
     }
 }
 
@@ -628,6 +631,20 @@ void Millipede::handle_event_fft(size_t tag)
                 frame_id, get_conq(EventType::kRC), get_ptok(EventType::kRC));
         }
     }
+}
+
+void* Millipede::worker_rpc_server(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
+
+    rpc_server = new RPCServer();
+}
+
+void* Millipede::worker_rpc_client(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
+
+    rpc_client = new RPCClient();
 }
 
 void* Millipede::worker(int tid)

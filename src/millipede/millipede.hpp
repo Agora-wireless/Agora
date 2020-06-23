@@ -68,6 +68,8 @@ public:
     void* worker_zf(int tid);
     void* worker_demul(int tid);
     void* worker(int tid);
+    void* worker_rpc_server(int tid);
+    void* worker_rpc_client(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
