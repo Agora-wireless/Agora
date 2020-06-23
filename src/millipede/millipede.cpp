@@ -549,6 +549,20 @@ finish:
     kUseLDPC ? save_decode_data_to_file(stats->last_frame_id)
              : save_demul_data_to_file(stats->last_frame_id);
     save_tx_data_to_file(stats->last_frame_id);
+    // calculate and print per-user BER
+    const size_t task_buffer_symbol_num_ul
+        = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
+    for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+        int total_decoded_bits(0);
+        int total_error_bits(0);
+        for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
+            total_decoded_bits += decoded_bits_count_[ue_id][i];
+            total_error_bits += error_bits_count_[ue_id][i];
+        }
+        std::cout << "UE " << ue_id << " bit errors " << total_error_bits << "("
+                  << total_decoded_bits << "), BER "
+                  << 1.0 * total_error_bits / total_decoded_bits << std::endl;
+    }
     this->stop();
 }
 
@@ -635,7 +649,8 @@ void* Millipede::worker(int tid)
             worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
         computeDecoding = new DoDecode(config_, tid, freq_ghz,
             *get_conq(EventType::kDecode), complete_task_queue_,
-            worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, stats);
+            worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_,
+            decoded_bits_count_, error_bits_count_, stats);
     }
 
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
@@ -1092,6 +1107,9 @@ void Millipede::initialize_uplink_buffers()
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
         task_buffer_symbol_num_ul, num_decoded_bytes * cfg->UE_NUM, 64);
+
+    decoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+    error_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
