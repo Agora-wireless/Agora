@@ -557,7 +557,7 @@ finish:
     save_tx_data_to_file(stats->last_frame_id);
     // calculate and print per-user BER
     if (!kEnableMac) {
-	phy_stats->print_phy_stats();
+        phy_stats->print_phy_stats();
     }
     this->stop();
 }
