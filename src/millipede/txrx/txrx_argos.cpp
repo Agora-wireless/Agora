@@ -22,10 +22,10 @@ void* PacketTXRX::loop_tx_rx_argos(int tid)
     int prev_frame_id = -1;
     int radio_id = radio_lo;
     while (cfg->running) {
-        if (-1 != dequeue_send(tid))
+        if (-1 != dequeue_send_argos(tid))
             continue;
         // receive data
-        struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
+        struct Packet* pkt = recv_enqueue_argos(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
         rx_offset = (rx_offset + cfg->nChannels) % packet_num_in_buffer_;
