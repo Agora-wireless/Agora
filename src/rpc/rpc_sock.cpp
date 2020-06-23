@@ -22,6 +22,7 @@ RPCServer::RPCServer() {
     nexus->register_req_func(kReqType, server_req_handler);
 
     server_rpc = new erpc::Rpc<erpc::CTransport>(nexus, nullptr, 0, nullptr);
+    server_rpc->run_event_loop(100000);
 }
 
 void *RPCServer::Launch(int tid) {
@@ -38,6 +39,17 @@ RPCClient::RPCClient() {
     nexus = new erpc::Nexus(client_uri, 0, 0);
 
     client_rpc = new erpc::Rpc<erpc::CTransport>(nexus, nullptr, 0, sm_handler);
+
+    std::string server_uri = kServerHostname + ":" + std::to_string(kUDPPort);
+    int session_num = client_rpc->create_session(server_uri, 0);
+
+    while (!client_rpc->is_connected(session_num)) client_rpc->run_event_loop_once();
+
+    req = client_rpc->alloc_msg_buffer_or_die(kMsgSize);
+    resp = client_rpc->alloc_msg_buffer_or_die(kMsgSize);
+
+    client_rpc->enqueue_request(session_num, kReqType, &req, &resp, cont_func, nullptr);
+    client_rpc->run_event_loop(100);
 }
 
 void *RPCClient::Launch(int tid) {
