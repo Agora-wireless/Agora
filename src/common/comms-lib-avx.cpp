@@ -422,44 +422,6 @@ std::vector<std::complex<float>> CommsLib::correlate_avx(
     return out;
 }
 
-std::vector<int16_t> CommsLib::correlate_avx_si(
-    std::vector<int16_t> const& f, std::vector<int16_t> const& g)
-{
-    // assuming length0 is larger or equal to length1
-    size_t length1 = g.size();
-
-    std::vector<int16_t> in(length1 - 1, 0);
-    in.insert(in.end(), f.begin(), f.end());
-    size_t length = in.size();
-
-    //int16_t* in1 = (int16_t*)(g.data());
-    std::vector<int16_t> out(length, 0);
-
-    size_t sz = sizeof(int16_t);
-
-    __m256i seq_samp[length1] __attribute__((aligned(ALIGNMENT)));
-
-    //for (size_t i = 0; i < length1; i++) {
-    //    __m256i samp_i = _mm256_set1_epi16(in1[i]);
-    //}
-
-    for (size_t i = 0; i < length - length1; i += AVX_PACKED_SI) {
-        __m256i accm0 = _mm256_set1_epi16(0x0);
-        __m256i accm1 = _mm256_set1_epi16(0x0);
-        for (size_t j = 0; j < length1; j++) {
-            __m256i* in_temp = (__m256i*)(in.data() + (i + j) * sz);
-            __m256i data = _mm256_loadu_si256(in_temp);
-            __m256i prod0 = _mm256_mulhi_epi16(data, seq_samp[j]);
-            __m256i prod1 = _mm256_mullo_epi16(data, seq_samp[j]);
-            accm0 = _mm256_adds_epi16(prod0, accm0);
-            accm1 = _mm256_adds_epi16(prod1, accm1);
-        }
-        __m256i* out_temp = (__m256i*)(out.data() + i * sz);
-        _mm256_storeu_si256(out_temp, accm0);
-    }
-    return out;
-}
-
 std::vector<float> CommsLib::correlate_avx_s(
     std::vector<float> const& f, std::vector<float> const& g)
 {

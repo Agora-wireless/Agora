@@ -1,7 +1,7 @@
 {
  "irises" : "data/user-iris-serials.txt",
  "cells" : 1,
- "channel" : "A",
+ "channel" : "AB",
  "frequency" : 3.56e9,
  "rxgainA" : 20,
  "txgainA" : 40,
@@ -23,6 +23,6 @@
  "client_ul_pilot_syms" : 2,
  "client_dl_pilot_syms" : 2,
  "modulation" : "16QAM",
- "worker_thread_num" : 2,
+ "worker_thread_num" : 1,
  "demul_block_size" : 48
 }

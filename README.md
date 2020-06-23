@@ -5,11 +5,20 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    an Intel C++ compiler (`icpc`).
  * Required packages
    * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
-   * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing_intel_free_libs_and_python_apt_repo.html))
+   * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html))
    * Install Armadillo: `./scripts/install_armadillo.sh`
-   * Install the latest version of SoapySDR from https://github.com/pothosware/SoapySDR
-   * Download Intel FlexRAN to `/opt` (does not need to be compiled)
+   * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`
+   * Download Intel FlexRAN's LDPC SDK to `/opt` (does not need to be compiled)
      * Download [link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
+     * Compile FlexRAN's LDPC SDK:
+     ```
+     % First, change ownership of /opt/FlexRAN_FEC_SDK_19_04 to your Linux user
+     cd /opt/FlexRAN_FEC_SDK_19_04/sdk/
+     ./create-makefiles-linux.sh
+     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
+     cd build-avx512-icc % or build-avx2-icc
+     make
+     ```
    * Optional: Install Intel compiler
      * Intel MKL and compiler can be installed by installing Parallel Studio XE
      * Set environment vairables by sourcing `compilervars.sh`, e.g.,
@@ -34,6 +43,10 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     cmake ..
     make -j
     ```
+
+ * To include LDPC in the build, 
+   * Make sure to enable Intel compiler as instructed above.
+   * Instead of `cmake ..` above, run `cmake -DCMAKE_C_COMPILER=icc -DCMAKE_CXX_COMPILER=icpc -DUSE_LDPC=1 ..`.
 
  * Run Millipede with simulated client traffic
    * First, run `./data_generator data/tddconfig-sim-ul.json` to generate data

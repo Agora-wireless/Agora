@@ -113,6 +113,12 @@ static constexpr bool kEnableMac = true;
 static constexpr bool kEnableMac = false;
 #endif
 
+#ifdef USE_ARGOS
+static constexpr bool kUseArgos = true;
+#else
+static constexpr bool kUseArgos = false;
+#endif
+
 static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
@@ -137,7 +143,6 @@ static constexpr bool kDebugBSReceiver = true;
 #define DEBUG_RECV 0
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
-#define DEBUG_DOWNLINK 0
 #define WRITE_RECV 0
 
 #define CORR_THRESHOLD 0x4

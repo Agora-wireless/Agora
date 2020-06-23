@@ -38,8 +38,8 @@ static inline uint8_t bitreverse8(uint8_t x)
 }
 
 /*
- * Copy packed, bit-reversed m-bit fields (m == mod_type) stored in
- * vec_in[0..len-1] into unpacked vec_out.  Storage at vec_out must be
+ * Copy unpacked, bit-reversed m-bit fields (m == mod_type) stored in
+ * vec_in[0..len-1] into packed vec_out.  Storage at vec_out must be
  * at least 8*len/m bytes.
  */
 static inline void adapt_bits_for_mod(

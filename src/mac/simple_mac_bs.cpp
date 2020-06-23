@@ -65,7 +65,7 @@ void* SimpleBSMac::loopRecv(int tid)
     socklen_t addrlen = sizeof(remote_addr);
     int packet_length = kUseLDPC
         ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
-        : (cfg->OFDM_DATA_NUM + 7) >> 3;
+        : (cfg->OFDM_DATA_NUM * cfg->mod_type + 7) >> 3;
     packet_length += MacPacket::kOffsetOfData;
     char* rx_buffer = (char*)malloc(packet_length);
     while (true) {
