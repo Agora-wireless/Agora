@@ -80,6 +80,9 @@ public:
     complex_float* pilots_sgn_;
     Table<int8_t> dl_bits;
     Table<int8_t> ul_bits;
+    Table<int8_t> ul_encoded_bits;
+    Table<uint8_t> ul_mod_input;
+    Table<uint8_t> dl_mod_input;
     Table<complex_float> dl_iq_f;
     Table<complex_float> ul_iq_f;
     Table<std::complex<int16_t>> dl_iq_t;
