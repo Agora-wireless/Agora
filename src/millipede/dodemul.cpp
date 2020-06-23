@@ -16,7 +16,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
-    Table<int8_t>& demod_soft_buffer, Stats* stats_manager)
+    Table<int8_t>& demod_soft_buffer, PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
@@ -25,6 +25,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     , equal_buffer_(equal_buffer)
     , demod_hard_buffer_(demod_hard_buffer)
     , demod_soft_buffer_(demod_soft_buffer)
+    , phy_stats(in_phy_stats)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
@@ -40,13 +41,6 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
-
-    // EVM calculation data
-    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
-    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-    ul_gt_mat = ul_iq_f_mat.st();
-    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
-    evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 
     // BER calculation data
     // ber_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
@@ -191,23 +185,9 @@ Event_data DoDemul::launch(size_t tag)
 
                 // Measure EVM from ground truth
                 if (symbol_idx_ul == cfg->UL_PILOT_SYMS) {
-                    fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
-                    fmat cur_evm_mat(
-                        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
-                        cfg->UE_NUM, 1, false);
-                    cur_evm_mat += evm % evm;
+		    phy_stats->update_evm_stats(frame_id, cur_sc_id, mat_equaled);
                     if (kPrintPhyStats && cur_sc_id == 0) {
-                        size_t prev_frame = (frame_id - 1);
-                        fmat evm_mat(
-                            evm_buffer_[prev_frame % TASK_BUFFER_FRAME_NUM],
-                            cfg->UE_NUM, 1, false);
-                        evm_mat = sqrt(evm_mat) / cfg->OFDM_DATA_NUM;
-                        std::stringstream ss;
-                        ss << "Frame " << prev_frame << ":\n"
-                           << "  EVM " << 100 * evm_mat.st() << ", SNR "
-                           << -10 * log10(evm_mat.st()) << ", theta "
-                           << cur_theta.st() << ", theta_inc" << theta_inc.st();
-                        std::cout << ss.str();
+			phy_stats->print_evm_stats(frame_id - 1);
                     }
                 }
             }

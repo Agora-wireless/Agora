@@ -10,6 +10,12 @@ PhyStats::PhyStats(Config* cfg)
 
     decoded_blocks_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
     block_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+
+    evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
+    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+    ul_gt_mat = ul_iq_f_mat.st();
+    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
 }
 
 void PhyStats::print_phy_stats()
@@ -36,6 +42,29 @@ void PhyStats::print_phy_stats()
                   << 1.0 * total_block_errors / total_decoded_blocks << ")"
                   << std::endl;
     }
+}
+
+void PhyStats::print_evm_stats(size_t frame_id)
+{
+    fmat evm_mat(
+        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
+        config_->UE_NUM, 1, false);
+    evm_mat = sqrt(evm_mat) / config_->OFDM_DATA_NUM;
+    std::stringstream ss;
+    ss << "Frame " << frame_id << ":\n"
+       << "  EVM " << 100 * evm_mat.st() << ", SNR "
+       << -10 * log10(evm_mat.st());
+    std::cout << ss.str();
+}
+
+void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
+{
+    //assert(eq.size() == ul_gt_mat.col(sc_id).size());
+    fmat evm = abs(eq - ul_gt_mat.col(sc_id));
+    fmat cur_evm_mat(
+        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
+        config_->UE_NUM, 1, false);
+    cur_evm_mat += evm % evm;
 }
 
 void PhyStats::update_bit_errors(
@@ -74,4 +103,6 @@ PhyStats::~PhyStats()
 
     decoded_blocks_count_.free();
     block_error_count_.free();
+
+    evm_buffer_.free();
 }

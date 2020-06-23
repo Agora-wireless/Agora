@@ -630,7 +630,7 @@ void* Millipede::worker(int tid)
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
             ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_hard_buffer_, demod_soft_buffer_, stats);
+            demod_hard_buffer_, demod_soft_buffer_, phy_stats, stats);
 
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
         *get_conq(EventType::kPrecode), complete_task_queue_,
@@ -711,7 +711,7 @@ void* Millipede::worker_demul(int tid)
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
             ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_hard_buffer_, demod_soft_buffer_, stats);
+            demod_hard_buffer_, demod_soft_buffer_, phy_stats, stats);
 
     /* Initialize Precode operator */
     auto computePrecode = new DoPrecode(config_, tid, freq_ghz,
