@@ -7,9 +7,6 @@
 #include "rpc_sock.hpp"
 using namespace std;
 
-extern RPCServer *rpc_server;
-extern RPCClient *rpc_client;
-
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
@@ -637,14 +634,14 @@ void* Millipede::worker_rpc_server(int tid)
 {
     pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
 
-    rpc_server = new RPCServer();
+    run_erpc_server();
 }
 
 void* Millipede::worker_rpc_client(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
+    pin_to_core_with_offset(ThreadType::kRPCClient, base_worker_core_offset + config_->worker_thread_num, 0);
 
-    rpc_client = new RPCClient();
+    run_erpc_client();
 }
 
 void* Millipede::worker(int tid)

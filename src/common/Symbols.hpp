@@ -163,6 +163,7 @@ enum class ThreadType {
     kMasterRX,
     kMasterTX,
     kRPCServer,
+    kRPCClient,
 };
 
 static inline std::string thread_type_str(ThreadType thread_type)
@@ -192,6 +193,8 @@ static inline std::string thread_type_str(ThreadType thread_type)
         return "Master (TX)";
     case ThreadType::kRPCServer:
         return "RPC Server";
+    case ThreadType::kRPCClient:
+        return "RPC Client";
     }
     return "Invalid thread type";
 }

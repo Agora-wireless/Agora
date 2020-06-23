@@ -11,26 +11,7 @@ static constexpr uint16_t kUDPPort = 31850;
 static constexpr uint8_t kReqType = 2;
 static constexpr size_t kMsgSize = 16;
 
-class RPCServer {
-public:
-    RPCServer();
-    ~RPCServer();
-
-    void *Launch(int tid);
-
-private:
-    erpc::Nexus *nexus;
-};
-
-class RPCClient {
-public:
-    RPCClient();
-    ~RPCClient();
-
-    void *Launch(int tid);
-
-private:
-    erpc::Nexus *nexus;
-};
+void run_erpc_server();
+void run_erpc_client();
 
 #endif // RPC_SOCK
