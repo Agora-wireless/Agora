@@ -555,18 +555,21 @@ finish:
              : save_demul_data_to_file(stats->last_frame_id);
     save_tx_data_to_file(stats->last_frame_id);
     // calculate and print per-user BER
-    const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
-    for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-        int total_decoded_bits(0);
-        int total_error_bits(0);
-        for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
-            total_decoded_bits += decoded_bits_count_[ue_id][i];
-            total_error_bits += error_bits_count_[ue_id][i];
+    if (!kEnableMac) {
+        const size_t task_buffer_symbol_num_ul
+            = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
+        for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+            int total_decoded_bits(0);
+            int total_error_bits(0);
+            for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
+                total_decoded_bits += decoded_bits_count_[ue_id][i];
+                total_error_bits += error_bits_count_[ue_id][i];
+            }
+            std::cout << "UE " << ue_id << " bit errors " << total_error_bits
+                      << "(" << total_decoded_bits << "), BER "
+                      << 1.0 * total_error_bits / total_decoded_bits
+                      << std::endl;
         }
-        std::cout << "UE " << ue_id << " bit errors " << total_error_bits << "("
-                  << total_decoded_bits << "), BER "
-                  << 1.0 * total_error_bits / total_decoded_bits << std::endl;
     }
     this->stop();
 }
