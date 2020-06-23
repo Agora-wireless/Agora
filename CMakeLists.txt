@@ -188,7 +188,8 @@ include_directories(
 	src/common/
   src/millipede/
   src/millipede/txrx/
-  src/client/)
+  src/client/
+  src/rpc)
 
 include_directories(SYSTEM src/third_party)
 
@@ -211,7 +212,8 @@ set(MILLIPEDE_SOURCES
   src/millipede/reciprocity.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/encoder/iobuffer.cpp
+  src/rpc/rpc_sock.cpp)
 
 # LDPC headers and sources that do not require an Intel compiler
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
@@ -250,7 +252,7 @@ if(${USE_ERPC})
   if(NOT ERPC_LIB)
     message(FATAL_ERROR "eRPC library not found")
   endif()
-  set(ERPC_LIBRARIES ${ERPC_LIBRARIES} -Wl,--whole-archive erpc -libverbs)
+  set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc)
   include_directories(SYSTEM $ENV{ERPC_INCLUDE_PATH})
 endif()
 

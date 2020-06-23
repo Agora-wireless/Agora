@@ -192,6 +192,9 @@ public:
     // int dl_data_symbol_perframe;
     std::atomic<bool> running;
 
+    // eRPC thread id
+    size_t rpc_thread_id;
+
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
 
