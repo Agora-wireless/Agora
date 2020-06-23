@@ -27,6 +27,7 @@ int DpdkTransport::nic_init(
     struct rte_eth_dev_info dev_info;
     struct rte_eth_rxconf rxconf;
     struct rte_eth_txconf txconf;
+    struct rte_flow_error error;
 
     if (rte_eth_dev_count_avail() < port)
         rte_exit(EXIT_FAILURE, "Not Enough NICs\n");
@@ -41,9 +42,9 @@ int DpdkTransport::nic_init(
 
     int promiscuous_en = rte_eth_promiscuous_get(port);
     printf("Promiscuous mode: %d\n", promiscuous_en);
-    rte_eth_promiscuous_enable(port);
-    promiscuous_en = rte_eth_promiscuous_get(port);
-    printf("Promiscuous mode: %d\n", promiscuous_en);
+    // rte_eth_promiscuous_enable(port);
+    // promiscuous_en = rte_eth_promiscuous_get(port);
+    // printf("Promiscuous mode: %d\n", promiscuous_en);
 
     rte_eth_dev_info_get(port, &dev_info);
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
@@ -52,6 +53,10 @@ int DpdkTransport::nic_init(
     port_conf.rxmode.max_rx_pkt_len
         = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+
+    retval = rte_flow_isolate(port, 1, &error);
+    if (retval != 0)
+        return retval;
 
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
     if (retval != 0)
