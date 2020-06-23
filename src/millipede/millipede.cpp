@@ -4,7 +4,11 @@
  *
  */
 #include "millipede.hpp"
+#include "rpc_sock.hpp"
 using namespace std;
+
+extern RPCServer *rpc_server;
+extern RPCClient *rpc_client;
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -65,6 +69,33 @@ Millipede::Millipede(Config* cfg)
     } else {
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>, 0,
             cfg->worker_thread_num);
+    }
+
+    /* Create eRPC server/client */
+    if (cfg->rpc_thread_id == 0) {
+        rpc_server = new RPCServer();
+        size_t pid;
+        int ret;
+        auto context = new EventHandlerContext<RPCServer>;
+        context->obj_ptr = rpc_server;
+        context->id = 0;
+        ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCServer, &RPCServer::Launch>, context);
+        if (ret != 0) {
+            perror("eRPC server thread create failed");
+            exit(0);
+        }
+    } else {
+        rpc_client = new RPCClient();
+        size_t pid;
+        int ret;
+        auto context = new EventHandlerContext<RPCClient>;
+        context->obj_ptr = rpc_client;
+        context->id = cfg->rpc_thread_id;
+        ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCClient, &RPCClient::Launch>, context);
+        if (ret != 0) {
+            perror("eRPC client thread create failed");
+            exit(0);
+        }
     }
 }
 
