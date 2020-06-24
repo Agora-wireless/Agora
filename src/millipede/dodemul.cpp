@@ -16,7 +16,8 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
-    Table<int8_t>& demod_soft_buffer, PhyStats* in_phy_stats, Stats* stats_manager)
+    Table<int8_t>& demod_soft_buffer, PhyStats* in_phy_stats,
+    Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
@@ -185,9 +186,10 @@ Event_data DoDemul::launch(size_t tag)
 
                 // Measure EVM from ground truth
                 if (symbol_idx_ul == cfg->UL_PILOT_SYMS) {
-		    phy_stats->update_evm_stats(frame_id, cur_sc_id, mat_equaled);
+                    phy_stats->update_evm_stats(
+                        frame_id, cur_sc_id, mat_equaled);
                     if (kPrintPhyStats && cur_sc_id == 0) {
-			phy_stats->print_evm_stats(frame_id - 1);
+                        phy_stats->print_evm_stats(frame_id - 1);
                     }
                 }
             }
@@ -260,9 +262,9 @@ Event_data DoDemul::launch(size_t tag)
             //     printf("%i ", demul_ptr[k]);
             // cout << endl;
         } else {
-            uint8_t* demul_ptr
-                = (&demod_hard_buffer_[total_data_symbol_idx_ul]
-                                      [cfg->OFDM_DATA_NUM * i + base_sc_id]);
+            size_t demod_sym_offset = cfg->OFDM_DATA_NUM * i + base_sc_id;
+            uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_symbol_idx_ul]
+                                                     [demod_sym_offset]);
             switch (cfg->mod_type) {
             case (CommsLib::QAM16):
                 demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
@@ -273,6 +275,19 @@ Event_data DoDemul::launch(size_t tag)
             default:
                 printf("Demodulation: modulation type %s not supported!\n",
                     cfg->modulation.c_str());
+            }
+            if (!kEnableMac && kPrintPhyStats
+                && symbol_idx_ul >= cfg->UL_PILOT_SYMS) {
+                phy_stats->update_uncoded_bits(
+                    i, total_data_symbol_idx_ul, max_sc_ite * cfg->mod_type);
+                for (size_t sc = 0; sc < max_sc_ite; sc++) {
+                    uint8_t mod_symbol
+                        = cfg->ul_bits[symbol_idx_ul][demod_sym_offset + sc];
+                    uint8_t demod_symbol = *(demul_ptr + sc);
+                    phy_stats->update_uncoded_bit_errors(i,
+                        total_data_symbol_idx_ul, cfg->mod_type, mod_symbol,
+                        demod_symbol);
+                }
             }
         }
     }
