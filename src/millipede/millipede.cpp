@@ -579,6 +579,7 @@ void Millipede::handle_event_fft(size_t tag)
                 if (fft_stats_.last_symbol(frame_id)) {
                     stats->master_set_tsc(TsType::kFFTDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
+                    phy_stats->print_snr_stats(frame_id);
                     schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
@@ -616,7 +617,7 @@ void* Millipede::worker(int tid)
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
-        calib_buffer_, stats);
+        calib_buffer_, phy_stats, stats);
 
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
@@ -676,7 +677,7 @@ void* Millipede::worker_fft(int tid)
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
-        calib_buffer_, stats);
+        calib_buffer_, phy_stats, stats);
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
         worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats);

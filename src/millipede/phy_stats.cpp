@@ -16,6 +16,8 @@ PhyStats::PhyStats(Config* cfg)
     cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
     ul_gt_mat = ul_iq_f_mat.st();
     ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
+
+    pilot_snr_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 }
 
 void PhyStats::print_phy_stats()
@@ -50,10 +52,36 @@ void PhyStats::print_evm_stats(size_t frame_id)
         1, false);
     evm_mat = sqrt(evm_mat) / config_->OFDM_DATA_NUM;
     std::stringstream ss;
-    ss << "Frame " << frame_id << ":\n"
+    ss << "Frame " << frame_id << " Constellation:\n"
        << "  EVM " << 100 * evm_mat.st() << ", SNR "
        << -10 * log10(evm_mat.st());
     std::cout << ss.str();
+}
+
+void PhyStats::print_snr_stats(size_t frame_id)
+{
+    std::stringstream ss;
+    ss << "Frame " << frame_id << " Pilot Signal SNR: ";
+    for (size_t i = 0; i < config_->UE_NUM; i++)
+        ss << pilot_snr_[frame_id % TASK_BUFFER_FRAME_NUM][i] << " ";
+    ss << std::endl;
+    std::cout << ss.str();
+}
+
+void PhyStats::update_pilot_snr(
+    size_t frame_id, size_t ue_id, complex_float* fft_data)
+{
+    cx_fmat fft_mat((cx_float*)fft_data, config_->OFDM_CA_NUM, 1, false);
+    fmat fft_abs_mat = abs(fft_mat);
+    fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+    float rssi = as_scalar(sum(fft_abs_mag));
+    float noise_per_sc1
+        = as_scalar(mean(fft_abs_mag.rows(0, config_->OFDM_DATA_START - 1)));
+    float noise_per_sc2 = as_scalar(mean(
+        fft_abs_mag.rows(config_->OFDM_DATA_STOP, config_->OFDM_CA_NUM - 1)));
+    float noise = config_->OFDM_CA_NUM * (noise_per_sc1 + noise_per_sc2) / 2;
+    float snr = (rssi - noise) / noise;
+    pilot_snr_[frame_id % TASK_BUFFER_FRAME_NUM][ue_id] = 10 * std::log10(snr);
 }
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)

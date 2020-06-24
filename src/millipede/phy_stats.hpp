@@ -19,6 +19,8 @@ public:
     void increment_decoded_blocks(size_t, size_t);
     void update_evm_stats(size_t, size_t, cx_fmat);
     void print_evm_stats(size_t);
+    void update_pilot_snr(size_t, size_t, complex_float*);
+    void print_snr_stats(size_t);
 
 private:
     Config* config_;
@@ -27,6 +29,7 @@ private:
     Table<size_t> decoded_blocks_count_;
     Table<size_t> block_error_count_;
     Table<float> evm_buffer_;
+    Table<float> pilot_snr_;
 
     cx_fmat ul_gt_mat;
 };
