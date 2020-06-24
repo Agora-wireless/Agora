@@ -46,9 +46,8 @@ void PhyStats::print_phy_stats()
 
 void PhyStats::print_evm_stats(size_t frame_id)
 {
-    fmat evm_mat(
-        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
-        config_->UE_NUM, 1, false);
+    fmat evm_mat(evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM], config_->UE_NUM,
+        1, false);
     evm_mat = sqrt(evm_mat) / config_->OFDM_DATA_NUM;
     std::stringstream ss;
     ss << "Frame " << frame_id << ":\n"
@@ -61,8 +60,7 @@ void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 {
     //assert(eq.size() == ul_gt_mat.col(sc_id).size());
     fmat evm = abs(eq - ul_gt_mat.col(sc_id));
-    fmat cur_evm_mat(
-        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
+    fmat cur_evm_mat(evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
         config_->UE_NUM, 1, false);
     cur_evm_mat += evm % evm;
 }
