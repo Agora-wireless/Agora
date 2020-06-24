@@ -226,13 +226,14 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 {
     auto* pkt = (MacPacket*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
     pkt->frame_id = tag.frame_id;
-    pkt->symbol_id = 0;
+    pkt->symbol_id = tag.symbol_id;
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
 
     // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
     std::random_device r;
-    std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+    //std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+    std::seed_seq seed{ 11, 12, 13, 14, 15, 16, 17, 18 };
     std::mt19937 eng(seed); // a source of random data
 
     std::uniform_int_distribution<char> dist;
@@ -240,6 +241,13 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 
     generate(begin(v), end(v), bind(dist, eng));
     memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+    printf("sending packet for frame %d, symbol %d, ue %d, bytes %d\n",
+        pkt->frame_id, pkt->symbol_id, pkt->ue_id,
+        cfg->mac_data_bytes_num_perframe);
+    for (size_t i = 0; i < v.size(); i++) {
+        printf("%i ", *((uint8_t*)pkt->data + i));
+    }
+    printf("\n");
 }
 
 void* SimpleClientMac::worker_thread(int tid)
