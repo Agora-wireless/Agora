@@ -11,6 +11,9 @@ PhyStats::PhyStats(Config* cfg)
     decoded_blocks_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
     block_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
 
+    uncoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+    uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+
     evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
     cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
     cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
@@ -26,23 +29,37 @@ void PhyStats::print_phy_stats()
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
     for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-        size_t total_decoded_bits(0);
-        size_t total_bit_errors(0);
-        size_t total_decoded_blocks(0);
-        size_t total_block_errors(0);
-        for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
-            total_decoded_bits += decoded_bits_count_[ue_id][i];
-            total_bit_errors += bit_error_count_[ue_id][i];
-            total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-            total_block_errors += block_error_count_[ue_id][i];
+        if (kUseLDPC) {
+            size_t total_decoded_bits(0);
+            size_t total_bit_errors(0);
+            size_t total_decoded_blocks(0);
+            size_t total_block_errors(0);
+            for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
+                total_decoded_bits += decoded_bits_count_[ue_id][i];
+                total_bit_errors += bit_error_count_[ue_id][i];
+                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
+                total_block_errors += block_error_count_[ue_id][i];
+            }
+            std::cout << "UE " << ue_id << ": bit errors (BER) "
+                      << total_bit_errors << "/" << total_decoded_bits << "("
+                      << 1.0 * total_bit_errors / total_decoded_bits
+                      << "), block errors (BLER) " << total_block_errors << "/"
+                      << total_decoded_blocks << " ("
+                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
+                      << std::endl;
+        } else {
+            size_t total_uncoded_bits(0);
+            size_t total_uncoded_bit_errors(0);
+            for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
+                total_uncoded_bits += uncoded_bits_count_[ue_id][i];
+                total_uncoded_bit_errors += uncoded_bit_error_count_[ue_id][i];
+            }
+            std::cout << "UE " << ue_id << ": uncoded bit errors (BER) "
+                      << total_uncoded_bit_errors << "/" << total_uncoded_bits
+                      << "("
+                      << 1.0 * total_uncoded_bit_errors / total_uncoded_bits
+                      << ")" << std::endl;
         }
-        std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
-                  << "/" << total_decoded_bits << "("
-                  << 1.0 * total_bit_errors / total_decoded_bits
-                  << "), block errors (BLER) " << total_block_errors << "/"
-                  << total_decoded_blocks << " ("
-                  << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                  << std::endl;
     }
 }
 
@@ -122,6 +139,24 @@ void PhyStats::increment_decoded_blocks(size_t ue_id, size_t offset)
     decoded_blocks_count_[ue_id][offset]++;
 }
 
+void PhyStats::update_uncoded_bit_errors(size_t ue_id, size_t offset,
+    size_t mod_bit_size, uint8_t tx_byte, uint8_t rx_byte)
+{
+    uint8_t xor_byte(tx_byte ^ rx_byte);
+    size_t bit_errors = 0;
+    for (size_t j = 0; j < mod_bit_size; j++) {
+        bit_errors += xor_byte & 1;
+        xor_byte >>= 1;
+    }
+    uncoded_bit_error_count_[ue_id][offset] += bit_errors;
+}
+
+void PhyStats::update_uncoded_bits(
+    size_t ue_id, size_t offset, size_t new_bits_num)
+{
+    uncoded_bits_count_[ue_id][offset] += new_bits_num;
+}
+
 PhyStats::~PhyStats()
 {
     decoded_bits_count_.free();
@@ -130,5 +165,9 @@ PhyStats::~PhyStats()
     decoded_blocks_count_.free();
     block_error_count_.free();
 
+    uncoded_bits_count_.free();
+    uncoded_bit_error_count_.free();
+
     evm_buffer_.free();
+    pilot_snr_.free();
 }
