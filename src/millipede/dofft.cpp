@@ -178,8 +178,9 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        phy_stats->update_pilot_snr(frame_id,
-            cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
+        if (kPrintPhyStats)
+            phy_stats->update_pilot_snr(frame_id,
+                cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
         partial_transpose(cfg->get_csi_mat(csi_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {

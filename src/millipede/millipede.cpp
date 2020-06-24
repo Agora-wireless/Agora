@@ -556,7 +556,7 @@ finish:
              : save_demul_data_to_file(stats->last_frame_id);
     save_tx_data_to_file(stats->last_frame_id);
     // calculate and print per-user BER
-    if (!kEnableMac) {
+    if (!kEnableMac && kPrintPhyStats) {
         phy_stats->print_phy_stats();
     }
     this->stop();
@@ -579,7 +579,8 @@ void Millipede::handle_event_fft(size_t tag)
                 if (fft_stats_.last_symbol(frame_id)) {
                     stats->master_set_tsc(TsType::kFFTDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
-                    phy_stats->print_snr_stats(frame_id);
+                    if (kPrintPhyStats)
+                        phy_stats->print_snr_stats(frame_id);
                     schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
