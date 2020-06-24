@@ -6,7 +6,7 @@
 
 #define EXPORT __attribute__((visibility("default")))
 
-#define ENABLE_CPU_ATTACH
+//#define ENABLE_CPU_ATTACH
 
 #define ARMA_ALLOW_FAKE_GCC
 
