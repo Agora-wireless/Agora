@@ -188,7 +188,7 @@ int MacPacketTXRX::dequeue_send(int tid)
     packet_length += MacPacket::kOffsetOfData;
 
     size_t total_symbol_idx
-        = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_id);
+        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
     uint8_t* ul_data_ptr
         = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * cfg->OFDM_DATA_NUM];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
