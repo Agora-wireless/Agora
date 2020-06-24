@@ -194,7 +194,7 @@ Event_data DoDecode::launch(size_t tag)
         phy_stats->update_decoded_bits(ue_id, symbol_offset, cbLenBytes * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
         size_t block_error(0);
-        for (size_t i = 0; i < cbLenBytes; i++) {
+        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
             uint8_t rx_byte = decoded_buffer_[symbol_offset][output_offset + i];
             uint8_t tx_byte = cfg->ul_bits[symbol_id][output_offset + i];
             phy_stats->update_bit_errors(
