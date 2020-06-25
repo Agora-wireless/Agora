@@ -23,7 +23,6 @@ public:
     int Connect(std::string uri, size_t obj_id);
     int Send(int session_num, char* buf, size_t msg_len);
 
-private:
     erpc::Nexus *nexus;
     erpc::Rpc<erpc::CTransport> *rpc;
     std::vector<int> session_vec;
