@@ -699,8 +699,13 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
-    std::string uri = kClientHostname + ":" + std::to_string(kUDPPort);
+    std::string uri = kClientHostname + ":" + std::to_string(kUDPPort + tid);
     ctx_list[tid] = new RPCContext(uri, tid);
+
+    uri = kServerHostname + ":" + std::to_string(kUDPPort);
+    int session_num = ctx_list[tid]->Connect(uri, 0);
+    rt_assert(session_num >= 0, "Connect failed!");
+    ctx_list[tid]->dedicated_session = session_num;
 
     while (true) {
         ctx_list[tid]->Serve();

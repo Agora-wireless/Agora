@@ -22,12 +22,14 @@ public:
     int Serve();
     int Connect(std::string uri, size_t obj_id);
     int Send(int session_num, char* buf, size_t msg_len);
+    int Send(char *buf, size_t msg_len);
 
     erpc::Nexus *nexus;
     erpc::Rpc<erpc::CTransport> *rpc;
     std::vector<int> session_vec;
     erpc::MsgBuffer req_msgbuf;
     erpc::MsgBuffer resp_msgbuf;
+    int dedicated_session;
 };
 
 #endif // RPC_SOCK
