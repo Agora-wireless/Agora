@@ -232,8 +232,8 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 
     // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
     std::random_device r;
-    //std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
-    std::seed_seq seed{ 11, 12, 13, 14, 15, 16, 17, 18 };
+    std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+    //std::seed_seq seed{ 11, 12, 13, 14, 15, 16, 17, 18 };
     std::mt19937 eng(seed); // a source of random data
 
     std::uniform_int_distribution<char> dist;
