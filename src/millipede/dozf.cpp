@@ -7,12 +7,15 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "doer.hpp"
 #include <malloc.h>
+#include "rpc_sock.hpp"
 
 static constexpr bool kUseSIMDGather = true;
 
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = true;
+
+extern RPCContext **ctx_list;
 
 DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
@@ -171,6 +174,10 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         // if (duration > 500) {
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
+
+        std::string uri = kServerHostname + ":" + kUDPPort;
+        int session_num = ctx_list[tid]->Connect(uri, 0);
+        ctx_list[tid]->Send(session_num, nullptr, 0);
     }
 }
 
