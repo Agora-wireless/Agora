@@ -54,6 +54,22 @@ void* SimpleBSMac::loopRecv(int tid)
            " with remote address %s:%d  \n",
         cfg->mac_rx_port + tid, cfg->tx_addr_to_mac.c_str(),
         cfg->mac_tx_port + tid);
+
+    int video_sockets[cfg->UE_NUM];
+    sockaddr_in vidaddr[cfg->UE_NUM];
+
+    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        int port_id = 8090 + i;
+        int remote_port_id = 8080 + i;
+        std::string remote_addr = "127.0.0.1";
+        video_sockets[i] = setup_socket_ipv4(port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(
+            &vidaddr[i], remote_port_id, remote_addr.c_str());
+        printf("Setup (video) UDP socket listening to port %d with remote "
+               "address %s:%d\n",
+            port_id, remote_addr.c_str(), remote_port_id);
+    }
+
 #else
     int socket_local
         = setup_socket_ipv6(cfg->ue_rx_port + tid, true, sock_buf_size);
@@ -80,17 +96,32 @@ void* SimpleBSMac::loopRecv(int tid)
             return (NULL);
         }
 
+        // write packet data to video playback process
+        if (pkt->symbol_id == 2) {
+            ret = sendto(video_sockets[pkt->ue_id], pkt->data,
+                packet_length - MacPacket::kOffsetOfData, 0,
+                (struct sockaddr*)&vidaddr[pkt->ue_id],
+                sizeof(vidaddr[pkt->ue_id]));
+            if (ret == -1) {
+                if (errno != EAGAIN) {
+                    perror("video send failed");
+                    exit(0);
+                }
+            }
+        }
+
         if (kDebugBSReceiver) {
             // Read information from received packet
             printf(
                 "RX thread %d received frame %d symbol %d, ue %d, size %d\n ",
                 tid, pkt->frame_id, pkt->symbol_id, pkt->ue_id,
                 packet_length - MacPacket::kOffsetOfData);
-            for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
-                 i++) {
-                printf("%i ", *((uint8_t*)pkt->data + i));
+            if (pkt->symbol_id == 2) {
+                for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
+                     i++)
+                    printf("%i ", *((uint8_t*)pkt->data + i));
+                printf("\n");
             }
-            printf("\n");
         }
     }
     return NULL;
