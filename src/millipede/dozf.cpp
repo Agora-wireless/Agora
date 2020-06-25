@@ -175,7 +175,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
 
-        std::string uri = kServerHostname + ":" + kUDPPort;
+        std::string uri = kServerHostname + ":" + std::to_string(kUDPPort);
         int session_num = ctx_list[tid]->Connect(uri, 0);
         ctx_list[tid]->Send(session_num, nullptr, 0);
     }

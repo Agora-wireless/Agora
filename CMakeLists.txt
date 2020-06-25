@@ -348,7 +348,8 @@ add_executable(test_zf test/test_zf.cc
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
   src/millipede/dozf.cpp
+  src/rpc/rpc_sock.cpp
   ${LDPC_SOURCES}
   ${HEADER_FILES})
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} -libverbs -lnuma)
 add_test(NAME test_zf COMMAND test_zf)

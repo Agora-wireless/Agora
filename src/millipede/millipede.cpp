@@ -7,7 +7,7 @@
 #include "rpc_sock.hpp"
 using namespace std;
 
-extern RPCContext *ctx_list;
+extern RPCContext **ctx_list;
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -73,34 +73,34 @@ Millipede::Millipede(Config* cfg)
     }
 
     /* Create eRPC server/client */
-    if (cfg->rpc_thread_id == 0) {
-        // rpc_server = new RPCServer();
-        // size_t pid;
-        // int ret;
-        // auto context = new EventHandlerContext<RPCServer>;
-        // context->obj_ptr = rpc_server;
-        // context->id = 0;
-        // printf("pivot!\n");
-        // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCServer, &RPCServer::Launch>, context);
-        // if (ret != 0) {
-        //     perror("eRPC server thread create failed");
-        //     exit(0);
-        // }
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_server>, 0, 1);
-    } else {
-        // rpc_client = new RPCClient();
-        // size_t pid;
-        // int ret;
-        // auto context = new EventHandlerContext<RPCClient>;
-        // context->obj_ptr = rpc_client;
-        // context->id = cfg->rpc_thread_id;
-        // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCClient, &RPCClient::Launch>, context);
-        // if (ret != 0) {
-        //     perror("eRPC client thread create failed");
-        //     exit(0);
-        // }
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_client>, 0, 1);
-    }
+    // if (cfg->rpc_thread_id == 0) {
+    //     // rpc_server = new RPCServer();
+    //     // size_t pid;
+    //     // int ret;
+    //     // auto context = new EventHandlerContext<RPCServer>;
+    //     // context->obj_ptr = rpc_server;
+    //     // context->id = 0;
+    //     // printf("pivot!\n");
+    //     // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCServer, &RPCServer::Launch>, context);
+    //     // if (ret != 0) {
+    //     //     perror("eRPC server thread create failed");
+    //     //     exit(0);
+    //     // }
+    //     create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_server>, 0, 1);
+    // } else {
+    //     // rpc_client = new RPCClient();
+    //     // size_t pid;
+    //     // int ret;
+    //     // auto context = new EventHandlerContext<RPCClient>;
+    //     // context->obj_ptr = rpc_client;
+    //     // context->id = cfg->rpc_thread_id;
+    //     // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCClient, &RPCClient::Launch>, context);
+    //     // if (ret != 0) {
+    //     //     perror("eRPC client thread create failed");
+    //     //     exit(0);
+    //     // }
+    //     create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_client>, 0, 1);
+    // }
 }
 
 Millipede::~Millipede()
@@ -634,19 +634,19 @@ void Millipede::handle_event_fft(size_t tag)
     }
 }
 
-void* Millipede::worker_rpc_server(int tid)
-{
-    pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
+// void* Millipede::worker_rpc_server(int tid)
+// {
+//     pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
 
-    run_erpc_server();
-}
+//     run_erpc_server();
+// }
 
-void* Millipede::worker_rpc_client(int tid)
-{
-    pin_to_core_with_offset(ThreadType::kRPCClient, base_worker_core_offset + config_->worker_thread_num, 0);
+// void* Millipede::worker_rpc_client(int tid)
+// {
+//     pin_to_core_with_offset(ThreadType::kRPCClient, base_worker_core_offset + config_->worker_thread_num, 0);
 
-    run_erpc_client();
-}
+//     run_erpc_client();
+// }
 
 void* Millipede::worker(int tid)
 {
@@ -699,7 +699,7 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
-    std::string uri = kClientHostname + ":" + kUDPPort;
+    std::string uri = kClientHostname + ":" + std::to_string(kUDPPort);
     ctx_list[tid] = new RPCContext(uri, tid);
 
     while (true) {
