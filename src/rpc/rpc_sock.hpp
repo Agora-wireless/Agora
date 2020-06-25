@@ -14,18 +14,38 @@ static constexpr size_t kMsgSize = 1024;
 void run_erpc_server();
 void run_erpc_client();
 
+/**
+ * @brief This class is used to ship Millipede tasks such as LDPC decoding
+ * to remote servers
+ */
 class RPCContext {
 public:
     RPCContext(std::string local_uri, size_t obj_id);
     ~RPCContext();
 
+    /**
+     * @brief 
+     *
+     * @return 
+     */
     int Serve();
-    int Connect(std::string uri, size_t obj_id);
-    int Send(int session_num, char* buf, size_t msg_len);
-    int Send(char *buf, size_t msg_len);
 
-    erpc::Nexus *nexus;
-    erpc::Rpc<erpc::CTransport> *rpc;
+    /**
+     * @brief 
+     *
+     * @param uri
+     * @param obj_id
+     *
+     * @return 
+     */
+    int Connect(std::string uri, size_t obj_id);
+
+    int Send(int session_num, char* buf, size_t msg_len);
+    int Send(char* buf, size_t msg_len);
+
+private:
+    erpc::Nexus* nexus;
+    erpc::Rpc<erpc::CTransport>* rpc;
     std::vector<int> session_vec;
     erpc::MsgBuffer req_msgbuf;
     erpc::MsgBuffer resp_msgbuf;

@@ -40,12 +40,6 @@ int DpdkTransport::nic_init(
     rte_eth_dev_get_mtu(port, &mtu_size);
     printf("MTU: %d\n", mtu_size);
 
-    int promiscuous_en = rte_eth_promiscuous_get(port);
-    printf("Promiscuous mode: %d\n", promiscuous_en);
-    // rte_eth_promiscuous_enable(port);
-    // promiscuous_en = rte_eth_promiscuous_get(port);
-    // printf("Promiscuous mode: %d\n", promiscuous_en);
-
     rte_eth_dev_info_get(port, &dev_info);
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
         port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
@@ -54,6 +48,7 @@ int DpdkTransport::nic_init(
         = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
+    // Ensures that Millipede gets packets only for the flows we register for
     retval = rte_flow_isolate(port, 1, &error);
     if (retval != 0)
         return retval;
