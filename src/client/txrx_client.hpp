@@ -1,50 +1,46 @@
 
-#ifndef RU_HEADER
-#define RU_HEADER
+#ifndef RadioTXRX_HEADER
+#define RadioTXRX_HEADER
 
-#ifdef USE_ARGOS
-class RadioConfig;
 #include "client_radio.hpp"
-#else
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#endif
-
-#include <complex>
-#include <pthread.h>
-#include <vector>
-
 #include "concurrentqueue.h"
 #include "utils.h"
-#include <fstream> // std::ifstream
+#include <arpa/inet.h>
+#include <complex>
+#include <fstream>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <vector>
 
-class RU {
+class RadioConfig;
+
+class RadioTXRX {
 public:
     // static const int OFDM_FRAME_LEN = SYMBOL_LEN; //OFDM_CA_NUM +
     // OFDM_PREFIX_LEN + OFDM_POSTFIX_LEN; header 4 int for: frame_id,
     // symbol_id, cell_id, ant_id ushort for: I/Q samples static const int
     // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
     // use for create pthread
-    struct RUContext {
-        RU* ptr;
+    struct RadioTXRXContext {
+        RadioTXRX* ptr;
         int tid;
     };
 
 public:
-    RU(Config* cfg, int n_rx_thread, int in_core_id);
+    RadioTXRX(Config* cfg, int n_rx_thread, int in_core_id);
     /**
      * N_THREAD: socket thread number
      * mode: tx=1 or rx=0 operation
      * in_queue: message queue to communicate with main thread
      */
-    RU(Config* cfg, int n_tx_thread, int in_core_id,
+    RadioTXRX(Config* cfg, int n_tx_thread, int in_core_id,
         moodycamel::ConcurrentQueue<Event_data>* in_queue,
         moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks,
         moodycamel::ProducerToken** in_tx_ptoks);
-    ~RU();
+    ~RadioTXRX();
 
     /**
      * called in main threads to start the socket threads
@@ -71,15 +67,12 @@ private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     Config* config_;
-#ifdef USE_ARGOS
-    ClientRadioConfig* radioconfig_;
-#else
+    ClientRadioConfig* radioconfig_; // Used only in Argos mode
     struct sockaddr_in servaddr_[10]; /* server address */
     struct sockaddr_in servaddr_tx_[10]; /* server address for tx*/
     struct sockaddr_in cliaddr_[10]; /* client address */
     int* rx_socket_;
     int* tx_socket_;
-#endif
 
     Table<char>* buffer_;
     Table<int>* buffer_status_;
