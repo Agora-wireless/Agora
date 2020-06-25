@@ -88,7 +88,7 @@ int RPCContext::Connect(std::string uri, size_t obj_id) {
     }
     session_vec.push_back(session_num);
 
-    return 0;
+    return session_num;
 }
 
 int RPCContext::Send(int session_num, char *buf, size_t msg_len) {
@@ -106,5 +106,23 @@ int RPCContext::Send(int session_num, char *buf, size_t msg_len) {
         memcpy(req_msgbuf.buf, buf, msg_len);
     }
     rpc->enqueue_request(session_num, kReqType, &req_msgbuf, &resp_msgbuf, app_cont_func, nullptr);
+    return 0;
+}
+
+int RPCContext::Send(char *buf, size_t msg_len) {
+    bool found = false;
+    for (const auto& num : session_vec) {
+        if (num == dedicated_session) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        return -1;
+    }
+    if (buf) {
+        memcpy(req_msgbuf.buf, buf, msg_len);
+    }
+    rpc->enqueue_request(dedicated_session, kReqType, &req_msgbuf, &resp_msgbuf, app_cont_func, nullptr);
     return 0;
 }
