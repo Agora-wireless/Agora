@@ -7,7 +7,7 @@
 #include "rpc_sock.hpp"
 using namespace std;
 
-extern RPCContext **ctx_list;
+extern RPCContext** ctx_list;
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -57,7 +57,7 @@ Millipede::Millipede(Config* cfg)
             tx_ptoks_ptr + cfg->socket_thread_num));
     }
 
-    ctx_list = new RPCContext *[cfg->worker_thread_num];
+    ctx_list = new RPCContext*[cfg->worker_thread_num];
 
     /* Create worker threads */
     if (config_->bigstation_mode) {

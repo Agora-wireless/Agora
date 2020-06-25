@@ -257,9 +257,6 @@ Config::Config(std::string jsonfile)
               << OFDM_DATA_NUM << ", packet length " << packet_length
               << std::endl;
 
-    // Config eRPC
-    rpc_thread_id = tddConf.value("rpc_thread_id", 0);
-
     if (packet_length >= 9000) {
         std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
                      "frame size (9000)! "
