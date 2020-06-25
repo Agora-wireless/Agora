@@ -86,11 +86,13 @@ void* SimpleBSMac::loopRecv(int tid)
                 "RX thread %d received frame %d symbol %d, ue %d, size %d\n ",
                 tid, pkt->frame_id, pkt->symbol_id, pkt->ue_id,
                 packet_length - MacPacket::kOffsetOfData);
-            for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
-                 i++) {
-                printf("%i ", *((uint8_t*)pkt->data + i));
+            if (pkt->symbol_id == 2) {
+                for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
+                     i++) {
+                    printf("%i ", *((uint8_t*)pkt->data + i));
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     }
     return NULL;
