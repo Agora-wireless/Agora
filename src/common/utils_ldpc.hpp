@@ -95,15 +95,31 @@ static inline void adapt_bits_for_mod(
 //    }
 //}
 
+//static inline void adapt_bits_from_mod(
+//    int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
+//{
+//    uint16_t bits = 0;
+//    for (int i = 0; i < len; i++) {
+//        bits |= bitreverse8(vec_in[i]) << (i % 2 + 1) * 4;
+//        if (i % 2 == 1) {
+//            *vec_out++ = bits >> 8;
+//            bits <<= 8;
+//        }
+//    }
+//}
+
 static inline void adapt_bits_from_mod(
     int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
 {
+    int bits_avail = 0;
     uint16_t bits = 0;
     for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << (i % 2 + 1) * 4;
-        if (i % 2 == 1) {
-            *vec_out++ = bits >> 8;
-            bits <<= 8;
+        bits |= (bitreverse8(vec_in[i]) >> (8 - mod_type)) << bits_avail;
+        bits_avail += mod_type;
+        while (bits_avail >= 8) {
+            *vec_out++ = bits & 0xff;
+            bits >>= 8;
+            bits_avail -= 8;
         }
     }
 }

@@ -118,8 +118,9 @@ void* SimpleBSMac::loopRecv(int tid)
                 packet_length - MacPacket::kOffsetOfData);
             if (pkt->symbol_id == 2) {
                 for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
-                     i++)
+                     i++) {
                     printf("%i ", *((uint8_t*)pkt->data + i));
+                }
                 printf("\n");
             }
         }
