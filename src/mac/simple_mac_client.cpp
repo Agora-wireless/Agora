@@ -63,6 +63,15 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
                        &SimpleClientMac::data_update_thread>,
         0, 1);
 
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+
+    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        int port_id = 8090 + i;
+        video_sockets[i] = setup_socket_ipv4(port_id, true, sock_buf_size);
+        setup_sockaddr_local_ipv4(&vidaddr[i], port_id);
+        printf("Set up (video) UDP socket listening to port %zu\n", port_id);
+    }
+
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -230,23 +239,37 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
 
-    // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
-    std::random_device r;
-    //std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
-    std::seed_seq seed{ 11, 12, 13, 14, 15, 16, 17, 18 };
-    std::mt19937 eng(seed); // a source of random data
+    printf("Preparing new MAC packet: frame %d, symbol %d, ue %d\n",
+        pkt->frame_id, pkt->symbol_id, pkt->ue_id);
 
-    std::uniform_int_distribution<char> dist;
-    std::vector<char> v(cfg->mac_data_bytes_num_perframe);
+    socklen_t addrlen = sizeof(vidaddr[tag.ue_id]);
+    int ret = recvfrom(video_sockets[tag.ue_id], (char*)pkt->data,
+        cfg->mac_data_bytes_num_perframe, 0,
+        (struct sockaddr*)&vidaddr[tag.ue_id], &addrlen);
+    printf("received %d bytes for ue %d\n", ret, tag.ue_id);
+    if (ret == -1) {
+        if (errno != EAGAIN) {
+            perror("video recv failed");
+            exit(0);
+        }
+    }
 
-    generate(begin(v), end(v), bind(dist, eng));
-    memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+    //// https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
+    //std::random_device r;
+    ////std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+    //std::seed_seq seed{ 11, 12, 13, 14, 15, 16, 17, 18 };
+    //std::mt19937 eng(seed); // a source of random data
+
+    //std::uniform_int_distribution<char> dist;
+    //std::vector<char> v(cfg->mac_data_bytes_num_perframe);
+
+    //generate(begin(v), end(v), bind(dist, eng));
+    //memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
     printf("sending packet for frame %d, symbol %d, ue %d, bytes %d\n",
         pkt->frame_id, pkt->symbol_id, pkt->ue_id,
         cfg->mac_data_bytes_num_perframe);
-    for (size_t i = 0; i < v.size(); i++) {
+    for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++)
         printf("%i ", *((uint8_t*)pkt->data + i));
-    }
     printf("\n");
 }
 

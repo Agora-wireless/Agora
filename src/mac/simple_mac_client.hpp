@@ -90,6 +90,9 @@ private:
     sockaddr_in6 cliaddr_ipv6; // Client address for IPv6
     int socket_[kMaxNumSockets]; // Network sockets
 
+    int video_sockets[kMaxUEs];
+    sockaddr_in vidaddr[kMaxUEs];
+
     // First dimension:
     //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)
