@@ -7,6 +7,8 @@
 #include "rpc_sock.hpp"
 using namespace std;
 
+extern RPCContext *ctx_list;
+
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
@@ -54,6 +56,8 @@ Millipede::Millipede(Config* cfg)
             rx_ptoks_ptr + cfg->socket_thread_num,
             tx_ptoks_ptr + cfg->socket_thread_num));
     }
+
+    ctx_list = new RPCContext *[cfg->worker_thread_num];
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -695,11 +699,17 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
+    std::string uri = kClientHostname + ":" + kUDPPort;
+    ctx_list[tid] = new RPCContext(uri, tid);
+
     while (true) {
+        ctx_list[tid]->Serve();
         for (size_t i = 0; i < computers_vec.size(); i++) {
+            ctx_list[tid]->Serve();
             if (computers_vec[i]->try_launch())
                 break;
         }
+        ctx_list[tid]->Serve();
     }
 }
 
