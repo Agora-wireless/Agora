@@ -74,14 +74,13 @@ RPCContext::RPCContext(std::string local_uri, size_t obj_id) {
     resp_msgbuf = rpc->alloc_msg_buffer_or_die(kMsgSize);
 }
 
-int RPCContext::Serve() {
+void RPCContext::poll_event() {
     // while (true) {
         rpc->run_event_loop_once();
     // }
-    return 0;
 }
 
-int RPCContext::Connect(std::string uri, size_t obj_id) {
+int RPCContext::connect(std::string uri, size_t obj_id) {
     int session_num = rpc->create_session(uri, obj_id);
     if (session_num < 0) {
         return session_num;
@@ -91,7 +90,7 @@ int RPCContext::Connect(std::string uri, size_t obj_id) {
     return session_num;
 }
 
-int RPCContext::Send(int session_num, char *buf, size_t msg_len) {
+int RPCContext::send(int session_num, char *buf, size_t msg_len) {
     bool found = false;
     for (const auto& num : session_vec) {
         if (num == session_num) {
@@ -109,7 +108,7 @@ int RPCContext::Send(int session_num, char *buf, size_t msg_len) {
     return 0;
 }
 
-int RPCContext::Send(char *buf, size_t msg_len) {
+int RPCContext::send(char *buf, size_t msg_len) {
     bool found = false;
     for (const auto& num : session_vec) {
         if (num == dedicated_session) {
@@ -125,4 +124,16 @@ int RPCContext::Send(char *buf, size_t msg_len) {
     }
     rpc->enqueue_request(dedicated_session, kReqType, &req_msgbuf, &resp_msgbuf, app_cont_func, nullptr);
     return 0;
+}
+
+void RPCContext::set_dedicate_session(int session_num) {
+    dedicated_session = session_num;
+}
+
+bool RPCContext::check_connection(int session_num) {
+    return rpc->is_connected(session_num);
+}
+
+bool RPCContext::check_connection() {
+    return rpc->is_connected(dedicated_session);
 }
