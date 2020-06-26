@@ -55,17 +55,18 @@ void* SimpleBSMac::loopRecv(int tid)
         cfg->mac_rx_port + tid, cfg->tx_addr_to_mac.c_str(),
         cfg->mac_tx_port + tid);
 
-    int video_sockets[cfg->UE_NUM];
-    sockaddr_in vidaddr[cfg->UE_NUM];
+    // Set up sockets to push MAC data to applications
+    int data_sockets[cfg->UE_NUM];
+    sockaddr_in data_addr[cfg->UE_NUM];
 
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
         int port_id = 8090 + i;
         int remote_port_id = 8080 + i;
         std::string remote_addr = "127.0.0.1";
-        video_sockets[i] = setup_socket_ipv4(port_id, true, sock_buf_size);
+        data_sockets[i] = setup_socket_ipv4(port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(
-            &vidaddr[i], remote_port_id, remote_addr.c_str());
-        printf("Setup (video) UDP socket listening to port %d with remote "
+            &data_addr[i], remote_port_id, remote_addr.c_str());
+        printf("Setup (data) UDP socket listening to port %d with remote "
                "address %s:%d\n",
             port_id, remote_addr.c_str(), remote_port_id);
     }
@@ -96,12 +97,12 @@ void* SimpleBSMac::loopRecv(int tid)
             return (NULL);
         }
 
-        // write packet data to video playback process
+        // write packet data to data sockets
         if (pkt->symbol_id == 2) {
-            ret = sendto(video_sockets[pkt->ue_id], pkt->data,
+            ret = sendto(data_sockets[pkt->ue_id], pkt->data,
                 packet_length - MacPacket::kOffsetOfData, 0,
-                (struct sockaddr*)&vidaddr[pkt->ue_id],
-                sizeof(vidaddr[pkt->ue_id]));
+                (struct sockaddr*)&data_addr[pkt->ue_id],
+                sizeof(data_addr[pkt->ue_id]));
             if (ret == -1) {
                 if (errno != EAGAIN) {
                     perror("video send failed");
