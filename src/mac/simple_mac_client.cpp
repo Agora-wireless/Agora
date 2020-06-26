@@ -63,13 +63,12 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
                        &SimpleClientMac::data_update_thread>,
         0, 1);
 
-    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-
+    // Init data socket per UE
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
         int port_id = 8090 + i;
-        video_sockets[i] = setup_socket_ipv4(port_id, true, sock_buf_size);
-        setup_sockaddr_local_ipv4(&vidaddr[i], port_id);
-        printf("Set up (video) UDP socket listening to port %zu\n", port_id);
+        data_sockets[i] = setup_socket_ipv4(port_id, false, 0);
+        setup_sockaddr_local_ipv4(&data_addr[i], port_id);
+        printf("Set up (data) UDP socket listening to port %zu\n", port_id);
     }
 
     for (size_t i = 0; i < socket_num; i++) {
@@ -239,14 +238,11 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
 
-    printf("Preparing new MAC packet: frame %d, symbol %d, ue %d\n",
-        pkt->frame_id, pkt->symbol_id, pkt->ue_id);
-
-    socklen_t addrlen = sizeof(vidaddr[tag.ue_id]);
-    int ret = recvfrom(video_sockets[tag.ue_id], (char*)pkt->data,
+    // Read packet data from socket
+    socklen_t addrlen = sizeof(data_addr[tag.ue_id]);
+    int ret = recvfrom(data_sockets[tag.ue_id], (char*)pkt->data,
         cfg->mac_data_bytes_num_perframe, 0,
-        (struct sockaddr*)&vidaddr[tag.ue_id], &addrlen);
-    printf("received %d bytes for ue %d\n", ret, tag.ue_id);
+        (struct sockaddr*)&data_addr[tag.ue_id], &addrlen);
     if (ret == -1) {
         if (errno != EAGAIN) {
             perror("video recv failed");
@@ -265,6 +261,8 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 
     //generate(begin(v), end(v), bind(dist, eng));
     //memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+
+    // Print MAC packet summary
     printf("sending packet for frame %d, symbol %d, ue %d, bytes %d\n",
         pkt->frame_id, pkt->symbol_id, pkt->ue_id,
         cfg->mac_data_bytes_num_perframe);

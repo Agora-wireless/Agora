@@ -17,18 +17,6 @@ void set_socket_buf_size(int socket_local, int sock_buf_size)
     }
 }
 
-void set_socket_rcv_timeout(int socket_local, int timeout_us)
-{
-    struct timeval tv;
-    tv.tv_usec = timeout_us;
-
-    if (setsockopt(socket_local, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))
-        < 0) {
-        printf("Error setting timeout to %d us\n", timeout_us);
-        exit(-1);
-    }
-}
-
 int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
 {
     struct sockaddr_in local_addr;
