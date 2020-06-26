@@ -727,7 +727,8 @@ void* Millipede::worker(int tid)
     uri = kServerHostname + ":" + std::to_string(kUDPPort);
     int session_num = ctx_list[tid]->Connect(uri, 0);
     rt_assert(session_num >= 0, "Connect failed!");
-    ctx_list[tid]->dedicated_session = session_num;
+    
+    ctx_list[tid]->set_dedicate_session(session_num);
 
     while (true) {
         ctx_list[tid]->Serve();
