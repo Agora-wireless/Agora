@@ -57,6 +57,8 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
+    ctx_list[tid]->Send(nullptr, 0);
+
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
     int input_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id

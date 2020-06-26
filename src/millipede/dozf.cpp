@@ -171,8 +171,6 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         // if (duration > 500) {
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
-
-        ctx_list[tid]->Send(nullptr, 0);
     }
 }
 
