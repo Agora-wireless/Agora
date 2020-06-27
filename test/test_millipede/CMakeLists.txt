@@ -114,6 +114,7 @@ set(COMMON_SOURCES
 set(MILLIPEDE_SOURCES 
   ${SOURCE_DIR}/src/millipede/millipede.cpp
   ${SOURCE_DIR}/src/millipede/stats.cpp 
+  ${SOURCE_DIR}/src/millipede/phy_stats.cpp 
   ${SOURCE_DIR}/src/millipede/dofft.cpp
   ${SOURCE_DIR}/src/millipede/dozf.cpp
   ${SOURCE_DIR}/src/millipede/dodemul.cpp
