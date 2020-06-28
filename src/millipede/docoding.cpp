@@ -99,14 +99,15 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
-    Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
-    Stats* in_stats_manager)
+    //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
+    PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , llr_buffer_(in_demod_buffer)
     , decoded_buffer_(in_decoded_buffer)
-    , decoded_bits_count_(in_decoded_bits_count)
-    , error_bits_count_(in_error_bits_count)
+    //, decoded_bits_count_(in_decoded_bits_count)
+    //, error_bits_count_(in_error_bits_count)
+    , phy_stats(in_phy_stats)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
@@ -189,19 +190,19 @@ Event_data DoDecode::launch(size_t tag)
         printf("\n");
     }
 
-    if (!kEnableMac && symbol_id >= cfg->UL_PILOT_SYMS) {
-        decoded_bits_count_[ue_id][symbol_offset] += cbLenBytes * 8;
-        for (size_t i = 0; i < cbLenBytes; i++) {
+    if (!kEnableMac && kPrintPhyStats && symbol_id >= cfg->UL_PILOT_SYMS) {
+        phy_stats->update_decoded_bits(ue_id, symbol_offset, cbLenBytes * 8);
+        phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
+        size_t block_error(0);
+        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
             uint8_t rx_byte = decoded_buffer_[symbol_offset][output_offset + i];
             uint8_t tx_byte = cfg->ul_bits[symbol_id][output_offset + i];
-            uint8_t xor_byte(tx_byte ^ rx_byte);
-            int err_bits = 0;
-            for (size_t j = 0; j < 8; j++) {
-                err_bits += xor_byte & 1;
-                xor_byte >> 1;
-            }
-            error_bits_count_[ue_id][symbol_offset] += err_bits;
+            phy_stats->update_bit_errors(
+                ue_id, symbol_offset, tx_byte, rx_byte);
+            if (rx_byte != tx_byte)
+                block_error++;
         }
+        phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
     }
 
     double duration = worker_rdtsc() - start_tsc;

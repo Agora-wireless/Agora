@@ -25,6 +25,7 @@ build/*
 
 # Logs and databases #
 ######################
+*.bin
 *.log
 *.sql
 *.sqlite
