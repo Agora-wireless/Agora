@@ -42,6 +42,8 @@ Config::Config(std::string jsonfile)
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
+    rt_assert(
+        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -96,8 +98,6 @@ Config::Config(std::string jsonfile)
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
     UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
     cl_tx_advance = tddConf.value("tx_advance", 100);
-    ue_ant_offset = tddConf.value("ue_ant_offset", 0);
-    total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
     hw_framer = tddConf.value("hw_framer", true);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
@@ -175,8 +175,8 @@ Config::Config(std::string jsonfile)
         UE_NUM = pilot_symbol_num_perframe;
         UE_ANT_NUM = UE_NUM;
     }
-    rt_assert(
-        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
+    ue_ant_offset = tddConf.value("ue_ant_offset", 0);
+    total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
@@ -382,22 +382,27 @@ void Config::genData()
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
     std::string filename1 = cur_directory1
         + (kUseLDPC ? "/data/LDPC_orig_data_" : "/data/orig_data_")
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(total_ue_ant_num)
-        + ".bin";
+        + std::to_string(OFDM_CA_NUM) + "_ant"
+        + std::to_string(total_ue_ant_num) + ".bin";
+    std::cout << "Reading raw data from " << filename1 << std::endl;
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
         printf("open antenna file %s failed.\n", filename1.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-	if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
+        if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
             return;
         size_t r = fread(
             ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
-	if (fseek(fd, num_bytes_per_ue * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM), SEEK_SET) != 0)
+        if (fseek(fd,
+                num_bytes_per_ue
+                    * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM),
+                SEEK_SET)
+            != 0)
             return;
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
