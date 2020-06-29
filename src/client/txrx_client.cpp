@@ -1,6 +1,6 @@
 
-#include "config.hpp"
 #include "txrx_client.hpp"
+#include "config.hpp"
 
 RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
 {
@@ -208,11 +208,11 @@ void* RadioTXRX::loopTXRX(int tid)
         int frame_id = (int)(frameTime >> 32);
         int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
         int ant_id = radio_id * c->nChannels;
-#if DEBUG_RECV
-        printf("receive thread %d: frame_id %d, symbol_id %d, radio_id %d "
-               "frametime %llx\n",
-            tid, frame_id, symbol_id, radio_id, frameTime);
-#endif
+        if (kDebugBSSender) {
+            printf("receive thread %d: frame_id %d, symbol_id %d, radio_id %d "
+                   "frametime %llx\n",
+                tid, frame_id, symbol_id, radio_id, frameTime);
+        }
         for (size_t ch = 0; ch < c->nChannels; ++ch) {
             new (pkt[ch])
                 Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
@@ -450,12 +450,13 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                     c->running = false;
                     break;
                 }
-#if DEBUG_RECV
-                printf("idle receive: thread %d, frame_id %d, symbol_id %d, "
-                       "radio_id %d "
-                       "rxtime %llx\n",
-                    tid, frame_id, symbol_id, radio_id, rxTime);
-#endif
+                if (kDebugBSSender) {
+                    printf(
+                        "idle receive: thread %d, frame_id %d, symbol_id %d, "
+                        "radio_id %d "
+                        "rxtime %llx\n",
+                        tid, frame_id, symbol_id, radio_id, rxTime);
+                }
             } else {
                 // if buffer is full, exit
                 if (buffer_status[cursor] == 1) {
@@ -484,12 +485,13 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 }
                 int ant_id = radio_id * c->nChannels;
                 assert((rxTime - time0) / frm_num_samps == frame_id);
-#if DEBUG_RECV
-                printf("downlink receive: thread %d, frame_id %d, symbol_id "
-                       "%d, radio_id %d "
-                       "rxtime %llx\n",
-                    tid, frame_id, symbol_id, radio_id, rxTime);
-#endif
+                if (kDebugBSSender) {
+                    printf(
+                        "downlink receive: thread %d, frame_id %d, symbol_id "
+                        "%d, radio_id %d "
+                        "rxtime %llx\n",
+                        tid, frame_id, symbol_id, radio_id, rxTime);
+                }
                 for (size_t ch = 0; ch < c->nChannels; ++ch) {
                     new (pkt[ch]) Packet(
                         frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
