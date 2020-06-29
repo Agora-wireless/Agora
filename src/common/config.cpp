@@ -418,7 +418,7 @@ void Config::genData()
     if (kUseLDPC) {
         size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
         size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
-        size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_NUM;
+        size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_ANT_NUM;
 
         // Encode uplink bits
         ul_encoded_bits.malloc(
@@ -431,7 +431,7 @@ void Config::genData()
         int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
             LDPC_config.Bg, LDPC_config.Zc)];
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM; j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     ul_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
@@ -439,9 +439,9 @@ void Config::genData()
         }
 
         ul_mod_input.calloc(
-            ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
+            ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < UE_NUM; j++) {
+            for (size_t j = 0; j < UE_ANT_NUM; j++) {
                 for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         ul_encoded_bits[i * num_blocks_per_symbol
@@ -460,7 +460,7 @@ void Config::genData()
 
         // Encode downlink bits
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM; j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     dl_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
@@ -468,9 +468,9 @@ void Config::genData()
         }
 
         dl_mod_input.calloc(
-            dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
+            dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < UE_NUM; j++) {
+            for (size_t j = 0; j < UE_ANT_NUM; j++) {
                 for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         dl_encoded_bits[i * num_blocks_per_symbol
