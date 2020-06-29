@@ -151,7 +151,7 @@ public:
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
-    // Indicates all UEs that are in this experiment, 
+    // Indicates all UEs that are in this experiment,
     // including the ones instantiated on other runs/machines.
     size_t total_ue_ant_num;
     // Indicates the (pilot) offset of the UEs in this instance,
