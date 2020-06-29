@@ -452,7 +452,7 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 }
                 if (kDebugBSSender) {
                     printf(
-                        "idle receive: thread %d, frame_id %d, symbol_id %d, "
+                        "idle receive: thread %d, frame_id %d, symbol_id %zu, "
                         "radio_id %d "
                         "rxtime %llx\n",
                         tid, frame_id, symbol_id, radio_id, rxTime);
@@ -488,7 +488,7 @@ void* RadioTXRX::loopSYNC_TXRX(int tid)
                 if (kDebugBSSender) {
                     printf(
                         "downlink receive: thread %d, frame_id %d, symbol_id "
-                        "%d, radio_id %d "
+                        "%zu, radio_id %d "
                         "rxtime %llx\n",
                         tid, frame_id, symbol_id, radio_id, rxTime);
                 }
