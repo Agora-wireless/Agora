@@ -166,8 +166,6 @@ void* SimpleClientMac::master_thread(int tid)
 
         const size_t comp_frame_slot = ctag.frame_id % SOCKET_BUFFER_FRAME_NUM;
         packet_count_per_frame[comp_frame_slot]++;
-        delay_for_symbol(ctag.frame_id, tick_start);
-        tick_start = rdtsc();
         size_t next_frame_id;
         if (packet_count_per_frame[comp_frame_slot] == cfg->UE_ANT_NUM) {
             if (kDebugPrintPerFrameDone) {
@@ -381,13 +379,11 @@ void SimpleClientMac::delay_for_symbol(
 void SimpleClientMac::delay_for_frame(
     size_t tx_frame_count, uint64_t tick_start)
 {
-    if (cfg->downlink_mode) {
-        if (tx_frame_count < 500) {
-            delay_ticks(
-                tick_start, 2 * cfg->data_symbol_num_perframe * ticks_all);
-        } else {
-            delay_ticks(tick_start, cfg->data_symbol_num_perframe * ticks_all);
-        }
+    if (tx_frame_count < 500) {
+        delay_ticks(
+            tick_start, 2 * cfg->symbol_num_perframe * ticks_all);
+    } else {
+        delay_ticks(tick_start, cfg->symbol_num_perframe * ticks_all);
     }
 }
 
