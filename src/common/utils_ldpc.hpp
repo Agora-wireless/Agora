@@ -85,11 +85,11 @@ static inline void adapt_bits_from_mod(
     int bits_avail = 0;
     uint16_t bits = 0;
     for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
+        bits |= (bitreverse8(vec_in[i]) >> (8 - mod_type)) << bits_avail;
         bits_avail += mod_type;
         while (bits_avail >= 8) {
-            *vec_out++ = bits >> 8;
-            bits <<= 8;
+            *vec_out++ = bits & 0xff;
+            bits >>= 8;
             bits_avail -= 8;
         }
     }
