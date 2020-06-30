@@ -137,12 +137,12 @@ struct MacPacket* PacketTXRX::recv_enqueue(
     int packet_length = config_->mac_packet_length;
 
     // if rx_buffer is full, exit
-    //if (rx_buffer_status[rx_offset] == 1) {
-    //    printf(
-    //        "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-    //    //config_->running = false;
-    //    //return (NULL);
-    //}
+    if (rx_buffer_status[rx_offset] == 1) {
+        printf(
+            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        //config_->running = false;
+        //return (NULL);
+    }
     struct MacPacket* pkt
         = (struct MacPacket*)&rx_buffer[rx_offset * packet_length];
     // if (-1 == recv(socket_[radio_id], pkt->data, packet_length, 0)) {
