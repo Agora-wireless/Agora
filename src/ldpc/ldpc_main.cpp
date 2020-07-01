@@ -1,13 +1,15 @@
 #include "ldpc_worker.hpp"
 #include "utils.h"
 
+// XXX: Do these two variables really need be global
+// XXX: Need doc
 size_t base_worker_core_offset;
+erpc::Nexus* nexus;
 
-erpc::Nexus *nexus;
-
-void *run_worker(void *args) {
-    auto* cfg = *(static_cast<Config **>(args));
-    auto tid = *(reinterpret_cast<int *>(static_cast<Config **>(args) + 1));
+void* run_worker(void* args)
+{
+    auto* cfg = *(static_cast<Config**>(args));
+    auto tid = *(reinterpret_cast<int*>(static_cast<Config**>(args) + 1));
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
     auto* worker = new LDPCWorker(cfg, tid, nexus);
@@ -16,7 +18,8 @@ void *run_worker(void *args) {
     return NULL;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
     std::string confFile;
     if (argc == 2)
         confFile = std::string("/") + std::string(argv[1]);
@@ -27,8 +30,10 @@ int main(int argc, char **argv) {
     auto* cfg = new Config(filename.c_str());
     cfg->genData();
 
-    size_t num_workers = cfg->ldpc_worker_num; 
-    base_worker_core_offset = cfg->ldpc_worker_core_offset; 
+    // XXX: Avoid copying ldpc_worker_num
+    // XXX: cfg->ldpc_worker_num could be cfg->ldpc_threads_per_remote_server
+    size_t num_workers = cfg->ldpc_worker_num;
+    base_worker_core_offset = cfg->ldpc_worker_core_offset;
 
     auto* task_threads = new pthread_t[num_workers];
 
@@ -36,11 +41,13 @@ int main(int argc, char **argv) {
     nexus = new erpc::Nexus(uri, 0, 0);
     nexus->register_req_func(kReqType, ldpc_req_handler);
 
-    for (int i = 0; i < num_workers; i ++) {
-        auto* args = new char[sizeof(Config *)+sizeof(int)];
-        *(reinterpret_cast<Config **>(args)) = cfg;
-        *(reinterpret_cast<int *>(args + sizeof(Config *))) = i;
+    // XXX: Use size_t i instead of int i in all loops
+    for (int i = 0; i < num_workers; i++) {
+        auto* args = new char[sizeof(Config*) + sizeof(int)];
+        *(reinterpret_cast<Config**>(args)) = cfg;
+        *(reinterpret_cast<int*>(args + sizeof(Config*))) = i;
         int ret;
+        // XXX: Use std::thread instead of pthread_create
         ret = pthread_create(&task_threads[i], NULL, run_worker, args);
         if (ret != 0) {
             perror("task thread create failed");
@@ -48,7 +55,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    for (int i = 0; i < num_workers; i ++) {
+    for (int i = 0; i < num_workers; i++) {
         pthread_join(task_threads[i], NULL);
     }
 
