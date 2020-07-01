@@ -55,7 +55,8 @@ enum class EventType : int {
     kRXSymbol,
     kModul,
     kPacketFromMac,
-    kPacketToMac
+    kPacketToMac,
+    kPending
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;

@@ -4,10 +4,17 @@
  *
  */
 #include "millipede.hpp"
-#include "rpc_sock.hpp"
+
+#ifdef USE_ERPC
+#include "rpc_context.hpp"
+#endif
+
 using namespace std;
 
+#ifdef USE_ERPC
 extern RPCContext** ctx_list;
+erpc::Nexus *nexus;
+#endif
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -57,7 +64,11 @@ Millipede::Millipede(Config* cfg)
             tx_ptoks_ptr + cfg->socket_thread_num));
     }
 
+#ifdef USE_ERPC
     ctx_list = new RPCContext*[cfg->worker_thread_num];
+    std::string uri = config_->server_addr + ":" + std::to_string(kUDPPort);
+    nexus = new erpc::Nexus(uri, 0, 0);
+#endif
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -71,36 +82,6 @@ Millipede::Millipede(Config* cfg)
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>, 0,
             cfg->worker_thread_num);
     }
-
-    /* Create eRPC server/client */
-    // if (cfg->rpc_thread_id == 0) {
-    //     // rpc_server = new RPCServer();
-    //     // size_t pid;
-    //     // int ret;
-    //     // auto context = new EventHandlerContext<RPCServer>;
-    //     // context->obj_ptr = rpc_server;
-    //     // context->id = 0;
-    //     // printf("pivot!\n");
-    //     // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCServer, &RPCServer::Launch>, context);
-    //     // if (ret != 0) {
-    //     //     perror("eRPC server thread create failed");
-    //     //     exit(0);
-    //     // }
-    //     create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_server>, 0, 1);
-    // } else {
-    //     // rpc_client = new RPCClient();
-    //     // size_t pid;
-    //     // int ret;
-    //     // auto context = new EventHandlerContext<RPCClient>;
-    //     // context->obj_ptr = rpc_client;
-    //     // context->id = cfg->rpc_thread_id;
-    //     // ret = pthread_create(&pid, NULL, pthread_fun_wrapper<RPCClient, &RPCClient::Launch>, context);
-    //     // if (ret != 0) {
-    //     //     perror("eRPC client thread create failed");
-    //     //     exit(0);
-    //     // }
-    //     create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_rpc_client>, 0, 1);
-    // }
 }
 
 Millipede::~Millipede()
@@ -655,20 +636,6 @@ void Millipede::handle_event_fft(size_t tag)
     }
 }
 
-// void* Millipede::worker_rpc_server(int tid)
-// {
-//     pin_to_core_with_offset(ThreadType::kRPCServer, base_worker_core_offset + config_->worker_thread_num, 0);
-
-//     run_erpc_server();
-// }
-
-// void* Millipede::worker_rpc_client(int tid)
-// {
-//     pin_to_core_with_offset(ThreadType::kRPCClient, base_worker_core_offset + config_->worker_thread_num, 0);
-
-//     run_erpc_client();
-// }
-
 void* Millipede::worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
@@ -721,23 +688,27 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
-    std::string uri = kClientHostname + ":" + std::to_string(kUDPPort + tid);
-    ctx_list[tid] = new RPCContext(uri, tid);
+    // TODO: change uri to cfg->ldpc_addr
+    // std::string uri = kClientHostname + ":" + std::to_string(kUDPPort + tid);
+    // std::string uri = config_->server_addr + ":" + std::to_string(kUDPPort + tid);
+#ifdef USE_ERPC
+    ctx_list[tid] = new RPCContext(nexus, tid, static_cast<void *>(computeDecoding));
 
-    uri = kServerHostname + ":" + std::to_string(kUDPPort);
-    int session_num = ctx_list[tid]->Connect(uri, 0);
+    std::string uri = config_->ldpc_worker_addr + ":" + std::to_string(kUDPPort);
+    int session_num = ctx_list[tid]->connect(uri, tid % config_->ldpc_worker_num);
     rt_assert(session_num >= 0, "Connect failed!");
     
     ctx_list[tid]->set_dedicate_session(session_num);
+#endif
 
     while (true) {
-        ctx_list[tid]->Serve();
         for (size_t i = 0; i < computers_vec.size(); i++) {
-            ctx_list[tid]->Serve();
+#ifdef USE_ERPC
+            ctx_list[tid]->poll_event();
+#endif
             if (computers_vec[i]->try_launch())
                 break;
         }
-        ctx_list[tid]->Serve();
     }
 }
 

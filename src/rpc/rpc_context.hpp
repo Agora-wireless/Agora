@@ -1,5 +1,5 @@
-#ifndef RPC_SOCK
-#define RPC_SOCK
+#ifndef RPC_CONTEXT
+#define RPC_CONTEXT
 
 #include "rpc.h"
 #include <string>
@@ -24,7 +24,7 @@ public:
      * @param local_uri The uri of the eRPC object to be created
      * @param obj_id The object ID of the eRPC object to be created
      */ 
-    RPCContext(std::string local_uri, size_t obj_id);
+    RPCContext(erpc::Nexus *nexus, size_t obj_id, void *info=nullptr, erpc::sm_handler_t sm_handler=nullptr);
     ~RPCContext();
 
     /**
@@ -55,8 +55,16 @@ public:
      * 
      * @return Returns 0 on success, and returns -1 on failure
      */
-    int send(int session_num, char* buf, size_t msg_len);
-    int send(char* buf, size_t msg_len);
+    int send(int session_num, char* buf, size_t msg_len, erpc::erpc_cont_func_t cont_func=nullptr, void *tag=nullptr);
+    int send(char* buf, size_t msg_len, erpc::erpc_cont_func_t cont_func=nullptr, void *tag=nullptr);
+
+    int respond(erpc::ReqHandle *req_handle, char *buf, size_t msg_len);
+    int respond_without_copy(erpc::ReqHandle *req_handle, erpc::MsgBuffer *msg_buf);
+
+    erpc::MsgBuffer alloc_msg_buffer(size_t max_data_size);
+
+    uint8_t* get_resp_buf();
+    size_t get_resp_buf_size();
 
     /**
      * @brief These two functions are used to check whether the session
@@ -75,13 +83,15 @@ public:
      */
     void set_dedicate_session(int session_num);
 
+    void* get_info();
+
 private:
-    erpc::Nexus* nexus;
     erpc::Rpc<erpc::CTransport>* rpc;
     std::vector<int> session_vec;
     erpc::MsgBuffer req_msgbuf;
     erpc::MsgBuffer resp_msgbuf;
     int dedicated_session;
+    void *info;
 };
 
-#endif // RPC_SOCK
+#endif // RPC_CONTEXT

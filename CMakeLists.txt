@@ -55,7 +55,7 @@ set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
-set(USE_ERPC True CACHE STRING "USE_ERPC defaulting to 'True'")
+set(USE_ERPC False CACHE STRING "USE_ERPC defaulting to 'False'")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
@@ -189,7 +189,8 @@ include_directories(
   src/millipede/
   src/millipede/txrx/
   src/client/
-  src/rpc)
+  src/rpc
+  src/ldpc)
 
 include_directories(SYSTEM src/third_party)
 
@@ -215,8 +216,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/reciprocity.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp
-  src/rpc/rpc_sock.cpp)
+  src/encoder/iobuffer.cpp)
 
 # LDPC headers and sources that do not require an Intel compiler
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
@@ -257,6 +257,7 @@ if(${USE_ERPC})
   endif()
   set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc)
   include_directories(SYSTEM $ENV{ERPC_INCLUDE_PATH})
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/rpc/rpc_context.cpp)
 endif()
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
@@ -341,8 +342,17 @@ add_executable(test_zf test/test_zf.cc
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
   src/millipede/dozf.cpp
-  src/rpc/rpc_sock.cpp
   ${LDPC_SOURCES}
   ${HEADER_FILES})
 target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} -libverbs -lnuma)
 add_test(NAME test_zf COMMAND test_zf)
+
+if(${USE_ERPC})
+  add_executable(ldpc_worker src/ldpc/ldpc_worker.cpp
+    src/ldpc/ldpc_main.cpp
+    ${COMMON_SOURCES}
+    ${LDPC_SOURCES}
+    src/rpc/rpc_context.cpp
+    ${HEADER_FILES})
+  target_link_libraries(ldpc_worker ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
+endif()

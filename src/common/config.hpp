@@ -188,6 +188,11 @@ public:
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
+    /* LDPC worker parameters */
+    std::string ldpc_worker_addr;
+    size_t ldpc_worker_num;
+    size_t ldpc_worker_core_offset;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

@@ -60,6 +60,8 @@ public:
 
     Event_data launch(size_t tag);
 
+    friend void decode_cont_func(void *_context, void *_tag);
+
 private:
     int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
@@ -67,6 +69,13 @@ private:
     Table<int> decoded_bits_count_;
     Table<int> error_bits_count_;
     DurationStat* duration_stat;
+};
+
+class DecodeTag {
+public:
+    size_t symbol_offset;
+    size_t output_offset;
+    size_t tag;
 };
 
 #endif
