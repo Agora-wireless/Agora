@@ -404,15 +404,12 @@ void Config::genData()
     fclose(fd);
 #endif
 
-    Table<uint8_t> ul_mod_input;
-    Table<uint8_t> dl_mod_input;
     if (kUseLDPC) {
         size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
         size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
         size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_NUM;
 
         // Encode uplink bits
-        Table<int8_t> ul_encoded_bits;
         ul_encoded_bits.malloc(
             ul_data_symbol_num_perframe * num_blocks_per_symbol,
             encoded_bytes_per_block, 64);

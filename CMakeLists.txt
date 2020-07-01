@@ -206,6 +206,7 @@ set(COMMON_SOURCES
 set(MILLIPEDE_SOURCES 
   src/millipede/millipede.cpp
   src/millipede/stats.cpp 
+  src/millipede/phy_stats.cpp 
   src/millipede/dofft.cpp
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp
@@ -316,12 +317,6 @@ set(SIMULATOR_SOURCES
 
 add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
-if(${ENABLE_MAC})
-  add_executable(macbs
-       ${MAC_BS_SOURCES}
-       ${COMMON_SOURCES})
-  target_link_libraries(macbs -larmadillo ${MKL_LIBS})
-endif()
 
 # The tests to run using ctest
 add_executable(test_zf test/test_zf.cc 

@@ -742,8 +742,12 @@ void Phy_UE::doModul(int tid, size_t tag)
             int8_t* ul_bits = kEnableMac
                 ? (int8_t*)&ul_syms_buffer_[ant_id]
                                            [total_ul_symbol_id * data_sc_len]
-                : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
-                                   [ant_id * data_sc_len];
+                : (kUseLDPC
+                          ? (int8_t*)&config_->ul_mod_input[ul_symbol_id
+                                + config_->UL_PILOT_SYMS][ant_id * data_sc_len]
+                          : &config_->ul_bits[ul_symbol_id
+                                + config_->UL_PILOT_SYMS]
+                                             [ant_id * data_sc_len]);
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
