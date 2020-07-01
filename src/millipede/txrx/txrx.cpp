@@ -2,6 +2,8 @@
  * Author: Jian Ding
  * Email: jianding17@gmail.com
  *
+ * Implementation of PacketTXRX initialization functions, and datapath functions
+ * for communicating with simulators.
  */
 
 #include "txrx.hpp"
@@ -11,12 +13,12 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
-    socket_ = new int[cfg->nRadios];
-#if USE_IPV4
-    servaddr_ = new struct sockaddr_in[cfg->nRadios];
-#else
-    servaddr_ = new struct sockaddr_in6[cfg->nRadios];
-#endif
+    if (!kUseArgos) {
+        socket_.resize(cfg->nRadios);
+        servaddr_.resize(cfg->nRadios);
+    } else {
+        radioconfig_ = new RadioConfig(cfg);
+    }
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
@@ -33,8 +35,10 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 
 PacketTXRX::~PacketTXRX()
 {
-    delete[] socket_;
-    delete[] servaddr_;
+    if (kUseArgos) {
+        radioconfig_->radioStop();
+        delete radioconfig_;
+    }
 }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
@@ -47,30 +51,46 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    printf("create TXRX threads\n");
+    if (kUseArgos) {
+        if (!radioconfig_->radioStart()) {
+            fprintf(stderr, "Failed to start radio\n");
+            return false;
+        }
+    }
+
+    printf("Creating %zu TX/RX threads\n", socket_thread_num);
     for (size_t i = 0; i < socket_thread_num; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
         context->obj_ptr = this;
         context->id = i;
-        if (pthread_create(&txrx_thread, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
-            != 0) {
-            perror("socket communication thread create failed");
-            exit(0);
+
+        if (kUseArgos) {
+            int ret = pthread_create(&txrx_thread, NULL,
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx_argos>,
+                context);
+            rt_assert(ret == 0, "Failed to create threads");
+        } else {
+            int ret = pthread_create(&txrx_thread, NULL,
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
+                context);
+            rt_assert(ret == 0, "Failed to create threads");
         }
     }
+
+    if (kUseArgos)
+        radioconfig_->go();
     return true;
 }
 
-void* PacketTXRX::loopTXRX(int tid)
+void* PacketTXRX::loop_tx_rx(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
     size_t* rx_frame_start = (*frame_start_)[tid];
     size_t rx_offset = 0;
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    printf("Receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
@@ -80,6 +100,10 @@ void* PacketTXRX::loopTXRX(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
             cfg->ue_rx_port + radio_id, cfg->tx_addr.c_str());
+        printf("TXRX thread %d: set up UDP socket server listening to port %d"
+               " with remote address %s:%d \n",
+            tid, local_port_id, cfg->tx_addr.c_str(),
+            cfg->ue_rx_port + radio_id);
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);

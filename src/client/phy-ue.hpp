@@ -1,7 +1,7 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
 #include "config.hpp"
-#include "ru.hpp"
+#include "txrx_client.hpp"
 //#include "l2.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
@@ -264,7 +264,7 @@ private:
      * Downlink
      *****************************************************/
 
-    std::unique_ptr<RU> ru_;
+    std::unique_ptr<RadioTXRX> ru_;
     std::unique_ptr<PacketTXRX> mac_receiver_;
 
     /**
@@ -362,7 +362,7 @@ private:
     int max_equaled_frame = 0;
     // long long* demul_output;
     // float* equal_output;
-    size_t record_frame = -1;
+    size_t record_frame = SIZE_MAX;
 #if USE_IPV4
     struct sockaddr_in* servaddr_; /* server address */
 #else

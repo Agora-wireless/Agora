@@ -10,6 +10,7 @@
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
+#include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
 #include <algorithm>
@@ -23,20 +24,13 @@
 #include <netinet/in.h>
 #include <numeric>
 #include <pthread.h>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-// #include <unistd.h>
 #include <vector>
-
-#ifdef USE_ARGOS
-#include "radio_lib.hpp"
-#else
-#include "config.hpp"
-#endif
 
 #ifdef USE_DPDK
 #include "dpdk_transport.hpp"
@@ -125,9 +119,6 @@ private:
     int tx_core_id_;
 
     Config* config_;
-#ifdef USE_ARGOS
-    RadioConfig* radioconfig_;
-#endif
 };
 
 #endif

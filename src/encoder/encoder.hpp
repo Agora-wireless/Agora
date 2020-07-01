@@ -56,10 +56,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #if defined(_MSC_VER)
 #define ALIGNED_(x) __declspec(align(x))
 #else
@@ -71,19 +67,61 @@ extern "C" {
 #define BITMASKU8(x) ((1U << (x)) - 1)
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
-#define I_LS_NUM 8
-#define ZC_MAX 384
-#define PROC_BYTES 32
+namespace avx2enc {
+static constexpr size_t I_LS_NUM = 8;
 
-#define BG1_COL_TOTAL 68
-#define BG1_ROW_TOTAL 46
-#define BG1_COL_INF_NUM 22
-#define BG1_NONZERO_NUM 307
+// This encoder supports Zc up to 255 (= AVX2 register size in bits - 1)
+static constexpr size_t ZC_MAX = 255;
 
-#define BG2_COL_TOTAL 52
-#define BG2_ROW_TOTAL 42
-#define BG2_COL_INF_NUM 10
-#define BG2_NONZERO_NUM 188
+static constexpr size_t PROC_BYTES = 32;
+static constexpr size_t BG1_COL_TOTAL = 68;
+static constexpr size_t BG1_ROW_TOTAL = 46;
+static constexpr size_t BG1_COL_INF_NUM = 22;
+static constexpr size_t BG1_NONZERO_NUM = 307;
+static constexpr size_t BG2_COL_TOTAL = 52;
+static constexpr size_t BG2_ROW_TOTAL = 42;
+static constexpr size_t BG2_COL_INF_NUM = 10;
+static constexpr size_t BG2_NONZERO_NUM = 188;
+static constexpr size_t MAX_CB_BLOCK = 32;
+
+/*!
+    \struct bblib_ldpc_encoder_5gnr_request
+    \brief Structure for input parameters in API of LDPC Encoder for 5GNR.
+    \note ... \n
+*/
+struct bblib_ldpc_encoder_5gnr_request {
+    /*!< Lifting factor Zc as defined in TS38212-5.2.1. */
+    uint16_t Zc;
+
+    /*!< LDPC Base graph, which can be 1 or 2  as defined in TS38212-5.2.1. */
+    int32_t baseGraph;
+
+    /*!< Number Rows being used for the encoding native code rate - Minimum 4 */
+    // int32_t nRows;
+
+    /*!< Used to run several code blocks in one operation notably for low
+     * expansion factor All code blocks must use the same parameters above.
+     * numberCodeblocks * Zc must not exceed 512 */
+    int8_t numberCodeblocks;
+
+    /*!< Pointer to input stream related to each code block. This corresponds
+     * to the bit sequence c_k as defined in TS38.212-5.3.2. This includes
+     * therefore the filler bits set as 0. */
+    int8_t* input[MAX_CB_BLOCK];
+};
+
+/*!
+    \struct bblib_ldpc_encoder_5gnr_response
+    \brief structure for outputs of LDPC encoder for 5GNR.
+    \note
+ */
+struct bblib_ldpc_encoder_5gnr_response {
+    /*
+    Output buffer for data stream after LDPC Encoding  for each  CodeBlocks
+    This corresponds to the parity bit sequence w_k as defined in TS38.212-5.3.2
+    The actual length is limited to the number of rows requested.  */
+    int8_t* output[MAX_CB_BLOCK];
+};
 
 void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
     const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
@@ -93,9 +131,8 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
     const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
     const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS);
 
-typedef void (*LDPC_ENCODER)(int8_t*, int8_t*, const int16_t*, const int16_t*,
-    const int16_t*, int16_t, uint8_t);
-LDPC_ENCODER ldpc_select_encoder_func(uint16_t Bg);
+void ldpc_encoder_avx2(struct bblib_ldpc_encoder_5gnr_request* request,
+    struct bblib_ldpc_encoder_5gnr_response* response);
 
 /* Table generated for BG1 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Number of non-null elements per columns in BG1 */
@@ -391,9 +428,6 @@ static constexpr int16_t Bg2HShiftMatrix[BG2_NONZERO_NUM * I_LS_NUM] = { 9, 167,
     175, 105, 230, 225, 202, 218, 190, 116, 135, 189, 154, 51, 219, 162, 11, 86,
     46, 141, 114, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-#ifdef __cplusplus
-}
-#endif
+} // namespace avx2enc
 
 #endif

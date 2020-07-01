@@ -13,18 +13,20 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& data_buffer, Table<complex_float>& ul_precoder_buffer,
+    Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
-    Table<int8_t>& demod_soft_buffer, Stats* stats_manager)
+    Table<int8_t>& demod_soft_buffer, PhyStats* in_phy_stats,
+    Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
-    , ul_precoder_buffer_(ul_precoder_buffer)
+    , ul_zf_buffer_(ul_zf_buffer)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
     , demod_hard_buffer_(demod_hard_buffer)
     , demod_soft_buffer_(demod_soft_buffer)
+    , phy_stats(in_phy_stats)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
@@ -40,13 +42,6 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
-
-    // EVM calculation data
-    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
-    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-    ul_gt_mat = ul_iq_f_mat.st();
-    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
-    evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 
     // BER calculation data
     // ber_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
@@ -132,9 +127,9 @@ Event_data DoDemul::launch(size_t tag)
                 reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]),
                 cfg->BS_ANT_NUM, 1, false);
 
-            const cx_fmat mat_precoder(
-                reinterpret_cast<cx_float*>(cfg->get_precoder_buf(
-                    ul_precoder_buffer_, frame_id, cur_sc_id)),
+            const cx_fmat mat_ul_zf(
+                reinterpret_cast<cx_float*>(
+                    cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id)),
                 cfg->UE_NUM, cfg->BS_ANT_NUM, false);
 
             cx_float* equal_ptr = nullptr;
@@ -151,9 +146,9 @@ Event_data DoDemul::launch(size_t tag)
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
             size_t start_tsc2 = worker_rdtsc();
             // duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
-            mat_equaled = mat_precoder * mat_data;
+            mat_equaled = mat_ul_zf * mat_data;
 
-            if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // calc new phase shift
+            if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
                     // Reset previous frame
                     cx_float* phase_shift_ptr
@@ -191,23 +186,10 @@ Event_data DoDemul::launch(size_t tag)
 
                 // Measure EVM from ground truth
                 if (symbol_idx_ul == cfg->UL_PILOT_SYMS) {
-                    fmat evm = abs(mat_equaled - ul_gt_mat.col(cur_sc_id));
-                    fmat cur_evm_mat(
-                        evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
-                        cfg->UE_NUM, 1, false);
-                    cur_evm_mat += evm % evm;
+                    phy_stats->update_evm_stats(
+                        frame_id, cur_sc_id, mat_equaled);
                     if (kPrintPhyStats && cur_sc_id == 0) {
-                        size_t prev_frame = (frame_id - 1);
-                        fmat evm_mat(
-                            evm_buffer_[prev_frame % TASK_BUFFER_FRAME_NUM],
-                            cfg->UE_NUM, 1, false);
-                        evm_mat = sqrt(evm_mat) / cfg->OFDM_DATA_NUM;
-                        std::stringstream ss;
-                        ss << "Frame " << prev_frame << ":\n"
-                           << "  EVM " << 100 * evm_mat.st() << ", SNR "
-                           << -10 * log10(evm_mat.st()) << ", theta "
-                           << cur_theta.st() << ", theta_inc" << theta_inc.st();
-                        std::cout << ss.str();
+                        phy_stats->print_evm_stats(frame_id - 1);
                     }
                 }
             }
@@ -261,7 +243,17 @@ Event_data DoDemul::launch(size_t tag)
                 = (&demod_soft_buffer_[total_data_symbol_idx_ul]
                                       [(cfg->OFDM_DATA_NUM * i + base_sc_id)
                                           * cfg->mod_type]);
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            switch (cfg->mod_type) {
+            case (CommsLib::QAM16):
+                demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            case (CommsLib::QAM64):
+                demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            default:
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
+            }
             // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
             //     tid, frame_id, symbol_idx_ul, base_sc_id);
             // cout << "Demuled data : \n ";
@@ -270,10 +262,33 @@ Event_data DoDemul::launch(size_t tag)
             //     printf("%i ", demul_ptr[k]);
             // cout << endl;
         } else {
-            uint8_t* demul_ptr
-                = (&demod_hard_buffer_[total_data_symbol_idx_ul]
-                                      [cfg->OFDM_DATA_NUM * i + base_sc_id]);
-            demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            size_t demod_sym_offset = cfg->OFDM_DATA_NUM * i + base_sc_id;
+            uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_symbol_idx_ul]
+                                                     [demod_sym_offset]);
+            switch (cfg->mod_type) {
+            case (CommsLib::QAM16):
+                demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            case (CommsLib::QAM64):
+                demod_64qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+                break;
+            default:
+                printf("Demodulation: modulation type %s not supported!\n",
+                    cfg->modulation.c_str());
+            }
+            if (!kEnableMac && kPrintPhyStats
+                && symbol_idx_ul >= cfg->UL_PILOT_SYMS) {
+                phy_stats->update_uncoded_bits(
+                    i, total_data_symbol_idx_ul, max_sc_ite * cfg->mod_type);
+                for (size_t sc = 0; sc < max_sc_ite; sc++) {
+                    uint8_t mod_symbol
+                        = cfg->ul_bits[symbol_idx_ul][demod_sym_offset + sc];
+                    uint8_t demod_symbol = *(demul_ptr + sc);
+                    phy_stats->update_uncoded_bit_errors(i,
+                        total_data_symbol_idx_ul, cfg->mod_type, mod_symbol,
+                        demod_symbol);
+                }
+            }
         }
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
