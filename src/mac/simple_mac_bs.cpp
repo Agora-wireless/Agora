@@ -65,28 +65,25 @@ void* SimpleBSMac::loopRecv(int tid)
     socklen_t addrlen = sizeof(remote_addr);
     int packet_length = kUseLDPC
         ? ((cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol)
-        : cfg->OFDM_DATA_NUM;
-    packet_length += offsetof(MacPacket, data);
-    char* cur_buffer = (char*)malloc(packet_length);
-    int count = 0;
+        : (cfg->OFDM_DATA_NUM * cfg->mod_type + 7) >> 3;
+    packet_length += MacPacket::kOffsetOfData;
+    char* rx_buffer = (char*)malloc(packet_length);
     while (true) {
-
-        int recvlen = -1;
-        if ((recvlen = recv(socket_local, (char*)cur_buffer, packet_length, 0))
-            //(struct sockaddr*)&remote_addr,
-            //&addrlen))
-            < 0) {
-            perror("recv failed");
-            //exit(0);
+        auto* pkt = (struct MacPacket*)rx_buffer;
+        int ret = recvfrom(socket_local, (char*)pkt, packet_length, 0,
+            (struct sockaddr*)&remote_addr, &addrlen);
+        if (ret == -1) {
+            if (errno != EAGAIN) {
+                perror("recv failed");
+                exit(0);
+            }
+            return (NULL);
         }
 
-        // Read information from received packet
-        auto* pkt = (struct Packet*)cur_buffer;
-        int frame_id = pkt->frame_id;
-
         if (kDebugBSReceiver) {
+            // Read information from received packet
             printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
-                frame_id, pkt->symbol_id, pkt->ant_id);
+                pkt->frame_id, pkt->symbol_id, pkt->ue_id);
         }
     }
     return NULL;

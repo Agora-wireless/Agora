@@ -13,15 +13,8 @@
 #include <vector>
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
-#include <boost/align/aligned_allocator.hpp>
-#ifdef USE_LDPC
 #include "common_typedef_sdk.h"
-#else
-struct complex_float {
-    float re;
-    float im;
-};
-#endif
+#include <boost/align/aligned_allocator.hpp>
 
 // Event data tag for RX events
 union rx_tag_t {
@@ -208,6 +201,9 @@ struct Event_data {
 static_assert(sizeof(Event_data) == 64, "");
 
 struct Packet {
+    // The packet's data starts at kOffsetOfData bytes from the start
+    static constexpr size_t kOffsetOfData = 64;
+
     uint32_t frame_id;
     uint32_t symbol_id;
     uint32_t cell_id;
@@ -233,6 +229,9 @@ struct Packet {
 
 // TODO: merge Packet and MacPacket into one struct
 struct MacPacket {
+    // The packet's data starts at kOffsetOfData bytes from the start
+    static constexpr size_t kOffsetOfData = 64;
+
     uint32_t frame_id;
     uint32_t symbol_id;
     uint32_t cell_id;
@@ -325,7 +324,7 @@ public:
     void init(int max_tasks)
     {
         Frame_stats::init(max_tasks);
-        coded_frame = -1;
+        coded_frame = SIZE_MAX;
     }
 };
 
