@@ -8,10 +8,39 @@
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 #include <malloc.h>
+#include "utils_ldpc.hpp"
+
+#ifdef USE_ERPC
+#include "rpc_context.hpp"
+#endif
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
+
+#ifdef USE_ERPC
+extern RPCContext** ctx_list;
+
+void decode_cont_func(void *_context, void *_tag) {
+    auto *context = static_cast<RPCContext *>(_context);
+    auto *computeDecoding = static_cast<DoDecode *>(context->get_info());
+    auto *tag = static_cast<DecodeTag *>(_tag);
+
+    auto symbol_offset = tag->symbol_offset;
+    auto output_offset = tag->output_offset;
+    uint8_t *out_buf = static_cast<uint8_t *>(computeDecoding->decoded_buffer_[symbol_offset]) + output_offset;
+
+    memcpy(out_buf, context->get_resp_buf(), context->get_resp_buf_size()); 
+
+    Event_data resp_event;
+    resp_event.num_tags = 1;
+    resp_event.tags[0] = tag->tag;
+    resp_event.event_type = EventType::kDecode;
+
+    try_enqueue_fallback(&computeDecoding->complete_task_queue, 
+        computeDecoding->worker_producer_token, resp_event);
+}
+#endif
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
@@ -56,8 +85,6 @@ Event_data DoEncode::launch(size_t tag)
     }
 
     size_t start_tsc = worker_rdtsc();
-
-    ctx_list[tid]->Send(nullptr, 0);
 
     int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
     int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
@@ -136,6 +163,27 @@ Event_data DoDecode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
+#ifdef USE_ERPC
+    // TODO: transfer data to LDPC decoder
+    size_t input_offset
+        = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+    size_t llr_buffer_offset = input_offset * cfg->mod_type;
+    size_t cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
+    size_t output_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
+        + cbLenBytes * cur_cb_id;
+
+    auto* send_buf = reinterpret_cast<char *>((int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset);
+    auto* decode_tag = new DecodeTag;
+    decode_tag->symbol_offset = symbol_offset;
+    decode_tag->output_offset = output_offset;
+    decode_tag->tag = tag;
+
+    size_t num_encoded_bits = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
+    size_t sent_bytes = ((num_encoded_bits - 1) / 32 + 1) * 32;
+    
+    ctx_list[tid]->send(send_buf, sent_bytes, decode_cont_func, decode_tag); // TODO
+
+#else
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
@@ -205,6 +253,7 @@ Event_data DoDecode::launch(size_t tag)
             error_bits_count_[ue_id][symbol_offset] += err_bits;
         }
     }
+#endif
 
     double duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
@@ -214,5 +263,9 @@ Event_data DoDecode::launch(size_t tag)
             cycles_to_us(duration, freq_ghz));
     }
 
+#ifdef USE_ERPC
+    return Event_data(EventType::kPending, tag);
+#else
     return Event_data(EventType::kDecode, tag);
+#endif
 }
