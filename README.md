@@ -20,9 +20,15 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      make
      ```
    * Optional: Install Intel compiler
-     * Intel MKL and compiler can be installed by installing Parallel Studio XE
-     * Set environment vairables by sourcing `compilervars.sh`, e.g.,
-     `source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64`
+     * Intel compiler version 19.0.4 is required for compiling FlexRAN. Newer
+       versions will not work. Please reach out to one of the current Millipede
+       developers Millipede Slack channel to learn how to get the correct
+       versions of Intel Parallel Studio XE or Intel System Studio.
+
+     * Set required environment vairables by sourcing `compilervars.sh`, e.g.,
+       `source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64`.
+       The location of `compilervars.sh` varies. After running this command,
+       ensure that `icc --version` reports 19.0.4.
 
 
 ## Millipede quickstart
