@@ -716,6 +716,7 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     struct MacPacket* pkt = (struct MacPacket*)(ul_bits_buffer_[ue_id]
         + offset_in_current_buffer * config_->mac_packet_length);
     size_t mac_frame_id = pkt->frame_id;
+    printf("OBCH - RX - MAC Frame ID: %d, UE_ID: %d, PKT_UE_ID: %d", mac_frame_id, ue_id, pkt->ue_id);
     rt_assert((size_t)pkt->ue_id == ue_id,
         "UE index in tag does not match that in received packet!");
 
