@@ -26,12 +26,10 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
        developers to learn how to get the correct versions of Intel Parallel
        Studio XE or Intel System Studio.
 
-     * Set required environment vairables by sourcing `compilervars.sh`, e.g.,
-       `source
-       /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh
-       intel64`. The location of `compilervars.sh` varies. After running this
-       command, ensure that `icc --version` reports 19.0.4.
-
+     * Set required environment vairables by sourcing `compilervars.sh`. For
+       example, if Intel compiler is in `/opt`, run `source $(find 2>/dev/null
+       /opt -name compilervars.sh) intel64`. After running this command, ensure
+       that `icc --version` reports 19.0.4.
 
 ## Millipede quickstart
 
