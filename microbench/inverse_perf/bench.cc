@@ -16,7 +16,7 @@ DEFINE_uint64(n_cols, 32, "Number of matrix columns");
 
 enum class PinvMode { kFormula, kSVD };
 
-std::pair<std::vector<arma::cx_fmat>, double> arma_inverses(
+std::pair<std::vector<arma::cx_fmat>, double> arma_pseudo_inverses(
     const std::vector<arma::cx_fmat>& test_matrices, PinvMode mode) {
   TscTimer timer(FLAGS_n_iters, freq_ghz);
   std::vector<arma::cx_fmat> ret;
@@ -43,7 +43,7 @@ std::pair<std::vector<arma::cx_fmat>, double> arma_inverses(
     if (take_measurement) timer.stop();
     ret.push_back(output);
   }
-  return std::pair<std::vector<arma::cx_fmat>, double>(ret, timer.avg_msec());
+  return std::pair<std::vector<arma::cx_fmat>, double>(ret, timer.avg_usec());
 }
 
 int main(int argc, char** argv) {
@@ -59,19 +59,20 @@ int main(int argc, char** argv) {
         arma::randn<arma::cx_fmat>(FLAGS_n_rows, FLAGS_n_cols));
   }
 
-  // Part 1: Test inverse speed
-  std::pair<std::vector<arma::cx_fmat>, double> ret_1 =
-      arma_inverses(test_matrices, PinvMode::kFormula);
-  std::pair<std::vector<arma::cx_fmat>, double> ret_2 =
-      arma_inverses(test_matrices, PinvMode::kSVD);
+  std::pair<std::vector<arma::cx_fmat>, double> ret_formula =
+      arma_pseudo_inverses(test_matrices, PinvMode::kFormula);
+  std::pair<std::vector<arma::cx_fmat>, double> ret_svd =
+      arma_pseudo_inverses(test_matrices, PinvMode::kSVD);
 
-  // Header: "Matrix_size Formula SVD SVD/Formula"
-  printf("%zux%zu %.3f %.3f %.2f\n", FLAGS_n_rows, FLAGS_n_cols, ret_1.second,
-         ret_2.second, ret_2.second / ret_1.second);
+  // Header: "<matrix size> <Microseconds with formula> <Microseconds with SVD>
+  // <Speedup with formula>"
+  printf("%zux%zu %.1f %.1f %.1f\n", FLAGS_n_rows, FLAGS_n_cols,
+         ret_formula.second, ret_svd.second,
+         ret_svd.second / ret_formula.second);
 
   double norm_sum = 0.0;
   for (size_t i = 0; i < FLAGS_n_iters; i++) {
-    norm_sum += arma::norm(ret_1.first[i] - ret_2.first[i]);
+    norm_sum += arma::norm(ret_formula.first[i] - ret_svd.first[i]);
   }
   fprintf(stderr, "Computation proof = %.2f\n", norm_sum);
 }

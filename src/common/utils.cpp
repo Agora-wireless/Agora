@@ -27,7 +27,9 @@ int pin_to_core(int core_id)
 void pin_to_core_with_offset(
     ThreadType thread_type, int core_offset, int thread_id)
 {
-#ifdef ENABLE_CPU_ATTACH
+    if (!kEnableThreadPinning)
+        return;
+
     int actual_core_id = core_offset + thread_id;
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -37,14 +39,17 @@ void pin_to_core_with_offset(
     }
 
     if (pin_to_core(actual_core_id) != 0) {
-        printf("%s thread %d: failed to pin to core %d\n",
+        fprintf(stderr,
+            "%s thread %d: failed to pin to core %d. Exiting. "
+            "This can happen if the machine has insufficient cores. "
+            "Set kEnableThreadPinning to false to run Millipede to run despite "
+            "this - performance will be low.\n",
             thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
         exit(0);
     } else {
         printf("%s thread %d: pinned to core %d\n",
             thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
     }
-#endif
 }
 
 std::vector<size_t> Utils::strToChannels(const std::string& channel)
