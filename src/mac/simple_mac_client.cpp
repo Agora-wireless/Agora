@@ -43,6 +43,10 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
     , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
+    // TUN Interface
+    ipbridge = new IPbridge();
+    data_from_tun = new unsigned char[cfg->mac_data_bytes_num_perframe]();
+
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -90,6 +94,7 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
 
 SimpleClientMac::~SimpleClientMac()
 {
+    delete[] data_from_tun;
     IQ_data_coded.free();
     IQ_data.free();
     tx_buffers_.free();
@@ -230,16 +235,51 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
 
-    // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
-    std::random_device r;
-    std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
-    std::mt19937 eng(seed); // a source of random data
+    // XXX OBCH XXX
+    if (cfg->ip_bridge_enable)
+    {
+        //printf("Read from TUN interface \n");
+        int payloadSizeInBytes = ipbridge->read_fragment(data_from_tun, cfg->mac_data_bytes_num_perframe); //ipbridge->radioMTU);
+        printf("Read %d bytes from TUN device for UE_ID: %d  FrameID: %d \n", payloadSizeInBytes, tag.ue_id, tag.frame_id);
+        std::vector<unsigned char> v(data_from_tun, data_from_tun + payloadSizeInBytes);
+        memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
 
-    std::uniform_int_distribution<char> dist;
-    std::vector<char> v(cfg->mac_data_bytes_num_perframe);
+        for(int i = 0; i < payloadSizeInBytes ; i+=16) {
+            fprintf(stderr, "MAC1: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+                data_from_tun[i],     data_from_tun[i + 1],
+                data_from_tun[i + 2], data_from_tun[i + 3],
+                data_from_tun[i + 4], data_from_tun[i + 5],
+                data_from_tun[i + 6], data_from_tun[i + 7],
+                data_from_tun[i + 8], data_from_tun[i + 9],
+                data_from_tun[i + 10], data_from_tun[i + 11],
+                data_from_tun[i + 12], data_from_tun[i + 13],
+                data_from_tun[i + 14], data_from_tun[i + 15]);
+        }
 
-    generate(begin(v), end(v), bind(dist, eng));
-    memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+        for(int i = 0; i < payloadSizeInBytes/2 ; i+=16) {
+            fprintf(stderr, "MAC2: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x\n",
+                pkt->data[i],     pkt->data[i + 1],
+                pkt->data[i + 2], pkt->data[i + 3],
+                pkt->data[i + 4], pkt->data[i + 5],
+                pkt->data[i + 6], pkt->data[i + 7],
+                pkt->data[i + 8], pkt->data[i + 9],
+                pkt->data[i + 10], pkt->data[i + 11],
+                pkt->data[i + 12], pkt->data[i + 13],
+                pkt->data[i + 14], pkt->data[i + 15]);
+        }
+
+    } else {
+        // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
+        std::random_device r;
+        std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+        std::mt19937 eng(seed); // a source of random data
+
+        std::uniform_int_distribution<char> dist;
+        std::vector<char> v(cfg->mac_data_bytes_num_perframe);
+
+        generate(begin(v), end(v), bind(dist, eng));
+        memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+    }
 }
 
 void* SimpleClientMac::worker_thread(int tid)

@@ -157,13 +157,27 @@ struct MacPacket* PacketTXRX::recv_enqueue(
         }
         return (NULL);
     }
-    // printf("received data %d\n", ret);
-    // printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
-    // printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
 
-    // printf("In MAC TXRX thread %d: received frame %d, ue %d\n", tid,
-    //     pkt->frame_id, pkt->ue_id);
-
+    bool debug = true;
+    if (debug)
+    {
+        for(int i = 0; i < ret ; i+=16) {
+            fprintf(stderr, "PHY: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+                    pkt->data[i],     pkt->data[i + 1],
+                    pkt->data[i + 2], pkt->data[i + 3],
+                    pkt->data[i + 4], pkt->data[i + 5],
+                    pkt->data[i + 6], pkt->data[i + 7],
+                    pkt->data[i + 8], pkt->data[i + 9],
+                    pkt->data[i + 10], pkt->data[i + 11],
+                    pkt->data[i + 12], pkt->data[i + 13],
+                    pkt->data[i + 14], pkt->data[i + 15]);
+            }
+        printf("received data %d\n", ret);
+        printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
+        printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
+        printf("In MAC TXRX thread %d: received frame %d, ue %d\n", tid,
+            pkt->frame_id, pkt->ue_id);
+    }
     // get the position in rx_buffer
     // move ptr & set status to full
     rx_buffer_status[rx_offset] = 1;

@@ -73,6 +73,7 @@ Config::Config(std::string jsonfile)
     mac_tx_port = tddConf.value("mac_rx_port", 4000);
 
     /* frame configurations */
+    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     auto symbolSize = tddConf.value("symbol_size", 1);
     prefix = tddConf.value("prefix", 0);
     dl_prefix = tddConf.value("dl_prefix", 0);

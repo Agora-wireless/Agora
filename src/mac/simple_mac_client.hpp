@@ -35,6 +35,7 @@
 #include "memory_manage.h"
 #include "net.hpp"
 #include "utils.h"
+#include "ip_bridge.hpp"
 
 class SimpleClientMac {
 public:
@@ -114,6 +115,10 @@ private:
 
     double* frame_start;
     double* frame_end;
+
+    // TUN interface
+    IPbridge* ipbridge;
+    unsigned char* data_from_tun;
 };
 
 #endif
