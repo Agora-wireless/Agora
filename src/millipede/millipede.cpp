@@ -699,6 +699,10 @@ void* Millipede::worker(int tid)
     rt_assert(session_num >= 0, "Connect failed!");
     
     ctx_list[tid]->set_dedicate_session(session_num);
+
+    while (!ctx_list[tid]->check_session(session_num)) {
+        ctx_list[tid]->poll_event();
+    }
 #endif
 
     while (true) {

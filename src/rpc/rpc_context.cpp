@@ -5,7 +5,9 @@ RPCContext **ctx_list;
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type, erpc::SmErrType sm_err_type, void *_context) {
     auto *context = static_cast<RPCContext *>(_context);
 
-    
+    context->insert_session(session_num);
+
+    printf("Connected session: %d\n", session_num);
 }
 
 void basic_req_handler(erpc::ReqHandle *req_handle, void * _context) {
@@ -48,7 +50,6 @@ int RPCContext::connect(std::string uri, size_t obj_id) {
     if (session_num < 0) {
         return session_num;
     }
-    session_vec.push_back(session_num);
 
     return session_num;
 }
@@ -62,6 +63,7 @@ int RPCContext::send(int session_num, char *buf, size_t msg_len, erpc::erpc_cont
         }
     }
     if (!found) {
+        printf("Session %d not found\n", session_num);
         return -1;
     }
     rpc->resize_msg_buffer(&req_msgbuf, msg_len);
@@ -86,13 +88,14 @@ int RPCContext::send(char *buf, size_t msg_len, erpc::erpc_cont_func_t cont_func
         }
     }
     if (!found) {
+        printf("Session %d not found\n", dedicated_session);
         return -1;
     }
     rpc->resize_msg_buffer(&req_msgbuf, msg_len);
     if (buf) {
         memcpy(req_msgbuf.buf, buf, msg_len);
     }
-
+    
     if (cont_func == nullptr) {
         rpc->enqueue_request(dedicated_session, kReqType, &req_msgbuf, &resp_msgbuf, basic_cont_func, tag);
     } else {
@@ -142,4 +145,17 @@ size_t RPCContext::get_resp_buf_size() {
 
 void* RPCContext::get_info() {
     return info;
+}
+
+void RPCContext::insert_session(int session_num) {
+    session_vec.push_back(session_num);
+}
+
+bool RPCContext::check_session(int session_num) {
+    for (const auto session : session_vec) {
+        if (session == session_num) {
+            return true;
+        }
+    }
+    return false;
 }

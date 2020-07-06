@@ -9,7 +9,7 @@ static const std::string kClientHostname = "192.168.12.145";
 
 static constexpr uint16_t kUDPPort = 31850;
 static constexpr uint8_t kReqType = 2;
-static constexpr size_t kMsgSize = 1024;
+static constexpr size_t kMsgSize = (32 * 65536);
 
 /**
  * @brief This class is used to ship Millipede tasks such as LDPC decoding
@@ -84,6 +84,9 @@ public:
     void set_dedicate_session(int session_num);
 
     void* get_info();
+
+    void insert_session(int session_num);
+    bool check_session(int session_num);
 
 private:
     erpc::Rpc<erpc::CTransport>* rpc;
