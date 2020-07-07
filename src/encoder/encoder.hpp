@@ -12,8 +12,8 @@ namespace avx2enc {
 static constexpr size_t kProcBytes = 32;
 };
 
-// kMaxProcBytes is 64 bytes in FlexRAN's LDPC encoder and 32 bytes in Millipede's
-// derived LDPC encoder. Using the larger of the two works.
+// kMaxProcBytes is 64 bytes in FlexRAN's LDPC encoder and 32 bytes in
+// Millipede's derived LDPC encoder. Using the larger of the two works.
 static constexpr size_t kMaxProcBytes = 64;
 
 #endif

@@ -216,7 +216,7 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
     // these values depend on the application
     uint16_t Zc = request->Zc;
     if (Zc > ZC_MAX) {
-        fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %zu\n",
+        fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %d\n",
             ZC_MAX);
         exit(-1);
     }

@@ -78,12 +78,16 @@ int main()
     // For some expansion factors, we don't have input and reference files yet
     const std::vector<size_t> zc_nofiles_vec = { 2, 3, 4, 5, 6, 9, 13 };
 
-    for (const auto& zc : zc_all_vec) {
+    for (const size_t& zc : zc_all_vec) {
+        if (zc > 255)
+            continue;
+
         const bool no_files = std::find(std::begin(zc_nofiles_vec),
                                   std::end(zc_nofiles_vec), zc)
             != std::end(zc_nofiles_vec);
 
         if (zc <= ZC_MAX and !no_files) {
+            printf("Running for zc = %zu\n", zc);
             run_test(1 /* base graph */, zc);
             run_test(2 /* base graph */, zc);
         }
