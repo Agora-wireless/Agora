@@ -22,10 +22,15 @@ void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
     auto* worker = static_cast<LDPCWorker*>(context->get_info());
     auto* in_buf = reinterpret_cast<int8_t*>(req_handle->get_req_msgbuf()->buf);
 
+    size_t *p = reinterpret_cast<size_t *>(in_buf);
+    size_t frame_id = *p;
+    size_t symbol_id = *(p + 1);
+    printf("Decode frame frame %lu symbol %lu\n", frame_id, symbol_id);
+
     req_handle->dyn_resp_msgbuf
         = context->alloc_msg_buffer(worker->get_decoded_bits());
     auto* out_buf = reinterpret_cast<uint8_t*>(req_handle->dyn_resp_msgbuf.buf);
-    worker->decode(in_buf, out_buf);
+    worker->decode(in_buf + 2 * sizeof(size_t), out_buf);
 
     context->respond_without_copy(req_handle, &req_handle->dyn_resp_msgbuf);
 }
