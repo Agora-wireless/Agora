@@ -56,9 +56,7 @@ static constexpr size_t kNumTimestampTypes
 
 class Stats {
 public:
-    Stats(Config* cfg, size_t break_down_num, size_t task_thread_num,
-        size_t fft_thread_num, size_t zf_thread_num, size_t demul_thread_num,
-        double freq_ghz);
+    Stats(Config* cfg, size_t break_down_num, double freq_ghz);
     ~Stats();
 
     /// If worker stats collection is enabled, combine and update per-worker
@@ -176,12 +174,16 @@ private:
         size_t thread_num_offset, FrameSummary* frame_summary_zf);
     void update_stats_in_dodemul_bigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_demul);
+    void update_stats_in_dodecode_bigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* frame_summary_demul);
     void update_stats_in_doifft_bigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_ifft,
         FrameSummary* frame_summary_csi);
     void update_stats_in_doprecode_bigstation(size_t frame_id,
         size_t thread_num, size_t thread_num_offset,
         FrameSummary* frame_summary_precode);
+    void update_stats_in_doencode_bigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* frame_summary_precode);
 
     void update_stats_in_functions_uplink_bigstation(size_t frame_id,
         FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
@@ -208,6 +210,7 @@ private:
     const size_t fft_thread_num;
     const size_t zf_thread_num;
     const size_t demul_thread_num;
+    const size_t decode_thread_num;
     const size_t break_down_num;
     const double freq_ghz;
     const size_t creation_tsc; // TSC at which this object was created
@@ -238,6 +241,7 @@ private:
     double csi_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
     double zf_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
     double demul_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
+    double decode_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
 };
 
 #endif
