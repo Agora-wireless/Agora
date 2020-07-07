@@ -209,6 +209,7 @@ set(COMMON_SOURCES
 set(MILLIPEDE_SOURCES 
   src/millipede/millipede.cpp
   src/millipede/stats.cpp 
+  src/millipede/phy_stats.cpp 
   src/millipede/dofft.cpp
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp
