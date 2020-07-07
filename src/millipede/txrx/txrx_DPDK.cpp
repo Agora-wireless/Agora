@@ -200,7 +200,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;
             if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id] = rdtsc();
+                rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
                 prev_frame_id = frame_id;
             }
         }
