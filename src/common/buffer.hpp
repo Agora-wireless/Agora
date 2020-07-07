@@ -292,7 +292,9 @@ public:
     bool last_symbol(int frame_id)
     {
         const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        if (verbose) printf("check last symbol %lu %lu %lu\n", frame_id, symbol_count[frame_slot], max_symbol_count);
+        if (verbose)
+            printf("check last symbol %d %lu %lu\n", frame_id,
+                symbol_count[frame_slot], max_symbol_count);
         if (++symbol_count[frame_slot] == max_symbol_count) {
             symbol_count[frame_slot] = 0;
             return true;
