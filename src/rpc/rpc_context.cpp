@@ -3,9 +3,9 @@
 RPCContext **ctx_list;
 
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type, erpc::SmErrType sm_err_type, void *_context) {
-    auto *context = static_cast<RPCContext *>(_context);
+    // auto *context = static_cast<RPCContext *>(_context);
 
-    context->insert_session(session_num);
+    // context->insert_session(session_num);
 
     printf("Connected session: %d\n", session_num);
 }

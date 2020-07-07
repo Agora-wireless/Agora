@@ -37,6 +37,7 @@ void decode_cont_func(void *_context, void *_tag) {
     auto tid = tag->tid;
     uint8_t *out_buf = static_cast<uint8_t *>(computeDecoding->decoded_buffer_[symbol_offset]) + output_offset;
 
+    // memcpy(out_buf, context->get_resp_buf(), context->get_resp_buf_size());
     memcpy(out_buf, resp_msgbuf_list[tid].buf, resp_msgbuf_list[tid].get_data_size()); 
 
     Event_data resp_event;
@@ -195,7 +196,7 @@ Event_data DoDecode::launch(size_t tag)
     // *(p + 1) = symbol_id;
     // memcpy(p + 2, send_buf, sent_bytes);
     rpc_list[tid]->resize_msg_buffer(&req_msgbuf_list[tid], sent_bytes + 2 * sizeof(size_t));
-    char *data_buf = req_msgbuf_list[tid].buf;
+    char *data_buf = reinterpret_cast<char *>(req_msgbuf_list[tid].buf);
     size_t *p = reinterpret_cast<size_t *>(data_buf);
     *p = frame_id;
     *(p + 1) = symbol_id;
@@ -205,7 +206,7 @@ Event_data DoDecode::launch(size_t tag)
     // ctx_list[tid]->send(send_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag); // TODO
     // ctx_list[tid]->send(data_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag);
     rpc_list[tid]->enqueue_request(session_vec[tid], kReqType, &req_msgbuf_list[tid], &resp_msgbuf_list[tid], decode_cont_func, decode_tag);
-    delete [] data_buf;
+    // delete [] data_buf;
 
 #else
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
