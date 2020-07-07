@@ -36,9 +36,7 @@ Millipede::Millipede(Config* cfg)
         initialize_downlink_buffers();
     }
 
-    stats = new Stats(cfg, kMaxStatBreakdown, cfg->worker_thread_num,
-        cfg->fft_thread_num, cfg->zf_thread_num, cfg->demul_thread_num,
-        freq_ghz);
+    stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
     phy_stats = new PhyStats(cfg);
 
     /* Initialize TXRX threads */
