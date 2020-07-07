@@ -1,5 +1,4 @@
 #include "../common/utils_ldpc.hpp"
-#include "encoder.hpp"
 #include <algorithm>
 #include <fstream>
 #include <vector>
@@ -36,7 +35,7 @@ void run_test(size_t base_graph, size_t zc)
     int8_t* encoded[kNumCodeBlocks];
     int8_t* parity_reference[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-        // We add avx2enc::PROC_BYTES as padding for the encoder's scatter (for
+        // We add kMaxProcBytes as padding for the encoder's scatter (for
         // input) and gather (for output) functions.
         input[n] = (int8_t*)read_binfile(
             input_filename, ldpc_encoding_input_buf_size(base_graph, zc));
@@ -84,7 +83,7 @@ int main()
                                   std::end(zc_nofiles_vec), zc)
             != std::end(zc_nofiles_vec);
 
-        if (zc <= avx2enc::ZC_MAX and !no_files) {
+        if (zc <= ZC_MAX and !no_files) {
             run_test(1 /* base graph */, zc);
             run_test(2 /* base graph */, zc);
         }
