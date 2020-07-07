@@ -33,7 +33,7 @@ void* PacketTXRX::loop_tx_rx_argos(int tid)
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;
             if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id] = rdtsc();
+                rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
                 prev_frame_id = frame_id;
             }
         }

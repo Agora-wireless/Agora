@@ -22,6 +22,7 @@
 #include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
+#include "phy_stats.hpp"
 #include "txrx.hpp"
 #include "txrx_mac.hpp"
 #include "utils.h"
@@ -141,6 +142,7 @@ private:
     std::unique_ptr<PacketTXRX> receiver_;
     std::unique_ptr<MacPacketTXRX> mac_receiver_;
     Stats* stats;
+    PhyStats* phy_stats;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
@@ -206,9 +208,6 @@ private:
     Table<uint8_t> decoded_buffer_;
 
     Table<complex_float> ue_spec_pilot_buffer_;
-
-    Table<int> decoded_bits_count_;
-    Table<int> error_bits_count_;
 
     RxCounters rx_counters_;
     FFT_stats fft_stats_;
