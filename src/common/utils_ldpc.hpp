@@ -4,7 +4,6 @@
 #include "Symbols.hpp"
 #include "encoder.hpp"
 #include "iobuffer.hpp"
-#include "local_phy_ldpc_encoder_5gnr_internal.h"
 #include "phy_ldpc_encoder_5gnr.h"
 #include <assert.h>
 #include <malloc.h>
@@ -244,7 +243,7 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
             = ldpc_select_adapter_func(zc, 1 /* num code blocks */);
         // Scatter input and parity into zc-bit chunks
         int8_t* _input_buffers[1] = { (int8_t*)&input_buffer };
-        int8_t* _parity_buffers[1] = { (int8_t*)&input_buffer };
+        int8_t* _parity_buffers[1] = { (int8_t*)&parity_buffer };
         adapter_func(_input_buffers, internal_buffer0, zc, num_input_bits, 1);
         adapter_func(_parity_buffers, internal_buffer1, zc, num_parity_bits, 1);
 #endif
@@ -265,7 +264,7 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
             ldpc_num_encoded_bits(base_graph, zc), 0);
 #else
         // Gather the concatenated chunks to create the encoded buffer
-        int8_t* _encoded_buffers[1] = { (int8_t*)&input_buffer };
+        int8_t* _encoded_buffers[1] = { (int8_t*)&encoded_buffer };
         adapter_func(_encoded_buffers, internal_buffer2, zc,
             ldpc_num_encoded_bits(base_graph, zc), 0);
 #endif
