@@ -718,7 +718,10 @@ void* Millipede::worker(int tid)
     //     ctx_list[tid]->poll_event();
     // }
 
-    rpc_list[tid] = new erpc::Rpc<erpc::CTransport>(nexus, computeDecoding, tid, nullptr);
+    rpc_list[tid] = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(computeDecoding), tid, basic_sm_handler);
+    rpc_list[tid]->retry_connect_on_invalid_rpc_id = true;
+    req_msgbuf_list[tid] = rpc_list[tid]->alloc_msg_buffer_or_die(kMsgSize);
+    resp_msgbuf_list[tid] = rpc_list[tid]->alloc_msg_buffer_or_die(kMsgSize);
     std::string uri = config_->ldpc_worker_addr + ":" + std::to_string(kUDPPort);
     int session_num = rpc_list[tid]->create_session(uri, tid % config_->ldpc_worker_num);
     rt_assert(session_num >= 0, "Connect failed!");
@@ -726,8 +729,6 @@ void* Millipede::worker(int tid)
     while (!rpc_list[tid]->is_connected(session_num)) {
         rpc_list[tid]->run_event_loop_once();
     }
-    req_msgbuf_list[tid] = rpc_list[tid]->alloc_msg_buffer_or_die(kMsgSize);
-    resp_msgbuf_list[tid] = rpc_list[tid]->alloc_msg_buffer_or_die(kMsgSize);
 #endif
 
     while (true) {

@@ -97,4 +97,6 @@ private:
     void *info;
 };
 
+void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type, erpc::SmErrType sm_err_type, void *_context);
+
 #endif // RPC_CONTEXT
