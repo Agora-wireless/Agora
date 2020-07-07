@@ -377,11 +377,15 @@ void Millipede::start()
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
+                printf("Decode frame %lu symbol %lu\n", frame_id, symbol_idx_ul);
 
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
+                    printf("Decode frame %lu symbol %lu done\n", frame_id, symbol_idx_ul);
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
+                    decode_stats_.verbose = true;
                     if (decode_stats_.last_symbol(frame_id)) {
+                        printf("Decode frame %lu done\n", frame_id);
                         assert(cur_frame_id == frame_id);
                         cur_frame_id++;
                         stats->master_set_tsc(TsType::kDecodeDone, frame_id);
@@ -526,6 +530,8 @@ void Millipede::start()
                 printf("Wrong event type in message queue!");
                 exit(0);
             } /* End of switch */
+
+            decode_stats_.verbose = false;
 
             // We schedule FFT processing if the event handling above results in
             // either (a) sufficient packets received for the current frame,
