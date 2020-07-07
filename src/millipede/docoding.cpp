@@ -22,6 +22,7 @@ static constexpr bool kPrintDecodedData = false;
 extern RPCContext** ctx_list;
 
 void decode_cont_func(void *_context, void *_tag) {
+    printf("decode cont\n");
     auto *context = static_cast<RPCContext *>(_context);
     auto *computeDecoding = static_cast<DoDecode *>(context->get_info());
     auto *tag = static_cast<DecodeTag *>(_tag);
@@ -180,8 +181,17 @@ Event_data DoDecode::launch(size_t tag)
 
     size_t num_encoded_bits = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
     size_t sent_bytes = ((num_encoded_bits - 1) / 32 + 1) * 32;
+
+    char *data_buf = new char[sent_bytes + 64];
+    size_t *p = reinterpret_cast<size_t *>(data_buf);
+    *p = frame_id;
+    *(p + 1) = symbol_id;
+    memcpy(p + 2, send_buf, sent_bytes);
     
-    ctx_list[tid]->send(send_buf, sent_bytes, decode_cont_func, decode_tag); // TODO
+    printf("Send decode frome %lu symbol %lu\n", frame_id, symbol_id);
+    // ctx_list[tid]->send(send_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag); // TODO
+    ctx_list[tid]->send(data_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag);
+    delete [] data_buf;
 
 #else
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
