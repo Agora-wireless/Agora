@@ -19,19 +19,25 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
 #ifdef USE_ERPC
-extern RPCContext** ctx_list;
+// extern RPCContext** ctx_list;
+extern erpc::Rpc<erpc::CTransport> **rpc_list;
+extern int *session_vec;
+extern erpc::MsgBuffer *req_msgbuf_list;
+extern erpc::MsgBuffer *resp_msgbuf_list;
 
 void decode_cont_func(void *_context, void *_tag) {
     printf("decode cont\n");
-    auto *context = static_cast<RPCContext *>(_context);
-    auto *computeDecoding = static_cast<DoDecode *>(context->get_info());
+    // auto *context = static_cast<RPCContext *>(_context);
+    // auto *computeDecoding = static_cast<DoDecode *>(context->get_info());
+    auto *computeDecoding = static_cast<DoDecode *>(_context);
     auto *tag = static_cast<DecodeTag *>(_tag);
 
     auto symbol_offset = tag->symbol_offset;
     auto output_offset = tag->output_offset;
+    auto tid = tag->tid;
     uint8_t *out_buf = static_cast<uint8_t *>(computeDecoding->decoded_buffer_[symbol_offset]) + output_offset;
 
-    memcpy(out_buf, context->get_resp_buf(), context->get_resp_buf_size()); 
+    memcpy(out_buf, resp_msgbuf_list[tid].buf, resp_msgbuf_list[tid].get_data_size()); 
 
     Event_data resp_event;
     resp_event.num_tags = 1;
@@ -178,19 +184,27 @@ Event_data DoDecode::launch(size_t tag)
     decode_tag->symbol_offset = symbol_offset;
     decode_tag->output_offset = output_offset;
     decode_tag->tag = tag;
+    decode_tag->tid = tid;
 
     size_t num_encoded_bits = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
     size_t sent_bytes = ((num_encoded_bits - 1) / 32 + 1) * 32;
 
-    char *data_buf = new char[sent_bytes + 64];
+    // char *data_buf = new char[sent_bytes + 64];
+    // size_t *p = reinterpret_cast<size_t *>(data_buf);
+    // *p = frame_id;
+    // *(p + 1) = symbol_id;
+    // memcpy(p + 2, send_buf, sent_bytes);
+    rpc_list[tid]->resize_msg_buffer(&req_msgbuf_list[tid], sent_bytes + 2 * sizeof(size_t));
+    char *data_buf = req_msgbuf_list[tid].buf;
     size_t *p = reinterpret_cast<size_t *>(data_buf);
     *p = frame_id;
     *(p + 1) = symbol_id;
     memcpy(p + 2, send_buf, sent_bytes);
-    
+
     printf("Send decode frome %lu symbol %lu\n", frame_id, symbol_id);
     // ctx_list[tid]->send(send_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag); // TODO
-    ctx_list[tid]->send(data_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag);
+    // ctx_list[tid]->send(data_buf, sent_bytes + 2 * sizeof(size_t), decode_cont_func, decode_tag);
+    rpc_list[tid]->enqueue_request(session_vec[tid], kReqType, &req_msgbuf_list[tid], &resp_msgbuf_list[tid], decode_cont_func, decode_tag);
     delete [] data_buf;
 
 #else

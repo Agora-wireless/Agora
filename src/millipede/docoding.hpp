@@ -76,6 +76,7 @@ public:
     size_t symbol_offset;
     size_t output_offset;
     size_t tag;
+    int tid;
 };
 
 #endif
