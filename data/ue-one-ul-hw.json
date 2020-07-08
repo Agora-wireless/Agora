@@ -1,7 +1,7 @@
 {
  "irises" : "data/user-iris-serials.txt",
  "cells" : 1,
- "channel" : "AB",
+ "channel" : "A",
  "frequency" : 3.56e9,
  "rxgainA" : 20,
  "txgainA" : 40,
@@ -15,7 +15,7 @@
  "cp_len" : 32,
  "Zc" : 18,
  "frames" : [
-     "GGDDGGPPGGUUUG"
+     "GGDDGGPGGGUUUG"
  ],
  "hw_framer": false,
  "tx_advance" : 78,
