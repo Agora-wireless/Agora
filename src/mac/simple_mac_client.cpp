@@ -248,6 +248,17 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 
     generate(begin(v), end(v), bind(dist, eng));
     memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+
+    // Print MAC packet summary
+    printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
+           "%d\n",
+        get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
+        cfg->mac_data_bytes_num_perframe);
+
+    for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
+        printf("%i ", *((uint8_t*)pkt->data + i));
+    }
+    printf("\n");
 }
 
 void* SimpleClientMac::worker_thread(int tid)
