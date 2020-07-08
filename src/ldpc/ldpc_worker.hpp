@@ -7,12 +7,7 @@
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "rpc.h"
-// #include "rpc_context.hpp"
 #include <cstdint>
-
-// XXX: Need a comment for global variables
-// static constexpr kLPDCMaxBufferSize = 65536;
-#define LDPC_MAX_BUFFER_SIZE (65536)
 
 void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
 
@@ -33,7 +28,6 @@ private:
     Config* cfg;
     int tid; // Thread ID as defined by eRPC
     int16_t* resp_var_nodes;
-    // RPCContext* ctx;
     erpc::Rpc<erpc::CTransport>* rpc;
     size_t decoded_bits;
 };

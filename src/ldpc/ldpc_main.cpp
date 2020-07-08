@@ -1,11 +1,6 @@
 #include "ldpc_worker.hpp"
 #include "utils.h"
 
-// XXX: Do these two variables really need be global
-// XXX: Need doc
-// size_t base_worker_core_offset;
-// erpc::Nexus* nexus;
-
 void* run_worker(void* args)
 {
     auto* cfg = *(static_cast<Config**>(args));
@@ -39,7 +34,6 @@ int main(int argc, char** argv)
     // XXX: Avoid copying ldpc_worker_num
     // XXX: cfg->ldpc_worker_num could be cfg->ldpc_threads_per_remote_server
     size_t num_workers = cfg->ldpc_worker_num;
-    // base_worker_core_offset = cfg->ldpc_worker_core_offset;
 
     auto* task_threads = new pthread_t[num_workers];
 

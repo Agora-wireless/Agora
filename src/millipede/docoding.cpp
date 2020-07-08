@@ -16,7 +16,6 @@ static constexpr bool kPrintDecodedData = false;
 
 void decode_cont_func(void* _context, void* _tag)
 {
-    printf("decode cont\n");
     auto* computeDecoding = static_cast<DoDecode*>(_context);
     auto* tag = static_cast<DecodeTag*>(_tag);
 
@@ -28,8 +27,6 @@ void decode_cont_func(void* _context, void* _tag)
         + output_offset;
 
     memcpy(out_buf, tag->resp_msgbuf->buf, tag->resp_msgbuf->get_data_size());
-    // memcpy(out_buf, computeDecoding->resp_msgbuf.buf,
-    // computeDecoding->resp_msgbuf.get_data_size());
 
     Event_data resp_event;
     resp_event.num_tags = 1;
@@ -39,11 +36,6 @@ void decode_cont_func(void* _context, void* _tag)
     try_enqueue_fallback(&computeDecoding->complete_task_queue,
         computeDecoding->worker_producer_token, resp_event);
 
-    // computeDecoding->session_in_use = false;
-    // tag->rpc->free_msg_buffer(*(tag->req_msgbuf));
-    // tag->rpc->free_msg_buffer(*(tag->resp_msgbuf));
-    // delete tag->req_msgbuf;
-    // delete tag->resp_msgbuf;
     computeDecoding->vec_req_msgbuf.push_back(tag->req_msgbuf);
     computeDecoding->vec_resp_msgbuf.push_back(tag->resp_msgbuf);
     delete tag;
@@ -141,8 +133,6 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
           worker_producer_token)
     , llr_buffer_(in_demod_buffer)
     , decoded_buffer_(in_decoded_buffer)
-    //, decoded_bits_count_(in_decoded_bits_count)
-    //, error_bits_count_(in_error_bits_count)
     , phy_stats(in_phy_stats)
 {
     duration_stat
@@ -166,9 +156,6 @@ void DoDecode::register_rpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
         *resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
         vec_resp_msgbuf.push_back(resp_msgbuf);
     }
-    // req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
-    // resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
-    // session_in_use = false;
 }
 
 Event_data DoDecode::launch(size_t tag)
@@ -215,7 +202,6 @@ Event_data DoDecode::launch(size_t tag)
         while (vec_req_msgbuf.size() == 0) {
             rpc->run_event_loop_once();
         }
-        // session_in_use = true;
         auto* req_msgbuf = vec_req_msgbuf.back();
         vec_req_msgbuf.pop_back();
         auto* resp_msgbuf = vec_resp_msgbuf.back();
@@ -226,16 +212,11 @@ Event_data DoDecode::launch(size_t tag)
         decode_tag->rpc = rpc;
         rpc->resize_msg_buffer(req_msgbuf, sent_bytes + 2 * sizeof(size_t));
         char* data_buf = reinterpret_cast<char*>(req_msgbuf->buf);
-        // rpc->resize_msg_buffer(&req_msgbuf, sent_bytes + 2 * sizeof(size_t));
-        // char* data_buf = reinterpret_cast<char*>(req_msgbuf.buf);
         size_t* p = reinterpret_cast<size_t*>(data_buf);
         *p = frame_id;
         *(p + 1) = symbol_id;
         memcpy(p + 2, send_buf, sent_bytes);
 
-        printf("Send decode frome %lu symbol %lu\n", frame_id, symbol_id);
-        // rpc->enqueue_request(session, kRpcReqType, &req_msgbuf, &resp_msgbuf,
-        // decode_cont_func, decode_tag);
         rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
             decode_cont_func, decode_tag);
     } else {
