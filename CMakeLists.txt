@@ -233,7 +233,16 @@ if(${USE_LDPC})
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+
+  # FlexRAN FEC libraries can be in one of two directories depending on arch
+  if (EXISTS ${FLEXRAN_SDK_DIR}/build-avx512-icc)
+    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx512-icc)
+  elseif (EXISTS ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+  else()
+    message(FATAL_ERROR "FlexRAN FEC libraries required but not found")
+  endif()
+
   set(FLEXRAN_LDPC_LIBS
     ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
     ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)

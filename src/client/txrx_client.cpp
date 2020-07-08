@@ -134,7 +134,6 @@ int RadioTXRX::dequeue_send(int tid)
 
 void* RadioTXRX::loopTXRX(int tid)
 {
-    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     auto& c = config_;
     int num_radios = c->nRadios;
@@ -237,7 +236,6 @@ void* RadioTXRX::loopTXRX(int tid)
 void* RadioTXRX::loopSYNC_TXRX(int tid)
 {
     // FIXME: This only works when there is 1 radio per thread.
-    // if ENABLE_CPU_ATTACH is enabled, attach threads to specific cores
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     auto& c = config_;
 
