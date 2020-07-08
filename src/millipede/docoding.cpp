@@ -142,16 +142,17 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
+// TODO: Rename to initialize_erpc
 void DoDecode::register_rpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
 {
     rpc = rpc_;
     session = session_;
-    for (int i = 0; i < kRpcMaxMsgBufNum; i++) {
+    for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
         auto* req_msgbuf = new erpc::MsgBuffer;
         *req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
         vec_req_msgbuf.push_back(req_msgbuf);
     }
-    for (int i = 0; i < kRpcMaxMsgBufNum; i++) {
+    for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
         auto* resp_msgbuf = new erpc::MsgBuffer;
         *resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
         vec_resp_msgbuf.push_back(resp_msgbuf);
@@ -178,10 +179,13 @@ Event_data DoDecode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kUseERPC) {
+        // TODO: Add a function to config.hpp called get_ldpc_input_offset(ue_id,
+        // code_block_id)
         size_t input_offset
             = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
         size_t llr_buffer_offset = input_offset * cfg->mod_type;
-        size_t cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
+        size_t cbLenBytes
+            = (LDPC_config.cbLen + 7) >> 3; // TODO Use bits_to_bytes
         size_t output_offset
             = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
             + cbLenBytes * cur_cb_id;
@@ -196,9 +200,11 @@ Event_data DoDecode::launch(size_t tag)
 
         size_t num_encoded_bits
             = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
+        // TODO: What is 32? Is it PROC_BYTES?
         size_t sent_bytes = ((num_encoded_bits - 1) / 32 + 1) * 32;
 
         while (vec_req_msgbuf.size() == 0) {
+            // TODO: Print a warning message: "Ran out of request message buffer"
             rpc->run_event_loop_once();
         }
         auto* req_msgbuf = vec_req_msgbuf.back();
@@ -212,13 +218,15 @@ Event_data DoDecode::launch(size_t tag)
         rpc->resize_msg_buffer(req_msgbuf, sent_bytes + 2 * sizeof(size_t));
         char* data_buf = reinterpret_cast<char*>(req_msgbuf->buf);
         size_t* p = reinterpret_cast<size_t*>(data_buf);
-        *p = frame_id;
-        *(p + 1) = symbol_id;
-        memcpy(p + 2, send_buf, sent_bytes);
+        p[0] = frame_id;
+        p[1] = symbol_id;
+        memcpy(&p[2], send_buf, sent_bytes);
 
         rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
             decode_cont_func, decode_tag);
     } else {
+        // TODO: Rename ldpc_decoder_5gnr_request/response to
+        // ldpc_request/responseresponse
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
         struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
@@ -301,6 +309,8 @@ Event_data DoDecode::launch(size_t tag)
             cycles_to_us(duration, freq_ghz));
     }
 
+    // TODO: Use kUseERPC, add comment: "When using eRPC, we ship the decoding
+    // task asynchronously to a remote server and return immediately"
 #ifdef USE_ERPC
     return Event_data(EventType::kPending, tag);
 #else

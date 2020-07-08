@@ -62,8 +62,8 @@ public:
 
     Event_data launch(size_t tag);
 
+    // TODO: Doc
     void register_rpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
-
     friend void decode_cont_func(void* _context, void* _tag);
 
 private:
@@ -75,16 +75,21 @@ private:
     PhyStats* phy_stats;
     DurationStat* duration_stat;
 
+    // eRPC-specific variables
+    // TODO: Need doc
+    // TODO: Need size_t
+
+    /// Number of preallocated msgbufs to hold pending eRPC requests
+    static const size_t kRpcMaxMsgBufNum = 64;
+    static const int kRpcReqType = 2;
+    static const int kRpcMaxMsgSize = (1 << 20);
     erpc::Rpc<erpc::CTransport>* rpc;
     std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
     std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
     int session;
-
-    static const size_t kRpcMaxMsgBufNum = 64;
-    static const int kRpcReqType = 2;
-    static const int kRpcMaxMsgSize = (1 << 20);
 };
 
+// TODO: doc, Local eRPC request tag for decoding tasks
 class DecodeTag {
 public:
     size_t symbol_offset;
