@@ -308,6 +308,8 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
+                    if (kEnableMac)
+                        mac_receiver_->wakeup_mac();
                     if (kUseLDPC) {
                         Event_data do_encode_task(EventType::kEncode,
                             gen_tag_t::frm_sym_ue(frame_id, symbol_id,
