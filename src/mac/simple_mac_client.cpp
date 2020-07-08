@@ -51,7 +51,7 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
 
     tx_buffers_.malloc(
         SOCKET_BUFFER_FRAME_NUM * cfg->UE_ANT_NUM, cfg->mac_packet_length, 64);
-    //init_data_from_file();
+    // init_data_from_file();
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
         64, thread_num * sizeof(moodycamel::ProducerToken*));
@@ -148,6 +148,16 @@ void* SimpleClientMac::master_thread(int tid)
 
     // add some delay to ensure data update is finished
     sleep(1);
+    int ret = 0;
+    char* start_msg[1024];
+    socklen_t addrlen = sizeof(servaddr_ipv4[0]);
+    while (keep_running && ret == 0) {
+        ret = recvfrom(socket_[0], start_msg, 1024, 0,
+            (struct sockaddr*)&servaddr_ipv4[0], &addrlen);
+    }
+    std::cout << "Received WAKEUP Message\n"
+              << "Starting Packet Transmission.." << std::endl;
+
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
         auto req_tag = gen_tag_t::frm_sym_ue(0, 0, i);
@@ -238,6 +248,17 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 
     generate(begin(v), end(v), bind(dist, eng));
     memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+
+    // Print MAC packet summary
+    printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
+           "%d\n",
+        get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
+        cfg->mac_data_bytes_num_perframe);
+
+    for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
+        printf("%i ", *((uint8_t*)pkt->data + i));
+    }
+    printf("\n");
 }
 
 void* SimpleClientMac::worker_thread(int tid)
@@ -254,7 +275,7 @@ void* SimpleClientMac::worker_thread(int tid)
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
-    size_t max_symbol_id = 1; //get_max_symbol_id();
+    size_t max_symbol_id = 1; // get_max_symbol_id();
     int radio_lo = tid * cfg->UE_ANT_NUM / thread_num;
     int radio_hi = (tid + 1) * cfg->UE_ANT_NUM / thread_num;
     size_t ant_num_this_thread = cfg->UE_ANT_NUM / thread_num
@@ -270,7 +291,7 @@ void* SimpleClientMac::worker_thread(int tid)
             continue;
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
-        //size_t start_tsc_send = rdtsc();
+        // size_t start_tsc_send = rdtsc();
         // Send a message to the server. We assume that the server is running.
         // if (kUseDPDK or !kConnectUDP) {
         int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
@@ -380,8 +401,7 @@ void SimpleClientMac::delay_for_frame(
     size_t tx_frame_count, uint64_t tick_start)
 {
     if (tx_frame_count < 500) {
-        delay_ticks(
-            tick_start, 2 * cfg->symbol_num_perframe * ticks_all);
+        delay_ticks(tick_start, 2 * cfg->symbol_num_perframe * ticks_all);
     } else {
         delay_ticks(tick_start, cfg->symbol_num_perframe * ticks_all);
     }

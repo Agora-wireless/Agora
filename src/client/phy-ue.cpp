@@ -308,6 +308,8 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
+                    if (kEnableMac)
+                        mac_receiver_->wakeup_mac();
                     if (kUseLDPC) {
                         Event_data do_encode_task(EventType::kEncode,
                             gen_tag_t::frm_sym_ue(frame_id, symbol_id,
@@ -358,6 +360,11 @@ void Phy_UE::start()
                 if (!kUseLDPC) {
                     Event_data do_map_task(EventType::kModul, event.tags[0]);
                     schedule_task(do_map_task, &map_queue_, ptok_map);
+                } else { 
+                    size_t ue_id = rx_tag_t(event.tags[0]).tid;
+                    size_t offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
+
+                    ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
                 }
                 // if (kDebugPrintPerFrameDone)
                 //     printf("Main thread: frame: %zu, finished mapping "
