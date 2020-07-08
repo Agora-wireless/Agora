@@ -20,6 +20,7 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "reciprocity.hpp"
+#include "rpc.h"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
@@ -51,6 +52,10 @@ public:
      */
     static const int kDequeueBulkSizeTXRX = 8;
     static const int kDequeueBulkSizeWorker = 4;
+    /* eRPC request type, UDP port and maximum message size */
+    static const int kRpcReqType = 2;
+    static const int kRpcPort = 31850;
+    static const int kRpcMaxMsgSize = (1 << 20);
 
     /**
      * @brief Create a Millipede object and start the worker threads
@@ -288,6 +293,11 @@ private:
     // moodycamel::ProducerToken* rx_ptoks_mac_ptr[kMaxThreads];
     // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
+
+    /**
+     * eRPC fields
+     */
+    erpc::Nexus* nexus;
 };
 
 #endif
