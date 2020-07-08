@@ -269,19 +269,18 @@ set(SOURCES
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
 			
-add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
+add_executable(millipede src/millipede/main.cpp ${SOURCES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
 
 
-add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
+add_library(comp MODULE ${SOURCES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
 
 add_executable(data_generator 
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
   ${LDPC_SOURCES} 
-  ${COMMON_SOURCES} 
-  ${HEADER_FILES})
+  ${COMMON_SOURCES})
 target_link_libraries(data_generator -larmadillo ${FLEXRAN_LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
@@ -289,16 +288,14 @@ add_executable(user
      src/client/user-main.cpp
      ${CLIENT_SOURCES}
      ${COMMON_SOURCES}
-     ${LDPC_SOURCES}
-     ${HEADER_FILES})
+     ${LDPC_SOURCES})
 target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_library(ue_phy MODULE 
      ${CLIENT_SOURCES}
      ${COMMON_SOURCES}
      ${ARGOS_SOURCES}
-     ${LDPC_SOURCES}
-     ${HEADER_FILES})
+     ${LDPC_SOURCES})
 target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_executable(macuser
@@ -315,8 +312,7 @@ set(SENDER_SOURCES
   simulator/sender_cli.cpp
   ${COMMON_SOURCES}
   ${SENDER_TXRX_SOURCES}
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
 target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
@@ -327,8 +323,7 @@ set(SIMULATOR_SOURCES
   simulator/sender.cpp
   simulator/receiver.cpp 
   ${COMMON_SOURCES}
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
@@ -338,7 +333,6 @@ add_executable(test_zf test/test_zf.cc
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
   src/millipede/dozf.cpp
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
