@@ -329,7 +329,7 @@ add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
 
 # The tests to run using ctest
-add_executable(test_zf test/test_zf.cc 
+add_executable(test_zf test/unit_tests/test_zf.cc 
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
   src/millipede/dozf.cpp
