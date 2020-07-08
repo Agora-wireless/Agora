@@ -12,7 +12,7 @@
 #include "rpc.h"
 #include <cstdint>
 
-// TODO: Add documentation
+// The eRPC request handler function to process remote LDPC decode tasks
 void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
 
 /**
@@ -24,30 +24,29 @@ public:
     /**
      * @brief Create an LDPCWorker class and initialize the eRPC object
      * 
-     * @param config The config file used to configure LDPC worker
+     * @param LDPC_config The configurations for the LDPC worker
      * @param tid The eRPC thread ID to help identify the eRPC object
      * @param nexus The nexus object used in eRPC
      */
-    LDPCWorker(Config* config, int tid, erpc::Nexus* nexus);
+    LDPCWorker(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus);
     ~LDPCWorker();
 
     /// Continuosly poll for incoming RPC requests and process them
-    void serve(); // TODO: Better name run_erpc_event_loop_forever?
+    void run_erpc_event_loop_forever();
 
     /// LDPC-decode data from in_buffer and place it in out_buffer
     void decode(int8_t* in_buffer, uint8_t* out_buffer);
-
-    /// Return the number of decoded bits for each decoding round
-    size_t get_decoded_bits();
 
     friend void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
 
 private:
     const int tid; // Thread ID as defined by eRPC
-    const size_t decoded_bits; // TODO: DOC
-    Config* cfg; // TODO: Do we just need cfg->LDPC_config?
-    int16_t* resp_var_nodes; // TODO: DOC
+    const size_t decoded_bits; // Number of decoded bits for each decoding round
+    LDPCconfig LDPC_config; // Configurations for LDPC worker
     erpc::Rpc<erpc::CTransport>* rpc;
+
+    // The buffer used to store the code word 16-bit LLR outputs for FlexRAN lib
+    int16_t* resp_var_nodes;
 };
 
 #endif
