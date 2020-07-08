@@ -253,6 +253,12 @@ static constexpr bool kUseLDPC = true;
 static constexpr bool kUseLDPC = false;
 #endif
 
+#if defined USE_ERPC
+static constexpr bool kUseERPC = true;
+#else
+static constexpr bool kUseERPC = false;
+#endif
+
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 #endif

@@ -23,6 +23,7 @@
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"
+#include "rpc.h"
 #include "utils_ldpc.hpp"
 
 class DoEncode : public Doer {
@@ -60,7 +61,9 @@ public:
 
     Event_data launch(size_t tag);
 
-    friend void decode_cont_func(void *_context, void *_tag);
+    void register_rpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
+
+    friend void decode_cont_func(void* _context, void* _tag);
 
 private:
     int16_t* resp_var_nodes;
@@ -69,6 +72,16 @@ private:
     Table<int> decoded_bits_count_;
     Table<int> error_bits_count_;
     DurationStat* duration_stat;
+
+    erpc::Rpc<erpc::CTransport>* rpc;
+    std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
+    std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
+    int session;
+    // bool session_in_use;
+
+    static const size_t kRpcMaxMsgBufNum = 64;
+    static const int kRpcReqType = 2;
+    static const int kRpcMaxMsgSize = (1 << 20);
 };
 
 class DecodeTag {
@@ -77,6 +90,9 @@ public:
     size_t output_offset;
     size_t tag;
     int tid;
+    erpc::MsgBuffer* req_msgbuf;
+    erpc::MsgBuffer* resp_msgbuf;
+    erpc::Rpc<erpc::CTransport>* rpc;
 };
 
 #endif

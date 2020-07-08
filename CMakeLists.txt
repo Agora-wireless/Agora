@@ -257,7 +257,7 @@ if(${USE_ERPC})
   endif()
   set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc)
   include_directories(SYSTEM $ENV{ERPC_INCLUDE_PATH})
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/rpc/rpc_context.cpp)
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES})
 endif()
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
@@ -352,7 +352,6 @@ if(${USE_ERPC})
     src/ldpc/ldpc_main.cpp
     ${COMMON_SOURCES}
     ${LDPC_SOURCES}
-    src/rpc/rpc_context.cpp
     ${HEADER_FILES})
   target_link_libraries(ldpc_worker ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
 endif()

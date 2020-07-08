@@ -5,20 +5,13 @@
  */
 #include "millipede.hpp"
 
-#ifdef USE_ERPC
-#include "rpc_context.hpp"
-#endif
-
 using namespace std;
 
-#ifdef USE_ERPC
-// extern RPCContext** ctx_list;
-erpc::Rpc<erpc::CTransport> **rpc_list;
-int *session_vec;
-erpc::Nexus *nexus;
-erpc::MsgBuffer *req_msgbuf_list;
-erpc::MsgBuffer *resp_msgbuf_list;
-#endif
+void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
+    erpc::SmErrType sm_err_type, void* _context)
+{
+    printf("Connected session: %d\n", session_num);
+}
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -68,15 +61,10 @@ Millipede::Millipede(Config* cfg)
             tx_ptoks_ptr + cfg->socket_thread_num));
     }
 
-#ifdef USE_ERPC
-    // ctx_list = new RPCContext*[cfg->worker_thread_num];
-    rpc_list = new erpc::Rpc<erpc::CTransport>*[cfg->worker_thread_num];
-    session_vec = new int[cfg->worker_thread_num];
-    std::string uri = config_->server_addr + ":" + std::to_string(kUDPPort);
-    nexus = new erpc::Nexus(uri, 0, 0);
-    req_msgbuf_list = new erpc::MsgBuffer[cfg->worker_thread_num];
-    resp_msgbuf_list = new erpc::MsgBuffer[cfg->worker_thread_num];
-#endif
+    if (kUseERPC) {
+        auto uri = config_->server_addr + ":" + std::to_string(kRpcPort);
+        nexus = new erpc::Nexus(uri, 0, 0);
+    }
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -385,10 +373,12 @@ void Millipede::start()
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-                printf("Decode frame %lu symbol %lu\n", frame_id, symbol_idx_ul);
+                printf(
+                    "Decode frame %lu symbol %lu\n", frame_id, symbol_idx_ul);
 
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
-                    printf("Decode frame %lu symbol %lu done\n", frame_id, symbol_idx_ul);
+                    printf("Decode frame %lu symbol %lu done\n", frame_id,
+                        symbol_idx_ul);
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     decode_stats_.verbose = true;
@@ -702,41 +692,25 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
-    // TODO: change uri to cfg->ldpc_addr
-    // std::string uri = kClientHostname + ":" + std::to_string(kUDPPort + tid);
-    // std::string uri = config_->server_addr + ":" + std::to_string(kUDPPort + tid);
-#ifdef USE_ERPC
-    // ctx_list[tid] = new RPCContext(nexus, tid, static_cast<void *>(computeDecoding));
-
-    // std::string uri = config_->ldpc_worker_addr + ":" + std::to_string(kUDPPort);
-    // int session_num = ctx_list[tid]->connect(uri, tid % config_->ldpc_worker_num);
-    // rt_assert(session_num >= 0, "Connect failed!");
-    
-    // ctx_list[tid]->set_dedicate_session(session_num);
-
-    // while (!ctx_list[tid]->check_session(session_num)) {
-    //     ctx_list[tid]->poll_event();
-    // }
-
-    rpc_list[tid] = new erpc::Rpc<erpc::CTransport>(nexus, static_cast<void *>(computeDecoding), tid, basic_sm_handler);
-    rpc_list[tid]->retry_connect_on_invalid_rpc_id = true;
-    req_msgbuf_list[tid] = rpc_list[tid]->alloc_msg_buffer_or_die(kMsgSize);
-    resp_msgbuf_list[tid] = rpc_list[tid]->alloc_msg_buffer_or_die(kMsgSize);
-    std::string uri = config_->ldpc_worker_addr + ":" + std::to_string(kUDPPort);
-    int session_num = rpc_list[tid]->create_session(uri, tid % config_->ldpc_worker_num);
-    rt_assert(session_num >= 0, "Connect failed!");
-    session_vec[tid] = session_num;
-    while (!rpc_list[tid]->is_connected(session_num)) {
-        rpc_list[tid]->run_event_loop_once();
+    erpc::Rpc<erpc::CTransport>* rpc;
+    if (kUseERPC) {
+        rpc = new erpc::Rpc<erpc::CTransport>(
+            nexus, static_cast<void*>(computeDecoding), tid, basic_sm_handler);
+        rpc->retry_connect_on_invalid_rpc_id = true;
+        auto uri = config_->ldpc_worker_addr + ":" + std::to_string(kRpcPort);
+        int session = rpc->create_session(uri, tid % config_->ldpc_worker_num);
+        rt_assert(session >= 0, "Connect failed!");
+        while (!rpc->is_connected(session)) {
+            rpc->run_event_loop_once();
+        }
+        static_cast<DoDecode*>(computeDecoding)->register_rpc(rpc, session);
     }
-#endif
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
-#ifdef USE_ERPC
-            // ctx_list[tid]->poll_event();
-            rpc_list[tid]->run_event_loop_once();
-#endif
+            if (kUseERPC) {
+                rpc->run_event_loop_once();
+            }
             if (computers_vec[i]->try_launch())
                 break;
         }

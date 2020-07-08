@@ -3,12 +3,20 @@
 #include <malloc.h>
 #include <string>
 
+void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
+    erpc::SmErrType sm_err_type, void* _context)
+{
+    printf("Connected session: %d\n", session_num);
+}
+
 LDPCWorker::LDPCWorker(Config* config, int tid, erpc::Nexus* nexus)
     : cfg(config)
     , tid(tid)
 {
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
-    ctx = new RPCContext(nexus, tid, static_cast<void*>(this));
+    // ctx = new RPCContext(nexus, tid, static_cast<void*>(this));
+    rpc = new erpc::Rpc<erpc::CTransport>(
+        nexus, static_cast<void*>(this), tid, basic_sm_handler);
 
     decoded_bits = ldpc_encoding_input_buf_size(
         config->LDPC_config.Bg, config->LDPC_config.Zc);
@@ -18,21 +26,25 @@ LDPCWorker::~LDPCWorker() { free(resp_var_nodes); }
 
 void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
 {
-    auto* context = static_cast<RPCContext*>(_context);
-    auto* worker = static_cast<LDPCWorker*>(context->get_info());
+    // auto* context = static_cast<RPCContext*>(_context);
+    // auto* worker = static_cast<LDPCWorker*>(context->get_info());
+    auto* worker = static_cast<LDPCWorker*>(_context);
     auto* in_buf = reinterpret_cast<int8_t*>(req_handle->get_req_msgbuf()->buf);
 
-    size_t *p = reinterpret_cast<size_t *>(in_buf);
+    size_t* p = reinterpret_cast<size_t*>(in_buf);
     size_t frame_id = *p;
     size_t symbol_id = *(p + 1);
     printf("Decode frame frame %lu symbol %lu\n", frame_id, symbol_id);
 
+    // req_handle->dyn_resp_msgbuf
+    // = context->alloc_msg_buffer(worker->get_decoded_bits());
     req_handle->dyn_resp_msgbuf
-        = context->alloc_msg_buffer(worker->get_decoded_bits());
+        = worker->rpc->alloc_msg_buffer(worker->get_decoded_bits());
     auto* out_buf = reinterpret_cast<uint8_t*>(req_handle->dyn_resp_msgbuf.buf);
     worker->decode(in_buf + 2 * sizeof(size_t), out_buf);
 
-    context->respond_without_copy(req_handle, &req_handle->dyn_resp_msgbuf);
+    // context->respond_without_copy(req_handle, &req_handle->dyn_resp_msgbuf);
+    worker->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
 size_t LDPCWorker::get_decoded_bits() { return decoded_bits; }
@@ -40,7 +52,8 @@ size_t LDPCWorker::get_decoded_bits() { return decoded_bits; }
 void LDPCWorker::serve()
 {
     while (true) {
-        ctx->poll_event();
+        // ctx->poll_event();
+        rpc->run_event_loop_once();
     }
 }
 
