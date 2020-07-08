@@ -75,7 +75,7 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lmlx4 -lcrypto -lpcap -lrt -lelf -lnuma -Wl,--no-whole-archive dl
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lmlx4 -lcrypto -lpcap -lrt -lelf -lnuma -Wl,--no-whole-archive dl)
 
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
