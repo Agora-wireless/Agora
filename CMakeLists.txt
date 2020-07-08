@@ -75,7 +75,7 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lmlx4 -lrt -lnuma -Wl,--no-whole-archive dl)
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lmlx4 -lcrypto -lpcap -lrt -lelf -lnuma -Wl,--no-whole-archive dl
 
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
@@ -209,6 +209,7 @@ set(COMMON_SOURCES
 set(MILLIPEDE_SOURCES 
   src/millipede/millipede.cpp
   src/millipede/stats.cpp 
+  src/millipede/phy_stats.cpp 
   src/millipede/dofft.cpp
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp

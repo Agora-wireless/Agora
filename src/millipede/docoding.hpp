@@ -15,6 +15,7 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "stats.hpp"
+#include "phy_stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -55,8 +56,8 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
-        Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
-        Stats* in_stats_manager);
+        //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
+        PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDecode();
 
     Event_data launch(size_t tag);
@@ -69,8 +70,9 @@ private:
     int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
     Table<uint8_t>& decoded_buffer_;
-    Table<int> decoded_bits_count_;
-    Table<int> error_bits_count_;
+    //Table<int> decoded_bits_count_;
+    //Table<int> error_bits_count_;
+    PhyStats* phy_stats;
     DurationStat* duration_stat;
 
     erpc::Rpc<erpc::CTransport>* rpc;
