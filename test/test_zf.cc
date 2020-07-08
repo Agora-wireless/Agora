@@ -31,9 +31,7 @@ TEST(TestZF, Perf)
     recip_buffer.rand_alloc_float(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
-    auto stats = new Stats(cfg, kMaxStatBreakdown, cfg->worker_thread_num,
-        cfg->fft_thread_num, cfg->zf_thread_num, cfg->demul_thread_num,
-        freq_ghz);
+    auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
     auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
         csi_buffer, recip_buffer, ul_zf_buffer, dl_zf_buffer, stats);
