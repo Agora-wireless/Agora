@@ -1,19 +1,22 @@
 #include "ldpc_worker.hpp"
 #include "utils.h"
 
-void* run_worker(void* args)
+#include <thread>
+
+// void* run_worker(void* args)
+void run_worker(Config* cfg, size_t tid, erpc::Nexus* nexus)
 {
-    auto* cfg = *(static_cast<Config**>(args));
-    auto tid = *(reinterpret_cast<int*>(static_cast<Config**>(args) + 1));
-    auto* nexus = *(reinterpret_cast<erpc::Nexus**>(
-        static_cast<int8_t*>(args) + sizeof(Config*) + sizeof(int)));
+    // auto* cfg = *(static_cast<Config**>(args));
+    // auto tid = *(reinterpret_cast<int*>(static_cast<Config**>(args) + 1));
+    // auto* nexus = *(reinterpret_cast<erpc::Nexus**>(
+    // static_cast<int8_t*>(args) + sizeof(Config*) + sizeof(int)));
     pin_to_core_with_offset(
         ThreadType::kWorker, cfg->ldpc_worker_core_offset, tid);
 
     auto* worker = new LDPCWorker(cfg, tid, nexus);
     worker->serve();
 
-    return NULL;
+    // return NULL;
 }
 
 int main(int argc, char** argv)
@@ -31,7 +34,8 @@ int main(int argc, char** argv)
     constexpr int kReqType = 2;
     constexpr int kUDPPort = 31850;
 
-    auto* task_threads = new pthread_t[cfg->ldpc_worker_num];
+    // auto* task_threads = new pthread_t[cfg->ldpc_worker_num];
+    auto* task_threads = new std::thread*[cfg->ldpc_worker_num];
 
     std::string uri = cfg->ldpc_worker_addr + ":" + std::to_string(kUDPPort);
     auto* nexus = new erpc::Nexus(uri, 0, 0);
@@ -39,23 +43,25 @@ int main(int argc, char** argv)
 
     // XXX: Use size_t i instead of int i in all loops
     for (size_t i = 0; i < cfg->ldpc_worker_num; i++) {
-        auto* args
-            = new char[sizeof(Config*) + sizeof(int) + sizeof(erpc::Nexus*)];
-        *(reinterpret_cast<Config**>(args)) = cfg;
-        *(reinterpret_cast<int*>(args + sizeof(Config*))) = i;
-        *(reinterpret_cast<erpc::Nexus**>(args + sizeof(Config*) + sizeof(int)))
-            = nexus;
-        int ret;
+        // auto* args
+        // = new char[sizeof(Config*) + sizeof(int) + sizeof(erpc::Nexus*)];
+        // *(reinterpret_cast<Config**>(args)) = cfg;
+        // *(reinterpret_cast<int*>(args + sizeof(Config*))) = i;
+        // *(reinterpret_cast<erpc::Nexus**>(args + sizeof(Config*) + sizeof(int)))
+        // = nexus;
+        // int ret;
         // XXX: Use std::thread instead of pthread_create
-        ret = pthread_create(&task_threads[i], NULL, run_worker, args);
-        if (ret != 0) {
-            perror("task thread create failed");
-            exit(0);
-        }
+        // ret = pthread_create(&task_threads[i], NULL, run_worker, args);
+        // if (ret != 0) {
+        // perror("task thread create failed");
+        // exit(0);
+        // }
+        task_threads[i] = new std::thread(run_worker, cfg, i, nexus);
     }
 
     for (size_t i = 0; i < cfg->ldpc_worker_num; i++) {
-        pthread_join(task_threads[i], NULL);
+        // pthread_join(task_threads[i], NULL);
+        task_threads[i]->join();
     }
 
     return 0;
