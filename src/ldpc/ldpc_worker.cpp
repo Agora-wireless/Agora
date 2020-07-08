@@ -12,13 +12,13 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
 LDPCWorker::LDPCWorker(Config* config, int tid, erpc::Nexus* nexus)
     : cfg(config)
     , tid(tid)
+    , decoded_bits(ldpc_encoding_input_buf_size(
+          config->LDPC_config.Bg, config->LDPC_config.Zc))
+    ,
 {
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
     rpc = new erpc::Rpc<erpc::CTransport>(
         nexus, static_cast<void*>(this), tid, basic_sm_handler);
-
-    decoded_bits = ldpc_encoding_input_buf_size(
-        config->LDPC_config.Bg, config->LDPC_config.Zc);
 }
 
 LDPCWorker::~LDPCWorker() { free(resp_var_nodes); }
@@ -53,6 +53,8 @@ void LDPCWorker::decode(int8_t* in_buffer, uint8_t* out_buffer)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
 
+    // TODO: Rename ldpc_decoder_5gnr_request/response to just ldpc_request &
+    // ldpc_response
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
