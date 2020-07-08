@@ -14,8 +14,8 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "stats.hpp"
 #include "phy_stats.hpp"
+#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -79,7 +79,6 @@ private:
     std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
     std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
     int session;
-    // bool session_in_use;
 
     static const size_t kRpcMaxMsgBufNum = 64;
     static const int kRpcReqType = 2;
