@@ -36,9 +36,7 @@ Millipede::Millipede(Config* cfg)
         initialize_downlink_buffers();
     }
 
-    stats = new Stats(cfg, kMaxStatBreakdown, cfg->worker_thread_num,
-        cfg->fft_thread_num, cfg->zf_thread_num, cfg->demul_thread_num,
-        freq_ghz);
+    stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
     phy_stats = new PhyStats(cfg);
 
     /* Initialize TXRX threads */
@@ -364,6 +362,10 @@ void Millipede::start()
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
 
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
+                    if (kEnableMac) {
+                        schedule_users(
+                            EventType::kPacketToMac, frame_id, symbol_idx_ul);
+                    }
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {

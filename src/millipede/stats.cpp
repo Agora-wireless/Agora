@@ -7,14 +7,13 @@
 
 #include <typeinfo>
 
-Stats::Stats(Config* cfg, size_t break_down_num, size_t task_thread_num,
-    size_t fft_thread_num, size_t zf_thread_num, size_t demul_thread_num,
-    double freq_ghz)
+Stats::Stats(Config* cfg, size_t break_down_num, double freq_ghz)
     : config_(cfg)
-    , task_thread_num(task_thread_num)
-    , fft_thread_num(fft_thread_num)
-    , zf_thread_num(zf_thread_num)
-    , demul_thread_num(demul_thread_num)
+    , task_thread_num(cfg->worker_thread_num)
+    , fft_thread_num(cfg->fft_thread_num)
+    , zf_thread_num(cfg->zf_thread_num)
+    , demul_thread_num(cfg->demul_thread_num)
+    , decode_thread_num(cfg->decode_thread_num)
     , break_down_num(break_down_num)
     , freq_ghz(freq_ghz)
     , creation_tsc(rdtsc())
@@ -62,7 +61,7 @@ void Stats::print_per_thread_per_task(FrameSummary s)
 
 void Stats::print_per_frame(const char* doer_string, FrameSummary frame_summary)
 {
-    printf("%s (%zu tasks): %.2f ms (~ %.4f + %.3f + %.4f ms), ", doer_string,
+    printf("%s (%zu tasks): %.3f ms (~ %.4f + %.3f + %.4f ms), ", doer_string,
         frame_summary.count_all_threads,
         frame_summary.us_avg_threads[0] / 1000.0,
         frame_summary.us_avg_threads[1] / 1000.0,
@@ -72,7 +71,8 @@ void Stats::print_per_frame(const char* doer_string, FrameSummary frame_summary)
 
 void Stats::update_stats_in_functions_uplink(size_t frame_id)
 {
-    last_frame_id = (size_t)frame_id;
+    last_frame_id = frame_id;
+    size_t frame_slot = frame_id % kNumStatsFrames;
     if (!kIsWorkerTimingEnabled)
         return;
 
@@ -82,31 +82,34 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
     FrameSummary demul_frame_summary;
     FrameSummary decode_frame_summary;
 
-#if BIGSTATION
-    update_stats_in_functions_uplink_bigstation(frame_id, &fft_frame_summary,
-        &csi_frame_summary, &zf_frame_summary, &demul_frame_summary,
-        &decode_frame_summary);
-#else
-    update_stats_in_functions_uplink_millipede(frame_id, &fft_frame_summary,
-        &csi_frame_summary, &zf_frame_summary, &demul_frame_summary,
-        &decode_frame_summary);
-#endif
+    if (config_->bigstation_mode)
+        update_stats_in_functions_uplink_bigstation(frame_slot,
+            &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
+            &demul_frame_summary, &decode_frame_summary);
+    else
+        update_stats_in_functions_uplink_millipede(frame_slot,
+            &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
+            &demul_frame_summary, &decode_frame_summary);
 
-    fft_us[frame_id] = fft_frame_summary.us_avg_threads[0];
-    csi_us[frame_id] = csi_frame_summary.us_avg_threads[0];
-    zf_us[frame_id] = zf_frame_summary.us_avg_threads[0];
-    demul_us[frame_id] = demul_frame_summary.us_avg_threads[0];
-    decode_us[frame_id] = decode_frame_summary.us_avg_threads[0];
+    fft_us[frame_slot] = fft_frame_summary.us_avg_threads[0];
+    csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];
+    zf_us[frame_slot] = zf_frame_summary.us_avg_threads[0];
+    demul_us[frame_slot] = demul_frame_summary.us_avg_threads[0];
+    decode_us[frame_slot] = decode_frame_summary.us_avg_threads[0];
 
-    const double sum_us_this_frame = fft_us[frame_id] + csi_us[frame_id]
-        + zf_us[frame_id] + demul_us[frame_id] + decode_us[frame_id];
+    const double sum_us_this_frame = fft_us[frame_slot] + csi_us[frame_slot]
+        + zf_us[frame_slot] + demul_us[frame_slot] + decode_us[frame_slot];
 
     for (size_t i = 1; i < break_down_num; i++) {
-        fft_breakdown_us[i - 1][frame_id] = fft_frame_summary.us_avg_threads[i];
-        csi_breakdown_us[i - 1][frame_id] = csi_frame_summary.us_avg_threads[i];
-        zf_breakdown_us[i - 1][frame_id] = zf_frame_summary.us_avg_threads[i];
-        demul_breakdown_us[i - 1][frame_id]
+        fft_breakdown_us[i - 1][frame_slot]
+            = fft_frame_summary.us_avg_threads[i];
+        csi_breakdown_us[i - 1][frame_slot]
+            = csi_frame_summary.us_avg_threads[i];
+        zf_breakdown_us[i - 1][frame_slot] = zf_frame_summary.us_avg_threads[i];
+        demul_breakdown_us[i - 1][frame_slot]
             = demul_frame_summary.us_avg_threads[i];
+        decode_breakdown_us[i - 1][frame_slot]
+            = decode_frame_summary.us_avg_threads[i];
     }
 
     if (kDebugPrintPerFrameDone) {
@@ -125,6 +128,7 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
 void Stats::update_stats_in_functions_downlink(size_t frame_id)
 {
     last_frame_id = (size_t)frame_id;
+    size_t frame_slot = frame_id % kNumStatsFrames;
     if (!kIsWorkerTimingEnabled)
         return;
 
@@ -134,23 +138,23 @@ void Stats::update_stats_in_functions_downlink(size_t frame_id)
     FrameSummary precode_frame_summary;
     FrameSummary encode_frame_summary;
 
-#if BIGSTATION
-    update_stats_in_functions_downlink_bigstation(frame_id, &ifft_frame_summary,
-        &csi_frame_summary, &zf_frame_summary, &precode_frame_summary,
-        &encode_frame_summary);
-#else
-    update_stats_in_functions_downlink_millipede(frame_id, &ifft_frame_summary,
-        &csi_frame_summary, &zf_frame_summary, &precode_frame_summary,
-        &encode_frame_summary);
-#endif
-    csi_us[frame_id] = csi_frame_summary.us_avg_threads[0];
-    ifft_us[frame_id] = ifft_frame_summary.us_avg_threads[0];
-    zf_us[frame_id] = zf_frame_summary.us_avg_threads[0];
-    precode_us[frame_id] = precode_frame_summary.us_avg_threads[0];
-    encode_us[frame_id] = encode_frame_summary.us_avg_threads[0];
+    if (config_->bigstation_mode)
+        update_stats_in_functions_downlink_bigstation(frame_slot,
+            &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
+            &precode_frame_summary, &encode_frame_summary);
+    else
+        update_stats_in_functions_downlink_millipede(frame_slot,
+            &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
+            &precode_frame_summary, &encode_frame_summary);
 
-    const double sum_us_this_frame = csi_us[frame_id] + ifft_us[frame_id]
-        + zf_us[frame_id] + precode_us[frame_id] + encode_us[frame_id];
+    csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];
+    ifft_us[frame_slot] = ifft_frame_summary.us_avg_threads[0];
+    zf_us[frame_slot] = zf_frame_summary.us_avg_threads[0];
+    precode_us[frame_slot] = precode_frame_summary.us_avg_threads[0];
+    encode_us[frame_slot] = encode_frame_summary.us_avg_threads[0];
+
+    const double sum_us_this_frame = csi_us[frame_slot] + ifft_us[frame_slot]
+        + zf_us[frame_slot] + precode_us[frame_slot] + encode_us[frame_slot];
 
     if (kDebugPrintPerFrameDone) {
         printf("Frame %zu summary: ", frame_id);
@@ -229,6 +233,26 @@ void Stats::update_stats_in_dodemul_bigstation(size_t frame_id,
     compute_avg_over_threads(demul_frame_summary, thread_num, break_down_num);
 }
 
+void Stats::update_stats_in_dodecode_bigstation(size_t frame_id,
+    size_t thread_num, size_t thread_num_offset,
+    FrameSummary* decode_frame_summary)
+{
+    for (size_t i = thread_num_offset; i < thread_num_offset + thread_num;
+         i++) {
+        populate_summary(decode_frame_summary, i, DoerType::kDecode);
+
+        if (kDebugPrintStatsPerThread) {
+            double sum_us_this_frame_this_thread
+                = decode_frame_summary->us_this_thread[0];
+            printf("In frame %zu, thread %zu, \t", frame_id, i);
+            printf("decode: ");
+            print_per_thread_per_task(*decode_frame_summary);
+            printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
+        }
+    }
+    compute_avg_over_threads(decode_frame_summary, thread_num, break_down_num);
+}
+
 void Stats::update_stats_in_doifft_bigstation(size_t frame_id,
     size_t thread_num, size_t thread_num_offset,
     FrameSummary* ifft_frame_summary, FrameSummary* csi_frame_summary)
@@ -274,10 +298,30 @@ void Stats::update_stats_in_doprecode_bigstation(size_t frame_id,
     compute_avg_over_threads(precode_frame_summary, thread_num, break_down_num);
 }
 
+void Stats::update_stats_in_doencode_bigstation(size_t frame_id,
+    size_t thread_num, size_t thread_num_offset,
+    FrameSummary* encode_frame_summary)
+{
+    for (size_t i = thread_num_offset; i < thread_num_offset + thread_num;
+         i++) {
+        populate_summary(encode_frame_summary, i, DoerType::kEncode);
+
+        if (kDebugPrintStatsPerThread) {
+            double sum_us_this_frame_this_thread
+                = encode_frame_summary->us_this_thread[0];
+            printf("In frame %zu, thread %zu, \t", frame_id, i);
+            printf("precode: ");
+            print_per_thread_per_task(*encode_frame_summary);
+            printf("sum: %.3f\n", sum_us_this_frame_this_thread);
+        }
+    }
+    compute_avg_over_threads(encode_frame_summary, thread_num, break_down_num);
+}
+
 void Stats::update_stats_in_functions_uplink_bigstation(size_t frame_id,
     FrameSummary* fft_frame_summary, FrameSummary* csi_frame_summary,
     FrameSummary* zf_frame_summary, FrameSummary* demul_frame_summary,
-    UNUSED FrameSummary* decode_frame_summary)
+    FrameSummary* decode_frame_summary)
 {
     update_stats_in_dofft_bigstation(
         frame_id, fft_thread_num, 0, fft_frame_summary, csi_frame_summary);
@@ -285,12 +329,15 @@ void Stats::update_stats_in_functions_uplink_bigstation(size_t frame_id,
         frame_id, zf_thread_num, fft_thread_num, zf_frame_summary);
     update_stats_in_dodemul_bigstation(frame_id, demul_thread_num,
         fft_thread_num + zf_thread_num, demul_frame_summary);
+    update_stats_in_dodecode_bigstation(frame_id, decode_thread_num,
+        fft_thread_num + zf_thread_num + demul_thread_num,
+        decode_frame_summary);
 }
 
 void Stats::update_stats_in_functions_downlink_bigstation(size_t frame_id,
     FrameSummary* ifft_frame_summary, FrameSummary* csi_frame_summary,
     FrameSummary* zf_frame_summary, FrameSummary* precode_frame_summary,
-    UNUSED FrameSummary* encode_frame_summary)
+    FrameSummary* encode_frame_summary)
 {
     update_stats_in_doifft_bigstation(
         frame_id, fft_thread_num, 0, ifft_frame_summary, csi_frame_summary);
@@ -298,6 +345,9 @@ void Stats::update_stats_in_functions_downlink_bigstation(size_t frame_id,
         frame_id, zf_thread_num, fft_thread_num, zf_frame_summary);
     update_stats_in_doprecode_bigstation(frame_id, demul_thread_num,
         fft_thread_num + zf_thread_num, precode_frame_summary);
+    update_stats_in_doencode_bigstation(frame_id, decode_thread_num,
+        fft_thread_num + zf_thread_num + demul_thread_num,
+        encode_frame_summary);
 }
 
 void Stats::update_stats_in_functions_uplink_millipede(size_t frame_id,
@@ -403,31 +453,29 @@ void Stats::save_to_file()
     printf("Stats: Saving master timestamps to %s\n", filename.c_str());
 
     if (config_->downlink_mode) {
-        for (size_t ii = 0; ii < last_frame_id; ii++) {
-            fprintf(fp_debug,
-                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-                "%.3f %.3f %.3f %.3f %.3f",
-                cycles_to_us(master_get_tsc(TsType::kPilotRX, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kRCAllRX, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kRXDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kFFTDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kRCDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kZFDone, ii), freq_ghz),
-                cycles_to_us(
-                    master_get_tsc(TsType::kPrecodeDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kIFFTDone, ii), freq_ghz),
-                cycles_to_us(master_get_tsc(TsType::kTXDone, ii), freq_ghz),
-                cycles_to_us(
-                    master_get_tsc(TsType::kTXProcessedFirst, ii), freq_ghz),
-                csi_us[ii], zf_us[ii], precode_us[ii], ifft_us[ii],
-                cycles_to_us(
-                    master_get_tsc(TsType::kProcessingStarted, ii), freq_ghz),
-                cycles_to_us(frame_start[0][ii], freq_ghz));
+        fprintf(fp_debug,
+            "Pilot RX by socket threads (= reference time), "
+            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTDone, kZFDone, "
+            "kPrecodeDone, kRXDone, time in CSI, time in FFT, time in ZF, "
+            "time in Demul, time in Decode\n");
 
-            if (config_->socket_thread_num > 1)
-                fprintf(fp_debug, " %.3f",
-                    cycles_to_us(frame_start[1][ii], freq_ghz));
-            fprintf(fp_debug, "\n");
+        for (size_t i = 0; i < last_frame_id; i++) {
+            size_t ref_tsc = SIZE_MAX;
+            for (size_t j = 0; j < config_->socket_thread_num; j++) {
+                ref_tsc = std::min(ref_tsc, frame_start[j][i]);
+            }
+            fprintf(fp_debug,
+                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
+                cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
+                master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
+                master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
+                master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
+                master_get_us_from_ref(TsType::kFFTDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kZFDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kPrecodeDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kIFFTDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kEncodeDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kRXDone, i, ref_tsc));
         }
     } else {
         // Print the header
@@ -435,7 +483,7 @@ void Stats::save_to_file()
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTDone, kZFDone, "
             "kDemulDone, kRXDone, time in CSI, time in FFT, time in ZF, "
-            "time in Demul\n");
+            "time in Demul, time in Decode\n");
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
             for (size_t j = 0; j < config_->socket_thread_num; j++) {
@@ -443,7 +491,8 @@ void Stats::save_to_file()
             }
 
             fprintf(fp_debug,
-                "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n",
+                "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
+                "%.3f %.3f\n",
                 cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
                 master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
                 master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
@@ -451,8 +500,9 @@ void Stats::save_to_file()
                 master_get_us_from_ref(TsType::kFFTDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kZFDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kDemulDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kDecodeDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kRXDone, i, ref_tsc), csi_us[i],
-                fft_us[i], zf_us[i], demul_us[i]);
+                fft_us[i], zf_us[i], demul_us[i], decode_us[i]);
         }
     }
 
@@ -467,15 +517,20 @@ void Stats::save_to_file()
         FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
         rt_assert(fp_debug_detailed != nullptr,
             std::string("Open file failed ") + std::to_string(errno));
+        // Print the header
+        fprintf(fp_debug,
+            "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
+            "decode_0, decode_1, decode_2\n");
 
         for (size_t i = 0; i < last_frame_id; i++) {
             fprintf(fp_debug_detailed,
-                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
+                "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
                 fft_breakdown_us[0][i], fft_breakdown_us[1][i],
                 fft_breakdown_us[2][i], zf_breakdown_us[0][i],
                 zf_breakdown_us[1][i], zf_breakdown_us[2][i],
                 demul_breakdown_us[0][i], demul_breakdown_us[1][i],
-                demul_breakdown_us[2][i]);
+                demul_breakdown_us[2][i], decode_breakdown_us[0][i],
+                decode_breakdown_us[1][i], decode_breakdown_us[2][i]);
         }
         fclose(fp_debug_detailed);
     }

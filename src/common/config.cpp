@@ -185,9 +185,11 @@ Config::Config(std::string jsonfile)
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     mac_socket_thread_num
         = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
-    fft_thread_num = tddConf.value("fft_thread_num", 4);
-    demul_thread_num = tddConf.value("demul_thread_num", 11);
-    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
+    fft_thread_num = tddConf.value("fft_thread_num", 5);
+    demul_thread_num = tddConf.value("demul_thread_num", 5);
+    decode_thread_num = tddConf.value("decode_thread_num", kUseLDPC ? 10 : 0);
+    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
+        - decode_thread_num;
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
@@ -237,8 +239,9 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
 
-    data_bytes_num_persymbol
-        = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
+    data_bytes_num_persymbol = kUseLDPC
+        ? (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol
+        : OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
