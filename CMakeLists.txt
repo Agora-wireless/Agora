@@ -14,7 +14,7 @@ set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64 -fPIC")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
@@ -55,6 +55,7 @@ set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
@@ -74,7 +75,10 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lrt -lnuma -Wl,--no-whole-archive dl)
+  if(${USE_MLX_NIC})
+    set(MLX_LIBRARIES -libverbs -lmlx5)
+  endif()
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
 
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
@@ -217,6 +221,7 @@ set(MILLIPEDE_SOURCES
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
 include_directories(
   ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
@@ -245,6 +250,7 @@ if(${USE_LDPC})
 
   set(FLEXRAN_LDPC_LIBS
     ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+    ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
     ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
