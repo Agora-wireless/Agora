@@ -189,7 +189,6 @@ include_directories(
   src/millipede/
   src/millipede/txrx/
   src/client/
-  src/rpc
   src/ldpc)
 
 include_directories(SYSTEM src/third_party)
