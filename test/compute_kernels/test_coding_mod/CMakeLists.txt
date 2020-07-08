@@ -47,18 +47,19 @@ else()
   message(FATAL_ERROR "FlexRAN FEC libraries required but not found")
 endif()
 
+set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
 include_directories(
   /opt/intel/mkl/include
   ${FLEXRAN_FEC_SDK_DIR}/test/phy/common
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
-  ../../src
-  ../../src/encoder)
+  ${SOURCE_DIR}/src
+  ${SOURCE_DIR}/src/encoder)
 
 set(SOURCES 
-  ../../src/encoder/cyclic_shift.cpp
-  ../../src/encoder/encoder.cpp
-  ../../src/encoder/iobuffer.cpp)
+  ${SOURCE_DIR}/src/encoder/cyclic_shift.cpp
+  ${SOURCE_DIR}/src/encoder/encoder.cpp
+  ${SOURCE_DIR}/src/encoder/iobuffer.cpp)
 
 add_executable(test_ldpc test_ldpc.cpp ${SOURCES})
 target_link_libraries (test_ldpc
