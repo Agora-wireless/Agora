@@ -14,7 +14,6 @@ LDPCWorker::LDPCWorker(Config* config, int tid, erpc::Nexus* nexus)
     , tid(tid)
     , decoded_bits(ldpc_encoding_input_buf_size(
           config->LDPC_config.Bg, config->LDPC_config.Zc))
-    ,
 {
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
     rpc = new erpc::Rpc<erpc::CTransport>(
