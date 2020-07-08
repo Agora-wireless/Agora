@@ -178,7 +178,6 @@ Event_data DoDecode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kUseERPC) {
-        // TODO: transfer data to LDPC decoder
         size_t input_offset
             = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
         size_t llr_buffer_offset = input_offset * cfg->mod_type;

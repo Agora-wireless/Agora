@@ -49,7 +49,7 @@ void LDPCWorker::serve()
     }
 }
 
-bool LDPCWorker::decode(int8_t* in_buffer, uint8_t* out_buffer)
+void LDPCWorker::decode(int8_t* in_buffer, uint8_t* out_buffer)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
 
@@ -80,6 +80,4 @@ bool LDPCWorker::decode(int8_t* in_buffer, uint8_t* out_buffer)
 
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
-
-    return true;
 }
