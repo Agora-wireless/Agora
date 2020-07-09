@@ -181,15 +181,12 @@ int MacPacketTXRX::dequeue_send(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
     size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
 
-    int packet_length = kUseLDPC
-        ? (bits_to_bytes(cfg->LDPC_config.cbLen)
-              * cfg->LDPC_config.nblocksInSymbol)
-        : bits_to_bytes(cfg->OFDM_DATA_NUM * cfg->mod_type);
-    packet_length += MacPacket::kOffsetOfData;
+    int packet_length = cfg->data_bytes_num_persymbol;
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    int data_offset = kUseLDPC ? packet_length : cfg->OFDM_DATA_NUM;
+    int data_offset
+        = kUseLDPC ? cfg->data_bytes_num_persymbol : cfg->OFDM_DATA_NUM;
     uint8_t* ul_data_ptr
         = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * data_offset];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
@@ -201,11 +198,14 @@ int MacPacketTXRX::dequeue_send(int tid)
         adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
             cfg->OFDM_DATA_NUM, cfg->mod_type);
     else
-	memcpy(pkt->data, ul_data_ptr, packet_length);
+        memcpy(pkt->data, ul_data_ptr, packet_length);
+
+    int mac_packet_length = packet_length + MacPacket::kOffsetOfData;
 
     // Send data (one OFDM symbol)
-    size_t ret = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, packet_length,
-        0, (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+    size_t ret
+        = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, mac_packet_length, 0,
+            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
     if (kDebugPrintInTask) {
