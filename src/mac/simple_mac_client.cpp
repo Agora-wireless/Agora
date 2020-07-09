@@ -156,15 +156,17 @@ void* SimpleClientMac::master_thread(int tid)
 
     // add some delay to ensure data update is finished
     sleep(1);
-    int ret = 0;
-    char* start_msg[1024];
-    socklen_t addrlen = sizeof(servaddr_ipv4[0]);
-    while (keep_running && ret == 0) {
-        ret = recvfrom(socket_[0], start_msg, 1024, 0,
-            (struct sockaddr*)&servaddr_ipv4[0], &addrlen);
+    if (!cfg->init_mac_running) {
+        int ret = 0;
+        char* start_msg[1024];
+        socklen_t addrlen = sizeof(servaddr_ipv4[0]);
+        while (keep_running && ret == 0) {
+            ret = recvfrom(socket_[0], start_msg, 1024, 0,
+                (struct sockaddr*)&servaddr_ipv4[0], &addrlen);
+        }
+        std::cout << "Received WAKEUP Message\n"
+                  << "Starting Packet Transmission.." << std::endl;
     }
-    std::cout << "Received WAKEUP Message\n"
-              << "Starting Packet Transmission.." << std::endl;
 
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
