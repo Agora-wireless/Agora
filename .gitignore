@@ -57,3 +57,7 @@ CTestTestfile.cmake
 /sim
 /millipede
 /data_generator
+
+# IDE config files #
+# ##################
+.vscode

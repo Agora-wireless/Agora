@@ -420,9 +420,9 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 
 void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
-    printf("Printing sender results to file...\n");
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
+    printf("Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
