@@ -189,15 +189,19 @@ int MacPacketTXRX::dequeue_send(int tid)
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
+    int data_offset = kUseLDPC ? packet_length : cfg->OFDM_DATA_NUM;
     uint8_t* ul_data_ptr
-        = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * cfg->OFDM_DATA_NUM];
+        = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * data_offset];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
     new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
     pkt->frame_id = frame_id;
     pkt->symbol_id = symbol_id;
     pkt->ue_id = ue_id;
-    adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
-        cfg->OFDM_DATA_NUM, cfg->mod_type);
+    if (!kUseLDPC)
+        adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
+            cfg->OFDM_DATA_NUM, cfg->mod_type);
+    else
+	memcpy(pkt->data, ul_data_ptr, packet_length);
 
     // Send data (one OFDM symbol)
     size_t ret = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, packet_length,
