@@ -8,14 +8,11 @@
 
 int main(int argc, char* argv[])
 {
-    std::string confFile;
-    if (argc == 2)
-        confFile = std::string("/") + std::string(argv[1]);
-    else
-        confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
-    auto* cfg = new Config(filename.c_str());
+    std::string confFile = cur_directory + "/data/tddconfig-sim-ul.json";
+    if (argc == 2)
+        confFile = std::string(argv[1]);
+    auto* cfg = new Config(confFile.c_str());
     cfg->genData();
     Millipede* millipede_cli;
 
