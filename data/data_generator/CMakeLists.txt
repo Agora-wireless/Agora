@@ -9,7 +9,7 @@ endif()
 message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
 
-set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(SOURCE_DIR ../..)
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=c99 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native  -m64")
