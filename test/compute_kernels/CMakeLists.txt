@@ -27,15 +27,29 @@ endif()
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
+set(FLEXRAN_FEC_SDK_DIR "/opt/FlexRAN-FEC-SDK-19-04/sdk")
+
+# FlexRAN FEC libraries can be in one of two directories depending on arch
+if (EXISTS ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
+elseif (EXISTS ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
+else()
+  message(FATAL_ERROR "FlexRAN FEC libraries required but not found")
+endif()
+
+
+set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
 include_directories(
-  ../src/common/)
+  ${SOURCE_DIR}/src/common/
+  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common)
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(COMMON_SOURCES 
-  ../src/common/utils.cpp
-  ../src/common/modulation.cpp)
+  ${SOURCE_DIR}/src/common/utils.cpp
+  ${SOURCE_DIR}/src/common/modulation.cpp)
 
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
