@@ -189,6 +189,7 @@ public:
     // Port ID at MAC layer side
     int mac_rx_port;
     int mac_tx_port;
+    bool init_mac_running;
 
     // Number of frames sent by sender during testing = number of frames
     // processed by Millipede before exiting.

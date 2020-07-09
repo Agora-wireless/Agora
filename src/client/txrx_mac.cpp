@@ -14,7 +14,7 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
 
-    mac_running = false;
+    mac_running = cfg->init_mac_running;
 
     /* initialize random seed: */
     srand(time(NULL));
