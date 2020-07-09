@@ -71,6 +71,7 @@ Config::Config(std::string jsonfile)
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_rx_port", 4000);
+    init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
