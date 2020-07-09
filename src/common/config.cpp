@@ -71,6 +71,7 @@ Config::Config(std::string jsonfile)
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_rx_port", 4000);
+    init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
@@ -240,7 +241,7 @@ Config::Config(std::string jsonfile)
     packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
 
     data_bytes_num_persymbol = kUseLDPC
-        ? (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol
+        ? (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol
         : OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
