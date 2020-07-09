@@ -63,7 +63,7 @@ public:
     Event_data launch(size_t tag);
 
     // TODO: Doc
-    void register_rpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
+    void initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
     friend void decode_cont_func(void* _context, void* _tag);
 
 private:

@@ -212,6 +212,12 @@ public:
     // Get the index of this pilot symbol among this frame's pilot symbols
     size_t get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const;
 
+    // Get the offset of input data for LDPC decoding
+    size_t get_ldpc_input_offset(size_t cb_id) const;
+
+    // Get the offset of output data for LDPC decoding
+    size_t get_ldpc_output_offset(size_t cb_id) const;
+
     bool isPilot(size_t, size_t);
     bool isCalDlPilot(size_t, size_t);
     bool isCalUlPilot(size_t, size_t);

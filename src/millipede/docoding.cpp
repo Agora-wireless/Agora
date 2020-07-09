@@ -142,8 +142,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
-// TODO: Rename to initialize_erpc
-void DoDecode::register_rpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
+void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
 {
     rpc = rpc_;
     session = session_;
@@ -179,16 +178,9 @@ Event_data DoDecode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kUseERPC) {
-        // TODO: Add a function to config.hpp called get_ldpc_input_offset(ue_id,
-        // code_block_id)
-        size_t input_offset
-            = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+        size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
         size_t llr_buffer_offset = input_offset * cfg->mod_type;
-        size_t cbLenBytes
-            = (LDPC_config.cbLen + 7) >> 3; // TODO Use bits_to_bytes
-        size_t output_offset
-            = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
-            + cbLenBytes * cur_cb_id;
+        size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
 
         auto* send_buf = reinterpret_cast<char*>(
             (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset);
@@ -200,11 +192,11 @@ Event_data DoDecode::launch(size_t tag)
 
         size_t num_encoded_bits
             = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
-        // TODO: What is 32? Is it PROC_BYTES?
+        // TODO: What is 32? Is it PROC_BYTES? aligned bytes
         size_t sent_bytes = ((num_encoded_bits - 1) / 32 + 1) * 32;
 
         while (vec_req_msgbuf.size() == 0) {
-            // TODO: Print a warning message: "Ran out of request message buffer"
+            printf("Ran out of request message buffers!\n");
             rpc->run_event_loop_once();
         }
         auto* req_msgbuf = vec_req_msgbuf.back();
@@ -225,44 +217,37 @@ Event_data DoDecode::launch(size_t tag)
         rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
             decode_cont_func, decode_tag);
     } else {
-        // TODO: Rename ldpc_decoder_5gnr_request/response to
-        // ldpc_request/responseresponse
-        struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
+        struct bblib_ldpc_decoder_5gnr_request ldpc_request {
         };
-        struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
+        struct bblib_ldpc_decoder_5gnr_response ldpc_response {
         };
 
         // Decoder setup
         int16_t numFillerBits = 0;
         int16_t numChannelLlrs = LDPC_config.cbCodewLen;
 
-        ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
-        ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
-        ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
-        ldpc_decoder_5gnr_request.enableEarlyTermination
-            = LDPC_config.earlyTermination;
-        ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
-        ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
-        ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+        ldpc_request.numChannelLlrs = numChannelLlrs;
+        ldpc_request.numFillerBits = numFillerBits;
+        ldpc_request.maxIterations = LDPC_config.decoderIter;
+        ldpc_request.enableEarlyTermination = LDPC_config.earlyTermination;
+        ldpc_request.Zc = LDPC_config.Zc;
+        ldpc_request.baseGraph = LDPC_config.Bg;
+        ldpc_request.nRows = LDPC_config.nRows;
 
         int numMsgBits = LDPC_config.cbLen - numFillerBits;
-        ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
-        ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
+        ldpc_response.numMsgBits = numMsgBits;
+        ldpc_response.varNodes = resp_var_nodes;
 
-        size_t input_offset
-            = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+        size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
         size_t llr_buffer_offset = input_offset * cfg->mod_type;
-        ldpc_decoder_5gnr_request.varNodes
+        ldpc_request.varNodes
             = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
-        size_t cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
-        size_t output_offset
-            = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
-            + cbLenBytes * cur_cb_id;
-        ldpc_decoder_5gnr_response.compactedMessageBytes
+        size_t cbLenBytes = bits_to_bytes(LDPC_config.cbLen);
+        size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
+        ldpc_response.compactedMessageBytes
             = (uint8_t*)decoded_buffer_[symbol_offset] + output_offset;
 
-        bblib_ldpc_decoder_5gnr(
-            &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+        bblib_ldpc_decoder_5gnr(&ldpc_request, &ldpc_response);
 
         if (kPrintLLRData) {
             printf("LLR data, symbol_offset: %zu, input offset: %zu\n",
@@ -309,11 +294,10 @@ Event_data DoDecode::launch(size_t tag)
             cycles_to_us(duration, freq_ghz));
     }
 
-    // TODO: Use kUseERPC, add comment: "When using eRPC, we ship the decoding
-    // task asynchronously to a remote server and return immediately"
-#ifdef USE_ERPC
-    return Event_data(EventType::kPending, tag);
-#else
-    return Event_data(EventType::kDecode, tag);
-#endif
+    // When using eRPC, we ship the decoding task asynchronously to a
+    // remote server and return immediately
+    if (kUseERPC)
+        return Event_data(EventType::kPendingToRemote, tag);
+    else
+        return Event_data(EventType::kDecode, tag);
 }
