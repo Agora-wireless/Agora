@@ -351,7 +351,8 @@ target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
 add_executable(test_zf test/unit_tests/test_zf.cc 
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
-  src/millipede/dozf.cpp)
+  src/millipede/dozf.cpp
+  ${LDPC_SOURCES})
 target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
