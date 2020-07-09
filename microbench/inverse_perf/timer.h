@@ -129,4 +129,5 @@ class TscTimer {
   void reset() { ms_duration_vec.clear(); }
   double stddev_msec() { return stddev(ms_duration_vec); }
   double avg_msec() { return mean(ms_duration_vec); }
+  double avg_usec() { return 1000 * mean(ms_duration_vec); }
 };

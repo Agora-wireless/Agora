@@ -14,7 +14,7 @@ set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64 -fPIC")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
@@ -56,6 +56,7 @@ set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_ERPC False CACHE STRING "USE_ERPC defaulting to 'False'")
+set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
@@ -75,7 +76,10 @@ if(${USE_DPDK})
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk -libverbs -lmlx5 -lmlx4 -lcrypto -lpcap -lrt -lelf -lnuma -Wl,--no-whole-archive dl)
+  if(${USE_MLX_NIC})
+    set(MLX_LIBRARIES -libverbs -lmlx4 -lmlx5)
+  endif()
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
 
   set(TXRX_SOURCES 
     src/millipede/txrx/txrx_DPDK.cpp
@@ -222,6 +226,7 @@ set(MILLIPEDE_SOURCES
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
 include_directories(
   ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
@@ -238,9 +243,19 @@ if(${USE_LDPC})
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+
+  # FlexRAN FEC libraries can be in one of two directories depending on arch
+  if (EXISTS ${FLEXRAN_SDK_DIR}/build-avx512-icc)
+    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx512-icc)
+  elseif (EXISTS ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+  else()
+    message(FATAL_ERROR "FlexRAN FEC libraries required but not found")
+  endif()
+
   set(FLEXRAN_LDPC_LIBS
     ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+    ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
     ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
@@ -273,19 +288,18 @@ set(SOURCES
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
 			
-add_executable(millipede src/millipede/main.cpp ${SOURCES} ${HEADER_FILES})
+add_executable(millipede src/millipede/main.cpp ${SOURCES})
 target_link_libraries(millipede -larmadillo
 	${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil ${ERPC_LIBRARIES})
 
 
-add_library(comp MODULE ${SOURCES} ${HEADER_FILES})
+add_library(comp MODULE ${SOURCES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
 
 add_executable(data_generator 
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
   ${LDPC_SOURCES} 
-  ${COMMON_SOURCES} 
-  ${HEADER_FILES})
+  ${COMMON_SOURCES})
 target_link_libraries(data_generator -larmadillo ${FLEXRAN_LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
@@ -293,16 +307,14 @@ add_executable(user
      src/client/user-main.cpp
      ${CLIENT_SOURCES}
      ${COMMON_SOURCES}
-     ${LDPC_SOURCES}
-     ${HEADER_FILES})
+     ${LDPC_SOURCES})
 target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_library(ue_phy MODULE 
      ${CLIENT_SOURCES}
      ${COMMON_SOURCES}
      ${ARGOS_SOURCES}
-     ${LDPC_SOURCES}
-     ${HEADER_FILES})
+     ${LDPC_SOURCES})
 target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
 add_executable(macuser
@@ -319,8 +331,7 @@ set(SENDER_SOURCES
   simulator/sender_cli.cpp
   ${COMMON_SOURCES}
   ${SENDER_TXRX_SOURCES}
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
 target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
@@ -331,20 +342,17 @@ set(SIMULATOR_SOURCES
   simulator/sender.cpp
   simulator/receiver.cpp 
   ${COMMON_SOURCES}
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
 
 # The tests to run using ctest
-add_executable(test_zf test/test_zf.cc 
+add_executable(test_zf test/unit_tests/test_zf.cc 
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
-  src/millipede/dozf.cpp
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} -libverbs -lnuma)
+  src/millipede/dozf.cpp)
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
 if(${USE_ERPC})
