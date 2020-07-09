@@ -16,9 +16,8 @@ LABEL author=t-keboo@microsoft.com
 # * https://github.com/phusion/baseimage-docker/issues/58
 # * https://github.com/phusion/baseimage-docker/issues/319#issuecomment-245857919
 ENV DEBIAN_FRONTEND noninteractive
-# RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends apt-utils gnupg
-
+# RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 # Just for convenience purposes
 RUN apt-get install -y vim
@@ -41,15 +40,18 @@ RUN apt-get -y install -y \
     libpython-dev \
     swig
 
+
 # Install gtest and gflags
 RUN apt-get install -y libgtest-dev
 RUN (cd /usr/src/gtest && cmake . && make && mv libg* /usr/lib/)
+
 
 # Build and install armadillo
 RUN wget http://sourceforge.net/projects/arma/files/armadillo-9.300.2.tar.xz
 RUN tar xf armadillo-9.300.2.tar.xz
 RUN (cd armadillo-9.300.2; cmake .; make -j8; make install)
 RUN rm -rf armadillo*
+
 
 # Set up Intel MKL
 RUN apt-get install -y apt-transport-https ca-certificates
@@ -81,17 +83,14 @@ ENV DEBIAN_FRONTEND teletype
 
 
 # Copy in our relevant build files. ("test" is optional)
-COPY build/  Millipede/
+COPY build/  Millipede/build/
 COPY data/   Millipede/data/
 COPY test/   Millipede/test/
 
+
 # Set up the intel MKL compiler variables (shell environment vars) so that Millipede can run.
-# Note that /bin/sh doesn't have the `source` cmd, so we use `.` instead.
-#    see: https://stackoverflow.com/questions/4732200/replacement-for-source-in-sh
 RUN echo "source /opt/intel/compilers_and_libraries/linux/bin/compilervars.sh intel64" >> ~/.bashrc
 
 
 # Finally, do something, e.g., run Millipede.
-# CMD [ "for (( ; ; )); do sleep 3 && echo 'HI' && ./hello;  done" ]
-
-
+# TODO, e.g., CMD ./build/millipede data/tddconfig-sim-ul.json
