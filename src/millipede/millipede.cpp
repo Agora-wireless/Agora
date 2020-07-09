@@ -369,13 +369,15 @@ void Millipede::start()
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {
-                        assert(cur_frame_id == frame_id);
-                        cur_frame_id++;
+                        if (!kEnableMac) {
+                            assert(cur_frame_id == frame_id);
+                            cur_frame_id++;
+                            stats->update_stats_in_functions_uplink(frame_id);
+                            if (stats->last_frame_id == cfg->frames_to_test - 1)
+                                goto finish;
+			}
                         stats->master_set_tsc(TsType::kDecodeDone, frame_id);
                         print_per_frame_done(PrintType::kDecode, frame_id);
-                        stats->update_stats_in_functions_uplink(frame_id);
-                        if (stats->last_frame_id == cfg->frames_to_test - 1)
-                            goto finish;
                     }
                 }
             } break;
