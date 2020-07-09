@@ -56,7 +56,7 @@ enum class EventType : int {
     kModul,
     kPacketFromMac,
     kPacketToMac,
-    kPending // TODO: Rename to kPendingToRemote?
+    kPendingToRemote
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;

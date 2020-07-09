@@ -26,7 +26,7 @@ public:
                 resp_event.event_type = resp_i.event_type;
             }
 
-            if (resp_event.event_type != EventType::kPending)
+            if (resp_event.event_type != EventType::kPendingToRemote)
                 try_enqueue_fallback(
                     &complete_task_queue, worker_producer_token, resp_event);
             return true;
