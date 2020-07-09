@@ -63,6 +63,14 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
                        &SimpleClientMac::data_update_thread>,
         0, 1);
 
+    // Init data socket per UE
+    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        int port_id = 8090 + i;
+        data_sockets[i] = setup_socket_ipv4(port_id, false, 0);
+        setup_sockaddr_local_ipv4(&data_addr[i], port_id);
+        printf("Set up (data) UDP socket listening to port %zu\n", port_id);
+    }
+
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -234,20 +242,32 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 {
     auto* pkt = (MacPacket*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
     pkt->frame_id = tag.frame_id;
-    pkt->symbol_id = 0;
+    pkt->symbol_id = tag.symbol_id;
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
 
-    // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
-    std::random_device r;
-    std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
-    std::mt19937 eng(seed); // a source of random data
+    // Read packet data from socket
+    socklen_t addrlen = sizeof(data_addr[tag.ue_id]);
+    int ret = recvfrom(data_sockets[tag.ue_id], (char*)pkt->data,
+        cfg->mac_data_bytes_num_perframe, 0,
+        (struct sockaddr*)&data_addr[tag.ue_id], &addrlen);
+    if (ret == -1) {
+        if (errno != EAGAIN) {
+            perror("data recv failed");
+            exit(0);
+        }
+    }
 
-    std::uniform_int_distribution<char> dist;
-    std::vector<char> v(cfg->mac_data_bytes_num_perframe);
+    // Print MAC packet summary
+    printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
+           "%d\n",
+        get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
+        cfg->mac_data_bytes_num_perframe);
 
-    generate(begin(v), end(v), bind(dist, eng));
-    memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+    for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
+        printf("%i ", *((uint8_t*)pkt->data + i));
+    }
+    printf("\n");
 }
 
 void* SimpleClientMac::worker_thread(int tid)
