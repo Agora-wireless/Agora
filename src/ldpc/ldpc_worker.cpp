@@ -26,14 +26,10 @@ void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
     auto* worker = static_cast<LDPCWorker*>(_context);
     auto* in_buf = reinterpret_cast<int8_t*>(req_handle->get_req_msgbuf()->buf);
 
-    size_t* p = reinterpret_cast<size_t*>(in_buf);
-    size_t frame_id = *p;
-    size_t symbol_id = *(p + 1);
-
     req_handle->dyn_resp_msgbuf
         = worker->rpc->alloc_msg_buffer(worker->decoded_bits);
     auto* out_buf = reinterpret_cast<uint8_t*>(req_handle->dyn_resp_msgbuf.buf);
-    worker->decode(in_buf + 2 * sizeof(size_t), out_buf);
+    worker->decode(in_buf, out_buf);
 
     worker->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
