@@ -190,10 +190,8 @@ Event_data DoDecode::launch(size_t tag)
         decode_tag->tag = tag;
         decode_tag->tid = tid;
 
-        size_t num_encoded_bits
+        size_t data_bytes
             = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
-        // TODO: What is 32? Is it PROC_BYTES? aligned bytes
-        size_t sent_bytes = ((num_encoded_bits - 1) / 32 + 1) * 32;
 
         while (vec_req_msgbuf.size() == 0) {
             printf("Ran out of request message buffers!\n");
@@ -207,12 +205,8 @@ Event_data DoDecode::launch(size_t tag)
         decode_tag->req_msgbuf = req_msgbuf;
         decode_tag->resp_msgbuf = resp_msgbuf;
         decode_tag->rpc = rpc;
-        rpc->resize_msg_buffer(req_msgbuf, sent_bytes + 2 * sizeof(size_t));
-        char* data_buf = reinterpret_cast<char*>(req_msgbuf->buf);
-        size_t* p = reinterpret_cast<size_t*>(data_buf);
-        p[0] = frame_id;
-        p[1] = symbol_id;
-        memcpy(&p[2], send_buf, sent_bytes);
+        rpc->resize_msg_buffer(req_msgbuf, data_bytes);
+        memcpy(req_msgbuf->buf, send_buf, data_bytes);
 
         rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
             decode_cont_func, decode_tag);
