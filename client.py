@@ -16,9 +16,12 @@ parser.add_argument('-a', '--app', type=str,
 args = parser.parse_args()
 
 if args.app == "rand":
-    cmd_app = './src/app/stream_rand.py -p {p}'
+    cmd_app = './src/app/stream_rand.py -p {p} -s 152'
 elif args.app == "video":
-    cmd_app = './src/app/stream_video.py -p {p}'
+    #cmd_app = './src/app/stream_video.py -p {p}'
+    cmd_app = './src/app/video_client.py -p {p} -s 49 -d 2'
+elif args.app == "none":
+    pass
 else:
     print('App type {} not supported.'.format(args.app))
 
@@ -28,9 +31,10 @@ logm = open('macuser.log', 'w')
 pm = sh.Popen(cmd_macuser.split(), stdout=logm)
 
 # start client apps
-print('Starting client apps...')
-loga0 = open('app0.log', 'w')
-pa0 = sh.Popen(cmd_app.format(p=8090).split(), stdout=loga0)
+if args.app != "none":
+    print('Starting client apps...')
+    loga0 = open('app0.log', 'w')
+    pa0 = sh.Popen(cmd_app.format(p=8090).split(), stdout=loga0)
 
 # start user
 print('Starting user...')
