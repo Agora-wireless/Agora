@@ -105,7 +105,7 @@ private:
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef USE_DPDK
-    uint32_t client_addr; // IPv4 address of the simulator sender
+    uint32_t sender_addr; // IPv4 address of the simulator sender
     uint32_t server_addr; // IPv4 address of the Millipede server
     struct rte_mempool* mbuf_pool;
 #endif

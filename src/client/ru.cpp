@@ -49,7 +49,7 @@ RU::RU(int n_rx_thread, int n_tx_thread, Config* cfg)
 
         cliaddr_[i].sin_family = AF_INET;
         cliaddr_[i].sin_port = htons(config_->ue_tx_port + i);
-        cliaddr_[i].sin_addr.s_addr = inet_addr(config_->client_addr.c_str());
+        cliaddr_[i].sin_addr.s_addr = inet_addr(config_->sender_addr.c_str());
         // cliaddr_.sin_addr.s_addr = htons(INADDR_ANY);
         memset(cliaddr_[i].sin_zero, 0, sizeof(cliaddr_[i].sin_zero));
         if ((tx_socket_[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {

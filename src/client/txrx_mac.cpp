@@ -97,17 +97,17 @@ void* PacketTXRX::loopTXRX(int tid)
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            config_->ue_tx_port + radio_id, config_->client_addr.c_str());
+            config_->ue_tx_port + radio_id, config_->sender_addr.c_str());
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
-            config_->ue_tx_port + radio_id, config_->client_addr.c_str());
+            config_->ue_tx_port + radio_id, config_->sender_addr.c_str());
 #endif
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
         printf("Set up UDP socket server listening to port %d"
                " with remote address %s:%d  \n",
-            local_port_id, config_->client_addr.c_str(),
+            local_port_id, config_->sender_addr.c_str(),
             config_->ue_tx_port + radio_id);
     }
 
