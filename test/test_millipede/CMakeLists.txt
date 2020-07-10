@@ -132,7 +132,9 @@ set(LDPC_SOURCES
 # LDPC headers and sources that do not require an Intel compiler
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
 include_directories(
+  ${FLEXRAN_SDK_DIR}/test/phy/common
   ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
@@ -162,13 +164,8 @@ if(${USE_LDPC})
   endif()
 
   set(LDPC_LIBS ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+                ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
                 ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
-
-  include_directories(
-    ${FLEXRAN_SDK_DIR}/test/phy/common
-    ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-    ${FLEXRAN_SDK_DIR}/source/phy/lib_common
-    ${SOURCE_DIR}/src/encoder)
 
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} ${SOURCE_DIR}/src/millipede/docoding.cpp)
 endif()

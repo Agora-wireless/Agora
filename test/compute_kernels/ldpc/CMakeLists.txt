@@ -44,13 +44,13 @@ target_link_libraries (test_ldpc
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-# if(${ISA_AVX512}) 
-#   add_executable(test_ldpc_flexran test_ldpc_flexran.cpp)
-#   target_link_libraries (test_ldpc
-#     ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-#     ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
-#     ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
-# endif()
+if(${ISA_AVX512}) 
+  add_executable(test_ldpc_flexran test_ldpc_flexran.cpp ${SOURCES})
+  target_link_libraries (test_ldpc_flexran
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
+endif()
 
 #set(MOD_SOURCES ../../src/common/modulation.cpp)
 #include_directories(../../src/common)
