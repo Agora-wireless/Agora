@@ -51,7 +51,6 @@ typedef unsigned short ushort;
  * with real wireless hardware peers (antenna hubs for the server, UE devices
  * for the client).
  */
-
 class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset = 1);
