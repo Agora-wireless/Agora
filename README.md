@@ -55,11 +55,11 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    * Instead of `cmake ..` above, run `cmake -DCMAKE_C_COMPILER=icc -DCMAKE_CXX_COMPILER=icpc -DUSE_LDPC=1 ..`.
 
  * Run Millipede with simulated client traffic
-   * First, run `./data_generator data/tddconfig-sim-ul.json` to generate data
+   * First, return to the base directory (`cd ..`), then run `./build/data_generator data/tddconfig-sim-ul.json` to generate data
      files.
-   * In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start
+   * In one terminal, run `./build/millipede data/tddconfig-sim-ul.json` to start
      Millipede with uplink configuration.
-   * In another terminal, run  `./sender --num_threads=2 --core_offset=0
+   * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
      --delay=5000 --enable_slow_start=false
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
