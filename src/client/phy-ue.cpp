@@ -160,12 +160,12 @@ Phy_UE::Phy_UE(Config* config)
         socket_[user_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->client_addr.c_str());
+            config_->ue_rx_port + user_id, config_->sender_addr.c_str());
 #else
         socket_[user_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv6(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->client_addr.c_str());
+            config_->ue_rx_port + user_id, config_->sender_addr.c_str());
 #endif
         fcntl(socket_[user_id], F_SETFL, O_NONBLOCK);
     }

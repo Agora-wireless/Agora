@@ -105,8 +105,8 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    ret = inet_pton(AF_INET, cfg->client_addr.c_str(), &client_addr);
-    rt_assert(ret == 1, "Invalid client IP address");
+    ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
@@ -114,7 +114,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     rt_assert(parsed_mac != NULL, "Invalid server mac address");
     memcpy(&server_mac_addr, parsed_mac, sizeof(ether_addr));
 
-    ret = rte_eth_macaddr_get(portid, &client_mac_addr);
+    ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -311,13 +311,13 @@ void* Sender::worker_thread(int tid)
 
         rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*);
         eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-        memcpy(eth_hdr->s_addr.addr_bytes, client_mac_addr.addr_bytes,
+        memcpy(eth_hdr->s_addr.addr_bytes, sender_mac_addr.addr_bytes,
             RTE_ETHER_ADDR_LEN);
         memcpy(eth_hdr->d_addr.addr_bytes, server_mac_addr.addr_bytes,
             RTE_ETHER_ADDR_LEN);
 
         auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
-        ip_h->src_addr = client_addr;
+        ip_h->src_addr = sender_addr;
         ip_h->dst_addr = server_addr;
         ip_h->next_proto_id = IPPROTO_UDP;
         ip_h->version_ihl = 0x45;
