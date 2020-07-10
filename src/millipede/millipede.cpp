@@ -375,7 +375,7 @@ void Millipede::start()
                             stats->update_stats_in_functions_uplink(frame_id);
                             if (stats->last_frame_id == cfg->frames_to_test - 1)
                                 goto finish;
-			}
+                        }
                         stats->master_set_tsc(TsType::kDecodeDone, frame_id);
                         print_per_frame_done(PrintType::kDecode, frame_id);
                     }
@@ -1105,8 +1105,10 @@ void Millipede::initialize_uplink_buffers()
     size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
+        >> 3 * config_->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        task_buffer_symbol_num_ul, cfg->data_bytes_num_persymbol * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, decoded_bytes * cfg->UE_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
