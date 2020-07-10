@@ -6,8 +6,6 @@
 
 #define EXPORT __attribute__((visibility("default")))
 
-#define ENABLE_CPU_ATTACH
-
 #define ARMA_ALLOW_FAKE_GCC
 
 #define SEPARATE_TX_RX_UE 0
@@ -93,6 +91,11 @@ enum class PrintType : int {
     kPacketFromMac,
     kPacketToMac
 };
+
+// Enable thread pinning and exit if thread pinning fails. Thread pinning is
+// crucial for good performance. For testing or developing Millipede on machines
+// with insufficient cores, disable this flag.
+static constexpr size_t kEnableThreadPinning = true;
 
 #define BIGSTATION 0
 #define USE_IPV4 1
