@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -march=native")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-set(FLEXRAN_FEC_SDK_DIR "${SOURCE_DIR}/src/third_party/FlexRAN-FEC-SDK-19-04/sdk")
+set(FLEXRAN_FEC_SDK_DIR "/opt/FlexRAN-FEC-SDK-19-04/sdk")
 
 CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
 if (ISA_AVX512)

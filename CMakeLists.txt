@@ -223,7 +223,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/doprecode.cpp
   src/millipede/reciprocity.cpp)
 
-set(FLEXRAN_FEC_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/FlexRAN-FEC-SDK-19-04/sdk)
+set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
