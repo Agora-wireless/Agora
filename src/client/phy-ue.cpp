@@ -774,7 +774,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
         ldpc_encoding_parity_buf_size(
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
-    size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
+    size_t bytes_per_block = (LDPC_config.cbLen) >> 3;
     size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
 
     for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
