@@ -39,10 +39,10 @@ while(True):
     # Capture frame-by-frame
     ret, frame = cam.read()
     print("raw:", frame.shape)
-    #result, frame = cv2.imencode('.jpg', frame, encode_param)
+    _, frame = cv2.imencode('.jpg', frame, encode_param)
     #data = bytearray(frame)
-    frame = cv2.resize(frame, (160, 120), interpolation=cv2.INTER_AREA)
-    print("downscale:", frame.shape)
+    #frame = cv2.resize(frame, (160, 120), interpolation=cv2.INTER_AREA)
+    #print("downscale:", frame.shape)
     data = frame.tostring()
     size = len(data)
 
@@ -50,18 +50,19 @@ while(True):
     start_header = bytearray(HEADER)
     print('sending', list(start_header))
     s.sendall(start_header)
-    time.sleep(0.0024)
+    time.sleep(0.0025)
 
     print("{}: {}".format(img_counter, size))
-    #s.sendall(struct.pack(">L", size) + data[:152-payload_size])
-    time.sleep(0.0024)
+    s.sendall(struct.pack(">L", size) + data[:args.size-payload_size])
+    time.sleep(0.0025)
+    data = data[args.size-payload_size:]
     for i in range(0, len(data), args.size):
         x = data[i:i+args.size]
         if len(x) < args.size:
             x += bytearray([0] * (args.size - len(x)))
         print('sending', list(x))
         s.sendall(x)
-        time.sleep(0.0024)
+        time.sleep(0.0025)
 
     # create and send end header
     #end_header = bytearray([2 for _ in range(args.size)])
