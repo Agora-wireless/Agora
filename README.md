@@ -1,20 +1,22 @@
 Millipede is a high-performance system for massive-MIMO baseband processing.
 
 ## Requirements
- * Toolchain: A C++11 compiler and CMake 2.8+. Enabling LDPC decoding requires
-   an Intel C++ compiler (`icpc`).
+ * Toolchain: A C++11 compiler and CMake 2.8+.
  * Required packages
    * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
    * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html))
    * Install Armadillo: `./scripts/install_armadillo.sh`
    * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`
-   * Download Intel FlexRAN's LDPC SDK to `/opt` (does not need to be compiled)
-     * Download [link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
-     * Compile FlexRAN's LDPC SDK:
+   * Download Intel FlexRAN's FEC SDK for LDPC decoding to `/opt`.
+     [Link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules).
+   * Getting FlexRAN FEC SDK libraries:
+     * Compiling FlexRAN requires an Intel compiler. For Millipede developers,
+       we provide precompiled FlexRAN libraries to use from `gcc`.
+     * After instaling `icc 19.04` (see instructions below), compile FlexRAN:
      ```
-     % First, change ownership of /opt/FlexRAN_FEC_SDK_19_04 to your Linux user
-     cd /opt/FlexRAN_FEC_SDK_19_04/sdk/
-     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
+     sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all users read-write access
+     cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
+     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake
      ./create-makefiles-linux.sh
      cd build-avx512-icc % or build-avx2-icc
      make
@@ -50,9 +52,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     make -j
     ```
 
- * To include LDPC in the build, 
-   * Make sure to enable Intel compiler as instructed above.
-   * Instead of `cmake ..` above, run `cmake -DCMAKE_C_COMPILER=icc -DCMAKE_CXX_COMPILER=icpc -DUSE_LDPC=1 ..`.
+ * To include LDPC in the build, run `cmake -DUSE_LDPC=1`.
 
  * Run Millipede with simulated client traffic
    * First, return to the base directory (`cd ..`), then run `./build/data_generator data/tddconfig-sim-ul.json` to generate data
