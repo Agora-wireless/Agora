@@ -550,10 +550,14 @@ finish:
     printf("Millipede: printing stats and saving to file\n");
     stats->print_summary();
     stats->save_to_file();
-    kUseLDPC ? save_decode_data_to_file(stats->last_frame_id)
-             : save_demul_data_to_file(stats->last_frame_id);
-    save_tx_data_to_file(stats->last_frame_id);
-    // calculate and print per-user BER
+    if (flags.enable_save_decode_data_to_file) {
+        kUseLDPC ? save_decode_data_to_file(stats->last_frame_id)
+                 : save_demul_data_to_file(stats->last_frame_id);
+    }
+    if (flags.enable_save_tx_data_to_file)
+        save_tx_data_to_file(stats->last_frame_id);
+
+    // Calculate and print per-user BER
     if (!kEnableMac && kPrintPhyStats) {
         phy_stats->print_phy_stats();
     }
@@ -1210,7 +1214,6 @@ void Millipede::free_downlink_buffers()
 
 void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_DEMUL
     auto& cfg = config_;
     printf("Saving demul data to data/demul_data.txt\n");
 
@@ -1230,12 +1233,10 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
         }
     }
     fclose(fp);
-#endif
 }
 
 void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_DEMUL
     auto& cfg = config_;
     printf("Saving decode data to data/decode_data.bin\n");
     size_t num_decoded_bytes
@@ -1253,12 +1254,10 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
         fwrite(ptr, cfg->UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
     }
     fclose(fp);
-#endif
 }
 
 void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_TX
     auto& cfg = config_;
     printf("Saving TX data to data/tx_data.bin\n");
 
@@ -1281,7 +1280,6 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
         }
     }
     fclose(fp);
-#endif
 }
 
 void Millipede::getDemulData(int** ptr, int* size)

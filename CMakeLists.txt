@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
+include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 project(Millipede)
 
@@ -6,10 +7,15 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
-message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
-message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_C_COMPILER}")
-
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+
+# New versions of GCC enable position-independent executables by default. We
+# don't want to compile FlexRAN libraries with -fPIC because it reduces
+# performance by around 40%.
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
@@ -217,12 +223,11 @@ set(MILLIPEDE_SOURCES
   src/millipede/doprecode.cpp
   src/millipede/reciprocity.cpp)
 
-# LDPC headers and sources that do not require an Intel compiler
-set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
+set(FLEXRAN_FEC_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/FlexRAN-FEC-SDK-19-04/sdk)
 include_directories(
-  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
-  ${FLEXRAN_SDK_DIR}/source/phy/lib_common
+  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
+  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
 set(LDPC_SOURCES
@@ -233,25 +238,21 @@ set(LDPC_SOURCES
 # LDPC sources that require an Intel compiler
 if(${USE_LDPC})
   message(STATUS "LDPC is enabled")
-  if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
-    message(STATUS "CMAKE_C_COMPILER_ID: ${CMAKE_C_COMPILER_ID}")
-    message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
-  endif()
   add_definitions(-DUSE_LDPC)
 
-  # FlexRAN FEC libraries can be in one of two directories depending on arch
-  if (EXISTS ${FLEXRAN_SDK_DIR}/build-avx512-icc)
-    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx512-icc)
-  elseif (EXISTS ${FLEXRAN_SDK_DIR}/build-avx2-icc)
-    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+  CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
+  if (ISA_AVX512)
+    message(STATUS "AVX-512 supported.")
+    set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
   else()
-    message(FATAL_ERROR "FlexRAN FEC libraries required but not found")
+    message(STATUS "AVX-512 not supported.")
+    set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
   endif()
 
   set(FLEXRAN_LDPC_LIBS
-    ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-    ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
-    ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
 endif()
@@ -272,7 +273,6 @@ set(SOURCES
 add_executable(millipede src/millipede/main.cpp ${SOURCES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
-
 
 add_library(comp MODULE ${SOURCES})
 target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
@@ -327,6 +327,11 @@ set(SIMULATOR_SOURCES
 
 add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
+
+# End-to-end test
+add_executable(test_millipede test/test_millipede/main.cpp ${SOURCES})
+target_link_libraries(test_millipede -larmadillo
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
 
 # The tests to run using ctest
 add_executable(test_zf test/unit_tests/test_zf.cc 
