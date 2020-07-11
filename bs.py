@@ -2,11 +2,20 @@
 
 import subprocess as sh
 import time
+from argparse import ArgumentParser
 
 MP = './build/'
 
-cmd_millipede = MP + '/millipede data/bs-one-ul-hw.json'
-cmd_macbs = MP + '/macbs 2 0 data/bs-one-ul-hw.json'
+# parse arguments
+parser = ArgumentParser(description="launch Millipede base station (hw)")
+parser.add_argument('-n', '--num', type=int, default=1,
+                    help='number of Iris clients talking to base station')
+args = parser.parse_args()
+
+# setup cmds
+cfg = 'data/bs-ul-hw.json' if args.num == 2 else 'data/bs-one-ul-hw.json'
+cmd_millipede = MP + '/millipede ' + cfg
+cmd_macbs = MP + '/macbs 2 0 ' + cfg
 
 # start millipede
 print('Starting millipede...')
