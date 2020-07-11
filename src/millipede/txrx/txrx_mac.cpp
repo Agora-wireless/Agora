@@ -183,12 +183,15 @@ int MacPacketTXRX::dequeue_send(int tid)
 
     int packet_length = cfg->data_bytes_num_persymbol;
 
+    size_t cbLenBytes = (cfg->LDPC_config.cbLen + 7) >> 3;
+    size_t data_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id;
+    if (!kUseLDPC)
+        data_offset = cfg->OFDM_DATA_NUM * ue_id;
+
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    int data_offset
-        = kUseLDPC ? cfg->data_bytes_num_persymbol : cfg->OFDM_DATA_NUM;
     uint8_t* ul_data_ptr
-        = &(*ul_bits_buffer_)[total_symbol_idx][ue_id * data_offset];
+        = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
     new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
     pkt->frame_id = frame_id;
