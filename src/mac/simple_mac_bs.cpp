@@ -83,6 +83,8 @@ void* SimpleBSMac::loopRecv(int tid)
     int packet_length = cfg->data_bytes_num_persymbol;
     packet_length += MacPacket::kOffsetOfData;
     char* rx_buffer = (char*)malloc(packet_length);
+    char* frame_data = (char*)malloc(cfg->mac_data_bytes_num_perframe);
+    bool data2, data3;
     while (true) {
         auto* pkt = (struct MacPacket*)rx_buffer;
         int ret = recvfrom(socket_local, (char*)pkt, packet_length, 0,
@@ -95,10 +97,20 @@ void* SimpleBSMac::loopRecv(int tid)
             return (NULL);
         }
 
-        // write packet data to data sockets
+        // create buffer for frame data
         if (pkt->symbol_id == 2) {
-            ret = sendto(data_sockets[pkt->ue_id], pkt->data,
-                packet_length - MacPacket::kOffsetOfData, 0,
+            memcpy(frame_data, (char*)pkt->data, cfg->data_bytes_num_persymbol);
+            data2 = true;
+        } else if (pkt->symbol_id == 3) {
+            memcpy(((char*)frame_data + cfg->data_bytes_num_persymbol),
+                (char*)pkt->data, cfg->data_bytes_num_persymbol);
+            data3 = true;
+        }
+
+        // write packet data to data sockets
+        if (data2 && data3) {
+            ret = sendto(data_sockets[pkt->ue_id], frame_data,
+                cfg->mac_data_bytes_num_perframe, 0,
                 (struct sockaddr*)&data_addr[pkt->ue_id],
                 sizeof(data_addr[pkt->ue_id]));
             if (ret == -1) {
@@ -107,15 +119,24 @@ void* SimpleBSMac::loopRecv(int tid)
                     exit(0);
                 }
             }
+            printf("received data for frame %d, ue %d, size %d\n",
+                pkt->frame_id, pkt->ue_id, cfg->mac_data_bytes_num_perframe);
+            for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
+                printf("%i ", *((uint8_t*)frame_data + i));
+            }
+            printf("\n");
+            data2 = false;
+            data3 = false;
         }
 
         if (kDebugBSReceiver) {
             // Read information from received packet
-            printf(
-                "RX thread %d received frame %d symbol %d, ue %d, size %d\n ",
-                tid, pkt->frame_id, pkt->symbol_id, pkt->ue_id,
+            printf("RX thread %d received frame %d symbol %d/%d, ue %d, size "
+                   "%d\n ",
+                tid, pkt->frame_id, pkt->symbol_id,
+                cfg->ul_data_symbol_num_perframe, pkt->ue_id,
                 packet_length - MacPacket::kOffsetOfData);
-            if (pkt->symbol_id == 2) {
+            if (pkt->symbol_id >= 2) {
                 for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
                      i++) {
                     printf("%i ", *((uint8_t*)pkt->data + i));
