@@ -1,26 +1,24 @@
-
 # Cmake 2.8.12 needed for "add_compile_options" command
 cmake_minimum_required(VERSION 2.8.12)
-
-find_program(ICPC_EXISTS "icpc")
-if(NOT ICPC_EXISTS)
-  message(FATAL_ERROR "Intel C++ compiler not found. Exiting.")
-endif()
-
-set(CMAKE_CXX_COMPILER icpc)  # Intel compiler required
+include(CheckCSourceRuns)
 set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -march=native")
 
-message(STATUS "ISA_AVX2: ${ISA_AVX2}")
-message(STATUS "ISA_AVX512: ${ISA_AVX512}")
+# New versions of GCC enable position-independent executables by default. We
+# don't want to compile FlexRAN libraries with -fPIC because it reduces
+# performance by around 40%.
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
-set(FLEXRAN_FEC_SDK_DIR "/opt/FlexRAN-FEC-SDK-19-04/sdk")
-if(${ISA_AVX512})
+set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
+set(FLEXRAN_FEC_SDK_DIR "${SOURCE_DIR}/src/third_party/FlexRAN-FEC-SDK-19-04/sdk")
+
+CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
+if (ISA_AVX512)
+  message(STATUS "AVX-512 supported.")
   set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
-elseif(${ISA_AVX2})
+else()
+  message(STATUS "AVX-512 not supported.")
   set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
 endif()
-
-
 
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
 include_directories(
