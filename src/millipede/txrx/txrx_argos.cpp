@@ -2,71 +2,15 @@
  * Author: Jian Ding
  * Email: jianding17@gmail.com
  *
+ * Implementation of PacketTXRX datapath functions for communicating with
+ * real Argos hardware
  */
 
 #include "txrx.hpp"
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
-    : cfg(cfg)
-    , core_offset(core_offset)
-    , socket_thread_num(cfg->socket_thread_num)
-{
-    radioconfig_ = new RadioConfig(cfg);
-}
+static constexpr bool kDebugDownlink = false;
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* queue_message,
-    moodycamel::ConcurrentQueue<Event_data>* queue_task,
-    moodycamel::ProducerToken** rx_ptoks, moodycamel::ProducerToken** tx_ptoks)
-    : PacketTXRX(cfg, core_offset)
-{
-    message_queue_ = queue_message;
-    task_queue_ = queue_task;
-    rx_ptoks_ = rx_ptoks;
-    tx_ptoks_ = tx_ptoks;
-}
-
-PacketTXRX::~PacketTXRX()
-{
-    radioconfig_->radioStop();
-    delete radioconfig_;
-}
-
-bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
-{
-    buffer_ = &buffer;
-    buffer_status_ = &buffer_status;
-    frame_start_ = &frame_start;
-
-    packet_num_in_buffer_ = packet_num_in_buffer;
-    tx_buffer_ = tx_buffer;
-
-    if (!radioconfig_->radioStart())
-        return false;
-
-    printf("create TXRX threads\n");
-    for (size_t i = 0; i < socket_thread_num; i++) {
-        pthread_t txrx_thread;
-        auto context = new EventHandlerContext<PacketTXRX>;
-        context->obj_ptr = this;
-        context->id = i;
-        if (pthread_create(&txrx_thread, NULL,
-                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>, context)
-            != 0) {
-            perror("socket communication thread create failed");
-            exit(0);
-        }
-    }
-
-    sleep(1);
-    pthread_cond_broadcast(&cond);
-    // sleep(1);
-    radioconfig_->go();
-    return true;
-}
-
-void* PacketTXRX::loopTXRX(int tid)
+void* PacketTXRX::loop_tx_rx_argos(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
     size_t* rx_frame_start = (*frame_start_)[tid];
@@ -75,19 +19,13 @@ void* PacketTXRX::loopTXRX(int tid)
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
     printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
-    //// Use mutex to sychronize data receiving across threads
-    pthread_mutex_lock(&mutex);
-    printf("Thread %d: waiting for release\n", tid);
-    pthread_cond_wait(&cond, &mutex);
-    pthread_mutex_unlock(&mutex); // unlocking for all other threads
-
     int prev_frame_id = -1;
     int radio_id = radio_lo;
     while (cfg->running) {
-        if (-1 != dequeue_send(tid))
+        if (-1 != dequeue_send_argos(tid))
             continue;
         // receive data
-        struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
+        struct Packet* pkt = recv_enqueue_argos(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
         rx_offset = (rx_offset + cfg->nChannels) % packet_num_in_buffer_;
@@ -95,7 +33,7 @@ void* PacketTXRX::loopTXRX(int tid)
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;
             if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id] = rdtsc();
+                rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
                 prev_frame_id = frame_id;
             }
         }
@@ -106,7 +44,8 @@ void* PacketTXRX::loopTXRX(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
+struct Packet* PacketTXRX::recv_enqueue_argos(
+    int tid, int radio_id, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
@@ -156,7 +95,7 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     return pkt[0];
 }
 
-int PacketTXRX::dequeue_send(int tid)
+int PacketTXRX::dequeue_send_argos(int tid)
 {
     auto& c = cfg;
     Event_data event;
@@ -180,23 +119,26 @@ int PacketTXRX::dequeue_send(int tid)
     void* txbuf[2];
     int nChannels = c->nChannels;
     int ch = ant_id % nChannels;
-#if DEBUG_DOWNLINK
-    std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
-    size_t dl_symbol_idx = c->get_dl_symbol_idx(frame_id, symbol_id);
-    if (ant_id != c->ref_ant)
-        txbuf[ch] = zeros.data();
-    else if (dl_symbol_idx < c->DL_PILOT_SYMS)
-        txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
-    else
-        txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
-#else
-    size_t socket_symbol_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-              * c->BS_ANT_NUM);
-    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    txbuf[ch] = (void*)pkt->data;
-#endif
+
+    if (kDebugDownlink) {
+        std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
+        size_t dl_symbol_idx = c->get_dl_symbol_idx(frame_id, symbol_id);
+        if (ant_id != c->ref_ant)
+            txbuf[ch] = zeros.data();
+        else if (dl_symbol_idx < c->DL_PILOT_SYMS)
+            txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
+        else
+            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
+    } else {
+        size_t socket_symbol_offset = offset
+            % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
+                  * c->BS_ANT_NUM);
+        char* cur_buffer_ptr
+            = tx_buffer_ + socket_symbol_offset * c->packet_length;
+        struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+        txbuf[ch] = (void*)pkt->data;
+    }
+
     size_t last = c->DLSymbols[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme

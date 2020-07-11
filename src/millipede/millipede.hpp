@@ -22,6 +22,7 @@
 #include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
+#include "phy_stats.hpp"
 #include "txrx.hpp"
 #include "txrx_mac.hpp"
 #include "utils.h"
@@ -139,6 +140,7 @@ private:
     std::unique_ptr<PacketTXRX> receiver_;
     std::unique_ptr<MacPacketTXRX> mac_receiver_;
     Stats* stats;
+    PhyStats* phy_stats;
     // std::unique_ptr<Stats> stats_manager_;
     // pthread_t task_threads[TASK_THREAD_NUM];
     // EventHandlerContext context[TASK_THREAD_NUM];
@@ -178,10 +180,10 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated precoder
+    // Calculated uplink zeroforcing detection matrices
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
     // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> ul_precoder_buffer_;
+    Table<complex_float> ul_zf_buffer_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -228,9 +230,10 @@ private:
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
 
+    // Calculated zeroforcing precoders for downlink beamforming
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
     // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> dl_precoder_buffer_;
+    Table<complex_float> dl_zf_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas

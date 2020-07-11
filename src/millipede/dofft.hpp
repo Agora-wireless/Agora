@@ -13,6 +13,7 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "mkl_dfti.h"
+#include "phy_stats.hpp"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
@@ -28,7 +29,8 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<char>& socket_buffer, Table<int>& socket_buffer_status,
         Table<complex_float>& data_buffer, Table<complex_float>& csi_buffer,
-        Table<complex_float>& calib_buffer, Stats* stats_manager);
+        Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
+        Stats* stats_manager);
     ~DoFFT();
 
     /**
@@ -108,6 +110,7 @@ private:
     complex_float* fft_inout; // Buffer for both FFT input and output
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
+    PhyStats* phy_stats;
 };
 
 class DoIFFT : public Doer {
