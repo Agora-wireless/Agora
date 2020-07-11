@@ -5,16 +5,31 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    an Intel C++ compiler (`icpc`).
  * Required packages
    * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
-   * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing_intel_free_libs_and_python_apt_repo.html))
+   * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html))
    * Install Armadillo: `./scripts/install_armadillo.sh`
-   * Install the latest version of SoapySDR from https://github.com/pothosware/SoapySDR
-   * Download Intel FlexRAN to `/opt` (does not need to be compiled)
+   * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`
+   * Download Intel FlexRAN's LDPC SDK to `/opt` (does not need to be compiled)
      * Download [link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
-   * Optional: Install Intel compiler
-     * Intel MKL and compiler can be installed by installing Parallel Studio XE
-     * Set environment vairables by sourcing `compilervars.sh`, e.g.,
-     `source /opt/intel/compilers_and_libraries_2019.0.117/linux/bin/compilervars.sh intel64`
+     * Compile FlexRAN's LDPC SDK:
+     ```
+     % First, change ownership of /opt/FlexRAN_FEC_SDK_19_04 to your Linux user
+     cd /opt/FlexRAN_FEC_SDK_19_04/sdk/
+     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
+     ./create-makefiles-linux.sh
+     cd build-avx512-icc % or build-avx2-icc
+     make
+     ```
 
+   * Optional: Install Intel compiler
+     * Intel compiler version 19.0.4 is required for compiling FlexRAN. Newer
+       versions will not work. Please reach out to one of the current Millipede
+       developers to learn how to get the correct versions of Intel Parallel
+       Studio XE or Intel System Studio.
+
+     * Set required environment vairables by sourcing `compilervars.sh`. For
+       example, if Intel compiler is in `/opt`, run `source $(find 2>/dev/null
+       /opt -name compilervars.sh) intel64`. After running this command, ensure
+       that `icc --version` reports 19.0.4.
 
 ## Millipede quickstart
 
@@ -35,12 +50,16 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     make -j
     ```
 
+ * To include LDPC in the build, 
+   * Make sure to enable Intel compiler as instructed above.
+   * Instead of `cmake ..` above, run `cmake -DCMAKE_C_COMPILER=icc -DCMAKE_CXX_COMPILER=icpc -DUSE_LDPC=1 ..`.
+
  * Run Millipede with simulated client traffic
-   * First, run `./data_generator data/tddconfig-sim-ul.json` to generate data
+   * First, return to the base directory (`cd ..`), then run `./build/data_generator data/tddconfig-sim-ul.json` to generate data
      files.
-   * In one terminal, run `./millipede data/tddconfig-sim-ul.json` to start
+   * In one terminal, run `./build/millipede data/tddconfig-sim-ul.json` to start
      Millipede with uplink configuration.
-   * In another terminal, run  `./sender --num_threads=2 --core_offset=0
+   * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
      --delay=5000 --enable_slow_start=false
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.

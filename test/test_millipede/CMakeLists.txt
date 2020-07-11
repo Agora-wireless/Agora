@@ -114,6 +114,7 @@ set(COMMON_SOURCES
 set(MILLIPEDE_SOURCES 
   ${SOURCE_DIR}/src/millipede/millipede.cpp
   ${SOURCE_DIR}/src/millipede/stats.cpp 
+  ${SOURCE_DIR}/src/millipede/phy_stats.cpp 
   ${SOURCE_DIR}/src/millipede/dofft.cpp
   ${SOURCE_DIR}/src/millipede/dozf.cpp
   ${SOURCE_DIR}/src/millipede/dodemul.cpp
@@ -131,7 +132,9 @@ set(LDPC_SOURCES
 # LDPC headers and sources that do not require an Intel compiler
 set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
 include_directories(
+  ${FLEXRAN_SDK_DIR}/test/phy/common
   ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
@@ -150,18 +153,20 @@ if(${USE_LDPC})
     message(FATAL_ERROR "Intel compiler is required for LDPC library!" )
   endif()
   add_definitions(-DUSE_LDPC)
-  set(SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
-  set(LIB_DIR ${SDK_DIR}/build-avx2-icc)
-  set(LDPC_LIBS ${LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-                ${LIB_DIR}/source/phy/lib_common/libcommon.a)
+  set(FLEXRAN_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk/)
+  # FlexRAN FEC libraries can be in one of two directories depending on arch
+  if (EXISTS ${FLEXRAN_SDK_DIR}/build-avx512-icc)
+    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx512-icc)
+  elseif (EXISTS ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+    set(FLEXRAN_LIB_DIR ${FLEXRAN_SDK_DIR}/build-avx2-icc)
+  else()
+    message(FATAL_ERROR "FlexRAN FEC libraries required but not found")
+  endif()
 
-  include_directories(
-    ${SDK_DIR}/test/phy/common
-    ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-    ${SDK_DIR}/source/phy/lib_common
-    ${SOURCE_DIR}/src/encoder)
+  set(LDPC_LIBS ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+                ${FLEXRAN_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
+                ${FLEXRAN_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-  set(HEADER_FILES ${SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr/phy_ldpc_decoder_5gnr.h)
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} ${SOURCE_DIR}/src/millipede/docoding.cpp)
 endif()
 
@@ -210,7 +215,7 @@ set(SOURCES
   ${ARGOS_SOURCES}
   ${LDPC_SOURCES})
       
-add_executable(millipede main.cpp ${SOURCES} ${HEADER_FILES})
+add_executable(millipede main.cpp ${SOURCES})
 target_link_libraries(millipede -larmadillo
   ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
 
@@ -218,8 +223,7 @@ set(SENDER_SOURCES
   ${SOURCE_DIR}/simulator/sender_cli.cpp
   ${SOURCE_DIR}/simulator/sender.cpp 
   ${COMMON_SOURCES}
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
 target_link_libraries(sender -lpthread gflags ${MKL_LIBS} ${LDPC_LIBS})
@@ -230,15 +234,14 @@ set(SIMULATOR_SOURCES
   ${SOURCE_DIR}/simulator/sender.cpp
   ${SOURCE_DIR}/simulator/receiver.cpp 
   ${COMMON_SOURCES}
-  ${LDPC_SOURCES}
-  ${HEADER_FILES})
+  ${LDPC_SOURCES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
 target_link_libraries(sim -lpthread ${MKL_LIBS} ${LDPC_LIBS})
 
 add_executable(data_generator 
   ${SOURCE_DIR}/data/data_generator/data_generator.cpp 
-  ${LDPC_SOURCES} ${COMMON_SOURCES} ${HEADER_FILES})
+  ${LDPC_SOURCES} ${COMMON_SOURCES})
 target_link_libraries(data_generator -larmadillo ${LDPC_LIBS} ${MKL_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 

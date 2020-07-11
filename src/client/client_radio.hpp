@@ -17,7 +17,6 @@
 class ClientRadioConfig {
 public:
     ClientRadioConfig(Config* cfg);
-    static void* initClientRadio(void* context);
     bool radioStart();
     void radioStop();
     void readSensors();
@@ -37,12 +36,15 @@ public:
     // std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*, size_t,
     // size_t); void dciqCalibrationProc(size_t);
     ~ClientRadioConfig();
+
+private:
     struct ClientRadioConfigContext {
         ClientRadioConfig* ptr;
         size_t tid;
     };
+    static void* initClientRadio_launch(void* context);
+    void initClientRadio(ClientRadioConfigContext* context);
 
-private:
     Config* _cfg;
     std::vector<SoapySDR::Device*> hubs;
     std::vector<SoapySDR::Device*> clStn;
@@ -52,7 +54,6 @@ private:
     std::vector<SoapySDR::Stream*> rxStreams;
     size_t _radioNum;
     size_t _antennaNum;
-    std::atomic<size_t> remainingJobs;
     ClientRadioConfigContext* context;
 };
 #endif

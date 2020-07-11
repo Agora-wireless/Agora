@@ -106,7 +106,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
             context->id = worker_id;
             rte_eal_remote_launch(
                 (lcore_function_t*)
-                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loopTXRX>,
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
                 context, lcore_id);
             printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
                 lcore_id);
@@ -116,7 +116,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     return true;
 }
 
-void* PacketTXRX::loopTXRX(int tid)
+void* PacketTXRX::loop_tx_rx(int tid)
 {
     size_t rx_offset = 0;
     int prev_frame_id = -1;
@@ -199,7 +199,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;
             if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id] = rdtsc();
+                rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
                 prev_frame_id = frame_id;
             }
         }

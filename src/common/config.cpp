@@ -39,9 +39,9 @@ Config::Config(std::string jsonfile)
     } else
         nRadios = tddConf.value("radio_num", BS_ANT_NUM);
 
-#ifdef USE_ARGOS
-    rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
-#endif
+    if (kUseArgos) {
+        rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
+    }
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -183,9 +183,11 @@ Config::Config(std::string jsonfile)
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     mac_socket_thread_num
         = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
-    fft_thread_num = tddConf.value("fft_thread_num", 4);
-    demul_thread_num = tddConf.value("demul_thread_num", 11);
-    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num;
+    fft_thread_num = tddConf.value("fft_thread_num", 5);
+    demul_thread_num = tddConf.value("demul_thread_num", 5);
+    decode_thread_num = tddConf.value("decode_thread_num", kUseLDPC ? 10 : 0);
+    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
+        - decode_thread_num;
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
@@ -267,46 +269,46 @@ Config::Config(std::string jsonfile)
 
 void Config::genData()
 {
-#ifdef USE_ARGOS
-    std::vector<std::vector<double>> gold_ifft
-        = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
-    std::vector<std::complex<int16_t>> gold_ifft_ci16
-        = Utils::double_to_cint16(gold_ifft);
-    for (size_t i = 0; i < 128; i++) {
-        gold_cf32.push_back(
-            std::complex<float>(gold_ifft[0][i], gold_ifft[1][i]));
+    if (kUseArgos) {
+        std::vector<std::vector<double>> gold_ifft
+            = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
+        std::vector<std::complex<int16_t>> gold_ifft_ci16
+            = Utils::double_to_cint16(gold_ifft);
+        for (size_t i = 0; i < 128; i++) {
+            gold_cf32.push_back(
+                std::complex<float>(gold_ifft[0][i], gold_ifft[1][i]));
+        }
+
+        std::vector<std::vector<double>> sts_seq
+            = CommsLib::getSequence(0, CommsLib::STS_SEQ);
+        std::vector<std::complex<int16_t>> sts_seq_ci16
+            = Utils::double_to_cint16(sts_seq);
+
+        // Populate STS (stsReps repetitions)
+        int stsReps = 15;
+        for (int i = 0; i < stsReps; i++) {
+            beacon_ci16.insert(
+                beacon_ci16.end(), sts_seq_ci16.begin(), sts_seq_ci16.end());
+        }
+
+        // Populate gold sequence (two reps, 128 each)
+        int goldReps = 2;
+        for (int i = 0; i < goldReps; i++) {
+            beacon_ci16.insert(beacon_ci16.end(), gold_ifft_ci16.begin(),
+                gold_ifft_ci16.end());
+        }
+
+        beacon_len = beacon_ci16.size();
+
+        if (sampsPerSymbol < beacon_len + prefix + postfix) {
+            std::string msg = "Minimum supported symbol_size is ";
+            msg += std::to_string(beacon_len);
+            throw std::invalid_argument(msg);
+        }
+
+        beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
+        coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
     }
-
-    std::vector<std::vector<double>> sts_seq
-        = CommsLib::getSequence(0, CommsLib::STS_SEQ);
-    std::vector<std::complex<int16_t>> sts_seq_ci16
-        = Utils::double_to_cint16(sts_seq);
-
-    // Populate STS (stsReps repetitions)
-    int stsReps = 15;
-    for (int i = 0; i < stsReps; i++) {
-        beacon_ci16.insert(
-            beacon_ci16.end(), sts_seq_ci16.begin(), sts_seq_ci16.end());
-    }
-
-    // Populate gold sequence (two reps, 128 each)
-    int goldReps = 2;
-    for (int i = 0; i < goldReps; i++) {
-        beacon_ci16.insert(
-            beacon_ci16.end(), gold_ifft_ci16.begin(), gold_ifft_ci16.end());
-    }
-
-    beacon_len = beacon_ci16.size();
-
-    if (sampsPerSymbol < beacon_len + prefix + postfix) {
-        std::string msg = "Minimum supported symbol_size is ";
-        msg += std::to_string(beacon_len);
-        throw std::invalid_argument(msg);
-    }
-
-    beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
-    coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
-#endif
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
     auto zc_seq_double
@@ -404,15 +406,12 @@ void Config::genData()
     fclose(fd);
 #endif
 
-    Table<uint8_t> ul_mod_input;
-    Table<uint8_t> dl_mod_input;
     if (kUseLDPC) {
         size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
         size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
         size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_NUM;
 
         // Encode uplink bits
-        Table<int8_t> ul_encoded_bits;
         ul_encoded_bits.malloc(
             ul_data_symbol_num_perframe * num_blocks_per_symbol,
             encoded_bytes_per_block, 64);

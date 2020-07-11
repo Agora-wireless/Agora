@@ -7,15 +7,16 @@
 
 int main(int argc, char const* argv[])
 {
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string confFile;
     int thread_num, core_offset, delay;
     if (argc == 5) {
         thread_num = strtol(argv[1], NULL, 10);
         core_offset = strtol(argv[2], NULL, 10);
         delay = strtol(argv[3], NULL, 10);
-        confFile = std::string("/") + std::string(argv[4]);
+        confFile = std::string(argv[4]);
     } else {
-        confFile = "/data/tddconfig-sim-dl.json";
+        confFile = cur_directory + "/data/tddconfig-sim-dl.json";
         thread_num = 4;
         core_offset = 22;
         delay = 5000;
@@ -24,9 +25,7 @@ int main(int argc, char const* argv[])
                "core offset, 3. frame duration, 4. config file)\n");
         printf("Arguments set to default: 4, 22, 5000, %s\n", confFile.c_str());
     }
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
-    auto* cfg = new Config(filename.c_str());
+    auto* cfg = new Config(confFile.c_str());
     cfg->genData();
     Simulator* simulator;
     int ret;
