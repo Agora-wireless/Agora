@@ -267,9 +267,9 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
         pAddr = Bg2Address;
     }
 
-    ALIGNED_(avx2enc::kProcBytes)
+    __attribute__((aligned(64)))
     int8_t input_internal_buffer[BG1_COL_TOTAL * avx2enc::kProcBytes] = { 0 };
-    ALIGNED_(avx2enc::kProcBytes)
+    __attribute__((aligned(64)))
     int8_t parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes] = { 0 };
 
     avx2enc::LDPC_ADAPTER_P ldpc_adapter_func
