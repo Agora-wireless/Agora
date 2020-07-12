@@ -385,9 +385,10 @@ void Config::genData()
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
         + ".bin";
     FILE* fd = fopen(filename1.c_str(), "rb");
-    if (fd == NULL) {
-        printf("open antenna file %s failed.\n", filename1.c_str());
-        std::cerr << "Error: " << strerror(errno) << std::endl;
+    if (fd == nullptr) {
+        printf("Failed to open antenna file %s. Error %s.\n", filename1.c_str(),
+            strerror(errno));
+        exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         size_t r = fread(
