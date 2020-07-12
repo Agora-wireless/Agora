@@ -19,10 +19,10 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
+#include "phy_stats.hpp"
 #include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
-#include "phy_stats.hpp"
 #include "txrx.hpp"
 #include "txrx_mac.hpp"
 #include "utils.h"
@@ -100,6 +100,15 @@ public:
     void save_tx_data_to_file(int frame_id);
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
+
+    // Flags that allow developer control over Millipede internals
+    struct {
+        // Before exiting, save LDPC-decoded or demodulated data to a file
+        bool enable_save_decode_data_to_file = false;
+
+        // Before exiting, save data sent on downlink to a file
+        bool enable_save_tx_data_to_file = false;
+    } flags;
 
 private:
     /// Fetch the concurrent queue for this event type

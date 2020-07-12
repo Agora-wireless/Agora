@@ -1,10 +1,9 @@
 /**
- * @file test_ldpc.cpp
+ * @file test_ldpc_flexran.cpp
  *
- * @brief Accuracy and performance test for LDPC. The encoder is Millipede's
- * avx2enc - unlike FlexRAN's encoder, avx2enc works with AVX2 (i.e., unlike
- * FlexRAN's encoder, avx2enc does not require AVX-512). The decoder is
- * FlexRAN's decoder, which supports AVX2.
+ * @brief Accuracy and performance test for LDPC. 
+ * The encoder is FlexRAN's encoder (requires AVX512 support). 
+ * The decoder is FlexRAN's decoder.
  */
 
 #include "common/Symbols.hpp"
@@ -24,32 +23,43 @@
 #include <time.h>
 #include <vector>
 
-static constexpr size_t kNumCodeBlocks = 2;
+static constexpr size_t kNumCodeBlocks = 1;
 static constexpr size_t kBaseGraph = 1;
-static constexpr bool kEnableEarlyTermination = false;
+static constexpr bool kEnableEarlyTermination = true;
 static constexpr size_t kNumFillerBits = 0;
-static constexpr size_t kMaxDecoderIters = 8;
+static constexpr size_t kMaxDecoderIters = 20;
 static constexpr size_t k5GNRNumPunctured = 2;
+static constexpr size_t kNumRows = 46;
+
+char* read_binfile(std::string filename, size_t buffer_size)
+{
+    std::ifstream infile;
+    infile.open(filename, std::ios::binary | std::ios::in);
+
+    char* x = (char*)malloc(buffer_size * sizeof(char));
+    infile.read((char*)x, buffer_size * sizeof(char));
+    infile.close();
+    return x;
+}
 
 int main()
 {
     double freq_ghz = measure_rdtsc_freq();
-    printf("Spinning for one second for Turbo Boost\n");
-    nano_sleep(1000 * 1000 * 1000, freq_ghz);
     int8_t* input[kNumCodeBlocks];
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
     uint8_t* decoded[kNumCodeBlocks];
-
     std::vector<size_t> zc_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3, 6, 12, 24,
         48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56, 112, 224,
         9, 18, 36, 72, 144, 288, 11, 22, 44, 88, 176, 352, 13, 26, 52, 104, 208,
         15, 30, 60, 120, 240 };
+
     std::sort(zc_vec.begin(), zc_vec.end());
     for (const size_t& zc : zc_vec) {
-        if (zc > avx2enc::ZC_MAX) {
+        if (zc == 2 || zc == 3 || zc == 5) {
             fprintf(stderr,
-                "Zc value %zu not supported by avx2enc. Skipping.\n", zc);
+                "Zc value %zu not supported by FlexRAN encoder. Skipping.\n",
+                zc);
             continue;
         }
         const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
@@ -57,13 +67,14 @@ int main()
         const size_t num_encoded_bits = ldpc_num_encoded_bits(kBaseGraph, zc);
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
-            input[i] = new int8_t[ldpc_encoding_input_buf_size(kBaseGraph, zc)];
-            parity[i]
-                = new int8_t[ldpc_encoding_parity_buf_size(kBaseGraph, zc)];
-            encoded[i]
-                = new int8_t[ldpc_encoding_encoded_buf_size(kBaseGraph, zc)];
-            decoded[i]
-                = new uint8_t[ldpc_encoding_encoded_buf_size(kBaseGraph, zc)];
+            input[i] = (int8_t*)memalign(
+                64, ldpc_encoding_input_buf_size(kBaseGraph, zc));
+            parity[i] = (int8_t*)memalign(
+                64, ldpc_encoding_parity_buf_size(kBaseGraph, zc));
+            encoded[i] = (int8_t*)memalign(
+                64, ldpc_encoding_encoded_buf_size(kBaseGraph, zc));
+            decoded[i] = (uint8_t*)memalign(
+                64, ldpc_encoding_encoded_buf_size(kBaseGraph, zc));
         }
 
         // Randomly generate input
@@ -75,7 +86,8 @@ int main()
 
         const size_t encoding_start_tsc = rdtsc();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            ldpc_encode_helper(kBaseGraph, zc, encoded[n], parity[n], input[n]);
+            ldpc_encode_helper_avx512(
+                kBaseGraph, zc, kNumRows, encoded[n], parity[n], input[n]);
         }
 
         const double encoding_us
@@ -107,7 +119,7 @@ int main()
         const size_t numMsgBits = num_input_bits - kNumFillerBits;
         ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
         ldpc_decoder_5gnr_response.varNodes = reinterpret_cast<int16_t*>(
-            memalign(32, buffer_len * sizeof(int16_t)));
+            memalign(64, buffer_len * sizeof(int16_t)));
 
         // Decoding
         const size_t decoding_start_tsc = rdtsc();
