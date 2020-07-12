@@ -1,7 +1,7 @@
 #ifndef _ENCODER_H_
 #define _ENCODER_H_
 
-#include "local_phy_ldpc_encoder_5gnr_internal.h"
+#include "gcc_phy_ldpc_encoder_5gnr_internal.h"
 #include "phy_ldpc_encoder_5gnr.h"
 #include <stdlib.h>
 

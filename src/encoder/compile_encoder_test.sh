@@ -1,10 +1,12 @@
 # Compile with local libraries and avx2
 
+FLEXRAN_SDK="${HOME}/FlexRAN-FEC-SDK-19-04"
+
 compile_with_millipede_encoder() {
   g++ -std=c++11 -mavx2 -Wall \
     -I. \
-    -isystem /opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_encoder_5gnr \
-    -isystem /opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_common \
+    -isystem ${FLEXRAN_SDK}/sdk/source/phy/lib_ldpc_encoder_5gnr \
+    -isystem ${FLEXRAN_SDK}/sdk/source/phy/lib_common \
     encoder_test.cpp encoder.cpp cyclic_shift.cpp iobuffer.cpp -o test_avx2
 }
 
@@ -25,4 +27,4 @@ compile_with_flexran_encoder() {
     -o test_avx512
 }
 
-compile_with_flexran_encoder
+compile_with_millipede_encoder
