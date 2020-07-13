@@ -152,6 +152,12 @@ public:
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
+    // Indicates all UEs that are in this experiment,
+    // including the ones instantiated on other runs/machines.
+    size_t total_ue_ant_num;
+    // Indicates the (pilot) offset of the UEs in this instance,
+    // with respect to all UEs used in the same experiment
+    size_t ue_ant_offset;
     float scale; // scaling factor for all transmit symbols
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
@@ -181,6 +187,7 @@ public:
     // Port ID at MAC layer side
     int mac_rx_port;
     int mac_tx_port;
+    bool init_mac_running;
 
     // Number of frames sent by sender during testing = number of frames
     // processed by Millipede before exiting.

@@ -42,6 +42,8 @@ Config::Config(std::string jsonfile)
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
+    rt_assert(
+        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -69,6 +71,7 @@ Config::Config(std::string jsonfile)
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
+    init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
     auto symbolSize = tddConf.value("symbol_size", 1);
@@ -173,8 +176,8 @@ Config::Config(std::string jsonfile)
         UE_NUM = pilot_symbol_num_perframe;
         UE_ANT_NUM = UE_NUM;
     }
-    rt_assert(
-        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
+    ue_ant_offset = tddConf.value("ue_ant_offset", 0);
+    total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
@@ -237,8 +240,9 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
     packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
 
-    data_bytes_num_persymbol
-        = OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
+    data_bytes_num_persymbol = kUseLDPC
+        ? (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol
+        : (OFDM_DATA_NUM * mod_type) >> 3; // number of Bytes in each OFDM Sym.
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
@@ -343,7 +347,7 @@ void Config::genData()
     auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
-            zc_ue_pilot, i * (float)M_PI / 6); // LTE DMRS
+            zc_ue_pilot, (i + ue_ant_offset) * (float)M_PI / 6); // LTE DMRS
         for (size_t j = 0; j < OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
@@ -382,19 +386,28 @@ void Config::genData()
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
     std::string filename1 = cur_directory1
         + (kUseLDPC ? "/data/LDPC_orig_data_" : "/data/orig_data_")
-        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
-        + ".bin";
+        + std::to_string(OFDM_CA_NUM) + "_ant"
+        + std::to_string(total_ue_ant_num) + ".bin";
+    std::cout << "Reading raw data from " << filename1 << std::endl;
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == NULL) {
         printf("open antenna file %s failed.\n", filename1.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+        if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
+            return;
         size_t r = fread(
             ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
         if (r < num_bytes_per_ue * UE_ANT_NUM)
             printf(
                 "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+        if (fseek(fd,
+                num_bytes_per_ue
+                    * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM),
+                SEEK_SET)
+            != 0)
+            return;
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         size_t r = fread(
@@ -409,7 +422,7 @@ void Config::genData()
     if (kUseLDPC) {
         size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
         size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
-        size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_NUM;
+        size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_ANT_NUM;
 
         // Encode uplink bits
         ul_encoded_bits.malloc(
@@ -422,7 +435,8 @@ void Config::genData()
         int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
             LDPC_config.Bg, LDPC_config.Zc)];
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM;
+                 j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     ul_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
@@ -430,9 +444,9 @@ void Config::genData()
         }
 
         ul_mod_input.calloc(
-            ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
+            ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < UE_NUM; j++) {
+            for (size_t j = 0; j < UE_ANT_NUM; j++) {
                 for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         ul_encoded_bits[i * num_blocks_per_symbol
@@ -451,7 +465,8 @@ void Config::genData()
 
         // Encode downlink bits
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_NUM; j++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM;
+                 j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     dl_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
@@ -459,9 +474,9 @@ void Config::genData()
         }
 
         dl_mod_input.calloc(
-            dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 32);
+            dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < UE_NUM; j++) {
+            for (size_t j = 0; j < UE_ANT_NUM; j++) {
                 for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         dl_encoded_bits[i * num_blocks_per_symbol

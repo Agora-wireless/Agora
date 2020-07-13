@@ -14,6 +14,8 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
 
+    mac_running = cfg->init_mac_running;
+
     /* initialize random seed: */
     srand(time(NULL));
 
@@ -42,6 +44,16 @@ PacketTXRX::~PacketTXRX()
 {
     delete[] socket_;
     delete[] servaddr_;
+}
+
+void PacketTXRX::wakeup_mac()
+{
+    mac_running = true;
+}
+
+bool PacketTXRX::is_mac_running()
+{
+    return mac_running;
 }
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
@@ -111,6 +123,16 @@ void* PacketTXRX::loopTXRX(int tid)
             config_->ue_tx_port + radio_id);
     }
 
+    while(config_->running && !is_mac_running());
+
+    // send start notification to mac
+    char* start_msg[1024];
+    ssize_t ret = sendto(socket_[0],
+        start_msg, 1024, 0, (struct sockaddr*)&servaddr_[0],
+        sizeof(servaddr_[0]));
+    rt_assert(ret > 0, "sendto() failed");
+    std::cout << "Waking up MAC.." << std::endl;
+
     int radio_id = radio_lo;
     while (config_->running) {
         //if (-1 != dequeue_send(tid))
@@ -137,12 +159,12 @@ struct MacPacket* PacketTXRX::recv_enqueue(
     int packet_length = config_->mac_packet_length;
 
     // if rx_buffer is full, exit
-    //if (rx_buffer_status[rx_offset] == 1) {
-    //    printf(
-    //        "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-    //    //config_->running = false;
-    //    //return (NULL);
-    //}
+    if (rx_buffer_status[rx_offset] == 1) {
+        printf(
+            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        //config_->running = false;
+        //return (NULL);
+    }
     struct MacPacket* pkt
         = (struct MacPacket*)&rx_buffer[rx_offset * packet_length];
     // if (-1 == recv(socket_[radio_id], pkt->data, packet_length, 0)) {
