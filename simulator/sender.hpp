@@ -38,6 +38,7 @@
 
 #ifdef USE_DPDK_SENDER
 #include "dpdk_transport.hpp"
+#include <netinet/ether.h>
 #endif
 
 class Sender {
@@ -47,7 +48,8 @@ public:
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
-        size_t delay = 0, bool enable_slow_start = true, 
+        size_t delay = 0, bool enable_slow_start = true,
+        std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
     ~Sender();
 
@@ -126,9 +128,13 @@ private:
     double* frame_end;
 
 #ifdef USE_DPDK_SENDER
-    uint32_t src_addr;
-    uint32_t dst_addr;
     struct rte_mempool* mbuf_pool;
+    uint32_t sender_addr; // IPv4 address of this data sender
+    uint32_t server_addr; // IPv4 address of the remote target Millipede server
+    rte_ether_addr sender_mac_addr; // MAC address of this data sender
+
+    // MAC address of the remote target Millipede server
+    rte_ether_addr server_mac_addr;
 #endif
 };
 
