@@ -66,11 +66,11 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
-            setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->mac_rx_port + i, cfg->rx_addr.c_str());
+            setup_sockaddr_remote_ipv4(&servaddr_ipv4[i], cfg->mac_rx_port + i,
+                cfg->server_addr.c_str());
             printf("Set up UDP socket client listening to port %zu"
                    " with remote address %s:%zu  \n",
-                cfg->ue_tx_port + i, cfg->rx_addr.c_str(),
+                cfg->ue_tx_port + i, cfg->server_addr.c_str(),
                 cfg->mac_rx_port + i);
         } else {
             socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
@@ -307,7 +307,7 @@ void* SimpleClientMac::worker_thread(int tid)
         //         fprintf(stderr,
         //             "send() failed. Error = %s. Is a server running at "
         //             "%s:%d?\n",
-        //             strerror(errno), cfg->rx_addr.c_str(),
+        //             strerror(errno), cfg->server_addr.c_str(),
         //             cfg->bs_port + radio_id);
         //         exit(-1);
         //     }
