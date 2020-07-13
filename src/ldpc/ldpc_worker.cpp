@@ -19,7 +19,11 @@ LDPCWorker::LDPCWorker(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus)
         nexus, static_cast<void*>(this), tid, basic_sm_handler);
 }
 
-LDPCWorker::~LDPCWorker() { free(resp_var_nodes); }
+LDPCWorker::~LDPCWorker()
+{
+    free(resp_var_nodes);
+    delete rpc;
+}
 
 void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
 {
@@ -36,7 +40,8 @@ void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
 
 void LDPCWorker::run_erpc_event_loop_forever()
 {
-    while (true) {
+    stop = false;
+    while (!stop) {
         rpc->run_event_loop_once();
     }
 }

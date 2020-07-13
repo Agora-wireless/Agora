@@ -37,7 +37,12 @@ public:
     /// LDPC-decode data from in_buffer and place it in out_buffer
     void decode(int8_t* in_buffer, uint8_t* out_buffer);
 
+    void stop_loop() { stop = true; }
+
     friend void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
+
+    friend void ldpc_req_handler_test(
+        erpc::ReqHandle* req_handle, void* _context);
 
 private:
     const int tid; // Thread ID as defined by eRPC
@@ -47,6 +52,8 @@ private:
 
     // The buffer used to store the code word 16-bit LLR outputs for FlexRAN lib
     int16_t* resp_var_nodes;
+
+    bool stop;
 };
 
 #endif

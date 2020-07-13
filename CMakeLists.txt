@@ -363,4 +363,13 @@ if(${USE_ERPC})
     ${LDPC_SOURCES}
     ${HEADER_FILES})
   target_link_libraries(ldpc_worker ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
+  add_executable(test_ldpc_worker test/unit_tests/test_ldpc_worker.cc
+    ${COMMON_SOURCES}
+    src/millipede/stats.cpp
+    src/millipede/docoding.cpp
+    src/ldpc/ldpc_worker.cpp
+    src/millipede/phy_stats.cpp
+    ${LDPC_SOURCES})
+  target_link_libraries(test_ldpc_worker ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
+  add_test(NAME test_ldpc_worker COMMAND test_ldpc_worker)
 endif()
