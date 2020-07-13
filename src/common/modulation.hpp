@@ -6,13 +6,12 @@
 #ifndef COMPUTE_COMMON
 #define COMPUTE_COMMON
 
+#include "buffer.hpp"
+#include <cmath>
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <iostream>
 #include <stdio.h>
-// #include <armadillo>
-#include "buffer.hpp"
-#include <cmath>
 
 #include "gettime.h"
 #include "memory_manage.h"
@@ -24,11 +23,8 @@
 #define QAM64_THRESHOLD_2 4 / sqrt(42)
 #define QAM64_THRESHOLD_3 6 / sqrt(42)
 
-// using namespace arma;
-// using namespace std;
 void init_modulation_table(Table<float>& table, size_t mod_order);
 void init_qpsk_table(Table<float>& table);
-// void init_qam16_table(Table<float> &table);
 void init_qam16_table(Table<float>& table);
 void init_qam64_table(Table<float>& table);
 

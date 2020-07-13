@@ -31,17 +31,6 @@ static constexpr size_t kNumFillerBits = 0;
 static constexpr size_t kMaxDecoderIters = 20;
 static constexpr size_t k5GNRNumPunctured = 2;
 
-char* read_binfile(std::string filename, size_t buffer_size)
-{
-    std::ifstream infile;
-    infile.open(filename, std::ios::binary | std::ios::in);
-
-    char* x = (char*)malloc(buffer_size * sizeof(char));
-    infile.read((char*)x, buffer_size * sizeof(char));
-    infile.close();
-    return x;
-}
-
 int main()
 {
     double freq_ghz = measure_rdtsc_freq();
@@ -86,6 +75,7 @@ int main()
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             ldpc_encode_helper(kBaseGraph, zc, encoded[n], parity[n], input[n]);
         }
+
         const double encoding_us
             = cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
 

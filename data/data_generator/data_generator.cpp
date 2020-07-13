@@ -39,16 +39,13 @@ float rand_float_from_short(float min, float max)
 
 int main(int argc, char* argv[])
 {
-    std::string confFile;
-    if (argc == 2)
-        confFile = std::string("/") + std::string(argv[1]);
-    else
-        confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
+    std::string confFile = cur_directory + "/data/tddconfig-sim-ul.json";
+    if (argc == 2)
+        confFile = std::string(argv[1]);
 
-    printf("Config file: %s\n", filename.c_str());
-    auto* config_ = new Config(filename.c_str());
+    printf("Config file: %s\n", confFile.c_str());
+    auto* config_ = new Config(confFile.c_str());
 
     printf("LDPC %s\n", kUseLDPC ? "enabled" : "disabled");
     printf("Using %s-orthogonal pilots\n",
@@ -159,12 +156,12 @@ int main(int argc, char* argv[])
                 = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
     }
 
-    printf("Saving raw data\n");
 
     if (kUseLDPC) {
         std::string filename_input = cur_directory + "/data/LDPC_orig_data_"
             + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
             + ".bin";
+        printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < numberCodeblocks; i++) {
             uint8_t* ptr = (uint8_t*)input[i];
@@ -177,6 +174,7 @@ int main(int argc, char* argv[])
         std::string filename_input = cur_directory + "/data/orig_data_"
             + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
             + ".bin";
+        printf("Saving raw data to %s\n", filename_input.c_str());
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < numberCodeblocks; i++) {
             uint8_t* ptr = (uint8_t*)mod_input[i];
@@ -306,11 +304,11 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("saving rx data...\n");
     std::string filename_rx = cur_directory
         + (kUseLDPC ? "/data/LDPC_rx_data_" : "/data/rx_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
+    printf("Saving rx data to %s\n", filename_rx.c_str());
     FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
     for (int i = 0; i < symbol_num_perframe; i++) {
         float* ptr = (float*)rx_data_all_symbols[i];
@@ -443,12 +441,11 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("saving dl tx data...\n");
     std::string filename_dl_tx = cur_directory
         + (kUseLDPC ? "/data/LDPC_dl_tx_data_" : "/data/dl_tx_data_")
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
-
+    printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
     FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
     for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
         short* ptr = (short*)dl_tx_data[i];
