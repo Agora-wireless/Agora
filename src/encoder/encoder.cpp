@@ -207,8 +207,6 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
     }
 }
 
-} // namespace avx2enc
-
 int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
     struct bblib_ldpc_encoder_5gnr_response* response)
 {
@@ -268,9 +266,11 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
     }
 
     __attribute__((aligned(64)))
-    int8_t input_internal_buffer[BG1_COL_TOTAL * avx2enc::kProcBytes] = { 0 };
+    int8_t input_internal_buffer[BG1_COL_TOTAL * avx2enc::kProcBytes]
+        = { 0 };
     __attribute__((aligned(64)))
-    int8_t parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes] = { 0 };
+    int8_t parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes]
+        = { 0 };
 
     avx2enc::LDPC_ADAPTER_P ldpc_adapter_func
         = avx2enc::ldpc_select_adapter_func(Zc);
@@ -293,3 +293,5 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
 
     return 0;
 }
+
+} // namespace avx2enc
