@@ -106,7 +106,7 @@ traffic with hardware UEs (e.g., Iris devices)
      * Pass `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
-   * Run `./data_generator data/ue-ul-hw.json` to generate required data files
+   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files
    * Run `./build/user data/ue-ul-hw.json`
    * Run `./build/macuser 2 5000 data/ue-ul-hw.json`
 
