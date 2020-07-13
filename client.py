@@ -15,7 +15,7 @@ parser.add_argument('-n', '--num', type=int, default=1,
 args = parser.parse_args()
 
 if args.app == "rand":
-    cmd_app = './src/app/stream_rand.py -p {p} -s 49'
+    cmd_app = './src/app/stream_rand.py -p {p} -s 98'
 elif args.app == "video":
     cmd_app = './src/app/video_client.py -p {p} -s 98 -d {d}'
 elif args.app == "none":
