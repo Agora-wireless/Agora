@@ -261,8 +261,6 @@ static inline void ldpc_encode_helper_avx512(size_t base_graph, size_t zc,
     size_t nRows, int8_t* encoded_buffer, int8_t* parity_buffer,
     int8_t* input_buffer)
 {
-    const size_t PROC_BYTES = 64;
-    const size_t BG1_COL_INF_NUM = 22;
     const size_t num_input_bits = ldpc_num_input_bits(base_graph, zc);
     const size_t num_parity_bits = ldpc_num_parity_bits(base_graph, zc);
     struct bblib_ldpc_encoder_5gnr_request ldpc_encoder_5gnr_request {

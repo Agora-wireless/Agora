@@ -35,6 +35,8 @@ Phy_UE::Phy_UE(Config* config)
         TASK_BUFFER_FRAME_NUM * symbol_perframe * antenna_num * 36);
     map_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * nUEs * 36);
+    encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+        TASK_BUFFER_FRAME_NUM * nUEs * 36);
     modul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * nUEs * 36);
     ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
@@ -246,7 +248,7 @@ void Phy_UE::start()
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
     moodycamel::ProducerToken ptok_map(map_queue_);
-    // moodycamel::ProducerToken ptok_tx(tx_queue_);
+    moodycamel::ProducerToken ptok_encode(encode_queue_);
 
     // for message_queue, main thread is a consumer, it is multiple producers
     // & single consumer for message_queue
@@ -306,11 +308,22 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    Event_data do_modul_task(EventType::kModul,
-                        gen_tag_t::frm_sym_ue(
-                            frame_id, symbol_id, ant_id / config_->nChannels)
-                            ._tag);
-                    schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+                    if (kEnableMac)
+                        mac_receiver_->wakeup_mac();
+                    if (kUseLDPC) {
+                        Event_data do_encode_task(EventType::kEncode,
+                            gen_tag_t::frm_sym_ue(frame_id, symbol_id,
+                                ant_id / config_->nChannels)
+                                ._tag);
+                        schedule_task(
+                            do_encode_task, &encode_queue_, ptok_encode);
+                    } else {
+                        Event_data do_modul_task(EventType::kModul,
+                            gen_tag_t::frm_sym_ue(frame_id, symbol_id,
+                                ant_id / config_->nChannels)
+                                ._tag);
+                        schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+                    }
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -344,9 +357,15 @@ void Phy_UE::start()
             case EventType::kPacketFromMac: {
                 // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 // size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
+                if (!kUseLDPC) {
+                    Event_data do_map_task(EventType::kModul, event.tags[0]);
+                    schedule_task(do_map_task, &map_queue_, ptok_map);
+                } else { 
+                    size_t ue_id = rx_tag_t(event.tags[0]).tid;
+                    size_t offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
 
-                Event_data do_map_modul_task(EventType::kModul, event.tags[0]);
-                schedule_task(do_map_modul_task, &map_queue_, ptok_map);
+                    ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
+                }
                 // if (kDebugPrintPerFrameDone)
                 //     printf("Main thread: frame: %zu, finished mapping "
                 //            "uplink data for user %zu\n",
@@ -358,6 +377,15 @@ void Phy_UE::start()
                 if (kDebugPrintPerFrameDone)
                     printf("Main thread: MAC data ready for frame: %zu \n",
                         frame_id);
+            } break;
+
+            case EventType::kEncode: {
+                //size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                //size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+                // size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
+                Event_data do_modul_task(EventType::kModul, event.tags[0]);
+                schedule_task(do_modul_task, &modul_queue_, ptok_modul);
+
             } break;
 
             case EventType::kModul: {
@@ -481,6 +509,8 @@ void Phy_UE::taskThread(int tid)
             doModul(tid, event.tags[0]);
         if (map_queue_.try_dequeue(event))
             doMapBits(tid, event.tags[0]);
+        if (encode_queue_.try_dequeue(event))
+            doEncode(tid, event.tags[0]);
         else if (fft_queue_.try_dequeue(event))
             doFFT(tid, event.tags[0]);
     }
@@ -726,6 +756,75 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
 }
 
+void Phy_UE::doEncode(int tid, size_t tag)
+{
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    //size_t ue_id = rx_tag_t(tag).tid;
+    //size_t offset = rx_tag_t(tag).offset;
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t ue_id = gen_tag_t(tag).ue_id;
+    size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    auto& cfg = config_;
+    //size_t start_tsc = worker_rdtsc();
+
+    int8_t* encoded_buffer_temp = (int8_t*)memalign(64,
+        ldpc_encoding_encoded_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+    int8_t* parity_buffer = (int8_t*)memalign(64,
+        ldpc_encoding_parity_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+
+    size_t bytes_per_block = (LDPC_config.cbLen) >> 3;
+    size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
+
+    for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
+         ul_symbol_id++) {
+        size_t total_ul_symbol_id
+            = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
+        for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
+             cb_id++) {
+            int8_t* input_ptr;
+            if (kEnableMac) {
+                struct MacPacket* pkt
+                    = (struct MacPacket*)(ul_bits_buffer_[ue_id]
+                        + frame_slot * config_->mac_packet_length);
+                int input_offset = bytes_per_block
+                        * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
+                    + bytes_per_block * cb_id;
+                input_ptr = (int8_t*)pkt->data + input_offset;
+            } else {
+                size_t cb_offset
+                    = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
+                    * bytes_per_block;
+                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS][cb_offset];
+            }
+            int8_t* output_ptr = encoded_buffer_temp;
+
+            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, output_ptr,
+                parity_buffer, input_ptr);
+            int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
+            int output_offset
+                = total_ul_symbol_id * data_sc_len + cbCodedBytes * cb_id;
+            int8_t* final_output_ptr
+                = (int8_t*)&ul_syms_buffer_[ue_id][output_offset];
+            adapt_bits_for_mod(output_ptr, final_output_ptr,
+                encoded_bytes_per_block, cfg->mod_type);
+        }
+    }
+    //double duration = worker_rdtsc() - start_tsc;
+    //if (cycles_to_us(duration, freq_ghz) > 500) {
+    //    printf("Thread %d Encode takes %.2f\n", tid,
+    //        cycles_to_us(duration, freq_ghz));
+    //}
+
+    Event_data encode_event(EventType::kEncode, tag);
+
+    if (!message_queue_.enqueue(*task_ptok[tid], encode_event)) {
+        printf("Encodingg message enqueue failed\n");
+        exit(0);
+    }
+}
+
 void Phy_UE::doModul(int tid, size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
@@ -739,15 +838,15 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
-            int8_t* ul_bits = kEnableMac
+            int8_t* ul_bits = kEnableMac || kUseLDPC
                 ? (int8_t*)&ul_syms_buffer_[ant_id]
                                            [total_ul_symbol_id * data_sc_len]
-                : (kUseLDPC
-                          ? (int8_t*)&config_->ul_mod_input[ul_symbol_id
-                                + config_->UL_PILOT_SYMS][ant_id * data_sc_len]
-                          : &config_->ul_bits[ul_symbol_id
-                                + config_->UL_PILOT_SYMS]
-                                             [ant_id * data_sc_len]);
+                //: (kUseLDPC
+                //          ? (int8_t*)&config_->ul_mod_input[ul_symbol_id
+                //                + config_->UL_PILOT_SYMS][ant_id * data_sc_len]
+                : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
+                                   [ant_id * data_sc_len];
+            //);
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
