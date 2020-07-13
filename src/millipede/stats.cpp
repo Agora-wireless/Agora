@@ -518,7 +518,7 @@ void Stats::save_to_file()
         rt_assert(fp_debug_detailed != nullptr,
             std::string("Open file failed ") + std::to_string(errno));
         // Print the header
-        fprintf(fp_debug,
+        fprintf(fp_debug_detailed,
             "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
             "decode_0, decode_1, decode_2\n");
 
