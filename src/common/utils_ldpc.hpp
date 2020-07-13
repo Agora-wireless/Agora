@@ -5,6 +5,7 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_encoder_5gnr.h"
+#include "utils.h"
 #include <assert.h>
 #include <malloc.h>
 
@@ -200,7 +201,11 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     req.input[0] = const_cast<int8_t*>(input_buffer);
     resp.output[0] = parity_buffer;
 
+#ifdef ISA_AVX512
     bblib_ldpc_encoder_5gnr(&req, &resp);
+#else
+    avx2enc::bblib_ldpc_encoder_5gnr(&req, &resp);
+#endif
 
     // Copy punctured input bits from the encoding request, and parity bits from
     // the encoding response into encoded_buffer
@@ -220,7 +225,16 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     } else {
         // Otherwise, we need to memcpy from/to byte-unaligned locations. A
         // simple but perhaps inefficient way to do this is to use the encoder's
-        // internal scatter/gather functions.
+        // internal scatter/gather functions. We don't have access to these
+        // functions for FlexRAN's internal AVX-512 encoder.
+        if (zc >= avx2enc::kProcBytes * 8) {
+            fprintf(stderr,
+                "Zc values >= %zu that are not multiples of four are not "
+                "supported yet.\n",
+                zc);
+            exit(-1);
+        }
+
         __attribute__((aligned(kMaxProcBytes)))
         int8_t internal_buffer0[BG1_COL_INF_NUM * kMaxProcBytes]
             = { 0 };
@@ -231,22 +245,12 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
         int8_t internal_buffer2[BG1_COL_TOTAL * kMaxProcBytes]
             = { 0 };
 
-#ifndef USE_LDPC
         auto adapter_func = avx2enc::ldpc_select_adapter_func(zc);
 
         // Scatter input and parity into zc-bit chunks
         adapter_func(
             (int8_t*)input_buffer, internal_buffer0, zc, num_input_bits, 1);
         adapter_func(parity_buffer, internal_buffer1, zc, num_parity_bits, 1);
-#else
-        auto adapter_func
-            = ldpc_select_adapter_func(zc, 1 /* num code blocks */);
-        // Scatter input and parity into zc-bit chunks
-        int8_t* _input_buffers[1] = { (int8_t*)&input_buffer };
-        int8_t* _parity_buffers[1] = { (int8_t*)&parity_buffer };
-        adapter_func(_input_buffers, internal_buffer0, zc, num_input_bits, 1);
-        adapter_func(_parity_buffers, internal_buffer1, zc, num_parity_bits, 1);
-#endif
 
         // Concactenate the chunks for input and parity
         memcpy(internal_buffer2,
@@ -258,16 +262,9 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
                     * kMaxProcBytes,
             internal_buffer1, ldpc_num_rows(base_graph) * kMaxProcBytes);
 
-#ifndef USE_LDPC
         // Gather the concatenated chunks to create the encoded buffer
         adapter_func(encoded_buffer, internal_buffer2, zc,
             ldpc_num_encoded_bits(base_graph, zc), 0);
-#else
-        // Gather the concatenated chunks to create the encoded buffer
-        int8_t* _encoded_buffers[1] = { (int8_t*)&encoded_buffer };
-        adapter_func(_encoded_buffers, internal_buffer2, zc,
-            ldpc_num_encoded_bits(base_graph, zc), 0);
-#endif
     }
 }
 

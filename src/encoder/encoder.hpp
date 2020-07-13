@@ -10,6 +10,8 @@
 
 namespace avx2enc {
 static constexpr size_t kProcBytes = 32;
+int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
+    struct bblib_ldpc_encoder_5gnr_response* response);
 };
 
 // kMaxProcBytes is 64 bytes in FlexRAN's LDPC encoder and 32 bytes in
