@@ -111,12 +111,20 @@ traffic with hardware UEs (e.g., Iris devices)
    * Run `./build/macuser 2 5000 data/ue-ul-hw.json`
 
  * Run Millipede on the server
+   * Recompile FlexRAN with `-fPIC` to allow using from Python
+     ```
+     cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
+     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
+     ./create-makefiles-linux.sh
+     cd build-avx512-icc % or build-avx2-icc
+     make
+     ```
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
      * Set `kExportConstellation = true` in `src/common/Symbols.hpp`
      * Pass `-DUSE_ARGOS=on` to cmake
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
-    serials of your RRU Irises and hub, respectively. Iris serials in your
-    Faros RRHs.
+     serials of your RRU Irises and hub, respectively. Iris serials in your
+     Faros RRHs.
    * Run `python mm_gui.py data/bs-ul-hw.json`
