@@ -362,16 +362,22 @@ void Millipede::start()
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
 
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
+                    if (kEnableMac) {
+                        schedule_users(
+                            EventType::kPacketToMac, frame_id, symbol_idx_ul);
+                    }
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {
-                        assert(cur_frame_id == frame_id);
-                        cur_frame_id++;
+                        if (!kEnableMac) {
+                            assert(cur_frame_id == frame_id);
+                            cur_frame_id++;
+                            stats->update_stats_in_functions_uplink(frame_id);
+                            if (stats->last_frame_id == cfg->frames_to_test - 1)
+                                goto finish;
+                        }
                         stats->master_set_tsc(TsType::kDecodeDone, frame_id);
                         print_per_frame_done(PrintType::kDecode, frame_id);
-                        stats->update_stats_in_functions_uplink(frame_id);
-                        if (stats->last_frame_id == cfg->frames_to_test - 1)
-                            goto finish;
                     }
                 }
             } break;
@@ -1099,10 +1105,10 @@ void Millipede::initialize_uplink_buffers()
     size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t num_decoded_bytes
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
+    size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
+        >> 3 * config_->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        task_buffer_symbol_num_ul, num_decoded_bytes * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, decoded_bytes * cfg->UE_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
