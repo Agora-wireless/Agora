@@ -10,8 +10,8 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    * Download Intel FlexRAN's FEC SDK for LDPC decoding to `/opt`.
      [Link](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules).
    * Getting FlexRAN FEC SDK libraries:
-     * Compiling FlexRAN requires an Intel compiler. For Millipede developers,
-       we provide precompiled FlexRAN libraries to use from `gcc`.
+     * Compiling FlexRAN requires an Intel compiler. For Millipede developers:
+       please ask internally for precompiled FlexRAN libraries to use from `gcc`.
      * After instaling `icc 19.04` (see instructions below), compile FlexRAN:
      ```
      sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all users read-write access
