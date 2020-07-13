@@ -36,7 +36,7 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
         fprintf(stderr, "Socket bind failed: %s", strerror(errno));
-        exit(0);
+        //exit(0);
     }
     return socket_local;
 }

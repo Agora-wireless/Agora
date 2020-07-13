@@ -67,6 +67,14 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
                        &SimpleClientMac::data_update_thread>,
         0, 1);
 
+    if (cfg->ip_bridge_enable)
+    {
+        // Start a thread to wait for data from TUN interface 
+        create_threads(pthread_fun_wrapper<SimpleClientMac,
+                           &SimpleClientMac::wait_tun_read_thread>,
+            0, 1);
+    }
+
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -237,6 +245,20 @@ void* SimpleClientMac::data_update_thread(int tid)
     }
 }
 
+void* SimpleClientMac::wait_tun_read_thread(int tid)
+{
+   /*
+    * Wait for data to be available at TUN interface
+    */
+   printf("Wait TUN thread running on core %d\n", sched_getcpu());
+
+    while (true) {
+        printf("Read from TUN interface \n");
+        tun_payload_size_bytes = ipbridge->read_fragment(data_from_tun, cfg->mac_data_bytes_num_perframe);
+        printf("Read %d bytes from TUN device\n", payloadSizeInBytes);
+    }
+}
+
 void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 {
     auto* pkt = (MacPacket*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
@@ -244,17 +266,22 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
     pkt->symbol_id = 0;
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
+    pkt->valid_tun_data = 0;
 
     // XXX OBCH XXX
-    if (cfg->ip_bridge_enable)
+    if (cfg->ip_bridge_enable && tun_ready)
     {
         //printf("Read from TUN interface \n");
-        int payloadSizeInBytes = ipbridge->read_fragment(data_from_tun, cfg->mac_data_bytes_num_perframe); //ipbridge->radioMTU);
-        printf("Read %d bytes from TUN device for UE_ID: %d  FrameID: %d \n", payloadSizeInBytes, tag.ue_id, tag.frame_id);
-        std::vector<unsigned char> v(data_from_tun, data_from_tun + payloadSizeInBytes);
+        //int payloadSizeInBytes = ipbridge->read_fragment(data_from_tun, cfg->mac_data_bytes_num_perframe); //ipbridge->radioMTU);
+        //int payloadSizeInBytes = 84;
+        //printf("Read %d bytes from TUN device for UE_ID: %d  FrameID: %d \n", payloadSizeInBytes, tag.ue_id, tag.frame_id);
+
+        pkt->valid_tun_data = 1;
+        std::vector<unsigned char> v(data_from_tun, data_from_tun + tun_payload_size_bytes);
+        v[0] = 'a'; v[1] = 'b'; v[2] = 'c'; v[3] = 'd';  // XXX OBCH XXX REMOVE ME
         memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
 
-        for(int i = 0; i < payloadSizeInBytes ; i+=16) {
+        for(int i = 0; i < tun_payload_size_bytes ; i+=16) {
             fprintf(stderr, "MAC1: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
                 data_from_tun[i],     data_from_tun[i + 1],
                 data_from_tun[i + 2], data_from_tun[i + 3],
@@ -266,7 +293,7 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
                 data_from_tun[i + 14], data_from_tun[i + 15]);
         }
 
-        for(int i = 0; i < payloadSizeInBytes/2 ; i+=16) {
+        for(int i = 0; i < tun_payload_size_bytes/2 ; i+=16) {
             fprintf(stderr, "MAC2: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x\n",
                 pkt->data[i],     pkt->data[i + 1],
                 pkt->data[i + 2], pkt->data[i + 3],
@@ -419,6 +446,7 @@ void SimpleClientMac::init_data_from_file()
             // %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
         }
     }
+    printf("MIERDA!!! AQUI: File: %s \n", filename);
     fclose(fp);
 }
 
