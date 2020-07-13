@@ -1,4 +1,3 @@
-// #include <complex.h>
 #include "buffer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
@@ -57,11 +56,11 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
     for (unsigned i = 0; i < iterations; i++) {
         for (unsigned j = 0; j < num; j++)
             output_mod[j] = mod_single(input[j], mod_table);
-        printf("modulated: \n");
-        for (unsigned i = 0; i < num; i++) {
-            printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
-        }
-        printf("\n");
+        // printf("modulated: \n");
+        // for (unsigned i = 0; i < num; i++) {
+        //     printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
+        // }
+        // printf("\n");
         if (mode == 0) {
             demod_16qam_hard_loop((float*)output_mod, output_demod_loop, num);
             demod_16qam_hard_sse((float*)output_mod, output_demod_sse, num);
@@ -168,9 +167,9 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
         for (unsigned j = 0; j < num; j++)
             output_mod[j] = mod_single(input[j], mod_table);
 
-        for (unsigned i = 0; i < num; i++) {
-            printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
-        }
+        // for (unsigned i = 0; i < num; i++) {
+        //     printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
+        // }
 
         if (mode == 0) {
             demod_64qam_hard_loop((float*)output_mod, output_demod_loop, num);
@@ -242,13 +241,13 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
 static void run_benchmark_16qam(unsigned iterations, unsigned mode)
 {
     double time = bench_mod_16qam(iterations, mode);
-    printf("time: %.2f us\n", time);
+    printf("time: %.2f us per iteration\n", time / iterations);
 }
 
 static void run_benchmark_64qam(unsigned iterations, unsigned mode)
 {
     double time = bench_mod_64qam(iterations, mode);
-    printf("time: %.2f us\n", time);
+    printf("time: %.2f us per iteration\n", time / iterations);
 }
 
 int main(int argc, char* argv[])
