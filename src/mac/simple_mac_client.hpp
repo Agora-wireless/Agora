@@ -56,6 +56,7 @@ private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
     void* data_update_thread(int tid);
+    void* wait_tun_read_thread(int tid);
     void init_data_from_file();
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
@@ -119,6 +120,7 @@ private:
     // TUN interface
     IPbridge* ipbridge;
     unsigned char* data_from_tun;
+    int tun_payload_size_bytes;
 };
 
 #endif
