@@ -66,6 +66,9 @@ void* SimpleBSMac::loopRecv(int tid)
     int packet_length = cfg->data_bytes_num_persymbol;
     packet_length += MacPacket::kOffsetOfData;
     char* rx_buffer = (char*)malloc(packet_length);
+    size_t ul_data_syms = cfg->ul_data_symbol_num_perframe - cfg->UL_PILOT_SYMS;
+    std::stringstream ss;
+    std::stringstream ss1[ul_data_syms];
     while (true) {
         auto* pkt = (struct MacPacket*)rx_buffer;
         int ret = recvfrom(socket_local, (char*)pkt, packet_length, 0,
@@ -80,16 +83,27 @@ void* SimpleBSMac::loopRecv(int tid)
 
         if (kDebugBSReceiver) {
             // Read information from received packet
-            printf(
-                "RX thread %d received frame %d symbol %d, ue %d, size %d\n ",
-                tid, pkt->frame_id, pkt->symbol_id, pkt->ue_id,
-                packet_length - MacPacket::kOffsetOfData);
-            if (pkt->symbol_id == 2) {
+            if (pkt->symbol_id == cfg->UL_PILOT_SYMS) {
+                ss << "RX thread " << tid << " received frame " << pkt->frame_id
+                   << " symbol " << pkt->symbol_id << ", ue " << pkt->ue_id
+                   << ", size " << cfg->data_bytes_num_perframe << std::endl;
+            }
+            if (pkt->symbol_id >= cfg->UL_PILOT_SYMS) {
                 for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
                      i++) {
-                    printf("%i ", *((uint8_t*)pkt->data + i));
+
+                    ss1[pkt->symbol_id - cfg->UL_PILOT_SYMS]
+                        << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
                 }
-                printf("\n");
+                if (pkt->symbol_id == cfg->ul_data_symbol_num_perframe - 1) {
+                    for (size_t j = 0; j < ul_data_syms; j++) {
+                        ss << ss1[j].str();
+                        ss1[j].str(std::string());
+                    }
+                    ss << std::endl;
+                    std::cout << ss.str();
+                    ss.str(std::string());
+                }
             }
         }
     }
