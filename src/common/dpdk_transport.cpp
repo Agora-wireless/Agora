@@ -27,7 +27,6 @@ int DpdkTransport::nic_init(
     struct rte_eth_dev_info dev_info;
     struct rte_eth_rxconf rxconf;
     struct rte_eth_txconf txconf;
-    struct rte_flow_error error;
 
     if (rte_eth_dev_count_avail() < port)
         rte_exit(EXIT_FAILURE, "Not Enough NICs\n");
@@ -49,6 +48,7 @@ int DpdkTransport::nic_init(
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
     // Ensures that Millipede gets packets only for the flows we register for
+    struct rte_flow_error error;
     retval = rte_flow_isolate(port, 1, &error);
     if (retval != 0)
         return retval;

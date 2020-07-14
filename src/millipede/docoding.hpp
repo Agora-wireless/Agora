@@ -66,7 +66,6 @@ public:
     Event_data launch(size_t tag);
 
 #ifdef USE_REMOTE
-    /// Attach an eRPC object to the DoDecode object, and register the session number connected with the remote LDPC object
     void initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
 
     inline size_t get_num_requests() { return num_requests_issued; }
