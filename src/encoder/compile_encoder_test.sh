@@ -18,10 +18,10 @@ compile_with_flexran_encoder() {
     -I. \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common \
+    ${SOURCES} -o test_avx512 \
     ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a \
-    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a \
-    ${SOURCES} -o test_avx512
+    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a
 }
 
-compile_with_millipede_encoder
+#compile_with_millipede_encoder
 compile_with_flexran_encoder
