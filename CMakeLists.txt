@@ -252,17 +252,8 @@ else()
   set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
 endif()
 
-if (NOT ISA_AVX512)
-  # FlexRAN's LDPC encoder does not support AVX2, so we use a local encoder
-  message(STATUS "Using Millipede's AVX2 encoder")
-else()
-  message(STATUS "Using FlexRAN's AVX-512 encoder")
-  set(FLEXRAN_LDPC_LIBS
-    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a)
-endif()
-
 set(FLEXRAN_LDPC_LIBS
-  ${FLEXRAN_LDPC_LIBS}
+  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
@@ -291,23 +282,23 @@ add_executable(user
      src/client/user-main.cpp
      ${CLIENT_SOURCES}
      ${COMMON_SOURCES})
-target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
 
 add_library(ue_phy MODULE 
      ${CLIENT_SOURCES}
      ${COMMON_SOURCES}
      ${ARGOS_SOURCES})
-target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
 
 add_executable(macuser
      ${MAC_CLIENT_SOURCES}
      ${COMMON_SOURCES})
-target_link_libraries(macuser -larmadillo ${MKL_LIBS})
+target_link_libraries(macuser -larmadillo ${MKL_LIBS} ${FLEXRAN_LDPC_LIBS})
 
 add_executable(macbs
      ${MAC_BS_SOURCES}
      ${COMMON_SOURCES})
-target_link_libraries(macbs -larmadillo ${MKL_LIBS})
+target_link_libraries(macbs -larmadillo ${MKL_LIBS} ${FLEXRAN_LDPC_LIBS})
 
 set(SENDER_SOURCES
   simulator/sender_cli.cpp
@@ -315,7 +306,7 @@ set(SENDER_SOURCES
   ${SENDER_TXRX_SOURCES})
 
 add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
+target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${FLEXRAN_LDPC_LIBS} gflags)
 
 set(SIMULATOR_SOURCES
   simulator/main.cpp
@@ -325,7 +316,7 @@ set(SIMULATOR_SOURCES
   ${COMMON_SOURCES})
 
 add_executable(sim ${SIMULATOR_SOURCES})
-target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
+target_link_libraries(sim ${MKL_LIBS} ${FLEXRAN_LDPC_LIBS})
 
 # End-to-end test
 add_executable(test_millipede test/test_millipede/main.cpp ${SOURCES})
@@ -337,5 +328,11 @@ add_executable(test_zf test/unit_tests/test_zf.cc
   ${COMMON_SOURCES} 
   src/millipede/stats.cpp 
   src/millipede/dozf.cpp)
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
+target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${FLEXRAN_LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
+
+add_executable(test_ldpc test/compute_kernels/ldpc/test_ldpc.cpp
+  ${MILLIPEDE_SOURCES}
+  ${COMMON_SOURCES})
+target_link_libraries(test_ldpc ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${FLEXRAN_LDPC_LIBS})
+add_test(NAME test_ldpc COMMAND test_ldpc)

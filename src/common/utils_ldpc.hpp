@@ -187,8 +187,9 @@ static inline size_t ldpc_encoding_encoded_buf_size(
 }
 
 // Return the maximum LDPC expansion factor supported
-static inline size_t ldpc_get_max_zc() {
-  return kAVX512 ? ZC_MAX : avx2enc::kZcMax;
+static inline size_t ldpc_get_max_zc()
+{
+    return kAVX512 ? ZC_MAX : avx2enc::kZcMax;
 }
 
 // Generate the codeword output and parity buffer for this input buffer
@@ -201,6 +202,7 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     bblib_ldpc_encoder_5gnr_request req;
     bblib_ldpc_encoder_5gnr_response resp;
     req.baseGraph = base_graph;
+    req.nRows = ldpc_num_rows(base_graph);
     req.Zc = zc;
     req.numberCodeblocks = 1;
     req.input[0] = const_cast<int8_t*>(input_buffer);

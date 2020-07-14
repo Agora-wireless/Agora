@@ -7,11 +7,11 @@
  * FlexRAN's decoder, which supports AVX2.
  */
 
-#include "common/Symbols.hpp"
-#include "common/gettime.h"
-#include "common/utils_ldpc.hpp"
+#include "Symbols.hpp"
 #include "encoder.hpp"
+#include "gettime.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 #include <algorithm>
 #include <assert.h>
 #include <bitset>
