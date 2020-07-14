@@ -98,9 +98,9 @@ void check_correctness_ul(Config* cfg)
                 if (raw_data[i][offset_in_raw]
                     != output_data[i][offset_in_output]) {
                     error_cnt++;
-                    printf("(%d, %d, %u, %u)\n", i, j,
-                        raw_data[i][offset_in_raw],
-                        output_data[i][offset_in_output]);
+                    // printf("(%d, %d, %u, %u)\n", i, j,
+                    //     raw_data[i][offset_in_raw],
+                    //     output_data[i][offset_in_output]);
                 }
             }
         }
@@ -178,24 +178,22 @@ void check_correctness_dl(Config* cfg)
 
 int main(int argc, char* argv[])
 {
-    std::string confFile;
-    if (argc == 2)
-        confFile = std::string("/") + std::string(argv[1]);
-    else
-        confFile = "/data/tddconfig-correctness-test-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
-    auto* cfg = new Config(filename.c_str());
+    std::string confFile
+        = cur_directory + "/data/tddconfig-correctness-test-ul.json";
+    if (argc == 2)
+        confFile = std::string(argv[1]);
+
+    auto* cfg = new Config(confFile.c_str());
     cfg->genData();
-    Millipede* millipede_cli;
 
     int ret;
     try {
         SignalHandler signalHandler;
-
-        // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
-        millipede_cli = new Millipede(cfg);
+        auto* millipede_cli = new Millipede(cfg);
+        millipede_cli->flags.enable_save_decode_data_to_file = true;
+        millipede_cli->flags.enable_save_tx_data_to_file = true;
         millipede_cli->start();
 
         if (cfg->downlink_mode)
