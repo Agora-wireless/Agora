@@ -1,3 +1,11 @@
+/**
+ * @file encoder.hpp
+ * @brief Definitions for Millipede's AVX2-based LDPC encoder.
+ *
+ * We need an AVX2-based LDPC encoder because FlexRAN's LDPC encoder requires
+ * AVX-512.
+ */
+
 #ifndef _ENCODER_H_
 #define _ENCODER_H_
 
@@ -9,6 +17,10 @@
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 namespace avx2enc {
+
+// Maximum 5G NR LDPC expansion factor (Zc) supported by the AVX2-based encoder
+static constexpr size_t kZcMax = 255;
+
 static constexpr size_t kProcBytes = 32;
 int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
     struct bblib_ldpc_encoder_5gnr_response* response);

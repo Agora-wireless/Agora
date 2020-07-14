@@ -255,6 +255,12 @@ static constexpr bool kUseLDPC = true;
 static constexpr bool kUseLDPC = false;
 #endif
 
+#ifdef ISA_AVX512
+static constexpr bool kAVX512 = true;
+#else
+static constexpr bool kAVX512 = false;
+#endif
+
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 #endif

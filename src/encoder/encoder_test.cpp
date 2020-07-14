@@ -36,8 +36,6 @@ void run_test(size_t base_graph, size_t zc)
     int8_t* encoded[kNumCodeBlocks];
     int8_t* parity_reference[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-        // We add kMaxProcBytes as padding for the encoder's scatter (for
-        // input) and gather (for output) functions.
         input[n] = (int8_t*)read_binfile(
             input_filename, ldpc_encoding_input_buf_size(base_graph, zc));
         parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
