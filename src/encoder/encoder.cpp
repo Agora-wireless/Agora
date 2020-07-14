@@ -221,8 +221,8 @@ void ldpc_encoder_avx2(struct bblib_ldpc_encoder_5gnr_request* request,
     int numberCodeblocks = request->numberCodeblocks;
     uint16_t Bg = request->baseGraph;
 
-    int nRows = (Bg == 1) ? BG1_ROW_TOTAL : BG2_ROW_TOTAL;
-    uint32_t cbEncLen = nRows * Zc;
+    // int nRows = (Bg == 1) ? BG1_ROW_TOTAL : BG2_ROW_TOTAL;
+    uint32_t cbEncLen = request->nRows * Zc;
     uint32_t cbLen = (Bg == 1) ? Zc * BG1_COL_INF_NUM : Zc * BG2_COL_INF_NUM;
 
     int8_t* input[numberCodeblocks];

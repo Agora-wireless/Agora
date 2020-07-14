@@ -97,7 +97,7 @@ struct bblib_ldpc_encoder_5gnr_request {
     int32_t baseGraph;
 
     /*!< Number Rows being used for the encoding native code rate - Minimum 4 */
-    // int32_t nRows;
+    int32_t nRows;
 
     /*!< Used to run several code blocks in one operation notably for low
      * expansion factor All code blocks must use the same parameters above.

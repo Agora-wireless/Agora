@@ -151,8 +151,8 @@ struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
         cfg->running = false;
         return (NULL);
     } else {
-        for (int i = 0; i < (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
-             i++)
+        for (size_t i = 0;
+             i < (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1); i++)
             (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
         memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
                                   [pkt->ue_id * cfg->OFDM_DATA_NUM],
@@ -190,8 +190,7 @@ int MacPacketTXRX::dequeue_send(int tid)
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    uint8_t* ul_data_ptr
-        = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
+    uint8_t* ul_data_ptr = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
     new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
     pkt->frame_id = frame_id;

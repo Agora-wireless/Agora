@@ -74,9 +74,12 @@ int main(int argc, char* argv[])
     srand(time(NULL));
     // srand(0);
 
+    const size_t base_graph = LDPC_config.Bg;
+    const size_t zc = LDPC_config.Zc;
+    const size_t nRows = LDPC_config.nRows;
     // Randomly generate input
     size_t num_mod = kUseLDPC
-        ? ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc) / mod_type
+        ? ldpc_num_encoded_bits(base_graph, zc, nRows) / mod_type
         : OFDM_DATA_NUM;
     size_t numberCodeblocks = kUseLDPC
         ? data_symbol_num_perframe * LDPC_config.nblocksInSymbol * UE_ANT_NUM
@@ -89,9 +92,6 @@ int main(int argc, char* argv[])
     int8_t* encoded[numberCodeblocks];
 
     if (kUseLDPC) {
-        const size_t base_graph = LDPC_config.Bg;
-        const size_t zc = LDPC_config.Zc;
-
         for (size_t i = 0; i < numberCodeblocks; i++) {
             input[i] = new int8_t[ldpc_encoding_input_buf_size(base_graph, zc)];
             parity[i]
@@ -126,7 +126,8 @@ int main(int argc, char* argv[])
         }
 
         for (size_t n = 0; n < numberCodeblocks; n++) {
-            ldpc_encode_helper(base_graph, zc, encoded[n], parity[n], input[n]);
+            ldpc_encode_helper(
+                base_graph, zc, nRows, encoded[n], parity[n], input[n]);
         }
     }
 
@@ -140,8 +141,8 @@ int main(int argc, char* argv[])
     for (size_t n = 0; n < numberCodeblocks; n++) {
         if (kUseLDPC) {
             adapt_bits_for_mod(encoded[n], mod_input[n],
-                bits_to_bytes(
-                    ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc)),
+                bits_to_bytes(ldpc_num_encoded_bits(
+                    LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows)),
                 mod_type);
         } else {
             for (size_t i = 0; i < num_mod; i++)
@@ -155,7 +156,6 @@ int main(int argc, char* argv[])
             mod_output[n][i]
                 = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
     }
-
 
     if (kUseLDPC) {
         std::string filename_input = cur_directory + "/data/LDPC_orig_data_"
@@ -228,7 +228,8 @@ int main(int argc, char* argv[])
 
     /* put pilot and data symbols together */
     Table<complex_float> tx_data_all_symbols;
-    tx_data_all_symbols.calloc(symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM, 64);
+    tx_data_all_symbols.calloc(
+        symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM, 64);
 
     if (config_->freq_orthogonal_pilot) {
         complex_float* pilots_t_ue;
@@ -360,7 +361,8 @@ int main(int argc, char* argv[])
 
     /* prepare downlink data from mod_output */
     Table<complex_float> dl_mod_data;
-    dl_mod_data.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
+    dl_mod_data.calloc(
+        dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (int j = 0; j < UE_ANT_NUM; j++) {
             if (i <= DL_PILOT_SYMS - 1) {
@@ -408,7 +410,8 @@ int main(int argc, char* argv[])
         for (int j = OFDM_DATA_START; j < OFDM_DATA_NUM + OFDM_DATA_START;
              j++) {
             cx_float* ptr_in_precoder = (cx_float*)precoder[j];
-            cx_fmat mat_precoder(ptr_in_precoder, UE_ANT_NUM, BS_ANT_NUM, false);
+            cx_fmat mat_precoder(
+                ptr_in_precoder, UE_ANT_NUM, BS_ANT_NUM, false);
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
             // printf("symbol %d, sc: %d\n", i, j - OFDM_DATA_START);

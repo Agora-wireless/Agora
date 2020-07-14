@@ -360,9 +360,10 @@ void Phy_UE::start()
                 if (!kUseLDPC) {
                     Event_data do_map_task(EventType::kModul, event.tags[0]);
                     schedule_task(do_map_task, &map_queue_, ptok_map);
-                } else { 
+                } else {
                     size_t ue_id = rx_tag_t(event.tags[0]).tid;
-                    size_t offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
+                    size_t offset_in_current_buffer
+                        = rx_tag_t(event.tags[0]).offset;
 
                     ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
                 }
@@ -796,12 +797,13 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 size_t cb_offset
                     = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
                     * bytes_per_block;
-                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS][cb_offset];
+                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
+                                         [cb_offset];
             }
             int8_t* output_ptr = encoded_buffer_temp;
 
-            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, output_ptr,
-                parity_buffer, input_ptr);
+            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                LDPC_config.nRows, output_ptr, parity_buffer, input_ptr);
             int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
             int output_offset
                 = total_ul_symbol_id * data_sc_len + cbCodedBytes * cb_id;

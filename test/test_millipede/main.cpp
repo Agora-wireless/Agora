@@ -98,9 +98,9 @@ void check_correctness_ul(Config* cfg)
                 if (raw_data[i][offset_in_raw]
                     != output_data[i][offset_in_output]) {
                     error_cnt++;
-                    printf("(%d, %d, %u, %u)\n", i, j,
-                        raw_data[i][offset_in_raw],
-                        output_data[i][offset_in_output]);
+                    // printf("(%d, %d, %u, %u)\n", i, j,
+                    //     raw_data[i][offset_in_raw],
+                    //     output_data[i][offset_in_output]);
                 }
             }
         }

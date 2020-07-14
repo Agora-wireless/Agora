@@ -218,22 +218,26 @@ Config::Config(std::string jsonfile)
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
     LDPC_config.Zc = tddConf.value("Zc", 72);
-    LDPC_config.nRows = (LDPC_config.Bg == 1) ? 46 : 42;
+    LDPC_config.nRows = tddConf.value("nRows", (LDPC_config.Bg == 1) ? 46 : 42);
     LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
-    LDPC_config.cbLen
-        = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 22 : LDPC_config.Zc * 10;
-    LDPC_config.cbCodewLen
-        = (LDPC_config.Bg == 1) ? LDPC_config.Zc * 66 : LDPC_config.Zc * 50;
+    LDPC_config.cbLen = LDPC_config.Zc * ldpc_num_input_cols(LDPC_config.Bg);
+    LDPC_config.cbCodewLen = (LDPC_config.Bg == 1)
+        ? LDPC_config.Zc * (LDPC_config.nRows + 20)
+        : LDPC_config.Zc * (LDPC_config.nRows + 8);
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
     rt_assert(LDPC_config.nblocksInSymbol > 0,
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
 
-    printf("Encoder: Zc: %d, code block per symbol: %d, code block len: %d, "
-           "encoded block len: %d, decoder iterations: %d\n",
+    printf("LDPC: Zc: %d, code block per symbol: %zu, encoding input len: %d, "
+           "encoded block len: %d, decoder iterations: %d, code rate %.3f "
+           "(nRows = %zu)\n",
         LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen,
-        LDPC_config.cbCodewLen, LDPC_config.decoderIter);
+        LDPC_config.cbCodewLen, LDPC_config.decoderIter,
+        1.f * ldpc_num_input_cols(LDPC_config.Bg)
+            / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
+        LDPC_config.nRows);
 
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
@@ -439,6 +443,7 @@ void Config::genData()
             for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM;
                  j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                    LDPC_config.nRows,
                     ul_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
             }
@@ -448,7 +453,7 @@ void Config::genData()
             ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
             for (size_t j = 0; j < UE_ANT_NUM; j++) {
-                for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         ul_encoded_bits[i * num_blocks_per_symbol
                             + j * LDPC_config.nblocksInSymbol + k],
@@ -469,6 +474,7 @@ void Config::genData()
             for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM;
                  j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                    LDPC_config.nRows,
                     dl_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
             }
@@ -478,7 +484,7 @@ void Config::genData()
             dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
             for (size_t j = 0; j < UE_ANT_NUM; j++) {
-                for (int k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
                     adapt_bits_for_mod(
                         dl_encoded_bits[i * num_blocks_per_symbol
                             + j * LDPC_config.nblocksInSymbol + k],
