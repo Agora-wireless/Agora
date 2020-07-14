@@ -14,6 +14,8 @@ PacketTXRX::PacketTXRX(Config* cfg, int COMM_THREAD_NUM, int in_core_offset)
     core_id_ = in_core_offset;
     tx_core_id_ = in_core_offset + COMM_THREAD_NUM;
 
+    mac_running = cfg->init_mac_running;
+
     /* initialize random seed: */
     srand(time(NULL));
 
@@ -42,6 +44,16 @@ PacketTXRX::~PacketTXRX()
 {
     delete[] socket_;
     delete[] servaddr_;
+}
+
+void PacketTXRX::wakeup_mac()
+{
+    mac_running = true;
+}
+
+bool PacketTXRX::is_mac_running()
+{
+    return mac_running;
 }
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
@@ -97,19 +109,29 @@ void* PacketTXRX::loopTXRX(int tid)
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            config_->ue_tx_port + radio_id, config_->tx_addr.c_str());
+            config_->ue_tx_port + radio_id, config_->sender_addr.c_str());
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
-            config_->ue_tx_port + radio_id, config_->tx_addr.c_str());
+            config_->ue_tx_port + radio_id, config_->sender_addr.c_str());
 #endif
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
         printf("Set up UDP socket server listening to port %d"
                " with remote address %s:%d  \n",
-            local_port_id, config_->tx_addr.c_str(),
+            local_port_id, config_->sender_addr.c_str(),
             config_->ue_tx_port + radio_id);
     }
+
+    while(config_->running && !is_mac_running());
+
+    // send start notification to mac
+    char* start_msg[1024];
+    ssize_t ret = sendto(socket_[0],
+        start_msg, 1024, 0, (struct sockaddr*)&servaddr_[0],
+        sizeof(servaddr_[0]));
+    rt_assert(ret > 0, "sendto() failed");
+    std::cout << "Waking up MAC.." << std::endl;
 
     int radio_id = radio_lo;
     while (config_->running) {
@@ -137,12 +159,12 @@ struct MacPacket* PacketTXRX::recv_enqueue(
     int packet_length = config_->mac_packet_length;
 
     // if rx_buffer is full, exit
-    //if (rx_buffer_status[rx_offset] == 1) {
-    //    printf(
-    //        "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-    //    //config_->running = false;
-    //    //return (NULL);
-    //}
+    if (rx_buffer_status[rx_offset] == 1) {
+        printf(
+            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        //config_->running = false;
+        //return (NULL);
+    }
     struct MacPacket* pkt
         = (struct MacPacket*)&rx_buffer[rx_offset * packet_length];
     // if (-1 == recv(socket_[radio_id], pkt->data, packet_length, 0)) {
