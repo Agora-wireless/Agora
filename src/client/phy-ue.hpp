@@ -88,6 +88,7 @@ public:
      * beamweights
      */
     void doMapBits(int, size_t);
+    void doEncode(int, size_t);
     void doModul(int, size_t);
     void doIFFT(int, size_t);
 
@@ -327,6 +328,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
     moodycamel::ConcurrentQueue<Event_data> tx_queue_;
     moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
+    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> modul_queue_;
     moodycamel::ConcurrentQueue<Event_data> map_queue_;
 
