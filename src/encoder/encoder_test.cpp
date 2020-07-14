@@ -38,8 +38,9 @@ void run_test(size_t base_graph, size_t zc)
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
         input[n] = (int8_t*)read_binfile(
             input_filename, ldpc_encoding_input_buf_size(base_graph, zc));
-        parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
-        encoded[n] = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)];
+        parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)]();
+        encoded[n]
+            = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)]();
         parity_reference[n] = (int8_t*)read_binfile(
             reference_filename, ldpc_encoding_parity_buf_size(base_graph, zc));
 
