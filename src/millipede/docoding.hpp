@@ -24,8 +24,11 @@
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"
-#include "rpc.h"
 #include "utils_ldpc.hpp"
+
+#ifdef USE_REMOTE
+#include "rpc.h"
+#endif
 
 class DoEncode : public Doer {
 public:
@@ -62,9 +65,15 @@ public:
 
     Event_data launch(size_t tag);
 
-    // TODO: Doc
+#ifdef USE_REMOTE
+    /// Attach an eRPC object to the DoDecode object, and register the session number connected with the remote LDPC object
     void initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
+
+    inline size_t get_num_requests() { return num_requests_issued; }
+    inline size_t get_num_responses() { return num_responses_received; }
+
     friend void decode_cont_func(void* _context, void* _tag);
+#endif
 
 private:
     int16_t* resp_var_nodes;
@@ -75,21 +84,27 @@ private:
     PhyStats* phy_stats;
     DurationStat* duration_stat;
 
-    // eRPC-specific variables
-    // TODO: Need doc
-    // TODO: Need size_t
-
+#ifdef USE_REMOTE
     /// Number of preallocated msgbufs to hold pending eRPC requests
     static const size_t kRpcMaxMsgBufNum = 64;
-    static const int kRpcReqType = 2;
-    static const int kRpcMaxMsgSize = (1 << 20);
+
+    /// eRPC request type for remote LDPC decoding
+    static const size_t kRpcReqType = 2;
+
+    /// Maximum size of preallocated msgbufs
+    static const size_t kRpcMaxMsgSize = (1 << 20);
+
     erpc::Rpc<erpc::CTransport>* rpc;
     std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
     std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
     int session;
+    size_t num_requests_issued;
+    size_t num_responses_received;
+#endif
 };
 
-// TODO: doc, Local eRPC request tag for decoding tasks
+#ifdef USE_REMOTE
+/// Local eRPC request tag used for processing responses of decoding tasks
 class DecodeTag {
 public:
     size_t symbol_offset;
@@ -100,5 +115,6 @@ public:
     erpc::MsgBuffer* resp_msgbuf;
     erpc::Rpc<erpc::CTransport>* rpc;
 };
+#endif
 
 #endif

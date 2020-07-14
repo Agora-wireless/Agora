@@ -57,7 +57,7 @@ enum class EventType : int {
     kPendingToRemote
 };
 static constexpr size_t kNumEventTypes
-    = static_cast<size_t>(EventType::kPacketToMac) + 1;
+    = static_cast<size_t>(EventType::kPendingToRemote) + 1;
 
 // Types of Millipede Doers
 enum class DoerType : size_t {
@@ -256,10 +256,10 @@ static constexpr bool kUseLDPC = true;
 static constexpr bool kUseLDPC = false;
 #endif
 
-#if defined USE_ERPC
-static constexpr bool kUseERPC = true;
+#if defined USE_REMOTE
+static constexpr bool kUseRemote = true;
 #else
-static constexpr bool kUseERPC = false;
+static constexpr bool kUseRemote = false;
 #endif
 
 // Enable debugging for sender and receiver applications

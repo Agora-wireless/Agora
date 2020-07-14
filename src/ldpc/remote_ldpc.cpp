@@ -1,4 +1,4 @@
-#include "ldpc_worker.hpp"
+#include "remote_ldpc.hpp"
 #include "utils_ldpc.hpp"
 #include <malloc.h>
 #include <string>
@@ -9,7 +9,7 @@ void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
     printf("Connected session: %d\n", session_num);
 }
 
-LDPCWorker::LDPCWorker(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus)
+RemoteLDPC::RemoteLDPC(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus)
     : LDPC_config(LDPC_config)
     , tid(tid)
     , decoded_bits(ldpc_encoding_input_buf_size(LDPC_config.Bg, LDPC_config.Zc))
@@ -19,7 +19,7 @@ LDPCWorker::LDPCWorker(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus)
         nexus, static_cast<void*>(this), tid, basic_sm_handler);
 }
 
-LDPCWorker::~LDPCWorker()
+RemoteLDPC::~RemoteLDPC()
 {
     free(resp_var_nodes);
     delete rpc;
@@ -27,18 +27,18 @@ LDPCWorker::~LDPCWorker()
 
 void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
 {
-    auto* worker = static_cast<LDPCWorker*>(_context);
+    auto* remote = static_cast<RemoteLDPC*>(_context);
     auto* in_buf = reinterpret_cast<int8_t*>(req_handle->get_req_msgbuf()->buf);
 
     req_handle->dyn_resp_msgbuf
-        = worker->rpc->alloc_msg_buffer(worker->decoded_bits);
+        = remote->rpc->alloc_msg_buffer(remote->decoded_bits);
     auto* out_buf = reinterpret_cast<uint8_t*>(req_handle->dyn_resp_msgbuf.buf);
-    worker->decode(in_buf, out_buf);
+    remote->decode(in_buf, out_buf);
 
-    worker->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
+    remote->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
 }
 
-void LDPCWorker::run_erpc_event_loop_forever()
+void RemoteLDPC::run_erpc_event_loop_forever()
 {
     stop = false;
     while (!stop) {
@@ -46,7 +46,7 @@ void LDPCWorker::run_erpc_event_loop_forever()
     }
 }
 
-void LDPCWorker::decode(int8_t* in_buffer, uint8_t* out_buffer)
+void RemoteLDPC::decode(int8_t* in_buffer, uint8_t* out_buffer)
 {
     struct bblib_ldpc_decoder_5gnr_request ldpc_request {
     };

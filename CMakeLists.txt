@@ -55,7 +55,7 @@ set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC False CACHE STRING "USE_LDPC defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
-set(USE_ERPC False CACHE STRING "USE_ERPC defaulting to 'False'")
+set(USE_REMOTE False CACHE STRING "USE_REMOTE defaulting to 'False'")
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
@@ -261,17 +261,17 @@ if(${USE_LDPC})
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
 endif()
 
-if(${USE_ERPC})
+if(${USE_REMOTE})
   message(STATUS "eRPC is enabled")
-  add_definitions(-DUSE_ERPC)
+  add_definitions(-DUSE_REMOTE)
   add_definitions(-DERPC_INFINIBAND=true)
-  find_library(ERPC_LIB erpc PATHS $ENV{ERPC_LIB_PATH})
+  find_library(ERPC_LIB erpc PATHS $ENV{ERPC_ROOT_PATH}/build)
   message(STATUS "ERPC_LIB: ${ERPC_LIB}")
   if(NOT ERPC_LIB)
     message(FATAL_ERROR "eRPC library not found")
   endif()
-  set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc)
-  include_directories(SYSTEM $ENV{ERPC_INCLUDE_PATH})
+  set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc -libverbs -lnuma)
+  include_directories(SYSTEM $ENV{ERPC_ROOT_PATH}/src)
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES})
 endif()
 
@@ -356,20 +356,20 @@ add_executable(test_zf test/unit_tests/test_zf.cc
 target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
-if(${USE_ERPC})
-  add_executable(ldpc_worker src/ldpc/ldpc_worker.cpp
+if(${USE_REMOTE})
+  add_executable(remote_ldpc src/ldpc/remote_ldpc.cpp
     src/ldpc/ldpc_main.cpp
     ${COMMON_SOURCES}
     ${LDPC_SOURCES}
     ${HEADER_FILES})
-  target_link_libraries(ldpc_worker ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
-  add_executable(test_ldpc_worker test/unit_tests/test_ldpc_worker.cc
+  target_link_libraries(remote_ldpc ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
+  add_executable(test_remote_ldpc test/unit_tests/test_remote_ldpc.cc
     ${COMMON_SOURCES}
     src/millipede/stats.cpp
     src/millipede/docoding.cpp
-    src/ldpc/ldpc_worker.cpp
+    src/ldpc/remote_ldpc.cpp
     src/millipede/phy_stats.cpp
     ${LDPC_SOURCES})
-  target_link_libraries(test_ldpc_worker ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
-  add_test(NAME test_ldpc_worker COMMAND test_ldpc_worker)
+  target_link_libraries(test_remote_ldpc ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
+  add_test(NAME test_remote_ldpc COMMAND test_remote_ldpc)
 endif()
