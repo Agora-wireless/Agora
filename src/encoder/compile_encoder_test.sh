@@ -4,9 +4,10 @@
 
 FLEXRAN_FEC_SDK_DIR="/opt/FlexRAN-FEC-SDK-19-04/sdk"
 SOURCES="encoder_test.cpp encoder.cpp cyclic_shift.cpp iobuffer.cpp"
+CPU_FEATURES_DETECT_AVX512=`cat /proc/cpuinfo | grep avx512 | wc -l`
 
 compile_with_millipede_encoder() {
-  g++ -std=c++11 -mavx2 -Wall \
+  g++ -std=c++11 -mavx2 -Wall -DUSE_AVX2_ENCODER \
     -I. \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common \
@@ -26,4 +27,10 @@ compile_with_flexran_encoder() {
 }
 
 compile_with_millipede_encoder
-compile_with_flexran_encoder
+
+if [ ${CPU_FEATURES_DETECT_AVX512} -ne 0 ]; then
+  echo "Compiling with FlexRAN's encoder"
+  compile_with_flexran_encoder
+else
+  echo "Skipping compiling with FlexRAN's encoder"
+fi
