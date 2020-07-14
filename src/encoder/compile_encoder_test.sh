@@ -23,4 +23,5 @@ compile_with_flexran_encoder() {
     ${SOURCES} -o test_avx512
 }
 
+compile_with_millipede_encoder
 compile_with_flexran_encoder
