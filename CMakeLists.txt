@@ -35,15 +35,6 @@ else()
   set(CMAKE_CXX_STANDARD 11)
 endif()
 
-# Determine if the current machine supports AVX-512
-CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
-if (ISA_AVX512)
-  message(STATUS "Processor supports AVX-512")
-  add_definitions(-DISA_AVX512)
-else()
-  message(STATUS "Processor does not support AVX-512")
-endif()
-
 # Unit tests
 enable_testing()
 find_package(GTest REQUIRED)
@@ -71,10 +62,32 @@ set(USE_LDPC True CACHE STRING "USE_LDPC defaulting to 'True'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
+set(USE_AVX2_ENCODER False CACHE STRING "Use Millipede's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "USE_LDPC: ${USE_LDPC}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
+
+set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
+
+# Determine if the current machine supports AVX-512
+CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
+if (ISA_AVX512)
+  message(STATUS "Processor supports AVX-512")
+  add_definitions(-DISA_AVX512)
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
+else()
+  message(STATUS "Processor does not support AVX-512")
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
+  set(USE_AVX2_ENCODER True)
+endif()
+
+if(USE_AVX2_ENCODER)
+  message(STATUS "Using Millipede's AVX2 encoder")
+  add_definitions(-DUSE_AVX2_ENCODER)
+else()
+  message(STATUS "Not using Millipede's AVX2 encoder. Using FlexRAN's AVX2 encoder.")
+endif()
 
 set(TXRX_SOURCES
   src/millipede/txrx/txrx.cpp
@@ -239,18 +252,11 @@ if(${USE_LDPC})
   add_definitions(-DUSE_LDPC)
 endif()
 
-set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
-
-if (ISA_AVX512)
-  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
-else()
-  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
-endif()
 
 set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
@@ -332,7 +338,6 @@ target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${FLEXR
 add_test(NAME test_zf COMMAND test_zf)
 
 add_executable(test_ldpc test/compute_kernels/ldpc/test_ldpc.cpp
-  ${MILLIPEDE_SOURCES}
   ${COMMON_SOURCES})
 target_link_libraries(test_ldpc ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${FLEXRAN_LDPC_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)

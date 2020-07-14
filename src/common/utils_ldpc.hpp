@@ -186,10 +186,13 @@ static inline size_t ldpc_encoding_encoded_buf_size(
     return bits_to_bytes(ldpc_num_encoded_bits(base_graph, zc)) + kMaxProcBytes;
 }
 
+// Return the minimum LDPC expansion factor supported
+static inline size_t ldpc_get_min_zc() { return kUseAVX2Encoder ? 2 : 6; }
+
 // Return the maximum LDPC expansion factor supported
 static inline size_t ldpc_get_max_zc()
 {
-    return kAVX512 ? ZC_MAX : avx2enc::kZcMax;
+    return kUseAVX2Encoder ? avx2enc::kZcMax : ZC_MAX;
 }
 
 // Generate the codeword output and parity buffer for this input buffer
@@ -208,11 +211,8 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     req.input[0] = const_cast<int8_t*>(input_buffer);
     resp.output[0] = parity_buffer;
 
-#ifdef ISA_AVX512
-    bblib_ldpc_encoder_5gnr(&req, &resp);
-#else
-    avx2enc::bblib_ldpc_encoder_5gnr(&req, &resp);
-#endif
+    kUseAVX2Encoder ? avx2enc::bblib_ldpc_encoder_5gnr(&req, &resp)
+                    : bblib_ldpc_encoder_5gnr(&req, &resp);
 
     // Copy punctured input bits from the encoding request, and parity bits from
     // the encoding response into encoded_buffer

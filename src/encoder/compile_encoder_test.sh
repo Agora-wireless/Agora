@@ -13,7 +13,7 @@ compile_with_millipede_encoder() {
 
 compile_with_flexran_encoder() {
   FLEXRAN_FEC_LIB_DIR=${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc
-  g++ -g -std=c++11 -march=native -Wall -no-pie -DISA_AVX512 \
+  g++ -g -std=c++11 -march=native -Wall -no-pie \
     -DUSE_LDPC=on  -D_BBLIB_AVX512_ \
     -I. \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr \
