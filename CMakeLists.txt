@@ -83,10 +83,10 @@ else()
 endif()
 
 if(USE_AVX2_ENCODER)
-  message(STATUS "Using Millipede's AVX2 encoder")
+  message(STATUS "Using Millipede's (i.e., not FlexRAN's) AVX2 encoder")
   add_definitions(-DUSE_AVX2_ENCODER)
 else()
-  message(STATUS "Not using Millipede's AVX2 encoder. Using FlexRAN's AVX2 encoder.")
+  message(STATUS "Using FlexRAN's (i.e., not Millipede's) AVX2 encoder")
 endif()
 
 set(TXRX_SOURCES
