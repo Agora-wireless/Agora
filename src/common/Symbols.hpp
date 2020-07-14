@@ -192,11 +192,11 @@ struct LDPCconfig {
     bool earlyTermination;
     int16_t decoderIter;
     uint16_t Zc;
-    int nRows;
+    size_t nRows;
     uint32_t cbEncLen;
     uint32_t cbLen;
     uint32_t cbCodewLen;
-    int nblocksInSymbol;
+    size_t nblocksInSymbol;
 };
 
 typedef struct LDPCconfig LDPCconfig;

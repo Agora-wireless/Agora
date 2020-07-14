@@ -253,7 +253,7 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 
     // Print MAC packet summary
     printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
-           "%d\n",
+           "%zu\n",
         get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
         cfg->mac_data_bytes_num_perframe);
 
