@@ -98,8 +98,8 @@ Event_data DoEncode::launch(size_t tag)
         = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
     int8_t* output_ptr = encoded_buffer_temp;
 
-    ldpc_encode_helper(
-        LDPC_config.Bg, LDPC_config.Zc, output_ptr, parity_buffer, input_ptr);
+    ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
+        output_ptr, parity_buffer, input_ptr);
     int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
     int output_offset = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
     int8_t* final_output_ptr
@@ -272,7 +272,7 @@ Event_data DoDecode::launch(size_t tag)
         printf("\n");
     }
 
-    if (!kEnableMac && kPrintPhyStats && symbol_id >= cfg->UL_PILOT_SYMS) {
+    if (!kEnableMac && kPrintPhyStats && symbol_id == cfg->UL_PILOT_SYMS) {
         phy_stats->update_decoded_bits(ue_id, symbol_offset, cbLenBytes * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
         size_t block_error(0);
