@@ -1,6 +1,8 @@
-# Compile with local libraries and avx2
+#!/bin/bash
+# Compile the encoder test with Millipede's internal AVX2 encoder and FlexRAN's
+# AVX-512 encoder
 
-FLEXRAN_FEC_SDK_DIR="${HOME}/FlexRAN-FEC-SDK-19-04/sdk"
+FLEXRAN_FEC_SDK_DIR="/opt/FlexRAN-FEC-SDK-19-04/sdk"
 SOURCES="encoder_test.cpp encoder.cpp cyclic_shift.cpp iobuffer.cpp"
 
 compile_with_millipede_encoder() {
@@ -23,5 +25,5 @@ compile_with_flexran_encoder() {
     ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a
 }
 
-#compile_with_millipede_encoder
+compile_with_millipede_encoder
 compile_with_flexran_encoder

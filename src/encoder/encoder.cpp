@@ -293,5 +293,4 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
 
     return 0;
 }
-
 } // namespace avx2enc

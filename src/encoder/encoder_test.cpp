@@ -1,4 +1,5 @@
 #include "../common/utils_ldpc.hpp"
+#include "encoder.hpp"
 #include "gcc_phy_ldpc_encoder_5gnr_internal.h"
 #include <algorithm>
 #include <fstream>
@@ -80,14 +81,16 @@ int main()
     const std::vector<size_t> zc_nofiles_vec = { 2, 3, 4, 5, 6, 9, 13 };
 
     for (const size_t& zc : zc_all_vec) {
-        if (zc > 255)
+        if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
+            fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
             continue;
+        }
 
         const bool no_files = std::find(std::begin(zc_nofiles_vec),
                                   std::end(zc_nofiles_vec), zc)
             != std::end(zc_nofiles_vec);
 
-        if (zc <= ZC_MAX and !no_files) {
+        if (!no_files) {
             printf("Running for zc = %zu\n", zc);
             run_test(1 /* base graph */, zc);
             run_test(2 /* base graph */, zc);
