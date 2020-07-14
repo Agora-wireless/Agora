@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example
+  labels:
+    app: example
+spec:
+  containers:
+  - image: booscr.azurecr.io/samples/millipede
+    command: [ "bash" ]
+    args: [ "/Millipede/run_millipede.sh" ]
+    # command: [ "sleep" ]
+    # args: [ "infinity" ]
+    name: cont1
+  imagePullSecrets:
+    - name: secret-booscr
+
