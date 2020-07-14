@@ -76,6 +76,7 @@ if (ISA_AVX512)
   message(STATUS "Processor supports AVX-512")
   add_definitions(-DISA_AVX512)
   set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
+  # Leave USE_AVX2_ENCODER unmodified
 else()
   message(STATUS "Processor does not support AVX-512")
   set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
