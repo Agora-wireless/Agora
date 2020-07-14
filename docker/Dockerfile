@@ -86,11 +86,18 @@ ENV DEBIAN_FRONTEND teletype
 COPY build/  Millipede/build/
 COPY data/   Millipede/data/
 COPY test/   Millipede/test/
+COPY run_millipede.sh Millipede/
 
 
 # Set up the intel MKL compiler variables (shell environment vars) so that Millipede can run.
+# This is only really needed when logging into the container via a remote bash shell and manually running commands.
+# Note that this will NOT take effect if a docker CMD or kubernetes command is used directly.
 RUN echo "source /opt/intel/compilers_and_libraries/linux/bin/compilervars.sh intel64" >> ~/.bashrc
 
 
 # Finally, do something, e.g., run Millipede.
 # TODO, e.g., CMD ./build/millipede data/tddconfig-sim-ul.json
+
+# This command is for debugging/testing; it makes the container run forever so we can remote into it.
+# It's better to do this using a kubernetes command instead.
+# CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
