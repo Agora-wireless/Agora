@@ -112,6 +112,15 @@ public:
     void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 
+    // Flags that allow developer control over Millipede internals
+    struct {
+        // Before exiting, save LDPC-decoded or demodulated data to a file
+        bool enable_save_decode_data_to_file = false;
+
+        // Before exiting, save data sent on downlink to a file
+        bool enable_save_tx_data_to_file = false;
+    } flags;
+
 private:
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)

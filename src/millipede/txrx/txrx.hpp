@@ -51,7 +51,6 @@ typedef unsigned short ushort;
  * with real wireless hardware peers (antenna hubs for the server, UE devices
  * for the client).
  */
-
 class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset = 1);
@@ -113,7 +112,7 @@ private:
     std::vector<int> socket_;
 
 #ifdef USE_DPDK
-    uint32_t client_addr; // IPv4 address of the simulator sender
+    uint32_t sender_addr; // IPv4 address of the simulator sender
     uint32_t server_addr; // IPv4 address of the Millipede server
     struct rte_mempool* mbuf_pool;
 #endif

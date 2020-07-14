@@ -192,12 +192,12 @@ void* Sender::master_thread(int tid)
                 next_frame_id = ctag.frame_id + 1;
                 if (next_frame_id == cfg->frames_to_test)
                     break;
-                frame_end[ctag.frame_id] = get_time();
+                frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
 
                 delay_for_frame(ctag.frame_id, tick_start);
                 tick_start = rdtsc();
-                frame_start[next_frame_id] = get_time();
+                frame_start[next_frame_id % kNumStatsFrames] = get_time();
             } else {
                 next_frame_id = ctag.frame_id;
             }
@@ -421,12 +421,12 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 
 void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
-    printf("Printing sender results to file...\n");
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
+    printf("Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
-        fprintf(fp_debug, "%.5f\n", frame_end[i]);
+        fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
     }
 }

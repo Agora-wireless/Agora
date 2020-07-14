@@ -129,9 +129,9 @@ private:
 
 #ifdef USE_DPDK_SENDER
     struct rte_mempool* mbuf_pool;
-    uint32_t client_addr; // IPv4 address of this data sender
+    uint32_t sender_addr; // IPv4 address of this data sender
     uint32_t server_addr; // IPv4 address of the remote target Millipede server
-    rte_ether_addr client_mac_addr; // MAC address of this data sender
+    rte_ether_addr sender_mac_addr; // MAC address of this data sender
 
     // MAC address of the remote target Millipede server
     rte_ether_addr server_mac_addr;
