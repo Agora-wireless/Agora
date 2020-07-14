@@ -26,8 +26,9 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
     struct bblib_ldpc_encoder_5gnr_response* response);
 };
 
-// kMaxProcBytes is 64 bytes in FlexRAN's LDPC encoder and 32 bytes in
-// Millipede's derived LDPC encoder. Using the larger of the two works.
+// PROC_BYTES (maximum bytes processed as an LDPC chunk) is 64 bytes in
+// FlexRAN's LDPC encoder and 32 bytes in Millipede's derived LDPC encoder.
+// Using the larger of the two works for padding buffers.
 static constexpr size_t kMaxProcBytes = 64;
 
 #endif

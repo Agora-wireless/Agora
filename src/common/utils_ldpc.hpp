@@ -240,14 +240,14 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
             exit(-1);
         }
 
-        __attribute__((aligned(kMaxProcBytes)))
-        int8_t internal_buffer0[BG1_COL_INF_NUM * kMaxProcBytes]
+        __attribute__((aligned(avx2enc::kProcBytes)))
+        int8_t internal_buffer0[BG1_COL_INF_NUM * avx2enc::kProcBytes]
             = { 0 };
-        __attribute__((aligned(kMaxProcBytes)))
-        int8_t internal_buffer1[BG1_ROW_TOTAL * kMaxProcBytes]
+        __attribute__((aligned(avx2enc::kProcBytes)))
+        int8_t internal_buffer1[BG1_ROW_TOTAL * avx2enc::kProcBytes]
             = { 0 };
-        __attribute__((aligned(kMaxProcBytes)))
-        int8_t internal_buffer2[BG1_COL_TOTAL * kMaxProcBytes]
+        __attribute__((aligned(avx2enc::kProcBytes)))
+        int8_t internal_buffer2[BG1_COL_TOTAL * avx2enc::kProcBytes]
             = { 0 };
 
         auto adapter_func = avx2enc::ldpc_select_adapter_func(zc);
@@ -259,13 +259,13 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
 
         // Concactenate the chunks for input and parity
         memcpy(internal_buffer2,
-            internal_buffer0 + kNumPuncturedCols * kMaxProcBytes,
+            internal_buffer0 + kNumPuncturedCols * avx2enc::kProcBytes,
             (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
-                * kMaxProcBytes);
+                * avx2enc::kProcBytes);
         memcpy(internal_buffer2
                 + (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
-                    * kMaxProcBytes,
-            internal_buffer1, ldpc_num_rows(base_graph) * kMaxProcBytes);
+                    * avx2enc::kProcBytes,
+            internal_buffer1, ldpc_num_rows(base_graph) * avx2enc::kProcBytes);
 
         // Gather the concatenated chunks to create the encoded buffer
         adapter_func(encoded_buffer, internal_buffer2, zc,
