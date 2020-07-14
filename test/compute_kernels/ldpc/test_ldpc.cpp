@@ -30,6 +30,7 @@ static constexpr bool kEnableEarlyTermination = false;
 static constexpr size_t kNumFillerBits = 0;
 static constexpr size_t kMaxDecoderIters = 8;
 static constexpr size_t k5GNRNumPunctured = 2;
+static constexpr size_t kNumRows = 46;
 
 int main()
 {
@@ -40,6 +41,8 @@ int main()
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
     uint8_t* decoded[kNumCodeBlocks];
+
+    printf("Code rate: %.3f (nRows = %zu)\n", 22.f / (20 + kNumRows), kNumRows);
 
     std::vector<size_t> zc_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3, 6, 12, 24,
         48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56, 112, 224,
@@ -52,8 +55,8 @@ int main()
             continue;
         }
         const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
-        const size_t num_parity_bits = ldpc_num_parity_bits(kBaseGraph, zc);
-        const size_t num_encoded_bits = ldpc_num_encoded_bits(kBaseGraph, zc);
+        const size_t num_encoded_bits
+            = ldpc_num_encoded_bits(kBaseGraph, zc, kNumRows);
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
             input[i] = new int8_t[ldpc_encoding_input_buf_size(kBaseGraph, zc)];
@@ -74,7 +77,8 @@ int main()
 
         const size_t encoding_start_tsc = rdtsc();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            ldpc_encode_helper(kBaseGraph, zc, encoded[n], parity[n], input[n]);
+            ldpc_encode_helper(
+                kBaseGraph, zc, kNumRows, encoded[n], parity[n], input[n]);
         }
 
         const double encoding_us
@@ -100,7 +104,7 @@ int main()
             = kEnableEarlyTermination;
         ldpc_decoder_5gnr_request.Zc = zc;
         ldpc_decoder_5gnr_request.baseGraph = kBaseGraph;
-        ldpc_decoder_5gnr_request.nRows = num_parity_bits / zc;
+        ldpc_decoder_5gnr_request.nRows = kNumRows;
 
         const size_t buffer_len = 1024 * 1024;
         const size_t numMsgBits = num_input_bits - kNumFillerBits;

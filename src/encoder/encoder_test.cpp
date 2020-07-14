@@ -44,12 +44,13 @@ void run_test(size_t base_graph, size_t zc)
         parity_reference[n] = (int8_t*)read_binfile(
             reference_filename, ldpc_encoding_parity_buf_size(base_graph, zc));
 
-        ldpc_encode_helper(base_graph, zc, encoded[n], parity[n], input[n]);
+        ldpc_encode_helper(base_graph, zc, ldpc_max_num_rows(base_graph),
+            encoded[n], parity[n], input[n]);
     }
 
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
         if (memcmp(parity[n], parity_reference[n],
-                bits_to_bytes(ldpc_num_parity_bits(base_graph, zc)))
+                bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc)))
             != 0) {
             fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n", zc,
                 base_graph);

@@ -50,15 +50,22 @@ void PhyStats::print_phy_stats()
         } else {
             size_t total_uncoded_bits(0);
             size_t total_uncoded_bit_errors(0);
+            size_t total_decoded_blocks(0);
+            size_t total_block_errors(0);
             for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
                 total_uncoded_bits += uncoded_bits_count_[ue_id][i];
                 total_uncoded_bit_errors += uncoded_bit_error_count_[ue_id][i];
+                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
+                total_block_errors += block_error_count_[ue_id][i];
             }
             std::cout << "UE " << ue_id << ": uncoded bit errors (BER) "
                       << total_uncoded_bit_errors << "/" << total_uncoded_bits
                       << "("
                       << 1.0 * total_uncoded_bit_errors / total_uncoded_bits
-                      << ")" << std::endl;
+                      << "), uncoded block errors (BLER) " << total_block_errors << "/"
+                      << total_decoded_blocks << " ("
+                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
+                      << std::endl;
         }
     }
 }

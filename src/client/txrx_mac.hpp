@@ -80,6 +80,9 @@ public:
     int dequeue_send(int tid);
     struct MacPacket* recv_enqueue(int tid, int radio_id, int rx_offset);
 
+    void wakeup_mac();
+    bool is_mac_running();
+
 private:
 #if USE_IPV4
     struct sockaddr_in* servaddr_; /* server address */
@@ -117,6 +120,7 @@ private:
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
+    bool mac_running;
 
     Config* config_;
 };

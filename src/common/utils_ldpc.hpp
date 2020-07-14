@@ -131,8 +131,8 @@ static inline size_t ldpc_num_input_cols(size_t base_graph)
     return (base_graph == 1 ? BG1_COL_INF_NUM : BG2_COL_INF_NUM);
 }
 
-// Return the number of rows in this non-expanded base graph
-static inline size_t ldpc_num_rows(size_t base_graph)
+// Return the maximum number of rows in this non-expanded base graph
+static inline size_t ldpc_max_num_rows(size_t base_graph)
 {
     return (base_graph == 1 ? BG1_ROW_TOTAL : BG2_ROW_TOTAL);
 }
@@ -146,19 +146,28 @@ static inline size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
 
 // Return the number of parity bits per code block with this base graph and
 // expansion factor
-static inline size_t ldpc_num_parity_bits(size_t base_graph, size_t zc)
+static inline size_t ldpc_max_num_parity_bits(size_t base_graph, size_t zc)
 {
-    return zc * ldpc_num_rows(base_graph);
+    return zc * ldpc_max_num_rows(base_graph);
 }
 
-// Return the number of total bits per code block with this base graph and
-// expansion factor
-static inline size_t ldpc_num_encoded_bits(size_t base_graph, size_t zc)
+// Return the maximum number of total bits per code block with this base graph
+// and expansion factor
+static inline size_t ldpc_max_num_encoded_bits(size_t base_graph, size_t zc)
 {
     static size_t num_punctured_cols = 2;
     return zc
         * (base_graph == 1 ? (BG1_COL_TOTAL - num_punctured_cols)
                            : (BG2_COL_TOTAL - num_punctured_cols));
+}
+
+// Return the number of total bits per code block with this base graph and
+// expansion factor
+static inline size_t ldpc_num_encoded_bits(
+    size_t base_graph, size_t zc, size_t nRows)
+{
+    static size_t num_punctured_cols = 2;
+    return zc * (ldpc_num_input_cols(base_graph) + nRows - num_punctured_cols);
 }
 
 // Return the number of bytes required in the input buffer used for LDPC
@@ -174,7 +183,7 @@ static inline size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
 static inline size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
 {
     // We add kMaxProcBytes as padding for the encoder's gather function
-    return bits_to_bytes(ldpc_num_parity_bits(base_graph, zc)) + kMaxProcBytes;
+    return bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the output encoded codeword buffer
@@ -183,7 +192,7 @@ static inline size_t ldpc_encoding_encoded_buf_size(
     size_t base_graph, size_t zc)
 {
     // We add kMaxProcBytes as padding for the encoder's gather function
-    return bits_to_bytes(ldpc_num_encoded_bits(base_graph, zc)) + kMaxProcBytes;
+    return bits_to_bytes(ldpc_max_num_encoded_bits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the minimum LDPC expansion factor supported
@@ -197,16 +206,18 @@ static inline size_t ldpc_get_max_zc()
 
 // Generate the codeword output and parity buffer for this input buffer
 static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
-    int8_t* encoded_buffer, int8_t* parity_buffer, const int8_t* input_buffer)
+    size_t nRows, int8_t* encoded_buffer, int8_t* parity_buffer,
+    const int8_t* input_buffer)
 {
     const size_t num_input_bits = ldpc_num_input_bits(base_graph, zc);
-    const size_t num_parity_bits = ldpc_num_parity_bits(base_graph, zc);
+    const size_t num_parity_bits = nRows * zc;
 
     bblib_ldpc_encoder_5gnr_request req;
     bblib_ldpc_encoder_5gnr_response resp;
     req.baseGraph = base_graph;
-    req.nRows = ldpc_num_rows(base_graph);
+    req.nRows = kUseAVX2Encoder ? ldpc_max_num_rows(base_graph) : nRows;
     req.Zc = zc;
+    req.nRows = nRows;
     req.numberCodeblocks = 1;
     req.input[0] = const_cast<int8_t*>(input_buffer);
     resp.output[0] = parity_buffer;
@@ -267,11 +278,12 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
         memcpy(internal_buffer2
                 + (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
                     * avx2enc::kProcBytes,
-            internal_buffer1, ldpc_num_rows(base_graph) * avx2enc::kProcBytes);
+            internal_buffer1,
+            ldpc_max_num_rows(base_graph) * avx2enc::kProcBytes);
 
         // Gather the concatenated chunks to create the encoded buffer
         adapter_func(encoded_buffer, internal_buffer2, zc,
-            ldpc_num_encoded_bits(base_graph, zc), 0);
+            ldpc_num_encoded_bits(base_graph, zc, nRows), 0);
     }
 }
 
