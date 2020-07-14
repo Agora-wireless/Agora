@@ -390,9 +390,10 @@ void Config::genData()
         + std::to_string(total_ue_ant_num) + ".bin";
     std::cout << "Reading raw data from " << filename1 << std::endl;
     FILE* fd = fopen(filename1.c_str(), "rb");
-    if (fd == NULL) {
-        printf("open antenna file %s failed.\n", filename1.c_str());
-        std::cerr << "Error: " << strerror(errno) << std::endl;
+    if (fd == nullptr) {
+        printf("Failed to open antenna file %s. Error %s.\n", filename1.c_str(),
+            strerror(errno));
+        exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
