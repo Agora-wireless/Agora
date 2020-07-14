@@ -232,9 +232,9 @@ Config::Config(std::string jsonfile)
         LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen,
         LDPC_config.cbCodewLen, LDPC_config.decoderIter);
 
-    ldpc_worker_addr = tddConf.value("ldpc_worker_addr", "127.0.0.1");
-    ldpc_worker_num = tddConf.value("ldpc_worker_num", 8);
-    ldpc_worker_core_offset = tddConf.value("ldpc_worker_core_offset", 0);
+    remote_ldpc_addr = tddConf.value("remote_ldpc_addr", "127.0.0.1");
+    remote_ldpc_num = tddConf.value("remote_ldpc_num", 8);
+    remote_ldpc_core_offset = tddConf.value("remote_ldpc_core_offset", 0);
 
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;

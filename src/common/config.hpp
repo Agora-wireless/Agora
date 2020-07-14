@@ -189,10 +189,10 @@ public:
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
-    /* LDPC worker parameters */
-    std::string ldpc_worker_addr;
-    size_t ldpc_worker_num;
-    size_t ldpc_worker_core_offset;
+    /* RemoteLDPC parameters */
+    std::string remote_ldpc_addr;
+    size_t remote_ldpc_num;
+    size_t remote_ldpc_core_offset;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

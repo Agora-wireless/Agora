@@ -21,7 +21,6 @@
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
 #include "reciprocity.hpp"
-#include "rpc.h"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
@@ -43,6 +42,10 @@
 #include <tuple>
 #include <unistd.h>
 #include <vector>
+
+#ifdef USE_REMOTE
+#include "rpc.h"
+#endif
 
 class Millipede {
 public:

@@ -7,11 +7,13 @@
 
 using namespace std;
 
+#ifdef USE_REMOTE
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
     erpc::SmErrType sm_err_type, void* _context)
 {
     printf("Connected session: %d\n", session_num);
 }
+#endif
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -60,10 +62,12 @@ Millipede::Millipede(Config* cfg)
             tx_ptoks_ptr + cfg->socket_thread_num));
     }
 
-    if (kUseERPC) {
+#ifdef USE_REMOTE
+    if (kUseRemote) {
         auto uri = config_->server_addr + ":" + std::to_string(kRpcPort);
         nexus = new erpc::Nexus(uri, 0, 0);
     }
+#endif
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -671,25 +675,29 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
+#ifdef USE_REMOTE
     erpc::Rpc<erpc::CTransport>* rpc;
-    if (kUseERPC) {
+    if (kUseRemote) {
         rpc = new erpc::Rpc<erpc::CTransport>(
             nexus, static_cast<void*>(computeDecoding), tid, basic_sm_handler);
         rpc->retry_connect_on_invalid_rpc_id = true;
-        auto uri = config_->ldpc_worker_addr + ":" + std::to_string(kRpcPort);
-        int session = rpc->create_session(uri, tid % config_->ldpc_worker_num);
+        auto uri = config_->remote_ldpc_addr + ":" + std::to_string(kRpcPort);
+        int session = rpc->create_session(uri, tid % config_->remote_ldpc_num);
         rt_assert(session >= 0, "Connect failed!");
         while (!rpc->is_connected(session)) {
             rpc->run_event_loop_once();
         }
         static_cast<DoDecode*>(computeDecoding)->initialize_erpc(rpc, session);
     }
+#endif
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
-            if (kUseERPC) {
+#ifdef USE_REMOTE
+            if (kUseRemote) {
                 rpc->run_event_loop_once();
             }
+#endif
             if (computers_vec[i]->try_launch())
                 break;
         }

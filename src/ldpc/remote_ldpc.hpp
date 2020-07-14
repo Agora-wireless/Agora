@@ -1,10 +1,10 @@
 /**
- * This file declares the LDPCWorker class
+ * This file declares the RemoteLDPC class
  * and the ldpc request handler function
  */
 
-#ifndef LDPC_WORKER
-#define LDPC_WORKER
+#ifndef REMOTE_LDPC
+#define REMOTE_LDPC
 
 #include "config.hpp"
 #include "encoder.hpp"
@@ -15,21 +15,25 @@
 // The eRPC request handler function to process remote LDPC decode tasks
 void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
 
+// The eRPC SM handler function
+void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
+    erpc::SmErrType sm_err_type, void* _context);
+
 /**
  * @brief This class is used to process LDPC decoding tasks 
  * from remote Millipede servers
  */
-class LDPCWorker {
+class RemoteLDPC {
 public:
     /**
-     * @brief Create an LDPCWorker class and initialize the eRPC object
+     * @brief Create an RemoteLDPC class and initialize the eRPC object
      * 
-     * @param LDPC_config The configurations for the LDPC worker
+     * @param LDPC_config The configurations for RemoteLDPC
      * @param tid The eRPC thread ID to help identify the eRPC object
      * @param nexus The nexus object used in eRPC
      */
-    LDPCWorker(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus);
-    ~LDPCWorker();
+    RemoteLDPC(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus);
+    ~RemoteLDPC();
 
     /// Continuosly poll for incoming RPC requests and process them
     void run_erpc_event_loop_forever();
@@ -47,7 +51,7 @@ public:
 private:
     const int tid; // Thread ID as defined by eRPC
     const size_t decoded_bits; // Number of decoded bits for each decoding round
-    LDPCconfig LDPC_config; // Configurations for LDPC worker
+    LDPCconfig LDPC_config; // Configurations for RemoteLDPC
     erpc::Rpc<erpc::CTransport>* rpc;
 
     // The buffer used to store the code word 16-bit LLR outputs for FlexRAN lib

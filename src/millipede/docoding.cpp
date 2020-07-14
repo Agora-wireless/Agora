@@ -14,6 +14,7 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
+#ifdef USE_REMOTE
 void decode_cont_func(void* _context, void* _tag)
 {
     auto* computeDecoding = static_cast<DoDecode*>(_context);
@@ -39,7 +40,10 @@ void decode_cont_func(void* _context, void* _tag)
     computeDecoding->vec_req_msgbuf.push_back(tag->req_msgbuf);
     computeDecoding->vec_resp_msgbuf.push_back(tag->resp_msgbuf);
     delete tag;
+
+    computeDecoding->num_responses_received++;
 }
+#endif
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
@@ -142,6 +146,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
+#ifdef USE_REMOTE
 void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
 {
     rpc = rpc_;
@@ -156,7 +161,10 @@ void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
         *resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
         vec_resp_msgbuf.push_back(resp_msgbuf);
     }
+    num_requests_issued = 0;
+    num_responses_received = 0;
 }
+#endif
 
 Event_data DoDecode::launch(size_t tag)
 {
@@ -177,108 +185,109 @@ Event_data DoDecode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    if (kUseERPC) {
-        size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
-        size_t llr_buffer_offset = input_offset * cfg->mod_type;
-        size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
+#ifdef USE_REMOTE
+    // if (kUseRemote) {
+    size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
+    size_t llr_buffer_offset = input_offset * cfg->mod_type;
+    size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
 
-        auto* send_buf = reinterpret_cast<char*>(
-            (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset);
-        auto* decode_tag = new DecodeTag;
-        decode_tag->symbol_offset = symbol_offset;
-        decode_tag->output_offset = output_offset;
-        decode_tag->tag = tag;
-        decode_tag->tid = tid;
+    auto* send_buf = reinterpret_cast<char*>(
+        (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset);
+    auto* decode_tag = new DecodeTag;
+    decode_tag->symbol_offset = symbol_offset;
+    decode_tag->output_offset = output_offset;
+    decode_tag->tag = tag;
+    decode_tag->tid = tid;
 
-        size_t data_bytes
-            = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
+    size_t data_bytes = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
 
-        while (vec_req_msgbuf.size() == 0) {
-            printf("Ran out of request message buffers!\n");
-            rpc->run_event_loop_once();
-        }
-        auto* req_msgbuf = vec_req_msgbuf.back();
-        vec_req_msgbuf.pop_back();
-        auto* resp_msgbuf = vec_resp_msgbuf.back();
-        vec_resp_msgbuf.pop_back();
-
-        decode_tag->req_msgbuf = req_msgbuf;
-        decode_tag->resp_msgbuf = resp_msgbuf;
-        decode_tag->rpc = rpc;
-        rpc->resize_msg_buffer(req_msgbuf, data_bytes);
-        memcpy(req_msgbuf->buf, send_buf, data_bytes);
-
-        rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
-            decode_cont_func, decode_tag);
-    } else {
-        struct bblib_ldpc_decoder_5gnr_request ldpc_request {
-        };
-        struct bblib_ldpc_decoder_5gnr_response ldpc_response {
-        };
-
-        // Decoder setup
-        int16_t numFillerBits = 0;
-        int16_t numChannelLlrs = LDPC_config.cbCodewLen;
-
-        ldpc_request.numChannelLlrs = numChannelLlrs;
-        ldpc_request.numFillerBits = numFillerBits;
-        ldpc_request.maxIterations = LDPC_config.decoderIter;
-        ldpc_request.enableEarlyTermination = LDPC_config.earlyTermination;
-        ldpc_request.Zc = LDPC_config.Zc;
-        ldpc_request.baseGraph = LDPC_config.Bg;
-        ldpc_request.nRows = LDPC_config.nRows;
-
-        int numMsgBits = LDPC_config.cbLen - numFillerBits;
-        ldpc_response.numMsgBits = numMsgBits;
-        ldpc_response.varNodes = resp_var_nodes;
-
-        size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
-        size_t llr_buffer_offset = input_offset * cfg->mod_type;
-        ldpc_request.varNodes
-            = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
-        size_t cbLenBytes = bits_to_bytes(LDPC_config.cbLen);
-        size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
-        ldpc_response.compactedMessageBytes
-            = (uint8_t*)decoded_buffer_[symbol_offset] + output_offset;
-
-        bblib_ldpc_decoder_5gnr(&ldpc_request, &ldpc_response);
-
-        if (kPrintLLRData) {
-            printf("LLR data, symbol_offset: %zu, input offset: %zu\n",
-                symbol_offset, input_offset);
-            for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
-                printf("%d ",
-                    *(llr_buffer_[symbol_offset] + llr_buffer_offset + i));
-            }
-            printf("\n");
-        }
-
-        if (kPrintDecodedData) {
-            printf("Decoded data\n");
-            for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
-                printf("%u ",
-                    *(decoded_buffer_[symbol_offset] + output_offset + i));
-            }
-            printf("\n");
-        }
-
-        if (!kEnableMac && kPrintPhyStats && symbol_id >= cfg->UL_PILOT_SYMS) {
-            phy_stats->update_decoded_bits(
-                ue_id, symbol_offset, cbLenBytes * 8);
-            phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
-            size_t block_error(0);
-            for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
-                uint8_t rx_byte
-                    = decoded_buffer_[symbol_offset][output_offset + i];
-                uint8_t tx_byte = cfg->ul_bits[symbol_id][output_offset + i];
-                phy_stats->update_bit_errors(
-                    ue_id, symbol_offset, tx_byte, rx_byte);
-                if (rx_byte != tx_byte)
-                    block_error++;
-            }
-            phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
-        }
+    while (vec_req_msgbuf.size() == 0) {
+        printf("Ran out of request message buffers!\n");
+        rpc->run_event_loop_once();
     }
+    auto* req_msgbuf = vec_req_msgbuf.back();
+    vec_req_msgbuf.pop_back();
+    auto* resp_msgbuf = vec_resp_msgbuf.back();
+    vec_resp_msgbuf.pop_back();
+
+    decode_tag->req_msgbuf = req_msgbuf;
+    decode_tag->resp_msgbuf = resp_msgbuf;
+    decode_tag->rpc = rpc;
+    rpc->resize_msg_buffer(req_msgbuf, data_bytes);
+    memcpy(req_msgbuf->buf, send_buf, data_bytes);
+
+    rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
+        decode_cont_func, decode_tag);
+    num_requests_issued++;
+    // } else {
+#else
+    struct bblib_ldpc_decoder_5gnr_request ldpc_request {
+    };
+    struct bblib_ldpc_decoder_5gnr_response ldpc_response {
+    };
+
+    // Decoder setup
+    int16_t numFillerBits = 0;
+    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+
+    ldpc_request.numChannelLlrs = numChannelLlrs;
+    ldpc_request.numFillerBits = numFillerBits;
+    ldpc_request.maxIterations = LDPC_config.decoderIter;
+    ldpc_request.enableEarlyTermination = LDPC_config.earlyTermination;
+    ldpc_request.Zc = LDPC_config.Zc;
+    ldpc_request.baseGraph = LDPC_config.Bg;
+    ldpc_request.nRows = LDPC_config.nRows;
+
+    int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    ldpc_response.numMsgBits = numMsgBits;
+    ldpc_response.varNodes = resp_var_nodes;
+
+    size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
+    size_t llr_buffer_offset = input_offset * cfg->mod_type;
+    ldpc_request.varNodes
+        = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
+    size_t cbLenBytes = bits_to_bytes(LDPC_config.cbLen);
+    size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
+    ldpc_response.compactedMessageBytes
+        = (uint8_t*)decoded_buffer_[symbol_offset] + output_offset;
+
+    bblib_ldpc_decoder_5gnr(&ldpc_request, &ldpc_response);
+
+    if (kPrintLLRData) {
+        printf("LLR data, symbol_offset: %zu, input offset: %zu\n",
+            symbol_offset, input_offset);
+        for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
+            printf(
+                "%d ", *(llr_buffer_[symbol_offset] + llr_buffer_offset + i));
+        }
+        printf("\n");
+    }
+
+    if (kPrintDecodedData) {
+        printf("Decoded data\n");
+        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
+            printf(
+                "%u ", *(decoded_buffer_[symbol_offset] + output_offset + i));
+        }
+        printf("\n");
+    }
+
+    if (!kEnableMac && kPrintPhyStats && symbol_id >= cfg->UL_PILOT_SYMS) {
+        phy_stats->update_decoded_bits(ue_id, symbol_offset, cbLenBytes * 8);
+        phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
+        size_t block_error(0);
+        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
+            uint8_t rx_byte = decoded_buffer_[symbol_offset][output_offset + i];
+            uint8_t tx_byte = cfg->ul_bits[symbol_id][output_offset + i];
+            phy_stats->update_bit_errors(
+                ue_id, symbol_offset, tx_byte, rx_byte);
+            if (rx_byte != tx_byte)
+                block_error++;
+        }
+        phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
+    }
+    // }
+#endif
 
     double duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
@@ -290,7 +299,7 @@ Event_data DoDecode::launch(size_t tag)
 
     // When using eRPC, we ship the decoding task asynchronously to a
     // remote server and return immediately
-    if (kUseERPC)
+    if (kUseRemote)
         return Event_data(EventType::kPendingToRemote, tag);
     else
         return Event_data(EventType::kDecode, tag);
