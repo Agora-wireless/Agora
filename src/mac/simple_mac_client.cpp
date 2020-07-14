@@ -74,11 +74,11 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
-            setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->mac_rx_port + i, cfg->rx_addr.c_str());
+            setup_sockaddr_remote_ipv4(&servaddr_ipv4[i], cfg->mac_rx_port + i,
+                cfg->server_addr.c_str());
             printf("Set up UDP socket client listening to port %zu"
                    " with remote address %s:%zu  \n",
-                cfg->ue_tx_port + i, cfg->rx_addr.c_str(),
+                cfg->ue_tx_port + i, cfg->server_addr.c_str(),
                 cfg->mac_rx_port + i);
         } else {
             socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
@@ -198,12 +198,12 @@ void* SimpleClientMac::master_thread(int tid)
             next_frame_id = ctag.frame_id + 1;
             if (next_frame_id == cfg->frames_to_test)
                 break;
-            frame_end[ctag.frame_id] = get_time();
+            frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
             packet_count_per_frame[comp_frame_slot] = 0;
 
             delay_for_frame(ctag.frame_id, tick_start);
             tick_start = rdtsc();
-            frame_start[next_frame_id] = get_time();
+            frame_start[next_frame_id % kNumStatsFrames] = get_time();
 
             for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
                 auto req_tag = gen_tag_t::frm_sym_ue(next_frame_id, 0, i);
@@ -316,7 +316,7 @@ void* SimpleClientMac::worker_thread(int tid)
         //         fprintf(stderr,
         //             "send() failed. Error = %s. Is a server running at "
         //             "%s:%d?\n",
-        //             strerror(errno), cfg->rx_addr.c_str(),
+        //             strerror(errno), cfg->server_addr.c_str(),
         //             cfg->bs_port + radio_id);
         //         exit(-1);
         //     }
@@ -440,6 +440,6 @@ void SimpleClientMac::write_stats_to_file(size_t tx_frame_count) const
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
-        fprintf(fp_debug, "%.5f\n", frame_end[i]);
+        fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
     }
 }
