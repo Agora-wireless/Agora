@@ -61,7 +61,7 @@ set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(USE_LDPC True CACHE STRING "USE_LDPC defaulting to 'True'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
-set(USE_REMOTE False CACHE STRING "USE_REMOTE defaulting to 'False'")
+set(USE_REMOTE False CACHE STRING "Use remote servers for LDPC (true/false)")
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
@@ -223,10 +223,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
-  src/millipede/reciprocity.cpp
-  src/encoder/cyclic_shift.cpp
-  src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/millipede/reciprocity.cpp)
 
 set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
 include_directories(
@@ -263,7 +260,7 @@ if(${USE_LDPC})
 endif()
 
 if(${USE_REMOTE})
-  message(STATUS "eRPC is enabled")
+  message(STATUS "Using remote servers for LDPC")
   add_definitions(-DUSE_REMOTE)
   add_definitions(-DERPC_INFINIBAND=true)
   find_library(ERPC_LIB erpc PATHS $ENV{ERPC_ROOT_PATH}/build)
@@ -361,6 +358,7 @@ add_executable(test_zf test/unit_tests/test_zf.cc
 target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
+# Add the remote LDPC executable
 if(${USE_REMOTE})
   add_executable(remote_ldpc src/ldpc/remote_ldpc.cpp
     src/ldpc/ldpc_main.cpp
@@ -368,6 +366,7 @@ if(${USE_REMOTE})
     ${LDPC_SOURCES}
     ${HEADER_FILES})
   target_link_libraries(remote_ldpc ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)
+
   add_executable(test_remote_ldpc test/unit_tests/test_remote_ldpc.cc
     ${COMMON_SOURCES}
     src/millipede/stats.cpp

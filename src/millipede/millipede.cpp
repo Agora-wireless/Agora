@@ -4,7 +4,6 @@
  *
  */
 #include "millipede.hpp"
-
 using namespace std;
 
 #ifdef USE_REMOTE
@@ -63,10 +62,8 @@ Millipede::Millipede(Config* cfg)
     }
 
 #ifdef USE_REMOTE
-    if (kUseRemote) {
-        auto uri = config_->server_addr + ":" + std::to_string(kRpcPort);
-        nexus = new erpc::Nexus(uri, 0, 0);
-    }
+    auto uri = config_->server_addr + ":" + std::to_string(kRpcPort);
+    nexus = new erpc::Nexus(uri, 0, 0);
 #endif
 
     /* Create worker threads */
@@ -376,6 +373,7 @@ void Millipede::start()
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
+
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
                     if (kEnableMac) {
                         schedule_users(
@@ -687,26 +685,22 @@ void* Millipede::worker(int tid)
 
 #ifdef USE_REMOTE
     erpc::Rpc<erpc::CTransport>* rpc;
-    if (kUseRemote) {
-        rpc = new erpc::Rpc<erpc::CTransport>(
-            nexus, static_cast<void*>(computeDecoding), tid, basic_sm_handler);
-        rpc->retry_connect_on_invalid_rpc_id = true;
-        auto uri = config_->remote_ldpc_addr + ":" + std::to_string(kRpcPort);
-        int session = rpc->create_session(uri, tid % config_->remote_ldpc_num);
-        rt_assert(session >= 0, "Connect failed!");
-        while (!rpc->is_connected(session)) {
-            rpc->run_event_loop_once();
-        }
-        static_cast<DoDecode*>(computeDecoding)->initialize_erpc(rpc, session);
+    rpc = new erpc::Rpc<erpc::CTransport>(
+        nexus, static_cast<void*>(computeDecoding), tid, basic_sm_handler);
+    rpc->retry_connect_on_invalid_rpc_id = true;
+    auto uri = config_->remote_ldpc_addr + ":" + std::to_string(kRpcPort);
+    int session = rpc->create_session(uri, tid % config_->remote_ldpc_num);
+    rt_assert(session >= 0, "Connect failed!");
+    while (!rpc->is_connected(session)) {
+        rpc->run_event_loop_once();
     }
+    static_cast<DoDecode*>(computeDecoding)->initialize_erpc(rpc, session);
 #endif
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
 #ifdef USE_REMOTE
-            if (kUseRemote) {
-                rpc->run_event_loop_once();
-            }
+            rpc->run_event_loop_once();
 #endif
             if (computers_vec[i]->try_launch())
                 break;

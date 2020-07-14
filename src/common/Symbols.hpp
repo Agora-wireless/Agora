@@ -50,7 +50,7 @@ enum class EventType : int {
     kModul,
     kPacketFromMac,
     kPacketToMac,
-    kPendingToRemote
+    kPendingToRemote // We need to wait for a remote server to respond
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPendingToRemote) + 1;

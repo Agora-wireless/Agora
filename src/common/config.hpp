@@ -196,9 +196,15 @@ public:
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
-    /* RemoteLDPC parameters */
+    /* Remote LDPC parameters */
+
+    // IPv4 address of a remote server available for LDPC
     std::string remote_ldpc_addr;
-    size_t remote_ldpc_num;
+
+    // Number of LDPC-decoding threads per remote LDPC server
+    size_t remote_ldpc_num_threads;
+
+    // Remote LDPC thread i runs on core remote_ldpc_core_offset + i
     size_t remote_ldpc_core_offset;
 
     bool isUE;
