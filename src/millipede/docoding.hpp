@@ -26,9 +26,9 @@
 #include "iobuffer.hpp"
 #include "utils_ldpc.hpp"
 
-#ifdef USE_REMOTE
+// #ifdef USE_REMOTE
 #include "rpc.h"
-#endif
+// #endif
 
 class DoEncode : public Doer {
 public:
@@ -65,14 +65,14 @@ public:
 
     Event_data launch(size_t tag);
 
-#ifdef USE_REMOTE
+    // #ifdef USE_REMOTE
     void initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
 
     inline size_t get_num_requests() { return num_requests_issued; }
     inline size_t get_num_responses() { return num_responses_received; }
 
     friend void decode_cont_func(void* _context, void* _tag);
-#endif
+    // #endif
 
 private:
     int16_t* resp_var_nodes;
@@ -83,7 +83,7 @@ private:
     PhyStats* phy_stats;
     DurationStat* duration_stat;
 
-#ifdef USE_REMOTE
+    // #ifdef USE_REMOTE
     /// Number of preallocated msgbufs to hold pending eRPC requests
     static const size_t kRpcMaxMsgBufNum = 64;
 
@@ -99,10 +99,10 @@ private:
     int session;
     size_t num_requests_issued;
     size_t num_responses_received;
-#endif
+    // #endif
 };
 
-#ifdef USE_REMOTE
+// #ifdef USE_REMOTE
 /// Local eRPC request tag used for processing responses of decoding tasks
 class DecodeTag {
 public:
@@ -114,6 +114,6 @@ public:
     erpc::MsgBuffer* resp_msgbuf;
     erpc::Rpc<erpc::CTransport>* rpc;
 };
-#endif
+// #endif
 
 #endif

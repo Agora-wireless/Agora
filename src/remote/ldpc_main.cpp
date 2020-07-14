@@ -27,17 +27,17 @@ int main(int argc, char** argv)
     constexpr int kReqType = 2;
     constexpr int kUDPPort = 31850;
 
-    auto* task_threads = new std::thread*[cfg->remote_ldpc_num];
+    auto* task_threads = new std::thread*[cfg->remote_ldpc_num_threads];
 
     std::string uri = cfg->remote_ldpc_addr + ":" + std::to_string(kUDPPort);
     auto* nexus = new erpc::Nexus(uri, 0, 0);
     nexus->register_req_func(kReqType, ldpc_req_handler);
 
-    for (size_t i = 0; i < cfg->remote_ldpc_num; i++) {
+    for (size_t i = 0; i < cfg->remote_ldpc_num_threads; i++) {
         task_threads[i] = new std::thread(run_remote, cfg, i, nexus);
     }
 
-    for (size_t i = 0; i < cfg->remote_ldpc_num; i++) {
+    for (size_t i = 0; i < cfg->remote_ldpc_num_threads; i++) {
         task_threads[i]->join();
     }
 

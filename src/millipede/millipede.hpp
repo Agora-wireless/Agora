@@ -43,9 +43,9 @@
 #include <unistd.h>
 #include <vector>
 
-#ifdef USE_REMOTE
+// #ifdef USE_REMOTE
 #include "rpc.h"
-#endif
+// #endif
 
 class Millipede {
 public:
@@ -306,9 +306,9 @@ private:
     // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 
-#ifdef USE_REMOTE
+    // #ifdef USE_REMOTE
     erpc::Nexus* nexus; // Per-process eRPC initialization object
-#endif
+    // #endif
 };
 
 #endif

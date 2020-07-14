@@ -199,7 +199,7 @@ include_directories(
   src/millipede/
   src/millipede/txrx/
   src/client/
-  src/ldpc)
+  src/remote)
 
 include_directories(SYSTEM src/third_party)
 
@@ -262,16 +262,16 @@ endif()
 if(${USE_REMOTE})
   message(STATUS "Using remote servers for LDPC")
   add_definitions(-DUSE_REMOTE)
-  add_definitions(-DERPC_INFINIBAND=true)
-  find_library(ERPC_LIB erpc PATHS $ENV{ERPC_ROOT_PATH}/build)
-  message(STATUS "ERPC_LIB: ${ERPC_LIB}")
-  if(NOT ERPC_LIB)
-    message(FATAL_ERROR "eRPC library not found")
-  endif()
-  set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc -libverbs -lnuma)
-  include_directories(SYSTEM $ENV{ERPC_ROOT_PATH}/src)
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES})
 endif()
+
+add_definitions(-DERPC_INFINIBAND=true)
+find_library(ERPC_LIB erpc PATHS ${SOURCE_DIR}/src/third_party/build)
+message(STATUS "ERPC_LIB: ${ERPC_LIB}")
+if(NOT ERPC_LIB)
+  message(FATAL_ERROR "eRPC library not found")
+endif()
+set(ERPC_LIBRARIES ${ERPC_LIBRARIES} erpc -libverbs -lnuma)
+include_directories(SYSTEM ${SOURCE_DIR}/src/third_party/src)
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})
@@ -347,7 +347,7 @@ target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
 # End-to-end test
 add_executable(test_millipede test/test_millipede/main.cpp ${SOURCES})
 target_link_libraries(test_millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
+  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} ${ERPC_LIBRARIES} -lutil)
 
 # The tests to run using ctest
 add_executable(test_zf test/unit_tests/test_zf.cc 
@@ -360,8 +360,8 @@ add_test(NAME test_zf COMMAND test_zf)
 
 # Add the remote LDPC executable
 if(${USE_REMOTE})
-  add_executable(remote_ldpc src/ldpc/remote_ldpc.cpp
-    src/ldpc/ldpc_main.cpp
+  add_executable(remote_ldpc src/remote/remote_ldpc.cpp
+    src/remote/ldpc_main.cpp
     ${COMMON_SOURCES}
     ${LDPC_SOURCES}
     ${HEADER_FILES})
@@ -371,7 +371,7 @@ if(${USE_REMOTE})
     ${COMMON_SOURCES}
     src/millipede/stats.cpp
     src/millipede/docoding.cpp
-    src/ldpc/remote_ldpc.cpp
+    src/remote/remote_ldpc.cpp
     src/millipede/phy_stats.cpp
     ${LDPC_SOURCES})
   target_link_libraries(test_remote_ldpc ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS} ${ERPC_LIBRARIES} ${FLEXRAN_LDPC_LIBS} -libverbs -lnuma)

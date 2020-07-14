@@ -240,7 +240,7 @@ Config::Config(std::string jsonfile)
         LDPC_config.nRows);
 
     remote_ldpc_addr = tddConf.value("remote_ldpc_addr", "127.0.0.1");
-    remote_ldpc_num = tddConf.value("remote_ldpc_num", 8);
+    remote_ldpc_num_threads = tddConf.value("remote_ldpc_num_threads", 8);
     remote_ldpc_core_offset = tddConf.value("remote_ldpc_core_offset", 0);
 
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;

@@ -102,6 +102,7 @@ public:
         delete ldpc_nexus;
     }
 
+    // Test whether the local server receives responses from the remote LDPC
     void test_connectivity()
     {
         FastRand fast_rand;
@@ -128,6 +129,7 @@ public:
         ASSERT_EQ(computeDecoding->get_num_responses(), kNumIters);
     }
 
+    // Test whether the remote LDPC reports the correct decoded results
     void test_correctness()
     {
         // Prepare Data
@@ -146,9 +148,10 @@ public:
                 continue;
             }
             const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
-            const size_t num_parity_bits = ldpc_num_parity_bits(kBaseGraph, zc);
+            const size_t num_parity_bits
+                = ldpc_max_num_parity_bits(kBaseGraph, zc);
             const size_t num_encoded_bits
-                = ldpc_num_encoded_bits(kBaseGraph, zc);
+                = ldpc_max_num_encoded_bits(kBaseGraph, zc);
 
             for (size_t i = 0; i < kNumCodeBlocks; i++) {
                 input[i]
@@ -170,8 +173,9 @@ public:
 
             const size_t encoding_start_tsc = rdtsc();
             for (size_t n = 0; n < kNumCodeBlocks; n++) {
-                ldpc_encode_helper(
-                    kBaseGraph, zc, encoded[n], parity[n], input[n]);
+                ldpc_encode_helper(kBaseGraph, zc,
+                    ldpc_max_num_rows(kBaseGraph), encoded[n], parity[n],
+                    input[n]);
             }
 
             // For decoding, generate log-likelihood ratios, one byte per input bit
@@ -199,6 +203,7 @@ public:
                 computeDecoding->launch(gen_tag_t::frm_sym_cb(n, 0, 0)._tag);
             }
 
+            // Wait for incoming responses
             rpc->run_event_loop(100);
 
             for (size_t n = 0; n < kNumCodeBlocks; n++) {
