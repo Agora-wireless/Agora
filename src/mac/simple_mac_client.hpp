@@ -36,6 +36,7 @@
 #include "net.hpp"
 #include "utils.h"
 #include "ip_bridge.hpp"
+#include "crc.hpp"
 
 class SimpleClientMac {
 public:
@@ -121,6 +122,9 @@ private:
     IPbridge* ipbridge;
     unsigned char* data_from_tun;
     int tun_payload_size_bytes;
+
+    // CRC
+    DoCRC *crc_dwn = new DoCRC();
 };
 
 #endif

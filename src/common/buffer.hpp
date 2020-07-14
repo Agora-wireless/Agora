@@ -236,15 +236,18 @@ struct MacPacket {
     uint32_t symbol_id;
     uint32_t cell_id;
     uint32_t ue_id;
-    uint32_t valid_tun_data;
-    uint32_t fill[11]; // Padding for 64-byte alignment needed for SIMD
+    uint8_t valid_tun_data;
+    uint32_t crc;
+    uint32_t datalen;
+    uint8_t fill[39]; // Padding for 64-byte alignment needed for SIMD
     short data[]; // Elements sent by antennae are two bytes (I/Q samples)
-    MacPacket(int f, int s, int c, int a, int v) // TODO: Should be unsigned integers
+    MacPacket(int f, int s, int c, int a, int v, int cc) // TODO: Should be unsigned integers
         : frame_id(f)
         , symbol_id(s)
         , cell_id(c)
         , ue_id(a)
         , valid_tun_data(v)
+        , crc(cc)
     {
     }
 
