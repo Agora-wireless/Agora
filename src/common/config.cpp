@@ -63,14 +63,14 @@ Config::Config(std::string jsonfile)
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "16QAM");
 
-    rx_addr = tddConf.value("rx_addr", "127.0.0.1");
-    tx_addr = tddConf.value("tx_addr", "127.0.0.1");
+    server_addr = tddConf.value("server_addr", "127.0.0.1");
+    sender_addr = tddConf.value("sender_addr", "127.0.0.1");
     tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
     bs_port = tddConf.value("bs_port", 8000);
     ue_rx_port = tddConf.value("ue_rx_port", 7000);
     ue_tx_port = tddConf.value("ue_tx_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
-    mac_tx_port = tddConf.value("mac_rx_port", 4000);
+    mac_tx_port = tddConf.value("mac_tx_port", 4000);
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
@@ -242,7 +242,7 @@ Config::Config(std::string jsonfile)
 
     data_bytes_num_persymbol = kUseLDPC
         ? (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol
-        : OFDM_DATA_NUM * mod_type / 8; // number of Bytes in each OFDM Sym.
+        : (OFDM_DATA_NUM * mod_type) >> 3; // number of Bytes in each OFDM Sym.
     data_bytes_num_perframe = data_bytes_num_persymbol
         * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
     mac_data_bytes_num_perframe = data_bytes_num_perframe;
@@ -435,7 +435,8 @@ void Config::genData()
         int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
             LDPC_config.Bg, LDPC_config.Zc)];
         for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM; j++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM;
+                 j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     ul_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
@@ -464,7 +465,8 @@ void Config::genData()
 
         // Encode downlink bits
         for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM; j++) {
+            for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM;
+                 j++) {
                 ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                     dl_encoded_bits[i * num_blocks_per_symbol + j],
                     temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
