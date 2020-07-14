@@ -26,14 +26,16 @@
 
 static constexpr size_t kNumCodeBlocks = 2;
 static constexpr size_t kBaseGraph = 1;
-static constexpr bool kEnableEarlyTermination = true;
+static constexpr bool kEnableEarlyTermination = false;
 static constexpr size_t kNumFillerBits = 0;
-static constexpr size_t kMaxDecoderIters = 20;
+static constexpr size_t kMaxDecoderIters = 8;
 static constexpr size_t k5GNRNumPunctured = 2;
 
 int main()
 {
     double freq_ghz = measure_rdtsc_freq();
+    printf("Spinning for one second for Turbo Boost\n");
+    nano_sleep(1000 * 1000 * 1000, freq_ghz);
     int8_t* input[kNumCodeBlocks];
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
