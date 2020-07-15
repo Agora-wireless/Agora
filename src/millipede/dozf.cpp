@@ -43,7 +43,6 @@ DoZF::~DoZF()
 
 Event_data DoZF::launch(size_t tag)
 {
-    printf("ZF %d\n", tid);
     if (cfg->freq_orthogonal_pilot)
         ZF_freq_orthogonal(tag);
     else

@@ -56,7 +56,6 @@ DoDemul::~DoDemul()
 
 Event_data DoDemul::launch(size_t tag)
 {
-    printf("Demul %d\n", tid);
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;

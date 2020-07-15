@@ -14,7 +14,6 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
-// #ifdef USE_REMOTE
 void decode_cont_func(void* _context, void* _tag)
 {
     auto* computeDecoding = static_cast<DoDecode*>(_context);
@@ -43,7 +42,6 @@ void decode_cont_func(void* _context, void* _tag)
 
     computeDecoding->num_responses_received++;
 }
-// #endif
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
@@ -146,7 +144,6 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
-// #ifdef USE_REMOTE
 void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
 {
     rpc = rpc_;
@@ -164,11 +161,9 @@ void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
     num_requests_issued = 0;
     num_responses_received = 0;
 }
-// #endif
 
 Event_data DoDecode::launch(size_t tag)
 {
-    printf("Decode %d\n", tid);
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
@@ -186,7 +181,6 @@ Event_data DoDecode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    // #ifdef USE_REMOTE
     if (kUseRemote) {
         size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
         size_t llr_buffer_offset = input_offset * cfg->mod_type;
@@ -222,7 +216,6 @@ Event_data DoDecode::launch(size_t tag)
             decode_cont_func, decode_tag);
         num_requests_issued++;
     } else {
-        // #else
         struct bblib_ldpc_decoder_5gnr_request ldpc_request {
         };
         struct bblib_ldpc_decoder_5gnr_response ldpc_response {
@@ -291,7 +284,6 @@ Event_data DoDecode::launch(size_t tag)
             phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
         }
     }
-    // #endif
 
     double duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
