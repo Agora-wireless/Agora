@@ -88,6 +88,8 @@ COPY data/   Millipede/data/
 COPY test/   Millipede/test/
 COPY run_millipede.sh Millipede/
 
+# Copy the FlexRAN files
+COPY FlexRAN-FEC-SDK-19-04/ /opt/
 
 # Set up the intel MKL compiler variables (shell environment vars) so that Millipede can run.
 # This is only really needed when logging into the container via a remote bash shell and manually running commands.
