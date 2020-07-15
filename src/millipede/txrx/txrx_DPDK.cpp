@@ -196,6 +196,9 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
         // rte_memcpy((char*)pkt, payload, c->packet_length);
         rte_pktmbuf_free(rx_bufs[i]);
 
+        printf("Receive packet frame %d symbol %d ant %d\n", pkt->frame_id,
+            pkt->symbol_id, pkt->ant_id);
+
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;
             if (frame_id > prev_frame_id) {
