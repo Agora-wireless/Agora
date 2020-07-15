@@ -330,8 +330,11 @@ void* Sender::worker_thread(int tid)
         ip_h->hdr_checksum = 0;
 
         auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
-        udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
-        udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+        // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
+        // udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+        udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
+        udp_h->dst_port
+            = rte_cpu_to_be_16(cfg->bs_port + rand() % cfg->socket_thread_num);
         udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
             - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
 
