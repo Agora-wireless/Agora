@@ -54,7 +54,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
-        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
+        // uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
+        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
             server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
