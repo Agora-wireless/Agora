@@ -19,6 +19,8 @@ public:
             Event_data resp_event;
             resp_event.num_tags = req_event.num_tags;
 
+            printf("Receive event %d tags %d\n", req_event.event_type,
+                req_event.num_tags);
             for (size_t i = 0; i < req_event.num_tags; i++) {
                 Event_data resp_i = launch(req_event.tags[i]);
                 rt_assert(resp_i.num_tags == 1, "Invalid num_tags in resp");

@@ -132,6 +132,7 @@ DoFFT::~DoFFT()
 
 Event_data DoFFT::launch(size_t tag)
 {
+    printf("FFT %d\n", tid);
     size_t socket_thread_id = fft_req_tag_t(tag).tid;
     size_t buf_offset = fft_req_tag_t(tag).offset;
     size_t start_tsc = worker_rdtsc();
