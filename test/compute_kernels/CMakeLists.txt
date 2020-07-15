@@ -46,7 +46,7 @@ include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common)
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
-add_definitions(-DPROJECT_DIRECTORY=..)
+add_definitions(-DPROJECT_DIRECTORY="..")
 set(COMMON_SOURCES 
   ${SOURCE_DIR}/src/common/utils.cpp
   ${SOURCE_DIR}/src/common/modulation.cpp)

@@ -1265,10 +1265,10 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 {
     auto& cfg = config_;
-    printf("Saving TX data to data/tx_data.bin\n");
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_data.bin";
+    printf("Saving TX data to %s\n", filename.c_str());
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
