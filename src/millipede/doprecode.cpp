@@ -39,6 +39,7 @@ DoPrecode::~DoPrecode()
 
 Event_data DoPrecode::launch(size_t tag)
 {
+    printf("Precode %d\n", tid);
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t base_sc_id = gen_tag_t(tag).sc_id;
     size_t data_symbol_idx_dl = gen_tag_t(tag).symbol_id;

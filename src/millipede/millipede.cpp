@@ -272,6 +272,8 @@ void Millipede::start()
                     }
                 }
 
+                printf("Receive packet frame %d symbol %d\n", pkt->frame_id,
+                    pkt->symbol_id);
                 fft_queue_arr[pkt->frame_id % TASK_BUFFER_FRAME_NUM].push(
                     fft_req_tag_t(event.tags[0]));
             } break;
@@ -592,6 +594,7 @@ void Millipede::handle_event_fft(size_t tag)
     SymbolType sym_type = config_->get_symbol_type(frame_id, symbol_id);
 
     if (sym_type == SymbolType::kPilot) {
+        printf("Schedule ZF %d %d\n", frame_id, symbol_id);
         if (fft_stats_.last_task(frame_id, symbol_id)) {
             print_per_symbol_done(PrintType::kFFTPilots, frame_id, symbol_id);
             if (!config_->downlink_mode
@@ -609,6 +612,7 @@ void Millipede::handle_event_fft(size_t tag)
             }
         }
     } else if (sym_type == SymbolType::kUL) {
+        printf("Schedule Demul %d %d\n", frame_id, symbol_id);
         if (fft_stats_.last_task(frame_id, symbol_id)) {
             size_t symbol_idx_ul
                 = config_->get_ul_symbol_idx(frame_id, symbol_id);

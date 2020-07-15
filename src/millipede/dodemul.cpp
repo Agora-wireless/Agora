@@ -56,6 +56,7 @@ DoDemul::~DoDemul()
 
 Event_data DoDemul::launch(size_t tag)
 {
+    printf("Demul %d\n", tid);
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
@@ -280,7 +281,8 @@ Event_data DoDemul::launch(size_t tag)
                 && symbol_idx_ul >= cfg->UL_PILOT_SYMS) {
                 phy_stats->update_uncoded_bits(
                     i, total_data_symbol_idx_ul, max_sc_ite * cfg->mod_type);
-                phy_stats->increment_decoded_blocks(i, total_data_symbol_idx_ul);
+                phy_stats->increment_decoded_blocks(
+                    i, total_data_symbol_idx_ul);
                 size_t block_error(0);
                 for (size_t sc = 0; sc < max_sc_ite; sc++) {
                     uint8_t mod_symbol
@@ -292,7 +294,8 @@ Event_data DoDemul::launch(size_t tag)
                     if (mod_symbol != demod_symbol)
                         block_error++;
                 }
-                phy_stats->update_block_errors(i, total_data_symbol_idx_ul, block_error);
+                phy_stats->update_block_errors(
+                    i, total_data_symbol_idx_ul, block_error);
             }
         }
     }

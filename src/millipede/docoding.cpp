@@ -168,6 +168,7 @@ void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
 
 Event_data DoDecode::launch(size_t tag)
 {
+    printf("Decode %d\n", tid);
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
