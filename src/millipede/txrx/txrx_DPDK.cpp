@@ -54,7 +54,6 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
-        // uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
         uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
@@ -196,9 +195,6 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
         DpdkTransport::fastMemcpy((char*)pkt, payload, cfg->packet_length);
         // rte_memcpy((char*)pkt, payload, c->packet_length);
         rte_pktmbuf_free(rx_bufs[i]);
-
-        printf("Receive packet frame %d symbol %d ant %d\n", pkt->frame_id,
-            pkt->symbol_id, pkt->ant_id);
 
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;

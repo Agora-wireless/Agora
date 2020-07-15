@@ -6,13 +6,11 @@
 #include "millipede.hpp"
 using namespace std;
 
-// #ifdef USE_REMOTE
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
     erpc::SmErrType sm_err_type, void* _context)
 {
     printf("Connected session: %d\n", session_num);
 }
-// #endif
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -61,12 +59,10 @@ Millipede::Millipede(Config* cfg)
             tx_ptoks_ptr + cfg->socket_thread_num));
     }
 
-    // #ifdef USE_REMOTE
     if (kUseRemote) {
         auto uri = config_->server_addr + ":" + std::to_string(kRpcPort);
         nexus = new erpc::Nexus(uri, 0, 0);
     }
-    // #endif
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -272,8 +268,6 @@ void Millipede::start()
                     }
                 }
 
-                printf("Receive packet frame %d symbol %d\n", pkt->frame_id,
-                    pkt->symbol_id);
                 fft_queue_arr[pkt->frame_id % TASK_BUFFER_FRAME_NUM].push(
                     fft_req_tag_t(event.tags[0]));
             } break;
@@ -594,7 +588,6 @@ void Millipede::handle_event_fft(size_t tag)
     SymbolType sym_type = config_->get_symbol_type(frame_id, symbol_id);
 
     if (sym_type == SymbolType::kPilot) {
-        printf("Schedule ZF %d %d\n", frame_id, symbol_id);
         if (fft_stats_.last_task(frame_id, symbol_id)) {
             print_per_symbol_done(PrintType::kFFTPilots, frame_id, symbol_id);
             if (!config_->downlink_mode
@@ -612,7 +605,6 @@ void Millipede::handle_event_fft(size_t tag)
             }
         }
     } else if (sym_type == SymbolType::kUL) {
-        printf("Schedule Demul %d %d\n", frame_id, symbol_id);
         if (fft_stats_.last_task(frame_id, symbol_id)) {
             size_t symbol_idx_ul
                 = config_->get_ul_symbol_idx(frame_id, symbol_id);
@@ -689,7 +681,6 @@ void* Millipede::worker(int tid)
         computers_vec.push_back(computeDecoding);
     }
 
-    // #ifdef USE_REMOTE
     erpc::Rpc<erpc::CTransport>* rpc;
     if (kUseRemote) {
         rpc = new erpc::Rpc<erpc::CTransport>(
@@ -704,15 +695,12 @@ void* Millipede::worker(int tid)
         }
         static_cast<DoDecode*>(computeDecoding)->initialize_erpc(rpc, session);
     }
-    // #endif
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
-            // #ifdef USE_REMOTE
             if (kUseRemote) {
                 rpc->run_event_loop_once();
             }
-            // #endif
             if (computers_vec[i]->try_launch())
                 break;
         }
