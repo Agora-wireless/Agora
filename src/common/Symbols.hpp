@@ -239,6 +239,12 @@ static constexpr bool kUseLDPC = true;
 static constexpr bool kUseLDPC = false;
 #endif
 
+#ifdef USE_AVX2_ENCODER
+static constexpr bool kUseAVX2Encoder = true;
+#else
+static constexpr bool kUseAVX2Encoder = false;
+#endif
+
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 #endif

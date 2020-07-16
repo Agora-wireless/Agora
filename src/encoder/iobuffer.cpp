@@ -4,6 +4,7 @@
  */
 
 #include "iobuffer.hpp"
+#include "common_typedef_sdk.h"
 #include "encoder.hpp"
 
 namespace avx2enc {
@@ -76,7 +77,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             uint8_t byteOffset = (src_offbits + zcSize) >> 3;
             src_offbits = (src_offbits + zcSize) - (byteOffset << 3);
             p_buff_0 = p_buff_0 + byteOffset;
-            p_buff_1 = p_buff_1 + PROC_BYTES;
+            p_buff_1 = p_buff_1 + kProcBytes;
         }
     } else {
         /* storing encoded bits into output buffer
@@ -87,7 +88,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             uint8_t byteOffset = (dst_offbits + zcSize) >> 3;
             dst_offbits = (dst_offbits + zcSize) - (byteOffset << 3);
             p_buff_0 = p_buff_0 + byteOffset;
-            p_buff_1 = p_buff_1 + PROC_BYTES;
+            p_buff_1 = p_buff_1 + kProcBytes;
         }
     }
 }
@@ -147,7 +148,7 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             // print256_epi8(x0);
             // printf("after: ");
             // print256_epi8(x1);
-            p_buff_1 = p_buff_1 + PROC_BYTES;
+            p_buff_1 = p_buff_1 + kProcBytes;
         }
     }
     // gather
@@ -160,7 +161,7 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             // print256_epi8(x0);
             // printf("after: ");
             // print256_epi8(x1);
-            p_buff_1 = p_buff_1 + PROC_BYTES;
+            p_buff_1 = p_buff_1 + kProcBytes;
             p_buff_0 = p_buff_0 + byte_num;
         }
     }
@@ -185,12 +186,12 @@ void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             // read the first 256 bits
             x0 = _mm256_loadu_si256((__m256i*)p_buff_in);
             _mm256_storeu_si256((__m256i*)p_buff_out, x0);
-            p_buff_out = p_buff_out + PROC_BYTES;
-            p_buff_in = p_buff_in + PROC_BYTES;
+            p_buff_out = p_buff_out + kProcBytes;
+            p_buff_in = p_buff_in + kProcBytes;
             // read the remaining bits
             x0 = _mm256_loadu_si256((__m256i*)p_buff_in);
             _mm256_maskstore_epi32((int*)p_buff_out, bit_mask, x0);
-            p_buff_out = p_buff_out + PROC_BYTES;
+            p_buff_out = p_buff_out + kProcBytes;
             p_buff_in = p_buff_in + xtra_byte_num;
         }
     }
