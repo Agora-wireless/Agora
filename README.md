@@ -3,7 +3,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+.
  * Required packages
-   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
+   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev ibverbs-providers`
    * Install Intel MKL (see [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html))
    * Install Armadillo: `./scripts/install_armadillo.sh`
    * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`
