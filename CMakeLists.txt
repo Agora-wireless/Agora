@@ -255,16 +255,22 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # Create a shared library for Python
-add_library(comp MODULE $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+add_library(comp MODULE
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(comp ${COMMON_LIBS})
 
 # TODO: The main millipede executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
 # against sources reduces performance.
-add_executable(millipede src/millipede/main.cpp $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(millipede
+  src/millipede/main.cpp
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(millipede ${COMMON_LIBS})
 
 add_executable(data_generator
@@ -273,37 +279,68 @@ add_executable(data_generator
 target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
-add_executable(user src/client/user-main.cpp $<TARGET_OBJECTS:client_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(user
+  src/client/user-main.cpp
+  $<TARGET_OBJECTS:client_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
 
-add_library(ue_phy MODULE $<TARGET_OBJECTS:client_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+add_library(ue_phy MODULE
+  $<TARGET_OBJECTS:client_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(ue_phy ${COMMON_LIBS})
 
-add_executable(macuser src/mac/simple_mac_client.cpp src/mac/mac_client_main.cpp $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(macuser
+  src/mac/simple_mac_client.cpp
+  src/mac/mac_client_main.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(macuser ${COMMON_LIBS})
 
-add_executable(macbs src/mac/simple_mac_bs.cpp src/mac/mac_bs_main.cpp $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(macbs
+  src/mac/simple_mac_bs.cpp
+  src/mac/mac_bs_main.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(macbs ${COMMON_LIBS})
 
 if(${USE_DPDK_SENDER})
-  add_executable(sender simulator/sender_cli.cpp simulator/sender_dpdk.cpp src/common/dpdk_transport.cpp $<TARGET_OBJECTS:common_sources_lib>)
+  add_executable(sender
+    simulator/sender_cli.cpp
+    simulator/sender_dpdk.cpp
+    src/common/dpdk_transport.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
 else()
-  add_executable(sender simulator/sender_cli.cpp simulator/sender.cpp $<TARGET_OBJECTS:common_sources_lib>)
+  add_executable(sender
+    simulator/sender_cli.cpp
+    simulator/sender.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
 endif()
 target_link_libraries(sender ${COMMON_LIBS})
 
-add_executable(sim simulator/main.cpp simulator/simulator.cpp simulator/sender.cpp simulator/receiver.cpp $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(sim
+  simulator/main.cpp
+  simulator/simulator.cpp
+  simulator/sender.cpp
+  simulator/receiver.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
 # End-to-end test
-add_executable(test_millipede test/test_millipede/main.cpp $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(test_millipede
+  test/test_millipede/main.cpp
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_millipede ${COMMON_LIBS})
 
 # The tests to run using ctest
-add_executable(test_zf test/unit_tests/test_zf.cc $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(test_zf
+  test/unit_tests/test_zf.cc
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_zf ${COMMON_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
-add_executable(test_ldpc test/compute_kernels/ldpc/test_ldpc.cpp $<TARGET_OBJECTS:common_sources_lib>)
+add_executable(test_ldpc
+  test/compute_kernels/ldpc/test_ldpc.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
