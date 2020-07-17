@@ -234,8 +234,7 @@ set(CLIENT_SOURCES
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
   src/client/txrx_client.cpp
-  src/client/txrx_mac.cpp
-)
+  src/client/txrx_mac.cpp)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 # LDPC encoding
