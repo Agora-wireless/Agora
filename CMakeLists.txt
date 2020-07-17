@@ -90,10 +90,6 @@ else()
   message(STATUS "Using FlexRAN's (i.e., not Millipede's) AVX2 encoder")
 endif()
 
-set(TXRX_SOURCES
-  src/millipede/txrx/txrx.cpp
-  src/millipede/txrx/txrx_argos.cpp)
-
 # DPDK
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled for Millipede")
@@ -108,10 +104,6 @@ if(${USE_DPDK})
     set(MLX_LIBRARIES -libverbs -lmlx5)
   endif()
   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
-
-  set(TXRX_SOURCES 
-    src/millipede/txrx/txrx_DPDK.cpp
-    src/common/dpdk_transport.cpp)
 
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
@@ -128,35 +120,19 @@ if(${USE_DPDK})
   if (${USE_DPDK_SENDER})
     message(STATUS "DPDK is enabled for sender")
     add_definitions(-DUSE_DPDK_SENDER)
-    set(SENDER_TXRX_SOURCES 
-      simulator/sender_dpdk.cpp
-      src/common/dpdk_transport.cpp)
   endif()
 else()
   set(USE_DPDK_SENDER False)
   message(STATUS "DPDK is disabled")
 endif()
 
-if (NOT ${USE_DPDK_SENDER})
-  message(STATUS "DPDK is disabled for sender")
-  set(USE_DPDK_SENDER False)
-  set(SENDER_TXRX_SOURCES simulator/sender.cpp)
-endif()
+message(STATUS "Use DPDK for millipede: ${USE_DPDK}")
+message(STATUS "Use DPDK for sender: ${USE_DPDK_SENDER}")
 
-message(STATUS "USE_DPDK: ${USE_DPDK}")
-message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
-
+# MAC
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
 endif()
-
-set(MAC_CLIENT_SOURCES
-  src/mac/simple_mac_client.cpp
-  src/mac/mac_client_main.cpp)
-set(MAC_BS_SOURCES
-  src/mac/simple_mac_bs.cpp
-  src/mac/mac_bs_main.cpp)
-set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
 if(${USE_ARGOS})
@@ -174,14 +150,6 @@ message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-set(ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
-set(CLIENT_SOURCES
-  src/common/modulation.cpp
-  src/client/client_radio.cpp
-  src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/client/txrx_mac.cpp
-)
 set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
 
@@ -235,6 +203,7 @@ set(COMMON_SOURCES
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)
+add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(MILLIPEDE_SOURCES 
   src/millipede/millipede.cpp
@@ -245,7 +214,29 @@ set(MILLIPEDE_SOURCES
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
   src/millipede/docoding.cpp
-  src/millipede/reciprocity.cpp)
+  src/millipede/reciprocity.cpp
+  src/millipede/radio_lib.cpp
+  src/millipede/radio_calibrate.cpp
+  src/millipede/txrx/txrx_mac.cpp)
+
+if(${USE_DPDK})
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
+    src/millipede/txrx/txrx_DPDK.cpp
+    src/common/dpdk_transport.cpp)
+else()
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
+    src/millipede/txrx/txrx.cpp
+    src/millipede/txrx/txrx_argos.cpp)
+endif()
+add_library(millipede_sources_lib OBJECT ${MILLIPEDE_SOURCES})
+
+set(CLIENT_SOURCES
+  src/client/client_radio.cpp
+  src/client/phy-ue.cpp
+  src/client/txrx_client.cpp
+  src/client/txrx_mac.cpp
+)
+add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 # LDPC encoding
 if(${USE_LDPC})
@@ -264,81 +255,55 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-# Executables
-set(SOURCES
-  ${MILLIPEDE_SOURCES}
-  ${TXRX_SOURCES}
-  ${TXRX_MAC_SOURCES}
-  ${COMMON_SOURCES}
-  ${ARGOS_SOURCES})
-			
-add_executable(millipede src/millipede/main.cpp ${SOURCES})
-target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
+set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
-add_library(comp MODULE ${SOURCES})
-target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
+# Create a shared library for Python
+add_library(comp MODULE $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(comp ${COMMON_LIBS})
 
-add_executable(data_generator 
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
-  ${COMMON_SOURCES})
-target_link_libraries(data_generator -larmadillo ${FLEXRAN_LDPC_LIBS} ${MKL_LIBS})
+# TODO: The main millipede executable is performance-critical, so we need to
+# test if compiling against precompiled objects instead of compiling directly
+# against sources reduces performance.
+add_executable(millipede src/millipede/main.cpp $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(millipede ${COMMON_LIBS})
+
+add_executable(data_generator
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
-add_executable(user 
-     src/client/user-main.cpp
-     ${CLIENT_SOURCES}
-     ${COMMON_SOURCES})
-target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
+add_executable(user src/client/user-main.cpp $<TARGET_OBJECTS:client_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(user ${COMMON_LIBS})
 
-add_library(ue_phy MODULE 
-     ${CLIENT_SOURCES}
-     ${COMMON_SOURCES}
-     ${ARGOS_SOURCES})
-target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
+add_library(ue_phy MODULE $<TARGET_OBJECTS:client_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(ue_phy ${COMMON_LIBS})
 
-add_executable(macuser
-     ${MAC_CLIENT_SOURCES}
-     ${COMMON_SOURCES})
-target_link_libraries(macuser -larmadillo ${MKL_LIBS} ${FLEXRAN_LDPC_LIBS})
+add_executable(macuser src/mac/simple_mac_client.cpp src/mac/mac_client_main.cpp $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(macuser ${COMMON_LIBS})
 
-add_executable(macbs
-     ${MAC_BS_SOURCES}
-     ${COMMON_SOURCES})
-target_link_libraries(macbs -larmadillo ${MKL_LIBS} ${FLEXRAN_LDPC_LIBS})
+add_executable(macbs src/mac/simple_mac_bs.cpp src/mac/mac_bs_main.cpp $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(macbs ${COMMON_LIBS})
 
-set(SENDER_SOURCES
-  simulator/sender_cli.cpp
-  ${COMMON_SOURCES}
-  ${SENDER_TXRX_SOURCES})
+if(${USE_DPDK_SENDER})
+  add_executable(sender simulator/sender_cli.cpp simulator/sender_dpdk.cpp src/common/dpdk_transport.cpp $<TARGET_OBJECTS:common_sources_lib>)
+else()
+  add_executable(sender simulator/sender_cli.cpp simulator/sender.cpp $<TARGET_OBJECTS:common_sources_lib>)
+endif()
+target_link_libraries(sender ${COMMON_LIBS})
 
-add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${FLEXRAN_LDPC_LIBS} gflags)
-
-set(SIMULATOR_SOURCES
-  simulator/main.cpp
-  simulator/simulator.cpp
-  simulator/sender.cpp
-  simulator/receiver.cpp 
-  ${COMMON_SOURCES})
-
-add_executable(sim ${SIMULATOR_SOURCES})
-target_link_libraries(sim ${MKL_LIBS} ${FLEXRAN_LDPC_LIBS})
+add_executable(sim simulator/main.cpp simulator/simulator.cpp simulator/sender.cpp simulator/receiver.cpp $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(sim ${COMMON_LIBS})
 
 # End-to-end test
-add_executable(test_millipede test/test_millipede/main.cpp ${SOURCES})
-target_link_libraries(test_millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
+add_executable(test_millipede test/test_millipede/main.cpp $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_millipede ${COMMON_LIBS})
 
 # The tests to run using ctest
-add_executable(test_zf test/unit_tests/test_zf.cc 
-  ${COMMON_SOURCES} 
-  src/millipede/stats.cpp 
-  src/millipede/dozf.cpp)
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${FLEXRAN_LDPC_LIBS})
+add_executable(test_zf test/unit_tests/test_zf.cc $<TARGET_OBJECTS:millipede_sources_lib> $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_zf ${COMMON_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
-add_executable(test_ldpc test/compute_kernels/ldpc/test_ldpc.cpp
-  ${COMMON_SOURCES})
-target_link_libraries(test_ldpc ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${FLEXRAN_LDPC_LIBS})
+add_executable(test_ldpc test/compute_kernels/ldpc/test_ldpc.cpp $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
