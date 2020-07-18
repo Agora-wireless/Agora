@@ -35,6 +35,10 @@ private:
     Table<int8_t>* dl_bits_buffer_;
     Table<int>* dl_bits_buffer_status_;
 
+    // Socket structures for communicating with remote applications
+    std::vector<int> app_sockets_;
+    std::vector<sockaddr_in> app_sockaddr_;
+
     // FIFO queues for receiving messages from the master thread
     moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
     moodycamel::ProducerToken* rx_ptok_;

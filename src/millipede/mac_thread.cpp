@@ -16,6 +16,24 @@ MacThread::MacThread(Config* cfg, size_t core_offset,
     , rx_ptok_(rx_ptok)
     , tx_ptok_(tx_ptok)
 {
+    // Set up sockets to push MAC data to applications
+    app_sockets_.resize(cfg_->UE_NUM);
+    app_sockaddr_.resize(cfg_->UE_NUM);
+
+    // Set up sockets to push MAC data to applications
+    int app_sockets_[cfg_->UE_NUM];
+    sockaddr_in app_sockaddr_[cfg_->UE_NUM];
+    for (size_t i = 0; i < cfg_->UE_NUM; i++) {
+        size_t local_port = 8090 + i;
+        size_t remote_port = 8080 + i;
+        std::string remote_addr = "127.0.0.1";
+        size_t sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+        app_sockets_[i] = setup_socket_ipv4(local_port, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(
+            &app_sockaddr_[i], remote_port, remote_addr.c_str());
+        printf("MAC thread: Sending data to app at %s:%zu from port %zu\n",
+            remote_addr.c_str(), remote_port, local_port);
+    }
 }
 
 MacThread::~MacThread() {}
@@ -28,21 +46,6 @@ void MacThread::run_event_loop()
     std::vector<uint8_t> mac_pkt_staging_buffer(
         Packet::kOffsetOfData + cfg_->OFDM_DATA_NUM);
     std::vector<uint8_t> frame_data(cfg_->mac_data_bytes_num_perframe);
-
-    // Set up sockets to push MAC data to applications
-    int app_sockets[cfg_->UE_NUM];
-    sockaddr_in app_sockaddr[cfg_->UE_NUM];
-    for (size_t i = 0; i < cfg_->UE_NUM; i++) {
-        size_t local_port = 8090 + i;
-        size_t remote_port = 8080 + i;
-        std::string remote_addr = "127.0.0.1";
-        size_t sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-        app_sockets[i] = setup_socket_ipv4(local_port, true, sock_buf_size);
-        setup_sockaddr_remote_ipv4(
-            &app_sockaddr[i], remote_port, remote_addr.c_str());
-        printf("MAC thread: Sending data to app at %s:%zu from port %zu\n",
-            remote_addr.c_str(), remote_port, local_port);
-    }
 
     const size_t cbLenBytes = (cfg_->LDPC_config.cbLen + 7) >> 3;
     const size_t ul_data_syms
@@ -117,10 +120,10 @@ void MacThread::run_event_loop()
         if (num_filled_bytes_in_frame == cfg_->data_bytes_num_perframe) {
             num_filled_bytes_in_frame = 0;
 
-            int ret = sendto(app_sockets[pkt->ue_id], &frame_data[0],
+            int ret = sendto(app_sockets_[pkt->ue_id], &frame_data[0],
                 cfg_->mac_data_bytes_num_perframe, 0,
-                (struct sockaddr*)&app_sockaddr[pkt->ue_id],
-                sizeof(app_sockaddr[pkt->ue_id]));
+                (struct sockaddr*)&app_sockaddr_[pkt->ue_id],
+                sizeof(sockaddr_in));
             if (ret == -1) {
                 fprintf(stderr, "MAC thread: sendto() failed with error %s\n",
                     strerror(errno));
