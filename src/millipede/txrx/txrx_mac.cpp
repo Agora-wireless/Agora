@@ -193,7 +193,13 @@ int MacPacketTXRX::dequeue_send(int tid)
     uint8_t* ul_data_ptr
         = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
-    new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
+    new (pkt) MacPacket(frame_id,
+                        symbol_id,
+                        0 /* cell_id */, 
+                        ue_id,
+                        0 /* valid tun */,
+                        0 /* CRC */,
+                        0 /* datalen */);
     pkt->frame_id = frame_id;
     pkt->symbol_id = symbol_id;
     pkt->ue_id = ue_id;
