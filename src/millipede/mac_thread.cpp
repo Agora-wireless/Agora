@@ -1,208 +1,142 @@
 #include "mac_thread.hpp"
+#include "utils_ldpc.hpp"
 
 MacThread::MacThread(Config* cfg, size_t core_offset,
+    Table<int8_t>* dl_bits_buffer, Table<int>* dl_bits_buffer_status,
+    Table<uint8_t>* ul_bits_buffer,
     moodycamel::ConcurrentQueue<Event_data>* rx_queue,
     moodycamel::ConcurrentQueue<Event_data>* tx_queue,
     moodycamel::ProducerToken* rx_ptok, moodycamel::ProducerToken* tx_ptok)
     : cfg_(cfg)
     , core_offset_(core_offset)
+    , dl_bits_buffer_(dl_bits_buffer)
+    , dl_bits_buffer_status_(dl_bits_buffer_status)
+    , ul_bits_buffer_(ul_bits_buffer)
     , rx_queue_(rx_queue)
     , rx_ptok_(rx_ptok)
     , tx_ptok_(tx_ptok)
 {
-    socket_.resize(cfg->UE_NUM);
-    servaddr_.resize(cfg->UE_NUM);
 }
 
 MacThread::~MacThread() {}
 
 void MacThread::run_event_loop()
 {
+    pin_to_core_with_offset(
+        ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
-    bool MacPacketTXRX::startTXRX(Table<int8_t> & dl_bits_buffer,
-        Table<int> & dl_bits_buffer_status, size_t packet_num_in_buffer,
-        Table<uint8_t> & ul_bits_buffer)
-    {
-        dl_bits_buffer_ = &dl_bits_buffer;
-        dl_bits_buffer_status_ = &dl_bits_buffer_status;
+    std::vector<uint8_t> mac_pkt_buffer(
+        Packet::kOffsetOfData + cfg_->OFDM_DATA_NUM);
+    std::vector<uint8_t> frame_data(cfg_->mac_data_bytes_num_perframe);
 
-        packet_num_in_buffer_ = packet_num_in_buffer;
-        ul_bits_buffer_ = &ul_bits_buffer;
-
-        printf("create %zu MAC TXRX threads\n", mac_thread_num);
-        for (size_t i = 0; i < mac_thread_num; i++) {
-            pthread_t txrx_thread;
-            auto context = new EventHandlerContext<MacPacketTXRX>;
-            context->obj_ptr = this;
-            context->id = i;
-            if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<MacPacketTXRX,
-                        &MacPacketTXRX::loopTXRX>,
-                    context)
-                != 0) {
-                perror("socket communication thread create failed");
-                exit(0);
-            }
-        }
-        return true;
+    // Set up sockets to push MAC data to applications
+    int app_sockets[cfg_->UE_NUM];
+    sockaddr_in app_sockaddr[cfg_->UE_NUM];
+    for (size_t i = 0; i < cfg_->UE_NUM; i++) {
+        size_t local_port = 8090 + i;
+        size_t remote_port = 8080 + i;
+        std::string remote_addr = "127.0.0.1";
+        size_t sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+        app_sockets[i] = setup_socket_ipv4(local_port, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(
+            &app_sockaddr[i], remote_port, remote_addr.c_str());
+        printf("MAC thread: Sending data to app at %s:%zu from port %zu\n",
+            remote_addr.c_str(), remote_port, local_port);
     }
 
-    void* MacPacketTXRX::loopTXRX(int tid)
-    {
-        pin_to_core_with_offset(ThreadType::kWorkerMacTXRX, core_offset, tid);
-        // int rx_offset = 0;
-        int radio_lo = tid * cfg->UE_NUM / mac_thread_num;
-        int radio_hi = (tid + 1) * cfg->UE_NUM / mac_thread_num;
-        printf(
-            "MAC receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    const size_t cbLenBytes = (cfg_->LDPC_config.cbLen + 7) >> 3;
+    const size_t ul_data_syms
+        = cfg_->ul_data_symbol_num_perframe - cfg_->UL_PILOT_SYMS;
+    std::stringstream ss;
+    std::stringstream ss1[ul_data_syms];
 
-        int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-        for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-            int local_port_id = cfg->mac_tx_port + radio_id;
-#if USE_IPV4
-            socket_[radio_id]
-                = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-            setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-                cfg->mac_rx_port + radio_id, cfg->tx_addr_to_mac.c_str());
-            printf("MAC TXRX thread %d: set up UDP socket server listening to "
-                   "port %d"
-                   " with remote address %s:%d  \n",
-                tid, local_port_id, cfg->tx_addr_to_mac.c_str(),
-                cfg->mac_rx_port + tid);
-#else
-            socket_[radio_id]
-                = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-            setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
-                cfg->mac_rx_port + radio_id, cfg->tx_addr_to_mac.c_str());
-#endif
-            fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
-        }
-
-        // int prev_frame_id = -1;
-        int radio_id = radio_lo;
-        while (cfg->running) {
-            if (-1 != dequeue_send(tid))
-                continue;
-            // receive data
-            //struct MacPacket* pkt = recv_enqueue(tid, radio_id);
-            //if (pkt == NULL)
-            //    continue;
-            // rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
-
-            if (++radio_id == radio_hi)
-                radio_id = radio_lo;
-        }
-        return 0;
-    }
-
-    struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
-    {
-        moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-        char* rx_buffer = rx_buffer_[tid];
-        // int* dl_bits_buffer_status = *dl_bits_buffer_status_;
-        int packet_length = kUseLDPC ? (bits_to_bytes(cfg->LDPC_config.cbLen)
-                                           * cfg->LDPC_config.nblocksInSymbol)
-                                     : bits_to_bytes(cfg->OFDM_DATA_NUM);
-        packet_length += MacPacket::kOffsetOfData;
-
-        struct MacPacket* pkt = (struct MacPacket*)rx_buffer;
-        // int ret = recv(socket_[radio_id], (char*)pkt, packet_length, 0);
-        socklen_t addrlen = sizeof(servaddr_[radio_id]);
-        int ret = recvfrom(socket_[radio_id], (char*)pkt, packet_length, 0,
-            (struct sockaddr*)&servaddr_[radio_id], &addrlen);
-        if (ret == -1) {
-            if (errno != EAGAIN && cfg->running) {
-                perror("recv failed");
-                exit(0);
-            }
-            return (NULL);
-        }
-        // printf("received data %d\n", ret);
-        // printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
-        // printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
-
-        size_t total_symbol_idx
-            = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
-        int rx_offset = total_symbol_idx
-            * (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
-        if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
-            printf("MAC Receive thread %d dl_bits_buffer full, offset: %d\n",
-                tid, rx_offset);
-            cfg->running = false;
-            return (NULL);
-        } else {
-            for (size_t i = 0;
-                 i < (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1); i++)
-                (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
-            memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
-                                      [pkt->ue_id * cfg->OFDM_DATA_NUM],
-                pkt->data, packet_length);
-        }
-
-        // Push kPacketRX event into the queue.
-        Event_data rx_message(EventType::kPacketFromMac,
-            gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)
-                ._tag);
-        if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
-        return pkt;
-    }
-
-    int MacPacketTXRX::dequeue_send(int tid)
-    {
+    size_t num_filled_bytes_in_frame = 0;
+    while (cfg_->running) {
         Event_data event;
-        if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
-            return -1;
-        // printf("mac queue length: %zu\n", task_queue_->size_approx());
+        if (!rx_queue_->try_dequeue_from_producer(*rx_ptok_, event))
+            continue;
         assert(event.event_type == EventType::kPacketToMac);
 
-        size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-        size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-        size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+        const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+        const size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+        const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+        const size_t data_offset = kUseLDPC
+            ? (cbLenBytes * cfg_->LDPC_config.nblocksInSymbol * ue_id)
+            : (cfg_->OFDM_DATA_NUM * ue_id);
+        const size_t total_symbol_idx
+            = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_id);
 
-        int packet_length = cfg->data_bytes_num_persymbol;
-
-        size_t cbLenBytes = (cfg->LDPC_config.cbLen + 7) >> 3;
-        size_t data_offset
-            = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id;
-        if (!kUseLDPC)
-            data_offset = cfg->OFDM_DATA_NUM * ue_id;
-
-        size_t total_symbol_idx
-            = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        uint8_t* ul_data_ptr
+        // Copy over the packet
+        const uint8_t* ul_data_ptr
             = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
-        auto* pkt = (MacPacket*)tx_buffer_[tid];
-        new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
+        auto* pkt = reinterpret_cast<MacPacket*>(&mac_pkt_buffer[0]);
         pkt->frame_id = frame_id;
         pkt->symbol_id = symbol_id;
+        pkt->cell_id = 0;
         pkt->ue_id = ue_id;
-        if (!kUseLDPC)
+        if (!kUseLDPC) {
             adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
-                cfg->OFDM_DATA_NUM, cfg->mod_type);
-        else
-            memcpy(pkt->data, ul_data_ptr, packet_length);
-
-        int mac_packet_length = packet_length + MacPacket::kOffsetOfData;
-
-        // Send data (one OFDM symbol)
-        size_t ret = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt,
-            mac_packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-            sizeof(servaddr_[tid]));
-        rt_assert(ret > 0, "sendto() failed");
-
-        if (kDebugPrintInTask) {
-            printf("In MAC TX thread %d: Transmitted frame %zu, symbol %zu, "
-                   "ue %zu, tag %s, msg_queue_length: %zu\n",
-                tid, frame_id, symbol_id, ue_id,
-                gen_tag_t(event.tags[0]).to_string().c_str(),
-                message_queue_->size_approx());
+                cfg_->OFDM_DATA_NUM, cfg_->mod_type);
+        } else {
+            memcpy(pkt->data, ul_data_ptr, cfg_->data_bytes_num_persymbol);
         }
 
-        rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+        // Print information about the received packet
+        if (kDebugBSReceiver) {
+            if (pkt->symbol_id == cfg_->UL_PILOT_SYMS) {
+                ss << "MAC thread received frame " << pkt->frame_id
+                   << " symbol " << pkt->symbol_id << ", ue " << pkt->ue_id
+                   << ", size " << cfg_->data_bytes_num_perframe << std::endl;
+            }
+            if (pkt->symbol_id >= cfg_->UL_PILOT_SYMS) {
+                for (size_t i = 0; i < cfg_->data_bytes_num_persymbol; i++) {
+                    ss1[pkt->symbol_id - cfg_->UL_PILOT_SYMS]
+                        << std::to_string(pkt->data[i]) << " ";
+                }
+                if (pkt->symbol_id == cfg_->ul_data_symbol_num_perframe - 1) {
+                    for (size_t j = 0; j < ul_data_syms; j++) {
+                        ss << ss1[j].str();
+                        ss1[j].str(std::string());
+                    }
+                    ss << std::endl;
+                    std::cout << ss.str();
+                    ss.str(std::string());
+                }
+            }
+        }
+
+        // Copy packet to the frame data buffer. It might take multiple symbols
+        // to fill up the frame. If the frame is full, send the frame to the
+        // application.
+        assert(pkt->symbol_id == 2 || pkt->symbol_id == 3); // TODO: Why?
+        memcpy(&frame_data[0]
+                + (pkt->symbol_id == 2 ? 0 : cfg_->data_bytes_num_persymbol),
+            (char*)pkt->data, cfg_->data_bytes_num_persymbol);
+        num_filled_bytes_in_frame += cfg_->data_bytes_num_persymbol;
+
+        if (num_filled_bytes_in_frame == cfg_->data_bytes_num_perframe) {
+            num_filled_bytes_in_frame = 0;
+
+            int ret = sendto(app_sockets[pkt->ue_id], &frame_data[0],
+                cfg_->mac_data_bytes_num_perframe, 0,
+                (struct sockaddr*)&app_sockaddr[pkt->ue_id],
+                sizeof(app_sockaddr[pkt->ue_id]));
+            if (ret == -1) {
+                fprintf(stderr, "MAC thread: sendto() failed with error %s\n",
+                    strerror(errno));
+                exit(-1);
+            }
+
+            printf("Sent data for frame %u, ue %u, size %zu\n", pkt->frame_id,
+                pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
+            for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+                printf("%u ", frame_data[i]);
+            }
+            printf("\n");
+        }
+
+        rt_assert(tx_queue_->enqueue(*tx_ptok_,
                       Event_data(EventType::kPacketToMac, event.tags[0])),
             "Socket message enqueue failed\n");
-        return event.tags[0];
     }
+}

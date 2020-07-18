@@ -13,7 +13,8 @@
  */
 class MacThread {
 public:
-    MacThread(Config* cfg, size_t core_offset,
+    MacThread(Config* cfg, size_t core_offset, Table<int8_t>* dl_bits_buffer,
+        Table<int>* dl_bits_buffer_status, Table<uint8_t>* ul_bits_buffer,
         moodycamel::ConcurrentQueue<Event_data>* rx_queue,
         moodycamel::ConcurrentQueue<Event_data>* tx_queue,
         moodycamel::ProducerToken* rx_ptok, moodycamel::ProducerToken* tx_ptok);
@@ -28,16 +29,11 @@ private:
 
     Table<int8_t>* dl_bits_buffer_;
     Table<int>* dl_bits_buffer_status_;
-    size_t packet_num_in_buffer_;
     Table<uint8_t>* ul_bits_buffer_;
-    Table<char> rx_buffer_;
-    Table<char> tx_buffer_;
 
     moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
     moodycamel::ProducerToken* rx_ptok_;
-    moodycamel::ProducerToken* tx_ptok_;
 
-    std::vector<struct sockaddr_in> servaddr_;
-    std::vector<int> socket_;
+    moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
+    moodycamel::ProducerToken* tx_ptok_;
 };
