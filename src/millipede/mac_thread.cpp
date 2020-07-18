@@ -9,9 +9,9 @@ MacThread::MacThread(Config* cfg, size_t core_offset,
     moodycamel::ProducerToken* rx_ptok, moodycamel::ProducerToken* tx_ptok)
     : cfg_(cfg)
     , core_offset_(core_offset)
+    , ul_bits_buffer_(ul_bits_buffer)
     , dl_bits_buffer_(dl_bits_buffer)
     , dl_bits_buffer_status_(dl_bits_buffer_status)
-    , ul_bits_buffer_(ul_bits_buffer)
     , rx_queue_(rx_queue)
     , rx_ptok_(rx_ptok)
     , tx_ptok_(tx_ptok)
@@ -25,7 +25,7 @@ void MacThread::run_event_loop()
     pin_to_core_with_offset(
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
-    std::vector<uint8_t> mac_pkt_buffer(
+    std::vector<uint8_t> mac_pkt_staging_buffer(
         Packet::kOffsetOfData + cfg_->OFDM_DATA_NUM);
     std::vector<uint8_t> frame_data(cfg_->mac_data_bytes_num_perframe);
 
@@ -69,7 +69,7 @@ void MacThread::run_event_loop()
         // Copy over the packet
         const uint8_t* ul_data_ptr
             = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
-        auto* pkt = reinterpret_cast<MacPacket*>(&mac_pkt_buffer[0]);
+        auto* pkt = reinterpret_cast<MacPacket*>(&mac_pkt_staging_buffer[0]);
         pkt->frame_id = frame_id;
         pkt->symbol_id = symbol_id;
         pkt->cell_id = 0;
@@ -106,7 +106,7 @@ void MacThread::run_event_loop()
         }
 
         // Copy packet to the frame data buffer. It might take multiple symbols
-        // to fill up the frame. If the frame is full, send the frame to the
+        // to fill up the frame. When the frame is full, send it to the
         // application.
         assert(pkt->symbol_id == 2 || pkt->symbol_id == 3); // TODO: Why?
         memcpy(&frame_data[0]
