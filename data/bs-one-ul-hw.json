@@ -24,10 +24,11 @@
  "calTxGainA" : 30,
  "calTxGainB" : 30,
  "frames" : [
-     "BGGGGGPGGGUUUG"
+     "BGGGGGPGGGUUUUG"
  ],
  "downlink_mode": false,
  "client_ul_pilot_syms" : 2,
- "worker_thread_num" : 25,
- "demul_block_size" : 48
+ "worker_thread_num" : 16,
+ "demul_block_size" : 48,
+ "frames_to_test": 50000
 }
