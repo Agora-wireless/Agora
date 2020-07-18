@@ -54,6 +54,23 @@ void* SimpleBSMac::loopRecv(int tid)
            " with remote address %s:%d  \n",
         cfg->mac_rx_port + tid, cfg->tx_addr_to_mac.c_str(),
         cfg->mac_tx_port + tid);
+
+    // Set up sockets to push MAC data to applications
+    int data_sockets[cfg->UE_NUM];
+    sockaddr_in data_addr[cfg->UE_NUM];
+
+    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        int port_id = 8090 + i;
+        int remote_port_id = 8080 + i;
+        std::string remote_addr = "127.0.0.1";
+        data_sockets[i] = setup_socket_ipv4(port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(
+            &data_addr[i], remote_port_id, remote_addr.c_str());
+        printf("Setup (data) UDP socket listening to port %d with remote "
+               "address %s:%d\n",
+            port_id, remote_addr.c_str(), remote_port_id);
+    }
+
 #else
     int socket_local
         = setup_socket_ipv6(cfg->ue_rx_port + tid, true, sock_buf_size);
@@ -66,6 +83,8 @@ void* SimpleBSMac::loopRecv(int tid)
     int packet_length = cfg->data_bytes_num_persymbol;
     packet_length += MacPacket::kOffsetOfData;
     char* rx_buffer = (char*)malloc(packet_length);
+    char* frame_data = (char*)malloc(cfg->mac_data_bytes_num_perframe);
+    bool data2, data3;
     size_t ul_data_syms = cfg->ul_data_symbol_num_perframe - cfg->UL_PILOT_SYMS;
     std::stringstream ss;
     std::stringstream ss1[ul_data_syms];
@@ -79,6 +98,38 @@ void* SimpleBSMac::loopRecv(int tid)
                 exit(0);
             }
             return (NULL);
+        }
+
+        // create buffer for frame data
+        if (pkt->symbol_id == 2) {
+            memcpy(frame_data, (char*)pkt->data, cfg->data_bytes_num_persymbol);
+            data2 = true;
+        } else if (pkt->symbol_id == 3) {
+            memcpy(((char*)frame_data + cfg->data_bytes_num_persymbol),
+                (char*)pkt->data, cfg->data_bytes_num_persymbol);
+            data3 = true;
+        }
+
+        // write packet data to data sockets
+        if (data2 && data3) {
+            ret = sendto(data_sockets[pkt->ue_id], frame_data,
+                cfg->mac_data_bytes_num_perframe, 0,
+                (struct sockaddr*)&data_addr[pkt->ue_id],
+                sizeof(data_addr[pkt->ue_id]));
+            if (ret == -1) {
+                if (errno != EAGAIN) {
+                    perror("data send failed");
+                    exit(0);
+                }
+            }
+            printf("received data for frame %d, ue %d, size %d\n",
+                pkt->frame_id, pkt->ue_id, cfg->mac_data_bytes_num_perframe);
+            for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
+                printf("%i ", *((uint8_t*)frame_data + i));
+            }
+            printf("\n");
+            data2 = false;
+            data3 = false;
         }
 
         if (kDebugBSReceiver) {
