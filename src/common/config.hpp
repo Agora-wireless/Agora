@@ -175,6 +175,7 @@ public:
     size_t mac_packet_length;
     size_t num_frames_per_mac_packet;
     size_t sym_packet_length;
+    bool ip_bridge_enable;
 
     // IP address at Millipde side
     std::string rx_addr;
