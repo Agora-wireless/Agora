@@ -129,9 +129,6 @@ private:
     double* frame_start;
     double* frame_end;
 
-    complex_float* fft_inout;
-    DFTI_DESCRIPTOR_HANDLE mkl_handle;
-
 #ifdef USE_DPDK_SENDER
     struct rte_mempool* mbuf_pool;
     uint32_t sender_addr; // IPv4 address of this data sender
