@@ -122,7 +122,7 @@ void* SimpleBSMac::loopRecv(int tid)
                     exit(0);
                 }
             }
-            printf("received data for frame %d, ue %d, size %d\n",
+            printf("Received data for frame %d, ue %d, size %zu\n",
                 pkt->frame_id, pkt->ue_id, cfg->mac_data_bytes_num_perframe);
             for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
                 printf("%i ", *((uint8_t*)frame_data + i));
