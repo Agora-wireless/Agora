@@ -62,15 +62,14 @@ void MacThread::run_event_loop()
         const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
         const size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
         const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+
         const size_t data_offset = kUseLDPC
             ? (cbLenBytes * cfg_->LDPC_config.nblocksInSymbol * ue_id)
             : (cfg_->OFDM_DATA_NUM * ue_id);
-        const size_t total_symbol_idx
-            = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
-
-        // Copy over the packet
         const uint8_t* ul_data_ptr
-            = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
+            = &(*ul_bits_buffer_)[cfg_->get_total_data_symbol_idx_ul(
+                frame_id, symbol_idx_ul)][data_offset];
+
         if (!kUseLDPC) {
             adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)&staging_buf[0],
                 cfg_->OFDM_DATA_NUM, cfg_->mod_type);
@@ -104,10 +103,8 @@ void MacThread::run_event_loop()
             }
         }
 
+        // Only non-pilot uplink symbols have application data.
         if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
-            // Copy packet to the frame data buffer. It might take multiple
-            // symbols to fill up the frame. When the frame is full, send it to
-            // the application.
             const size_t frame_data_offset
                 = (symbol_idx_ul - cfg_->UL_PILOT_SYMS)
                 * cfg_->data_bytes_num_persymbol;
@@ -116,6 +113,7 @@ void MacThread::run_event_loop()
             num_filled_bytes_in_frame += cfg_->data_bytes_num_persymbol;
         }
 
+        // When the frame is full, send it to the application.
         if (num_filled_bytes_in_frame == cfg_->data_bytes_num_perframe) {
             num_filled_bytes_in_frame = 0;
 
