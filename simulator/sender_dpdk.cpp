@@ -31,7 +31,8 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
 }
 
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
-    bool enable_slow_start, bool create_thread_for_master)
+    bool enable_slow_start, std::string server_mac_addr_str,
+    bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -76,8 +77,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     std::string core_list = std::to_string(core_offset) + "-"
         + std::to_string(core_offset + thread_num);
     // n: channels, m: maximum memory in megabytes
-    const char* rte_argv[]
-        = { "txrx", "-l", core_list.c_str(), "-w", "0000:84:00.1", NULL };
+    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
     int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
     printf("rte_eal_init argv: ");
@@ -100,13 +100,22 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
     uint16_t portid = 0;
-    // RTE_ETH_FOREACH_DEV(portid)
 
     if (DpdkTransport::nic_init(portid, mbuf_pool, thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
-    src_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 4));
-    dst_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 3));
+    // Parse IP addresses and MAC addresses
+    ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    rt_assert(ret == 1, "Invalid sender IP address");
+    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    rt_assert(ret == 1, "Invalid server IP address");
+
+    ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
+    rt_assert(parsed_mac != NULL, "Invalid server mac address");
+    memcpy(&server_mac_addr, parsed_mac, sizeof(ether_addr));
+
+    ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
+    rt_assert(ret == 0, "Cannot get MAC address of the port");
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 
@@ -212,12 +221,12 @@ void* Sender::master_thread(int tid)
                 next_frame_id = ctag.frame_id + 1;
                 if (next_frame_id == cfg->frames_to_test)
                     break;
-                frame_end[ctag.frame_id] = get_time();
+                frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
 
                 delay_for_frame(ctag.frame_id, tick_start);
                 tick_start = rdtsc();
-                frame_start[next_frame_id] = get_time();
+                frame_start[next_frame_id % kNumStatsFrames] = get_time();
             } else {
                 next_frame_id = ctag.frame_id;
             }
@@ -297,29 +306,39 @@ void* Sender::worker_thread(int tid)
 
         size_t start_tsc_send = rdtsc();
 
-        struct rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
+        rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
 
-        struct rte_ether_hdr* eth_hdr
-            = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+        rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*);
         eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+        memcpy(eth_hdr->s_addr.addr_bytes, sender_mac_addr.addr_bytes,
+            RTE_ETHER_ADDR_LEN);
+        memcpy(eth_hdr->d_addr.addr_bytes, server_mac_addr.addr_bytes,
+            RTE_ETHER_ADDR_LEN);
 
-        struct rte_ipv4_hdr* ip_h = (struct rte_ipv4_hdr*)((char*)eth_hdr
-            + sizeof(struct rte_ether_hdr));
-        ip_h->src_addr = src_addr;
-        ip_h->dst_addr = dst_addr;
+        auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
+        ip_h->src_addr = sender_addr;
+        ip_h->dst_addr = server_addr;
         ip_h->next_proto_id = IPPROTO_UDP;
+        ip_h->version_ihl = 0x45;
+        ip_h->type_of_service = 0;
+        ip_h->total_length = rte_cpu_to_be_16(
+            buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
+        ip_h->packet_id = 0;
+        ip_h->fragment_offset = 0;
+        ip_h->time_to_live = 64;
+        ip_h->hdr_checksum = 0;
 
-        struct rte_udp_hdr* udp_h
-            = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
+        auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
         udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
         udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+        udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
+            - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
 
         tx_bufs[0]->pkt_len = buffer_length + kPayloadOffset;
         tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
-        char* payload = (char*)eth_hdr + kPayloadOffset;
-        // DpdkTransport::fastMemcpy(
-        //     payload, tx_buffers_[tx_bufs_idx], buffer_length);
+        tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
+        auto* payload = (char*)eth_hdr + kPayloadOffset;
         rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
 
         // Send a message to the server. We assume that the server is running.
@@ -487,6 +506,6 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
-        fprintf(fp_debug, "%.5f\n", frame_end[i]);
+        fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
     }
 }

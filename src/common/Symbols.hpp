@@ -8,10 +8,6 @@
 
 #define ARMA_ALLOW_FAKE_GCC
 
-#define SEPARATE_TX_RX_UE 0
-
-#define MOD_ORDER 4
-
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -142,21 +138,9 @@ static constexpr bool kDebugBSSender = false;
 static constexpr bool kDebugBSReceiver = true;
 
 #define DEBUG_DL_PILOT 0
-#define DEBUG_PLOT 0
 #define DEBUG_RECV 0
 #define DEBUG_RADIO_TX 0
 #define DEBUG_RADIO_RX 0
-#define WRITE_RECV 0
-
-#define CORR_THRESHOLD 0x4
-#define CORR_RST 0x0
-#define CORR_SCNT 0x8
-#define CORR_CONF 60
-#define RF_RST_REG 48
-#define TDD_CONF_REG 120
-#define SCH_ADDR_REG 136
-#define SCH_MODE_REG 140
-#define TX_GAIN_CTRL 88
 
 enum class ThreadType {
     kMaster,
@@ -208,11 +192,11 @@ struct LDPCconfig {
     bool earlyTermination;
     int16_t decoderIter;
     uint16_t Zc;
-    int nRows;
+    size_t nRows;
     uint32_t cbEncLen;
     uint32_t cbLen;
     uint32_t cbCodewLen;
-    int nblocksInSymbol;
+    size_t nblocksInSymbol;
 };
 
 typedef struct LDPCconfig LDPCconfig;
@@ -249,10 +233,16 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
-#if defined USE_LDPC || defined USE_LDPC_SENDER
+#ifdef USE_LDPC
 static constexpr bool kUseLDPC = true;
 #else
 static constexpr bool kUseLDPC = false;
+#endif
+
+#ifdef USE_AVX2_ENCODER
+static constexpr bool kUseAVX2Encoder = true;
+#else
+static constexpr bool kUseAVX2Encoder = false;
 #endif
 
 // Enable debugging for sender and receiver applications

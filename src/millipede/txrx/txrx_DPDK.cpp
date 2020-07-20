@@ -13,13 +13,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
-
+    // Use one core to allocate launch threads, and use one core to run each
+    // socket thread
     std::string core_list = std::to_string(core_offset - 1) + "-"
         + std::to_string(core_offset - 1 + socket_thread_num);
 
     // n: channels, m: maximum memory in megabytes
-    const char* rte_argv[]
-        = { "txrx", "-l", core_list.c_str(), "-w", "0000:84:00.1", NULL };
+    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
     int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
     printf("rte_eal_init argv: ");
@@ -34,31 +34,30 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     unsigned int nb_ports = rte_eth_dev_count_avail();
     printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
-    // struct rte_mempool* mbuf_pool;
     size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
-    //= 128 + (sizeof(int) * 16 + sizeof(ushort) * cfg->OFDM_FRAME_LEN * 2);
     mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
         MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 
     rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
     uint16_t portid = 0;
-    // RTE_ETH_FOREACH_DEV(portid)
 
     if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
-    src_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 4));
-    dst_addr = rte_cpu_to_be_32(RTE_IPV4(10, 0, 0, 3));
+    ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    rt_assert(ret == 1, "Invalid sender IP address");
+    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    rt_assert(ret == 1, "Invalid server IP address");
 
-    struct rte_flow_error error;
-    struct rte_flow* flow;
+    rte_flow_error error;
+    rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
-        flow = DpdkTransport::generate_ipv4_flow(0, i, src_addr, FULL_MASK,
-            dst_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
+        flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
+            server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
         printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
             src_port, dst_port, i);
         if (!flow)
@@ -178,12 +177,12 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
             continue;
         }
 
-        if (ip_h->src_addr != src_addr) {
+        if (ip_h->src_addr != sender_addr) {
             printf("Source addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
-        if (ip_h->dst_addr != dst_addr) {
+        if (ip_h->dst_addr != server_addr) {
             printf("Destination addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
@@ -266,8 +265,8 @@ int PacketTXRX::dequeue_send(int tid)
 
     struct rte_ipv4_hdr* ip_h
         = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-    ip_h->src_addr = dst_addr;
-    ip_h->dst_addr = src_addr;
+    ip_h->src_addr = server_addr;
+    ip_h->dst_addr = sender_addr;
     ip_h->next_proto_id = IPPROTO_UDP;
 
     struct rte_udp_hdr* udp_h

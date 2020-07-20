@@ -31,7 +31,8 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
 }
 
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
-    bool enable_slow_start, bool create_thread_for_master)
+    bool enable_slow_start, std::string server_mac_addr_str,
+    bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -76,7 +77,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
             setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->bs_port + i, cfg->rx_addr.c_str());
+                &servaddr_ipv4[i], cfg->bs_port + i, cfg->server_addr.c_str());
         } else {
             socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
             setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
@@ -191,12 +192,12 @@ void* Sender::master_thread(int tid)
                 next_frame_id = ctag.frame_id + 1;
                 if (next_frame_id == cfg->frames_to_test)
                     break;
-                frame_end[ctag.frame_id] = get_time();
+                frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
 
                 delay_for_frame(ctag.frame_id, tick_start);
                 tick_start = rdtsc();
-                frame_start[next_frame_id] = get_time();
+                frame_start[next_frame_id % kNumStatsFrames] = get_time();
             } else {
                 next_frame_id = ctag.frame_id;
             }
@@ -290,7 +291,7 @@ void* Sender::worker_thread(int tid)
             if (ret < 0) {
                 fprintf(stderr,
                     "send() failed. Error = %s. Is a server running at %s?\n",
-                    strerror(errno), cfg->rx_addr.c_str());
+                    strerror(errno), cfg->server_addr.c_str());
                 exit(-1);
             }
         }
@@ -420,12 +421,12 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 
 void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
-    printf("Printing sender results to file...\n");
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
+    printf("Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
-        fprintf(fp_debug, "%.5f\n", frame_end[i]);
+        fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
     }
 }
