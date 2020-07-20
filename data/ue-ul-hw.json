@@ -25,5 +25,5 @@
  "modulation" : "16QAM",
  "worker_thread_num" : 2,
  "demul_block_size" : 48,
- "ip_bridge_enable" : false
+ "ip_bridge_enable" : true
 }

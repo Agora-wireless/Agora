@@ -51,7 +51,7 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
     data_from_tun = new unsigned char[cfg->mac_data_bytes_num_perframe]();
 
     // CRC
-    DoCRC *crc_dwn = new DoCRC();
+    crc_dwn = new DoCRC();
 
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
@@ -278,20 +278,18 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
     pkt->cell_id = 0;
     pkt->ue_id = tag.ue_id;
     pkt->valid_tun_data = 0;
+    pkt->datalen = cfg->mac_data_bytes_num_perframe;
 
-    // XXX OBCH XXX
-    printf("HERE: IP_bridge_enable: %d, tun_read: %d\n",cfg->ip_bridge_enable, tun_ready.load());
     if (cfg->ip_bridge_enable && tun_ready.load())
     {
-        printf("INSIDE !!!\n");
-        //printf("Read from TUN interface \n");
-        //int payloadSizeInBytes = ipbridge->read_fragment(data_from_tun, cfg->mac_data_bytes_num_perframe); //ipbridge->radioMTU);
-        //int payloadSizeInBytes = 84;
-        //printf("Read %d bytes from TUN device for UE_ID: %d  FrameID: %d \n", payloadSizeInBytes, tag.ue_id, tag.frame_id);
+        // Valid TUN data
         std::vector<unsigned char> v(data_from_tun, data_from_tun + tun_payload_size_bytes);
         tun_ready = false;
         pkt->valid_tun_data = 1;
         v[0] = 'a'; v[1] = 'b'; v[2] = 'c'; v[3] = 'd';  // XXX OBCH XXX REMOVE ME
+
+        // Insert CRC
+        pkt->crc = crc_dwn->calculateCRC24((unsigned char*)v.data(), pkt->datalen);
 
         // V --> Pkt
         memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
@@ -306,13 +304,13 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
         std::vector<char> v(cfg->mac_data_bytes_num_perframe);
         generate(begin(v), end(v), bind(dist, eng));
  
+        // Insert CRC
+        //crc_dwn->addCRC24((unsigned char*)v.data()); //pkt);
+        pkt->crc = crc_dwn->calculateCRC24((unsigned char*)v.data(), pkt->datalen);
+
         // V --> Pkt
         memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
     }
-
-    // Insert CRC
-    //pkt->datalen = cfg->mac_data_bytes_num_perframe;
-    //crc_dwn->addCRC24(pkt);
 
     // Print MAC packet summary
     printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
