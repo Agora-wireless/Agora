@@ -121,13 +121,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 
     num_threads_ready_atomic = 0;
-
-    fft_inout = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
-
-    DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
-    DftiCommitDescriptor(mkl_handle);
 }
 
 Sender::~Sender()
@@ -293,6 +286,16 @@ void* Sender::worker_thread(int tid)
     while (num_threads_ready_atomic != thread_num + 1) {
         // Wait
     }
+
+    complex_float* fft_inout;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+
+    fft_inout = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+
+    DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+    DftiCommitDescriptor(mkl_handle);
 
     const size_t buffer_length = cfg->packet_length;
     double begin = get_time();
