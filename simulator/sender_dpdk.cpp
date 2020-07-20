@@ -4,6 +4,7 @@
  *
  */
 #include "sender.hpp"
+#include "utils_simd.hpp"
 #include <thread>
 
 bool keep_running = true;
@@ -120,6 +121,13 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 
     num_threads_ready_atomic = 0;
+
+    fft_inout = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+
+    DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+    DftiCommitDescriptor(mkl_handle);
 }
 
 Sender::~Sender()
@@ -339,7 +347,22 @@ void* Sender::worker_thread(int tid)
         tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
         tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
         auto* payload = (char*)eth_hdr + kPayloadOffset;
-        rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+
+        auto* pkt = (Packet*)(tx_buffers_[tx_bufs_idx]);
+        simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+        SymbolType sym_type
+            = cfg->get_symbol_type(pkt->frame_id, pkt->symbol_id);
+
+        DftiComputeForward(mkl_handle,
+            reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+
+        // rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+        rte_memcpy(payload, tx_buffers_[tx_bufs_idx], Packet::kOffsetOfData);
+        simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
+            reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
+            cfg->OFDM_CA_NUM * 2);
 
         // Send a message to the server. We assume that the server is running.
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);

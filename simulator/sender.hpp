@@ -21,6 +21,7 @@
 #include <chrono>
 #include <emmintrin.h>
 #include <immintrin.h>
+#include <malloc.h>
 #include <numeric>
 #include <pthread.h>
 #include <signal.h>
@@ -33,6 +34,7 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "mkl_dfti.h"
 #include "net.hpp"
 #include "utils.h"
 
@@ -126,6 +128,9 @@ private:
 
     double* frame_start;
     double* frame_end;
+
+    complex_float* fft_inout;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
 
 #ifdef USE_DPDK_SENDER
     struct rte_mempool* mbuf_pool;
