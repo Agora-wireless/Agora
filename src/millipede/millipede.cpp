@@ -362,16 +362,22 @@ void Millipede::start()
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
 
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
+                    if (kEnableMac) {
+                        schedule_users(
+                            EventType::kPacketToMac, frame_id, symbol_idx_ul);
+                    }
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {
-                        assert(cur_frame_id == frame_id);
-                        cur_frame_id++;
+                        if (!kEnableMac) {
+                            assert(cur_frame_id == frame_id);
+                            cur_frame_id++;
+                            stats->update_stats_in_functions_uplink(frame_id);
+                            if (stats->last_frame_id == cfg->frames_to_test - 1)
+                                goto finish;
+                        }
                         stats->master_set_tsc(TsType::kDecodeDone, frame_id);
                         print_per_frame_done(PrintType::kDecode, frame_id);
-                        stats->update_stats_in_functions_uplink(frame_id);
-                        if (stats->last_frame_id == cfg->frames_to_test - 1)
-                            goto finish;
                     }
                 }
             } break;
@@ -550,10 +556,14 @@ finish:
     printf("Millipede: printing stats and saving to file\n");
     stats->print_summary();
     stats->save_to_file();
-    kUseLDPC ? save_decode_data_to_file(stats->last_frame_id)
-             : save_demul_data_to_file(stats->last_frame_id);
-    save_tx_data_to_file(stats->last_frame_id);
-    // calculate and print per-user BER
+    if (flags.enable_save_decode_data_to_file) {
+        kUseLDPC ? save_decode_data_to_file(stats->last_frame_id)
+                 : save_demul_data_to_file(stats->last_frame_id);
+    }
+    if (flags.enable_save_tx_data_to_file)
+        save_tx_data_to_file(stats->last_frame_id);
+
+    // Calculate and print per-user BER
     if (!kEnableMac && kPrintPhyStats) {
         phy_stats->print_phy_stats();
     }
@@ -1099,10 +1109,10 @@ void Millipede::initialize_uplink_buffers()
     size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t num_decoded_bytes
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
+    size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
+        >> 3 * config_->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
-        task_buffer_symbol_num_ul, num_decoded_bytes * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, decoded_bytes * cfg->UE_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1210,7 +1220,6 @@ void Millipede::free_downlink_buffers()
 
 void Millipede::save_demul_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_DEMUL
     auto& cfg = config_;
     printf("Saving demul data to data/demul_data.txt\n");
 
@@ -1230,12 +1239,10 @@ void Millipede::save_demul_data_to_file(UNUSED int frame_id)
         }
     }
     fclose(fp);
-#endif
 }
 
 void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_DEMUL
     auto& cfg = config_;
     printf("Saving decode data to data/decode_data.bin\n");
     size_t num_decoded_bytes
@@ -1253,17 +1260,15 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
         fwrite(ptr, cfg->UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
     }
     fclose(fp);
-#endif
 }
 
 void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 {
-#ifdef WRITE_TX
     auto& cfg = config_;
-    printf("Saving TX data to data/tx_data.bin\n");
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_data.bin";
+    printf("Saving TX data to %s\n", filename.c_str());
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
@@ -1281,7 +1286,6 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
         }
     }
     fclose(fp);
-#endif
 }
 
 void Millipede::getDemulData(int** ptr, int* size)

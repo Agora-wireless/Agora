@@ -7,11 +7,11 @@
  * FlexRAN's decoder, which supports AVX2.
  */
 
-#include "common/Symbols.hpp"
-#include "common/gettime.h"
-#include "common/utils_ldpc.hpp"
+#include "Symbols.hpp"
 #include "encoder.hpp"
+#include "gettime.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 #include <algorithm>
 #include <assert.h>
 #include <bitset>
@@ -26,29 +26,23 @@
 
 static constexpr size_t kNumCodeBlocks = 2;
 static constexpr size_t kBaseGraph = 1;
-static constexpr bool kEnableEarlyTermination = true;
+static constexpr bool kEnableEarlyTermination = false;
 static constexpr size_t kNumFillerBits = 0;
-static constexpr size_t kMaxDecoderIters = 20;
+static constexpr size_t kMaxDecoderIters = 8;
 static constexpr size_t k5GNRNumPunctured = 2;
-
-char* read_binfile(std::string filename, size_t buffer_size)
-{
-    std::ifstream infile;
-    infile.open(filename, std::ios::binary | std::ios::in);
-
-    char* x = (char*)malloc(buffer_size * sizeof(char));
-    infile.read((char*)x, buffer_size * sizeof(char));
-    infile.close();
-    return x;
-}
+static constexpr size_t kNumRows = 46;
 
 int main()
 {
     double freq_ghz = measure_rdtsc_freq();
+    printf("Spinning for one second for Turbo Boost\n");
+    nano_sleep(1000 * 1000 * 1000, freq_ghz);
     int8_t* input[kNumCodeBlocks];
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
     uint8_t* decoded[kNumCodeBlocks];
+
+    printf("Code rate: %.3f (nRows = %zu)\n", 22.f / (20 + kNumRows), kNumRows);
 
     std::vector<size_t> zc_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3, 6, 12, 24,
         48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56, 112, 224,
@@ -56,14 +50,13 @@ int main()
         15, 30, 60, 120, 240 };
     std::sort(zc_vec.begin(), zc_vec.end());
     for (const size_t& zc : zc_vec) {
-        if (zc > avx2enc::ZC_MAX) {
-            fprintf(stderr,
-                "Zc value %zu not supported by avx2enc. Skipping.\n", zc);
+        if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
+            fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
             continue;
         }
         const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
-        const size_t num_parity_bits = ldpc_num_parity_bits(kBaseGraph, zc);
-        const size_t num_encoded_bits = ldpc_num_encoded_bits(kBaseGraph, zc);
+        const size_t num_encoded_bits
+            = ldpc_num_encoded_bits(kBaseGraph, zc, kNumRows);
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
             input[i] = new int8_t[ldpc_encoding_input_buf_size(kBaseGraph, zc)];
@@ -84,8 +77,10 @@ int main()
 
         const size_t encoding_start_tsc = rdtsc();
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            ldpc_encode_helper(kBaseGraph, zc, encoded[n], parity[n], input[n]);
+            ldpc_encode_helper(
+                kBaseGraph, zc, kNumRows, encoded[n], parity[n], input[n]);
         }
+
         const double encoding_us
             = cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
 
@@ -109,7 +104,7 @@ int main()
             = kEnableEarlyTermination;
         ldpc_decoder_5gnr_request.Zc = zc;
         ldpc_decoder_5gnr_request.baseGraph = kBaseGraph;
-        ldpc_decoder_5gnr_request.nRows = num_parity_bits / zc;
+        ldpc_decoder_5gnr_request.nRows = kNumRows;
 
         const size_t buffer_len = 1024 * 1024;
         const size_t numMsgBits = num_input_bits - kNumFillerBits;
