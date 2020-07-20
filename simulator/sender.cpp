@@ -47,6 +47,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
+    _unused(server_mac_addr_str);
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -125,7 +126,7 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
 }
 
-void* Sender::master_thread(int tid)
+void* Sender::master_thread(int)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
@@ -218,7 +219,7 @@ void* Sender::master_thread(int tid)
     exit(0);
 }
 
-void* Sender::data_update_thread(int tid)
+void* Sender::data_update_thread(int)
 {
     // Sender get better performance when this thread is not pinned to core
     // pin_to_core_with_offset(ThreadType::kWorker, 13, 0);
