@@ -10,8 +10,8 @@ sudo apt -y install g++ cmake make
 
 # General libs
 sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen \
-  nlohmann-json-dev python-numpy python-pyqt5 libnuma-dev libgflags-dev \
-  libgtest-dev libpython-dev swig
+  python-numpy python-pyqt5 libnuma-dev libgflags-dev libgtest-dev \
+  libpython-dev swig
 
 # GTest needs special compilation
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
@@ -21,6 +21,17 @@ wget http://sourceforge.net/projects/arma/files/armadillo-9.300.2.tar.xz .
 tar xf armadillo-9.300.2.tar.xz
 (cd armadillo-9.300.2; cmake .; make -j4; sudo make install)
 rm -rf armadillo*
+
+# Install nlohmann json-dev from the GitHub repo
+cd `mktemp -d`
+git clone --depth=1 https://github.com/nlohmann/json.git
+cd json
+mkdir build
+cd build
+cmake ..
+make -j8
+sudo make install
+sudo ldconfig
 
 # Install SoapySDR from the GitHub repo
 cd `mktemp -d`
