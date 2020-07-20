@@ -202,7 +202,8 @@ set(COMMON_SOURCES
   src/common/net.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/encoder/iobuffer.cpp
+  src/common/utils_simd.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(MILLIPEDE_SOURCES 
@@ -343,3 +344,9 @@ add_executable(test_ldpc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
+
+add_executable(test_simd test/unit_tests/test_simd.cc
+  ${COMMON_SOURCES}
+)
+target_link_libraries(test_simd ${GTEST_LIBRARIES})
+add_test(NAME test_simd COMMAND test_simd)
