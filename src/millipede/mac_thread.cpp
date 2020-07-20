@@ -43,8 +43,7 @@ void MacThread::run_event_loop()
     pin_to_core_with_offset(
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
-    std::vector<uint8_t> mac_pkt_staging_buffer(
-        Packet::kOffsetOfData + cfg_->OFDM_DATA_NUM);
+    std::vector<uint8_t> staging_buf(cfg_->OFDM_DATA_NUM);
     std::vector<uint8_t> frame_data(cfg_->mac_data_bytes_num_perframe);
 
     const size_t cbLenBytes = (cfg_->LDPC_config.cbLen + 7) >> 3;
@@ -61,42 +60,39 @@ void MacThread::run_event_loop()
         assert(event.event_type == EventType::kPacketToMac);
 
         const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-        const size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+        const size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
         const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
         const size_t data_offset = kUseLDPC
             ? (cbLenBytes * cfg_->LDPC_config.nblocksInSymbol * ue_id)
             : (cfg_->OFDM_DATA_NUM * ue_id);
         const size_t total_symbol_idx
-            = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_id);
+            = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
 
         // Copy over the packet
         const uint8_t* ul_data_ptr
             = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
-        auto* pkt = reinterpret_cast<MacPacket*>(&mac_pkt_staging_buffer[0]);
-        pkt->frame_id = frame_id;
-        pkt->symbol_id = symbol_id;
-        pkt->cell_id = 0;
-        pkt->ue_id = ue_id;
         if (!kUseLDPC) {
-            adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
+            adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)&staging_buf[0],
                 cfg_->OFDM_DATA_NUM, cfg_->mod_type);
         } else {
-            memcpy(pkt->data, ul_data_ptr, cfg_->data_bytes_num_persymbol);
+            memcpy(
+                &staging_buf[0], ul_data_ptr, cfg_->data_bytes_num_persymbol);
         }
 
         // Print information about the received packet
         if (kDebugBSReceiver) {
-            if (pkt->symbol_id == cfg_->UL_PILOT_SYMS) {
-                ss << "MAC thread received frame " << pkt->frame_id
-                   << " symbol " << pkt->symbol_id << ", ue " << pkt->ue_id
-                   << ", size " << cfg_->data_bytes_num_perframe << std::endl;
+            if (symbol_idx_ul == cfg_->UL_PILOT_SYMS) {
+                ss << "MAC thread received frame " << frame_id
+                   << ", uplink symbol index " << symbol_idx_ul << ", ue "
+                   << ue_id << ", size " << cfg_->data_bytes_num_perframe
+                   << std::endl;
             }
-            if (pkt->symbol_id >= cfg_->UL_PILOT_SYMS) {
+            if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
                 for (size_t i = 0; i < cfg_->data_bytes_num_persymbol; i++) {
-                    ss1[pkt->symbol_id - cfg_->UL_PILOT_SYMS]
-                        << std::to_string(pkt->data[i]) << " ";
+                    ss1[symbol_idx_ul - cfg_->UL_PILOT_SYMS]
+                        << std::to_string(staging_buf[i]) << " ";
                 }
-                if (pkt->symbol_id == cfg_->ul_data_symbol_num_perframe - 1) {
+                if (symbol_idx_ul == cfg_->ul_data_symbol_num_perframe - 1) {
                     for (size_t j = 0; j < ul_data_syms; j++) {
                         ss << ss1[j].str();
                         ss1[j].str(std::string());
@@ -108,30 +104,32 @@ void MacThread::run_event_loop()
             }
         }
 
-        // Copy packet to the frame data buffer. It might take multiple symbols
-        // to fill up the frame. When the frame is full, send it to the
-        // application.
-        assert(pkt->symbol_id == 2 || pkt->symbol_id == 3); // TODO: Why?
-        memcpy(&frame_data[0]
-                + (pkt->symbol_id == 2 ? 0 : cfg_->data_bytes_num_persymbol),
-            (char*)pkt->data, cfg_->data_bytes_num_persymbol);
-        num_filled_bytes_in_frame += cfg_->data_bytes_num_persymbol;
+        if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
+            // Copy packet to the frame data buffer. It might take multiple
+            // symbols to fill up the frame. When the frame is full, send it to
+            // the application.
+            const size_t frame_data_offset
+                = (symbol_idx_ul - cfg_->UL_PILOT_SYMS)
+                * cfg_->data_bytes_num_persymbol;
+            memcpy(&frame_data[frame_data_offset], &staging_buf,
+                cfg_->data_bytes_num_persymbol);
+            num_filled_bytes_in_frame += cfg_->data_bytes_num_persymbol;
+        }
 
         if (num_filled_bytes_in_frame == cfg_->data_bytes_num_perframe) {
             num_filled_bytes_in_frame = 0;
 
-            int ret = sendto(app_sockets_[pkt->ue_id], &frame_data[0],
+            int ret = sendto(app_sockets_[ue_id], &frame_data[0],
                 cfg_->mac_data_bytes_num_perframe, 0,
-                (struct sockaddr*)&app_sockaddr_[pkt->ue_id],
-                sizeof(sockaddr_in));
+                (struct sockaddr*)&app_sockaddr_[ue_id], sizeof(sockaddr_in));
             if (ret == -1) {
                 fprintf(stderr, "MAC thread: sendto() failed with error %s\n",
                     strerror(errno));
                 exit(-1);
             }
 
-            printf("Sent data for frame %u, ue %u, size %zu\n", pkt->frame_id,
-                pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
+            printf("MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
+                frame_id, ue_id, cfg_->mac_data_bytes_num_perframe);
             for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
                 printf("%u ", frame_data[i]);
             }

@@ -10,8 +10,8 @@ sudo apt -y install g++ cmake make
 
 # General libs
 sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen \
-  nlohmann-json-dev python-numpy python-pyqt5 libnuma-dev libgflags-dev \
-  libgtest-dev libpython-dev swig
+  python-numpy python-pyqt5 libnuma-dev libgflags-dev libgtest-dev \
+  libpython-dev swig
 
 # GTest needs special compilation
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
