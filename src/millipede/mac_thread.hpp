@@ -13,11 +13,15 @@
  */
 class MacThread {
 public:
+    // Default log file for MAC layer outputs
+    const char* kDefaultLogFilename = "/tmp/millipede_mac_log";
+
     MacThread(Config* cfg, size_t core_offset, Table<int8_t>* dl_bits_buffer,
         Table<int>* dl_bits_buffer_status, Table<uint8_t>* ul_bits_buffer,
         moodycamel::ConcurrentQueue<Event_data>* rx_queue,
         moodycamel::ConcurrentQueue<Event_data>* tx_queue,
-        moodycamel::ProducerToken* rx_ptok, moodycamel::ProducerToken* tx_ptok);
+        moodycamel::ProducerToken* rx_ptok, moodycamel::ProducerToken* tx_ptok,
+        std::string log_filename = "");
 
     ~MacThread();
 
@@ -28,6 +32,9 @@ public:
 private:
     Config* cfg_;
     const size_t core_offset_; // The CPU core on which this thread runs
+
+    FILE* log_file_; // Log file used to store MAC layer outputs
+    std::string log_filename_ = kDefaultLogFilename; // Name of the log file
 
     Table<uint8_t>* ul_bits_buffer_; // Uplink bits decoded by the PHY
 
@@ -41,9 +48,9 @@ private:
 
     // FIFO queues for receiving messages from the master thread
     moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
-    moodycamel::ProducerToken* rx_ptok_;
+    moodycamel::ProducerToken* tx_ptok_;
 
     // FIFO queues for sending messages to the master thread
     moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
-    moodycamel::ProducerToken* tx_ptok_;
+    moodycamel::ProducerToken* rx_ptok_;
 };

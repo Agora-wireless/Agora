@@ -217,7 +217,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/reciprocity.cpp
   src/millipede/radio_lib.cpp
   src/millipede/radio_calibrate.cpp
-  src/millipede/txrx/txrx_mac.cpp)
+  src/millipede/mac_thread.cpp)
 
 if(${USE_DPDK})
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
