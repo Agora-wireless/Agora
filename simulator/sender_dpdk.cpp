@@ -354,21 +354,25 @@ void* Sender::worker_thread(int tid)
         tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
         auto* payload = (char*)eth_hdr + kPayloadOffset;
 
-        auto* pkt = (Packet*)(tx_buffers_[tx_bufs_idx]);
-        simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
-            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        if (kSenderFFT) {
+            auto* pkt = (Packet*)(tx_buffers_[tx_bufs_idx]);
+            simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+                reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-        SymbolType sym_type
-            = cfg->get_symbol_type(pkt->frame_id, pkt->symbol_id);
+            SymbolType sym_type
+                = cfg->get_symbol_type(pkt->frame_id, pkt->symbol_id);
 
-        DftiComputeForward(mkl_handle,
-            reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+            DftiComputeForward(mkl_handle,
+                reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
 
-        // rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
-        rte_memcpy(payload, tx_buffers_[tx_bufs_idx], Packet::kOffsetOfData);
-        simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
-            reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
-            cfg->OFDM_CA_NUM * 2);
+            rte_memcpy(
+                payload, tx_buffers_[tx_bufs_idx], Packet::kOffsetOfData);
+            simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
+                reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
+                cfg->OFDM_CA_NUM * 2);
+        } else {
+            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+        }
 
         // Send a message to the server. We assume that the server is running.
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
