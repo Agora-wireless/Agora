@@ -17,6 +17,7 @@
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
+#include "mac_thread.hpp"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
@@ -147,7 +148,10 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    std::unique_ptr<MacPacketTXRX> mac_receiver_;
+
+    MacThread* mac_thread_; // The thread running MAC layer functions
+    std::thread mac_std_thread_; // Handle for the MAC threa
+
     Stats* stats;
     PhyStats* phy_stats;
     // std::unique_ptr<Stats> stats_manager_;
