@@ -275,7 +275,7 @@ void Sender::update_tx_buffer(gen_tag_t tag)
     pkt->ant_id = tag.ant_id;
 
     size_t data_index = (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
-    DpdkTransport::fastMemcpy(pkt->data, (char*)IQ_data_coded[data_index],
+    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
         cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 }
 
@@ -533,9 +533,9 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 
 void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
-    printf("Printing sender results to file...\n");
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
+    printf("Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
