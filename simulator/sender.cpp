@@ -113,6 +113,9 @@ void Sender::startTX()
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
     master_thread(0); // Start the master thread
+    // // Start a thread to update data buffer
+    // create_threads(
+    //     pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
 }
 
 void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
