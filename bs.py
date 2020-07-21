@@ -15,7 +15,6 @@ args = parser.parse_args()
 # setup cmds
 cfg = 'data/bs-ul-hw.json' if args.num == 2 else 'data/bs-one-ul-hw.json'
 cmd_millipede = MP + '/millipede ' + cfg
-cmd_macbs = MP + '/macbs 2 0 ' + cfg
 
 # start millipede
 print('Starting millipede...')
@@ -24,13 +23,7 @@ pm = sh.Popen(cmd_millipede.split(), stdout=logm)
 
 time.sleep(1)
 
-# start macbs
-print('Starting macbs...')
-logb = open('macbs.log', 'w')
-pb = sh.Popen(cmd_macbs.split(), stdout=logb)
-
 # wait
 print('Waiting...')
 pm.wait()
-pb.wait()
 print('...done!')

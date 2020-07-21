@@ -25,7 +25,6 @@
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
-#include "txrx_mac.hpp"
 #include "utils.h"
 #include <algorithm>
 #include <armadillo>
