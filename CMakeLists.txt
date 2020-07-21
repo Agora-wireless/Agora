@@ -295,12 +295,6 @@ add_executable(macuser
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(macuser ${COMMON_LIBS})
 
-add_executable(macbs
-  src/mac/simple_mac_bs.cpp
-  src/mac/mac_bs_main.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(macbs ${COMMON_LIBS})
-
 if(${USE_DPDK_SENDER})
   add_executable(sender
     simulator/sender_cli.cpp

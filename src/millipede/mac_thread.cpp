@@ -33,7 +33,8 @@ MacThread::~MacThread()
 
 void MacThread::run_event_loop()
 {
-    MLPD_INFO("Running MAC thread event loop\n");
+    MLPD_INFO("Running MAC thread event loop, logging to file %s\n",
+        log_filename_.c_str());
     pin_to_core_with_offset(
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
