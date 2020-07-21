@@ -344,14 +344,8 @@ void Sender::init_IQ_from_file()
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 
-    std::string filename;
-    if (kUseLDPC) {
-        filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
-            + std::to_string(cfg->BS_ANT_NUM) + ".bin";
-    } else {
-        filename = cur_directory + "/data/rx_data_2048_ant"
-            + std::to_string(cfg->BS_ANT_NUM) + ".bin";
-    }
+    std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
+        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
