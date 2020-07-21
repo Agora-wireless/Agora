@@ -30,8 +30,8 @@ MacThread::MacThread(Config* cfg, size_t core_offset,
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
 
     for (size_t i = 0; i < cfg_->UE_NUM; i++) {
-        size_t local_port = 8090 + i;
-        size_t remote_port = 8080 + i;
+        size_t local_port = kBaseLocalPort + i;
+        size_t remote_port = kBaseRemotePort + i;
         std::string remote_addr = "127.0.0.1";
         size_t sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
         app_sockets_[i] = setup_socket_ipv4(local_port, true, sock_buf_size);

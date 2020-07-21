@@ -10,11 +10,21 @@
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Millipede
  * server.
+ *
+ * On the uplink, this thread takes symbols decoded by Millipede and sends them
+ * to higher-level applications.
  */
 class MacThread {
 public:
     // Default log file for MAC layer outputs
     const char* kDefaultLogFilename = "/tmp/millipede_mac_log";
+
+    // Packets for UE #i will be sent with destination UDP port
+    // kBaseRemotePort + i
+    static constexpr size_t kBaseRemotePort = 8080;
+
+    // Packets for UE #i will be sent with source UDP port kBaseLocalPort + i
+    static constexpr size_t kBaseLocalPort = 8090;
 
     MacThread(Config* cfg, size_t core_offset, Table<int8_t>* dl_bits_buffer,
         Table<int>* dl_bits_buffer_status, Table<uint8_t>* ul_bits_buffer,
