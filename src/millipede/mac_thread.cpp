@@ -21,7 +21,7 @@ MacThread::MacThread(Config* cfg, size_t core_offset,
     if (log_filename != "") {
         log_filename_ = log_filename; // Use a non-default log filename
     }
-    log_file_ = fopen("/tmp/millipede_mac_log", "w");
+    log_file_ = fopen(log_filename.c_str(), "w");
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
 }
 
