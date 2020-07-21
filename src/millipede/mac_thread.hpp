@@ -6,6 +6,7 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
+#include "udp_client.h"
 
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Millipede
@@ -19,12 +20,12 @@ public:
     // Default log file for MAC layer outputs
     const char* kDefaultLogFilename = "/tmp/millipede_mac_log";
 
-    // Packets for UE #i will be sent with destination UDP port
+    // Decoded uplink packets will be sent to kRemoteHostname
+    const char* kRemoteHostname = "127.0.0.1";
+
+    // Decoded uplink packets for UE #i will be sent with destination UDP port
     // kBaseRemotePort + i
     static constexpr size_t kBaseRemotePort = 8080;
-
-    // Packets for UE #i will be sent with source UDP port kBaseLocalPort + i
-    static constexpr size_t kBaseLocalPort = 8090;
 
     MacThread(Config* cfg, size_t core_offset, Table<int8_t>* dl_bits_buffer,
         Table<int>* dl_bits_buffer_status, Table<uint8_t>* ul_bits_buffer,
@@ -46,15 +47,13 @@ private:
     FILE* log_file_; // Log file used to store MAC layer outputs
     std::string log_filename_ = kDefaultLogFilename; // Name of the log file
 
+    UDPClient udp_client; // UDP endpoint used for sending messages
+
     Table<uint8_t>* ul_bits_buffer_; // Uplink bits decoded by the PHY
 
     // Downlink: Not implemented yet
     Table<int8_t>* dl_bits_buffer_;
     Table<int>* dl_bits_buffer_status_;
-
-    // Socket structures for communicating with remote applications
-    std::vector<int> app_sockets_;
-    std::vector<sockaddr_in> app_sockaddr_;
 
     // FIFO queues for receiving messages from the master thread
     moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
