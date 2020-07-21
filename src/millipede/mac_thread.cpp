@@ -98,7 +98,7 @@ void MacThread::run_event_loop()
         if (num_filled_bytes_in_frame[ue_id] == cfg_->data_bytes_num_perframe) {
             num_filled_bytes_in_frame[ue_id] = 0;
 
-            udp_client.send(kRemoteHostname, kBaseRemotePort,
+            udp_client.send(kRemoteHostname, kBaseRemotePort + ue_id,
                 &frame_data[ue_id][0], cfg_->mac_data_bytes_num_perframe);
 
             fprintf(log_file_,
