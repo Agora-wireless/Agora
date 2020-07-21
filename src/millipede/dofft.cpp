@@ -143,23 +143,26 @@ Event_data DoFFT::launch(size_t tag)
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
-    // convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
-    //     reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+    if (kSenderFFT) {
+        simd_convert_float16_to_float32(
+            reinterpret_cast<float*>(&pkt->data[2 * cfg->OFDM_PREFIX_LEN]),
+            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+    } else {
+        convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    // if (kDebugPrintInTask) {
-    //     printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
-    //         frame_id, symbol_id, ant_id);
-    //     if (kPrintFFTInput) {
-    //         printf("FFT input\n");
-    //         for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-    //             printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-    simd_convert_float16_to_float32(
-        reinterpret_cast<float*>(&pkt->data[2 * cfg->OFDM_PREFIX_LEN]),
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        if (kDebugPrintInTask) {
+            printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
+                tid, frame_id, symbol_id, ant_id);
+            if (kPrintFFTInput) {
+                printf("FFT input\n");
+                for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+                    printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
+                }
+                printf("\n");
+            }
+        }
+    }
 
     DurationStat dummy_duration_stat; // TODO: timing for calibration symbols
     DurationStat* duration_stat = nullptr;
@@ -175,8 +178,10 @@ Event_data DoFFT::launch(size_t tag)
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    // DftiComputeForward(mkl_handle,
-    //     reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    if (!kSenderFFT) {
+        DftiComputeForward(mkl_handle,
+            reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    }
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;

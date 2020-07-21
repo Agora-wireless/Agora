@@ -350,3 +350,7 @@ add_executable(test_simd test/unit_tests/test_simd.cc
 )
 target_link_libraries(test_simd ${GTEST_LIBRARIES})
 add_test(NAME test_simd COMMAND test_simd)
+
+if(${SENDER_FFT})
+  add_definitions(-DSENDER_FFT)
+endif()
