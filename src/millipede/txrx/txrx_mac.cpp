@@ -120,9 +120,8 @@ struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = rx_buffer_[tid];
     // int* dl_bits_buffer_status = *dl_bits_buffer_status_;
-    int packet_length = kUseLDPC ? (bits_to_bytes(cfg->LDPC_config.cbLen)
-                                       * cfg->LDPC_config.nblocksInSymbol)
-                                 : bits_to_bytes(cfg->OFDM_DATA_NUM);
+    int packet_length = bits_to_bytes(cfg->LDPC_config.cbLen)
+        * cfg->LDPC_config.nblocksInSymbol;
     packet_length += MacPacket::kOffsetOfData;
 
     struct MacPacket* pkt = (struct MacPacket*)rx_buffer;
@@ -143,16 +142,14 @@ struct MacPacket* MacPacketTXRX::recv_enqueue(int tid, int radio_id)
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
-    int rx_offset
-        = total_symbol_idx * (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1);
+    int rx_offset = total_symbol_idx * cfg->LDPC_config.nblocksInSymbol;
     if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
         printf("MAC Receive thread %d dl_bits_buffer full, offset: %d\n", tid,
             rx_offset);
         cfg->running = false;
         return (NULL);
     } else {
-        for (size_t i = 0;
-             i < (kUseLDPC ? cfg->LDPC_config.nblocksInSymbol : 1); i++)
+        for (size_t i = 0; i < cfg->LDPC_config.nblocksInSymbol; i++)
             (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
         memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
                                   [pkt->ue_id * cfg->OFDM_DATA_NUM],
@@ -185,9 +182,6 @@ int MacPacketTXRX::dequeue_send(int tid)
 
     size_t cbLenBytes = (cfg->LDPC_config.cbLen + 7) >> 3;
     size_t data_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id;
-    if (!kUseLDPC)
-        data_offset = cfg->OFDM_DATA_NUM * ue_id;
-
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
     uint8_t* ul_data_ptr = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
@@ -196,11 +190,7 @@ int MacPacketTXRX::dequeue_send(int tid)
     pkt->frame_id = frame_id;
     pkt->symbol_id = symbol_id;
     pkt->ue_id = ue_id;
-    if (!kUseLDPC)
-        adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
-            cfg->OFDM_DATA_NUM, cfg->mod_type);
-    else
-        memcpy(pkt->data, ul_data_ptr, packet_length);
+    memcpy(pkt->data, ul_data_ptr, packet_length);
 
     int mac_packet_length = packet_length + MacPacket::kOffsetOfData;
 
