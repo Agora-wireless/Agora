@@ -362,7 +362,7 @@ void* Sender::worker_thread(int tid)
         auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
-        if (kSenderFFT) {
+        if (cfg->fft_in_sender) {
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
         } else {
@@ -379,7 +379,7 @@ void* Sender::worker_thread(int tid)
         // Send a message to the server. We assume that the server is running.
         if (kUseDPDK or !kConnectUDP) {
             int ret;
-            if (kSenderFFT) {
+            if (cfg->fft_in_sender) {
                 char* payload = reinterpret_cast<char*>(malloc(buffer_length));
                 run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                     fft_inout, mkl_handle, payload);
@@ -395,7 +395,7 @@ void* Sender::worker_thread(int tid)
             rt_assert(ret >= 0, "Worker: sendto() failed");
         } else {
             int ret;
-            if (kSenderFFT) {
+            if (cfg->fft_in_sender) {
                 char* payload = reinterpret_cast<char*>(malloc(buffer_length));
                 run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                     fft_inout, mkl_handle, payload);

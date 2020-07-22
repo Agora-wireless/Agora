@@ -245,12 +245,6 @@ static constexpr bool kUseAVX2Encoder = true;
 static constexpr bool kUseAVX2Encoder = false;
 #endif
 
-#ifdef SENDER_FFT
-static constexpr bool kSenderFFT = true;
-#else
-static constexpr bool kSenderFFT = false;
-#endif
-
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 #endif

@@ -143,7 +143,7 @@ Event_data DoFFT::launch(size_t tag)
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
-    if (kSenderFFT) {
+    if (cfg->fft_in_sender) {
         simd_convert_float16_to_float32(
             reinterpret_cast<float*>(&pkt->data[2 * cfg->OFDM_PREFIX_LEN]),
             reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
@@ -178,7 +178,7 @@ Event_data DoFFT::launch(size_t tag)
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    if (!kSenderFFT) {
+    if (!cfg->fft_in_sender) {
         DftiComputeForward(mkl_handle,
             reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
     }
