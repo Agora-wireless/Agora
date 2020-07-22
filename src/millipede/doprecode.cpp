@@ -74,13 +74,9 @@ Event_data DoPrecode::launch(size_t tag)
                     data_ptr[user_id]
                         = cfg->ue_specific_pilot[user_id][cur_sc_id];
             } else {
-                int symbol_id_in_buffer
-                    = data_symbol_idx_dl - cfg->dl_data_symbol_start;
-
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[kUseLDPC ? total_data_symbol_idx
-                                                : symbol_id_in_buffer][cur_sc_id
+                        = &dl_raw_data[total_data_symbol_idx][cur_sc_id
                             + cfg->OFDM_DATA_NUM * user_id];
                     if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
                         data_ptr[user_id]

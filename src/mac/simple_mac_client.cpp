@@ -361,14 +361,8 @@ void SimpleClientMac::init_data_from_file()
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 
-    std::string filename;
-    if (kUseLDPC) {
-        filename = cur_directory + "/data/LDPC_orig_data_2048_ant"
-            + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-    } else {
-        filename = cur_directory + "/data/orig_data_2048_ant"
-            + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-    }
+    std::string filename = cur_directory + "/data/LDPC_orig_data_2048_ant"
+        + std::to_string(cfg->UE_ANT_NUM) + ".bin";
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
