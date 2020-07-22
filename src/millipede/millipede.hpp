@@ -190,16 +190,6 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated uplink zeroforcing detection matrices
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> ul_zf_buffer_;
-
-    // Data after equalization
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<complex_float> equal_buffer_;
-
     // Data after soft demodulation
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
@@ -210,7 +200,6 @@ private:
     // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
 
-    Table<complex_float> ue_spec_pilot_buffer_;
 
     RxCounters rx_counters_;
     FFT_stats fft_stats_;

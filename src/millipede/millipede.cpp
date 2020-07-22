@@ -604,20 +604,7 @@ void* Millipede::worker(int tid)
         *get_conq(EventType::kIFFT), complete_task_queue_,
         worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats);
 
-    auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
-        complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_zf_buffer_, dl_zf_buffer_, stats);
-
-    auto computeDemul
-        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
-            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats);
-
-    auto computePrecode
-        = new DoPrecode(config_, tid, freq_ghz, *get_conq(EventType::kPrecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], dl_zf_buffer_,
-            dl_ifft_buffer_, dl_encoded_buffer_, stats);
+    auto computeSubcarrier = nullptr; // TODO finish this
 
     auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
         *get_conq(EventType::kEncode), complete_task_queue_,
@@ -632,8 +619,8 @@ void* Millipede::worker(int tid)
         calib_buffer_, recip_buffer_, stats);
 
     std::vector<Doer*> computers_vec
-        = { computeIFFT, computePrecode, computeZF, computeReciprocity,
-              computeFFT, computeDemul, computeEncoding, computeDecoding };
+        = { computeIFFT, computeReciprocity, /*  TODO: add in computeSubcarrier */
+              computeFFT, computeEncoding, computeDecoding };
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
@@ -1062,16 +1049,6 @@ void Millipede::initialize_uplink_buffers()
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    ul_zf_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-
-    equal_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    ue_spec_pilot_buffer_.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
-    size_t mod_type = config_->mod_type;
-    demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
-        mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
         >> 3 * config_->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
