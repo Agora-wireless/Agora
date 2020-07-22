@@ -196,6 +196,9 @@ public:
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
+    /* FFT parameters */
+    bool fft_in_sender;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;
