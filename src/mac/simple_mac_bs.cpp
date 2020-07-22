@@ -11,6 +11,12 @@ SimpleBSMac::SimpleBSMac(Config* cfg, size_t rx_thread_num, size_t core_offset)
     , core_id_(core_offset)
     , cfg(cfg)
 {
+    // TUN Interface
+    ipbridge = new IPbridge();
+    data_to_tun = new unsigned char[cfg->mac_data_bytes_num_perframe]();
+
+    // CRC
+    crc_up = new DoCRC();
 }
 
 SimpleBSMac::~SimpleBSMac() { delete cfg; }
@@ -79,6 +85,19 @@ void* SimpleBSMac::loopRecv(int tid)
                 exit(0);
             }
             return (NULL);
+        }
+
+        // XXX OBCH XXX
+        // Check CRC
+        if (crc_up->checkCRC24(pkt)) {
+            // CRC Good, valid packets -> upstream
+            printf("XXX OBCH XXX CRC GOOD!! \n");
+            if (cfg->ip_bridge_enable && pkt->valid_tun_data) {
+                printf("XXX OBCH XXX Valid TUN Data, send up \n");
+                // TODO : different data formats (pkt->data and data_to_tun)
+                data_to_tun = (unsigned char*) pkt->data;
+                ipbridge->write_fragment(data_to_tun, cfg->data_bytes_num_perframe);
+            }
         }
 
         if (kDebugBSReceiver) {
