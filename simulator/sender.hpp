@@ -81,6 +81,10 @@ private:
     // antenna fields set
     inline size_t tag_to_tx_buffers_index(gen_tag_t tag) const;
 
+    // Run FFT in the sender
+    void run_fft(Packet* pkt, complex_float* fft_inout,
+        DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload);
+
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz

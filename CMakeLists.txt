@@ -221,6 +221,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/txrx/txrx_mac.cpp)
 
 if(${USE_DPDK})
+  add_definitions(-DUSE_DPDK)
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
     src/millipede/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
@@ -303,9 +304,10 @@ add_executable(macbs
 target_link_libraries(macbs ${COMMON_LIBS})
 
 if(${USE_DPDK_SENDER})
+  add_definitions(-DUSE_DPDK_SENDER)
   add_executable(sender
     simulator/sender_cli.cpp
-    simulator/sender_dpdk.cpp
+    simulator/sender_merge.cpp
     src/common/dpdk_transport.cpp
     $<TARGET_OBJECTS:common_sources_lib>)
 else()
