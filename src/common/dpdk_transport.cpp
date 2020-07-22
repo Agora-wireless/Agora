@@ -233,3 +233,45 @@ struct rte_flow* DpdkTransport::generate_ipv4_flow(uint16_t port_id,
         flow = rte_flow_create(port_id, &attr, pattern, action, error);
     return flow;
 }
+
+rte_mbuf* DpdkTransport::generate_udp_header(rte_mempool* mbuf_pool,
+    rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr, uint32_t src_addr,
+    uint32_t dst_addr, int src_port, int dst_port, size_t buffer_length)
+{
+    rte_mbuf* tx_buf __attribute__((aligned(64)));
+    tx_buf = rte_pktmbuf_alloc(mbuf_pool);
+
+    rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_buf, rte_ether_hdr*);
+    eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+    memcpy(eth_hdr->s_addr.addr_bytes, src_mac_addr.addr_bytes,
+        RTE_ETHER_ADDR_LEN);
+    memcpy(eth_hdr->d_addr.addr_bytes, dst_mac_addr.addr_bytes,
+        RTE_ETHER_ADDR_LEN);
+
+    auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
+    ip_h->src_addr = src_addr;
+    ip_h->dst_addr = dst_addr;
+    ip_h->next_proto_id = IPPROTO_UDP;
+    ip_h->version_ihl = 0x45;
+    ip_h->type_of_service = 0;
+    ip_h->total_length = rte_cpu_to_be_16(
+        buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
+    ip_h->packet_id = 0;
+    ip_h->fragment_offset = 0;
+    ip_h->time_to_live = 64;
+    ip_h->hdr_checksum = 0;
+
+    auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
+    // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
+    udp_h->src_port = rte_cpu_to_be_16(src_port);
+    // udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+    udp_h->dst_port = rte_cpu_to_be_16(dst_port);
+    udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
+        - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
+
+    tx_buf->pkt_len = buffer_length + kPayloadOffset;
+    tx_buf->data_len = buffer_length + kPayloadOffset;
+    tx_buf->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
+
+    return tx_buf;
+}

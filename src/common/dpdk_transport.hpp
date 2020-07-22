@@ -55,6 +55,10 @@ public:
     static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
     static void print_pkt(int src_ip, int dst_ip, uint16_t src_port,
         uint16_t dst_port, int len, int tid);
+    static rte_mbuf* generate_udp_header(rte_mempool* mbuf_pool,
+        rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
+        uint32_t src_addr, uint32_t dst_addr, int src_port, int dst_port,
+        size_t buffer_length);
 };
 
 #endif

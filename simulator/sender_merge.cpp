@@ -355,41 +355,47 @@ void* Sender::worker_thread(int tid)
         size_t start_tsc_send = rdtsc();
 #ifdef USE_DPDK_SENDER
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
-        tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+        tx_bufs[0]
+            = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
+                server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
+                cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
+        // rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
+        // tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
 
-        rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*);
-        eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-        memcpy(eth_hdr->s_addr.addr_bytes, sender_mac_addr.addr_bytes,
-            RTE_ETHER_ADDR_LEN);
-        memcpy(eth_hdr->d_addr.addr_bytes, server_mac_addr.addr_bytes,
-            RTE_ETHER_ADDR_LEN);
+        // rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*);
+        // eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+        // memcpy(eth_hdr->s_addr.addr_bytes, sender_mac_addr.addr_bytes,
+        //     RTE_ETHER_ADDR_LEN);
+        // memcpy(eth_hdr->d_addr.addr_bytes, server_mac_addr.addr_bytes,
+        //     RTE_ETHER_ADDR_LEN);
 
-        auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
-        ip_h->src_addr = sender_addr;
-        ip_h->dst_addr = server_addr;
-        ip_h->next_proto_id = IPPROTO_UDP;
-        ip_h->version_ihl = 0x45;
-        ip_h->type_of_service = 0;
-        ip_h->total_length = rte_cpu_to_be_16(
-            buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
-        ip_h->packet_id = 0;
-        ip_h->fragment_offset = 0;
-        ip_h->time_to_live = 64;
-        ip_h->hdr_checksum = 0;
+        // auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
+        // ip_h->src_addr = sender_addr;
+        // ip_h->dst_addr = server_addr;
+        // ip_h->next_proto_id = IPPROTO_UDP;
+        // ip_h->version_ihl = 0x45;
+        // ip_h->type_of_service = 0;
+        // ip_h->total_length = rte_cpu_to_be_16(
+        //     buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
+        // ip_h->packet_id = 0;
+        // ip_h->fragment_offset = 0;
+        // ip_h->time_to_live = 64;
+        // ip_h->hdr_checksum = 0;
 
-        auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
-        // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
-        udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
-        // udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
-        udp_h->dst_port
-            = rte_cpu_to_be_16(cfg->bs_port + rand() % cfg->socket_thread_num);
-        udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
-            - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
+        // auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
+        // // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
+        // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
+        // // udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
+        // udp_h->dst_port
+        //     = rte_cpu_to_be_16(cfg->bs_port + rand() % cfg->socket_thread_num);
+        // udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
+        //     - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
 
-        tx_bufs[0]->pkt_len = buffer_length + kPayloadOffset;
-        tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
-        tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
-        auto* payload = (char*)eth_hdr + kPayloadOffset;
+        // tx_bufs[0]->pkt_len = buffer_length + kPayloadOffset;
+        // tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
+        // tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
+        auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
+            + kPayloadOffset;
 
         if (kSenderFFT) {
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
@@ -450,8 +456,8 @@ void* Sender::worker_thread(int tid)
                 pkt->symbol_id, pkt->ant_id, tx_bufs_idx,
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
 #ifdef USE_DPDK_SENDER
-            DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
-                udp_h->src_port, udp_h->dst_port, tx_bufs[0]->data_len, tid);
+            // DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
+            //     udp_h->src_port, udp_h->dst_port, tx_bufs[0]->data_len, tid);
 #endif
         }
 
