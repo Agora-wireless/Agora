@@ -307,23 +307,33 @@ if(${USE_DPDK_SENDER})
   add_definitions(-DUSE_DPDK_SENDER)
   add_executable(sender
     simulator/sender_cli.cpp
-    simulator/sender_merge.cpp
+    simulator/sender.cpp
     src/common/dpdk_transport.cpp
     $<TARGET_OBJECTS:common_sources_lib>)
 else()
   add_executable(sender
     simulator/sender_cli.cpp
-    simulator/sender_merge.cpp
+    simulator/sender.cpp
     $<TARGET_OBJECTS:common_sources_lib>)
 endif()
 target_link_libraries(sender ${COMMON_LIBS})
 
-add_executable(sim
-  simulator/main.cpp
-  simulator/simulator.cpp
-  simulator/sender_merge.cpp
-  simulator/receiver.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
+if(${USE_DPDK_SENDER})
+  add_executable(sim
+    simulator/main.cpp
+    simulator/simulator.cpp
+    simulator/sender.cpp
+    simulator/receiver.cpp
+    src/common/dpdk_transport.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
+else()
+  add_executable(sim
+    simulator/main.cpp
+    simulator/simulator.cpp
+    simulator/sender.cpp
+    simulator/receiver.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
+endif()
 target_link_libraries(sim ${COMMON_LIBS})
 
 # End-to-end test
