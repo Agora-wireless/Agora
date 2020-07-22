@@ -33,6 +33,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include "ip_bridge.hpp"
+#include "crc.hpp"
 
 typedef unsigned short ushort;
 class SimpleBSMac {
@@ -67,6 +69,14 @@ private:
 
     size_t core_id_;
     Config* cfg;
+
+    // TUN interface
+    IPbridge* ipbridge;
+    unsigned char* data_to_tun;
+    uint32_t tun_payload_size_bytes;
+
+    // CRC
+    DoCRC* crc_up;
 };
 
 #endif

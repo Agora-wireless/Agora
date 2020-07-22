@@ -29,5 +29,6 @@
  "downlink_mode": false,
  "client_ul_pilot_syms" : 2,
  "worker_thread_num" : 25,
- "demul_block_size" : 48
+ "demul_block_size" : 48,
+ "ip_bridge_enable" : true
 }

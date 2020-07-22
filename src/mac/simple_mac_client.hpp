@@ -121,7 +121,7 @@ private:
     // TUN interface
     IPbridge* ipbridge;
     unsigned char* data_from_tun;
-    int tun_payload_size_bytes;
+    uint32_t tun_payload_size_bytes;
 
     // CRC
     DoCRC* crc_dwn;
