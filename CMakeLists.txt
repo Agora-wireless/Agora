@@ -217,7 +217,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/reciprocity.cpp
   src/millipede/radio_lib.cpp
   src/millipede/radio_calibrate.cpp
-  src/millipede/txrx/txrx_mac.cpp)
+  src/millipede/mac_thread.cpp)
 
 if(${USE_DPDK})
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
@@ -294,12 +294,6 @@ add_executable(macuser
   src/mac/mac_client_main.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(macuser ${COMMON_LIBS})
-
-add_executable(macbs
-  src/mac/simple_mac_bs.cpp
-  src/mac/mac_bs_main.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(macbs ${COMMON_LIBS})
 
 if(${USE_DPDK_SENDER})
   add_executable(sender
