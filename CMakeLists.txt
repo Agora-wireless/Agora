@@ -321,7 +321,7 @@ target_link_libraries(sender ${COMMON_LIBS})
 add_executable(sim
   simulator/main.cpp
   simulator/simulator.cpp
-  simulator/sender.cpp
+  simulator/sender_merge.cpp
   simulator/receiver.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
