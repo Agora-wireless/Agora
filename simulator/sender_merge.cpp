@@ -359,41 +359,6 @@ void* Sender::worker_thread(int tid)
             = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
                 server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
                 cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
-        // rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
-        // tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
-
-        // rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*);
-        // eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-        // memcpy(eth_hdr->s_addr.addr_bytes, sender_mac_addr.addr_bytes,
-        //     RTE_ETHER_ADDR_LEN);
-        // memcpy(eth_hdr->d_addr.addr_bytes, server_mac_addr.addr_bytes,
-        //     RTE_ETHER_ADDR_LEN);
-
-        // auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
-        // ip_h->src_addr = sender_addr;
-        // ip_h->dst_addr = server_addr;
-        // ip_h->next_proto_id = IPPROTO_UDP;
-        // ip_h->version_ihl = 0x45;
-        // ip_h->type_of_service = 0;
-        // ip_h->total_length = rte_cpu_to_be_16(
-        //     buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
-        // ip_h->packet_id = 0;
-        // ip_h->fragment_offset = 0;
-        // ip_h->time_to_live = 64;
-        // ip_h->hdr_checksum = 0;
-
-        // auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
-        // // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
-        // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
-        // // udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
-        // udp_h->dst_port
-        //     = rte_cpu_to_be_16(cfg->bs_port + rand() % cfg->socket_thread_num);
-        // udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
-        //     - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
-
-        // tx_bufs[0]->pkt_len = buffer_length + kPayloadOffset;
-        // tx_bufs[0]->data_len = buffer_length + kPayloadOffset;
-        // tx_bufs[0]->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
         auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
@@ -620,7 +585,7 @@ void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
     DftiComputeForward(mkl_handle,
         reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
 
-    rte_memcpy(payload, pkt, Packet::kOffsetOfData);
+    memcpy(payload, pkt, Packet::kOffsetOfData);
     simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
         reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
         cfg->OFDM_CA_NUM * 2);

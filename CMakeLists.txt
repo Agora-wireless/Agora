@@ -313,7 +313,7 @@ if(${USE_DPDK_SENDER})
 else()
   add_executable(sender
     simulator/sender_cli.cpp
-    simulator/sender.cpp
+    simulator/sender_merge.cpp
     $<TARGET_OBJECTS:common_sources_lib>)
 endif()
 target_link_libraries(sender ${COMMON_LIBS})
