@@ -15,6 +15,7 @@
 #include "dodemul.hpp"
 #include "dofft.hpp"
 #include "doprecode.hpp"
+#include "dosubcarrier.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
 #include "mac_thread.hpp"
@@ -65,9 +66,11 @@ public:
     void start();
     void stop();
 
+#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
+#endif // BIGSTATION
     void* worker(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
@@ -156,6 +159,18 @@ private:
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
 
+    /// The list of subcarrier doers, of which there should be
+    /// `demul_events_per_symbol` elements in total. 
+    /// FIXME: ensure this is correct
+    ///
+    /// This exists for accessibility purposes to expose inner buffers
+    /// within demodulation, e.g., `equal_buffer`, `demul_soft_buffer`.
+    ///
+    /// TODO: we could also include the subcarrier range in this vector,
+    ///       e.g., using a std::pair -- `vector<pair<int, DoSubcarrier*>>`
+    std::vector<DoSubcarrier*> subcarrier_doers_;
+
+
     /*****************************************************
      * Buffers
      *****************************************************/
@@ -190,11 +205,6 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Data after soft demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> demod_soft_buffer_;
-
     // Data after LDPC decoding
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: decoded bytes per UE * number of UEs
@@ -223,11 +233,6 @@ private:
     // data symbols per frame
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
-
-    // Calculated zeroforcing precoders for downlink beamforming
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> dl_zf_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas

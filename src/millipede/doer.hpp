@@ -34,7 +34,6 @@ public:
     }
 
 protected:
-    virtual Event_data launch(size_t tag) = 0;
     Doer(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -48,6 +47,8 @@ protected:
     {
     }
 
+    virtual Event_data launch(size_t tag) = 0;
+    
     Config* cfg;
     int tid; // Thread ID of this Doer
     double freq_ghz; // RDTSC frequency in GHz

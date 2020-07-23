@@ -56,12 +56,14 @@ Millipede::Millipede(Config* cfg)
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
+#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_fft>,
             0, cfg->fft_thread_num);
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_zf>,
             cfg->fft_thread_num, cfg->fft_thread_num + cfg->zf_thread_num);
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_demul>,
             cfg->fft_thread_num + cfg->zf_thread_num, cfg->worker_thread_num);
+#endif // BIGSTATION
     } else {
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>, 0,
             cfg->worker_thread_num);
@@ -78,6 +80,11 @@ Millipede::~Millipede()
     if (kEnableMac)
         mac_std_thread_.join();
     delete mac_thread_;
+    
+    // free all of the DoSubcarrier instances
+    for (DoSubcarrier*& dsc : subcarrier_doers_) {
+        delete dsc;
+    }
 }
 
 void Millipede::stop()
@@ -598,38 +605,54 @@ void* Millipede::worker(int tid)
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
-        calib_buffer_, phy_stats, stats);
+        calib_buffer_, phy_stats, stats
+    );
 
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
-        worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats);
+        worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats
+    );
 
-    auto computeSubcarrier = nullptr; // TODO finish this
+    auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
+        *get_conq(EventType::kSubcarrier), complete_task_queue_, worker_ptoks_ptr[tid],
+        csi_buffer_, recip_buffer_, dl_encoded_buffer_,
+        data_buffer_, dl_ifft_buffer_,
+        phy_stats, stats
+    );
+    subcarrier_doers_.push_back(computeSubcarrier); 
+
 
     auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
         *get_conq(EventType::kEncode), complete_task_queue_,
-        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
+        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats
+    );
+
+    /// FIXME: redirect this to use subcarrier_doers.get(sc)->get_demod_hard_buffer()
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
             complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
-            decoded_buffer_, phy_stats, stats);
+            decoded_buffer_, phy_stats, stats
+        );
 
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
         *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
-        calib_buffer_, recip_buffer_, stats);
+        calib_buffer_, recip_buffer_, stats
+    );
 
-    std::vector<Doer*> computers_vec
-        = { computeIFFT, computeReciprocity, /*  TODO: add in computeSubcarrier */
-              computeFFT, computeEncoding, computeDecoding };
+    std::vector<Doer*> compute_vec = { 
+        computeIFFT, computeReciprocity, computeSubcarrier,
+        computeFFT, computeEncoding, computeDecoding
+    };
 
     while (true) {
-        for (size_t i = 0; i < computers_vec.size(); i++) {
-            if (computers_vec[i]->try_launch())
+        for (size_t i = 0; i < compute_vec.size(); i++) {
+            if (compute_vec[i]->try_launch())
                 break;
         }
     }
 }
 
+#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
 void* Millipede::worker_fft(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
@@ -689,6 +712,8 @@ void* Millipede::worker_demul(int tid)
         }
     }
 }
+#endif // BIGSTATION
+
 
 void Millipede::create_threads(
     void* (*worker)(void*), int tid_start, int tid_end)
@@ -1103,8 +1128,6 @@ void Millipede::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    dl_zf_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.calloc(
@@ -1148,7 +1171,6 @@ void Millipede::free_downlink_buffers()
     dl_ifft_buffer_.free();
     recip_buffer_.free();
     calib_buffer_.free();
-    dl_zf_buffer_.free();
     dl_encoded_buffer_.free();
 
     encode_stats_.fini();
@@ -1204,11 +1226,14 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
     fclose(fp);
 }
 
+// FIXME: move this into DoDemul as a part of its public API,
+//        or simply redirect it to this->computeDemul->getEqualData().
 void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
     auto offset = cfg->get_total_data_symbol_idx_ul(
         max_equaled_frame, cfg->UL_PILOT_SYMS);
+    /// FIXME: redirect this to use subcarrier_doers.get(sc)->get_equal_buffer()
     *ptr = (float*)&equal_buffer_[offset][0];
     *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
 }

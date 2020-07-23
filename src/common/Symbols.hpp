@@ -39,6 +39,10 @@ enum class EventType : int {
     kFFT,
     kZF,
     kDemul,
+    /// A meta-event that subsumes the three subcarrier-related events:
+    /// kDemul, kZF, and kPrecode. 
+    /// TODO: after this is fully supported, we can remove those 3 event types.
+    kSubcarrier,
     kIFFT,
     kMapBits,
     kPrecode,
