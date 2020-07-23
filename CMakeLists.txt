@@ -58,14 +58,12 @@ find_package(Armadillo)
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
-set(USE_LDPC True CACHE STRING "USE_LDPC defaulting to 'True'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Millipede's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
-message(STATUS "USE_LDPC: ${USE_LDPC}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
 set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
@@ -238,12 +236,6 @@ set(CLIENT_SOURCES
   src/client/txrx_client.cpp
   src/client/txrx_mac.cpp)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
-
-# LDPC encoding
-if(${USE_LDPC})
-  message(STATUS "LDPC is enabled")
-  add_definitions(-DUSE_LDPC)
-endif()
 
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
