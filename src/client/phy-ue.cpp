@@ -310,20 +310,11 @@ void Phy_UE::start()
                     && ant_id % config_->nChannels == 0) {
                     if (kEnableMac)
                         mac_receiver_->wakeup_mac();
-                    if (kUseLDPC) {
-                        Event_data do_encode_task(EventType::kEncode,
-                            gen_tag_t::frm_sym_ue(frame_id, symbol_id,
-                                ant_id / config_->nChannels)
-                                ._tag);
-                        schedule_task(
-                            do_encode_task, &encode_queue_, ptok_encode);
-                    } else {
-                        Event_data do_modul_task(EventType::kModul,
-                            gen_tag_t::frm_sym_ue(frame_id, symbol_id,
-                                ant_id / config_->nChannels)
-                                ._tag);
-                        schedule_task(do_modul_task, &modul_queue_, ptok_modul);
-                    }
+                    Event_data do_encode_task(EventType::kEncode,
+                        gen_tag_t::frm_sym_ue(
+                            frame_id, symbol_id, ant_id / config_->nChannels)
+                            ._tag);
+                    schedule_task(do_encode_task, &encode_queue_, ptok_encode);
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -356,17 +347,11 @@ void Phy_UE::start()
 
             case EventType::kPacketFromMac: {
                 // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                // size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
-                if (!kUseLDPC) {
-                    Event_data do_map_task(EventType::kModul, event.tags[0]);
-                    schedule_task(do_map_task, &map_queue_, ptok_map);
-                } else {
-                    size_t ue_id = rx_tag_t(event.tags[0]).tid;
-                    size_t offset_in_current_buffer
-                        = rx_tag_t(event.tags[0]).offset;
+                size_t ue_id = rx_tag_t(event.tags[0]).tid;
+                size_t offset_in_current_buffer
+                    = rx_tag_t(event.tags[0]).offset;
 
-                    ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
-                }
+                ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
                 // if (kDebugPrintPerFrameDone)
                 //     printf("Main thread: frame: %zu, finished mapping "
                 //            "uplink data for user %zu\n",
@@ -840,15 +825,11 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
-            int8_t* ul_bits = kEnableMac || kUseLDPC
+            int8_t* ul_bits = kEnableMac
                 ? (int8_t*)&ul_syms_buffer_[ant_id]
                                            [total_ul_symbol_id * data_sc_len]
-                //: (kUseLDPC
-                //          ? (int8_t*)&config_->ul_mod_input[ul_symbol_id
-                //                + config_->UL_PILOT_SYMS][ant_id * data_sc_len]
                 : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
                                    [ant_id * data_sc_len];
-            //);
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
