@@ -329,3 +329,8 @@ add_executable(test_ldpc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
+
+add_executable(test_udp_client_server
+  test/unit_tests/test_udp_client_server.cc)
+target_link_libraries(test_udp_client_server ${COMMON_LIBS})
+add_test(NAME test_udp_client_server COMMAND test_udp_client_server)

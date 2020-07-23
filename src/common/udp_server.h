@@ -14,28 +14,41 @@
 
 #pragma once
 
+#include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <stdexcept>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
-/// Basic UDP server class that supports receiving messages
+/// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServer {
 public:
     // Initialize a UDP server listening on this UDP port with socket buffer
     // size = rx_buffer_size
     UDPServer(uint16_t port, size_t rx_buffer_size = 0)
-        : port(port)
+        : port_(port)
     {
-        sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (sock_fd == -1) {
+        sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sock_fd_ == -1) {
             throw std::runtime_error(
                 "UDPServer: Failed to create local socket.");
         }
 
+        // Set the socket as non-blocking
+        int flags = fcntl(sock_fd_, F_GETFL);
+        if (flags == -1) {
+            throw std::runtime_error("UDPServer: fcntl failed to get flags");
+        }
+        int ret = fcntl(sock_fd_, F_SETFL, flags | O_NONBLOCK);
+        if (ret == -1) {
+            throw std::runtime_error("UDPServer: fcntl failed to set nonblock");
+        }
+
         // Set buffer size
         if (rx_buffer_size != 0) {
-            int ret = setsockopt(sock_fd, SOL_SOCKET, SO_RCVBUF,
+            int ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF,
                 &rx_buffer_size, sizeof(rx_buffer_size));
             if (ret != 0) {
                 throw std::runtime_error(
@@ -48,9 +61,9 @@ public:
         serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
         serveraddr.sin_port = htons(static_cast<unsigned short>(port));
 
-        int r = bind(sock_fd, reinterpret_cast<struct sockaddr*>(&serveraddr),
+        ret = bind(sock_fd_, reinterpret_cast<struct sockaddr*>(&serveraddr),
             sizeof(serveraddr));
-        if (r != 0) {
+        if (ret != 0) {
             throw std::runtime_error("UDPServer: Failed to bind socket to port "
                 + std::to_string(port));
         }
@@ -61,20 +74,32 @@ public:
 
     ~UDPServer()
     {
-        if (sock_fd != -1)
-            close(sock_fd);
+        if (sock_fd_ != -1)
+            close(sock_fd_);
     }
 
     /**
-     * @brief Try to receive up to len bytes in buf
-     * @return The return value of the underlying recv() syscall
+     * @brief Try once to receive up to len bytes in buf without blocking
+     * @return The number of bytes received into buf. If no bytes are received,
+     * return 0.
      */
-    ssize_t recv_nonblocking(uint8_t* buf, size_t len)
+    size_t recv_nonblocking(uint8_t* buf, size_t len)
     {
-        return recv(sock_fd, static_cast<void*>(buf), len, 0);
+        ssize_t ret = recv(sock_fd_, static_cast<void*>(buf), len, 0);
+        if (ret == -1) {
+            if (errno == EAGAIN || ret == EWOULDBLOCK) {
+                // These errors mean that there's no data to receive
+                return 0;
+            } else {
+                throw std::runtime_error(
+                    "UDPServer: recv() failed with unexpected error "
+                    + std::string(strerror(errno)));
+            }
+        }
+        return ret;
     }
 
 private:
-    uint16_t port; // The UDP port to listen on
-    int sock_fd = -1;
+    uint16_t port_; // The UDP port to listen on
+    int sock_fd_ = -1;
 };

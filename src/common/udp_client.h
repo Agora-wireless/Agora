@@ -22,8 +22,8 @@
 #include <unistd.h>
 #include <vector>
 
-/// Basic UDP client class that supports sending messages and caches remote
-/// addrinfo mappings
+// Basic UDP client class based on OS sockets that supports sending messages
+// and caches remote addrinfo mappings
 class UDPClient {
 public:
     UDPClient()
@@ -46,7 +46,10 @@ public:
     }
 
     /**
-     * @brief Send one UDP packet to a remote server
+     * @brief Send one UDP packet to a remote server. The client caches the
+     * the remote server's addrinfo after resolving it for the first time. After
+     * the first time, sending data does not require expensive addrinfo
+     * resolution.
      *
      * @param rem_hostname Hostname or IP address of the remote server
      * @param rem_port UDP port that the remote server is listening on
