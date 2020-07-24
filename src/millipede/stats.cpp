@@ -439,10 +439,10 @@ void Stats::save_to_file()
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
+    printf("Stats: Saving master timestamps to %s\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr,
         std::string("Open file failed ") + std::to_string(errno));
-    printf("Stats: Saving master timestamps to %s\n", filename.c_str());
 
     if (config_->downlink_mode) {
         fprintf(fp_debug,
