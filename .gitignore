@@ -61,3 +61,4 @@ CTestTestfile.cmake
 # IDE config files #
 # ##################
 .vscode
+sftp-config.json
