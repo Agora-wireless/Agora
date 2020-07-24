@@ -69,9 +69,6 @@ private:
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
-#ifdef USE_DPDK_SENDER
-    void create_dpdk_threads(void* (*worker)(void*));
-#endif
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void update_tx_buffer(gen_tag_t tag);

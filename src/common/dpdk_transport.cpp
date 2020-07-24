@@ -237,8 +237,9 @@ struct rte_flow* DpdkTransport::generate_ipv4_flow(uint16_t port_id,
 }
 
 rte_mbuf* DpdkTransport::generate_udp_header(rte_mempool* mbuf_pool,
-    rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr, uint32_t src_addr,
-    uint32_t dst_addr, int src_port, int dst_port, size_t buffer_length)
+    rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
+    uint32_t src_ip_addr, uint32_t dst_ip_addr, uint16_t src_udp_port,
+    uint16_t dst_udp_port, size_t buffer_length)
 {
     rte_mbuf* tx_buf __attribute__((aligned(64)));
     tx_buf = rte_pktmbuf_alloc(mbuf_pool);
@@ -251,8 +252,8 @@ rte_mbuf* DpdkTransport::generate_udp_header(rte_mempool* mbuf_pool,
         RTE_ETHER_ADDR_LEN);
 
     auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
-    ip_h->src_addr = src_addr;
-    ip_h->dst_addr = dst_addr;
+    ip_h->src_addr = src_ip_addr;
+    ip_h->dst_addr = dst_ip_addr;
     ip_h->next_proto_id = IPPROTO_UDP;
     ip_h->version_ihl = 0x45;
     ip_h->type_of_service = 0;
@@ -264,10 +265,8 @@ rte_mbuf* DpdkTransport::generate_udp_header(rte_mempool* mbuf_pool,
     ip_h->hdr_checksum = 0;
 
     auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
-    // udp_h->src_port = rte_cpu_to_be_16(cfg->ue_tx_port + tid);
-    udp_h->src_port = rte_cpu_to_be_16(src_port);
-    // udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_port + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(dst_port);
+    udp_h->src_port = rte_cpu_to_be_16(src_udp_port);
+    udp_h->dst_port = rte_cpu_to_be_16(dst_udp_port);
     udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
         - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
 

@@ -160,17 +160,9 @@ void Sender::startTX()
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
 
-    // Create worker threads
-    // #ifdef USE_DPDK_SENDER
-    // create_dpdk_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>);
-    // #else
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-    // #endif
     master_thread(0); // Start the master thread
-    // // Start a thread to update data buffer
-    // create_threads(
-    //     pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
 }
 
 void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
@@ -178,13 +170,8 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
-    // Create worker threads
-#ifdef USE_DPDK_SENDER
-    create_dpdk_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>);
-#else
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-#endif
 }
 
 void* Sender::master_thread(int tid)
@@ -419,10 +406,6 @@ void* Sender::worker_thread(int tid)
                 tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
                 pkt->symbol_id, pkt->ant_id, tx_bufs_idx,
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
-#ifdef USE_DPDK_SENDER
-            // DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
-            //     udp_h->src_port, udp_h->dst_port, tx_bufs[0]->data_len, tid);
-#endif
         }
 
         rt_assert(completion_queue_.enqueue(tag), "Completion enqueue failed");
@@ -519,28 +502,6 @@ void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
         }
     }
 }
-
-#ifdef USE_DPDK_SENDER
-void Sender::create_dpdk_threads(void* (*worker)(void*))
-{
-    size_t lcore_id;
-    size_t worker_id = 0;
-    // Launch specific task to cores
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
-    {
-        // launch communication and task thread onto specific core
-        if (worker_id < thread_num) {
-            auto context = new EventHandlerContext<Sender>;
-            context->obj_ptr = this;
-            context->id = worker_id;
-            rte_eal_remote_launch((lcore_function_t*)worker, context, lcore_id);
-            printf("DPDK TXRX thread %zu: pinned to core %zu\n", worker_id,
-                lcore_id);
-        }
-        worker_id++;
-    }
-}
-#endif
 
 void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 {
