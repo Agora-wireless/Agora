@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
-#include "utils_simd.hpp"
+#include "datatype_conversion.h"
 #include <malloc.h>
 
 static constexpr size_t kSIMDTestNum = 1024;

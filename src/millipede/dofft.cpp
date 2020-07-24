@@ -5,7 +5,7 @@
  */
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
-#include "utils_simd.hpp"
+#include "datatype_conversion.h"
 #include <malloc.h>
 
 using namespace arma;
