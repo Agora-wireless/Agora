@@ -161,12 +161,12 @@ void Sender::startTX()
     frame_end = new double[kNumStatsFrames]();
 
     // Create worker threads
-#ifdef USE_DPDK_SENDER
-    create_dpdk_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>);
-#else
+    // #ifdef USE_DPDK_SENDER
+    // create_dpdk_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>);
+    // #else
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
-#endif
+    // #endif
     master_thread(0); // Start the master thread
     // // Start a thread to update data buffer
     // create_threads(

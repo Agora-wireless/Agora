@@ -348,8 +348,8 @@ add_executable(test_ldpc
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
 
-add_executable(test_simd test/unit_tests/test_simd.cc
+add_executable(test_datatype_conversion test/unit_tests/test_datatype_conversion.cc
   ${COMMON_SOURCES}
 )
-target_link_libraries(test_simd ${GTEST_LIBRARIES})
-add_test(NAME test_simd COMMAND test_simd)
+target_link_libraries(test_datatype_conversion ${GTEST_LIBRARIES})
+add_test(NAME test_datatype_conversion COMMAND test_datatype_conversion)
