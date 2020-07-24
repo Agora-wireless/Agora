@@ -127,7 +127,7 @@ void SimpleClientMac::startTXfromMain(
         thread_num, thread_num + 1);
 }
 
-void* SimpleClientMac::master_thread(int tid)
+void* SimpleClientMac::master_thread(int)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
@@ -214,7 +214,7 @@ void* SimpleClientMac::master_thread(int tid)
     exit(0);
 }
 
-void* SimpleClientMac::data_update_thread(int tid)
+void* SimpleClientMac::data_update_thread(int)
 {
     // Sender get better performance when this thread is not pinned to core
     // pin_to_core_with_offset(ThreadType::kWorker, 13, 0);
