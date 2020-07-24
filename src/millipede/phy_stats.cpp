@@ -29,44 +29,23 @@ void PhyStats::print_phy_stats()
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
     for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-        if (kUseLDPC) {
-            size_t total_decoded_bits(0);
-            size_t total_bit_errors(0);
-            size_t total_decoded_blocks(0);
-            size_t total_block_errors(0);
-            for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
-                total_decoded_bits += decoded_bits_count_[ue_id][i];
-                total_bit_errors += bit_error_count_[ue_id][i];
-                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-                total_block_errors += block_error_count_[ue_id][i];
-            }
-            std::cout << "UE " << ue_id << ": bit errors (BER) "
-                      << total_bit_errors << "/" << total_decoded_bits << "("
-                      << 1.0 * total_bit_errors / total_decoded_bits
-                      << "), block errors (BLER) " << total_block_errors << "/"
-                      << total_decoded_blocks << " ("
-                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                      << std::endl;
-        } else {
-            size_t total_uncoded_bits(0);
-            size_t total_uncoded_bit_errors(0);
-            size_t total_decoded_blocks(0);
-            size_t total_block_errors(0);
-            for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
-                total_uncoded_bits += uncoded_bits_count_[ue_id][i];
-                total_uncoded_bit_errors += uncoded_bit_error_count_[ue_id][i];
-                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-                total_block_errors += block_error_count_[ue_id][i];
-            }
-            std::cout << "UE " << ue_id << ": uncoded bit errors (BER) "
-                      << total_uncoded_bit_errors << "/" << total_uncoded_bits
-                      << "("
-                      << 1.0 * total_uncoded_bit_errors / total_uncoded_bits
-                      << "), uncoded block errors (BLER) " << total_block_errors << "/"
-                      << total_decoded_blocks << " ("
-                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                      << std::endl;
+        size_t total_decoded_bits(0);
+        size_t total_bit_errors(0);
+        size_t total_decoded_blocks(0);
+        size_t total_block_errors(0);
+        for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
+            total_decoded_bits += decoded_bits_count_[ue_id][i];
+            total_bit_errors += bit_error_count_[ue_id][i];
+            total_decoded_blocks += decoded_blocks_count_[ue_id][i];
+            total_block_errors += block_error_count_[ue_id][i];
         }
+        std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
+                  << "/" << total_decoded_bits << "("
+                  << 1.0 * total_bit_errors / total_decoded_bits
+                  << "), block errors (BLER) " << total_block_errors << "/"
+                  << total_decoded_blocks << " ("
+                  << 1.0 * total_block_errors / total_decoded_blocks << ")"
+                  << std::endl;
     }
 }
 
