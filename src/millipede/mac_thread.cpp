@@ -44,7 +44,7 @@ MacThread::~MacThread()
     MLPD_INFO("MAC thread destroyed\n");
 }
 
-void MacThread::process_events_from_master()
+void MacThread::process_codeblocks_from_master()
 {
     Event_data event;
     if (!rx_queue_->try_dequeue_from_producer(*tx_ptok_, event))
@@ -154,7 +154,7 @@ void MacThread::run_event_loop()
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
     while (cfg_->running) {
-        process_events_from_master();
+        process_codeblocks_from_master();
         process_downlink_packets();
     }
 }

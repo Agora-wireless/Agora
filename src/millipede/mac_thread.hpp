@@ -51,7 +51,7 @@ public:
 private:
     // Receive decoded codeblocks from the PHY master thread. Send
     // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
-    void process_events_from_master();
+    void process_codeblocks_from_master();
 
     // Receive user bits and forward them to the PHY master thread
     void process_downlink_packets();
