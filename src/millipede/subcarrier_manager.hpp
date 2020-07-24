@@ -2,10 +2,10 @@
  * Author: Kevin Boos
  * Email: kevinaboos@gmail.com
  *
- * @see DoSubcarrier
+ * @see SubcarrierManager
  */
-#ifndef DOSUBCARRIER_HPP
-#define DOSUBCARRIER_HPP
+#ifndef SUBCARRIER_MANAGER_HPP
+#define SUBCARRIER_MANAGER_HPP
 
 #include "Symbols.hpp"
 #include "buffer.hpp"
@@ -16,78 +16,42 @@
 #include "modulation.hpp"
 #include "stats.hpp"
 #include "phy_stats.hpp"
-#include <armadillo>
+// #include <armadillo>
 #include <iostream>
 #include <stdio.h> /* for fprintf */
 #include <string.h> /* for memcpy */
 #include <vector>
 // #include "mkl_dfti.h"
 
-using namespace arma;
+// using namespace arma;
 
 /**
- * @brief A worker class that handles all forms of subcarrier-parallel processing tasks.
+ * @brief The singleton manager of all `DoSubcarrier` instances.
  * 
- * Currently, this worker class contains the following functionality:
- * @li DoZF
- * @li DoDemul
- * @li DoPrecode
- * @li Reciprocity (?? TBD)
- * 
- * ## General Usage ##
- * One instance of this class should handle the computation for one `block_size` range of subcarrier frequencies,
- * so we should spawn `num_events` instances of this class. 
- * For example, see `config->demul_events_per_symbol` and `config->demul_block_size`,
- * or the similar ones for zeroforcing (`zf_events_per_symbol` and `zf_block_size`).
- * 
- * It then executes the sequential processing stages that are required for each subcarrier block,
- * consisting of the following stages:
- * FIXME: ensure this is right
- * @li zeroforcing (`DoZF`)
- * @li demodulation (`DoDemul`) for uplink, or precoding (`DoPrecode`) for downlink.
+ * This class is essentially a wrapper around the many `DoSubcarrier` instances,
+ * aka subcarrier workers.
+ * It encapsulates (and owns) the buffers shared by those `DoSubcarrier` instances
+ * and exposes interfaces to communicate with them, e.g., by using event queues. 
  * 
  * 
- * FIXME: The biggest issue is how buffers are going to be allocated, shared, and accessed. 
- *        Currently, the rest of Millipede expects a single instance of all buffers,
- *        but with this redesign, we are allocating per-DoSubcarrier buffers. 
- *        While this probably works just fine for intermediate internal buffers,
- *        perhaps we should require (at least initially) that all input and output buffers
- *        are shared across all `DoSubcarrier` instances. 
- * 
- * 
- * ## Buffer ownership and management ##
- * The general buffer ownership policy is to accept *references* to input buffers, 
- * and to own both intermediate buffers for internal usage
- * as well as output buffers that are shared with others. 
- * This means that the constructor/destructor of this class is responsible
- * for allocating/deallocating the intermediate buffers and output buffers 
- * but not the input buffers.
- *
- * FIXME: Currently, however, some of the output buffers are still owned
- *        by the core `Millipede` class instance. We'll gradually move them into here.
+ * There is at least one `DoSubcarrier` instance per subcarrier range,
+ * typically just one but potentially more redundant replicates for 
+ * purposes of scalability and reliability.
+ * This class is responsible for owning the internal buffers that are used
+ * by the subcarrier workers, 
+ * and serves as a wrapper interface to export subcarrier-parallel functionality. 
  * 
  */
-class DoSubcarrier: public Doer {
+class SubcarrierManager {
 public:
-    /**
-     * @brief Construct a new Do Subcarrier object
-     * 
-     * In general, 
-     * NOTE: The following buffers are owned by this class, but if we wanted to 
-     *       share them differently, we could accept a reference to an externally-owned instance.
-     *       - `demod_soft_buffer`
-     *       - `dl_ifft_buffer` (TODO, currently still owned by `Millipede` class)
-     * 
-     */
-    DoSubcarrier(
+    
+    SubcarrierManager(
         Config* config,
         int tid,
         double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& task_queue,
+        // moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
-        /// The starting subcarrier range of this doer
-        size_t subcarrier_range,
+        // moodycamel::ProducerToken* worker_producer_token,
         // input buffers below
         Table<complex_float>& csi_buffer,
         Table<complex_float>& recip_buffer,
@@ -98,38 +62,48 @@ public:
         // Table<int8_t>& demod_soft_buffer,  
         PhyStats* phy_stats,
         Stats* stats
-    ) : Doer(config, tid, freq_ghz, task_queue, complete_task_queue, worker_producer_token),
-        subcarrier_range_(subcarrier_range),
+    ) : cfg(config), 
+        freq_ghz_(freq_ghz),
+        complete_task_queue(complete_task_queue), 
         csi_buffer_(csi_buffer),
         recip_buffer_(recip_buffer),
         data_buffer_(data_buffer),
         dl_ifft_buffer_(dl_ifft_buffer),
         dl_encoded_buffer_(dl_encoded_buffer)
     {
+        const size_t task_buffer_symbol_num_ul = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
-        // Create the requisite Doers
-        computeZF = new DoZF(this->cfg, tid, freq_ghz, 
-            this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
-            csi_buffer_, recip_buffer_, ul_zf_buffer_, dl_zf_buffer_, stats
-        );
-        computeDemul = new DoDemul(this->cfg, tid, freq_ghz, 
-            this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
-            data_buffer_, ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_hard_buffer_, demod_soft_buffer_, phy_stats, stats
-        );
-        computePrecode = new DoPrecode(this->cfg, tid, freq_ghz, 
-            this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
-            dl_zf_buffer_, dl_ifft_buffer_, dl_encoded_buffer_, stats
-        );
-        // TODO: I believe we need the Reciprocity doer too, since it's used for calculating `dl_zf_buffer`
+        /*
+         * Create the various buffers owned by the subcarrier manager. 
+         * These buffers are shared across all subcarrier doers.
+         * 
+         * TODO: Currently, these buffers are created to be huge enough to store data 
+         *       for *ALL* subcarrier ranges, system-wide. 
+         *       We may want to scale them down to be sufficient for just a single subcarrier range;
+         *       although, then we'd need to perform some kind of "gather" operation at the end
+         *       before handing them off to the encoder stage.
+         */
+
+        equal_buffer_        .malloc(task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        demod_soft_buffer_   .malloc(task_buffer_symbol_num_ul, cfg->mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        ue_spec_pilot_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
+        ul_zf_buffer_        .malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
+        dl_zf_buffer_        .calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     }
 
 
     ~DoSubcarrier() {
-        delete computeZF;
-        delete computeDemul;
-        delete computePrecode;
-        // TODO: delete recip;
+        // First, free all of the buffers we own.
+        equal_buffer_.free();
+        demod_soft_buffer_.free();
+        ue_spec_pilot_buffer_.free();
+        ul_zf_buffer_.free();
+        dl_zf_buffer_.free();
+
+        // Destroy all of the Subcarrier doers
+        for (DoSubcarrier*& dsc : subcarrier_doers_) {
+            delete dsc;
+        }
     }
 
 
@@ -154,28 +128,28 @@ public:
     }
 
 
+    /// An accessor function to expose the internal `equal_buffer_`
+    /// for debugging/GUI purposes.
+    Table<complex_float>& get_equal_buffer() {
+        return equal_buffer_;
+    }
+
+
 private:
-
-    /// The lower bound of the subcarrier range handled by this subcarrier doer.
-    size_t subcarrier_range_;
-
-    /*
-     * TODO: I'd like to use owned objects here instead of pointers,
-     *       but I don't think we can create them in initializer lists because
-     *       the other buffers (`Table`s) need to be allocated first via calls to `malloc`.
-     *       In other news, C++ initializer lists are complete and utter garbage.
-     */
-    DoZF* computeZF;
-    DoDemul* computeDemul;
-    DoPrecode* computePrecode; 
     
+    /// The list of subcarrier doers, of which there should be
+    /// `demul_events_per_symbol` elements in total. 
+    /// FIXME: ensure this is correct
+    ///
+    /// TODO: we could also include the subcarrier range in this vector,
+    ///       e.g., using a std::pair -- `vector<pair<int, DoSubcarrier*>>`
+    std::vector<DoSubcarrier*> subcarrier_doers_;
 
+  
 
     ///////////////////////////////////////////////////
     ////////////////// Input Buffers //////////////////
     ///////////////////////////////////////////////////
-
-    // For the following buffers, see 
 
     /// An input buffer of channel state information (CSI), the output of the FFT stage.
     Table<complex_float>& csi_buffer_;
@@ -249,11 +223,26 @@ private:
     /// and then fed into `DoPrecode` as input.
     Table<complex_float> dl_zf_buffer_;
 
-    /// The internal buffer for data after hard demodulation.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    /// @li 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<uint8_t> demod_hard_buffer_;
+
+    ///////////////////////////////////////////////////
+    ///////// Basic data items from Millipede /////////
+    ///////////////////////////////////////////////////
+
+    /// Millipede-wide configuration values.
+    Config* cfg;
+    /// RDTSC frequency in GHz.
+    double freq_ghz_;
+
+    /// TODO: there should be one task_queue per SubcarrierDoer.
+    /// Millipede pushes events onto this queue to indicate
+    /// to worker threads that various tasks are available to work on.
+    // moodycamel::ConcurrentQueue<Event_data>& task_queue_;
+
+    /// The singleton task completion queue. 
+    /// Push events onto this queue to notify Millipede's master thread
+    /// that a given task has been completed. 
+    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue;
 
 };
 
-#endif // DOSUBCARRIER_HPP
+#endif // SUBCARRIER_MANAGER_HPP

@@ -627,7 +627,7 @@ void* Millipede::worker(int tid)
         worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats
     );
 
-    /// FIXME: redirect this to use subcarrier_doers.get(sc)->get_demod_hard_buffer()
+    /// FIXME: redirect this to use subcarrier_doers.get(sc)->get_demod_soft_buffer()
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
             complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,

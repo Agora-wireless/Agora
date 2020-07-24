@@ -159,16 +159,9 @@ private:
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
 
-    /// The list of subcarrier doers, of which there should be
-    /// `demul_events_per_symbol` elements in total. 
-    /// FIXME: ensure this is correct
-    ///
-    /// This exists for accessibility purposes to expose inner buffers
-    /// within demodulation, e.g., `equal_buffer`, `demul_soft_buffer`.
-    ///
-    /// TODO: we could also include the subcarrier range in this vector,
-    ///       e.g., using a std::pair -- `vector<pair<int, DoSubcarrier*>>`
-    std::vector<DoSubcarrier*> subcarrier_doers_;
+    /// The singleton subcarrier manager instance. 
+    /// @see SubcarrierManager documentation.
+    SubcarrierManager subcarrier_manager_;
 
 
     /*****************************************************
