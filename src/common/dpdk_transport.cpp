@@ -5,6 +5,8 @@
  */
 
 #include "dpdk_transport.hpp"
+#include "utils.h"
+#include <string>
 
 inline const struct rte_eth_conf port_conf_default()
 {
@@ -274,4 +276,38 @@ rte_mbuf* DpdkTransport::generate_udp_header(rte_mempool* mbuf_pool,
     tx_buf->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
 
     return tx_buf;
+}
+
+void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
+{
+    // DPDK setup
+    std::string core_list = std::to_string(core_offset) + "-"
+        + std::to_string(core_offset + thread_num);
+    // n: channels, m: maximum memory in megabytes
+    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
+    int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
+
+    printf("rte_eal_init argv: ");
+    for (int i = 0; i < rte_argc; i++) {
+        printf("%s, ", rte_argv[i]);
+    }
+    printf("\n");
+
+    // Initialize DPDK environment
+    int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
+    rt_assert(ret >= 0, "Failed to initialize DPDK");
+}
+
+rte_mempool* DpdkTransport::create_mempool()
+{
+    unsigned int nb_ports = rte_eth_dev_count_avail();
+    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
+
+    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
+        NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
+
+    rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+
+    return mbuf_pool;
 }

@@ -59,6 +59,8 @@ public:
         rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
         uint32_t src_addr, uint32_t dst_addr, int src_port, int dst_port,
         size_t buffer_length);
+    static void dpdk_init(uint16_t core_offset, size_t thread_num);
+    static rte_mempool* create_mempool();
 };
 
 #endif

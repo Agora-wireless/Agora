@@ -4,7 +4,7 @@
  *
  */
 #include "sender.hpp"
-#include "utils_simd.hpp"
+#include "datatype_conversion.h"
 #include <thread>
 
 bool keep_running = true;
@@ -75,31 +75,33 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
             thread_num, thread_num + 1);
 
 #ifdef USE_DPDK_SENDER
-    // DPDK setup
-    std::string core_list = std::to_string(core_offset) + "-"
-        + std::to_string(core_offset + thread_num);
-    // n: channels, m: maximum memory in megabytes
-    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
-    int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
+    // // DPDK setup
+    // std::string core_list = std::to_string(core_offset) + "-"
+    //     + std::to_string(core_offset + thread_num);
+    // // n: channels, m: maximum memory in megabytes
+    // const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
+    // int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
-    printf("rte_eal_init argv: ");
-    for (int i = 0; i < rte_argc; i++) {
-        printf("%s, ", rte_argv[i]);
-    }
-    printf("\n");
+    // printf("rte_eal_init argv: ");
+    // for (int i = 0; i < rte_argc; i++) {
+    //     printf("%s, ", rte_argv[i]);
+    // }
+    // printf("\n");
 
-    // Initialize DPDK environment
-    int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
-    rt_assert(ret >= 0, "Failed to initialize DPDK");
+    // // Initialize DPDK environment
+    // int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
+    // rt_assert(ret >= 0, "Failed to initialize DPDK");
+    DpdkTransport::dpdk_init(core_offset, thread_num);
 
-    unsigned int nb_ports = rte_eth_dev_count_avail();
-    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
+    // unsigned int nb_ports = rte_eth_dev_count_avail();
+    // printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
-    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
-    mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
-        MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
+    // size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    // mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+    //     MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 
-    rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+    // rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+    mbuf_pool = DpdkTransport::create_mempool();
 
     uint16_t portid = 0;
 
@@ -107,7 +109,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
@@ -371,10 +373,7 @@ void* Sender::worker_thread(int tid)
 
         // Send a message to the server. We assume that the server is running.
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-        if (unlikely(nb_tx_new != 1)) {
-            printf("rte_eth_tx_burst() failed\n");
-            exit(0);
-        }
+        rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed\n");
 #else
         // Send a message to the server. We assume that the server is running.
         if (kUseDPDK or !kConnectUDP) {

@@ -202,8 +202,7 @@ set(COMMON_SOURCES
   src/common/net.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp
-  src/common/utils_simd.cpp)
+  src/encoder/iobuffer.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(MILLIPEDE_SOURCES 

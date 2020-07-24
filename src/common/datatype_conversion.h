@@ -1,4 +1,6 @@
-#include "utils_simd.hpp"
+#ifndef DATATYPE_CONVERSION
+#define DATATYPE_CONVERSION
+
 #include <emmintrin.h>
 #include <immintrin.h>
 
@@ -85,3 +87,5 @@ void simd_convert_float32_to_float16(
     }
 #endif
 }
+
+#endif
