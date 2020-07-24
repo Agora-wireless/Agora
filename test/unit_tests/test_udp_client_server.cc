@@ -21,37 +21,49 @@ void client_func()
     }
 
     for (size_t i = 1; i <= kNumPackets; i++) {
-        memset(&packet[0], static_cast<uint8_t>(i), kMessageSize);
+        static_assert(kMessageSize >= sizeof(size_t), "");
+        *reinterpret_cast<size_t*>(&packet[0]) = i;
         udp_client.send("localhost", kServerUDPPort, &packet[0], kMessageSize);
     }
 }
 
+// Spin until kNumPackets are received
 void server_func()
 {
     double freq_ghz = measure_rdtsc_freq();
     FastRand fast_rand;
-    UDPServer udp_server(kServerUDPPort);
-    std::vector<uint8_t> packet(kMessageSize);
-    server_ready = 1;
 
+    // Without buffer resizing, the server will sometimes drop packets and
+    // therefore never return from this function
+    UDPServer udp_server(kServerUDPPort, kMessageSize * kNumPackets);
+    std::vector<uint8_t> pkt_buf(kMessageSize);
+
+    server_ready = 1;
+    size_t largest_pkt_index = 0;
     size_t start_time = rdtsc();
     size_t num_pkts_received = 0;
+    size_t num_pkts_reordered = 0;
     while (true) {
-        ssize_t ret = udp_server.recv_nonblocking(&packet[0], kMessageSize);
+        ssize_t ret = udp_server.recv_nonblocking(&pkt_buf[0], kMessageSize);
         ASSERT_GE(ret, 0);
         if (ret != 0) {
-            ASSERT_EQ(packet[fast_rand.next_u32() % kMessageSize],
-                static_cast<uint8_t>(num_pkts_received + 1));
+            auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0]);
+            if (pkt_index < largest_pkt_index) {
+                num_pkts_reordered++;
+            }
+            largest_pkt_index = std::max(pkt_index, largest_pkt_index);
             num_pkts_received++;
+
             if (num_pkts_received == kNumPackets) {
                 break;
             }
         }
     }
 
-    printf("Bandwidth = %.2f MB/s\n",
-        (kNumPackets * kMessageSize)
-            / cycles_to_us(rdtsc() - start_time, freq_ghz));
+    printf("Bandwidth = %.2f Gbps/s, number of reordered packets = %zu\n",
+        (kNumPackets * kMessageSize * 8)
+            / cycles_to_ns(rdtsc() - start_time, freq_ghz),
+        num_pkts_reordered);
 }
 
 // Test bandwidth between client and server

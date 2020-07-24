@@ -80,10 +80,14 @@ public:
 
     /**
      * @brief Try once to receive up to len bytes in buf without blocking
-     * @return The number of bytes received into buf. If no bytes are received,
+     *
+     * @return Return the number of bytes received if non-zero bytes are
+     * received. If no bytes are received, return zero. If there was an error
+     * in receiving, return -1.
+     *
      * return 0.
      */
-    size_t recv_nonblocking(uint8_t* buf, size_t len)
+    ssize_t recv_nonblocking(uint8_t* buf, size_t len)
     {
         ssize_t ret = recv(sock_fd_, static_cast<void*>(buf), len, 0);
         if (ret == -1) {
@@ -91,9 +95,10 @@ public:
                 // These errors mean that there's no data to receive
                 return 0;
             } else {
-                throw std::runtime_error(
-                    "UDPServer: recv() failed with unexpected error "
-                    + std::string(strerror(errno)));
+                fprintf(stderr,
+                    "UDPServer: recv() failed with unexpected error %s\n",
+                    strerror(errno));
+                return ret;
             }
         }
         return ret;
