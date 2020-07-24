@@ -55,10 +55,14 @@ public:
     static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
     static void print_pkt(int src_ip, int dst_ip, uint16_t src_port,
         uint16_t dst_port, int len, int tid);
+
+    /// Generate a rte_mbuf object pointer, with ethernet, ip, and udp header filled
     static rte_mbuf* generate_udp_header(rte_mempool* mbuf_pool,
         rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
-        uint32_t src_addr, uint32_t dst_addr, int src_port, int dst_port,
-        size_t buffer_length);
+        uint32_t src_ip_addr, uint32_t dst_ip_addr, uint16_t src_udp_port,
+        uint16_t dst_udp_port, size_t buffer_length);
+
+    /// Init dpdk on core [core_offset:core_offset+thread_num]
     static void dpdk_init(uint16_t core_offset, size_t thread_num);
     static rte_mempool* create_mempool();
 };
