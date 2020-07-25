@@ -11,35 +11,43 @@
 
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Millipede
- * server.
+ * server or client.
  *
- * On the uplink, this thread takes symbols decoded by Millipede and sends them
- * to higher-level applications.
+ * This thread receives UDP data packets from remote apps and forwards them to
+ * Millipede. It receives decoded symbols from Millipede and forwards UDP data
+ * packets to applications.
  */
 class MacThread {
 public:
-    // Default log file for MAC layer outputs
-    const char* kDefaultLogFilename = "/tmp/millipede_mac_log";
+    enum class Mode {
+        kServer, // The MAC thread is running the the Millipede server
+        kClient // The MAC thread is running at the Millipede client
+    };
 
-    // Decoded uplink packets will be sent to kRemoteHostname
+    // Default log file for MAC layer outputs
+    const char* kDefaultLogFilename = "/tmp/mac_log";
+
+    // After receiving decoded packets from the PHY (uplink at the server,
+    // downlink at the client), we send UDP packets to kRemoteHostname
     const char* kRemoteHostname = "127.0.0.1";
 
-    // We'll send decoded uplink packets for UE #i with destination port
-    // number UDP port kBaseRemotePort + i
+    // UDP packets for UE #i (uplink packets at the server, downlink packets at
+    // the client) are sent to kBaseRemotePort + i
     static constexpr size_t kBaseRemotePort = 8080;
 
-    // We'll listen for downlink data packets on UDP port kLocalPort
+    // We listen for UDP packets from applications (downlink packets at the
+    // server, uplink packets at the client) on kLocalPort
     static constexpr size_t kLocalPort = 8070;
 
     // Maximum number of outstanding downlink packets per UE that we allocate
-    // buffer space for
-    static constexpr size_t kMaxDLPktsPerUE = 64;
+    // UDP buffer space for
+    static constexpr size_t kMaxPktsPerUE = 64;
 
-    MacThread(Config* cfg, size_t core_offset, Table<int8_t>* dl_bits_buffer,
-        Table<int>* dl_bits_buffer_status, Table<uint8_t>* ul_bits_buffer,
+    MacThread(Mode mode, Config* cfg, size_t core_offset,
+        Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
+        Table<int8_t>* dl_bits_buffer, Table<int>* dl_bits_buffer_status,
         moodycamel::ConcurrentQueue<Event_data>* rx_queue,
         moodycamel::ConcurrentQueue<Event_data>* tx_queue,
-        moodycamel::ProducerToken* rx_ptok, moodycamel::ProducerToken* tx_ptok,
         std::string log_filename = "");
 
     ~MacThread();
@@ -53,9 +61,13 @@ private:
     // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
     void process_codeblocks_from_master();
 
-    // Receive user bits and forward them to the PHY master thread
-    void process_downlink_packets();
+    // Receive user data bits (uplink bits at the client, downlink bits at the
+    // server) and forward them to the PHY.
+    void process_udp_packets_from_apps();
 
+    // If Mode::kServer, this thread is running at the Millipede server. Else at
+    // the client.
+    const Mode mode_;
     Config* cfg_;
     const size_t core_offset_; // The CPU core on which this thread runs
 
@@ -65,25 +77,23 @@ private:
     UDPClient udp_client; // UDP endpoint used for sending messages
     UDPServer udp_server; // UDP endpoint used for receiving messages
 
-    Table<uint8_t>* ul_bits_buffer_; // Uplink bits decoded by the PHY
+    Table<uint8_t>* ul_bits_buffer_;
+    Table<uint8_t>* ul_bits_buffer_status_;
 
-    // Staging buffers to accumulate decoded uplink code blocks for each UE
-    std::vector<uint8_t> frame_data[kMaxUEs];
-
-    std::vector<uint8_t> dl_pkt_buf; // Buffer to receive downlink packets
-
-    // The number of bytes received in the current frame for each UE
-    std::array<size_t, kMaxUEs> num_filled_bytes_in_frame;
-
-    // Downlink: Not implemented yet
     Table<int8_t>* dl_bits_buffer_;
     Table<int>* dl_bits_buffer_status_;
 
-    // FIFO queues for receiving messages from the master thread
-    moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
-    moodycamel::ProducerToken* tx_ptok_;
+    std::vector<uint8_t> udp_pkt_buf_;
 
-    // FIFO queues for sending messages to the master thread
+    // Staging buffers to accumulate decoded uplink code blocks for each UE
+    std::vector<uint8_t> frame_data_[kMaxUEs];
+
+    // The number of bytes received in the current frame for each UE
+    std::array<size_t, kMaxUEs> num_filled_bytes_in_frame_;
+
+    // FIFO queue for receiving messages from the master thread
+    moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
+
+    // FIFO queue for sending messages to the master thread
     moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
-    moodycamel::ProducerToken* rx_ptok_;
 };

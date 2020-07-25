@@ -44,13 +44,12 @@ Millipede::Millipede(Config* cfg)
         get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
 
     if (kEnableMac) {
-        mac_thread_ = new MacThread(cfg,
-            cfg->core_offset + cfg->socket_thread_num + cfg->worker_thread_num
-                + 1,
-            &dl_bits_buffer_, &dl_bits_buffer_status_, &decoded_buffer_,
-            &message_queue_, get_conq(EventType::kPacketToMac),
-            rx_ptoks_ptr[cfg->socket_thread_num],
-            tx_ptoks_ptr[cfg->socket_thread_num]);
+        const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
+            + cfg->worker_thread_num + 1;
+        mac_thread_ = new MacThread(MacThread::Mode::kServer, cfg, mac_cpu_core,
+            &decoded_buffer_ /* ul bits */, nullptr /* ul bits status */,
+            &dl_bits_buffer_, &dl_bits_buffer_status_, &message_queue_,
+            get_conq(EventType::kPacketToMac));
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
