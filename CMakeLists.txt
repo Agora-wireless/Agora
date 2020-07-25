@@ -184,6 +184,7 @@ endif()
 
 include_directories(
 	src/common/
+	src/mac/
   src/millipede/
   src/millipede/txrx/
   src/client/)
@@ -215,7 +216,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/reciprocity.cpp
   src/millipede/radio_lib.cpp
   src/millipede/radio_calibrate.cpp
-  src/millipede/mac_thread.cpp)
+  src/mac/mac_thread.cpp)
 
 if(${USE_DPDK})
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
@@ -232,7 +233,8 @@ set(CLIENT_SOURCES
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
   src/client/txrx_client.cpp
-  src/client/txrx_mac.cpp)
+  src/client/txrx_mac.cpp
+  src/mac/mac_thread.cpp)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 include_directories(
