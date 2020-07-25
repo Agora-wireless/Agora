@@ -261,13 +261,13 @@ private:
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> dl_bits_buffer_;
+    Table<uint8_t> dl_bits_buffer_;
 
     // 1st dimension: number of UEs
     // 2nd dimension: number of OFDM data subcarriers * TASK_BUFFER_FRAME_NUM
     //                * number of DL data symbols per frame
     // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
-    Table<int> dl_bits_buffer_status_;
+    Table<uint8_t> dl_bits_buffer_status_;
 
     /**
      * Data for transmission

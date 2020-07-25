@@ -4,7 +4,7 @@
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
-    Table<int8_t>* dl_bits_buffer, Table<int>* dl_bits_buffer_status,
+    Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<Event_data>* rx_queue,
     moodycamel::ConcurrentQueue<Event_data>* tx_queue, std::string log_filename)
     : mode_(mode)
@@ -24,9 +24,11 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
 
     // Set up buffers
-    num_filled_bytes_in_frame_.fill(0);
-    for (auto& v : frame_data_)
+    server_.n_filled_in_frame_.fill(0);
+    for (auto& v : server_.frame_data_)
         v.resize(cfg_->mac_data_bytes_num_perframe);
+
+    client_.ul_bits_buffer_id_.fill(0);
 
     const size_t udp_pkt_len = MacPacket::kOffsetOfData
         + bits_to_bytes(cfg_->LDPC_config.cbLen)
@@ -65,9 +67,9 @@ void MacThread::process_codeblocks_from_master()
     if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
         const size_t frame_data__offset = (symbol_idx_ul - cfg_->UL_PILOT_SYMS)
             * cfg_->data_bytes_num_persymbol;
-        memcpy(&frame_data_[ue_id][frame_data__offset], ul_data_ptr,
+        memcpy(&server_.frame_data_[ue_id][frame_data__offset], ul_data_ptr,
             cfg_->data_bytes_num_persymbol);
-        num_filled_bytes_in_frame_[ue_id] += cfg_->data_bytes_num_persymbol;
+        server_.n_filled_in_frame_[ue_id] += cfg_->data_bytes_num_persymbol;
 
         // Print information about the received symbol
         if (kDebugBSReceiver) {
@@ -86,17 +88,17 @@ void MacThread::process_codeblocks_from_master()
     }
 
     // When the frame is full, send it to the application
-    if (num_filled_bytes_in_frame_[ue_id] == cfg_->data_bytes_num_perframe) {
-        num_filled_bytes_in_frame_[ue_id] = 0;
+    if (server_.n_filled_in_frame_[ue_id] == cfg_->data_bytes_num_perframe) {
+        server_.n_filled_in_frame_[ue_id] = 0;
 
         udp_client.send(kRemoteHostname, kBaseRemotePort + ue_id,
-            &frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe);
+            &server_.frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe);
 
         fprintf(log_file_,
             "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n", frame_id,
             ue_id, cfg_->mac_data_bytes_num_perframe);
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string(frame_data_[ue_id][i]) << " ";
+            ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
         }
         fprintf(log_file_, "%s\n", ss.str().c_str());
         ss.str("");
@@ -120,27 +122,54 @@ void MacThread::process_udp_packets_from_apps()
     }
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-    const size_t total_symbol_idx
-        = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
-    const size_t rx_offset
-        = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
 
-    if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
-        MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu\n", rx_offset);
-        cfg_->running = false;
-        return;
-    } else {
+    if (mode_ == Mode::kServer) {
+        const size_t total_symbol_idx
+            = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
+        const size_t rx_offset
+            = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
+
+        if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
+            MLPD_ERROR(
+                "MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
+                rx_offset);
+            cfg_->running = false;
+            return;
+        }
+
         for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
             (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
         memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
                                   [pkt->ue_id * cfg_->OFDM_DATA_NUM],
             pkt->data, udp_pkt_buf_.size());
-    }
 
-    Event_data msg(EventType::kPacketFromMac,
-        gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)._tag);
-    rt_assert(tx_queue_->enqueue(msg),
-        "MAC thread: Failed to enqueue downlink packet");
+        Event_data msg(EventType::kPacketFromMac,
+            gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)
+                ._tag);
+        rt_assert(tx_queue_->enqueue(msg),
+            "MAC thread: Failed to enqueue downlink packet");
+    } else {
+        const size_t radio_id = fast_rand.next_u32() % cfg_->UE_ANT_NUM;
+        const size_t rx_offset = client_.ul_bits_buffer_id_[radio_id];
+
+        if ((*ul_bits_buffer_status_)[radio_id][rx_offset] == 1) {
+            fprintf(stderr,
+                "MAC thread: UDP RX buffer full, offset: %zu. Dropping "
+                "packet.\n",
+                rx_offset);
+            return;
+        } else {
+            memcpy(&(*ul_bits_buffer_)[radio_id]
+                                      [rx_offset * cfg_->mac_packet_length],
+                pkt->data, cfg_->mac_packet_length);
+            (*ul_bits_buffer_status_)[radio_id][rx_offset] = 1;
+        }
+
+        Event_data msg(
+            EventType::kPacketFromMac, rx_tag_t(radio_id, rx_offset)._tag);
+        rt_assert(tx_queue_->enqueue(msg),
+            "MAC thread: Failed to enqueue uplink packet");
+    }
 }
 
 void MacThread::run_event_loop()

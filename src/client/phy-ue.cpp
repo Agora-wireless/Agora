@@ -64,10 +64,15 @@ Phy_UE::Phy_UE(Config* config)
     ru_.reset(new RadioTXRX(config_, rx_thread_num, config_->core_offset + 1,
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
-    if (kEnableMac)
-        mac_receiver_.reset(new PacketTXRX(config_, rx_thread_num,
-            config_->core_offset + 1 + rx_thread_num, &message_queue_,
-            &to_mac_queue_, mac_rx_ptoks_ptr, mac_tx_ptoks_ptr));
+    if (kEnableMac) {
+        const size_t mac_cpu_core = config_->core_offset + 1 + rx_thread_num;
+        mac_thread_ = new MacThread(MacThread::Mode::kClient, config_,
+            mac_cpu_core, &ul_bits_buffer_, &ul_bits_buffer_status_,
+            nullptr /* dl bits buffer */, nullptr /* dl bits buffer status */,
+            &message_queue_, &to_mac_queue_);
+
+        mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
+    }
 
     printf("initializing buffers...\n");
 
@@ -193,6 +198,10 @@ Phy_UE::~Phy_UE()
     // release FFT_buffer
     fft_buffer_.free();
     ifft_buffer_.free();
+
+    if (kEnableMac)
+        mac_std_thread_.join();
+    delete mac_thread_;
 }
 
 void Phy_UE::schedule_task(Event_data do_task,
@@ -226,13 +235,6 @@ void Phy_UE::start()
     if (!ru_->startTXRX(rx_buffer_, rx_buffer_status_, rx_buffer_status_size,
             rx_buffer_size, tx_buffer_, tx_buffer_status_,
             tx_buffer_status_size, tx_buffer_size)) {
-        this->stop();
-        return;
-    }
-
-    if (kEnableMac
-        && !mac_receiver_->startTXRX(ul_bits_buffer_, ul_bits_buffer_status_,
-               TASK_BUFFER_FRAME_NUM, ul_bits_buffer_size_, NULL, NULL, 0, 0)) {
         this->stop();
         return;
     }
@@ -308,8 +310,6 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    if (kEnableMac)
-                        mac_receiver_->wakeup_mac();
                     Event_data do_encode_task(EventType::kEncode,
                         gen_tag_t::frm_sym_ue(
                             frame_id, symbol_id, ant_id / config_->nChannels)

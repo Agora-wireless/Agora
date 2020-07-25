@@ -46,15 +46,9 @@ PacketTXRX::~PacketTXRX()
     delete[] servaddr_;
 }
 
-void PacketTXRX::wakeup_mac()
-{
-    mac_running = true;
-}
+void PacketTXRX::wakeup_mac() { mac_running = true; }
 
-bool PacketTXRX::is_mac_running()
-{
-    return mac_running;
-}
+bool PacketTXRX::is_mac_running() { return mac_running; }
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length, char* in_tx_buffer,
@@ -123,13 +117,13 @@ void* PacketTXRX::loopTXRX(int tid)
             config_->ue_tx_port + radio_id);
     }
 
-    while(config_->running && !is_mac_running());
+    while (config_->running && !is_mac_running())
+        ;
 
     // send start notification to mac
     char* start_msg[1024];
-    ssize_t ret = sendto(socket_[0],
-        start_msg, 1024, 0, (struct sockaddr*)&servaddr_[0],
-        sizeof(servaddr_[0]));
+    ssize_t ret = sendto(socket_[0], start_msg, 1024, 0,
+        (struct sockaddr*)&servaddr_[0], sizeof(servaddr_[0]));
     rt_assert(ret > 0, "sendto() failed");
     std::cout << "Waking up MAC.." << std::endl;
 

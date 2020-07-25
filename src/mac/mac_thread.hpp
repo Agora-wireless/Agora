@@ -45,7 +45,7 @@ public:
 
     MacThread(Mode mode, Config* cfg, size_t core_offset,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
-        Table<int8_t>* dl_bits_buffer, Table<int>* dl_bits_buffer_status,
+        Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
         moodycamel::ConcurrentQueue<Event_data>* rx_queue,
         moodycamel::ConcurrentQueue<Event_data>* tx_queue,
         std::string log_filename = "");
@@ -80,16 +80,31 @@ private:
     Table<uint8_t>* ul_bits_buffer_;
     Table<uint8_t>* ul_bits_buffer_status_;
 
-    Table<int8_t>* dl_bits_buffer_;
-    Table<int>* dl_bits_buffer_status_;
+    Table<uint8_t>* dl_bits_buffer_;
+    Table<uint8_t>* dl_bits_buffer_status_;
 
+    // A preallocated buffer to store UDP packets received via recv()
     std::vector<uint8_t> udp_pkt_buf_;
 
-    // Staging buffers to accumulate decoded uplink code blocks for each UE
-    std::vector<uint8_t> frame_data_[kMaxUEs];
+    FastRand fast_rand;
 
-    // The number of bytes received in the current frame for each UE
-    std::array<size_t, kMaxUEs> num_filled_bytes_in_frame_;
+    // Server-only members
+    struct {
+        // Staging buffers to accumulate decoded uplink code blocks for each UE
+        std::vector<uint8_t> frame_data_[kMaxUEs];
+
+        // n_filled_in_frame_[i] is the number of bytes received in the current
+        // frame for UE #i
+        std::array<size_t, kMaxUEs> n_filled_in_frame_;
+    } server_;
+
+    // Client-only members
+    struct {
+        // ul_bits_buffer_id_[i] is the index of the uplink data bits buffer to
+        // next use for radio #i
+        std::array<size_t, kMaxAntennas> ul_bits_buffer_id_;
+
+    } client_;
 
     // FIFO queue for receiving messages from the master thread
     moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
