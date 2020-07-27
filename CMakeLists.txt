@@ -332,9 +332,3 @@ add_executable(test_datatype_conversion
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_datatype_conversion ${COMMON_LIBS})
 add_test(NAME test_datatype_conversion COMMAND test_datatype_conversion)
-
-add_executable(test_concurrent_queue
-  test/unit_tests/test_concurrent_queue.cc
-   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_concurrent_queue ${COMMON_LIBS})
-add_test(NAME test_concurrent_queue COMMAND test_concurrent_queue)
