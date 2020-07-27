@@ -39,7 +39,6 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
-    '-DUSE_LDPC=true',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_decoder_5gnr',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_encoder_5gnr',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_common',

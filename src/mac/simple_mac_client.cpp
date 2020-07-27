@@ -135,7 +135,7 @@ void SimpleClientMac::startTXfromMain(
         thread_num, thread_num + 1);
 }
 
-void* SimpleClientMac::master_thread(int tid)
+void* SimpleClientMac::master_thread(int)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
@@ -222,7 +222,7 @@ void* SimpleClientMac::master_thread(int tid)
     exit(0);
 }
 
-void* SimpleClientMac::data_update_thread(int tid)
+void* SimpleClientMac::data_update_thread(int)
 {
     // Sender get better performance when this thread is not pinned to core
     // pin_to_core_with_offset(ThreadType::kWorker, 13, 0);
@@ -361,14 +361,8 @@ void SimpleClientMac::init_data_from_file()
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 
-    std::string filename;
-    if (kUseLDPC) {
-        filename = cur_directory + "/data/LDPC_orig_data_2048_ant"
-            + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-    } else {
-        filename = cur_directory + "/data/orig_data_2048_ant"
-            + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-    }
+    std::string filename = cur_directory + "/data/LDPC_orig_data_2048_ant"
+        + std::to_string(cfg->UE_ANT_NUM) + ".bin";
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
