@@ -15,16 +15,14 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
-    Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
-    Table<int8_t>& demod_soft_buffer, PhyStats* in_phy_stats,
-    Stats* stats_manager)
+    Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
+    PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
     , ul_zf_buffer_(ul_zf_buffer)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
-    , demod_hard_buffer_(demod_hard_buffer)
     , demod_soft_buffer_(demod_soft_buffer)
     , phy_stats(in_phy_stats)
 {
