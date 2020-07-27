@@ -38,7 +38,7 @@
 #include "net.hpp"
 #include "utils.h"
 
-#ifdef USE_DPDK_SENDER
+#ifdef USE_DPDK
 #include "dpdk_transport.hpp"
 #include <netinet/ether.h>
 #endif
@@ -131,7 +131,7 @@ private:
     double* frame_start;
     double* frame_end;
 
-#ifdef USE_DPDK_SENDER
+#ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
     uint32_t sender_addr; // IPv4 address of this data sender
     uint32_t server_addr; // IPv4 address of the remote target Millipede server
