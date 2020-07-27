@@ -239,7 +239,7 @@ Config::Config(std::string jsonfile)
             / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
         LDPC_config.nRows);
 
-    fft_in_sender = tddConf.value("fft_in_sender", false);
+    fft_in_rru = tddConf.value("fft_in_rru", false);
 
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;

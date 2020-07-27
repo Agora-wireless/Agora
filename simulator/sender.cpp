@@ -328,7 +328,7 @@ void* Sender::worker_thread(int tid)
         auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
-        if (cfg->fft_in_sender) {
+        if (cfg->fft_in_rru) {
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
         } else {
@@ -342,7 +342,7 @@ void* Sender::worker_thread(int tid)
         // Send a message to the server. We assume that the server is running.
         int ret;
         char* payload;
-        if (cfg->fft_in_sender) {
+        if (cfg->fft_in_rru) {
             payload = reinterpret_cast<char*>(malloc(buffer_length));
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
@@ -351,7 +351,7 @@ void* Sender::worker_thread(int tid)
         // Use the correct send function based on whether Millipede uses DPDK
         // and whether uses fft in sender
         if (kUseDPDK or !kConnectUDP) {
-            if (cfg->fft_in_sender) {
+            if (cfg->fft_in_rru) {
                 ret = sendto(socket_[radio_id], payload, buffer_length, 0,
                     (struct sockaddr*)&servaddr_ipv4[tid],
                     sizeof(servaddr_ipv4[tid]));
@@ -362,7 +362,7 @@ void* Sender::worker_thread(int tid)
                     sizeof(servaddr_ipv4[tid]));
             }
         } else {
-            if (cfg->fft_in_sender) {
+            if (cfg->fft_in_rru) {
                 ret = send(socket_[radio_id], payload, buffer_length, 0);
                 free(payload);
             } else {
@@ -501,13 +501,11 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     }
 }
 
-void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload)
+void Sender::run_fft(const Packet* pkt, complex_float* fft_inout,
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const
 {
     simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
-
-    SymbolType sym_type = cfg->get_symbol_type(pkt->frame_id, pkt->symbol_id);
 
     DftiComputeForward(mkl_handle,
         reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
