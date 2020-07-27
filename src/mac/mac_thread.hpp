@@ -27,8 +27,8 @@ public:
     // Default log file for MAC layer outputs
     const char* kDefaultLogFilename = "/tmp/mac_log";
 
-    // After receiving decoded packets from the PHY (uplink at the server,
-    // downlink at the client), we send UDP packets to kRemoteHostname
+    // After receiving decoded codeblocks from the PHY (uplink at the
+    // server, downlink at the client), we send UDP packets to kRemoteHostname
     const char* kRemoteHostname = "127.0.0.1";
 
     // UDP packets for UE #i (uplink packets at the server, downlink packets at
@@ -39,8 +39,8 @@ public:
     // server, uplink packets at the client) on kLocalPort
     static constexpr size_t kLocalPort = 8070;
 
-    // Maximum number of outstanding downlink packets per UE that we allocate
-    // UDP buffer space for
+    // Maximum number of outstanding UDP packets per UE that we allocate recv()
+    // buffer space for
     static constexpr size_t kMaxPktsPerUE = 64;
 
     MacThread(Mode mode, Config* cfg, size_t core_offset,
@@ -61,9 +61,12 @@ private:
     // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
     void process_codeblocks_from_master();
 
-    // Receive user data bits (uplink bits at the client, downlink bits at the
-    // server) and forward them to the PHY.
+    // Receive user data bits (downlink bits at the MAC thread running at the
+    // server, uplink bits at the MAC thread running at the client) and forward
+    // them to the PHY.
     void process_udp_packets_from_apps();
+    void process_udp_packets_from_apps_server(const MacPacket* pkt);
+    void process_udp_packets_from_apps_client(const MacPacket* pkt);
 
     // If Mode::kServer, this thread is running at the Millipede server. Else at
     // the client.

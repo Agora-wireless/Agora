@@ -122,54 +122,63 @@ void MacThread::process_udp_packets_from_apps()
     }
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
+    mode_ == Mode::kServer ? process_udp_packets_from_apps_server(pkt)
+                           : process_udp_packets_from_apps_client(pkt);
+}
 
-    if (mode_ == Mode::kServer) {
-        const size_t total_symbol_idx
-            = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
-        const size_t rx_offset
-            = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
+void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
+{
+    // We've received bits for the downlink
+    const size_t total_symbol_idx
+        = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
+    const size_t rx_offset
+        = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
 
-        if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
-            MLPD_ERROR(
-                "MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
-                rx_offset);
-            cfg_->running = false;
-            return;
-        }
-
-        for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
-            (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
-        memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
-                                  [pkt->ue_id * cfg_->OFDM_DATA_NUM],
-            pkt->data, udp_pkt_buf_.size());
-
-        Event_data msg(EventType::kPacketFromMac,
-            gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)
-                ._tag);
-        rt_assert(tx_queue_->enqueue(msg),
-            "MAC thread: Failed to enqueue downlink packet");
-    } else {
-        const size_t radio_id = fast_rand.next_u32() % cfg_->UE_ANT_NUM;
-        const size_t rx_offset = client_.ul_bits_buffer_id_[radio_id];
-
-        if ((*ul_bits_buffer_status_)[radio_id][rx_offset] == 1) {
-            fprintf(stderr,
-                "MAC thread: UDP RX buffer full, offset: %zu. Dropping "
-                "packet.\n",
-                rx_offset);
-            return;
-        } else {
-            memcpy(&(*ul_bits_buffer_)[radio_id]
-                                      [rx_offset * cfg_->mac_packet_length],
-                pkt->data, cfg_->mac_packet_length);
-            (*ul_bits_buffer_status_)[radio_id][rx_offset] = 1;
-        }
-
-        Event_data msg(
-            EventType::kPacketFromMac, rx_tag_t(radio_id, rx_offset)._tag);
-        rt_assert(tx_queue_->enqueue(msg),
-            "MAC thread: Failed to enqueue uplink packet");
+    if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
+        MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
+            rx_offset);
+        cfg_->running = false;
+        return;
     }
+
+    for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
+        (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
+    memcpy(
+        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->OFDM_DATA_NUM],
+        pkt->data, udp_pkt_buf_.size());
+
+    Event_data msg(EventType::kPacketFromMac,
+        gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)._tag);
+    rt_assert(tx_queue_->enqueue(msg),
+        "MAC thread: Failed to enqueue downlink packet");
+}
+
+void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
+{
+    // We've received bits for the uplink. The received MAC packet does not
+    // specify a radio ID, so choose one at random.
+    const size_t radio_id = fast_rand.next_u32() % cfg_->UE_ANT_NUM;
+    size_t& radio_buf_id = client_.ul_bits_buffer_id_[radio_id];
+
+    if ((*ul_bits_buffer_status_)[radio_id][radio_buf_id] == 1) {
+        fprintf(stderr,
+            "MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
+            "packet.\n",
+            radio_buf_id);
+        return;
+    }
+
+    memcpy(
+        &(*ul_bits_buffer_)[radio_id][radio_buf_id * cfg_->mac_packet_length],
+        pkt->data, cfg_->mac_packet_length);
+    (*ul_bits_buffer_status_)[radio_id][radio_buf_id] = 1;
+
+    Event_data msg(
+        EventType::kPacketFromMac, rx_tag_t(radio_id, radio_buf_id)._tag);
+    rt_assert(
+        tx_queue_->enqueue(msg), "MAC thread: Failed to enqueue uplink packet");
+
+    radio_buf_id = (radio_buf_id + 1) % TASK_BUFFER_FRAME_NUM;
 }
 
 void MacThread::run_event_loop()
