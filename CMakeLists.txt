@@ -229,6 +229,10 @@ else()
 endif()
 add_library(millipede_sources_lib OBJECT ${MILLIPEDE_SOURCES})
 
+if(${USE_DPDK_SENDER})
+  add_definitions(-DUSE_DPDK_SENDER)
+endif()
+
 set(CLIENT_SOURCES
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
@@ -283,37 +287,20 @@ add_executable(macbs
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(macbs ${COMMON_LIBS})
 
-if(${USE_DPDK_SENDER})
-  add_definitions(-DUSE_DPDK_SENDER)
-  add_executable(sender
-    simulator/sender_cli.cpp
-    simulator/sender.cpp
-    src/common/dpdk_transport.cpp
-    $<TARGET_OBJECTS:common_sources_lib>)
-else()
-  add_executable(sender
-    simulator/sender_cli.cpp
-    simulator/sender.cpp
-    $<TARGET_OBJECTS:common_sources_lib>)
-endif()
+add_executable(sender
+  simulator/sender_cli.cpp
+  simulator/sender.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sender ${COMMON_LIBS})
 
-if(${USE_DPDK_SENDER})
-  add_executable(sim
-    simulator/main.cpp
-    simulator/simulator.cpp
-    simulator/sender.cpp
-    simulator/receiver.cpp
-    src/common/dpdk_transport.cpp
-    $<TARGET_OBJECTS:common_sources_lib>)
-else()
-  add_executable(sim
-    simulator/main.cpp
-    simulator/simulator.cpp
-    simulator/sender.cpp
-    simulator/receiver.cpp
-    $<TARGET_OBJECTS:common_sources_lib>)
-endif()
+add_executable(sim
+  simulator/main.cpp
+  simulator/simulator.cpp
+  simulator/sender.cpp
+  simulator/receiver.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
 if(NOT ${USE_DPDK})
