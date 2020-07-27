@@ -11,7 +11,6 @@
 #include "net.hpp"
 #include "signalHandler.hpp"
 #include "txrx_client.hpp"
-#include "txrx_mac.hpp"
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
