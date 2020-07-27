@@ -290,12 +290,10 @@ void* Sender::worker_thread(int tid)
         // Wait
     }
 
-    complex_float* fft_inout;
-    DFTI_DESCRIPTOR_HANDLE mkl_handle;
-
-    fft_inout = reinterpret_cast<complex_float*>(
+    auto fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
 
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
     DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     DftiCommitDescriptor(mkl_handle);
@@ -337,7 +335,7 @@ void* Sender::worker_thread(int tid)
 
         // Send a message to the server. We assume that the server is running.
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-        rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed\n");
+        rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
 #else
         // Send a message to the server. We assume that the server is running.
         int ret;
