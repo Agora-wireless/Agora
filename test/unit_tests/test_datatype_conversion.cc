@@ -5,7 +5,7 @@
 
 static constexpr size_t kSIMDTestNum = 1024;
 
-TEST(SIMD, float_conversion)
+TEST(SIMD, float_32_to_16)
 {
     constexpr float allowed_error = 1e-3;
     float* in_buf
