@@ -4,7 +4,11 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 
-void simd_convert_short_to_float(short* in_buf, float* out_buf, size_t length)
+// Convert a short array [in_buf] to a float array [out_buf]
+// in_buf and out_buf must be 64-byte aligned
+// length must be a multiple of 16
+void simd_convert_short_to_float(
+    const short* in_buf, float* out_buf, size_t length)
 {
 #ifdef __AVX512F__
     const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
@@ -50,28 +54,32 @@ void simd_convert_short_to_float(short* in_buf, float* out_buf, size_t length)
 #endif
 }
 
+// Convert a float16 array [in_buf] to a float32 array [out_buf]
+// in_buf and out_buf must be 64-byte aligned
+// length must be a multiple of 16
 void simd_convert_float16_to_float32(
-    float* in_buf, float* out_buf, size_t length)
+    const float* in_buf, float* out_buf, size_t length)
 {
 #ifdef __AVX512F__
     for (size_t i = 0; i < length; i += 16) {
-        __m256i val_a
-            = _mm256_load_si256(reinterpret_cast<__m256i*>(in_buf + i / 2));
+        __m256i val_a = _mm256_load_si256((__m256i*)(in_buf + i / 2));
         __m512 val = _mm512_cvtph_ps(val_a);
         _mm512_store_ps(out_buf + i, val);
     }
 #else
     for (size_t i = 0; i < length; i += 8) {
-        __m128i val_a
-            = _mm_load_si128(reinterpret_cast<__m128i*>(in_buf + i / 2));
+        __m128i val_a = _mm_load_si128((__m128i*)(in_buf + i / 2));
         __m256 val = _mm256_cvtph_ps(val_a);
         _mm256_store_ps(out_buf + i, val);
     }
 #endif
 }
 
+// Convert a float32 array [in_buf] to a float16 array [out_buf]
+// in_buf and out_buf must be 64-byte aligned
+// length must be a multiple of 16
 void simd_convert_float32_to_float16(
-    float* in_buf, float* out_buf, size_t length)
+    const float* in_buf, float* out_buf, size_t length)
 {
 #ifdef __AVX512F__
     for (size_t i = 0; i < length; i += 16) {
