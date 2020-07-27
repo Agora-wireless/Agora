@@ -612,7 +612,7 @@ void* Millipede::worker(int tid)
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
             ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_hard_buffer_, demod_soft_buffer_, phy_stats, stats);
+            demod_soft_buffer_, phy_stats, stats);
 
     auto computePrecode
         = new DoPrecode(config_, tid, freq_ghz, *get_conq(EventType::kPrecode),
@@ -686,7 +686,7 @@ void* Millipede::worker_demul(int tid)
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
             ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_hard_buffer_, demod_soft_buffer_, phy_stats, stats);
+            demod_soft_buffer_, phy_stats, stats);
 
     /* Initialize Precode operator */
     auto computePrecode
@@ -1069,8 +1069,6 @@ void Millipede::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
-    demod_hard_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t mod_type = config_->mod_type;
     demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
         mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
@@ -1157,7 +1155,6 @@ void Millipede::free_uplink_buffers()
     data_buffer_.free();
     ul_zf_buffer_.free();
     equal_buffer_.free();
-    demod_hard_buffer_.free();
     demod_soft_buffer_.free();
     decoded_buffer_.free();
 
@@ -1183,38 +1180,15 @@ void Millipede::free_downlink_buffers()
     tx_stats_.fini();
 }
 
-void Millipede::save_demul_data_to_file(UNUSED int frame_id)
-{
-    auto& cfg = config_;
-    printf("Saving demul data to data/demul_data.txt\n");
-
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + "/data/demul_data.bin";
-
-    FILE* fp = fopen(filename.c_str(), "wb");
-    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        int total_data_symbol_id = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * cfg->ul_data_symbol_num_perframe
-            + i;
-
-        for (size_t sc = 0; sc < cfg->OFDM_DATA_NUM; sc++) {
-            uint8_t* ptr
-                = &demod_hard_buffer_[total_data_symbol_id][sc * cfg->UE_NUM];
-            fwrite(ptr, cfg->UE_NUM, sizeof(uint8_t), fp);
-        }
-    }
-    fclose(fp);
-}
-
 void Millipede::save_decode_data_to_file(UNUSED int frame_id)
 {
     auto& cfg = config_;
-    printf("Saving decode data to data/decode_data.bin\n");
     size_t num_decoded_bytes
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
+    printf("Saving decode data to %s\n", filename.c_str());
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
@@ -1253,15 +1227,6 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
     fclose(fp);
 }
 
-void Millipede::getDemulData(int** ptr, int* size)
-{
-    auto& cfg = config_;
-    auto offset = cfg->get_total_data_symbol_idx_ul(
-        max_equaled_frame, cfg->UL_PILOT_SYMS);
-    *ptr = (int*)&demod_hard_buffer_[offset][0];
-    *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM;
-}
-
 void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
@@ -1288,9 +1253,5 @@ EXPORT void Millipede_destroy(Millipede* millipede) { delete millipede; }
 EXPORT void Millipede_getEqualData(Millipede* millipede, float** ptr, int* size)
 {
     return millipede->getEqualData(ptr, size);
-}
-EXPORT void Millipede_getDemulData(Millipede* millipede, int** ptr, int* size)
-{
-    return millipede->getDemulData(ptr, size);
 }
 }

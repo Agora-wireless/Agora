@@ -251,12 +251,6 @@ set(FLEXRAN_LDPC_LIBS
 set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
-# Create a shared library for Python
-add_library(comp MODULE
-  $<TARGET_OBJECTS:millipede_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(comp ${COMMON_LIBS})
-
 # TODO: The main millipede executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
 # against sources reduces performance.
@@ -277,11 +271,6 @@ add_executable(user
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
-
-add_library(ue_phy MODULE
-  $<TARGET_OBJECTS:client_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(ue_phy ${COMMON_LIBS})
 
 add_executable(macuser
   src/mac/simple_mac_client.cpp
@@ -336,3 +325,19 @@ add_executable(test_udp_client_server
   test/unit_tests/test_udp_client_server.cc)
 target_link_libraries(test_udp_client_server ${COMMON_LIBS})
 add_test(NAME test_udp_client_server COMMAND test_udp_client_server)
+
+if(NOT ${USE_DPDK})
+  # Create shared libraries for Python
+  # DPDK is currently not supported
+  add_library(comp MODULE
+    $<TARGET_OBJECTS:millipede_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(comp ${COMMON_LIBS})
+
+  add_library(ue_phy MODULE
+    $<TARGET_OBJECTS:client_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(ue_phy ${COMMON_LIBS})
+else()
+  message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
+endif()

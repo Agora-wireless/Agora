@@ -95,10 +95,8 @@ public:
     void free_uplink_buffers();
     void free_downlink_buffers();
 
-    void save_demul_data_to_file(int frame_id);
     void save_decode_data_to_file(int frame_id);
     void save_tx_data_to_file(int frame_id);
-    void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 
     // Flags that allow developer control over Millipede internals
@@ -201,11 +199,6 @@ private:
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
-
-    // Data after hard demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<uint8_t> demod_hard_buffer_;
 
     // Data after soft demodulation
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
