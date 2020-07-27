@@ -1,16 +1,15 @@
-#include <gtest/gtest.h>
-// For some reason, gtest include order matters
 #include "concurrentqueue.h"
+#include <gtest/gtest.h>
 #include <thread>
 
-static constexpr size_t kNumWorker = 2;
+static constexpr size_t kNumWorkers = 2;
 static constexpr size_t kMaxTestNum = (1 << 24);
 
 void run_master(moodycamel::ConcurrentQueue<size_t>** queues,
     moodycamel::ProducerToken** ptoks)
 {
     for (size_t i = 0; i < kMaxTestNum; i++) {
-        queues[i % kNumWorker]->enqueue(*ptoks[i % kNumWorker], i);
+        queues[i % kNumWorkers]->enqueue(*ptoks[i % kNumWorkers], i);
     }
 }
 
@@ -22,28 +21,28 @@ void run_worker(size_t worker_id, moodycamel::ConcurrentQueue<size_t>* queue,
         size_t item;
         if (queue->try_dequeue(*ctok, item)) {
             ASSERT_EQ(item, next_expected);
-            next_expected += kNumWorker;
+            next_expected += kNumWorkers;
         }
     }
 }
 
 TEST(TestConcurrentQueue, Correctness)
 {
-    auto** queues = new moodycamel::ConcurrentQueue<size_t>*[kNumWorker];
-    auto** ptoks = new moodycamel::ProducerToken*[kNumWorker];
-    auto** ctoks = new moodycamel::ConsumerToken*[kNumWorker];
-    for (size_t i = 0; i < kNumWorker; i++) {
+    auto** queues = new moodycamel::ConcurrentQueue<size_t>*[kNumWorkers];
+    auto** ptoks = new moodycamel::ProducerToken*[kNumWorkers];
+    auto** ctoks = new moodycamel::ConsumerToken*[kNumWorkers];
+    for (size_t i = 0; i < kNumWorkers; i++) {
         queues[i] = new moodycamel::ConcurrentQueue<size_t>;
         ptoks[i] = new moodycamel::ProducerToken(*queues[i]);
         ctoks[i] = new moodycamel::ConsumerToken(*queues[i]);
     }
     auto* master = new std::thread(run_master, queues, ptoks);
-    auto** workers = new std::thread*[kNumWorker];
-    for (size_t i = 0; i < kNumWorker; i++) {
+    auto** workers = new std::thread*[kNumWorkers];
+    for (size_t i = 0; i < kNumWorkers; i++) {
         workers[i] = new std::thread(run_worker, i, queues[i], ctoks[i]);
     }
     master->join();
-    for (size_t i = 0; i < kNumWorker; i++) {
+    for (size_t i = 0; i < kNumWorkers; i++) {
         workers[i]->join();
     }
 }
