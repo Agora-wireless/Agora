@@ -45,6 +45,7 @@ flags = [
     '-I' + str(home_dir) + '/Millipede/src/third_party',
     '-I' + str(home_dir) + '/Millipede/src/millipede',
     '-I' + str(home_dir) + '/Millipede/src/common',
+    '-I' + str(home_dir) + '/Millipede/src/mac',
     '-I' + str(home_dir) + '/Millipede/src/encoder',
     '-I' + str(home_dir) + '/Millipede/src/millipede/txrx',
     '-Wall',
