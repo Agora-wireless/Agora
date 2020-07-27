@@ -196,9 +196,7 @@ public:
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
-    /* FFT parameters */
-    // If true, the RRU does FFT instead of Millipede
-    bool fft_in_rru;
+    bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
