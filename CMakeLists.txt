@@ -56,7 +56,6 @@ add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
@@ -115,17 +114,9 @@ if(${USE_DPDK})
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
   add_definitions(-DUSE_DPDK)
-  if (${USE_DPDK_SENDER})
-    message(STATUS "DPDK is enabled for sender")
-    add_definitions(-DUSE_DPDK_SENDER)
-  endif()
-else()
-  set(USE_DPDK_SENDER False)
-  message(STATUS "DPDK is disabled")
 endif()
 
 message(STATUS "Use DPDK for millipede: ${USE_DPDK}")
-message(STATUS "Use DPDK for sender: ${USE_DPDK_SENDER}")
 
 # MAC
 if(${ENABLE_MAC})
@@ -228,10 +219,6 @@ else()
     src/millipede/txrx/txrx_argos.cpp)
 endif()
 add_library(millipede_sources_lib OBJECT ${MILLIPEDE_SOURCES})
-
-if(${USE_DPDK_SENDER})
-  add_definitions(-DUSE_DPDK_SENDER)
-endif()
 
 set(CLIENT_SOURCES
   src/client/client_radio.cpp

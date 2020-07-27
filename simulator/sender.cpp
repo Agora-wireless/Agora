@@ -75,7 +75,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
             thread_num, thread_num + 1);
 
-#ifdef USE_DPDK_SENDER
+#ifdef USE_DPDK
     DpdkTransport::dpdk_init(core_offset, thread_num);
 
     mbuf_pool = DpdkTransport::create_mempool();
@@ -264,7 +264,7 @@ void* Sender::data_update_thread(int)
 
 void Sender::update_tx_buffer(gen_tag_t tag)
 {
-#ifdef USE_DPDK_SENDER
+#ifdef USE_DPDK
     auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
 #else
     auto* pkt
@@ -319,7 +319,7 @@ void* Sender::worker_thread(int tid)
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
-#ifdef USE_DPDK_SENDER
+#ifdef USE_DPDK
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0]
             = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
