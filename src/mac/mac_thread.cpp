@@ -126,7 +126,7 @@ void MacThread::process_udp_packets_from_apps()
                            : process_udp_packets_from_apps_client(pkt);
 }
 
-void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
+void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
 {
     // We've received bits for the downlink
     const size_t total_symbol_idx
@@ -153,7 +153,7 @@ void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
         "MAC thread: Failed to enqueue downlink packet");
 }
 
-void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
+void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
 {
     // We've received bits for the uplink. The received MAC packet does not
     // specify a radio ID, so choose one at random.
