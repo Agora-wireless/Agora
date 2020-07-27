@@ -76,32 +76,8 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
             thread_num, thread_num + 1);
 
 #ifdef USE_DPDK_SENDER
-    // // DPDK setup
-    // std::string core_list = std::to_string(core_offset) + "-"
-    //     + std::to_string(core_offset + thread_num);
-    // // n: channels, m: maximum memory in megabytes
-    // const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
-    // int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
-
-    // printf("rte_eal_init argv: ");
-    // for (int i = 0; i < rte_argc; i++) {
-    //     printf("%s, ", rte_argv[i]);
-    // }
-    // printf("\n");
-
-    // // Initialize DPDK environment
-    // int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
-    // rt_assert(ret >= 0, "Failed to initialize DPDK");
     DpdkTransport::dpdk_init(core_offset, thread_num);
 
-    // unsigned int nb_ports = rte_eth_dev_count_avail();
-    // printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
-
-    // size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
-    // mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
-    //     MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
-
-    // rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
     mbuf_pool = DpdkTransport::create_mempool();
 
     uint16_t portid = 0;
@@ -364,12 +340,18 @@ void* Sender::worker_thread(int tid)
         rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed\n");
 #else
         // Send a message to the server. We assume that the server is running.
+        int ret;
+        char* payload;
+        if (cfg->fft_in_sender) {
+            payload = reinterpret_cast<char*>(malloc(buffer_length));
+            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
+                fft_inout, mkl_handle, payload);
+        }
+
+        // Use the correct send function based on whether Millipede uses DPDK
+        // and whether uses fft in sender
         if (kUseDPDK or !kConnectUDP) {
-            int ret;
             if (cfg->fft_in_sender) {
-                char* payload = reinterpret_cast<char*>(malloc(buffer_length));
-                run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                    fft_inout, mkl_handle, payload);
                 ret = sendto(socket_[radio_id], payload, buffer_length, 0,
                     (struct sockaddr*)&servaddr_ipv4[tid],
                     sizeof(servaddr_ipv4[tid]));
@@ -379,26 +361,16 @@ void* Sender::worker_thread(int tid)
                     buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
                     sizeof(servaddr_ipv4[tid]));
             }
-            rt_assert(ret >= 0, "Worker: sendto() failed");
         } else {
-            int ret;
             if (cfg->fft_in_sender) {
-                char* payload = reinterpret_cast<char*>(malloc(buffer_length));
-                run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                    fft_inout, mkl_handle, payload);
                 ret = send(socket_[radio_id], payload, buffer_length, 0);
                 free(payload);
             } else {
                 ret = send(socket_[radio_id], tx_buffers_[tx_bufs_idx],
                     buffer_length, 0);
             }
-            if (ret < 0) {
-                fprintf(stderr,
-                    "send() failed. Error = %s. Is a server running at %s?\n",
-                    strerror(errno), cfg->server_addr.c_str());
-                exit(-1);
-            }
         }
+        rt_assert(ret >= 0, "Worker: sendto() failed");
 #endif
         if (kDebugSenderReceiver) {
             auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
