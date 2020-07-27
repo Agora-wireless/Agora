@@ -233,7 +233,6 @@ set(CLIENT_SOURCES
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
   src/client/txrx_client.cpp
-  src/client/txrx_mac.cpp
   src/mac/mac_thread.cpp)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
@@ -271,12 +270,6 @@ add_executable(user
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
-
-add_executable(macuser
-  src/mac/simple_mac_client.cpp
-  src/mac/mac_client_main.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(macuser ${COMMON_LIBS})
 
 if(${USE_DPDK_SENDER})
   add_executable(sender

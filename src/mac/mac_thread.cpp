@@ -193,3 +193,53 @@ void MacThread::run_event_loop()
         process_udp_packets_from_apps();
     }
 }
+
+// TODO: Integrate process_codeblocks_from_master_client() for downlink at the
+// client, based on this excerpt from txrx_mac.cpp
+
+/*
+int PacketTXRX::dequeue_send(int tid)
+{
+    auto& c = config_;
+    Event_data event;
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+        return -1;
+
+    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    assert(event.event_type == EventType::kPacketTX);
+
+    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+    size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+
+    size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
+                        * c->BS_ANT_NUM)
+        + ant_id;
+
+    if (kDebugPrintInTask) {
+        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+            tid, frame_id, data_symbol_idx, ant_id,
+            gen_tag_t(event.tags[0])._tag, offset,
+            message_queue_->size_approx());
+    }
+
+    size_t socket_symbol_offset = offset
+        % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
+              * c->BS_ANT_NUM);
+    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
+    auto* pkt = (Packet*)cur_buffer_ptr;
+    new (pkt) Packet(frame_id, data_symbol_idx, 0, ant_id);
+
+    // Send data (one OFDM symbol)
+    ssize_t ret = sendto(socket_[ant_id % config_->socket_thread_num],
+        cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
+        sizeof(servaddr_[tid]));
+    rt_assert(ret > 0, "sendto() failed");
+
+    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                  Event_data(EventType::kPacketTX, event.tags[0])),
+        "Socket message enqueue failed\n");
+    return event.tags[0];
+}
+*/
