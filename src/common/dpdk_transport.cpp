@@ -4,6 +4,8 @@
  *
  */
 
+#ifdef USE_DPDK
+
 #include "dpdk_transport.hpp"
 #include "utils.h"
 #include <string>
@@ -310,3 +312,5 @@ rte_mempool* DpdkTransport::create_mempool()
 
     return mbuf_pool;
 }
+
+#endif
