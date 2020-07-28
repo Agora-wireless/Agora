@@ -62,6 +62,80 @@ TEST(TestConcurrentQueue, MasterToWorkerStatic)
     }
 }
 
+// Test if the token affects the performance when master dequeues items from workers
+void WorkerToMaster_master(moodycamel::ConcurrentQueue<item_t>* queue)
+{
+    item_t item;
+    size_t sum = 0;
+    while (sum < kMaxTestNum) {
+        if (queue->try_dequeue(item)) {
+            sum++;
+        }
+    }
+}
+
+void WorkerToMaster_worker_with_token(size_t worker_id,
+    moodycamel::ConcurrentQueue<item_t>* queue, moodycamel::ProducerToken* ptok)
+{
+    size_t next_expected = worker_id;
+    while (next_expected < kMaxTestNum) {
+        item_t item(next_expected);
+        if (queue->enqueue(*ptok, item)) {
+            next_expected += kNumWorkers;
+        }
+    }
+}
+
+void WorkerToMaster_worker_without_token(
+    size_t worker_id, moodycamel::ConcurrentQueue<item_t>* queue)
+{
+    size_t next_expected = worker_id;
+    while (next_expected < kMaxTestNum) {
+        item_t item(next_expected);
+        if (queue->enqueue(item)) {
+            next_expected += kNumWorkers;
+        }
+    }
+}
+
+TEST(TestConcurrentQueue, WorkerToMasterWithTokens)
+{
+    moodycamel::ConcurrentQueue<item_t> queue;
+    moodycamel::ProducerToken* ptoks[kNumWorkers];
+    for (size_t i = 0; i < kNumWorkers; i++) {
+        ptoks[i] = new moodycamel::ProducerToken(queue);
+    }
+
+    auto master = std::thread(WorkerToMaster_master, &queue);
+    std::thread workers[kNumWorkers];
+    for (size_t i = 0; i < kNumWorkers; i++) {
+        workers[i] = std::thread(
+            WorkerToMaster_worker_with_token, i, &queue, ptoks[i]);
+    }
+    master.join();
+    for (auto& w : workers)
+        w.join();
+
+    for (size_t i = 0; i < kNumWorkers; i++) {
+        delete ptoks[i];
+    }
+}
+
+TEST(TestConcurrentQueue, WorkerToMasterWithoutTokens)
+{
+    moodycamel::ConcurrentQueue<item_t> queue;
+
+    auto master = std::thread(WorkerToMaster_master, &queue);
+    std::thread workers[kNumWorkers];
+    for (size_t i = 0; i < kNumWorkers; i++) {
+        workers[i]
+            = std::thread(WorkerToMaster_worker_without_token, i, &queue);
+    }
+    master.join();
+    for (auto& w : workers)
+        w.join();
+}
+
 int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);
