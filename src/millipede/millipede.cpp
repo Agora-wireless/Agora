@@ -54,6 +54,17 @@ Millipede::Millipede(Config* cfg)
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
 
+    // Create the subcarrier manager, which will create the subcarrier doers.
+    // This needs to be done before creating the worker threads,
+    // since the worker threads will use information from the subcarrier manager
+    // to determine which subcarrier doers each worker thread should contain/create.
+    subcarrier_manager_ = new SubcarrierManager(
+        this->config_, freq_ghz, complete_task_queue_,
+        csi_buffer_, recip_buffer_, calib_buffer_, dl_encoded_buffer_, data_buffer_, 
+        demod_soft_buffer_, dl_ifft_buffer_,
+        phy_stats, stats
+    );
+
     /* Create worker threads */
     if (config_->bigstation_mode) {
 #if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
@@ -81,10 +92,7 @@ Millipede::~Millipede()
         mac_std_thread_.join();
     delete mac_thread_;
     
-    // free all of the DoSubcarrier instances
-    for (DoSubcarrier*& dsc : subcarrier_doers_) {
-        delete dsc;
-    }
+    delete subcarrier_manager_;
 }
 
 void Millipede::stop()
@@ -121,33 +129,6 @@ void Millipede::schedule_antennas(
     }
 }
 
-void Millipede::schedule_subcarriers(
-    EventType event_type, size_t frame_id, size_t symbol_id)
-{
-    auto base_tag = gen_tag_t::frm_sym_sc(frame_id, symbol_id, 0);
-    size_t num_events = SIZE_MAX;
-    size_t block_size = SIZE_MAX;
-
-    switch (event_type) {
-    case EventType::kDemul:
-    case EventType::kPrecode:
-        num_events = config_->demul_events_per_symbol;
-        block_size = config_->demul_block_size;
-        break;
-    case EventType::kZF:
-        num_events = config_->zf_events_per_symbol;
-        block_size = config_->zf_block_size;
-        break;
-    default:
-        assert(false);
-    }
-
-    for (size_t i = 0; i < num_events; i++) {
-        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
-            Event_data(event_type, base_tag._tag));
-        base_tag.sc_id += block_size;
-    }
-}
 
 void Millipede::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_id)
@@ -291,7 +272,7 @@ void Millipede::start()
                     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe;
                          i++) {
                         if (fft_stats_.cur_frame_for_symbol[i] == frame_id) {
-                            schedule_subcarriers(
+                            subcarrier_manager_->schedule_subcarriers(
                                 EventType::kDemul, frame_id, i);
                         }
                     }
@@ -391,7 +372,7 @@ void Millipede::start()
                 size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
                 if (encode_stats_.last_task(frame_id, data_symbol_idx)) {
-                    schedule_subcarriers(
+                    subcarrier_manager_->schedule_subcarriers(
                         EventType::kPrecode, frame_id, data_symbol_idx);
                     print_per_symbol_done(
                         PrintType::kEncode, frame_id, data_symbol_idx);
@@ -568,7 +549,7 @@ void Millipede::handle_event_fft(size_t tag)
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
-                    schedule_subcarriers(EventType::kZF, frame_id, 0);
+                    subcarrier_manager_->schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
         }
@@ -580,7 +561,7 @@ void Millipede::handle_event_fft(size_t tag)
             print_per_symbol_done(PrintType::kFFTData, frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
             if (zf_stats_.coded_frame == frame_id) {
-                schedule_subcarriers(
+                subcarrier_manager_->schedule_subcarriers(
                     EventType::kDemul, frame_id, symbol_idx_ul);
             }
         }
@@ -613,36 +594,44 @@ void* Millipede::worker(int tid)
         worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats
     );
 
-    auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
-        *get_conq(EventType::kSubcarrier), complete_task_queue_, worker_ptoks_ptr[tid],
-        csi_buffer_, recip_buffer_, dl_encoded_buffer_,
-        data_buffer_, dl_ifft_buffer_,
-        phy_stats, stats
-    );
-    subcarrier_doers_.push_back(computeSubcarrier); 
-
-
     auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
         *get_conq(EventType::kEncode), complete_task_queue_,
         worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats
     );
 
-    /// FIXME: redirect this to use subcarrier_doers.get(sc)->get_demod_soft_buffer()
-    auto computeDecoding
-        = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
-            decoded_buffer_, phy_stats, stats
-        );
-
-    auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
-        *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
-        calib_buffer_, recip_buffer_, stats
+    auto computeDecoding = new DoDecode(config_, tid, freq_ghz, 
+        *get_conq(EventType::kDecode), complete_task_queue_, 
+        worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_,
+        phy_stats, stats
     );
 
+    /// TODO: move this into the subcarrier manager/doer infrastructure.
+    ///       It's currently in the SubcarrierDoer but isn't actually used
+    auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
+        *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
+        calib_buffer_, recip_buffer_, stats);
+
     std::vector<Doer*> compute_vec = { 
-        computeIFFT, computeReciprocity, computeSubcarrier,
-        computeFFT, computeEncoding, computeDecoding
+        computeIFFT, computeFFT,
+        computeReciprocity,
     };
+
+    /*
+     * Currently, we create Subcarrier doer instances within worker threads,
+     * such that a given worker thread can handle subcarrier doers along with all other doers. 
+     * We create them here for now to preserve compatibility with the existing form
+     * of scheduling any kind of doer on any kind of worker thread,
+     * but in the future they'll be created by the subcarrier manager itself. 
+     */
+    for (auto sc_range : subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
+        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(tid, sc_range);
+        compute_vec.push_back(computeSubcarrier);
+    }
+
+
+    compute_vec.push_back(computeEncoding);
+    compute_vec.push_back(computeDecoding);
+
 
     while (true) {
         for (size_t i = 0; i < compute_vec.size(); i++) {
@@ -1126,6 +1115,11 @@ void Millipede::initialize_downlink_buffers()
         = task_buffer_symbol_num * cfg->LDPC_config.nblocksInSymbol;
     dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
 
+    demod_soft_buffer_.malloc(
+        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM, 
+        cfg->mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 
+        64
+    );
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
     recip_buffer_.calloc(
@@ -1153,8 +1147,6 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
     csi_buffer_.free();
     data_buffer_.free();
-    ul_zf_buffer_.free();
-    equal_buffer_.free();
     demod_soft_buffer_.free();
     decoded_buffer_.free();
 
@@ -1226,15 +1218,14 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
     fclose(fp);
 }
 
-// FIXME: move this into DoDemul as a part of its public API,
-//        or simply redirect it to this->computeDemul->getEqualData().
+// TODO: remove this in the future, since it will only exist privately
+//       within each subcarrier worker's `DoDemul` instance. 
 void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
     auto offset = cfg->get_total_data_symbol_idx_ul(
         max_equaled_frame, cfg->UL_PILOT_SYMS);
-    /// FIXME: redirect this to use subcarrier_doers.get(sc)->get_equal_buffer()
-    *ptr = (float*)&equal_buffer_[offset][0];
+    *ptr = (float*)&subcarrier_manager_->get_equal_buffer()[offset][0];
     *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
 }
 

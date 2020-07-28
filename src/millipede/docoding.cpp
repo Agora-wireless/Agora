@@ -40,7 +40,7 @@ DoEncode::~DoEncode()
     free(encoded_buffer_temp);
 }
 
-Event_data DoEncode::launch(size_t tag)
+Event_data DoEncode::launch(size_t tag, UNUSED EventType event_type)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
@@ -116,7 +116,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
-Event_data DoDecode::launch(size_t tag)
+Event_data DoDecode::launch(size_t tag, UNUSED EventType event_type)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;

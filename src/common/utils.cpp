@@ -10,6 +10,18 @@
 
 #include "utils.h"
 
+/// Returns the greatest common divisor of `a` and `b`.
+size_t gcd(size_t a, size_t b) {  
+    if (a == 0)
+        return b;
+    return gcd(b % a, a);
+}  
+  
+/// Returns the least common multiple of `a` and `b`.
+size_t lcm(size_t a, size_t b) {  
+    return (a * b) / gcd(a, b);
+}
+
 int pin_to_core(int core_id)
 {
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);

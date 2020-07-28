@@ -7,21 +7,26 @@
 #ifndef DOSUBCARRIER_HPP
 #define DOSUBCARRIER_HPP
 
+// [Kevin]: unsure if all of these includes are needed.
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "doer.hpp"
+#include "doprecode.hpp"
+#include "dodemul.hpp"
+#include "dozf.hpp"
+#include "reciprocity.hpp"
+
 #include "gettime.h"
 #include "modulation.hpp"
 #include "stats.hpp"
 #include "phy_stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
+#include <stdio.h>
+#include <string.h>
 #include <vector>
-// #include "mkl_dfti.h"
 
 using namespace arma;
 
@@ -63,8 +68,8 @@ using namespace arma;
  * for allocating/deallocating the intermediate buffers and output buffers 
  * but not the input buffers.
  *
- * FIXME: Currently, however, some of the output buffers are still owned
- *        by the core `Millipede` class instance. We'll gradually move them into here.
+ * FIXME: Currently, the output buffers are still owned by the core `Millipede` instance.
+ *        We eventually should move them into here.
  * 
  */
 class DoSubcarrier: public Doer {
@@ -86,78 +91,98 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        /// The starting subcarrier range of this doer
-        size_t subcarrier_range,
-        // input buffers below
+        /// The range of subcarriers handled by this subcarrier doer.
+        struct Range subcarrier_range,
+        // input buffers
         Table<complex_float>& csi_buffer,
         Table<complex_float>& recip_buffer,
+        Table<complex_float>& calib_buffer,
         Table<int8_t>&        dl_encoded_buffer,
         Table<complex_float>& data_buffer, 
-        // output buffers below
+        // output buffers
+        Table<int8_t>&        demod_soft_buffer,  
         Table<complex_float>& dl_ifft_buffer,
-        // Table<int8_t>& demod_soft_buffer,  
+        // intermediate buffers owned by SubcarrierManager
+        Table<complex_float>& ue_spec_pilot_buffer,
+        Table<complex_float>& equal_buffer,
+        Table<complex_float>& ul_zf_buffer,
+        Table<complex_float>& dl_zf_buffer,
         PhyStats* phy_stats,
         Stats* stats
     ) : Doer(config, tid, freq_ghz, task_queue, complete_task_queue, worker_producer_token),
         subcarrier_range_(subcarrier_range),
         csi_buffer_(csi_buffer),
         recip_buffer_(recip_buffer),
+        calib_buffer_(calib_buffer),
+        dl_encoded_buffer_(dl_encoded_buffer),
         data_buffer_(data_buffer),
+        demod_soft_buffer_(demod_soft_buffer),
         dl_ifft_buffer_(dl_ifft_buffer),
-        dl_encoded_buffer_(dl_encoded_buffer)
+        ue_spec_pilot_buffer_(ue_spec_pilot_buffer),
+        equal_buffer_(equal_buffer),
+        ul_zf_buffer_(ul_zf_buffer),
+        dl_zf_buffer_(dl_zf_buffer)
     {
 
         // Create the requisite Doers
-        computeZF = new DoZF(this->cfg, tid, freq_ghz, 
+        computeZF_ = new DoZF(this->cfg, tid, freq_ghz, 
             this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
             csi_buffer_, recip_buffer_, ul_zf_buffer_, dl_zf_buffer_, stats
         );
-        computeDemul = new DoDemul(this->cfg, tid, freq_ghz, 
+        computeDemul_ = new DoDemul(this->cfg, tid, freq_ghz, 
             this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
             data_buffer_, ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_hard_buffer_, demod_soft_buffer_, phy_stats, stats
+            demod_soft_buffer_, phy_stats, stats
         );
-        computePrecode = new DoPrecode(this->cfg, tid, freq_ghz, 
+        computePrecode_ = new DoPrecode(this->cfg, tid, freq_ghz, 
             this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
             dl_zf_buffer_, dl_ifft_buffer_, dl_encoded_buffer_, stats
         );
-        // TODO: I believe we need the Reciprocity doer too, since it's used for calculating `dl_zf_buffer`
+        computeReciprocity_ = new Reciprocity(this->cfg, tid, freq_ghz,
+            this->task_queue_, this->complete_task_queue, this->worker_producer_token,
+            calib_buffer_, recip_buffer_, stats);
     }
 
 
     ~DoSubcarrier() {
-        delete computeZF;
-        delete computeDemul;
-        delete computePrecode;
-        // TODO: delete recip;
+        delete computeZF_;
+        delete computeDemul_;
+        delete computePrecode_;
+        delete computeReciprocity_;
     }
 
 
-    /// TODO: here's where the real work happens
-    Event_data launch(size_t tag) {
-        /*
-         * Here we need to directly invoke `compute[ZF|Demul|Precoder].launch()`
-         * so we prevent those `Doer`s from enqueueing their individual events types 
-         * onto the `complete_task_queue`. 
-         * Instead, we'll enqueue a single `EventType::kSubcarrier` event once all stages are complete.
-         */
+    Event_data launch(size_t tag, EventType event_type) {
+        switch (event_type) {
+        case EventType::kZF: {
+            return computeZF_->launch(tag, event_type);
+        } break;
+        case EventType::kDemul: {
+            return computeDemul_->launch(tag, event_type);
+        } break;
+        case EventType::kPrecode: {
+            return computePrecode_->launch(tag, event_type);
+        } break;
+        /// TODO: when reciprocity is moved into Subcarrier doers, add this back in.
+        // case EventType::kRc: {
+        //     return computeReciprocity_->launch(tag, event_type);
+        // } break;
 
-        /*
-         * Based on the given `tag`, we need to run the following stages:
-         * TODO: if necessary, call computeZF.launch()
-         * TODO: if necessary, call computeDemul.launch()
-         * TODO: if necessary, call computePrecode.launch()
-         */
+        // all other cases are handled below
+        default: break;
+        }
 
+        std::cerr << "[DoSubcarrier::launch] error, unexpected event type " << (int)event_type << std::endl;
+        rt_assert(false, "[DoSubcarrier::launch] error, unexpected event type.");
 
-        return Event_data(EventType::kSubcarrier, tag);
+        return Event_data();
     }
 
 
 private:
 
-    /// The lower bound of the subcarrier range handled by this subcarrier doer.
-    size_t subcarrier_range_;
+    /// The subcarrier range handled by this subcarrier doer.
+    struct Range subcarrier_range_;
 
     /*
      * TODO: I'd like to use owned objects here instead of pointers,
@@ -165,94 +190,40 @@ private:
      *       the other buffers (`Table`s) need to be allocated first via calls to `malloc`.
      *       In other news, C++ initializer lists are complete and utter garbage.
      */
-    DoZF* computeZF;
-    DoDemul* computeDemul;
-    DoPrecode* computePrecode; 
-    
+    DoZF*         computeZF_;
+    DoDemul*      computeDemul_;
+    DoPrecode*    computePrecode_;
+    Reciprocity*  computeReciprocity_;
 
+    // For the following buffers, see the `SubcarrierManager`'s documentation.
 
     ///////////////////////////////////////////////////
     ////////////////// Input Buffers //////////////////
     ///////////////////////////////////////////////////
 
-    // For the following buffers, see 
-
-    /// An input buffer of channel state information (CSI), the output of the FFT stage.
     Table<complex_float>& csi_buffer_;
-
-    /// TODO: I'm not 100% sure what this is used for. It's an input buffer into doZF...
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM
-    /// @li 2nd dimension: number of OFDM data subcarriers * number of antennas
     Table<complex_float>& recip_buffer_;
-
-    /// An input buffer of encoded data coming from the encoder (e.g., LDPC),
-    /// which is used only during downlink. 
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
-    /// @li 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t>& dl_encoded_buffer_;
-
-    /// The main input buffer for subcarrier processing stages,
-    /// which holds the data symbols after the FFT stage.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    /// @li 2nd dimension: number of antennas * number of OFDM data subcarriers
-    ///
-    /// The 2nd dimension's data order: 32 blocks each with 32 subcarriers each:
-    /// subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
-    /// subcarrier 993 -- 1024 of antennas.
+    Table<complex_float>& calib_buffer_;
+    Table<int8_t>&        dl_encoded_buffer_;
     Table<complex_float>& data_buffer_;
 
 
     ///////////////////////////////////////////////////
     ////////////////// Output Buffers /////////////////
     ///////////////////////////////////////////////////
-
-    /// The main output buffer, which comes from the soft demodulation stage.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    /// @li 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> demod_soft_buffer_;
-
-    /// An output buffer (TODO: currently a reference) holding data destined for IFFT,
-    /// only useful for downlink.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * number of antennas * number of data symbols per frame
-    /// @li 2nd dimension: number of OFDM carriers (including non-data carriers)
-    Table<complex_float> dl_ifft_buffer_;
+    
+    Table<int8_t>&        demod_soft_buffer_;
+    Table<complex_float>& dl_ifft_buffer_;
 
 
     ///////////////////////////////////////////////////
     ///////// Internal / Intermediate Buffers /////////
     ///////////////////////////////////////////////////
-
-    /// An internal buffer
-    /// TODO: I'm fairly certain this is used only in DoDemul, so we can move it directly into that class.
-    Table<complex_float> ue_spec_pilot_buffer_;
-
-    /// Data after equalization
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    /// @li 2nd dimension: number of OFDM data subcarriers * number of UEs
-    /// TODO: I'm fairly certain this is used only in DoDemul, so we can move it directly into that class.
-    ///       The only concern with that is that it's accessed externally by the Python GUI, so we'd need to export it.
-    Table<complex_float> equal_buffer_;
-
-    /// Calculated uplink zeroforcing detection matrices.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    /// @li 2nd dimension: number of antennas * number of UEs
-    ///
-    /// This is an internal buffer that is written to by DoZF as output
-    /// and then fed into `DoDemul` as input.
-    Table<complex_float> ul_zf_buffer_;
-
-    /// Calculated zeroforcing precoders for downlink beamforming.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    /// @li 2nd dimension: number of antennas * number of UEs
-    ///
-    /// This is an internal buffer that is written to by DoZF as output
-    /// and then fed into `DoPrecode` as input.
-    Table<complex_float> dl_zf_buffer_;
-
-    /// The internal buffer for data after hard demodulation.
-    /// @li 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    /// @li 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<uint8_t> demod_hard_buffer_;
+    
+    Table<complex_float>& ue_spec_pilot_buffer_;
+    Table<complex_float>& equal_buffer_;
+    Table<complex_float>& ul_zf_buffer_;
+    Table<complex_float>& dl_zf_buffer_;
 
 };
 

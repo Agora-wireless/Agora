@@ -52,7 +52,7 @@ DoDemul::~DoDemul()
     free(equaled_buffer_temp_transposed);
 }
 
-Event_data DoDemul::launch(size_t tag)
+Event_data DoDemul::launch(size_t tag, UNUSED EventType event_type)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;

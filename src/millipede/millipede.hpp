@@ -25,6 +25,7 @@
 #include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
+#include "subcarrier_manager.hpp"
 #include "txrx.hpp"
 #include "utils.h"
 #include <algorithm>
@@ -84,8 +85,6 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
-    void schedule_subcarriers(
-        EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_codeblocks(
@@ -161,7 +160,11 @@ private:
 
     /// The singleton subcarrier manager instance. 
     /// @see SubcarrierManager documentation.
-    SubcarrierManager subcarrier_manager_;
+    /// TODO: this should be a direct object, not a pointer. 
+    ///       But first we need other items within the Millipede class
+    ///       to be properly initialized in its constructor's initializer lists
+    ///       instead of the copious class pointer allocation.
+    SubcarrierManager* subcarrier_manager_;
 
 
     /*****************************************************
@@ -197,6 +200,11 @@ private:
     // subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
+
+    // Data after soft demodulation
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
+    Table<int8_t> demod_soft_buffer_;
 
     // Data after LDPC decoding
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -260,11 +268,7 @@ private:
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
 
-    struct sched_info_t {
-        moodycamel::ConcurrentQueue<Event_data> concurrent_q;
-        moodycamel::ProducerToken* ptok;
-    };
-    sched_info_t sched_info_arr[kNumEventTypes];
+    struct sched_info_t sched_info_arr[kNumEventTypes];
 
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;

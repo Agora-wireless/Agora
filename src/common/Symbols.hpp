@@ -39,10 +39,6 @@ enum class EventType : int {
     kFFT,
     kZF,
     kDemul,
-    /// A meta-event that subsumes the three subcarrier-related events:
-    /// kDemul, kZF, and kPrecode. 
-    /// TODO: after this is fully supported, we can remove those 3 event types.
-    kSubcarrier,
     kIFFT,
     kMapBits,
     kPrecode,
@@ -94,7 +90,7 @@ enum class PrintType : int {
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Millipede on machines
 // with insufficient cores, disable this flag.
-static constexpr size_t kEnableThreadPinning = true;
+static constexpr size_t kEnableThreadPinning = false;
 
 #define BIGSTATION 0
 #define USE_IPV4 1

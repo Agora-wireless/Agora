@@ -43,7 +43,7 @@ TEST(TestZF, Perf)
         size_t base_sc_id
             = (fast_rand.next_u32() % (cfg->OFDM_DATA_NUM / cfg->zf_block_size))
             * cfg->zf_block_size;
-        computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
+        computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag, EventType::kZF);
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
 

@@ -131,7 +131,7 @@ DoFFT::~DoFFT()
     free(fft_inout);
 }
 
-Event_data DoFFT::launch(size_t tag)
+Event_data DoFFT::launch(size_t tag, UNUSED EventType event_type)
 {
     size_t socket_thread_id = fft_req_tag_t(tag).tid;
     size_t buf_offset = fft_req_tag_t(tag).offset;
@@ -320,7 +320,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
-Event_data DoIFFT::launch(size_t tag)
+Event_data DoIFFT::launch(size_t tag, UNUSED EventType event_type)
 {
     size_t start_tsc = worker_rdtsc();
     size_t ant_id = gen_tag_t(tag).ant_id;
