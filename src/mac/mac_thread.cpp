@@ -15,6 +15,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     , dl_bits_buffer_(dl_bits_buffer)
     , dl_bits_buffer_status_(dl_bits_buffer_status)
     , rx_queue_(rx_queue)
+    , tx_queue_(tx_queue)
 {
     // Set up MAC log file
     if (log_filename != "") {
@@ -35,13 +36,15 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
             * cfg_->LDPC_config.nblocksInSymbol;
     udp_pkt_buf_.resize(udp_pkt_len);
 
-    udp_server = UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_server
+        = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 }
 
 MacThread::~MacThread()
 {
     fclose(log_file_);
     MLPD_INFO("MAC thread destroyed\n");
+    delete udp_server;
 }
 
 void MacThread::process_codeblocks_from_master()
@@ -112,7 +115,7 @@ void MacThread::process_codeblocks_from_master()
 void MacThread::process_udp_packets_from_apps()
 {
     ssize_t ret
-        = udp_server.recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+        = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {

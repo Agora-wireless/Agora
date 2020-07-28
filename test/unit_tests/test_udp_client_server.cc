@@ -77,16 +77,6 @@ TEST(UDPClientServer, Perf)
     client_thread.join();
 }
 
-TEST(UDPClientServer, Assignment)
-{
-    UDPServer udp_server;
-    udp_server = UDPServer(kServerUDPPort);
-
-    std::vector<uint8_t> rx_buf(kMessageSize);
-    int ret = udp_server.recv_nonblocking(&rx_buf[0], rx_buf.size());
-    ASSERT_EQ(ret, 0);
-}
-
 // Test that the server is actually non-blocking
 TEST(UDPClientServer, ServerIsNonBlocking)
 {
