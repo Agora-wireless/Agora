@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+### This script builds Millipede locally and creates a docker image
+### that can execute Millipede, either as a local container
+### or as a remote container (e.g., part of a kubernetes cluster).
+### 
+### Pass "clean" as a command-line argument to this script to remove docker build files.
+
+
 # Obtain the absolute directory where this script exists, which is the `./docker` directory.
 DOCKER_DIR=$(dirname $(readlink -f ${BASH_SOURCE}))
 MILLIPEDE_BASE_DIR=$(readlink -f ${DOCKER_DIR}/.. )
@@ -12,6 +19,16 @@ FLEXRAN_DIR=/opt/${FLEXRAN_DIR_NAME}
 
 # Navigate to the `docker` directory, everything in this script will be executed within there.
 cd ${DOCKER_DIR}
+
+if [ $1 = "clean" ]; then
+    echo -n "Cleaning docker build files ... "
+    rm -rf ./build/
+    rm -rf ./data/
+    rm -rf ./test/
+    rm -rf ./${FLEXRAN_DIR_NAME}/
+    echo "done."
+    exit 0
+fi
 
 # Perform a regular build, and do so in a new `build` directory
 echo "Performing regular build ..."
@@ -35,8 +52,14 @@ cp -r  ${FLEXRAN_DIR}   ./${FLEXRAN_DIR_NAME}/
 echo "done"
 
 
-# Build the docker image
-docker build -t boos:Dockerfile ./
+DOCKER_TAG="millipede:Dockerfile"
 
-# Tag it so we can more easily push it to the Azure container registry
-docker tag boos:Dockerfile booscr.azurecr.io/samples/millipede
+# Build the docker image
+docker build -t ${DOCKER_TAG} ./
+
+# Add another tag so we can more easily push it to the Azure container registry
+docker tag ${DOCKER_TAG} booscr.azurecr.io/samples/millipede
+
+
+echo "Docker build complete. You can run the container locally with:"
+echo "    docker run -ti ${DOCKER_TAG}"
