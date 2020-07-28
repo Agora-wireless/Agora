@@ -46,6 +46,17 @@ TEST(TestConcurrentQueue, Correctness)
     for (size_t i = 0; i < kNumWorker; i++) {
         workers[i]->join();
     }
+    delete master;
+    for (size_t i = 0; i < kNumWorker; i++) {
+        delete workers[i];
+        delete queues[i];
+        delete ptoks[i];
+        delete ctoks[i];
+    }
+    delete workers;
+    delete queues;
+    delete ptoks;
+    delete ctoks;
 }
 
 int main(int argc, char** argv)
