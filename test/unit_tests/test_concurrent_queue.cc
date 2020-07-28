@@ -46,7 +46,7 @@ TEST(TestConcurrentQueue, Correctness)
         workers[i]->join();
     }
     delete master;
-    for (size_t i = 0; i < kNumWorker; i++) {
+    for (size_t i = 0; i < kNumWorkers; i++) {
         delete workers[i];
         delete queues[i];
         delete ptoks[i];
