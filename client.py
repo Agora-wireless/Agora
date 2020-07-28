@@ -26,12 +26,6 @@ else:
 # setup cmds
 cfg = 'data/ue-ul-hw.json' if args.num == 2 else 'data/ue-one-ul-hw.json'
 cmd_user = MP + '/user ' + cfg
-cmd_macuser = MP + '/macuser 2 2593 ' + cfg
-
-# start macuser
-print('Starting macuser...')
-logm = open('macuser.log', 'w')
-pm = sh.Popen(cmd_macuser.split(), stdout=logm)
 
 # start client apps
 if args.app != "none":
@@ -51,5 +45,4 @@ pu = sh.Popen(cmd_user.split(), stdout=logu)
 # wait
 print('Waiting...')
 pu.wait()
-pm.wait()
 print('...done!')
