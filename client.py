@@ -27,6 +27,13 @@ else:
 cfg = 'data/ue-ul-hw.json' if args.num == 2 else 'data/ue-one-ul-hw.json'
 cmd_user = MP + '/user ' + cfg
 
+# start user
+print('Starting user...')
+logu = open('user.log', 'w')
+pu = sh.Popen(cmd_user.split(), stdout=logu)
+
+time.sleep(5)
+
 # start client apps
 if args.app != "none":
     loga = []
@@ -34,13 +41,8 @@ if args.app != "none":
     for i in range(args.num):
         print('Starting client {}...'.format(i))
         loga += [open('app{}.log', 'w')]
-        cmda = cmd_app.format(p=8090+i, d=i*2)
+        cmda = cmd_app.format(p=8070+i, d=i*2)
         proca += [sh.Popen(cmda.split(), stdout=loga[i])]
-
-# start user
-print('Starting user...')
-logu = open('user.log', 'w')
-pu = sh.Popen(cmd_user.split(), stdout=logu)
 
 # wait
 print('Waiting...')
