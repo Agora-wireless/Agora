@@ -308,6 +308,13 @@ add_executable(test_zf
 target_link_libraries(test_zf ${COMMON_LIBS})
 add_test(NAME test_zf COMMAND test_zf)
 
+add_executable(test_mac_thread
+  test/unit_tests/test_mac_thread.cc
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_mac_thread ${COMMON_LIBS})
+add_test(NAME test_mac_thread COMMAND test_mac_thread)
+
 add_executable(test_ldpc
   test/compute_kernels/ldpc/test_ldpc.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
