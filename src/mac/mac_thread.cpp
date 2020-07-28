@@ -176,6 +176,15 @@ void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
         pkt->data, cfg_->mac_packet_length);
     (*ul_bits_buffer_status_)[radio_id][radio_buf_id] = 1;
 
+    if (kDebugBSReceiver) {
+        std::stringstream ss;
+        fprintf(log_file_, "MAC thread: Received data from app: ");
+        for (size_t i = 0; i < cfg_->mac_packet_length; i++) {
+            ss << std::to_string(pkt->data[i]) << " ";
+        }
+        fprintf(log_file_, "%s\n", ss.str().c_str());
+    }
+
     Event_data msg(
         EventType::kPacketFromMac, rx_tag_t(radio_id, radio_buf_id)._tag);
     rt_assert(
