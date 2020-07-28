@@ -69,7 +69,7 @@ Phy_UE::Phy_UE(Config* config)
         mac_thread_ = new MacThread(MacThread::Mode::kClient, config_,
             mac_cpu_core, &ul_bits_buffer_, &ul_bits_buffer_status_,
             nullptr /* dl bits buffer */, nullptr /* dl bits buffer status */,
-            &message_queue_, &to_mac_queue_);
+            &to_mac_queue_, &message_queue_);
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
