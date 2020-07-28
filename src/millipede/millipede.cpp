@@ -624,7 +624,9 @@ void* Millipede::worker(int tid)
      * but in the future they'll be created by the subcarrier manager itself. 
      */
     for (auto sc_range : subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
-        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(tid, sc_range);
+        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(tid, worker_ptoks_ptr[tid], sc_range);
+        std::cout << "Worker thread " << tid 
+            << " created DoSubcarrier, ptr: " << computeSubcarrier << std::endl;
         compute_vec.push_back(computeSubcarrier);
     }
 

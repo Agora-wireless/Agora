@@ -195,18 +195,21 @@ public:
         for (size_t i = 0; i < num_events; i++) {
             // get the subcarrier doer that handles the current `sc_id` in the `base_tag`.
             auto &matching_doer = subcarrier_doer_for_id(base_tag.sc_id);
-            auto &queue_info = matching_doer.first;
+            auto &master_to_worker_queue = matching_doer.first;
 
             std::cout << "[schedule_subcarriers] enqueueing event: " << (int)event_type 
                 << ", frame_id: " << frame_id 
                 << ", symbol_id: " << symbol_id
                 << " into DoSubcarrier[" << base_tag.sc_id 
                 << "] ptr: " << matching_doer.second
-                // << ", queue.size: " << queue_info.concurrent_q.size_approx() 
-                << ", ptok: " << queue_info.ptok << std::endl;
+                << ", queue.ptok: " << master_to_worker_queue.ptok
+                << ", queue.size: " << master_to_worker_queue.concurrent_q.size_approx() 
+                << std::endl;
 
 
-            try_enqueue_fallback(&queue_info.concurrent_q, queue_info.ptok,
+            try_enqueue_fallback(
+                &master_to_worker_queue.concurrent_q,
+                master_to_worker_queue.ptok,
                 Event_data(event_type, base_tag._tag)
             );
             base_tag.sc_id += block_size;
@@ -219,7 +222,11 @@ public:
     ///
     /// This function also creates an event queue for each subcarrier doer
     /// such that this subcarrier manager can 
-    DoSubcarrier* create_subcarrier_doer(int worker_tid, Range sc_range) {
+    DoSubcarrier* create_subcarrier_doer(
+        int worker_tid,
+        moodycamel::ProducerToken* worker_producer_token,
+        Range sc_range
+    ) {
         rt_assert((sc_range.start) / subcarrier_block_size_ == 
             (sc_range.end-1) / subcarrier_block_size_ ,
             "invalid subcarrier range, all subcarrier IDs within the range "
@@ -230,7 +237,7 @@ public:
 
         std::cout << "[create_subcarrier_doer]: worker_tid: " << worker_tid 
             << ", range: [" << sc_range.start << ":" << sc_range.end << ")"
-            << ", there are " << subcarrier_doers_.size() << " doers." << std::endl;
+            << ", worker_producer_token: " << worker_producer_token << std::endl;
 
         // Not sure how large this queue needs to be; size taken from Millipede::initialize_queues().
         // sched_info_t queue_info(mt_queue_t(512 * cfg->data_symbol_num_perframe * 4));
@@ -244,7 +251,8 @@ public:
         subcarrier_doers_[dest_index] = std::make_pair(
             // TODO: what's the right queue size? This is taken from `Millipede::initialize_queues()`.
             sched_info_t(mt_queue_t(512 * cfg->data_symbol_num_perframe * 4)),
-            nullptr
+            // this nullptr will be replaced below.
+            nullptr 
         ); 
         
         // Second, get that sched_info_t that we just inserted into the `subcarrier_doers_` vector,
@@ -252,7 +260,7 @@ public:
         // and then properly insert a pointer to the new subcarrier doer into the vector.
         auto &inserted_sched = subcarrier_doers_[dest_index];
         auto computeSubcarrier = new DoSubcarrier(cfg, worker_tid, freq_ghz_,
-            inserted_sched.first.concurrent_q, complete_task_queue_, inserted_sched.first.ptok,
+            inserted_sched.first.concurrent_q, complete_task_queue_, /*inserted_sched.first.ptok*/ worker_producer_token,
             sc_range,
             csi_buffer_, recip_buffer_, calib_buffer_, dl_encoded_buffer_, data_buffer_,
             demod_soft_buffer_, dl_ifft_buffer_,

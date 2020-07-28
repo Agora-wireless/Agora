@@ -138,9 +138,9 @@ public:
             this->task_queue_, this->complete_task_queue, this->worker_producer_token, 
             dl_zf_buffer_, dl_ifft_buffer_, dl_encoded_buffer_, stats
         );
-        computeReciprocity_ = new Reciprocity(this->cfg, tid, freq_ghz,
-            this->task_queue_, this->complete_task_queue, this->worker_producer_token,
-            calib_buffer_, recip_buffer_, stats);
+        // computeReciprocity_ = new Reciprocity(this->cfg, tid, freq_ghz,
+        //     this->task_queue_, this->complete_task_queue, this->worker_producer_token,
+        //     calib_buffer_, recip_buffer_, stats);
     }
 
 
@@ -148,7 +148,7 @@ public:
         delete computeZF_;
         delete computeDemul_;
         delete computePrecode_;
-        delete computeReciprocity_;
+        // delete computeReciprocity_;
     }
 
 
@@ -193,7 +193,7 @@ private:
     DoZF*         computeZF_;
     DoDemul*      computeDemul_;
     DoPrecode*    computePrecode_;
-    Reciprocity*  computeReciprocity_;
+    // Reciprocity*  computeReciprocity_;
 
     // For the following buffers, see the `SubcarrierManager`'s documentation.
 
