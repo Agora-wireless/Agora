@@ -19,8 +19,7 @@ s.connect((args.ip, args.port))
 
 while(True):
     # create random data
-    #data = bytearray([random.randint(0, 255) for _ in range(args.size)])
-    data = bytearray([5 for _ in range(args.size)])
+    data = bytearray([random.randint(0, 255) for _ in range(args.size)])
 
     # send data
     s.sendall(data)
