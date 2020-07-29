@@ -36,13 +36,9 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
 
     client_.ul_bits_buffer_id_.fill(0);
 
-    const size_t udp_pkt_len = MacPacket::kOffsetOfData
-        + bits_to_bytes(cfg_->LDPC_config.cbLen)
-            * cfg_->LDPC_config.nblocksInSymbol;
-    udp_pkt_buf_.resize(udp_pkt_len);
-
-    udp_server
-        = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_pkt_buf_.resize(cfg_->mac_packet_length);
+    udp_server = new UDPServer(
+        kLocalPort, udp_pkt_buf_.size() * kMaxUEs * kMaxPktsPerUE);
 }
 
 MacThread::~MacThread()
