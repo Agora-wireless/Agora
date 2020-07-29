@@ -111,12 +111,10 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
                 "fe80::f436:d735:b04a:864a");
         }
 
-        if (!kUseDPDK && kConnectUDP) {
-            int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
-                sizeof(servaddr_ipv4[i]));
-            rt_assert(ret == 0, "UDP socket connect failed");
-            printf("UDP socket %zu connected\n", i);
-        }
+        int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
+            sizeof(servaddr_ipv4[i]));
+        rt_assert(ret == 0, "UDP socket connect failed");
+        printf("UDP socket %zu connected\n", i);
     }
 #endif
     num_threads_ready_atomic = 0;
@@ -343,25 +341,12 @@ void* Sender::worker_thread(int tid)
 
         // Use the correct send function based on whether Millipede uses DPDK
         // and whether uses fft in sender
-        if (kUseDPDK or !kConnectUDP) {
-            if (cfg->fft_in_rru) {
-                ret = sendto(socket_[radio_id], payload, buffer_length, 0,
-                    (struct sockaddr*)&servaddr_ipv4[tid],
-                    sizeof(servaddr_ipv4[tid]));
-                free(payload);
-            } else {
-                ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
-                    buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
-                    sizeof(servaddr_ipv4[tid]));
-            }
+        if (cfg->fft_in_rru) {
+            ret = send(socket_[radio_id], payload, buffer_length, 0);
+            free(payload);
         } else {
-            if (cfg->fft_in_rru) {
-                ret = send(socket_[radio_id], payload, buffer_length, 0);
-                free(payload);
-            } else {
-                ret = send(socket_[radio_id], tx_buffers_[tx_bufs_idx],
-                    buffer_length, 0);
-            }
+            ret = send(
+                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
         }
         rt_assert(ret >= 0, "Worker: sendto() failed");
 #endif

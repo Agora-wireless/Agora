@@ -102,7 +102,6 @@ traffic with hardware UEs (e.g., Iris devices)
 
  * Run the client on a machine connected to the Iris UEs
    * Rebuild the code
-     * Set `kConnectUDP = false` in `src/common/Symbols.hpp`
      * Pass `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
