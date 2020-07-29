@@ -274,7 +274,8 @@ private:
         moodycamel::ConcurrentQueue<Event_data> concurrent_q;
         moodycamel::ProducerToken* ptok;
     };
-    sched_info_t sched_info_arr[kNumEventTypes];
+    // sched_info_t sched_info_arr[kNumEventTypes];
+    sched_info_t sched_info_arr[kMaxThreads];
 
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
@@ -287,6 +288,8 @@ private:
     // moodycamel::ProducerToken* rx_ptoks_mac_ptr[kMaxThreads];
     // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
+
+    size_t cur_tid;
 };
 
 #endif

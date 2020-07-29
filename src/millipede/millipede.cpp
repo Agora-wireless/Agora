@@ -103,8 +103,12 @@ void Millipede::schedule_antennas(
     auto base_tag = gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0);
 
     for (size_t i = 0; i < config_->BS_ANT_NUM; i++) {
-        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        // try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        // Event_data(event_type, base_tag._tag));
+        try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
+            sched_info_arr[cur_tid].ptok,
             Event_data(event_type, base_tag._tag));
+        cur_tid = (cur_tid + 1) % config_->worker_thread_num;
         base_tag.ant_id++;
     }
 }
@@ -131,8 +135,12 @@ void Millipede::schedule_subcarriers(
     }
 
     for (size_t i = 0; i < num_events; i++) {
-        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        // try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        // Event_data(event_type, base_tag._tag));
+        try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
+            sched_info_arr[cur_tid].ptok,
             Event_data(event_type, base_tag._tag));
+        cur_tid = (cur_tid + 1) % config_->worker_thread_num;
         base_tag.sc_id += block_size;
     }
 }
@@ -146,8 +154,12 @@ void Millipede::schedule_codeblocks(
 
     for (size_t i = 0;
          i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
-        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        // try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
+        // Event_data(event_type, base_tag._tag));
+        try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
+            sched_info_arr[cur_tid].ptok,
             Event_data(event_type, base_tag._tag));
+        cur_tid = (cur_tid + 1) % config_->worker_thread_num;
         base_tag.cb_id++;
     }
 }
@@ -170,6 +182,7 @@ void Millipede::schedule_users(
 void Millipede::start()
 {
     auto& cfg = config_;
+    cur_tid = 0;
 
     /* start txrx receiver */
     if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
@@ -521,8 +534,11 @@ void Millipede::start()
                             }
                         }
                     }
-                    try_enqueue_fallback(get_conq(EventType::kFFT),
-                        get_ptok(EventType::kFFT), do_fft_task);
+                    // try_enqueue_fallback(get_conq(EventType::kFFT),
+                    // get_ptok(EventType::kFFT), do_fft_task);
+                    try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
+                        sched_info_arr[cur_tid].ptok, do_fft_task);
+                    cur_tid = (cur_tid + 1) % config_->worker_thread_num;
                 }
             }
         } /* End of for */
@@ -639,10 +655,57 @@ void* Millipede::worker(int tid)
         = { computeIFFT, computePrecode, computeZF, computeReciprocity,
               computeFFT, computeDemul, computeEncoding, computeDecoding };
 
+    // while (true) {
+    //     for (size_t i = 0; i < computers_vec.size(); i++) {
+    //         if (computers_vec[i]->try_launch())
+    //             break;
+    //     }
+    // }
     while (true) {
-        for (size_t i = 0; i < computers_vec.size(); i++) {
-            if (computers_vec[i]->try_launch())
+        Event_data req_event;
+        if (sched_info_arr[tid].concurrent_q.try_dequeue(req_event)) {
+            Event_data resp_event;
+            resp_event.num_tags = req_event.num_tags;
+            Doer* doer;
+
+            switch (req_event.event_type) {
+            case EventType::kFFT:
+                doer = computeFFT;
                 break;
+            case EventType::kZF:
+                doer = computeZF;
+                break;
+            case EventType::kDemul:
+                doer = computeDemul;
+                break;
+            case EventType::kIFFT:
+                doer = computeIFFT;
+                break;
+            case EventType::kPrecode:
+                doer = computePrecode;
+                break;
+            case EventType::kDecode:
+                doer = computeDecoding;
+                break;
+            case EventType::kEncode:
+                doer = computeEncoding;
+                break;
+            case EventType::kRC:
+                doer = computeReciprocity;
+                break;
+            default:
+                assert(false);
+            }
+
+            for (size_t i = 0; i < req_event.num_tags; i++) {
+                Event_data resp_i = doer->launch(req_event.tags[i]);
+                rt_assert(resp_i.num_tags == 1, "Invalid num_tags in resp");
+                resp_event.tags[i] = resp_i.tags[0];
+                resp_event.event_type = resp_i.event_type;
+            }
+
+            try_enqueue_fallback(
+                &complete_task_queue_, worker_ptoks_ptr[tid], resp_event);
         }
     }
 }
@@ -1017,9 +1080,15 @@ void Millipede::initialize_queues()
     complete_task_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
 
     // Create concurrent queues for each Doer
-    for (sched_info_t& s : sched_info_arr) {
-        s.concurrent_q = mt_queue_t(512 * data_symbol_num_perframe * 4);
-        s.ptok = new moodycamel::ProducerToken(s.concurrent_q);
+    // for (sched_info_t& s : sched_info_arr) {
+    //     s.concurrent_q = mt_queue_t(512 * data_symbol_num_perframe * 4);
+    //     s.ptok = new moodycamel::ProducerToken(s.concurrent_q);
+    // }
+    for (size_t i = 0; i < config_->worker_thread_num; i++) {
+        sched_info_arr[i].concurrent_q
+            = mt_queue_t(512 * data_symbol_num_perframe * 4);
+        sched_info_arr[i].ptok
+            = new moodycamel::ProducerToken(sched_info_arr[i].concurrent_q);
     }
 
     for (size_t i = 0;
