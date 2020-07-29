@@ -701,6 +701,14 @@ void Phy_UE::doMapBits(int tid, size_t tag)
 
     struct MacPacket* pkt = (struct MacPacket*)(ul_bits_buffer_[ue_id]
         + offset_in_current_buffer * config_->mac_packet_length);
+
+    std::stringstream ss;
+    ss << "PhyUE doMapBits, frame ID " << pkt->frame_id << " ";
+    for (size_t i = 0; i < 4; i++) {
+        ss << std::to_string((reinterpret_cast<uint8_t*>(pkt->data))[i]);
+    }
+    printf("%s\n", ss.str().c_str());
+
     size_t mac_frame_id = pkt->frame_id;
     rt_assert((size_t)pkt->ue_id == ue_id,
         "UE index in tag does not match that in received packet!");
