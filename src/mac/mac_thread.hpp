@@ -74,6 +74,7 @@ private:
     // the client.
     const Mode mode_;
 
+    const double freq_ghz_; // RDTSC frequency in GHz
     // We check for new MAC packets from applications every [tsc_delta_]
     // clock ticks
     const size_t tsc_delta_;

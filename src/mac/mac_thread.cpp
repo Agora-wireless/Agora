@@ -16,7 +16,8 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     moodycamel::ConcurrentQueue<Event_data>* tx_queue, std::string log_filename)
     : cfg_(cfg)
     , mode_(mode)
-    , tsc_delta_((cfg_->get_frame_duration_sec() * 1e9) / measure_rdtsc_freq())
+    , freq_ghz_(measure_rdtsc_freq())
+    , tsc_delta_((cfg_->get_frame_duration_sec() * 1e9) / freq_ghz_)
     , core_offset_(core_offset)
     , ul_bits_buffer_(ul_bits_buffer)
     , ul_bits_buffer_status_(ul_bits_buffer_status)
@@ -175,11 +176,20 @@ void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
     const size_t radio_id = fast_rand_.next_u32() % cfg_->UE_ANT_NUM;
     size_t& radio_buf_id = client_.ul_bits_buffer_id_[radio_id];
 
-    if ((*ul_bits_buffer_status_)[radio_id][radio_buf_id] == 1) {
-        MLPD_WARN("MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
-                  "packet.\n",
-            radio_buf_id);
-        return;
+    size_t start_tsc = rdtsc();
+    while (true) {
+        auto* canary = reinterpret_cast<volatile uint8_t*>(
+            &(*ul_bits_buffer_status_)[radio_id][radio_buf_id]);
+        if (*canary == 0) {
+            break;
+        }
+
+        if (cycles_to_ms(rdtsc() - start_tsc, freq_ghz_) > 10) {
+            printf("MAC thread waited for buffer %zu for radio ID to become "
+                   "free (for UE %zu).\n",
+                radio_buf_id, radio_id);
+            start_tsc = rdtsc();
+        }
     }
 
     memset(pkt, 0, MacPacket::kOffsetOfData);

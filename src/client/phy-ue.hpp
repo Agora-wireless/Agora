@@ -217,6 +217,7 @@ private:
     std::thread mac_std_thread_; // Handle for the MAC thread
 
     size_t expected_frame_id_from_mac_ = 0;
+    size_t num_frames_consumed_[kMaxUEs] = {};
 
     /*****************************************************
      * Uplink
