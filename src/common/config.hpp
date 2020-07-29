@@ -299,6 +299,12 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
+    // Return the frame duration in seconds
+    inline double get_frame_duration_sec()
+    {
+        return symbol_num_perframe * sampsPerSymbol / rate;
+    }
+
     Config(std::string);
     void genData();
     ~Config();

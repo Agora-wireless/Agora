@@ -64,14 +64,20 @@ private:
     // Receive user data bits (downlink bits at the MAC thread running at the
     // server, uplink bits at the MAC thread running at the client) and forward
     // them to the PHY.
-    void process_udp_packets_from_apps();
-    void process_udp_packets_from_apps_server(const MacPacket* pkt);
-    void process_udp_packets_from_apps_client(const MacPacket* pkt);
+    void process_mac_packets_from_apps();
+    void process_mac_packets_from_apps_server(MacPacket* pkt);
+    void process_mac_packets_from_apps_client(MacPacket* pkt);
+
+    Config* cfg_;
 
     // If Mode::kServer, this thread is running at the Millipede server. Else at
     // the client.
     const Mode mode_;
-    Config* cfg_;
+
+    // We check for new MAC packets from applications every [tsc_delta_]
+    // clock ticks
+    const size_t tsc_delta_;
+
     const size_t core_offset_; // The CPU core on which this thread runs
 
     FILE* log_file_; // Log file used to store MAC layer outputs
@@ -89,7 +95,13 @@ private:
     // A preallocated buffer to store UDP packets received via recv()
     std::vector<uint8_t> udp_pkt_buf_;
 
-    FastRand fast_rand;
+    // The timestamp at which we last received a UDP packet from an application
+    size_t last_mac_pkt_rx_tsc_ = 0;
+
+    // The frame ID of the next MAC packet we'll hand over to the PHY
+    size_t next_frame_id_ = 0;
+
+    FastRand fast_rand_;
 
     // Server-only members
     struct {

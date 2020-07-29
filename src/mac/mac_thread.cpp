@@ -1,14 +1,16 @@
 #include "mac_thread.hpp"
 #include "logger.h"
 #include "utils_ldpc.hpp"
+#include <string.h>
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<Event_data>* rx_queue,
     moodycamel::ConcurrentQueue<Event_data>* tx_queue, std::string log_filename)
-    : mode_(mode)
-    , cfg_(cfg)
+    : cfg_(cfg)
+    , mode_(mode)
+    , tsc_delta_((cfg_->get_frame_duration_sec() * 1e9) / measure_rdtsc_freq())
     , core_offset_(core_offset)
     , ul_bits_buffer_(ul_bits_buffer)
     , ul_bits_buffer_status_(ul_bits_buffer_status)
@@ -23,6 +25,9 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     }
     log_file_ = fopen(log_filename_.c_str(), "w");
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
+
+    printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
+        cfg_->get_frame_duration_sec() * 1000, tsc_delta_);
 
     // Set up buffers
     server_.n_filled_in_frame_.fill(0);
@@ -112,7 +117,7 @@ void MacThread::process_codeblocks_from_master()
         "Socket message enqueue failed\n");
 }
 
-void MacThread::process_udp_packets_from_apps()
+void MacThread::process_mac_packets_from_apps()
 {
     ssize_t ret
         = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
@@ -124,12 +129,12 @@ void MacThread::process_udp_packets_from_apps()
         return;
     }
 
-    const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-    mode_ == Mode::kServer ? process_udp_packets_from_apps_server(pkt)
-                           : process_udp_packets_from_apps_client(pkt);
+    auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
+    mode_ == Mode::kServer ? process_mac_packets_from_apps_server(pkt)
+                           : process_mac_packets_from_apps_client(pkt);
 }
 
-void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
+void MacThread::process_mac_packets_from_apps_server(MacPacket* pkt)
 {
     // We've received bits for the downlink
     const size_t total_symbol_idx
@@ -156,11 +161,11 @@ void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
         "MAC thread: Failed to enqueue downlink packet");
 }
 
-void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
+void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
 {
     // We've received bits for the uplink. The received MAC packet does not
     // specify a radio ID, so choose one at random.
-    const size_t radio_id = fast_rand.next_u32() % cfg_->UE_ANT_NUM;
+    const size_t radio_id = fast_rand_.next_u32() % cfg_->UE_ANT_NUM;
     size_t& radio_buf_id = client_.ul_bits_buffer_id_[radio_id];
 
     if ((*ul_bits_buffer_status_)[radio_id][radio_buf_id] == 1) {
@@ -171,9 +176,13 @@ void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
         return;
     }
 
+    memset(pkt, 0, MacPacket::kOffsetOfData);
+    pkt->frame_id = next_frame_id_;
+    next_frame_id_++;
+
     memcpy(
         &(*ul_bits_buffer_)[radio_id][radio_buf_id * cfg_->mac_packet_length],
-        pkt->data, cfg_->mac_packet_length);
+        pkt, cfg_->mac_packet_length);
     (*ul_bits_buffer_status_)[radio_id][radio_buf_id] = 1;
 
     if (kDebugBSReceiver) {
@@ -205,7 +214,11 @@ void MacThread::run_event_loop()
 
     while (cfg_->running) {
         process_codeblocks_from_master();
-        process_udp_packets_from_apps();
+
+        if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
+            process_mac_packets_from_apps();
+            last_mac_pkt_rx_tsc_ = rdtsc();
+        }
     }
 }
 
