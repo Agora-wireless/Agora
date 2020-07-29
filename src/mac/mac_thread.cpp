@@ -176,9 +176,8 @@ void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
     size_t& radio_buf_id = client_.ul_bits_buffer_id_[radio_id];
 
     if ((*ul_bits_buffer_status_)[radio_id][radio_buf_id] == 1) {
-        fprintf(stderr,
-            "MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
-            "packet.\n",
+        MLPD_WARN("MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
+                  "packet.\n",
             radio_buf_id);
         return;
     }
