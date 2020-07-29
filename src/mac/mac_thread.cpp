@@ -7,7 +7,7 @@
 static constexpr bool kLogMACMetadata = true;
 
 // Save all data bytes to the MAC log file
-static constexpr bool kLogMACBytes = false;
+static constexpr bool kLogMACBytes = true;
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
