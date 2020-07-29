@@ -219,6 +219,9 @@ void MacThread::run_event_loop()
             process_mac_packets_from_apps();
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
+
+        if (next_frame_id_ == cfg_->frames_to_test)
+            break;
     }
 }
 
