@@ -264,11 +264,7 @@ void* Sender::data_update_thread(int)
 
 void Sender::update_tx_buffer(gen_tag_t tag)
 {
-#ifdef USE_DPDK
     auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
-#else
-    auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
-#endif
     pkt->frame_id = tag.frame_id;
     pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
     pkt->cell_id = 0;
