@@ -20,7 +20,7 @@ FLEXRAN_DIR=/opt/${FLEXRAN_DIR_NAME}
 # Navigate to the `docker` directory, everything in this script will be executed within there.
 cd ${DOCKER_DIR}
 
-if [ $1 = "clean" ]; then
+if [ "$1" = "clean" ]; then
     echo -n "Cleaning docker build files ... "
     rm -rf ./build/
     rm -rf ./data/
@@ -32,23 +32,23 @@ fi
 
 # Perform a regular build, and do so in a new `build` directory
 echo "Performing regular build ..."
-( mkdir -p build;  cd build;  cmake ${MILLIPEDE_BASE_DIR};  make -j12 )
+( mkdir -p build;  cd build;  cmake -DFORCE_BUILD_PATH=off ${MILLIPEDE_BASE_DIR};  make -j12 )
 
 # The build directory is now present, but we also need `data` and (optionally) `test`
-echo -n "Copying ./data ... "
+echo -n "Copying ./data into docker context ... "
 rm -rf ./data/
-cp -r  ${MILLIPEDE_BASE_DIR}/data/   ./data/
+cp -rf  ${MILLIPEDE_BASE_DIR}/data/   ./data/
 echo "done"
 
-echo -n "Copying ./test ... "
+echo -n "Copying ./test into docker context ... "
 rm -rf ./test/
-cp -r  ${MILLIPEDE_BASE_DIR}/test/   ./test/
+cp -rf  ${MILLIPEDE_BASE_DIR}/test/   ./test/
 echo "done"
 
 
 # Millipede now requires the FlexRAN libs
-echo -n "Copying ${FLEXRAN_DIR} ... "
-cp -r  ${FLEXRAN_DIR}   ./${FLEXRAN_DIR_NAME}/
+echo -n "Copying ${FLEXRAN_DIR} into docker context ... "
+cp -rf  ${FLEXRAN_DIR}   ./${FLEXRAN_DIR_NAME}/
 echo "done"
 
 
@@ -61,5 +61,5 @@ docker build -t ${DOCKER_TAG} ./
 docker tag ${DOCKER_TAG} booscr.azurecr.io/samples/millipede
 
 
-echo "Docker build complete. You can run the container locally with:"
+echo -e "$(tput setaf 10)\nDocker build complete. You can run the container locally with:$(tput sgr0)"
 echo "    docker run -ti ${DOCKER_TAG}"
