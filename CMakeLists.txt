@@ -175,6 +175,7 @@ endif()
 
 include_directories(
 	src/common/
+	src/mac/
   src/millipede/
   src/millipede/txrx/
   src/client/)
@@ -206,7 +207,7 @@ set(MILLIPEDE_SOURCES
   src/millipede/reciprocity.cpp
   src/millipede/radio_lib.cpp
   src/millipede/radio_calibrate.cpp
-  src/millipede/txrx/txrx_mac.cpp)
+  src/mac/mac_thread.cpp)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
@@ -224,7 +225,7 @@ set(CLIENT_SOURCES
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
   src/client/txrx_client.cpp
-  src/client/txrx_mac.cpp)
+  src/mac/mac_thread.cpp)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 include_directories(
@@ -261,18 +262,6 @@ add_executable(user
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
-
-add_executable(macuser
-  src/mac/simple_mac_client.cpp
-  src/mac/mac_client_main.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(macuser ${COMMON_LIBS})
-
-add_executable(macbs
-  src/mac/simple_mac_bs.cpp
-  src/mac/mac_bs_main.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(macbs ${COMMON_LIBS})
 
 add_executable(sender
   simulator/sender_cli.cpp
@@ -332,3 +321,8 @@ add_executable(test_datatype_conversion
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_datatype_conversion ${COMMON_LIBS})
 add_test(NAME test_datatype_conversion COMMAND test_datatype_conversion)
+
+add_executable(test_udp_client_server
+  test/unit_tests/test_udp_client_server.cc)
+target_link_libraries(test_udp_client_server ${COMMON_LIBS})
+add_test(NAME test_udp_client_server COMMAND test_udp_client_server)
