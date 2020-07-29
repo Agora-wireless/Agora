@@ -178,6 +178,7 @@ void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
     memset(pkt, 0, MacPacket::kOffsetOfData);
     pkt->frame_id = next_frame_id_;
     next_frame_id_++;
+    rt_assert(pkt->frame_id < cfg_->frames_to_test);
 
     memcpy(
         &(*ul_bits_buffer_)[radio_id][radio_buf_id * cfg_->mac_packet_length],
@@ -220,8 +221,12 @@ void MacThread::run_event_loop()
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
 
-        if (next_frame_id_ == cfg_->frames_to_test)
+        if (next_frame_id_ == cfg_->frames_to_test) {
+            MLPD_WARN("MAC thread stopping. Next frame ID = %zu, configured "
+                      "frames to test = %zu\n",
+                next_frame_id_, cfg_->frames_to_test);
             break;
+        }
     }
 }
 
