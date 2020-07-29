@@ -3,6 +3,12 @@
 #include "utils_ldpc.hpp"
 #include <string.h>
 
+// Save metadata like frame ID, UE ID to the MAC log file
+static constexpr bool kLogMACMetadata = true;
+
+// Save all data bytes to the MAC log file
+static constexpr bool kLogMACBytes = false;
+
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
@@ -76,18 +82,20 @@ void MacThread::process_codeblocks_from_master()
         server_.n_filled_in_frame_[ue_id] += cfg_->data_bytes_num_persymbol;
 
         // Print information about the received symbol
-        if (kDebugBSReceiver) {
+        if (kLogMACMetadata) {
             fprintf(log_file_,
                 "MAC thread received frame %zu, uplink symbol index %zu, "
                 "size %zu, copied to frame data offset %zu\n",
                 frame_id, symbol_idx_ul, cfg_->data_bytes_num_perframe,
                 frame_data__offset);
 
-            for (size_t i = 0; i < cfg_->data_bytes_num_persymbol; i++) {
-                ss << std::to_string(ul_data_ptr[i]) << " ";
+            if (kLogMACBytes) {
+                for (size_t i = 0; i < cfg_->data_bytes_num_persymbol; i++) {
+                    ss << std::to_string(ul_data_ptr[i]) << " ";
+                }
+                fprintf(log_file_, "%s\n", ss.str().c_str());
+                ss.str("");
             }
-            fprintf(log_file_, "%s\n", ss.str().c_str());
-            ss.str("");
         }
     }
 
@@ -185,17 +193,20 @@ void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
         pkt, cfg_->mac_packet_length);
     (*ul_bits_buffer_status_)[radio_id][radio_buf_id] = 1;
 
-    if (kDebugBSReceiver) {
+    if (kLogMACMetadata) {
         std::stringstream ss;
         fprintf(log_file_,
             "MAC thread: Received data from app for frame %d, ue %d, size "
             "%zu:\n",
             pkt->frame_id, pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
-        for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string(reinterpret_cast<uint8_t*>(pkt->data)[i])
-               << " ";
+
+        if (kLogMACBytes) {
+            for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+                ss << std::to_string(reinterpret_cast<uint8_t*>(pkt->data)[i])
+                   << " ";
+            }
+            fprintf(log_file_, "%s\n", ss.str().c_str());
         }
-        fprintf(log_file_, "%s\n", ss.str().c_str());
     }
 
     Event_data msg(
