@@ -8,9 +8,13 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
 endif()
 
 set(SOURCE_DIR ".")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+
+option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Millipede/build/'" ON)
+if(FORCE_BUILD_PATH)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+endif()
 
 # New versions of GCC enable position-independent executables by default. We
 # don't want to compile FlexRAN libraries with -fPIC because it reduces
