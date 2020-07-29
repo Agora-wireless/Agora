@@ -4,7 +4,7 @@
 #include <string.h>
 
 // Save metadata like frame ID, UE ID to the MAC log file
-static constexpr bool kLogMACMetadata = true;
+static constexpr bool kLogMACMetadata = false;
 
 // Save all data bytes to the MAC log file
 static constexpr bool kLogMACBytes = true;
@@ -90,13 +90,11 @@ void MacThread::process_codeblocks_from_master()
                 frame_id, symbol_idx_ul, cfg_->data_bytes_num_perframe,
                 frame_data__offset);
 
-            if (kLogMACBytes) {
-                for (size_t i = 0; i < cfg_->data_bytes_num_persymbol; i++) {
-                    ss << std::to_string(ul_data_ptr[i]) << " ";
-                }
-                fprintf(log_file_, "%s\n", ss.str().c_str());
-                ss.str("");
+            for (size_t i = 0; i < cfg_->data_bytes_num_persymbol; i++) {
+                ss << std::to_string(ul_data_ptr[i]) << " ";
             }
+            fprintf(log_file_, "%s\n", ss.str().c_str());
+            ss.str("");
         }
     }
 
@@ -107,14 +105,16 @@ void MacThread::process_codeblocks_from_master()
         udp_client.send(kRemoteHostname, kBaseRemotePort + ue_id,
             &server_.frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe);
 
-        fprintf(log_file_,
-            "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n", frame_id,
-            ue_id, cfg_->mac_data_bytes_num_perframe);
-        for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
+        if (kLogMACBytes) {
+            fprintf(log_file_,
+                "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
+                frame_id, ue_id, cfg_->mac_data_bytes_num_perframe);
+            for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+                ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
+            }
+            fprintf(log_file_, "%s\n", ss.str().c_str());
+            ss.str("");
         }
-        fprintf(log_file_, "%s\n", ss.str().c_str());
-        ss.str("");
     }
 
     rt_assert(
