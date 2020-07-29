@@ -216,6 +216,8 @@ private:
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
 
+    size_t expected_frame_id_from_mac_ = 0;
+
     /*****************************************************
      * Uplink
      *****************************************************/
