@@ -44,13 +44,14 @@ Millipede::Millipede(Config* cfg)
         get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
 
     if (kEnableMac) {
-        /* Initialize TXRX threads for communication with MAC layer*/
-        mac_receiver_.reset(new MacPacketTXRX(cfg,
-            cfg->core_offset + cfg->socket_thread_num + cfg->worker_thread_num
-                + 1,
-            &message_queue_, get_conq(EventType::kPacketToMac),
-            rx_ptoks_ptr + cfg->socket_thread_num,
-            tx_ptoks_ptr + cfg->socket_thread_num));
+        const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
+            + cfg->worker_thread_num + 1;
+        mac_thread_ = new MacThread(MacThread::Mode::kServer, cfg, mac_cpu_core,
+            &decoded_buffer_ /* ul bits */, nullptr /* ul bits status */,
+            &dl_bits_buffer_, &dl_bits_buffer_status_, &message_queue_,
+            get_conq(EventType::kPacketToMac));
+
+        mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
 
     /* Create worker threads */
@@ -73,6 +74,10 @@ Millipede::~Millipede()
     /* Downlink */
     if (config_->dl_data_symbol_num_perframe > 0)
         free_downlink_buffers();
+
+    if (kEnableMac)
+        mac_std_thread_.join();
+    delete mac_thread_;
 }
 
 void Millipede::stop()
@@ -171,21 +176,12 @@ void Millipede::start()
 {
     auto& cfg = config_;
 
-    /* start txrx receiver */
+    // Start packet I/O
     if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
             socket_buffer_status_size_, stats->frame_start,
             dl_socket_buffer_)) {
         this->stop();
         return;
-    }
-
-    if (kEnableMac) {
-        /* start mac txrx receiver */
-        if (!mac_receiver_->startTXRX(dl_bits_buffer_, dl_bits_buffer_status_,
-                socket_buffer_status_size_, decoded_buffer_)) {
-            this->stop();
-            return;
-        }
     }
 
     // Millipede processes a frame after processing for previous frames is
