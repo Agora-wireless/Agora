@@ -45,7 +45,6 @@
 
 class Sender {
 public:
-    static constexpr size_t kTXBufOffset = kUseDPDK ? 22 : 0;
     static constexpr size_t kMaxNumSockets = 128; // Max network sockets
 
 public:

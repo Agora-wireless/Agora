@@ -57,7 +57,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     tx_buffers_.calloc(
         SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM,
-        kTXBufOffset + cfg->packet_length, 64);
+        cfg->packet_length, 64);
     init_IQ_from_file();
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
@@ -267,8 +267,7 @@ void Sender::update_tx_buffer(gen_tag_t tag)
 #ifdef USE_DPDK
     auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
 #else
-    auto* pkt
-        = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)] + kTXBufOffset);
+    auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
 #endif
     pkt->frame_id = tag.frame_id;
     pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
@@ -298,7 +297,7 @@ void* Sender::worker_thread(int tid)
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     DftiCommitDescriptor(mkl_handle);
 
-    const size_t buffer_length = kTXBufOffset + cfg->packet_length;
+    const size_t buffer_length = cfg->packet_length;
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
