@@ -117,6 +117,7 @@ void MacThread::process_mac_packets_from_apps()
 {
     ssize_t ret
         = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+    rt_assert(static_cast<size_t>(ret) == cfg_->mac_packet_length);
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {
