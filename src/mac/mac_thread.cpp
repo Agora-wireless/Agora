@@ -178,9 +178,12 @@ void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
 
     if (kDebugBSReceiver) {
         std::stringstream ss;
-        fprintf(log_file_, "MAC thread: Received data from app: ");
-        for (size_t i = 0; i < cfg_->mac_packet_length; i++) {
-            ss << std::to_string(pkt->data[i]) << " ";
+        fprintf(log_file_,
+            "MAC thread: Received data from app for frame %d, ue %d, size "
+            "%zu:\n",
+            pkt->frame_id, pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
+        for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+            ss << std::to_string((uint8_t)pkt->data[i]) << " ";
         }
         fprintf(log_file_, "%s\n", ss.str().c_str());
     }
