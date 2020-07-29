@@ -115,9 +115,9 @@ void MacThread::process_codeblocks_from_master()
 
 void MacThread::process_mac_packets_from_apps()
 {
-    ssize_t ret
-        = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
-    rt_assert(static_cast<size_t>(ret) == cfg_->mac_packet_length);
+    ssize_t ret = udp_server->recv_nonblocking(
+        reinterpret_cast<uint8_t*>(&udp_pkt_buf_[0]) + MacPacket::kOffsetOfData,
+        udp_pkt_buf_.size());
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {
@@ -125,6 +125,7 @@ void MacThread::process_mac_packets_from_apps()
         cfg_->running = false;
         return;
     }
+    rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe);
 
     auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
     mode_ == Mode::kServer ? process_mac_packets_from_apps_server(pkt)
