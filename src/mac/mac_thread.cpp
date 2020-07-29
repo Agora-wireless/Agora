@@ -115,9 +115,10 @@ void MacThread::process_codeblocks_from_master()
 
 void MacThread::process_mac_packets_from_apps()
 {
+    memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
     ssize_t ret = udp_server->recv_nonblocking(
         reinterpret_cast<uint8_t*>(&udp_pkt_buf_[0]) + MacPacket::kOffsetOfData,
-        udp_pkt_buf_.size());
+        cfg_->mac_data_bytes_num_perframe);
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {
@@ -190,7 +191,8 @@ void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
             "%zu:\n",
             pkt->frame_id, pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string((uint8_t)pkt->data[i]) << " ";
+            ss << std::to_string(reinterpret_cast<uint8_t*>(pkt->data)[i])
+               << " ";
         }
         fprintf(log_file_, "%s\n", ss.str().c_str());
     }
