@@ -28,7 +28,7 @@ cfg = 'data/ue-ul-hw.json' if args.num == 2 else 'data/ue-one-ul-hw.json'
 cmd_user = MP + '/user ' + cfg
 
 # start user
-print('Starting user...')
+print('Starting user: {}'.format(cmd_user))
 pu = sh.Popen(cmd_user.split())
 
 time.sleep(5)
