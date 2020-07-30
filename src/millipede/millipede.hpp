@@ -88,6 +88,8 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_task_set(
+        EventType task_type, int task_set_size, int task_set_id);
 
     void initialize_queues();
     void initialize_uplink_buffers();

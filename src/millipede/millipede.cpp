@@ -85,13 +85,25 @@ void Millipede::stop()
 
 /// Enqueue a batch of task_set_size tasks starting from task index
 /// (task_set_size * task_set_id).
-static void schedule_task_set(EventType task_type, int task_set_size,
-    int task_set_id, moodycamel::ConcurrentQueue<Event_data>* task_queue,
-    moodycamel::ProducerToken* producer_token)
+// static void schedule_task_set(EventType task_type, int task_set_size,
+//     int task_set_id, moodycamel::ConcurrentQueue<Event_data>* task_queue,
+//     moodycamel::ProducerToken* producer_token)
+// {
+//     Event_data task(task_type, task_set_size * task_set_id);
+//     for (int i = 0; i < task_set_size; i++) {
+//         try_enqueue_fallback(task_queue, producer_token, task);
+//         task.tags[0]++;
+//     }
+// }
+
+void Millipede::schedule_task_set(
+    EventType task_type, int task_set_size, int task_set_id)
 {
     Event_data task(task_type, task_set_size * task_set_id);
     for (int i = 0; i < task_set_size; i++) {
-        try_enqueue_fallback(task_queue, producer_token, task);
+        try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
+            sched_info_arr[cur_tid].ptok, task);
+        cur_tid = (cur_tid + 1) % config_->worker_thread_num;
         task.tags[0]++;
     }
 }
@@ -604,8 +616,10 @@ void Millipede::handle_event_fft(size_t tag)
             == fft_stats_.max_symbol_rc_count) {
             print_per_frame_done(PrintType::kFFTCal, frame_id);
             // TODO: rc_stats_.max_task_count appears uninitalized
-            schedule_task_set(EventType::kRC, rc_stats_.max_task_count,
-                frame_id, get_conq(EventType::kRC), get_ptok(EventType::kRC));
+            // schedule_task_set(EventType::kRC, rc_stats_.max_task_count,
+            // frame_id, get_conq(EventType::kRC), get_ptok(EventType::kRC));
+            schedule_task_set(
+                EventType::kRC, rc_stats_.max_task_count, frame_id);
         }
     }
 }
