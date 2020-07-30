@@ -48,8 +48,8 @@ Millipede::Millipede(Config* cfg)
             + cfg->worker_thread_num + 1;
         mac_thread_ = new MacThread(MacThread::Mode::kServer, cfg, mac_cpu_core,
             &decoded_buffer_ /* ul bits */, nullptr /* ul bits status */,
-            &dl_bits_buffer_, &dl_bits_buffer_status_, &message_queue_,
-            get_conq(EventType::kPacketToMac));
+            &dl_bits_buffer_, &dl_bits_buffer_status_, &mac_request_queue_,
+            &mac_response_queue_);
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
@@ -164,10 +164,8 @@ void Millipede::schedule_users(
     auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
 
     for (size_t i = 0; i < config_->UE_NUM; i++) {
-        try_enqueue_fallback(get_conq(event_type),
-            tx_ptoks_ptr[config_->socket_thread_num
-                + i % config_->mac_socket_thread_num],
-            Event_data(event_type, base_tag._tag));
+        try_enqueue_fallback(&mac_request_queue_,
+            Event_data(EventType::kPacketToMac, base_tag._tag));
         base_tag.ue_id++;
     }
 }
@@ -195,8 +193,8 @@ void Millipede::start()
     double tx_begin = get_time_us();
 
     bool is_turn_to_dequeue_from_io = true;
-    const size_t max_events_needed = std::max(kDequeueBulkSizeTXRX
-            * (cfg->socket_thread_num + cfg->mac_socket_thread_num),
+    const size_t max_events_needed = std::max(
+        kDequeueBulkSizeTXRX * (cfg->socket_thread_num + 1 /* MAC */),
         kDequeueBulkSizeWorker * cfg->worker_thread_num);
     Event_data events_list[max_events_needed];
 
@@ -204,12 +202,13 @@ void Millipede::start()
         /* Get a batch of events */
         size_t num_events = 0;
         if (is_turn_to_dequeue_from_io) {
-            for (size_t i = 0;
-                 i < cfg->socket_thread_num + cfg->mac_socket_thread_num; i++) {
+            for (size_t i = 0; i < cfg->socket_thread_num; i++) {
                 num_events += message_queue_.try_dequeue_bulk_from_producer(
                     *(rx_ptoks_ptr[i]), events_list + num_events,
                     kDequeueBulkSizeTXRX);
             }
+            num_events += mac_response_queue_.try_dequeue_bulk(
+                events_list + num_events, kDequeueBulkSizeTXRX);
         } else {
             for (size_t i = 0; i < cfg->worker_thread_num; i++) {
                 num_events
@@ -1018,19 +1017,11 @@ void Millipede::initialize_queues()
         s.ptok = new moodycamel::ProducerToken(s.concurrent_q);
     }
 
-    for (size_t i = 0;
-         i < config_->socket_thread_num + config_->mac_socket_thread_num; i++) {
+    for (size_t i = 0; i < config_->socket_thread_num; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
-        tx_ptoks_ptr[i] = new moodycamel::ProducerToken(*get_conq(
-            i < config_->socket_thread_num ? EventType::kPacketTX
-                                           : EventType::kPacketToMac));
+        tx_ptoks_ptr[i]
+            = new moodycamel::ProducerToken(*get_conq(EventType::kPacketTX));
     }
-
-    // for (size_t i = 0; i < config_->mac_socket_thread_num; i++) {
-    //     rx_ptoks_mac_ptr[i] = new moodycamel::ProducerToken(message_queue_);
-    //     tx_ptoks_mac_ptr[i]
-    //         = new moodycamel::ProducerToken(*get_conq(EventType::kPacketToMac));
-    // }
 
     for (size_t i = 0; i < config_->worker_thread_num; i++)
         worker_ptoks_ptr[i]

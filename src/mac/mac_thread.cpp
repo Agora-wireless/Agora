@@ -1,20 +1,30 @@
 #include "mac_thread.hpp"
 #include "logger.h"
 #include "utils_ldpc.hpp"
+#include <string.h>
+
+// Save metadata like frame ID, UE ID to the MAC log file
+static constexpr bool kLogMACMetadata = false;
+
+// Save all data bytes to the MAC log file
+static constexpr bool kLogMACBytes = true;
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<Event_data>* rx_queue,
     moodycamel::ConcurrentQueue<Event_data>* tx_queue, std::string log_filename)
-    : mode_(mode)
-    , cfg_(cfg)
+    : cfg_(cfg)
+    , mode_(mode)
+    , freq_ghz_(measure_rdtsc_freq())
+    , tsc_delta_((cfg_->get_frame_duration_sec() * 1e9) / freq_ghz_)
     , core_offset_(core_offset)
     , ul_bits_buffer_(ul_bits_buffer)
     , ul_bits_buffer_status_(ul_bits_buffer_status)
     , dl_bits_buffer_(dl_bits_buffer)
     , dl_bits_buffer_status_(dl_bits_buffer_status)
     , rx_queue_(rx_queue)
+    , tx_queue_(tx_queue)
 {
     // Set up MAC log file
     if (log_filename != "") {
@@ -23,6 +33,9 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     log_file_ = fopen(log_filename_.c_str(), "w");
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
 
+    printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
+        cfg_->get_frame_duration_sec() * 1000, tsc_delta_);
+
     // Set up buffers
     server_.n_filled_in_frame_.fill(0);
     for (auto& v : server_.frame_data_)
@@ -30,18 +43,16 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
 
     client_.ul_bits_buffer_id_.fill(0);
 
-    const size_t udp_pkt_len = MacPacket::kOffsetOfData
-        + bits_to_bytes(cfg_->LDPC_config.cbLen)
-            * cfg_->LDPC_config.nblocksInSymbol;
-    udp_pkt_buf_.resize(udp_pkt_len);
-
-    udp_server = UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_pkt_buf_.resize(cfg_->mac_packet_length);
+    udp_server = new UDPServer(
+        kLocalPort, udp_pkt_buf_.size() * kMaxUEs * kMaxPktsPerUE);
 }
 
 MacThread::~MacThread()
 {
     fclose(log_file_);
     MLPD_INFO("MAC thread destroyed\n");
+    delete udp_server;
 }
 
 void MacThread::process_codeblocks_from_master()
@@ -72,7 +83,7 @@ void MacThread::process_codeblocks_from_master()
         server_.n_filled_in_frame_[ue_id] += cfg_->data_bytes_num_persymbol;
 
         // Print information about the received symbol
-        if (kDebugBSReceiver) {
+        if (kLogMACMetadata) {
             fprintf(log_file_,
                 "MAC thread received frame %zu, uplink symbol index %zu, "
                 "size %zu, copied to frame data offset %zu\n",
@@ -94,14 +105,16 @@ void MacThread::process_codeblocks_from_master()
         udp_client.send(kRemoteHostname, kBaseRemotePort + ue_id,
             &server_.frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe);
 
-        fprintf(log_file_,
-            "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n", frame_id,
-            ue_id, cfg_->mac_data_bytes_num_perframe);
-        for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
+        if (kLogMACBytes) {
+            fprintf(log_file_,
+                "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
+                frame_id, ue_id, cfg_->mac_data_bytes_num_perframe);
+            for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+                ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
+            }
+            fprintf(log_file_, "%s\n", ss.str().c_str());
+            ss.str("");
         }
-        fprintf(log_file_, "%s\n", ss.str().c_str());
-        ss.str("");
     }
 
     rt_assert(
@@ -109,10 +122,12 @@ void MacThread::process_codeblocks_from_master()
         "Socket message enqueue failed\n");
 }
 
-void MacThread::process_udp_packets_from_apps()
+void MacThread::process_mac_packets_from_apps()
 {
-    ssize_t ret
-        = udp_server.recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+    memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
+    ssize_t ret = udp_server->recv_nonblocking(
+        reinterpret_cast<uint8_t*>(&udp_pkt_buf_[0]) + MacPacket::kOffsetOfData,
+        cfg_->mac_data_bytes_num_perframe);
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {
@@ -120,13 +135,14 @@ void MacThread::process_udp_packets_from_apps()
         cfg_->running = false;
         return;
     }
+    rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe);
 
-    const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-    mode_ == Mode::kServer ? process_udp_packets_from_apps_server(pkt)
-                           : process_udp_packets_from_apps_client(pkt);
+    auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
+    mode_ == Mode::kServer ? process_mac_packets_from_apps_server(pkt)
+                           : process_mac_packets_from_apps_client(pkt);
 }
 
-void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
+void MacThread::process_mac_packets_from_apps_server(MacPacket* pkt)
 {
     // We've received bits for the downlink
     const size_t total_symbol_idx
@@ -153,25 +169,54 @@ void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
         "MAC thread: Failed to enqueue downlink packet");
 }
 
-void MacThread::process_udp_packets_from_apps_client(const MacPacket* pkt)
+void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
 {
     // We've received bits for the uplink. The received MAC packet does not
     // specify a radio ID, so choose one at random.
-    const size_t radio_id = fast_rand.next_u32() % cfg_->UE_ANT_NUM;
+    const size_t radio_id = fast_rand_.next_u32() % cfg_->UE_ANT_NUM;
     size_t& radio_buf_id = client_.ul_bits_buffer_id_[radio_id];
 
-    if ((*ul_bits_buffer_status_)[radio_id][radio_buf_id] == 1) {
-        fprintf(stderr,
-            "MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
-            "packet.\n",
-            radio_buf_id);
-        return;
+    size_t start_tsc = rdtsc();
+    while (true) {
+        auto* canary = reinterpret_cast<volatile uint8_t*>(
+            &(*ul_bits_buffer_status_)[radio_id][radio_buf_id]);
+        if (*canary == 0) {
+            break;
+        }
+
+        if (cycles_to_ms(rdtsc() - start_tsc, freq_ghz_) > 10) {
+            printf("MAC thread waited for buffer %zu for radio ID to become "
+                   "free (for UE %zu).\n",
+                radio_buf_id, radio_id);
+            start_tsc = rdtsc();
+        }
     }
+
+    memset(pkt, 0, MacPacket::kOffsetOfData);
+    pkt->frame_id = next_frame_id_;
+    next_frame_id_++;
+    rt_assert(pkt->frame_id < cfg_->frames_to_test);
 
     memcpy(
         &(*ul_bits_buffer_)[radio_id][radio_buf_id * cfg_->mac_packet_length],
-        pkt->data, cfg_->mac_packet_length);
+        pkt, cfg_->mac_packet_length);
     (*ul_bits_buffer_status_)[radio_id][radio_buf_id] = 1;
+
+    if (kLogMACMetadata) {
+        std::stringstream ss;
+        fprintf(log_file_,
+            "MAC thread: Received data from app for frame %d, ue %d, size "
+            "%zu:\n",
+            pkt->frame_id, pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
+
+        if (kLogMACBytes) {
+            for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+                ss << std::to_string(reinterpret_cast<uint8_t*>(pkt->data)[i])
+                   << " ";
+            }
+            fprintf(log_file_, "%s\n", ss.str().c_str());
+        }
+    }
 
     Event_data msg(
         EventType::kPacketFromMac, rx_tag_t(radio_id, radio_buf_id)._tag);
@@ -190,7 +235,18 @@ void MacThread::run_event_loop()
 
     while (cfg_->running) {
         process_codeblocks_from_master();
-        process_udp_packets_from_apps();
+
+        if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
+            process_mac_packets_from_apps();
+            last_mac_pkt_rx_tsc_ = rdtsc();
+        }
+
+        if (next_frame_id_ == cfg_->frames_to_test) {
+            MLPD_WARN("MAC thread stopping. Next frame ID = %zu, configured "
+                      "frames to test = %zu\n",
+                next_frame_id_, cfg_->frames_to_test);
+            break;
+        }
     }
 }
 
