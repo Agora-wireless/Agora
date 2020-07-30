@@ -60,7 +60,6 @@ add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
@@ -119,17 +118,9 @@ if(${USE_DPDK})
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
   add_definitions(-DUSE_DPDK)
-  if (${USE_DPDK_SENDER})
-    message(STATUS "DPDK is enabled for sender")
-    add_definitions(-DUSE_DPDK_SENDER)
-  endif()
-else()
-  set(USE_DPDK_SENDER False)
-  message(STATUS "DPDK is disabled")
 endif()
 
 message(STATUS "Use DPDK for millipede: ${USE_DPDK}")
-message(STATUS "Use DPDK for sender: ${USE_DPDK_SENDER}")
 
 # MAC
 if(${ENABLE_MAC})
@@ -223,6 +214,7 @@ set(MILLIPEDE_SOURCES
   src/mac/mac_thread.cpp)
 
 if(${USE_DPDK})
+  add_definitions(-DUSE_DPDK)
   set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
     src/millipede/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
@@ -275,18 +267,11 @@ add_executable(user
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
 
-if(${USE_DPDK_SENDER})
-  add_executable(sender
-    simulator/sender_cli.cpp
-    simulator/sender_dpdk.cpp
-    src/common/dpdk_transport.cpp
-    $<TARGET_OBJECTS:common_sources_lib>)
-else()
-  add_executable(sender
-    simulator/sender_cli.cpp
-    simulator/sender.cpp
-    $<TARGET_OBJECTS:common_sources_lib>)
-endif()
+add_executable(sender
+  simulator/sender_cli.cpp
+  simulator/sender.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sender ${COMMON_LIBS})
 
 add_executable(sim
@@ -294,8 +279,25 @@ add_executable(sim
   simulator/simulator.cpp
   simulator/sender.cpp
   simulator/receiver.cpp
+  src/common/dpdk_transport.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
+
+if(NOT ${USE_DPDK})
+  # Create shared libraries for Python
+  # DPDK is currently not supported
+  add_library(comp MODULE
+    $<TARGET_OBJECTS:millipede_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(comp ${COMMON_LIBS})
+
+  add_library(ue_phy MODULE
+    $<TARGET_OBJECTS:client_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(ue_phy ${COMMON_LIBS})
+else()
+  message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
+endif()
 
 # End-to-end test
 add_executable(test_millipede
@@ -318,23 +320,13 @@ add_executable(test_ldpc
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
 
+add_executable(test_datatype_conversion
+  test/unit_tests/test_datatype_conversion.cc
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_datatype_conversion ${COMMON_LIBS})
+add_test(NAME test_datatype_conversion COMMAND test_datatype_conversion)
+
 add_executable(test_udp_client_server
   test/unit_tests/test_udp_client_server.cc)
 target_link_libraries(test_udp_client_server ${COMMON_LIBS})
 add_test(NAME test_udp_client_server COMMAND test_udp_client_server)
-
-if(NOT ${USE_DPDK})
-  # Create shared libraries for Python
-  # DPDK is currently not supported
-  add_library(comp MODULE
-    $<TARGET_OBJECTS:millipede_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>)
-  target_link_libraries(comp ${COMMON_LIBS})
-
-  add_library(ue_phy MODULE
-    $<TARGET_OBJECTS:client_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>)
-  target_link_libraries(ue_phy ${COMMON_LIBS})
-else()
-  message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
-endif()
