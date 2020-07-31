@@ -17,6 +17,7 @@
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
+#include "mac_thread.hpp"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
@@ -24,7 +25,6 @@
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
-#include "txrx_mac.hpp"
 #include "utils.h"
 #include <algorithm>
 #include <armadillo>
@@ -147,7 +147,10 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    std::unique_ptr<MacPacketTXRX> mac_receiver_;
+
+    MacThread* mac_thread_; // The thread running MAC layer functions
+    std::thread mac_std_thread_; // Handle for the MAC thread
+
     Stats* stats;
     PhyStats* phy_stats;
     // std::unique_ptr<Stats> stats_manager_;
@@ -253,13 +256,13 @@ private:
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> dl_bits_buffer_;
+    Table<uint8_t> dl_bits_buffer_;
 
     // 1st dimension: number of UEs
     // 2nd dimension: number of OFDM data subcarriers * TASK_BUFFER_FRAME_NUM
     //                * number of DL data symbols per frame
     // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
-    Table<int> dl_bits_buffer_status_;
+    Table<uint8_t> dl_bits_buffer_status_;
 
     /**
      * Data for transmission
