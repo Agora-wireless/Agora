@@ -1,9 +1,8 @@
-/**
- * Author: Kevin Boos
- * Email: kevinaboos@gmail.com
- *
- * @see DoSubcarrier
- */
+/// Author: Kevin Boos
+/// Email: kevinaboos@gmail.com
+///
+/// @see DoSubcarrier
+
 #ifndef DOSUBCARRIER_HPP
 #define DOSUBCARRIER_HPP
 
@@ -30,60 +29,56 @@
 
 using namespace arma;
 
-/**
- * @brief A worker class that handles all forms of subcarrier-parallel processing tasks.
- * 
- * Currently, this worker class contains the following functionality:
- * @li DoZF
- * @li DoDemul
- * @li DoPrecode
- * @li Reciprocity (?? TBD)
- * 
- * ## General Usage ##
- * One instance of this class should handle the computation for one `block_size` range of subcarrier frequencies,
- * so we should spawn `num_events` instances of this class. 
- * For example, see `config->demul_events_per_symbol` and `config->demul_block_size`,
- * or the similar ones for zeroforcing (`zf_events_per_symbol` and `zf_block_size`).
- * 
- * It then executes the sequential processing stages that are required for each subcarrier block,
- * consisting of the following stages:
- * FIXME: ensure this is right
- * @li zeroforcing (`DoZF`)
- * @li demodulation (`DoDemul`) for uplink, or precoding (`DoPrecode`) for downlink.
- * 
- * 
- * FIXME: The biggest issue is how buffers are going to be allocated, shared, and accessed. 
- *        Currently, the rest of Millipede expects a single instance of all buffers,
- *        but with this redesign, we are allocating per-DoSubcarrier buffers. 
- *        While this probably works just fine for intermediate internal buffers,
- *        perhaps we should require (at least initially) that all input and output buffers
- *        are shared across all `DoSubcarrier` instances. 
- * 
- * 
- * ## Buffer ownership and management ##
- * The general buffer ownership policy is to accept *references* to input buffers, 
- * and to own both intermediate buffers for internal usage
- * as well as output buffers that are shared with others. 
- * This means that the constructor/destructor of this class is responsible
- * for allocating/deallocating the intermediate buffers and output buffers 
- * but not the input buffers.
- *
- * FIXME: Currently, the output buffers are still owned by the core `Millipede` instance.
- *        We eventually should move them into here.
- * 
- */
+/// @brief A worker class that handles all forms of subcarrier-parallel processing tasks.
+/// 
+/// Currently, this worker class contains the following functionality:
+/// @li DoZF
+/// @li DoDemul
+/// @li DoPrecode
+/// @li Reciprocity (?? TBD)
+/// 
+/// ## General Usage ##
+/// One instance of this class should handle the computation for one `block_size` range of subcarrier frequencies,
+/// so we should spawn `num_events` instances of this class. 
+/// For example, see `config->demul_events_per_symbol` and `config->demul_block_size`,
+/// or the similar ones for zeroforcing (`zf_events_per_symbol` and `zf_block_size`).
+/// 
+/// It then executes the sequential processing stages that are required for each subcarrier block,
+/// consisting of the following stages:
+/// FIXME: ensure this is right
+/// @li zeroforcing (`DoZF`)
+/// @li demodulation (`DoDemul`) for uplink, or precoding (`DoPrecode`) for downlink.
+/// 
+/// 
+/// FIXME: The biggest issue is how buffers are going to be allocated, shared, and accessed. 
+///        Currently, the rest of Millipede expects a single instance of all buffers,
+///        but with this redesign, we are allocating per-DoSubcarrier buffers. 
+///        While this probably works just fine for intermediate internal buffers,
+///        perhaps we should require (at least initially) that all input and output buffers
+///        are shared across all `DoSubcarrier` instances. 
+/// 
+/// 
+/// ## Buffer ownership and management ##
+/// The general buffer ownership policy is to accept *references* to input buffers, 
+/// and to own both intermediate buffers for internal usage
+/// as well as output buffers that are shared with others. 
+/// This means that the constructor/destructor of this class is responsible
+/// for allocating/deallocating the intermediate buffers and output buffers 
+/// but not the input buffers.
+///
+/// FIXME: Currently, the output buffers are still owned by the core `Millipede` instance.
+///        We eventually should move them into here.
+///
 class DoSubcarrier: public Doer {
 public:
-    /**
-     * @brief Construct a new Do Subcarrier object
-     * 
-     * In general, 
-     * NOTE: The following buffers are owned by this class, but if we wanted to 
-     *       share them differently, we could accept a reference to an externally-owned instance.
-     *       - `demod_soft_buffer`
-     *       - `dl_ifft_buffer` (TODO, currently still owned by `Millipede` class)
-     * 
-     */
+    /// @brief Construct a new Do Subcarrier object
+    /// 
+    /// In general, 
+    /// NOTE: The following buffers are owned by this class, but if we wanted to 
+    ///       share them differently, we could accept a reference to an externally-owned instance.
+    ///       - `demod_soft_buffer`
+    ///       - `dl_ifft_buffer` (TODO, currently still owned by `Millipede` class)
+    ///
     DoSubcarrier(
         Config* config,
         int tid,
@@ -109,19 +104,20 @@ public:
         Table<complex_float>& dl_zf_buffer,
         PhyStats* phy_stats,
         Stats* stats
-    ) : Doer(config, tid, freq_ghz, task_queue, complete_task_queue, worker_producer_token),
-        subcarrier_range_(subcarrier_range),
-        csi_buffer_(csi_buffer),
-        recip_buffer_(recip_buffer),
-        calib_buffer_(calib_buffer),
-        dl_encoded_buffer_(dl_encoded_buffer),
-        data_buffer_(data_buffer),
-        demod_soft_buffer_(demod_soft_buffer),
-        dl_ifft_buffer_(dl_ifft_buffer),
-        ue_spec_pilot_buffer_(ue_spec_pilot_buffer),
-        equal_buffer_(equal_buffer),
-        ul_zf_buffer_(ul_zf_buffer),
-        dl_zf_buffer_(dl_zf_buffer)
+    )   : Doer(config, tid, freq_ghz, task_queue,
+            complete_task_queue, worker_producer_token)
+        , subcarrier_range_(subcarrier_range)
+        , csi_buffer_(csi_buffer)
+        , recip_buffer_(recip_buffer)
+        , calib_buffer_(calib_buffer)
+        , dl_encoded_buffer_(dl_encoded_buffer)
+        , data_buffer_(data_buffer)
+        , demod_soft_buffer_(demod_soft_buffer)
+        , dl_ifft_buffer_(dl_ifft_buffer)
+        , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
+        , equal_buffer_(equal_buffer)
+        , ul_zf_buffer_(ul_zf_buffer)
+        , dl_zf_buffer_(dl_zf_buffer)
     {
 
         // Create the requisite Doers
@@ -184,12 +180,11 @@ private:
     /// The subcarrier range handled by this subcarrier doer.
     struct Range subcarrier_range_;
 
-    /*
-     * TODO: I'd like to use owned objects here instead of pointers,
-     *       but I don't think we can create them in initializer lists because
-     *       the other buffers (`Table`s) need to be allocated first via calls to `malloc`.
-     *       In other news, C++ initializer lists are complete and utter garbage.
-     */
+    // TODO: I'd like to use owned objects here instead of pointers,
+    //       but I don't think we can create them in initializer lists because
+    //       the other buffers (`Table`s) need to be allocated first via calls to `malloc`.
+    //       In other news, C++ initializer lists are complete and utter garbage.
+
     DoZF*         computeZF_;
     DoDemul*      computeDemul_;
     DoPrecode*    computePrecode_;

@@ -625,8 +625,9 @@ void* Millipede::worker(int tid)
      */
     for (auto sc_range : subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
         auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(tid, worker_ptoks_ptr[tid], sc_range);
-        std::cout << "Worker thread " << tid 
-            << " created DoSubcarrier, ptr: " << computeSubcarrier << std::endl;
+        // std::cout << "Worker thread " << tid 
+        //     << " created DoSubcarrier, ptr: " << computeSubcarrier
+        //     << std::endl;
         compute_vec.push_back(computeSubcarrier);
     }
 
@@ -637,8 +638,9 @@ void* Millipede::worker(int tid)
 
     while (true) {
         for (size_t i = 0; i < compute_vec.size(); i++) {
-            if (compute_vec[i]->try_launch())
+            if (compute_vec[i]->try_launch()) {
                 break;
+            }
         }
     }
 }
@@ -1065,6 +1067,9 @@ void Millipede::initialize_uplink_buffers()
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+    demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
+        cfg->mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+
     size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
         >> 3 * config_->LDPC_config.nblocksInSymbol;
     decoded_buffer_.calloc(
@@ -1117,11 +1122,6 @@ void Millipede::initialize_downlink_buffers()
         = task_buffer_symbol_num * cfg->LDPC_config.nblocksInSymbol;
     dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
 
-    demod_soft_buffer_.malloc(
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM, 
-        cfg->mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 
-        64
-    );
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
     recip_buffer_.calloc(
