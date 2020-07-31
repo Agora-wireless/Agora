@@ -96,9 +96,9 @@ public:
         // Fill the subcarrier_doers_ with the total amount of doers (uninitialized ones).
         // This allows us to easily insert the real subcarrier doers at the correct index.
         auto num_doers = cfg->OFDM_DATA_NUM / subcarrier_block_size_;
-        std::cout << "[SubcarrierManager]: subcarrier block size is " << subcarrier_block_size_ 
-            << ", max subcarrier is " << cfg->OFDM_DATA_NUM 
-            << ", requires " << num_doers << " doer(s)." << std::endl;
+        MLPD_INFO("[SubcarrierManager]: subcarrier block size is %zu, " 
+            "max subcarrier is %zu, requires %zu subcarrier doers.",
+            subcarrier_block_size_, num_doers);
         subcarrier_doers_.reserve(num_doers);
         for (size_t i = 0; i < num_doers; i++) {
             subcarrier_doers_.emplace_back(std::make_pair(sched_info_t(), nullptr));
@@ -120,7 +120,6 @@ public:
 
             tid = (tid + 1) % (int)cfg->worker_thread_num;
         }
-    
 
         std::cout << "[SubcarrierManager]: map of " << cfg->worker_thread_num << " worker threads to SC ranges: " << std::endl;
         for (auto &sc_ranges : worker_tid_to_subcarrier_range_) {
@@ -152,7 +151,6 @@ public:
     ~SubcarrierManager() {
         // First, free all of the buffers we own.
         equal_buffer_.free();
-        // demod_soft_buffer_.free();
         ue_spec_pilot_buffer_.free();
         ul_zf_buffer_.free();
         dl_zf_buffer_.free();
