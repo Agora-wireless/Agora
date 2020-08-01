@@ -57,17 +57,16 @@ Millipede::Millipede(Config* cfg)
     // Create the subcarrier manager, which will create the subcarrier doers.
     // This needs to be done before creating the worker threads,
     // since the worker threads will use information from the subcarrier manager
-    // to determine which subcarrier doers each worker thread should contain/create.
-    subcarrier_manager_ = new SubcarrierManager(
-        this->config_, freq_ghz, complete_task_queue_,
-        csi_buffer_, recip_buffer_, calib_buffer_, dl_encoded_buffer_, data_buffer_, 
-        demod_soft_buffer_, dl_ifft_buffer_,
-        phy_stats, stats
-    );
+    // to determine which subcarrier doers each worker thread should use/create.
+    subcarrier_manager_ = new SubcarrierManager(this->config_, freq_ghz,
+        complete_task_queue_, csi_buffer_, recip_buffer_, calib_buffer_,
+        dl_encoded_buffer_, data_buffer_, demod_soft_buffer_, dl_ifft_buffer_,
+        phy_stats, stats);
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
-#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
+    // Note: bigstation mode currently doesn't work with DoSubcarrier redesign.
+#if BIGSTATION 
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_fft>,
             0, cfg->fft_thread_num);
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_zf>,
@@ -91,7 +90,7 @@ Millipede::~Millipede()
     if (kEnableMac)
         mac_std_thread_.join();
     delete mac_thread_;
-    
+
     delete subcarrier_manager_;
 }
 
@@ -128,7 +127,6 @@ void Millipede::schedule_antennas(
         base_tag.ant_id++;
     }
 }
-
 
 void Millipede::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_id)
@@ -549,7 +547,8 @@ void Millipede::handle_event_fft(size_t tag)
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
-                    subcarrier_manager_->schedule_subcarriers(EventType::kZF, frame_id, 0);
+                    subcarrier_manager_->schedule_subcarriers(
+                        EventType::kZF, frame_id, 0);
                 }
             }
         }
@@ -586,24 +585,20 @@ void* Millipede::worker(int tid)
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
-        calib_buffer_, phy_stats, stats
-    );
+        calib_buffer_, phy_stats, stats);
 
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
-        worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats
-    );
+        worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats);
 
     auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
         *get_conq(EventType::kEncode), complete_task_queue_,
-        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats
-    );
+        worker_ptoks_ptr[tid], config_->dl_bits, dl_encoded_buffer_, stats);
 
-    auto computeDecoding = new DoDecode(config_, tid, freq_ghz, 
-        *get_conq(EventType::kDecode), complete_task_queue_, 
-        worker_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_,
-        phy_stats, stats
-    );
+    auto computeDecoding
+        = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
+            complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
+            decoded_buffer_, phy_stats, stats);
 
     /// TODO: move this into the subcarrier manager/doer infrastructure.
     ///       It's currently in the SubcarrierDoer but isn't actually used
@@ -611,8 +606,9 @@ void* Millipede::worker(int tid)
         *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
         calib_buffer_, recip_buffer_, stats);
 
-    std::vector<Doer*> compute_vec = { 
-        computeIFFT, computeFFT,
+    std::vector<Doer*> compute_vec = {
+        computeIFFT,
+        computeFFT,
         computeReciprocity,
     };
 
@@ -623,18 +619,18 @@ void* Millipede::worker(int tid)
      * of scheduling any kind of doer on any kind of worker thread,
      * but in the future they'll be created by the subcarrier manager itself. 
      */
-    for (auto sc_range : subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
-        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(tid, worker_ptoks_ptr[tid], sc_range);
-        // std::cout << "Worker thread " << tid 
+    for (auto sc_range :
+        subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
+        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(
+            tid, worker_ptoks_ptr[tid], sc_range);
+        // std::cout << "Worker thread " << tid
         //     << " created DoSubcarrier, ptr: " << computeSubcarrier
         //     << std::endl;
         compute_vec.push_back(computeSubcarrier);
     }
 
-
     compute_vec.push_back(computeEncoding);
     compute_vec.push_back(computeDecoding);
-
 
     while (true) {
         for (size_t i = 0; i < compute_vec.size(); i++) {
@@ -706,7 +702,6 @@ void* Millipede::worker_demul(int tid)
     }
 }
 #endif // BIGSTATION
-
 
 void Millipede::create_threads(
     void* (*worker)(void*), int tid_start, int tid_end)
@@ -1221,7 +1216,7 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
 }
 
 // TODO: remove this in the future, since it will only exist privately
-//       within each subcarrier worker's `DoDemul` instance. 
+//       within each subcarrier worker's `DoDemul` instance.
 void Millipede::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
