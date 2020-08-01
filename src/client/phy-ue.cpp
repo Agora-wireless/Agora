@@ -78,7 +78,8 @@ Phy_UE::Phy_UE(Config* config)
     // initialize ul data buffer
     // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
     // ul_data_symbol_perframe);
-    ul_bits_buffer_size_ = TASK_BUFFER_FRAME_NUM * config_->mac_packet_length;
+    ul_bits_buffer_size_
+        = TASK_BUFFER_FRAME_NUM * config_->mac_bytes_num_perframe;
     ul_bits_buffer_.malloc(antenna_num, ul_bits_buffer_size_, 64);
     ul_bits_buffer_status_.calloc(antenna_num, TASK_BUFFER_FRAME_NUM, 64);
     ul_syms_buffer_size_
@@ -360,9 +361,10 @@ void Phy_UE::start()
                 if (!kUseLDPC) {
                     Event_data do_map_task(EventType::kModul, event.tags[0]);
                     schedule_task(do_map_task, &map_queue_, ptok_map);
-                } else { 
+                } else {
                     size_t ue_id = rx_tag_t(event.tags[0]).tid;
-                    size_t offset_in_current_buffer = rx_tag_t(event.tags[0]).offset;
+                    size_t offset_in_current_buffer
+                        = rx_tag_t(event.tags[0]).offset;
 
                     ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
                 }
@@ -714,7 +716,7 @@ void Phy_UE::doMapBits(int tid, size_t tag)
     size_t offset_in_current_buffer = rx_tag_t(tag).offset;
 
     struct MacPacket* pkt = (struct MacPacket*)(ul_bits_buffer_[ue_id]
-        + offset_in_current_buffer * config_->mac_packet_length);
+        + offset_in_current_buffer * config_->mac_bytes_num_perframe);
     size_t mac_frame_id = pkt->frame_id;
     rt_assert((size_t)pkt->ue_id == ue_id,
         "UE index in tag does not match that in received packet!");
@@ -781,13 +783,13 @@ void Phy_UE::doEncode(int tid, size_t tag)
          ul_symbol_id++) {
         size_t total_ul_symbol_id
             = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
-        for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
+        for (int cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
              cb_id++) {
             int8_t* input_ptr;
             if (kEnableMac) {
                 struct MacPacket* pkt
                     = (struct MacPacket*)(ul_bits_buffer_[ue_id]
-                        + frame_slot * config_->mac_packet_length);
+                        + frame_slot * config_->mac_bytes_num_perframe);
                 int input_offset = bytes_per_block
                         * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
                     + bytes_per_block * cb_id;
@@ -796,7 +798,8 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 size_t cb_offset
                     = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
                     * bytes_per_block;
-                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS][cb_offset];
+                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
+                                         [cb_offset];
             }
             int8_t* output_ptr = encoded_buffer_temp;
 

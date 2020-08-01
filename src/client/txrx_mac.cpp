@@ -46,15 +46,9 @@ PacketTXRX::~PacketTXRX()
     delete[] servaddr_;
 }
 
-void PacketTXRX::wakeup_mac()
-{
-    mac_running = true;
-}
+void PacketTXRX::wakeup_mac() { mac_running = true; }
 
-bool PacketTXRX::is_mac_running()
-{
-    return mac_running;
-}
+bool PacketTXRX::is_mac_running() { return mac_running; }
 
 bool PacketTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_buffer_frame_num, long long in_buffer_length, char* in_tx_buffer,
@@ -123,13 +117,13 @@ void* PacketTXRX::loopTXRX(int tid)
             config_->ue_tx_port + radio_id);
     }
 
-    while(config_->running && !is_mac_running());
+    while (config_->running && !is_mac_running())
+        ;
 
     // send start notification to mac
     char* start_msg[1024];
-    ssize_t ret = sendto(socket_[0],
-        start_msg, 1024, 0, (struct sockaddr*)&servaddr_[0],
-        sizeof(servaddr_[0]));
+    ssize_t ret = sendto(socket_[0], start_msg, 1024, 0,
+        (struct sockaddr*)&servaddr_[0], sizeof(servaddr_[0]));
     rt_assert(ret > 0, "sendto() failed");
     std::cout << "Waking up MAC.." << std::endl;
 
@@ -156,7 +150,7 @@ struct MacPacket* PacketTXRX::recv_enqueue(
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[radio_id];
     int* rx_buffer_status = (*buffer_status_)[radio_id];
-    int packet_length = config_->mac_packet_length;
+    int packet_length = config_->mac_bytes_num_perframe;
 
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
@@ -181,24 +175,23 @@ struct MacPacket* PacketTXRX::recv_enqueue(
     }
 
     bool debug = true;
-    if (debug)
-    {
+    if (debug) {
         // printf("PKT HEADER: Valid TUN? %d, CRC: %d \n", pkt->valid_tun_data, pkt->crc);
-	if (pkt->valid_tun_data) {
-            for(int i = 0; i < ret ; i+=16) {
-                printf("PHY: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                        pkt->data[i],     pkt->data[i + 1],
-                        pkt->data[i + 2], pkt->data[i + 3],
-                        pkt->data[i + 4], pkt->data[i + 5],
-                        pkt->data[i + 6], pkt->data[i + 7],
-                        pkt->data[i + 8], pkt->data[i + 9],
-                        pkt->data[i + 10], pkt->data[i + 11],
-                        pkt->data[i + 12], pkt->data[i + 13],
-                        pkt->data[i + 14], pkt->data[i + 15]);
-                }
+        if (pkt->valid_tun_data) {
+            for (int i = 0; i < ret; i += 16) {
+                printf("PHY: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x "
+                       "%02x %02x %02x %02x %02x %02x\n",
+                    pkt->data[i], pkt->data[i + 1], pkt->data[i + 2],
+                    pkt->data[i + 3], pkt->data[i + 4], pkt->data[i + 5],
+                    pkt->data[i + 6], pkt->data[i + 7], pkt->data[i + 8],
+                    pkt->data[i + 9], pkt->data[i + 10], pkt->data[i + 11],
+                    pkt->data[i + 12], pkt->data[i + 13], pkt->data[i + 14],
+                    pkt->data[i + 15]);
+            }
 
             printf("received data %d\n", ret);
-            printf("IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
+            printf(
+                "IP address is: %s\n", inet_ntoa(servaddr_[radio_id].sin_addr));
             printf("port is: %d\n", (int)ntohs(servaddr_[radio_id].sin_port));
             printf("In MAC TXRX thread %d: received frame %d, ue %d\n", tid,
                 pkt->frame_id, pkt->ue_id);
