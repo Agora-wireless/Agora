@@ -73,14 +73,12 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
                        &SimpleClientMac::data_update_thread>,
         0, 1);
 
-    if (cfg->ip_bridge_enable)
-    {
+    if (cfg->ip_bridge_enable) {
         // Start a thread to wait for data from TUN interface
         create_threads(pthread_fun_wrapper<SimpleClientMac,
                            &SimpleClientMac::wait_tun_read_thread>,
             0, 1);
     }
-
 
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
@@ -254,14 +252,15 @@ void* SimpleClientMac::data_update_thread(int tid)
 
 void* SimpleClientMac::wait_tun_read_thread(int tid)
 {
-   /*
+    /*
     * Wait for data to be available at TUN interface
     */
-   printf("Wait TUN thread running on core %d\n", sched_getcpu());
+    printf("Wait TUN thread running on core %d\n", sched_getcpu());
 
     while (true) {
         printf("Read from TUN interface \n");
-        tun_payload_size_bytes = ipbridge->read_fragment(data_from_tun, cfg->mac_data_bytes_num_perframe);
+        tun_payload_size_bytes = ipbridge->read_fragment(
+            data_from_tun, cfg->mac_data_bytes_num_perframe);
         printf("Read %d bytes from TUN device\n", tun_payload_size_bytes);
         tun_ready = true;
         while (tun_ready.load()) {
@@ -272,56 +271,60 @@ void* SimpleClientMac::wait_tun_read_thread(int tid)
 
 void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
 {
-    auto* pkt = (MacPacket*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
-    pkt->frame_id = tag.frame_id;
-    pkt->symbol_id = 0;
-    pkt->cell_id = 0;
-    pkt->ue_id = tag.ue_id;
-    pkt->valid_tun_data = 0;
-    pkt->datalen = cfg->mac_data_bytes_num_perframe;
+    char* tx_buffer = tx_buffers_[tag_to_tx_buffers_index(tag)];
+    bool tun_data_ready = cfg->ip_bridge_enable && tun_ready.load();
+    for (size_t pkt_id = 0; pkt_id < cfg->mac_packets_perframe; pkt_id++) {
+        auto* pkt = (MacPacket*)(tx_buffer + pkt_id * cfg->mac_packet_length);
+        pkt->frame_id = tag.frame_id;
+        pkt->symbol_id = pkt_id;
+        pkt->ue_id = tag.ue_id;
+        pkt->valid_tun_data = 0;
+        pkt->datalen = cfg->mac_payload_length;
+        pkt->rsvd[0] = 0;
+        pkt->rsvd[1] = 0;
+        pkt->rsvd[2] = 0;
+        pkt->crc = 0;
 
-    if (cfg->ip_bridge_enable && tun_ready.load())
-    {
-        // Valid TUN data
-        std::vector<unsigned char> v(data_from_tun, data_from_tun + tun_payload_size_bytes);
-        tun_ready = false;
-        pkt->valid_tun_data = 1;
-        v[0] = 'a'; v[1] = 'b'; v[2] = 'c'; v[3] = 'd';  // XXX OBCH XXX REMOVE ME
+        if (tun_data_ready) {
+            // Valid TUN data
+            std::vector<unsigned char> v(
+                data_from_tun + pkt_id * cfg->mac_payload_length,
+                data_from_tun + (pkt_id + 1) * cfg->mac_payload_length);
+            tun_ready = false;
+            pkt->valid_tun_data = 1;
 
+            // V --> Pkt
+            memcpy(pkt->data, (char*)v.data(), cfg->mac_payload_length);
+
+        } else {
+            // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
+            std::random_device r;
+            std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+            std::mt19937 eng(seed); // a source of random data
+
+            std::uniform_int_distribution<char> dist;
+            std::vector<char> v(cfg->mac_payload_length);
+            generate(begin(v), end(v), bind(dist, eng));
+
+            // V --> Pkt
+            memcpy(pkt->data, (char*)v.data(), cfg->mac_payload_length);
+        }
         // Insert CRC
-        pkt->crc = crc_dwn->calculateCRC24((unsigned char*)v.data(), pkt->datalen);
+        pkt->crc = crc_dwn->calculateCRC24(
+            (unsigned char*)pkt, cfg->mac_packet_length);
 
-        // V --> Pkt
-        memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+        // Print MAC packet summary
+        printf(
+            "time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
+            "%zu\n",
+            get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
+            cfg->mac_packet_length);
 
-    } else {
-        // https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
-        std::random_device r;
-        std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
-        std::mt19937 eng(seed); // a source of random data
-
-        std::uniform_int_distribution<char> dist;
-        std::vector<char> v(cfg->mac_data_bytes_num_perframe);
-        generate(begin(v), end(v), bind(dist, eng));
- 
-        // Insert CRC
-        //crc_dwn->addCRC24((unsigned char*)v.data()); //pkt);
-        pkt->crc = crc_dwn->calculateCRC24((unsigned char*)v.data(), pkt->datalen);
-
-        // V --> Pkt
-        memcpy(pkt->data, (char*)v.data(), cfg->mac_data_bytes_num_perframe);
+        for (size_t i = 0; i < cfg->mac_payload_length; i++) {
+            printf("%i ", *((uint8_t*)pkt->data + i));
+        }
+        printf("\n");
     }
-
-    // Print MAC packet summary
-    printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
-           "%d\n",
-        get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
-        cfg->mac_data_bytes_num_perframe);
-
-    for (size_t i = 0; i < cfg->mac_data_bytes_num_perframe; i++) {
-        printf("%i ", *((uint8_t*)pkt->data + i));
-    }
-    printf("\n");
 }
 
 void* SimpleClientMac::worker_thread(int tid)
@@ -334,7 +337,8 @@ void* SimpleClientMac::worker_thread(int tid)
         // Wait
     }
 
-    const size_t buffer_length = cfg->mac_packet_length;
+    const size_t buffer_length
+        = cfg->mac_bytes_num_perframe; // Sending all MAC packets in one frame to phy at once
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;

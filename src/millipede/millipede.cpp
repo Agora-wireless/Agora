@@ -320,7 +320,7 @@ void Millipede::start()
                     if (kUseLDPC) {
                         schedule_codeblocks(
                             EventType::kDecode, frame_id, symbol_idx_ul);
-                    } else if (kEnableMac) {
+                    } else if (kEnableMac && symbol_idx_ul >= cfg->UL_PILOT_SYMS) {
                         schedule_users(
                             EventType::kPacketToMac, frame_id, symbol_idx_ul);
                     }
@@ -362,7 +362,7 @@ void Millipede::start()
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
 
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
-                    if (kEnableMac) {
+                    if (kEnableMac && symbol_idx_ul >= cfg->UL_PILOT_SYMS) {
                         schedule_users(
                             EventType::kPacketToMac, frame_id, symbol_idx_ul);
                     }

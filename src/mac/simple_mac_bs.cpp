@@ -69,15 +69,12 @@ void* SimpleBSMac::loopRecv(int tid)
 
     // loop recv
     socklen_t addrlen = sizeof(remote_addr);
-    int packet_length = cfg->data_bytes_num_persymbol;
-    packet_length += MacPacket::kOffsetOfData;
+    int packet_length = cfg->mac_packet_length;
     char* rx_buffer = (char*)malloc(packet_length);
-    size_t ul_data_syms = cfg->ul_data_symbol_num_perframe - cfg->UL_PILOT_SYMS;
     std::stringstream ss;
-    std::stringstream ss1[ul_data_syms];
+    std::stringstream ss1[cfg->mac_packets_perframe];
     while (true) {
-        auto* pkt = (struct MacPacket*)rx_buffer;
-        int ret = recvfrom(socket_local, (char*)pkt, packet_length, 0,
+        int ret = recvfrom(socket_local, rx_buffer, packet_length, 0,
             (struct sockaddr*)&remote_addr, &addrlen);
         if (ret == -1) {
             if (errno != EAGAIN) {
@@ -87,42 +84,43 @@ void* SimpleBSMac::loopRecv(int tid)
             return (NULL);
         }
 
-        // XXX OBCH XXX
+        auto* pkt = (struct MacPacket*)rx_buffer;
+
         // Check CRC
         if (crc_up->checkCRC24(pkt)) {
             // CRC Good, valid packets -> upstream
-            printf("XXX OBCH XXX CRC GOOD!! \n");
+            printf("CRC GOOD!! \n");
             if (cfg->ip_bridge_enable && pkt->valid_tun_data) {
-                printf("XXX OBCH XXX Valid TUN Data, send up \n");
+                printf("Valid TUN Data, send up \n");
                 // TODO : different data formats (pkt->data and data_to_tun)
-                data_to_tun = (unsigned char*) pkt->data;
-                ipbridge->write_fragment(data_to_tun, cfg->data_bytes_num_perframe);
+                data_to_tun = (unsigned char*)pkt->data;
+                ipbridge->write_fragment(
+                    data_to_tun, cfg->data_bytes_num_perframe);
             }
         }
 
         if (kDebugBSReceiver) {
+            int symbol_id = pkt->symbol_id;
             // Read information from received packet
-            if (pkt->symbol_id == cfg->UL_PILOT_SYMS) {
+            if (symbol_id == 0) {
                 ss << "RX thread " << tid << " received frame " << pkt->frame_id
                    << " symbol " << pkt->symbol_id << ", ue " << pkt->ue_id
                    << ", size " << cfg->data_bytes_num_perframe << std::endl;
             }
-            if (pkt->symbol_id >= cfg->UL_PILOT_SYMS) {
-                for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
-                     i++) {
+            for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
+                 i++) {
 
-                    ss1[pkt->symbol_id - cfg->UL_PILOT_SYMS]
-                        << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
+                ss1[pkt->symbol_id - cfg->UL_PILOT_SYMS]
+                    << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
+            }
+            if (symbol_id == cfg->mac_packets_perframe - 1) {
+                for (size_t j = 0; j < cfg->mac_packets_perframe; j++) {
+                    ss << ss1[j].str();
+                    ss1[j].str(std::string());
                 }
-                if (pkt->symbol_id == cfg->ul_data_symbol_num_perframe - 1) {
-                    for (size_t j = 0; j < ul_data_syms; j++) {
-                        ss << ss1[j].str();
-                        ss1[j].str(std::string());
-                    }
-                    ss << std::endl;
-                    std::cout << ss.str();
-                    ss.str(std::string());
-                }
+                ss << std::endl;
+                std::cout << ss.str();
+                ss.str(std::string());
             }
         }
     }

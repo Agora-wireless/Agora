@@ -13,8 +13,8 @@ MacPacketTXRX::MacPacketTXRX(Config* cfg, size_t core_offset)
 {
 
     socket_ = new int[cfg->UE_NUM];
-    rx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM + 64, 64);
-    tx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM + 64, 64);
+    rx_buffer_.calloc(mac_thread_num, cfg->mac_packet_length, 64);
+    tx_buffer_.calloc(mac_thread_num, cfg->mac_packet_length, 64);
 
 #if USE_IPV4
     servaddr_ = new struct sockaddr_in[cfg->UE_NUM];
@@ -190,31 +190,22 @@ int MacPacketTXRX::dequeue_send(int tid)
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    uint8_t* ul_data_ptr
-        = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
+    uint8_t* ul_data_ptr = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
     auto* pkt = (MacPacket*)tx_buffer_[tid];
-    new (pkt) MacPacket(frame_id,
-                        symbol_id,
-                        0 /* cell_id */, 
-                        ue_id,
-                        0 /* valid tun */,
-                        0 /* CRC */,
-                        0 /* datalen */);
-    pkt->frame_id = frame_id;
-    pkt->symbol_id = symbol_id;
-    pkt->ue_id = ue_id;
+    //new (pkt) MacPacket(frame_id, symbol_id, ue_id, 0 /* valid tun */,
+    //    0 /* datalen */, 0 /* CRC */);
+    //pkt->frame_id = frame_id;
+    //pkt->symbol_id = symbol_id;
+    //pkt->ue_id = ue_id;
     if (!kUseLDPC)
-        adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
+        adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt,
             cfg->OFDM_DATA_NUM, cfg->mod_type);
     else
-        memcpy(pkt->data, ul_data_ptr, packet_length);
-
-    int mac_packet_length = packet_length + MacPacket::kOffsetOfData;
+        memcpy((char*)pkt, (char*)ul_data_ptr, packet_length);
 
     // Send data (one OFDM symbol)
-    size_t ret
-        = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, mac_packet_length, 0,
-            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+    size_t ret = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, packet_length,
+        0, (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
     if (kDebugPrintInTask) {
