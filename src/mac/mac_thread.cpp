@@ -202,20 +202,18 @@ void MacThread::process_mac_packets_from_apps_client(MacPacket* pkt)
         pkt, cfg_->mac_packet_length);
     (*ul_bits_buffer_status_)[radio_id][radio_buf_id] = 1;
 
-    if (kLogMACMetadata) {
+    if (kLogMACBytes) {
         std::stringstream ss;
         fprintf(log_file_,
             "MAC thread: Received data from app for frame %d, ue %d, size "
             "%zu:\n",
             pkt->frame_id, pkt->ue_id, cfg_->mac_data_bytes_num_perframe);
 
-        if (kLogMACBytes) {
-            for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-                ss << std::to_string(reinterpret_cast<uint8_t*>(pkt->data)[i])
-                   << " ";
-            }
-            fprintf(log_file_, "%s\n", ss.str().c_str());
+        for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
+            ss << std::to_string(reinterpret_cast<uint8_t*>(pkt->data)[i])
+               << " ";
         }
+        fprintf(log_file_, "%s\n", ss.str().c_str());
     }
 
     Event_data msg(
