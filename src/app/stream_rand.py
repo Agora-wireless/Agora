@@ -17,12 +17,9 @@ args = parser.parse_args()
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect((args.ip, args.port))
 
-idx = 0
 while(True):
     # create random data
-    #data = bytearray([random.randint(0, 255) for _ in range(args.size)])
-    data = bytearray([idx % 255 for _ in range(args.size)])
-    idx += 1
+    data = bytearray([random.randint(0, 255) for _ in range(args.size)])
 
     # send data
     s.sendall(data)
