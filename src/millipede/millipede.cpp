@@ -147,12 +147,14 @@ void Millipede::schedule_subcarriers(
     }
 
     for (size_t i = 0; i < num_events; i++) {
-        // try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
-        // Event_data(event_type, base_tag._tag));
-        try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
-            sched_info_arr[cur_tid].ptok,
+        // try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
+            // sched_info_arr[cur_tid].ptok,
+            // Event_data(event_type, base_tag._tag));
+        // cur_tid = (cur_tid + 1) % config_->worker_thread_num;
+        size_t tid = base_tag.sc_id * config_->worker_thread_num / config_->OFDM_DATA_NUM;
+        try_enqueue_fallback(&sched_info_arr[tid].concurrent_q,
+            sched_info_arr[tid].ptok,
             Event_data(event_type, base_tag._tag));
-        cur_tid = (cur_tid + 1) % config_->worker_thread_num;
         base_tag.sc_id += block_size;
     }
 }
