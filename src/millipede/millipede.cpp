@@ -612,13 +612,12 @@ void* Millipede::worker(int tid)
         computeReciprocity,
     };
 
-    /*
-     * Currently, we create Subcarrier doer instances within worker threads,
-     * such that a given worker thread can handle subcarrier doers along with all other doers. 
-     * We create them here for now to preserve compatibility with the existing form
-     * of scheduling any kind of doer on any kind of worker thread,
-     * but in the future they'll be created by the subcarrier manager itself. 
-     */
+    // Currently, we create Subcarrier doer instances within worker threads,
+    // such that a given worker thread can handle subcarrier doers
+    // alongside all of its other doers. 
+    // We create them here for now to preserve compatibility with the existing
+    // form of scheduling any kind of doer on any kind of worker thread,
+    // but in the future they'll be created by the subcarrier manager itself. 
     for (auto sc_range :
         subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
         auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(
@@ -641,7 +640,8 @@ void* Millipede::worker(int tid)
     }
 }
 
-#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
+// Note: bigstation mode currently doesn't work with the DoSubcarrier redesign.
+#if BIGSTATION 
 void* Millipede::worker_fft(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
