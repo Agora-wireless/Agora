@@ -1,18 +1,16 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
-#include "config.hpp"
-#include "txrx_client.hpp"
-//#include "l2.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "mac_thread.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
 #include "net.hpp"
 #include "signalHandler.hpp"
-#include "txrx_mac.hpp"
+#include "txrx_client.hpp"
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
@@ -215,6 +213,9 @@ private:
     size_t RX_BUFFER_FRAME_NUM;
     size_t TX_BUFFER_FRAME_NUM;
 
+    MacThread* mac_thread_; // The thread running MAC layer functions
+    std::thread mac_std_thread_; // Handle for the MAC thread
+
     /*****************************************************
      * Uplink
      *****************************************************/
@@ -248,8 +249,8 @@ private:
      * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    Table<char> ul_bits_buffer_;
-    Table<int> ul_bits_buffer_status_;
+    Table<uint8_t> ul_bits_buffer_;
+    Table<uint8_t> ul_bits_buffer_status_;
     int ul_bits_buffer_size_;
 
     Table<uint8_t> ul_syms_buffer_;
@@ -266,7 +267,6 @@ private:
      *****************************************************/
 
     std::unique_ptr<RadioTXRX> ru_;
-    std::unique_ptr<PacketTXRX> mac_receiver_;
 
     /**
      * received data
