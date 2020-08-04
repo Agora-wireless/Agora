@@ -8,8 +8,8 @@
 #define BUFFER_HEAD
 
 #include "Symbols.hpp"
-#include "memory_manage.h"
 #include "concurrentqueue.h"
+#include "memory_manage.h"
 #include <sstream>
 #include <vector>
 
@@ -201,21 +201,20 @@ struct Event_data {
 };
 static_assert(sizeof(Event_data) == 64, "");
 
-/// A struct pair containing a concurrent event queue and 
-/// a pointer to that queue's producer token.
+// A struct pair containing a concurrent event queue and a pointer to that
+// queue's producer token.
 struct sched_info_t {
     moodycamel::ConcurrentQueue<Event_data> concurrent_q;
     moodycamel::ProducerToken* ptok;
 
     sched_info_t() = default;
-    
+
     sched_info_t(moodycamel::ConcurrentQueue<Event_data> conq)
-        : concurrent_q(std::move(conq)) // moodycamel's conc. queue cannot be copied
+        : concurrent_q(std::move(conq)) // moodycamel queue can't be copied
     {
         ptok = new moodycamel::ProducerToken(concurrent_q);
     }
 };
-
 
 struct Packet {
     // The packet's data starts at kOffsetOfData bytes from the start

@@ -160,14 +160,9 @@ private:
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
 
-    /// The singleton subcarrier manager instance. 
-    /// @see SubcarrierManager documentation.
-    /// TODO: this should be a direct object, not a pointer. 
-    ///       But first we need other items within the Millipede class
-    ///       to be properly initialized in its constructor's initializer lists
-    ///       instead of the copious class pointer allocation.
+    /// The subcarrier manager owns buffers for subcarrier-parallel tasks,
+    /// and coordinates scheduling of these tasks.
     SubcarrierManager* subcarrier_manager_;
-
 
     /*****************************************************
      * Buffers
@@ -212,7 +207,6 @@ private:
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
-
 
     RxCounters rx_counters_;
     FFT_stats fft_stats_;
@@ -270,7 +264,6 @@ private:
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
 
-    // sched_info_t sched_info_arr[kNumEventTypes];
     sched_info_t sched_info_arr[kMaxThreads];
 
     // Master thread's message queue for receiving packets
@@ -285,7 +278,7 @@ private:
     // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 
-    size_t cur_tid;
+    size_t cur_tid; // TODO (junzhi): Add documentation
 };
 
 #endif
