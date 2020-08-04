@@ -124,6 +124,37 @@ static inline void rt_assert(bool condition, std::string throw_str, char* s)
     }
 }
 
+/// Returns the greatest common divisor of `a` and `b`.
+size_t gcd(size_t a, size_t b);
+  
+/// Returns the least common multiple of `a` and `b`.
+size_t lcm(size_t a, size_t b);
+
+/// A range type with an inclusive start bound
+/// and an exclusive end bound.
+struct Range {
+    size_t start; // inclusive
+    size_t end;   // exclusive
+
+    /// Create a new Range with the given `start` and `end` values. 
+    /// `end` must be greater than or equal to `start`. 
+    Range(size_t start, size_t end) : start(start), end(end) {
+        rt_assert(end >= start, "invalid range, end must be >= start");
+    }
+
+    /// Returns `true` if this range contains the given `value`.
+    bool contains(size_t value) {
+        return (value >= start) && (value < end);
+    }
+
+    std::string to_string() {
+        std::ostringstream ret;
+        ret << "[" << start << ":" << end << ")";
+        return ret.str();
+    }
+};
+
+
 class SlowRand {
     std::random_device rand_dev; // Non-pseudorandom seed for twister
     std::mt19937_64 mt;

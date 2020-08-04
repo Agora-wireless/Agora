@@ -45,7 +45,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    Event_data launch(size_t tag, EventType event_type);
 
 private:
     void ZF_time_orthogonal(size_t tag);
@@ -82,11 +82,11 @@ private:
      */
     void Predict(size_t offset);
 
-    Table<complex_float> csi_buffer_;
+    Table<complex_float>& csi_buffer_;
     complex_float* pred_csi_buffer;
-    Table<complex_float> recip_buffer_;
-    Table<complex_float> ul_zf_buffer_;
-    Table<complex_float> dl_zf_buffer_;
+    Table<complex_float>& recip_buffer_;
+    Table<complex_float>& ul_zf_buffer_;
+    Table<complex_float>& dl_zf_buffer_;
     DurationStat* duration_stat;
 
     complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI

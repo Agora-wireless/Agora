@@ -20,7 +20,8 @@ public:
             resp_event.num_tags = req_event.num_tags;
 
             for (size_t i = 0; i < req_event.num_tags; i++) {
-                Event_data resp_i = launch(req_event.tags[i]);
+                Event_data resp_i = launch(req_event.tags[i], 
+                    req_event.event_type);
                 rt_assert(resp_i.num_tags == 1, "Invalid num_tags in resp");
                 resp_event.tags[i] = resp_i.tags[0];
                 resp_event.event_type = resp_i.event_type;
@@ -32,7 +33,9 @@ public:
         }
         return false;
     }
-    virtual Event_data launch(size_t tag) = 0;
+
+    /// The main event handling function that performs Doer-specific work.
+    virtual Event_data launch(size_t tag, EventType event_type) = 0;
 
 protected:
     Doer(Config* in_config, int in_tid, double freq_ghz,
@@ -48,6 +51,10 @@ protected:
     {
     }
 
+    /// This is required because this `Doer` class acts as a base class
+    /// that provides virtual functions to its child classes. 
+    virtual ~Doer() = default;
+    
     Config* cfg;
     int tid; // Thread ID of this Doer
     double freq_ghz; // RDTSC frequency in GHz

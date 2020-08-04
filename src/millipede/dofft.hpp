@@ -65,7 +65,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    Event_data launch(size_t tag, EventType event_type);
 
     /**
      * Fill-in the partial transpose of the computed FFT for this antenna into
@@ -146,7 +146,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    Event_data launch(size_t tag, EventType event_type);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;

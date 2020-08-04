@@ -15,6 +15,7 @@
 #include "dodemul.hpp"
 #include "dofft.hpp"
 #include "doprecode.hpp"
+#include "dosubcarrier.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
 #include "mac_thread.hpp"
@@ -24,6 +25,7 @@
 #include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
+#include "subcarrier_manager.hpp"
 #include "txrx.hpp"
 #include "utils.h"
 #include <algorithm>
@@ -65,9 +67,11 @@ public:
     void start();
     void stop();
 
+#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
+#endif // BIGSTATION
     void* worker(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
@@ -81,8 +85,6 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
-    void schedule_subcarriers(
-        EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_codeblocks(
@@ -158,6 +160,15 @@ private:
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
 
+    /// The singleton subcarrier manager instance. 
+    /// @see SubcarrierManager documentation.
+    /// TODO: this should be a direct object, not a pointer. 
+    ///       But first we need other items within the Millipede class
+    ///       to be properly initialized in its constructor's initializer lists
+    ///       instead of the copious class pointer allocation.
+    SubcarrierManager* subcarrier_manager_;
+
+
     /*****************************************************
      * Buffers
      *****************************************************/
@@ -192,16 +203,6 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated uplink zeroforcing detection matrices
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> ul_zf_buffer_;
-
-    // Data after equalization
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<complex_float> equal_buffer_;
-
     // Data after soft demodulation
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
@@ -212,7 +213,6 @@ private:
     // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
 
-    Table<complex_float> ue_spec_pilot_buffer_;
 
     RxCounters rx_counters_;
     FFT_stats fft_stats_;
@@ -236,11 +236,6 @@ private:
     // data symbols per frame
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
-
-    // Calculated zeroforcing precoders for downlink beamforming
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> dl_zf_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
@@ -275,10 +270,6 @@ private:
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
 
-    struct sched_info_t {
-        moodycamel::ConcurrentQueue<Event_data> concurrent_q;
-        moodycamel::ProducerToken* ptok;
-    };
     // sched_info_t sched_info_arr[kNumEventTypes];
     sched_info_t sched_info_arr[kMaxThreads];
 

@@ -36,7 +36,7 @@ public:
         Stats* in_stats_manager);
     ~DoEncode();
 
-    Event_data launch(size_t tag);
+    Event_data launch(size_t tag, EventType event_type);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -59,7 +59,7 @@ public:
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDecode();
 
-    Event_data launch(size_t tag);
+    Event_data launch(size_t tag, EventType event_type);
 
 private:
     int16_t* resp_var_nodes;
