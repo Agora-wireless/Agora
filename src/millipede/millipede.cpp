@@ -663,14 +663,14 @@ void* Millipede::worker(int tid)
     // We do it this way in order to allow fast indexing into the list
     // by using a request event's subcarrier id to calculate the index.
     auto num_subcarrier_ranges = subcarrier_manager_->num_subcarrier_ranges();
-    auto subcarrier_block_size = subcarrier_manager_->subcarrier_block_size();
     std::vector<Doer*> subcarrier_doers = {num_subcarrier_ranges, nullptr};
-    for (auto sc_range :
+    for (auto &sc_range :
         subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid))
     {
         auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(
             tid, worker_ptoks_ptr[tid], sc_range);
-        auto index = sc_range.start / subcarrier_block_size;
+        auto index = subcarrier_manager_->index_for_subcarrier_id(
+            sc_range.start);
         std::cout << "Worker thread " << tid
             << " created DoSubcarrier, ptr: " << computeSubcarrier
             << ", at worker doer index " << index 
