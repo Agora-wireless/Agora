@@ -41,13 +41,13 @@ using namespace arma;
  * ## General usage ##
  * One instance of this class should handle the computation for one `block_size`
  * range of subcarrier frequencies, so we should spawn `num_events` instances of
- * this class. For example, see `Config::demul_events_per_symbol and
+ * this class.
+ * For example, see `Config::demul_events_per_symbol and
  * `Config::demul_block_size`, or the similar ones for zeroforcing,
  * `zf_events_per_symbol` and `zf_block_size`.
  *
  * Upon receiving an event, it executes the specific doer for that event type,
  * consisting of one of the following:
- *
  * @li zeroforcing (`DoZF`)
  * @li reciprocity (`Reciprocity)
  * @li demodulation (`DoDemul`) for uplink
@@ -63,8 +63,8 @@ using namespace arma;
  * ## Buffer ownership and management ##
  * The general buffer ownership policy is to accept *references* to input
  * buffers, and to own both intermediate buffers for internal usage as well as
- * output buffers that are shared with others. This means that the
- * constructor/destructor of this class is responsible for
+ * output buffers that are shared with others.
+ * This means that the constructor/destructor of this class is responsible for
  * allocating/deallocating the intermediate buffers and output buffers but not
  * the input buffers.
  * 

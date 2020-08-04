@@ -119,8 +119,9 @@ static constexpr bool kUseArgos = false;
 #endif
 
 /// If true, the subcarrier manager uses dedicated queues to send events
-/// directly to the subcarrier doers. If false (default), the subcarrier manager
-/// uses the existing worker queues to send events to the subcarrier doers.
+/// directly to the subcarrier doers.
+/// If false (default), the subcarrier manager uses the existing worker queues
+/// to send events to the subcarrier doers.
 static constexpr bool kDedicatedSubcarrierDoerQueues = false;
 
 static constexpr bool kExportConstellation = false;

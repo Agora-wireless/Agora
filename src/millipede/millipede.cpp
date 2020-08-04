@@ -634,10 +634,10 @@ void* Millipede::worker(int tid)
 
     // Currently, we create Subcarrier doer instances within worker threads,
     // such that a given worker thread can handle subcarrier doers alongside all
-    // of its other doers. We create them here for now to preserve compatibility
-    // with the existing form of scheduling any kind of doer on any kind of
-    // worker thread, but in the future they'll be created by the subcarrier
-    // manager itself.
+    // of its other doers.
+    // We create them here for now to preserve compatibility with the existing
+    // form of scheduling any kind of doer on any kind of worker thread, but in
+    // the future they'll be created by the subcarrier manager itself.
     std::vector<Doer*> subcarrier_doers;
     if (kDedicatedSubcarrierDoerQueues) {
         // When subcarrier doer queues and worker queues are separate, we create
@@ -654,9 +654,9 @@ void* Millipede::worker(int tid)
     } else {
         // When subcarrier doer queues and worker queues are unified, we store
         // this worker's subcarrier doer instances in a sparse list, in which
-        // there is one entry per subcarrier range. This allows fast indexing
-        // into the list by using a request event's subcarrier id to calculate
-        // the index.
+        // there is one entry per subcarrier range.
+        // This allows fast indexing into the list by using a request event's
+        // subcarrier id to calculate the index.
         subcarrier_doers
             = { subcarrier_manager_->num_subcarrier_ranges(), nullptr };
         for (auto& sc_range :

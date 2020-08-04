@@ -28,15 +28,16 @@ using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
  * @brief The singleton manager of all `DoSubcarrier` instances.
  *
  * This class is essentially a wrapper around the `DoSubcarrier` instances, aka
- * subcarrier doers, and coordinates scheduling of tasks among them. It owns the
- * buffers shared by all `DoSubcarrier` instances and exposes interfaces to
- * communicate with them, e.g., by using event queues.
+ * subcarrier doers, and coordinates scheduling of tasks among them.
+ * It owns the buffers shared by all `DoSubcarrier` instances and exposes
+ * interfaces to communicate with them, e.g., by using event queues.
  *
  * There is at least one `DoSubcarrier` instance per subcarrier range,
  * typically just one but potentially more redundant replicates for purposes
- * of scalability and reliability. This class is responsible for owning the
- * internal buffers that are used by the subcarrier workers, and serves as a
- * wrapper interface to export subcarrier-parallel functionality.
+ * of scalability and reliability.
+ * This class is responsible for owning the internal buffers that are used by
+ * the subcarrier workers, and serves as a wrapper interface to export
+ * subcarrier-parallel functionality.
  */
 class SubcarrierManager {
 public:
@@ -68,8 +69,8 @@ public:
         const size_t task_buffer_symbol_num_ul
             = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
-        // Create the various buffers owned by the subcarrier manager. These
-        // buffers are shared across all subcarrier doers.
+        // Create the various buffers owned by the subcarrier manager.
+        // These buffers are shared across all subcarrier doers.
         //
         // TODO: Currently, these buffers are created to be huge enough to store
         // data for *ALL* subcarrier ranges, system-wide. We may want to scale
