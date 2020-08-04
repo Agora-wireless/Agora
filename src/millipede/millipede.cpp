@@ -59,16 +59,14 @@ Millipede::Millipede(Config* cfg)
     // since the worker threads will use information from the subcarrier manager
     // to determine which subcarrier doers each worker thread should use/create.
     subcarrier_manager_ = new SubcarrierManager(this->config_, freq_ghz,
-        sched_info_arr, complete_task_queue_, 
-        csi_buffer_, recip_buffer_, calib_buffer_, 
-        dl_encoded_buffer_, data_buffer_,
-        demod_soft_buffer_, dl_ifft_buffer_,
-        phy_stats, stats);
+        sched_info_arr, complete_task_queue_, csi_buffer_, recip_buffer_,
+        calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
+        dl_ifft_buffer_, phy_stats, stats);
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
-    // Note: bigstation mode currently doesn't work with DoSubcarrier redesign.
-#if BIGSTATION 
+        // Note: bigstation mode currently doesn't work with DoSubcarrier redesign.
+#if BIGSTATION
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_fft>,
             0, cfg->fft_thread_num);
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_zf>,
@@ -634,51 +632,47 @@ void* Millipede::worker(int tid)
         *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
         calib_buffer_, recip_buffer_, stats);
 
-
     // Currently, we create Subcarrier doer instances within worker threads,
     // such that a given worker thread can handle subcarrier doers
-    // alongside all of its other doers. 
+    // alongside all of its other doers.
     // We create them here for now to preserve compatibility with the existing
     // form of scheduling any kind of doer on any kind of worker thread,
-    // but in the future they'll be created by the subcarrier manager itself.    
-#if DEDICATED_SUBCARRIER_DOER_QUEUES
-    // When subcarrier doer queues and worker queues are dedicated (separate),
-    // 
+    // but in the future they'll be created by the subcarrier manager itself.
     std::vector<Doer*> subcarrier_doers;
-    for (auto sc_range :
-        subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid))
-    {
-        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(
-            tid, worker_ptoks_ptr[tid], sc_range);
-        std::cout << "Worker thread " << tid
-            << " created DoSubcarrier, ptr: " << computeSubcarrier
-            << std::endl;
-        subcarrier_doers.push_back(computeSubcarrier);
+    if (kDedicatedSubcarrierDoerQueues) {
+        // When subcarrier doer queues and worker queues are separate,
+        // we create a regular list of subcarrier doer instances.
+        for (auto sc_range :
+            subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
+            auto computeSubcarrier
+                = subcarrier_manager_->create_subcarrier_doer(
+                    tid, worker_ptoks_ptr[tid], sc_range);
+            std::cout << "Worker thread " << tid
+                      << " created DoSubcarrier, ptr: " << computeSubcarrier
+                      << std::endl;
+            subcarrier_doers.push_back(computeSubcarrier);
+        }
+    } else {
+        // When subcarrier doer queues and worker queues are unified,
+        // we store this worker's subcarrier doer instances in a sparse list,
+        // in which there is one entry per subcarrier range.
+        // This allows fast indexing into the list by using a request event's
+        // subcarrier id to calculate the index.
+        subcarrier_doers
+            = { subcarrier_manager_->num_subcarrier_ranges(), nullptr };
+        for (auto& sc_range :
+            subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid)) {
+            auto computeSubcarrier
+                = subcarrier_manager_->create_subcarrier_doer(
+                    tid, worker_ptoks_ptr[tid], sc_range);
+            auto index
+                = subcarrier_manager_->index_for_subcarrier_id(sc_range.start);
+            std::cout << "Worker thread " << tid
+                      << " created DoSubcarrier, ptr: " << computeSubcarrier
+                      << ", at worker doer index " << index << std::endl;
+            subcarrier_doers[index] = computeSubcarrier;
+        }
     }
-
-#else // not DEDICATED_SUBCARRIER_DOER_QUEUES
-    // When subcarrier doer queues and worker queues are unified, 
-    // we store this worker's subcarrier doer instances in a sparse list,
-    // in which there is one entry per subcarrier range.
-    // We do it this way in order to allow fast indexing into the list
-    // by using a request event's subcarrier id to calculate the index.
-    auto num_subcarrier_ranges = subcarrier_manager_->num_subcarrier_ranges();
-    std::vector<Doer*> subcarrier_doers = {num_subcarrier_ranges, nullptr};
-    for (auto &sc_range :
-        subcarrier_manager_->get_subcarrier_ranges_for_worker_tid(tid))
-    {
-        auto computeSubcarrier = subcarrier_manager_->create_subcarrier_doer(
-            tid, worker_ptoks_ptr[tid], sc_range);
-        auto index = subcarrier_manager_->index_for_subcarrier_id(
-            sc_range.start);
-        std::cout << "Worker thread " << tid
-            << " created DoSubcarrier, ptr: " << computeSubcarrier
-            << ", at worker doer index " << index 
-            << std::endl;
-        subcarrier_doers[index] = computeSubcarrier;
-    }
-#endif // DEDICATED_SUBCARRIER_DOER_QUEUES
-
 
     while (true) {
         Event_data req_event;
@@ -697,31 +691,29 @@ void* Millipede::worker(int tid)
             case EventType::kRC:
                 doer = computeReciprocity;
                 break;
-
-#if DEDICATED_SUBCARRIER_DOER_QUEUES
-            // When subcarrier doers have separate event queues, 
-            // subcarrier doer events are  not handled here, 
-            // but rather in the if-conditional below.
-
-#else // not DEDICATED_SUBCARRIER_DOER_QUEUES
             case EventType::kZF:
             case EventType::kDemul:
             case EventType::kPrecode: {
-                // Choose the proper subcarrier doer instance based on 
-                // the subcarrier id of the request event's first tag.
-                auto first_tag = gen_tag_t(req_event.tags[0]);
-                auto index = subcarrier_manager_->index_for_subcarrier_id(
-                    first_tag.sc_id);
-                doer = subcarrier_doers[index];
-                rt_assert(doer != nullptr, "BUG: chose null subcarrier doer");
+                if (kDedicatedSubcarrierDoerQueues) {
+                    // When subcarrier doers have separate event queues,
+                    // subcarrier doer events are not handled here,
+                    // but rather in the if-conditional below.
+                } else {
+                    // Choose the proper subcarrier doer instance based on
+                    // the subcarrier id of the request event's first tag.
+                    auto first_tag = gen_tag_t(req_event.tags[0]);
+                    auto index = subcarrier_manager_->index_for_subcarrier_id(
+                        first_tag.sc_id);
+                    doer = subcarrier_doers[index];
+                    rt_assert(
+                        doer != nullptr, "BUG: chose null subcarrier doer");
 
-                // std::cout << "\tWorker " << tid 
-                //     << " chose index " << index
-                //     << " for subcarrier id " << first_tag.sc_id
-                //     << std::endl;
+                    // std::cout << "\tWorker " << tid
+                    //     << " chose index " << index
+                    //     << " for subcarrier id " << first_tag.sc_id
+                    //     << std::endl;
+                }
             } break;
-#endif //DEDICATED_SUBCARRIER_DOER_QUEUES
-
             case EventType::kDecode:
                 doer = computeDecoding;
                 break;
@@ -733,8 +725,8 @@ void* Millipede::worker(int tid)
             }
 
             for (size_t i = 0; i < req_event.num_tags; i++) {
-                Event_data resp_i = doer->launch(req_event.tags[i],
-                    req_event.event_type);
+                Event_data resp_i
+                    = doer->launch(req_event.tags[i], req_event.event_type);
                 rt_assert(resp_i.num_tags == 1, "Invalid num_tags in resp");
                 resp_event.tags[i] = resp_i.tags[0];
                 resp_event.event_type = resp_i.event_type;
@@ -746,13 +738,13 @@ void* Millipede::worker(int tid)
             continue;
         }
 
-#if DEDICATED_SUBCARRIER_DOER_QUEUES 
-        for (auto &subcarrier_doer : subcarrier_doers) {
-            if (subcarrier_doer->try_launch()) {
-                break;  // exit this for loop
+        if (kDedicatedSubcarrierDoerQueues) {
+            for (auto& subcarrier_doer : subcarrier_doers) {
+                if (subcarrier_doer->try_launch()) {
+                    break; // exit this for loop
+                }
             }
         }
-#endif // DEDICATED_SUBCARRIER_DOER_QUEUES
 
     } // end of `while(true)` loop
 
@@ -760,7 +752,7 @@ void* Millipede::worker(int tid)
 }
 
 // Note: bigstation mode currently doesn't work with the DoSubcarrier redesign.
-#if BIGSTATION 
+#if BIGSTATION
 void* Millipede::worker_fft(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);

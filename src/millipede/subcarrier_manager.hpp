@@ -20,7 +20,6 @@
 #include <iostream>
 #include <mutex>
 #include <numeric>
-#include <unordered_map>
 #include <vector>
 // #include "mkl_dfti.h"
 
@@ -104,27 +103,17 @@ public:
 
         // Calculate the mapping from worker tid to subcarrier doer instance.
         for (size_t sc_base = 0; sc_base < cfg->OFDM_DATA_NUM;
-             sc_base += subcarrier_block_size_)
-        {
+             sc_base += subcarrier_block_size_) {
             Range range_to_insert(sc_base, sc_base + subcarrier_block_size_);
             auto tid = worker_tid_for_subcarrier(sc_base);
-            auto iter = worker_tid_to_subcarrier_range_.find(tid);
-            if (iter == worker_tid_to_subcarrier_range_.end()) {
-                // if empty, create a new vector.
-                worker_tid_to_subcarrier_range_[tid] = { range_to_insert };
-            }
-            else {
-                // if occupied, append to the existing vector.
-                worker_tid_to_subcarrier_range_[tid].emplace_back(
-                    range_to_insert);
-            }
+            worker_tid_to_subcarrier_range_[tid].emplace_back(range_to_insert);
         }
 
         std::cout << "[SubcarrierManager]: map of " << cfg->worker_thread_num
                   << " worker threads to SC ranges: " << std::endl;
-        for (auto& sc_ranges : worker_tid_to_subcarrier_range_) {
-            std::cout << "\t Worker " << sc_ranges.first << ": { ";
-            for (auto range : sc_ranges.second) {
+        for (size_t tid = 0; tid < cfg->worker_thread_num; tid++) {
+            std::cout << "\t Worker " << tid << ": { ";
+            for (auto& range : worker_tid_to_subcarrier_range_[tid]) {
                 std::cout << range.to_string() << ", ";
             }
             std::cout << " }" << std::endl;
@@ -189,31 +178,30 @@ public:
         for (size_t i = 0; i < num_events; i++) {
             mt_queue_t* destination_queue;
             moodycamel::ProducerToken* ptok;
-            
-#if DEDICATED_SUBCARRIER_DOER_QUEUES
-            // Enqueue the task onto the queue for the subcarrier doer
-            // that handles the `sc_id` in `base_tag`.
-            auto& matching_doer = subcarrier_doer_for_id(base_tag.sc_id);
-            auto& master_to_worker_queue = matching_doer.first;
-            destination_queue = &master_to_worker_queue.concurrent_q;
-            ptok = master_to_worker_queue.ptok;
 
-#else // not DEDICATED_SUBCARRIER_DOER_QUEUES
-            // Enqueue the task onto the queue for the worker thread
-            // that contains the subcarrier doer that handles the `sc_id`.
-            size_t tid = worker_tid_for_subcarrier(base_tag.sc_id);
-            destination_queue = &sched_info_arr_[tid].concurrent_q;
-            ptok = sched_info_arr_[tid].ptok;
-            
-            // std::cout << "[schedule_subcarrier]: "
-            //     << " event_type: " << (int)event_type
-            //     << ", sc_id: " << base_tag.sc_id 
-            //     << ", enqueueing onto worker tid: " << tid
-            //     << std::endl;
-#endif // DEDICATED_SUBCARRIER_DOER_QUEUES
+            if (kDedicatedSubcarrierDoerQueues) {
+                // Enqueue the task onto the queue for the subcarrier doer
+                // that handles the `sc_id` in `base_tag`.
+                auto& matching_doer = subcarrier_doer_for_id(base_tag.sc_id);
+                auto& master_to_worker_queue = matching_doer.first;
+                destination_queue = &master_to_worker_queue.concurrent_q;
+                ptok = master_to_worker_queue.ptok;
+            } else {
+                // Enqueue the task onto the queue for the worker thread
+                // that contains the subcarrier doer that handles the `sc_id`.
+                size_t tid = worker_tid_for_subcarrier(base_tag.sc_id);
+                destination_queue = &sched_info_arr_[tid].concurrent_q;
+                ptok = sched_info_arr_[tid].ptok;
 
-            try_enqueue_fallback(destination_queue, ptok,
-                Event_data(event_type, base_tag._tag));
+                // std::cout << "[schedule_subcarrier]: "
+                //     << " event_type: " << (int)event_type
+                //     << ", sc_id: " << base_tag.sc_id
+                //     << ", enqueueing onto worker tid: " << tid
+                //     << std::endl;
+            }
+
+            try_enqueue_fallback(
+                destination_queue, ptok, Event_data(event_type, base_tag._tag));
             base_tag.sc_id += block_size;
         }
     }
@@ -227,16 +215,16 @@ public:
         moodycamel::ProducerToken* worker_producer_token, Range sc_range)
     {
         rt_assert((sc_range.start) / subcarrier_block_size_
-                      == (sc_range.end - 1) / subcarrier_block_size_,
+                == (sc_range.end - 1) / subcarrier_block_size_,
             "invalid subcarrier range, all subcarrier IDs within the range "
             "do not map to the same index into the subcarrier doers list");
 
         std::lock_guard<std::mutex> lock(subcarrier_doers_mutex_);
 
         std::cout << "[create_subcarrier_doer]: worker_tid: " << worker_tid
-            << ", range: [" << sc_range.start << ":" << sc_range.end << ")"
-            << ", worker_producer_token: " << worker_producer_token
-            << std::endl;
+                  << ", range: " << sc_range.to_string()
+                  << ", worker_producer_token: " << worker_producer_token
+                  << std::endl;
 
         // Not sure how large this queue needs to be;
         // the size was taken from Millipede::initialize_queues().
@@ -244,7 +232,7 @@ public:
 
         // First, move the sched_info_t and its queue into `subcarrier_doers_`,
         // using a temporary nullptr in place of the real doer instance.
-        auto dest_index = sc_range.start / subcarrier_block_size_;
+        auto dest_index = index_for_subcarrier_id(sc_range.start);
         subcarrier_doers_[dest_index]
             = std::make_pair(sched_info_t(mt_queue_t(queue_size)),
                 // this nullptr will be replaced below.
@@ -268,39 +256,34 @@ public:
 
     /// Returns the subcarrier ranges that the given worker thread uses,
     /// with each range corresponding to an individual `DoSubcarrier` instance.
-    const std::vector<Range>& get_subcarrier_ranges_for_worker_tid(
-        int worker_tid)
+    const std::vector<Range>& get_subcarrier_ranges_for_worker_tid(int tid)
     {
-        static const std::vector<Range> empty;
-        auto iter = worker_tid_to_subcarrier_range_.find(worker_tid);
-        if (iter != worker_tid_to_subcarrier_range_.end()) {
-            return iter->second;
-        }
-        return empty;
+        return worker_tid_to_subcarrier_range_[tid];
     }
 
     /// Returns the worker thread ID (tid) that contains the
-    /// subcarrier doer instance that handles the given subcarrier id. 
-    inline size_t worker_tid_for_subcarrier(size_t subcarrier_id) {
+    /// subcarrier doer instance that handles the given subcarrier id.
+    inline size_t worker_tid_for_subcarrier(size_t subcarrier_id)
+    {
         return index_for_subcarrier_id(subcarrier_id) * cfg->worker_thread_num
             / num_subcarrier_ranges();
     }
 
-    /// Returns the index into the list of subcarrier doers 
+    /// Returns the index into the list of subcarrier doers
     /// for the given subcarrier id.
-    inline size_t index_for_subcarrier_id(size_t subcarrier_id) {
+    inline size_t index_for_subcarrier_id(size_t subcarrier_id)
+    {
         return subcarrier_id / subcarrier_block_size_;
     }
 
     /// Returns the subcarrier block size, which is the least common multiple
     /// of the zeroforcing block size and the demodulation block size.
-    inline size_t subcarrier_block_size() {
-        return subcarrier_block_size_;
-    }
+    inline size_t subcarrier_block_size() { return subcarrier_block_size_; }
 
     /// Returns the number of subcarrier ranges, which is given by
     /// `OFDM_DATA_NUM / subcarrier_block_size`.
-    inline size_t num_subcarrier_ranges() {
+    inline size_t num_subcarrier_ranges()
+    {
         return cfg->OFDM_DATA_NUM / subcarrier_block_size_;
     }
 
@@ -326,18 +309,16 @@ private:
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue_;
 
     /// The range of subcarrier frequencies handled by each subcarrier doer.
-    /// This is initialized (see the constructor's initializer list) to be the
-    /// least common multiple of the demodulation block size `demod_block_size`
-    /// and the zeroforcing block size `zf_block_size`.
     /// This block size dictates how many subcarrier doers there are, with one
     /// `DoSubcarrier` instance for each block-sized range of subcarriers.
     size_t subcarrier_block_size_;
 
-    /// The mappings from a given worker thread ID (an `int`) to the
-    /// subcarrier ranges for which that worker thread creates subcarrier doers.
+    /// The mappings from a given worker thread ID (the index into this array)
+    /// to the list of subcarrier ranges for which that worker thread
+    /// creates subcarrier doers.
     /// A single worker thread may create and contain multiple subcarrier doers;
     /// this occurs when there are fewer worker threads than subcarrier ranges.
-    std::unordered_map<int, std::vector<Range>> worker_tid_to_subcarrier_range_;
+    std::array<std::vector<Range>, kMaxThreads> worker_tid_to_subcarrier_range_;
 
     /// The list of subcarrier doers, indexed by subcarrier range base values.
     /// The `ith` element corresponds to the `ith` subcarrier block, e.g.,

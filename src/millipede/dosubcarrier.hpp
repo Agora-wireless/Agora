@@ -94,7 +94,7 @@ public:
         Table<complex_float>& equal_buffer, Table<complex_float>& ul_zf_buffer,
         Table<complex_float>& dl_zf_buffer, PhyStats* phy_stats, Stats* stats)
         : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
-            worker_producer_token)
+              worker_producer_token)
         , subcarrier_range_(subcarrier_range)
         , csi_buffer_(csi_buffer)
         , recip_buffer_(recip_buffer)
@@ -137,11 +137,11 @@ public:
     Event_data launch(size_t tag, EventType event_type)
     {
         rt_assert(subcarrier_range_.contains(gen_tag_t(tag).sc_id),
-            std::string("BUG: DoSubcarrier for ") 
+            std::string("BUG: DoSubcarrier for ")
                 + subcarrier_range_.to_string()
-                + " tried to handle wrong subcarrier ID: " 
-                + std::to_string(gen_tag_t(tag).sc_id)
-                + ", event_type " + std::to_string((int)event_type));
+                + " tried to handle wrong subcarrier ID: "
+                + std::to_string(gen_tag_t(tag).sc_id) + ", event_type "
+                + std::to_string((int)event_type));
 
         switch (event_type) {
         case EventType::kZF: {
@@ -172,9 +172,7 @@ public:
     }
 
     // Returns the range of subcarrier IDs handled by this subcarrier doer.
-    Range& subcarrier_range() {
-        return subcarrier_range_;
-    }
+    Range& subcarrier_range() { return subcarrier_range_; }
 
 private:
     /// The subcarrier range handled by this subcarrier doer.

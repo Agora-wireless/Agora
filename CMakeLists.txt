@@ -52,12 +52,6 @@ else()
   message(STATUS "Debugging is enabled. Performance will be low")
 endif()
 
-option(DEDICATED_SUBCARRIER_DOER_QUEUES "Use separate dedicated queues for each subcarrier doer" OFF)
-if(DEDICATED_SUBCARRIER_DOER_QUEUES)
-  message(STATUS "Setting DEDICATED_SUBCARRIER_DOER_QUEUES to true")
-  add_definitions(-DDEDICATED_SUBCARRIER_DOER_QUEUES)
-endif()
-
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
