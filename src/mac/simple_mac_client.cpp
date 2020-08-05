@@ -59,8 +59,8 @@ SimpleClientMac::SimpleClientMac(Config* cfg, size_t core_offset, size_t delay)
     }
     memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
-    tx_buffers_.malloc(
-        SOCKET_BUFFER_FRAME_NUM * cfg->UE_ANT_NUM, cfg->mac_packet_length, 64);
+    tx_buffers_.malloc(SOCKET_BUFFER_FRAME_NUM * cfg->UE_ANT_NUM,
+        cfg->mac_bytes_num_perframe, 64);
     // init_data_from_file();
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
@@ -280,9 +280,8 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
         pkt->ue_id = tag.ue_id;
         pkt->valid_tun_data = 0;
         pkt->datalen = cfg->mac_payload_length;
-        pkt->rsvd[0] = 0;
-        pkt->rsvd[1] = 0;
-        pkt->rsvd[2] = 0;
+        pkt->rsvd = 12345;
+        pkt->rsvd = 6789;
         pkt->crc = 0;
 
         if (tun_data_ready) {
@@ -310,18 +309,17 @@ void SimpleClientMac::update_tx_buffer(gen_tag_t tag)
             memcpy(pkt->data, (char*)v.data(), cfg->mac_payload_length);
         }
         // Insert CRC
-        pkt->crc = crc_dwn->calculateCRC24(
-            (unsigned char*)pkt, cfg->mac_packet_length);
+        pkt->crc = (uint16_t)(crc_dwn->calculateCRC24((unsigned char*)pkt->data,
+                                  cfg->mac_payload_length)
+            & 0xFFFF);
 
         // Print MAC packet summary
-        printf(
-            "time %0.2f sending packet for frame %d, symbol %d, ue %d, bytes "
-            "%zu\n",
-            get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id,
-            cfg->mac_packet_length);
+        printf("time %0.2f sending packet for frame %d, symbol %d, ue %d, CRC "
+               "%02x\n",
+            get_time(), pkt->frame_id, pkt->symbol_id, pkt->ue_id, pkt->crc);
 
-        for (size_t i = 0; i < cfg->mac_payload_length; i++) {
-            printf("%i ", *((uint8_t*)pkt->data + i));
+        for (size_t i = 0; i < cfg->mac_packet_length; i++) {
+            printf("%i ", *((uint8_t*)pkt + i));
         }
         printf("\n");
     }

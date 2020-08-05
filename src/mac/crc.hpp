@@ -127,7 +127,7 @@ public:
     /*
      * Verify CRC
      */
-    bool checkCRC24(MacPacket* p);
+    bool checkCRC24(unsigned char *data, int len, uint32_t ref_crc);
 };
 
 #endif

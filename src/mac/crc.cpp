@@ -112,7 +112,7 @@ uint32_t DoCRC::calculateCRC24(unsigned char *data, int len)
 }
 
 
-bool DoCRC::checkCRC24(MacPacket* p)
+bool DoCRC::checkCRC24(unsigned char* data, int len, uint32_t ref_crc)
 {
     /*
      * Compute CRC for incoming packet and verify it matches the CRC entry.
@@ -120,14 +120,14 @@ bool DoCRC::checkCRC24(MacPacket* p)
      */
 
     bool rval;
-    uint32_t crc = calculateCRC24((unsigned char*)p->data, p->datalen);
+    uint32_t crc = calculateCRC24(data, len);
 
     /*
     rval = (((p->crc[0] == HI(crc)) &&
 	         (p->crc[1] == MID(crc)) && 
              (p->crc[2] == LO(crc))));
     */
-    rval = p->crc == crc ? 1 : 0;
+    rval = ref_crc == crc ? 1 : 0;
 
     return rval;
 }
