@@ -87,9 +87,46 @@ void* SimpleBSMac::loopRecv(int tid)
         auto* pkt = (struct MacPacket*)rx_buffer;
 
         // Check CRC
-        if (crc_up->checkCRC24(pkt)) {
+        uint16_t crc
+            = (uint16_t)(crc_up->calculateCRC24(
+                             (unsigned char*)pkt->data, cfg->mac_payload_length)
+                & 0xFFFF);
+        if (crc == pkt->crc) {
             // CRC Good, valid packets -> upstream
-            printf("CRC GOOD!! \n");
+            printf("Good Packet: CRC Check OK! \n");
+            if (kDebugBSReceiver) {
+                int symbol_id = pkt->symbol_id;
+                // Read information from received packet
+                if (symbol_id == 0) {
+                    ss << "Header Info:\n"
+                       << "FRAME_ID: " << pkt->frame_id
+                       << "\nSYMBOL_ID: " << pkt->symbol_id
+                       << "\nUE_ID: " << pkt->ue_id
+                       << "\nVALID_TUN_DATA: " << pkt->valid_tun_data
+                       << "\nDATLEN: " << pkt->datalen << "\nPAYLOAD:\n";
+                }
+
+                if (symbol_id >= 0 && symbol_id < cfg->mac_packets_perframe) {
+                    for (size_t i = 0; i < cfg->mac_payload_length; i++) {
+
+                        ss1[pkt->symbol_id]
+                            << std::setfill('0') << std::setw(2) << std::right
+                            << std::hex
+                            << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
+                        if (i % 16 == 15)
+                            ss1[pkt->symbol_id] << "\n";
+                    }
+                    if (symbol_id == cfg->mac_packets_perframe - 1) {
+                        for (size_t j = 0; j < cfg->mac_packets_perframe; j++) {
+                            ss << ss1[j].str();
+                            ss1[j].str(std::string());
+                        }
+                        ss << "\n" << std::endl;
+                        std::cout << ss.str();
+                        ss.str(std::string());
+                    }
+                }
+            }
             if (cfg->ip_bridge_enable && pkt->valid_tun_data) {
                 printf("Valid TUN Data, send up \n");
                 // TODO : different data formats (pkt->data and data_to_tun)
@@ -97,31 +134,8 @@ void* SimpleBSMac::loopRecv(int tid)
                 ipbridge->write_fragment(
                     data_to_tun, cfg->data_bytes_num_perframe);
             }
-        }
-
-        if (kDebugBSReceiver) {
-            int symbol_id = pkt->symbol_id;
-            // Read information from received packet
-            if (symbol_id == 0) {
-                ss << "RX thread " << tid << " received frame " << pkt->frame_id
-                   << " symbol " << pkt->symbol_id << ", ue " << pkt->ue_id
-                   << ", size " << cfg->data_bytes_num_perframe << std::endl;
-            }
-            for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
-                 i++) {
-
-                ss1[pkt->symbol_id - cfg->UL_PILOT_SYMS]
-                    << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
-            }
-            if (symbol_id == cfg->mac_packets_perframe - 1) {
-                for (size_t j = 0; j < cfg->mac_packets_perframe; j++) {
-                    ss << ss1[j].str();
-                    ss1[j].str(std::string());
-                }
-                ss << std::endl;
-                std::cout << ss.str();
-                ss.str(std::string());
-            }
+        } else {
+            printf("Bad Packet: CRC Check Failed! \n");
         }
     }
     return NULL;

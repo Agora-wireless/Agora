@@ -234,11 +234,12 @@ struct MacPacket {
     uint16_t frame_id;
     uint16_t symbol_id;
     uint16_t ue_id;
-    uint8_t valid_tun_data;
+    uint16_t valid_tun_data;
     uint16_t datalen;
-    uint32_t crc;
-    uint8_t rsvd[3];
-    short data[]; // Elements sent by antennae are two bytes (I/Q samples)
+    uint16_t crc;
+    uint16_t rsvd;
+    uint16_t rsvd2;
+    char data[];
     MacPacket(int f, int s, int u, uint8_t v, int d,
         int cc) // TODO: Should be unsigned integers
         : frame_id(f)
