@@ -787,13 +787,12 @@ void Phy_UE::doEncode(int tid, size_t tag)
              cb_id++) {
             int8_t* input_ptr;
             if (kEnableMac) {
-                struct MacPacket* pkt
-                    = (struct MacPacket*)(ul_bits_buffer_[ue_id]
-                        + frame_slot * config_->mac_bytes_num_perframe);
+                char* pkt = ul_bits_buffer_[ue_id]
+                    + frame_slot * config_->mac_bytes_num_perframe;
                 int input_offset = bytes_per_block
                         * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
                     + bytes_per_block * cb_id;
-                input_ptr = (int8_t*)pkt->data + input_offset;
+                input_ptr = (int8_t*)pkt + input_offset;
             } else {
                 size_t cb_offset
                     = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
