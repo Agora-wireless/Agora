@@ -74,6 +74,7 @@ Config::Config(std::string jsonfile)
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
+    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     auto symbolSize = tddConf.value("symbol_size", 1);
     prefix = tddConf.value("prefix", 0);
     dl_prefix = tddConf.value("dl_prefix", 0);
@@ -243,15 +244,11 @@ Config::Config(std::string jsonfile)
     data_bytes_num_persymbol = kUseLDPC
         ? (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol
         : (OFDM_DATA_NUM * mod_type) >> 3; // number of Bytes in each OFDM Sym.
-    data_bytes_num_perframe = data_bytes_num_persymbol
-        * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
-    mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
-    // The current implementation only supports the case when  MAC packet size
-    // is multiples of data_bytes_num_perframe
-    if (data_bytes_num_perframe != 0)
-        rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
-            "MAC packet size need to be multiples of data_bytes_num_perframe!");
+    mac_packet_length = data_bytes_num_persymbol;
+    mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
+    mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
+    mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
+    mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
     std::cout << "Config: "

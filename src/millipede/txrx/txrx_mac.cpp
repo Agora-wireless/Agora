@@ -13,8 +13,8 @@ MacPacketTXRX::MacPacketTXRX(Config* cfg, size_t core_offset)
 {
 
     socket_ = new int[cfg->UE_NUM];
-    rx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM + 64, 64);
-    tx_buffer_.calloc(mac_thread_num, cfg->OFDM_DATA_NUM + 64, 64);
+    rx_buffer_.calloc(mac_thread_num, cfg->mac_packet_length, 64);
+    tx_buffer_.calloc(mac_thread_num, cfg->mac_packet_length, 64);
 
 #if USE_IPV4
     servaddr_ = new struct sockaddr_in[cfg->UE_NUM];
@@ -181,8 +181,6 @@ int MacPacketTXRX::dequeue_send(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
     size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
 
-    int packet_length = cfg->data_bytes_num_persymbol;
-
     size_t cbLenBytes = (cfg->LDPC_config.cbLen + 7) >> 3;
     size_t data_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id;
     if (!kUseLDPC)
@@ -190,25 +188,25 @@ int MacPacketTXRX::dequeue_send(int tid)
 
     size_t total_symbol_idx
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
-    uint8_t* ul_data_ptr
-        = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
-    auto* pkt = (MacPacket*)tx_buffer_[tid];
-    new (pkt) MacPacket(frame_id, symbol_id, 0 /* cell_id */, ue_id);
-    pkt->frame_id = frame_id;
-    pkt->symbol_id = symbol_id;
-    pkt->ue_id = ue_id;
+
+    if (symbol_id < cfg->UL_PILOT_SYMS) {
+        rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                      Event_data(EventType::kPacketToMac, event.tags[0])),
+            "Socket message enqueue failed\n");
+        return event.tags[0];
+    }
+
+    uint8_t* ul_data_ptr = &(*ul_bits_buffer_)[total_symbol_idx][data_offset];
     if (!kUseLDPC)
-        adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)pkt->data,
+        adapt_bits_from_mod((int8_t*)ul_data_ptr, (int8_t*)tx_buffer_[tid],
             cfg->OFDM_DATA_NUM, cfg->mod_type);
     else
-        memcpy(pkt->data, ul_data_ptr, packet_length);
-
-    int mac_packet_length = packet_length + MacPacket::kOffsetOfData;
+        memcpy(tx_buffer_[tid], (char*)ul_data_ptr, cfg->mac_packet_length);
 
     // Send data (one OFDM symbol)
-    size_t ret
-        = sendto(socket_[ue_id % cfg->UE_NUM], (char*)pkt, mac_packet_length, 0,
-            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+    size_t ret = sendto(socket_[ue_id % cfg->UE_NUM], tx_buffer_[tid],
+        cfg->mac_packet_length, 0, (struct sockaddr*)&servaddr_[tid],
+        sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
     if (kDebugPrintInTask) {

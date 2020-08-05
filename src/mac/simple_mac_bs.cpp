@@ -11,6 +11,12 @@ SimpleBSMac::SimpleBSMac(Config* cfg, size_t rx_thread_num, size_t core_offset)
     , core_id_(core_offset)
     , cfg(cfg)
 {
+    // TUN Interface
+    ipbridge = new IPbridge();
+    data_to_tun = new unsigned char[cfg->mac_data_bytes_num_perframe]();
+
+    // CRC
+    crc_up = new DoCRC();
 }
 
 SimpleBSMac::~SimpleBSMac() { delete cfg; }
@@ -63,15 +69,11 @@ void* SimpleBSMac::loopRecv(int tid)
 
     // loop recv
     socklen_t addrlen = sizeof(remote_addr);
-    int packet_length = cfg->data_bytes_num_persymbol;
-    packet_length += MacPacket::kOffsetOfData;
+    int packet_length = cfg->mac_packet_length;
     char* rx_buffer = (char*)malloc(packet_length);
-    size_t ul_data_syms = cfg->ul_data_symbol_num_perframe - cfg->UL_PILOT_SYMS;
     std::stringstream ss;
-    std::stringstream ss1[ul_data_syms];
     while (true) {
-        auto* pkt = (struct MacPacket*)rx_buffer;
-        int ret = recvfrom(socket_local, (char*)pkt, packet_length, 0,
+        int ret = recvfrom(socket_local, rx_buffer, packet_length, 0,
             (struct sockaddr*)&remote_addr, &addrlen);
         if (ret == -1) {
             if (errno != EAGAIN) {
@@ -81,30 +83,46 @@ void* SimpleBSMac::loopRecv(int tid)
             return (NULL);
         }
 
-        if (kDebugBSReceiver) {
-            // Read information from received packet
-            if (pkt->symbol_id == cfg->UL_PILOT_SYMS) {
-                ss << "RX thread " << tid << " received frame " << pkt->frame_id
-                   << " symbol " << pkt->symbol_id << ", ue " << pkt->ue_id
-                   << ", size " << cfg->data_bytes_num_perframe << std::endl;
-            }
-            if (pkt->symbol_id >= cfg->UL_PILOT_SYMS) {
-                for (size_t i = 0; i < packet_length - MacPacket::kOffsetOfData;
-                     i++) {
+        auto* pkt = (struct MacPacket*)rx_buffer;
 
-                    ss1[pkt->symbol_id - cfg->UL_PILOT_SYMS]
-                        << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
-                }
-                if (pkt->symbol_id == cfg->ul_data_symbol_num_perframe - 1) {
-                    for (size_t j = 0; j < ul_data_syms; j++) {
-                        ss << ss1[j].str();
-                        ss1[j].str(std::string());
+        // Check CRC
+        uint16_t crc
+            = (uint16_t)(crc_up->calculateCRC24(
+                             (unsigned char*)pkt->data, cfg->mac_payload_length)
+                & 0xFFFF);
+        if (crc == pkt->crc) {
+            printf("Good Packet: CRC Check OK! \n");
+            if (kDebugBSReceiver) {
+                // Read information from received packet
+                if (pkt->symbol_id < cfg->mac_packets_perframe) {
+                    ss << "Header Info:\n"
+                       << "FRAME_ID: " << pkt->frame_id
+                       << "\nSYMBOL_ID: " << pkt->symbol_id
+                       << "\nUE_ID: " << pkt->ue_id
+                       << "\nVALID_TUN_DATA: " << pkt->valid_tun_data
+                       << "\nDATLEN: " << pkt->datalen << "\nPAYLOAD:\n";
+                    for (size_t i = 0; i < cfg->mac_payload_length; i++) {
+
+                        ss << std::setfill('0') << std::setw(2) << std::right
+                           << std::hex << (uint32_t) * ((uint8_t*)pkt->data + i)
+                           << " ";
+                        if (i % 16 == 15)
+                            ss << "\n";
                     }
-                    ss << std::endl;
+                    ss << "\n" << std::endl;
                     std::cout << ss.str();
                     ss.str(std::string());
                 }
             }
+            if (cfg->ip_bridge_enable && pkt->valid_tun_data) {
+                printf("Valid TUN Data, send up \n");
+                // TODO : different data formats (pkt->data and data_to_tun)
+                data_to_tun = (unsigned char*)pkt->data;
+                ipbridge->write_fragment(
+                    data_to_tun, cfg->data_bytes_num_perframe);
+            }
+        } else {
+            printf("Bad Packet: CRC Check Failed! \n");
         }
     }
     return NULL;
