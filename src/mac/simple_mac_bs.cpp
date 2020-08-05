@@ -72,7 +72,6 @@ void* SimpleBSMac::loopRecv(int tid)
     int packet_length = cfg->mac_packet_length;
     char* rx_buffer = (char*)malloc(packet_length);
     std::stringstream ss;
-    std::stringstream ss1[cfg->mac_packets_perframe];
     while (true) {
         int ret = recvfrom(socket_local, rx_buffer, packet_length, 0,
             (struct sockaddr*)&remote_addr, &addrlen);
@@ -92,39 +91,27 @@ void* SimpleBSMac::loopRecv(int tid)
                              (unsigned char*)pkt->data, cfg->mac_payload_length)
                 & 0xFFFF);
         if (crc == pkt->crc) {
-            // CRC Good, valid packets -> upstream
             printf("Good Packet: CRC Check OK! \n");
             if (kDebugBSReceiver) {
-                int symbol_id = pkt->symbol_id;
                 // Read information from received packet
-                if (symbol_id == 0) {
+                if (pkt->symbol_id < cfg->mac_packets_perframe) {
                     ss << "Header Info:\n"
                        << "FRAME_ID: " << pkt->frame_id
                        << "\nSYMBOL_ID: " << pkt->symbol_id
                        << "\nUE_ID: " << pkt->ue_id
                        << "\nVALID_TUN_DATA: " << pkt->valid_tun_data
                        << "\nDATLEN: " << pkt->datalen << "\nPAYLOAD:\n";
-                }
-
-                if (symbol_id >= 0 && symbol_id < cfg->mac_packets_perframe) {
                     for (size_t i = 0; i < cfg->mac_payload_length; i++) {
 
-                        ss1[pkt->symbol_id]
-                            << std::setfill('0') << std::setw(2) << std::right
-                            << std::hex
-                            << (uint32_t) * ((uint8_t*)pkt->data + i) << " ";
+                        ss << std::setfill('0') << std::setw(2) << std::right
+                           << std::hex << (uint32_t) * ((uint8_t*)pkt->data + i)
+                           << " ";
                         if (i % 16 == 15)
-                            ss1[pkt->symbol_id] << "\n";
+                            ss << "\n";
                     }
-                    if (symbol_id == cfg->mac_packets_perframe - 1) {
-                        for (size_t j = 0; j < cfg->mac_packets_perframe; j++) {
-                            ss << ss1[j].str();
-                            ss1[j].str(std::string());
-                        }
-                        ss << "\n" << std::endl;
-                        std::cout << ss.str();
-                        ss.str(std::string());
-                    }
+                    ss << "\n" << std::endl;
+                    std::cout << ss.str();
+                    ss.str(std::string());
                 }
             }
             if (cfg->ip_bridge_enable && pkt->valid_tun_data) {
