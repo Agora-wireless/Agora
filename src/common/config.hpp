@@ -172,9 +172,11 @@ public:
     size_t data_bytes_num_persymbol;
     size_t data_bytes_num_perframe;
     size_t mac_data_bytes_num_perframe;
+    size_t mac_bytes_num_perframe;
     size_t mac_packet_length;
-    size_t num_frames_per_mac_packet;
-    size_t sym_packet_length;
+    size_t mac_payload_length;
+    size_t mac_packets_perframe;
+    bool ip_bridge_enable;
 
     // IP address at Millipde side
     std::string rx_addr;

@@ -119,10 +119,14 @@ endif()
 
 set(MAC_CLIENT_SOURCES
   src/mac/simple_mac_client.cpp
-  src/mac/mac_client_main.cpp)
+  src/mac/mac_client_main.cpp
+  src/mac/ip_bridge.cpp
+  src/mac/crc.cpp)
 set(MAC_BS_SOURCES
   src/mac/simple_mac_bs.cpp
-  src/mac/mac_bs_main.cpp)
+  src/mac/mac_bs_main.cpp
+  src/mac/ip_bridge.cpp
+  src/mac/crc.cpp)
 set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
