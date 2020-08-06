@@ -70,7 +70,7 @@ public:
     }
 
     UDPServer() {}
-    UDPServer(const UDPServer&) = delete;
+    UDPServer& operator=(const UDPServer&) = delete;
 
     ~UDPServer()
     {
