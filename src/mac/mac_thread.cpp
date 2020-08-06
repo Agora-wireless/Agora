@@ -39,7 +39,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
 
-    udp_server = UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_server = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
     crc_obj = new DoCRC();
 }
@@ -116,7 +116,7 @@ void MacThread::process_codeblocks_from_master()
     if (server_.n_filled_in_frame_[ue_id] == cfg_->mac_data_bytes_num_perframe) {
         server_.n_filled_in_frame_[ue_id] = 0;
 
-        udp_client.send(kRemoteHostname, kBaseRemotePort + ue_id,
+        udp_client->send(kRemoteHostname, kBaseRemotePort + ue_id,
             &server_.frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe);
         fprintf(log_file_,
             "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n", frame_id,
@@ -137,7 +137,7 @@ void MacThread::process_udp_packets_from_apps()
 {
     memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
     ssize_t ret
-        = udp_server.recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+        = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {

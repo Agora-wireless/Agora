@@ -84,8 +84,8 @@ private:
     FILE* log_file_; // Log file used to store MAC layer outputs
     std::string log_filename_ = kDefaultLogFilename; // Name of the log file
 
-    UDPClient udp_client; // UDP endpoint used for sending messages
-    UDPServer udp_server; // UDP endpoint used for receiving messages
+    UDPClient* udp_client; // UDP endpoint used for sending messages
+    UDPServer* udp_server; // UDP endpoint used for receiving messages
 
     Table<uint8_t>* ul_bits_buffer_;
     Table<uint8_t>* ul_bits_buffer_status_;
