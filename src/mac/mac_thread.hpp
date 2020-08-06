@@ -73,6 +73,12 @@ private:
     // the client.
     const Mode mode_;
     Config* cfg_;
+
+    const double freq_ghz_; // RDTSC frequency in GHz
+    // We check for new MAC packets from applications every [tsc_delta_]
+    // clock ticks
+    const size_t tsc_delta_;
+
     const size_t core_offset_; // The CPU core on which this thread runs
 
     FILE* log_file_; // Log file used to store MAC layer outputs
@@ -90,6 +96,17 @@ private:
     // A preallocated buffer to store UDP packets received via recv()
     std::vector<uint8_t> udp_pkt_buf_;
 
+    // The timestamp at which we last received a UDP packet from an application
+    size_t last_mac_pkt_rx_tsc_ = 0;
+
+    // The frame ID of the next MAC packet we'll hand over to the PHY
+    size_t next_frame_id_ = 0;
+
+    // The radio ID of the next MAC packet we'll hand over to the PHY
+    size_t next_radio_id_ = 0;
+
+    FastRand fast_rand_;
+ 
     // Server-only members
     struct {
         // Staging buffers to accumulate decoded uplink code blocks for each UE
@@ -113,12 +130,6 @@ private:
 
     // FIFO queue for sending messages to the master thread
     moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
-
-    // radio to send data to
-    size_t radio_id;
-
-    // current MAC frame id
-    size_t frame_id;
 
     // CRC
     DoCRC* crc_obj;
