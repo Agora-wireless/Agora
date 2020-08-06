@@ -34,9 +34,7 @@
        exit(0); //continue;
  */
 
-
 #include "crc.hpp"
-
 
 #ifdef REBUILD_TABLE
 static void DoCRC::initCRC24(uint32_t table[256])
@@ -52,13 +50,12 @@ static void DoCRC::initCRC24(uint32_t table[256])
     table[1] = h = G_CRC_24A;
 
     for (i = 2; i < 256; i *= 2) {
-	if ((h <<= 1) & 0x1000000)
-	    h ^= G_CRC_24A;
-	for (j = 0; j < i; j++)
-	    table[i + j] = table[j] ^ h;
+        if ((h <<= 1) & 0x1000000)
+            h ^= G_CRC_24A;
+        for (j = 0; j < i; j++)
+            table[i + j] = table[j] ^ h;
     }
 }
-
 
 int main()
 {
@@ -68,13 +65,13 @@ int main()
     crcInit(crcTable);
 
     for (i = 0; i < 256; i++) {
-	    printf("0x%04X, ", crcTable[i]);
-	    if ((i % 4) == 3) putchar('\n');
+        printf("0x%04X, ", crcTable[i]);
+        if ((i % 4) == 3)
+            putchar('\n');
     }
     return 0;
 }
 #endif
-
 
 void DoCRC::addCRC24(MacPacket* p)
 {
@@ -82,7 +79,7 @@ void DoCRC::addCRC24(MacPacket* p)
      * TODO: Size of CRC should depend on Transport Block length and should 
      * consider both header and data, not just data
      * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
-     */ 
+     */
 
     uint32_t crc = calculateCRC24((unsigned char*)p->data, p->datalen);
     /*
@@ -93,8 +90,7 @@ void DoCRC::addCRC24(MacPacket* p)
     p->crc = crc;
 }
 
-
-uint32_t DoCRC::calculateCRC24(unsigned char *data, int len)
+uint32_t DoCRC::calculateCRC24(unsigned char* data, int len)
 {
     /*
      *
@@ -110,7 +106,6 @@ uint32_t DoCRC::calculateCRC24(unsigned char *data, int len)
 
     return crc;
 }
-
 
 bool DoCRC::checkCRC24(unsigned char* data, int len, uint32_t ref_crc)
 {
