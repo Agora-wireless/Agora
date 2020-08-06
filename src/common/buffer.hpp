@@ -234,18 +234,15 @@ struct MacPacket {
     uint16_t frame_id;
     uint16_t symbol_id;
     uint16_t ue_id;
-    uint16_t valid_tun_data;
     uint16_t datalen;
     uint16_t crc;
-    uint16_t rsvd;
-    uint16_t rsvd2;
+    uint16_t rsvd[3];
     char data[];
-    MacPacket(int f, int s, int u, uint8_t v, int d,
+    MacPacket(int f, int s, int u, int d,
         int cc) // TODO: Should be unsigned integers
         : frame_id(f)
         , symbol_id(s)
         , ue_id(u)
-        , valid_tun_data(v)
         , datalen(d)
         , crc(cc)
     {

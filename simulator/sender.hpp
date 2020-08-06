@@ -21,6 +21,7 @@
 #include <chrono>
 #include <emmintrin.h>
 #include <immintrin.h>
+#include <malloc.h>
 #include <numeric>
 #include <pthread.h>
 #include <signal.h>
@@ -33,21 +34,23 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "mkl_dfti.h"
 #include "net.hpp"
 #include "utils.h"
 
-#ifdef USE_DPDK_SENDER
+#ifdef USE_DPDK
 #include "dpdk_transport.hpp"
+#include <netinet/ether.h>
 #endif
 
 class Sender {
 public:
-    static constexpr size_t kTXBufOffset = kUseDPDK ? 22 : 0;
     static constexpr size_t kMaxNumSockets = 128; // Max network sockets
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
-        size_t delay = 0, bool enable_slow_start = true, 
+        size_t delay = 0, bool enable_slow_start = true,
+        std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
     ~Sender();
 
@@ -65,9 +68,6 @@ private:
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
-#ifdef USE_DPDK_SENDER
-    void create_dpdk_threads(void* (*worker)(void*));
-#endif
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
     void update_tx_buffer(gen_tag_t tag);
@@ -76,6 +76,11 @@ private:
     // Return the TX buffer for a tag. The tag must have frame, symbol, and
     // antenna fields set
     inline size_t tag_to_tx_buffers_index(gen_tag_t tag) const;
+
+    // Run FFT on the data field in pkt, output to fft_inout
+    // Recombine pkt header data and fft output data into payload
+    void run_fft(const Packet* pkt, complex_float* fft_inout,
+        DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const;
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
@@ -125,10 +130,14 @@ private:
     double* frame_start;
     double* frame_end;
 
-#ifdef USE_DPDK_SENDER
-    uint32_t src_addr;
-    uint32_t dst_addr;
+#ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
+    uint32_t sender_addr; // IPv4 address of this data sender
+    uint32_t server_addr; // IPv4 address of the remote target Millipede server
+    rte_ether_addr sender_mac_addr; // MAC address of this data sender
+
+    // MAC address of the remote target Millipede server
+    rte_ether_addr server_mac_addr;
 #endif
 };
 

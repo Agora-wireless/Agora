@@ -39,18 +39,14 @@ float rand_float_from_short(float min, float max)
 
 int main(int argc, char* argv[])
 {
-    std::string confFile;
-    if (argc == 2)
-        confFile = std::string("/") + std::string(argv[1]);
-    else
-        confFile = "/data/tddconfig-sim-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
+    std::string confFile = cur_directory + "/data/tddconfig-sim-ul.json";
+    if (argc == 2)
+        confFile = std::string(argv[1]);
 
-    printf("Config file: %s\n", filename.c_str());
-    auto* config_ = new Config(filename.c_str());
+    printf("Config file: %s\n", confFile.c_str());
+    auto* config_ = new Config(confFile.c_str());
 
-    printf("LDPC %s\n", kUseLDPC ? "enabled" : "disabled");
     printf("Using %s-orthogonal pilots\n",
         config_->freq_orthogonal_pilot ? "frequency" : "time");
 
@@ -77,13 +73,12 @@ int main(int argc, char* argv[])
     srand(time(NULL));
     // srand(0);
 
+    const size_t base_graph = LDPC_config.Bg;
+    const size_t zc = LDPC_config.Zc;
+    const size_t nRows = LDPC_config.nRows;
     // Randomly generate input
-    size_t num_mod = kUseLDPC
-        ? ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc) / mod_type
-        : OFDM_DATA_NUM;
-    size_t numberCodeblocks = kUseLDPC
-        ? data_symbol_num_perframe * LDPC_config.nblocksInSymbol * UE_ANT_NUM
-        : data_symbol_num_perframe * UE_ANT_NUM;
+    size_t numberCodeblocks
+        = data_symbol_num_perframe * LDPC_config.nblocksInSymbol * UE_ANT_NUM;
     printf("Total number of blocks: %zu\n", numberCodeblocks);
 
     // Initialize buffers
@@ -91,46 +86,40 @@ int main(int argc, char* argv[])
     int8_t* parity[numberCodeblocks];
     int8_t* encoded[numberCodeblocks];
 
-    if (kUseLDPC) {
-        const size_t base_graph = LDPC_config.Bg;
-        const size_t zc = LDPC_config.Zc;
+    for (size_t i = 0; i < numberCodeblocks; i++) {
+        input[i] = new int8_t[ldpc_encoding_input_buf_size(base_graph, zc)];
+        parity[i] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
+        encoded[i] = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)];
+    }
 
-        for (size_t i = 0; i < numberCodeblocks; i++) {
-            input[i] = new int8_t[ldpc_encoding_input_buf_size(base_graph, zc)];
-            parity[i]
-                = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
-            encoded[i]
-                = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)];
+    const size_t num_input_bytes
+        = bits_to_bytes(ldpc_num_input_bits(base_graph, zc));
+    for (size_t n = 0; n < numberCodeblocks; n++) {
+        for (size_t i = 0; i < num_input_bytes; i++) {
+            input[n][i] = (int8_t)rand();
         }
+    }
 
-        const size_t num_input_bytes
-            = bits_to_bytes(ldpc_num_input_bits(base_graph, zc));
+    if (kVerbose) {
+        printf("Raw input\n");
         for (size_t n = 0; n < numberCodeblocks; n++) {
-            for (size_t i = 0; i < num_input_bytes; i++) {
-                input[n][i] = (int8_t)rand();
+            if (n % UE_ANT_NUM == 0) {
+                printf("Symbol %zu\n", n / UE_ANT_NUM);
             }
-        }
+            printf("UE %zu\n", n % UE_ANT_NUM);
 
-        if (kVerbose) {
-            printf("Raw input\n");
-            for (size_t n = 0; n < numberCodeblocks; n++) {
-                if (n % UE_ANT_NUM == 0) {
-                    printf("Symbol %zu\n", n / UE_ANT_NUM);
-                }
-                printf("UE %zu\n", n % UE_ANT_NUM);
-
-                for (size_t i = 0; i < num_input_bytes; i++) {
-                    // std::cout << std::bitset<8>(input[n][i]) << " ";
-                    printf("%u ", (uint8_t)input[n][i]);
-                    printf("\n");
-                }
+            for (size_t i = 0; i < num_input_bytes; i++) {
+                // std::cout << std::bitset<8>(input[n][i]) << " ";
+                printf("%u ", (uint8_t)input[n][i]);
                 printf("\n");
             }
+            printf("\n");
         }
+    }
 
-        for (size_t n = 0; n < numberCodeblocks; n++) {
-            ldpc_encode_helper(base_graph, zc, encoded[n], parity[n], input[n]);
-        }
+    for (size_t n = 0; n < numberCodeblocks; n++) {
+        ldpc_encode_helper(
+            base_graph, zc, nRows, encoded[n], parity[n], input[n]);
     }
 
     Table<uint8_t> mod_input;
@@ -141,49 +130,27 @@ int main(int argc, char* argv[])
     init_modulation_table(mod_table, mod_type);
 
     for (size_t n = 0; n < numberCodeblocks; n++) {
-        if (kUseLDPC) {
-            adapt_bits_for_mod(encoded[n], mod_input[n],
-                bits_to_bytes(
-                    ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc)),
-                mod_type);
-        } else {
-            for (size_t i = 0; i < num_mod; i++)
-                mod_input[n][i] = (uint8_t)(rand() % config_->mod_order);
-            // printf("symbol %d ue %d\n", n / UE_ANT_NUM, n % UE_ANT_NUM );
-            // for (int i = 0; i < num_mod; i++)
-            //     printf("%u ", mod_input[n][i]);
-            // printf("\n");
-        }
+        adapt_bits_for_mod(encoded[n], mod_input[n],
+            bits_to_bytes(ldpc_num_encoded_bits(
+                LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows)),
+            mod_type);
         for (int i = 0; i < OFDM_DATA_NUM; i++)
             mod_output[n][i]
                 = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
     }
 
-    printf("Saving raw data\n");
-
-    if (kUseLDPC) {
-        std::string filename_input = cur_directory + "/data/LDPC_orig_data_"
-            + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
-            + ".bin";
-        FILE* fp_input = fopen(filename_input.c_str(), "wb");
-        for (size_t i = 0; i < numberCodeblocks; i++) {
-            uint8_t* ptr = (uint8_t*)input[i];
-            const size_t num_input_bytes = bits_to_bytes(
-                ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc));
-            fwrite(ptr, num_input_bytes, sizeof(uint8_t), fp_input);
-        }
-        fclose(fp_input);
-    } else {
-        std::string filename_input = cur_directory + "/data/orig_data_"
-            + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
-            + ".bin";
-        FILE* fp_input = fopen(filename_input.c_str(), "wb");
-        for (size_t i = 0; i < numberCodeblocks; i++) {
-            uint8_t* ptr = (uint8_t*)mod_input[i];
-            fwrite(ptr, OFDM_DATA_NUM, sizeof(uint8_t), fp_input);
-        }
-        fclose(fp_input);
+    std::string filename_input = cur_directory + "/data/LDPC_orig_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(UE_ANT_NUM)
+        + ".bin";
+    printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
+    FILE* fp_input = fopen(filename_input.c_str(), "wb");
+    for (size_t i = 0; i < numberCodeblocks; i++) {
+        uint8_t* ptr = (uint8_t*)input[i];
+        const size_t num_input_bytes = bits_to_bytes(
+            ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc));
+        fwrite(ptr, num_input_bytes, sizeof(uint8_t), fp_input);
     }
+    fclose(fp_input);
 
     /* Convert data into time domain */
     Table<complex_float> IFFT_data;
@@ -230,7 +197,8 @@ int main(int argc, char* argv[])
 
     /* put pilot and data symbols together */
     Table<complex_float> tx_data_all_symbols;
-    tx_data_all_symbols.calloc(symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM, 64);
+    tx_data_all_symbols.calloc(
+        symbol_num_perframe, UE_ANT_NUM * OFDM_CA_NUM, 64);
 
     if (config_->freq_orthogonal_pilot) {
         complex_float* pilots_t_ue;
@@ -306,11 +274,10 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("saving rx data...\n");
-    std::string filename_rx = cur_directory
-        + (kUseLDPC ? "/data/LDPC_rx_data_" : "/data/rx_data_")
+    std::string filename_rx = cur_directory + "/data/LDPC_rx_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
+    printf("Saving rx data to %s\n", filename_rx.c_str());
     FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
     for (int i = 0; i < symbol_num_perframe; i++) {
         float* ptr = (float*)rx_data_all_symbols[i];
@@ -362,7 +329,8 @@ int main(int argc, char* argv[])
 
     /* prepare downlink data from mod_output */
     Table<complex_float> dl_mod_data;
-    dl_mod_data.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
+    dl_mod_data.calloc(
+        dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (int j = 0; j < UE_ANT_NUM; j++) {
             if (i <= DL_PILOT_SYMS - 1) {
@@ -410,7 +378,8 @@ int main(int argc, char* argv[])
         for (int j = OFDM_DATA_START; j < OFDM_DATA_NUM + OFDM_DATA_START;
              j++) {
             cx_float* ptr_in_precoder = (cx_float*)precoder[j];
-            cx_fmat mat_precoder(ptr_in_precoder, UE_ANT_NUM, BS_ANT_NUM, false);
+            cx_fmat mat_precoder(
+                ptr_in_precoder, UE_ANT_NUM, BS_ANT_NUM, false);
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
             // printf("symbol %d, sc: %d\n", i, j - OFDM_DATA_START);
@@ -443,12 +412,10 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("saving dl tx data...\n");
-    std::string filename_dl_tx = cur_directory
-        + (kUseLDPC ? "/data/LDPC_dl_tx_data_" : "/data/dl_tx_data_")
+    std::string filename_dl_tx = cur_directory + "/data/LDPC_dl_tx_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
-
+    printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
     FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
     for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
         short* ptr = (short*)dl_tx_data[i];
@@ -469,12 +436,10 @@ int main(int argc, char* argv[])
     // }
     // printf("\n");
 
-    if (kUseLDPC) {
-        for (size_t n = 0; n < numberCodeblocks; n++) {
-            delete[] input[n];
-            delete[] parity[n];
-            delete[] encoded[n];
-        }
+    for (size_t n = 0; n < numberCodeblocks; n++) {
+        delete[] input[n];
+        delete[] parity[n];
+        delete[] encoded[n];
     }
 
     mod_input.free();

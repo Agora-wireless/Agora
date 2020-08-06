@@ -157,14 +157,12 @@ void Simulator::update_rx_counters(
     } else if (rx_counter_packets_[frame_id_in_buffer]
         == max_packet_num_per_frame) {
         frame_end_receive[frame_id] = get_time();
-        print_per_frame_done(
-            PrintType::kPacketRX, frame_id, frame_id_in_buffer);
+        print_per_frame_done(PrintType::kPacketRX, frame_id);
         rx_counter_packets_[frame_id_in_buffer] = 0;
     }
 }
 
-void Simulator::print_per_frame_done(
-    PrintType print_type, size_t frame_id, size_t frame_id_in_buffer)
+void Simulator::print_per_frame_done(PrintType print_type, size_t frame_id)
 {
     if (!kDebugPrintPerFrameDone)
         return;

@@ -22,8 +22,6 @@ class CoMP(object):
         lib.Millipede_start.restype = c_void_p
         lib.Millipede_getEqualData.argtypes = [c_void_p,POINTER(POINTER(c_float)),POINTER(c_int)]
         lib.Millipede_getEqualData.restype = c_void_p
-        lib.Millipede_getDemulData.argtypes = [c_void_p,POINTER(POINTER(c_longlong)),POINTER(c_int)]
-        lib.Millipede_getDemulData.restype = c_void_p
         self.obj = lib.Millipede_new(conf.obj)
 
     def startCoMP(self):
@@ -41,11 +39,6 @@ class CoMP(object):
         lib.Millipede_getEqualData(self.obj, mem, size)
         return mem,size
     
-    def getDemulData(self):
-        mem = POINTER(c_longlong)()
-        size = c_int(0)
-        lib.Millipede_getDemulData(self.obj, byref(mem),byref(size))
-        return mem,size
 
 # filename = "../tddconfig.json"
 # cfg = Config(filename)

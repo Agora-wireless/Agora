@@ -25,8 +25,6 @@
     * Source file names should end in `.cc`, header file names in `.h`.
 
   * Classes:
-    * Class members and functions should have documentation comments in the
-      class header file.
     * Mark eligible class functions and members as `const`, `private`, or
       `static`.
     * Eligible classes should have corresponding tests.
@@ -88,7 +86,7 @@
 
   * Use `size_t` as the integer type unless negative integers are needed.
 
-  * Mark elgible function arguments and implementation variables as `const`.
+  * Mark eligible function arguments and implementation variables as `const`.
 
   * Use C++-style casts with `static_cast` and `reinterpret_cast` instead of
     C-style casts.
@@ -102,3 +100,9 @@
     ```
     auto *pkt = new Packet[kNumPackets];
     ```
+
+## Documentation requirements
+  * Each file must have a comment at the top explaining what the file's purpose.
+  * Each class must have a top-level comment explaining the class's purpose.
+  * Non-trivial class members and functions should have documentation comments
+    in the class header file.

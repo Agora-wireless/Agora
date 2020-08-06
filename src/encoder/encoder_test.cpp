@@ -1,5 +1,6 @@
 #include "../common/utils_ldpc.hpp"
 #include "encoder.hpp"
+#include "gcc_phy_ldpc_encoder_5gnr_internal.h"
 #include <algorithm>
 #include <fstream>
 #include <vector>
@@ -36,21 +37,21 @@ void run_test(size_t base_graph, size_t zc)
     int8_t* encoded[kNumCodeBlocks];
     int8_t* parity_reference[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-        // We add avx2enc::PROC_BYTES as padding for the encoder's scatter (for
-        // input) and gather (for output) functions.
         input[n] = (int8_t*)read_binfile(
             input_filename, ldpc_encoding_input_buf_size(base_graph, zc));
-        parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)];
-        encoded[n] = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)];
+        parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)]();
+        encoded[n]
+            = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)]();
         parity_reference[n] = (int8_t*)read_binfile(
             reference_filename, ldpc_encoding_parity_buf_size(base_graph, zc));
 
-        ldpc_encode_helper(base_graph, zc, encoded[n], parity[n], input[n]);
+        ldpc_encode_helper(base_graph, zc, ldpc_max_num_rows(base_graph),
+            encoded[n], parity[n], input[n]);
     }
 
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
         if (memcmp(parity[n], parity_reference[n],
-                bits_to_bytes(ldpc_num_parity_bits(base_graph, zc)))
+                bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc)))
             != 0) {
             fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n", zc,
                 base_graph);
@@ -79,12 +80,18 @@ int main()
     // For some expansion factors, we don't have input and reference files yet
     const std::vector<size_t> zc_nofiles_vec = { 2, 3, 4, 5, 6, 9, 13 };
 
-    for (const auto& zc : zc_all_vec) {
+    for (const size_t& zc : zc_all_vec) {
+        if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
+            fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
+            continue;
+        }
+
         const bool no_files = std::find(std::begin(zc_nofiles_vec),
                                   std::end(zc_nofiles_vec), zc)
             != std::end(zc_nofiles_vec);
 
-        if (zc <= avx2enc::ZC_MAX and !no_files) {
+        if (!no_files) {
+            printf("Running for zc = %zu\n", zc);
             run_test(1 /* base graph */, zc);
             run_test(2 /* base graph */, zc);
         }

@@ -65,21 +65,18 @@ void check_correctness_ul(Config* cfg)
     int UL_PILOT_SYMS = cfg->UL_PILOT_SYMS;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string raw_data_filename = cur_directory
-        + (kUseLDPC ? "/data/LDPC_orig_data_" : "/data/orig_data_")
+    std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_"
         + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
         + std::to_string(cfg->UE_NUM) + ".bin";
-    std::string output_data_filename = cur_directory
-        + (kUseLDPC ? "/data/decode_data.bin" : "/data/demul_data.bin");
+    std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
     raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
     output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
 
-    int num_bytes_per_ue = kUseLDPC
-        ? (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol
-        : OFDM_DATA_NUM;
+    int num_bytes_per_ue
+        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
     printf("num_bytes_per_ue: %d\n", num_bytes_per_ue);
 
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
@@ -98,9 +95,9 @@ void check_correctness_ul(Config* cfg)
                 if (raw_data[i][offset_in_raw]
                     != output_data[i][offset_in_output]) {
                     error_cnt++;
-                    printf("(%d, %d, %u, %u)\n", i, j,
-                        raw_data[i][offset_in_raw],
-                        output_data[i][offset_in_output]);
+                    // printf("(%d, %d, %u, %u)\n", i, j,
+                    //     raw_data[i][offset_in_raw],
+                    //     output_data[i][offset_in_output]);
                 }
             }
         }
@@ -125,8 +122,7 @@ void check_correctness_dl(Config* cfg)
     int sampsPerSymbol = cfg->sampsPerSymbol;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string raw_data_filename = cur_directory
-        + (kUseLDPC ? "/data/LDPC_dl_tx_data_" : "/data/dl_tx_data_")
+    std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant" + std::to_string(BS_ANT_NUM)
         + ".bin";
     std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
@@ -178,24 +174,22 @@ void check_correctness_dl(Config* cfg)
 
 int main(int argc, char* argv[])
 {
-    std::string confFile;
-    if (argc == 2)
-        confFile = std::string("/") + std::string(argv[1]);
-    else
-        confFile = "/data/tddconfig-correctness-test-ul.json";
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
-    auto* cfg = new Config(filename.c_str());
+    std::string confFile
+        = cur_directory + "/data/tddconfig-correctness-test-ul.json";
+    if (argc == 2)
+        confFile = std::string(argv[1]);
+
+    auto* cfg = new Config(confFile.c_str());
     cfg->genData();
-    Millipede* millipede_cli;
 
     int ret;
     try {
         SignalHandler signalHandler;
-
-        // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
-        millipede_cli = new Millipede(cfg);
+        auto* millipede_cli = new Millipede(cfg);
+        millipede_cli->flags.enable_save_decode_data_to_file = true;
+        millipede_cli->flags.enable_save_tx_data_to_file = true;
         millipede_cli->start();
 
         if (cfg->downlink_mode)
