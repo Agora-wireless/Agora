@@ -71,14 +71,8 @@ public:
 
         // Create the various buffers owned by the subcarrier manager.
         // These buffers are shared across all subcarrier doers.
-        //
-        // TODO: Currently, these buffers are created to be huge enough to store
-        // data for *ALL* subcarrier ranges, system-wide. We may want to scale
-        // them down to be sufficient for just a single subcarrier range, but
-        // then we'd need to perform some kind of "gather" operation at the end
-        // before handing them off to the encoder stage. Such a "gather"
-        // operation will be required when
-
+        // TODO: Ideally, workers should allocate space for only their
+        // subcarrier ranges.
         ue_spec_pilot_buffer_.calloc(
             TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
         equal_buffer_.malloc(
@@ -178,30 +172,15 @@ public:
         }
 
         for (size_t i = 0; i < num_events; i++) {
-            mt_queue_t* destination_queue;
-            moodycamel::ProducerToken* ptok;
+            size_t tid = worker_tid_for_subcarrier(base_tag.sc_id);
 
-            if (kDedicatedSubcarrierDoerQueues) {
-                // Enqueue the task onto the queue for the subcarrier doer
-                // that handles the `sc_id` in `base_tag`.
-                sched_info_t& master_to_worker_queue
-                    = subcarrier_doer_for_id(base_tag.sc_id).first;
-                destination_queue = &master_to_worker_queue.concurrent_q;
-                ptok = master_to_worker_queue.ptok;
-            } else {
-                // Enqueue the task onto the queue for the worker thread
-                // that contains the subcarrier doer that handles the `sc_id`.
-                size_t tid = worker_tid_for_subcarrier(base_tag.sc_id);
-                destination_queue = &sched_info_arr_[tid].concurrent_q;
-                ptok = sched_info_arr_[tid].ptok;
+            MLPD_TRACE("schedule_subcarriers: event type %zu, base "
+                       "subcarrier ID %u, enqueuing onto worker TID %zu\n",
+                static_cast<size_t>(event_type), base_tag.sc_id, tid);
 
-                MLPD_TRACE("Schedule subcarrier: event type %zu, base "
-                           "subcarrier ID %u, enqueuing onto worker TID %zu\n",
-                    static_cast<size_t>(event_type), base_tag.sc_id, tid);
-            }
-
-            try_enqueue_fallback(
-                destination_queue, ptok, Event_data(event_type, base_tag._tag));
+            try_enqueue_fallback(&sched_info_arr_[tid].concurrent_q,
+                sched_info_arr_[tid].ptok,
+                Event_data(event_type, base_tag._tag));
             base_tag.sc_id += block_size;
         }
     }
