@@ -216,6 +216,15 @@ private:
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
 
+    // The frame ID of the next MAC packet we expect to receive from the MAC
+    // thread
+    size_t expected_frame_id_from_mac_ = 0;
+
+    // num_frames_consumed_[i] is the number of frames on the uplink completely
+    // processed (i.e., including radio transmissing) by the PHY for UE #i
+    size_t num_frames_consumed_[kMaxUEs] = {};
+
+
     /*****************************************************
      * Uplink
      *****************************************************/
