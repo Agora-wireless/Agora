@@ -18,6 +18,17 @@ static inline void try_enqueue_fallback(
     }
 }
 
+/// Enqueue one event to a concurrent queue and print a warning message
+/// if we're short on queue space
+static inline void try_enqueue_fallback(
+    moodycamel::ConcurrentQueue<Event_data>* mc_queue, const Event_data& event)
+{
+    if (!mc_queue->try_enqueue(event)) {
+        printf("Need more memory\n");
+        rt_assert(mc_queue->enqueue(event), "Message enqueue failed");
+    }
+}
+
 /// Enqueue a batch of events to a concurrent queue and print a warning message
 /// if we're short on queue space
 static inline void try_enqueue_bulk_fallback(

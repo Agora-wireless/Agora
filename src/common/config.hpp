@@ -118,7 +118,6 @@ public:
     size_t core_offset;
     size_t worker_thread_num;
     size_t socket_thread_num;
-    size_t mac_socket_thread_num;
     size_t fft_thread_num;
     size_t demul_thread_num;
     size_t decode_thread_num;
@@ -302,6 +301,12 @@ public:
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
+    }
+
+    // Return the frame duration in seconds
+    inline double get_frame_duration_sec()
+    {
+        return symbol_num_perframe * sampsPerSymbol / rate;
     }
 
     Config(std::string);
