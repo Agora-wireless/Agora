@@ -178,16 +178,14 @@ public:
     size_t mac_packets_perframe;
     bool ip_bridge_enable;
 
-    // IP address at Millipde side
-    std::string rx_addr;
-    // IP address at sender side
-    std::string tx_addr;
+    std::string server_addr; // IP address of the Millipede server
+    std::string sender_addr; // IP address of the simulator sender
     std::string tx_addr_to_mac;
     // Port ID at Millipede side
     int bs_port;
-    // Port IDs at sender side
-    int ue_rx_port;
-    int ue_tx_port;
+    int ue_rx_port; // UDP port used by UEs to receive data
+    int ue_tx_port; // UDP port used by UEs to transmit data
+
     // Port ID at MAC layer side
     int mac_rx_port;
     int mac_tx_port;
@@ -199,6 +197,8 @@ public:
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;
+
+    bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

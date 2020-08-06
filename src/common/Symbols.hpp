@@ -118,7 +118,6 @@ static constexpr bool kUseArgos = true;
 static constexpr bool kUseArgos = false;
 #endif
 
-static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 
@@ -192,11 +191,11 @@ struct LDPCconfig {
     bool earlyTermination;
     int16_t decoderIter;
     uint16_t Zc;
-    int nRows;
+    size_t nRows;
     uint32_t cbEncLen;
     uint32_t cbLen;
     uint32_t cbCodewLen;
-    int nblocksInSymbol;
+    size_t nblocksInSymbol;
 };
 
 typedef struct LDPCconfig LDPCconfig;
@@ -233,10 +232,10 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
-#if defined USE_LDPC || defined USE_LDPC_SENDER
-static constexpr bool kUseLDPC = true;
+#ifdef USE_AVX2_ENCODER
+static constexpr bool kUseAVX2Encoder = true;
 #else
-static constexpr bool kUseLDPC = false;
+static constexpr bool kUseAVX2Encoder = false;
 #endif
 
 // Enable debugging for sender and receiver applications

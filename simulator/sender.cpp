@@ -4,6 +4,7 @@
  *
  */
 #include "sender.hpp"
+#include "datatype_conversion.h"
 #include <thread>
 
 bool keep_running = true;
@@ -31,7 +32,8 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
 }
 
 Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
-    bool enable_slow_start, bool create_thread_for_master)
+    bool enable_slow_start, std::string server_mac_addr_str,
+    bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -46,6 +48,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
+    _unused(server_mac_addr_str);
     rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -54,7 +57,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     tx_buffers_.calloc(
         SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM,
-        kTXBufOffset + cfg->packet_length, 64);
+        cfg->packet_length, 64);
     init_IQ_from_file();
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
@@ -72,24 +75,48 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
             thread_num, thread_num + 1);
 
+#ifdef USE_DPDK
+    DpdkTransport::dpdk_init(core_offset, thread_num);
+
+    mbuf_pool = DpdkTransport::create_mempool();
+
+    uint16_t portid = 0;
+
+    if (DpdkTransport::nic_init(portid, mbuf_pool, thread_num) != 0)
+        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+
+    // Parse IP addresses and MAC addresses
+    int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    rt_assert(ret == 1, "Invalid sender IP address");
+    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    rt_assert(ret == 1, "Invalid server IP address");
+
+    ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
+    rt_assert(parsed_mac != NULL, "Invalid server mac address");
+    memcpy(&server_mac_addr, parsed_mac, sizeof(ether_addr));
+
+    ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
+    rt_assert(ret == 0, "Cannot get MAC address of the port");
+
+    printf("Number of DPDK cores: %d\n", rte_lcore_count());
+#else
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
             setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->bs_port + i, cfg->rx_addr.c_str());
+                &servaddr_ipv4[i], cfg->bs_port + i, cfg->server_addr.c_str());
         } else {
             socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
             setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
                 "fe80::f436:d735:b04a:864a");
         }
 
-        if (!kUseDPDK && kConnectUDP) {
-            int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
-                sizeof(servaddr_ipv4[i]));
-            rt_assert(ret == 0, "UDP socket connect failed");
-            printf("UDP socket %zu connected\n", i);
-        }
+        int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
+            sizeof(servaddr_ipv4[i]));
+        rt_assert(ret == 0, "UDP socket connect failed");
+        printf("UDP socket %zu connected\n", i);
     }
+#endif
     num_threads_ready_atomic = 0;
 }
 
@@ -108,7 +135,6 @@ void Sender::startTX()
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
 
-    // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
     master_thread(0); // Start the master thread
@@ -119,12 +145,11 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
-    // Create worker threads
     create_threads(
         pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
 }
 
-void* Sender::master_thread(int tid)
+void* Sender::master_thread(int)
 {
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
@@ -191,12 +216,12 @@ void* Sender::master_thread(int tid)
                 next_frame_id = ctag.frame_id + 1;
                 if (next_frame_id == cfg->frames_to_test)
                     break;
-                frame_end[ctag.frame_id] = get_time();
+                frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
 
                 delay_for_frame(ctag.frame_id, tick_start);
                 tick_start = rdtsc();
-                frame_start[next_frame_id] = get_time();
+                frame_start[next_frame_id % kNumStatsFrames] = get_time();
             } else {
                 next_frame_id = ctag.frame_id;
             }
@@ -217,7 +242,7 @@ void* Sender::master_thread(int tid)
     exit(0);
 }
 
-void* Sender::data_update_thread(int tid)
+void* Sender::data_update_thread(int)
 {
     // Sender get better performance when this thread is not pinned to core
     // pin_to_core_with_offset(ThreadType::kWorker, 13, 0);
@@ -237,8 +262,7 @@ void* Sender::data_update_thread(int tid)
 
 void Sender::update_tx_buffer(gen_tag_t tag)
 {
-    auto* pkt
-        = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)] + kTXBufOffset);
+    auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
     pkt->frame_id = tag.frame_id;
     pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
     pkt->cell_id = 0;
@@ -259,7 +283,15 @@ void* Sender::worker_thread(int tid)
         // Wait
     }
 
-    const size_t buffer_length = kTXBufOffset + cfg->packet_length;
+    auto fft_inout = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+    DftiCommitDescriptor(mkl_handle);
+
+    const size_t buffer_length = cfg->packet_length;
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
@@ -272,29 +304,52 @@ void* Sender::worker_thread(int tid)
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
     int radio_id = radio_lo;
     while (true) {
-        size_t tag;
+        size_t tag = 0;
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag))
             continue;
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
-        // Send a message to the server. We assume that the server is running.
-        if (kUseDPDK or !kConnectUDP) {
-            int ret = sendto(socket_[radio_id], tx_buffers_[tx_bufs_idx],
-                buffer_length, 0, (struct sockaddr*)&servaddr_ipv4[tid],
-                sizeof(servaddr_ipv4[tid]));
-            rt_assert(ret >= 0, "Worker: sendto() failed");
+#ifdef USE_DPDK
+        rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
+        tx_bufs[0]
+            = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
+                server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
+                cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
+        auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
+            + kPayloadOffset;
+
+        if (cfg->fft_in_rru) {
+            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
+                fft_inout, mkl_handle, payload);
         } else {
-            int ret = send(
-                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
-            if (ret < 0) {
-                fprintf(stderr,
-                    "send() failed. Error = %s. Is a server running at %s?\n",
-                    strerror(errno), cfg->rx_addr.c_str());
-                exit(-1);
-            }
+            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
         }
 
+        // Send a message to the server. We assume that the server is running.
+        size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+        rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
+#else
+        // Send a message to the server. We assume that the server is running.
+        int ret;
+        char* payload;
+        if (cfg->fft_in_rru) {
+            payload = reinterpret_cast<char*>(malloc(buffer_length));
+            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
+                fft_inout, mkl_handle, payload);
+        }
+
+        // Use the correct send function based on whether Millipede uses DPDK
+        // and whether uses fft in sender
+        if (cfg->fft_in_rru) {
+            ret = send(socket_[radio_id], payload, buffer_length, 0);
+            free(payload);
+        } else {
+            ret = send(
+                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
+        }
+        rt_assert(ret >= 0, "Worker: sendto() failed");
+#endif
         if (kDebugSenderReceiver) {
             auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
             printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
@@ -343,14 +398,8 @@ void Sender::init_IQ_from_file()
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 
-    std::string filename;
-    if (kUseLDPC) {
-        filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
-            + std::to_string(cfg->BS_ANT_NUM) + ".bin";
-    } else {
-        filename = cur_directory + "/data/rx_data_2048_ant"
-            + std::to_string(cfg->BS_ANT_NUM) + ".bin";
-    }
+    std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
+        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
@@ -420,12 +469,27 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 
 void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
-    printf("Printing sender results to file...\n");
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
+    printf("Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
-        fprintf(fp_debug, "%.5f\n", frame_end[i]);
+        fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
     }
+}
+
+void Sender::run_fft(const Packet* pkt, complex_float* fft_inout,
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const
+{
+    simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+    DftiComputeForward(mkl_handle,
+        reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+
+    memcpy(payload, pkt, Packet::kOffsetOfData);
+    simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
+        reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
+        cfg->OFDM_CA_NUM * 2);
 }

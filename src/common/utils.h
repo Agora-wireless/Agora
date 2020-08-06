@@ -12,6 +12,7 @@
 #define UTILS_HEADER
 
 #define UNUSED __attribute__((unused))
+#define _unused(x) ((void)(x))
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
