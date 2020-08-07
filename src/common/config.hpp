@@ -195,6 +195,8 @@ public:
     /* LDPC parameters */
     LDPCconfig LDPC_config;
 
+    bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

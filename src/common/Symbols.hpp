@@ -118,7 +118,6 @@ static constexpr bool kUseArgos = true;
 static constexpr bool kUseArgos = false;
 #endif
 
-static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 
