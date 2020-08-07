@@ -40,6 +40,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     udp_pkt_buf_.resize(udp_pkt_len);
 
     udp_server = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_client = new UDPClient();
 
     crc_obj = new DoCRC();
 }
