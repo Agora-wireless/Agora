@@ -326,9 +326,9 @@ void* Sender::worker_thread(int tid)
 #else
         // Send a message to the server. We assume that the server is running.
         int ret;
-        char* payload;
+        uint8_t* payload;
         if (cfg->fft_in_rru) {
-            payload = reinterpret_cast<char*>(malloc(buffer_length));
+            payload = reinterpret_cast<uint8_t*>(malloc(buffer_length));
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
         }
@@ -474,7 +474,7 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 }
 
 void Sender::run_fft(const Packet* pkt, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, uint8_t* payload) const
 {
     simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);

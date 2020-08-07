@@ -80,7 +80,7 @@ private:
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
     void run_fft(const Packet* pkt, complex_float* fft_inout,
-        DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const;
+        DFTI_DESCRIPTOR_HANDLE mkl_handle, uint8_t* payload) const;
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
@@ -100,9 +100,6 @@ private:
     const uint64_t ticks_500;
 
     sockaddr_in servaddr_ipv4[kMaxNumSockets]; // Server address for IPv4
-    sockaddr_in cliaddr_ipv4; // Client address for IPv4
-    sockaddr_in6 servaddr_ipv6[kMaxNumSockets]; // Server address for IPv6
-    sockaddr_in6 cliaddr_ipv6; // Client address for IPv6
     int socket_[kMaxNumSockets]; // Network sockets
 
     // First dimension:
