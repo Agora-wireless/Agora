@@ -48,6 +48,8 @@ flags = [
     '-I' + str(home_dir) + '/Millipede/src/mac',
     '-I' + str(home_dir) + '/Millipede/src/encoder',
     '-I' + str(home_dir) + '/Millipede/src/millipede/txrx',
+    '-isystem' + '/usr/include/dpdk',
+    '-isystem' + '/usr/local/include/dpdk',
     '-Wall',
     '-Wsign-compare',
     '-std=c++11',
