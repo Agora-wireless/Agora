@@ -104,11 +104,7 @@ private:
     moodycamel::ProducerToken** rx_ptoks_;
     moodycamel::ProducerToken** tx_ptoks_;
 
-#if USE_IPV4
     std::vector<struct sockaddr_in> servaddr_; /* server address */
-#else
-    std::vector<struct sockaddr_in6> servaddr_; /* server address */
-#endif
     std::vector<int> socket_;
 
 #ifdef USE_DPDK

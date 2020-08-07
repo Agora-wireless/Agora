@@ -93,13 +93,6 @@ enum class PrintType : int {
 static constexpr size_t kEnableThreadPinning = true;
 
 #define BIGSTATION 0
-#define USE_IPV4 1
-#if USE_IPV4
-static constexpr bool kUseIPv4 = true;
-#else
-static constexpr bool kUseIPv4 = false;
-#endif
-
 #ifdef USE_DPDK
 static constexpr bool kUseDPDK = true;
 #else
