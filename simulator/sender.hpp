@@ -6,29 +6,6 @@
 #ifndef SENDER
 #define SENDER
 
-#include <arpa/inet.h>
-#include <iostream>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <vector>
-// #include <ctime>
-#include <algorithm>
-#include <boost/align/aligned_allocator.hpp>
-#include <chrono>
-#include <emmintrin.h>
-#include <immintrin.h>
-#include <malloc.h>
-#include <numeric>
-#include <pthread.h>
-#include <signal.h>
-#include <thread>
-#include <time.h>
-#include <unistd.h>
-
 #include "Symbols.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
@@ -37,6 +14,26 @@
 #include "mkl_dfti.h"
 #include "net.hpp"
 #include "utils.h"
+#include <algorithm>
+#include <arpa/inet.h>
+#include <boost/align/aligned_allocator.hpp>
+#include <chrono>
+#include <emmintrin.h>
+#include <immintrin.h>
+#include <iostream>
+#include <malloc.h>
+#include <numeric>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <thread>
+#include <time.h>
+#include <unistd.h>
+#include <vector>
 
 #ifdef USE_DPDK
 #include "dpdk_transport.hpp"
@@ -44,8 +41,6 @@
 #endif
 
 class Sender {
-public:
-    static constexpr size_t kMaxNumSockets = 128; // Max network sockets
 
 public:
     Sender(Config* config, size_t thread_num, size_t core_offset = 30,
@@ -86,7 +81,6 @@ private:
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t thread_num; // Number of worker threads sending packets
-    const size_t socket_num; // Total network sockets across worker threads
     const bool enable_slow_start; // Send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
@@ -98,9 +92,6 @@ private:
     const uint64_t ticks_100;
     const uint64_t ticks_200;
     const uint64_t ticks_500;
-
-    sockaddr_in servaddr_ipv4[kMaxNumSockets]; // Server address for IPv4
-    int socket_[kMaxNumSockets]; // Network sockets
 
     // First dimension:
     //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM

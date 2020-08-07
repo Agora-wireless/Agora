@@ -5,6 +5,7 @@
  */
 #include "sender.hpp"
 #include "datatype_conversion.h"
+#include "udp_client.h"
 #include <thread>
 
 bool keep_running = true;
@@ -38,7 +39,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
     , thread_num(thread_num)
-    , socket_num(cfg->nRadios)
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
     , delay(delay)
@@ -49,7 +49,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
     _unused(server_mac_addr_str);
-    rt_assert(socket_num <= kMaxNumSockets, "Too many network sockets");
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
     }
@@ -99,17 +98,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     rt_assert(ret == 0, "Cannot get MAC address of the port");
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
-#else
-    for (size_t i = 0; i < socket_num; i++) {
-        socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
-        setup_sockaddr_remote_ipv4(
-            &servaddr_ipv4[i], cfg->bs_port + i, cfg->server_addr.c_str());
-
-        int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
-            sizeof(servaddr_ipv4[i]));
-        rt_assert(ret == 0, "UDP socket connect failed");
-        printf("UDP socket %zu connected\n", i);
-    }
 #endif
     num_threads_ready_atomic = 0;
 }
@@ -269,6 +257,7 @@ void Sender::update_tx_buffer(gen_tag_t tag)
 
 void* Sender::worker_thread(int tid)
 {
+    UDPClient udp_client;
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
     // Wait for all Sender threads (including master) to start runnung
@@ -306,11 +295,10 @@ void* Sender::worker_thread(int tid)
         size_t start_tsc_send = rdtsc();
 #ifdef USE_DPDK
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
-        tx_bufs[0]
-            = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
-                server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
-                cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
-        auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
+        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
+            server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
+            cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
+        auto* payload = (uint8_t*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
         if (cfg->fft_in_rru) {
@@ -325,24 +313,19 @@ void* Sender::worker_thread(int tid)
         rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
 #else
         // Send a message to the server. We assume that the server is running.
-        int ret;
-        uint8_t* payload;
         if (cfg->fft_in_rru) {
-            payload = reinterpret_cast<uint8_t*>(malloc(buffer_length));
+            uint8_t* payload
+                = reinterpret_cast<uint8_t*>(malloc(buffer_length));
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
-        }
-
-        // Use the correct send function based on whether Millipede uses DPDK
-        // and whether uses fft in sender
-        if (cfg->fft_in_rru) {
-            ret = send(socket_[radio_id], payload, buffer_length, 0);
+            udp_client.send(cfg->server_addr, cfg->bs_port + radio_id, payload,
+                buffer_length);
             free(payload);
         } else {
-            ret = send(
-                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
+            udp_client.send(cfg->server_addr, cfg->bs_port + radio_id,
+                reinterpret_cast<uint8_t*>(tx_buffers_[tx_bufs_idx]),
+                buffer_length);
         }
-        rt_assert(ret >= 0, "Worker: sendto() failed");
 #endif
         if (kDebugSenderReceiver) {
             auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
