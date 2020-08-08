@@ -108,8 +108,7 @@ private:
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
-    Table<float> IQ_data;
-    Table<ushort> IQ_data_coded;
+    Table<ushort> iq_data_short_;
 
     // Number of packets transmitted for each symbol in a frame
     size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
