@@ -104,8 +104,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
 Sender::~Sender()
 {
-    IQ_data_coded.free();
-    IQ_data.free();
+    iq_data_short_.free();
     tx_buffers_.free();
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         free(packet_count_per_symbol[i]);
@@ -251,7 +250,7 @@ void Sender::update_tx_buffer(gen_tag_t tag)
     pkt->ant_id = tag.ant_id;
 
     size_t data_index = (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
-    memcpy(pkt->data, (char*)IQ_data_coded[data_index],
+    memcpy(pkt->data, (char*)iq_data_short_[data_index],
         cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 }
 
@@ -370,8 +369,10 @@ size_t Sender::get_max_symbol_id() const
 void Sender::init_IQ_from_file()
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
-    IQ_data.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
-    IQ_data_coded.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
+    iq_data_short_.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
+
+    Table<float> iq_data_float;
+    iq_data_float.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
 
@@ -382,9 +383,9 @@ void Sender::init_IQ_from_file()
     rt_assert(fp != nullptr, "Failed to open IQ data file");
 
     for (size_t i = 0; i < packets_per_frame; i++) {
-        size_t expect_bytes = cfg->OFDM_FRAME_LEN * 2;
-        size_t actual_bytes
-            = fread(IQ_data[i], sizeof(float), expect_bytes, fp);
+        const size_t expect_bytes = cfg->OFDM_FRAME_LEN * 2;
+        const size_t actual_bytes
+            = fread(iq_data_float[i], sizeof(float), expect_bytes, fp);
         if (expect_bytes != actual_bytes) {
             printf("read file failed: %s\n", filename.c_str());
             printf("i: %zu, expected: %zu, actual: %zu\n", i, expect_bytes,
@@ -392,12 +393,12 @@ void Sender::init_IQ_from_file()
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
         for (size_t j = 0; j < cfg->OFDM_FRAME_LEN * 2; j++) {
-            IQ_data_coded[i][j] = (unsigned short)(IQ_data[i][j] * 32768);
-            // printf("i:%d, j:%d, Coded: %d, orignal:
-            // %.4f\n",i,j/2,IQ_data_coded[i][j],IQ_data[i][j]);
+            iq_data_short_[i][j]
+                = (unsigned short)(iq_data_float[i][j] * 32768);
         }
     }
     fclose(fp);
+    iq_data_float.free();
 }
 
 void Sender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
