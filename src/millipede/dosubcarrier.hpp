@@ -11,6 +11,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "datatype_conversion.h"
 #include "dodemul.hpp"
 #include "doer.hpp"
 #include "doprecode.hpp"
@@ -81,6 +82,7 @@ public:
         /// The range of subcarriers handled by this subcarrier doer.
         struct Range subcarrier_range,
         // input buffers
+        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
         Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
         Table<complex_float>& data_buffer,
@@ -93,6 +95,8 @@ public:
         : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
               worker_producer_token)
         , subcarrier_range_(subcarrier_range)
+        , socket_buffer_(socket_buffer)
+        , socket_buffer_status_(socket_buffer_status)
         , csi_buffer_(csi_buffer)
         , recip_buffer_(recip_buffer)
         , calib_buffer_(calib_buffer)
@@ -144,6 +148,9 @@ public:
                 + std::to_string((int)event_type));
 
         switch (event_type) {
+        case EventType::kCSI: {
+            return run_csi(tag);
+        } break;
         case EventType::kZF: {
             return computeZF_->launch(tag, event_type);
         } break;
@@ -175,6 +182,136 @@ public:
     Range& subcarrier_range() { return subcarrier_range_; }
 
 private:
+    static inline __m256 __m256_complex_cf32_mult(
+        __m256 data1, __m256 data2, bool conj)
+    {
+        __m256 prod0 __attribute__((aligned(32)));
+        __m256 prod1 __attribute__((aligned(32)));
+        __m256 res __attribute__((aligned(32)));
+
+        // https://stackoverflow.com/questions/39509746
+        const __m256 neg0
+            = _mm256_setr_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+        const __m256 neg1
+            = _mm256_set_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+        prod0 = _mm256_mul_ps(data1, data2); // q1*q2, i1*i2, ...
+
+        /* Step 2: Negate the imaginary elements of vec2 */
+        data2 = _mm256_mul_ps(data2, conj ? neg0 : neg1);
+
+        /* Step 3: Switch the real and imaginary elements of vec2 */
+        data2 = _mm256_permute_ps(data2, 0xb1);
+
+        /* Step 4: Multiply vec1 and the modified vec2 */
+        prod1 = _mm256_mul_ps(data1, data2); // i2*q1, -i1*q2, ...
+
+        /* Horizontally add the elements in vec3 and vec4 */
+        res = conj
+            ? _mm256_hadd_ps(prod0, prod1)
+            : _mm256_hsub_ps(prod0, prod1); // i2*q1+-i1*q2, i1*i2+-q1*q2, ...
+        res = _mm256_permute_ps(res, 0xd8);
+
+        return res;
+    }
+
+    Event_data run_csi(size_t tag)
+    {
+        const size_t frame_id = gen_tag_t(tag).frame_id;
+        const size_t base_sc_id = gen_tag_t(tag).sc_id;
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+
+        for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
+            for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+                Packet* pkt; // TODO: find out the packet
+                // Subcarrier ranges should be aligned with kTransposeBlockSize
+                size_t block_idx_start
+                    = subcarrier_range_.start / kTransposeBlockSize;
+                size_t block_idx_end
+                    = subcarrier_range_.end / kTransposeBlockSize;
+                for (size_t block_idx = block_idx_start;
+                     block_idx < block_idx_end; block_idx++) {
+                    const size_t block_base_offset
+                        = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+
+                    for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
+                         sc_j += kSCsPerCacheline) {
+                        const size_t sc_idx
+                            = (block_idx * kTransposeBlockSize) + sc_j;
+                        const complex_float*
+                            src; // TODO: find src pointer from pkt
+
+                        complex_float* dst
+                            = cfg->get_csi_mat(csi_buffer_, frame_id, i);
+                        dst = &dst[block_base_offset + (j * kTransposeBlockSize)
+                            + sc_j];
+
+                        // With either of AVX-512 or AVX2, load one cacheline =
+                        // 16 float values = 8 subcarriers = kSCsPerCacheline
+
+#if 0
+                        // AVX-512. Disabled for now because we don't have a working
+                        // complex multiply for __m512 type.
+                        __m512 fft_result
+                            = _mm512_load_ps(reinterpret_cast<const float*>(src));
+                        if (symbol_type == SymbolType::kPilot) {
+                            __m512 pilot_tx = _mm512_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
+                                cfg->pilots_sgn_[sc_idx + 7].re,
+                                cfg->pilots_sgn_[sc_idx + 6].im,
+                                cfg->pilots_sgn_[sc_idx + 6].re,
+                                cfg->pilots_sgn_[sc_idx + 5].im,
+                                cfg->pilots_sgn_[sc_idx + 5].re,
+                                cfg->pilots_sgn_[sc_idx + 4].im,
+                                cfg->pilots_sgn_[sc_idx + 4].re,
+                                cfg->pilots_sgn_[sc_idx + 3].im,
+                                cfg->pilots_sgn_[sc_idx + 3].re,
+                                cfg->pilots_sgn_[sc_idx + 2].im,
+                                cfg->pilots_sgn_[sc_idx + 2].re,
+                                cfg->pilots_sgn_[sc_idx + 1].im,
+                                cfg->pilots_sgn_[sc_idx + 1].re,
+                                cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                            fft_result = _mm512_mul_ps(fft_result, pilot_tx);
+                        }
+                        _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
+#else
+                        __m256 fft_result0 = _mm256_load_ps(
+                            reinterpret_cast<const float*>(src));
+                        __m256 fft_result1 = _mm256_load_ps(
+                            reinterpret_cast<const float*>(src + 4));
+                        __m256 pilot_tx0
+                            = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 3].im,
+                                cfg->pilots_sgn_[sc_idx + 3].re,
+                                cfg->pilots_sgn_[sc_idx + 2].im,
+                                cfg->pilots_sgn_[sc_idx + 2].re,
+                                cfg->pilots_sgn_[sc_idx + 1].im,
+                                cfg->pilots_sgn_[sc_idx + 1].re,
+                                cfg->pilots_sgn_[sc_idx].im,
+                                cfg->pilots_sgn_[sc_idx].re);
+                        fft_result0 = __m256_complex_cf32_mult(
+                            fft_result0, pilot_tx0, true);
+
+                        __m256 pilot_tx1
+                            = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
+                                cfg->pilots_sgn_[sc_idx + 7].re,
+                                cfg->pilots_sgn_[sc_idx + 6].im,
+                                cfg->pilots_sgn_[sc_idx + 6].re,
+                                cfg->pilots_sgn_[sc_idx + 5].im,
+                                cfg->pilots_sgn_[sc_idx + 5].re,
+                                cfg->pilots_sgn_[sc_idx + 4].im,
+                                cfg->pilots_sgn_[sc_idx + 4].re);
+                        fft_result1 = __m256_complex_cf32_mult(
+                            fft_result1, pilot_tx1, true);
+                        _mm256_stream_ps(
+                            reinterpret_cast<float*>(dst), fft_result0);
+                        _mm256_stream_ps(
+                            reinterpret_cast<float*>(dst + 4), fft_result1);
+#endif
+                    }
+                }
+            }
+        }
+        return Event_data(EventType::kCSI, tag);
+    }
+
     /// The subcarrier range handled by this subcarrier doer.
     struct Range subcarrier_range_;
 
@@ -189,6 +326,8 @@ private:
 
     // Input buffers
 
+    Table<char>& socket_buffer_;
+    Table<int>& socket_buffer_status_;
     Table<complex_float>& csi_buffer_;
     Table<complex_float>& recip_buffer_;
     Table<complex_float>& calib_buffer_;

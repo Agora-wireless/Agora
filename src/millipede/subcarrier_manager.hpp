@@ -45,6 +45,7 @@ public:
         sched_info_t (&sched_info_arr)[kMaxThreads],
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         // input buffers
+        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
         Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
         Table<complex_float>& data_buffer,
@@ -58,6 +59,8 @@ public:
         , sched_info_arr_(sched_info_arr)
         , complete_task_queue_(complete_task_queue)
         , subcarrier_block_size_(lcm(cfg->demul_block_size, cfg->zf_block_size))
+        , socket_buffer_(socket_buffer)
+        , socket_buffer_status_(socket_buffer_status)
         , csi_buffer_(csi_buffer)
         , recip_buffer_(recip_buffer)
         , calib_buffer_(calib_buffer)
@@ -158,6 +161,11 @@ public:
         size_t block_size = SIZE_MAX;
 
         switch (event_type) {
+        case EventType::kCSI:
+            // TODO: should be modified, just one event per worker
+            num_events = cfg->worker_thread_num;
+            block_size = cfg->OFDM_DATA_NUM / num_events;
+            break;
         case EventType::kDemul:
         case EventType::kPrecode:
             num_events = cfg->demul_events_per_symbol;
@@ -223,8 +231,9 @@ public:
             = subcarrier_doers_[dest_index];
         auto computeSubcarrier = new DoSubcarrier(cfg, worker_tid, freq_ghz_,
             inserted_sched.first.concurrent_q, complete_task_queue_,
-            worker_producer_token, sc_range, csi_buffer_, recip_buffer_,
-            calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
+            worker_producer_token, sc_range, socket_buffer_,
+            socket_buffer_status_, csi_buffer_, recip_buffer_, calib_buffer_,
+            dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
             dl_ifft_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
             ul_zf_buffer_, dl_zf_buffer_, phy_stats_, stats_);
         inserted_sched.second = computeSubcarrier;
@@ -329,6 +338,10 @@ private:
     ///////////////////////////////////////////////////
     ////////////////// Input Buffers //////////////////
     ///////////////////////////////////////////////////
+
+    // TODO: comments
+    Table<char>& socket_buffer_;
+    Table<int>& socket_buffer_status_;
 
     /// An input buffer of channel state information (CSI),
     /// an output of the FFT stage.

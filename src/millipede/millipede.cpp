@@ -59,9 +59,10 @@ Millipede::Millipede(Config* cfg)
     // since the worker threads will use information from the subcarrier manager
     // to determine which subcarrier doers each worker thread should use/create.
     subcarrier_manager_ = new SubcarrierManager(this->config_, freq_ghz,
-        sched_info_arr, complete_task_queue_, csi_buffer_, recip_buffer_,
-        calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
-        dl_ifft_buffer_, phy_stats, stats);
+        sched_info_arr, complete_task_queue_, socket_buffer_,
+        socket_buffer_status_, csi_buffer_, recip_buffer_, calib_buffer_,
+        dl_encoded_buffer_, data_buffer_, demod_soft_buffer_, dl_ifft_buffer_,
+        phy_stats, stats);
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
@@ -247,6 +248,11 @@ void Millipede::start()
                         << "slowly, e.g., in debug mode\n";
                     cfg->running = false;
                     break;
+                } else if (pkt->frame_id < cur_frame_id) {
+                    std::cout << "Error: Received packet for a frame that has "
+                                 "been processed\n";
+                    cfg->running = false;
+                    break;
                 }
 
                 update_rx_counters(pkt->frame_id, pkt->symbol_id);
@@ -259,8 +265,13 @@ void Millipede::start()
                     }
                 }
 
-                fft_queue_arr[pkt->frame_id % TASK_BUFFER_FRAME_NUM].push(
-                    fft_req_tag_t(event.tags[0]));
+                // fft_queue_arr[pkt->frame_id % TASK_BUFFER_FRAME_NUM].push(
+                // fft_req_tag_t(event.tags[0]));
+                if (received_all_pilots(pkt->frame_id)) {
+                    // TODO: schedule sc for csi
+                    subcarrier_manager_->schedule_subcarriers(
+                        EventType::kCSI, pkt->frame_id, pkt->symbol_id);
+                }
             } break;
 
             case EventType::kFFT: {
@@ -268,6 +279,13 @@ void Millipede::start()
                     handle_event_fft(event.tags[i]);
                 }
             } break;
+
+            case EventType::kCSI: {
+                size_t frame_id = event.tags[0];
+                // TODO: add stats updates and reports
+                subcarrier_manager_->schedule_subcarriers(
+                    EventType::kZF, frame_id, 0);
+            }
 
             case EventType::kRC: {
                 size_t frame_id = event.tags[0];
@@ -776,6 +794,17 @@ void Millipede::create_threads(
     }
 }
 
+bool Millipede::received_all_pilots(size_t frame_id)
+{
+    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    if (rx_counters_.num_pilot_pkts[frame_slot]
+        == rx_counters_.num_pilot_pkts_per_frame) {
+        rx_counters_.num_pilot_pkts[frame_slot] = 0;
+        return true;
+    }
+    return false;
+}
+
 void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
 {
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
@@ -783,7 +812,7 @@ void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
         rx_counters_.num_pilot_pkts[frame_slot]++;
         if (rx_counters_.num_pilot_pkts[frame_slot]
             == rx_counters_.num_pilot_pkts_per_frame) {
-            rx_counters_.num_pilot_pkts[frame_slot] = 0;
+            // rx_counters_.num_pilot_pkts[frame_slot] = 0;
             stats->master_set_tsc(TsType::kPilotAllRX, frame_id);
             print_per_frame_done(PrintType::kPacketRXPilots, frame_id);
         }

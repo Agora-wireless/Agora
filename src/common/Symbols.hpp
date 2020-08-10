@@ -37,6 +37,7 @@ template <typename T> static constexpr inline bool is_power_of_two(T x)
 enum class EventType : int {
     kPacketRX,
     kFFT,
+    kCSI,
     kZF,
     kDemul,
     kIFFT,
