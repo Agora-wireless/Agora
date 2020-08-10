@@ -137,8 +137,8 @@ inline size_t lcm(size_t a, size_t b) { return (a * b) / gcd(a, b); }
 
 /// A range type with an inclusive start bound and an exclusive end bound.
 struct Range {
-    const size_t start; // Inclusive
-    const size_t end; // Exclusive
+    const size_t start;
+    const size_t end;
 
     /// Create a new Range with the given `start` and `end` values.
     /// `end` must be greater than or equal to `start`.
