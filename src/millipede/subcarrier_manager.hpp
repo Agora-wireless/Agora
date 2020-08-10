@@ -277,8 +277,8 @@ public:
         return cfg->OFDM_DATA_NUM / subcarrier_block_size_;
     }
 
-    /// Return the internal equalization buffer. This is useful for debugging or
-    /// GUI
+    /// Return the internal equalization buffer.
+    /// This is useful for debugging or GUI display.
     Table<complex_float>& get_equal_buffer() { return equal_buffer_; }
 
 private:
@@ -292,8 +292,8 @@ private:
     sched_info_t (&sched_info_arr_)[kMaxThreads];
 
     /// The singleton task completion queue.
-    /// Push events onto this queue to inform Millipede's master thread that a
-    /// given task has been completed.
+    /// Push events onto this queue to inform Millipede's master thread
+    /// that a given task has been completed.
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue_;
 
     /// The range of subcarrier frequencies handled by each subcarrier doer.

@@ -201,8 +201,8 @@ struct Event_data {
 };
 static_assert(sizeof(Event_data) == 64, "");
 
-// A struct pair containing a concurrent event queue and a pointer to that
-// queue's producer token.
+/// A struct pair containing a concurrent event queue 
+/// and a pointer to that queue's producer token.
 struct sched_info_t {
     moodycamel::ConcurrentQueue<Event_data> concurrent_q;
     moodycamel::ProducerToken* ptok;
