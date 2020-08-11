@@ -234,10 +234,10 @@ struct MacPacket {
     uint16_t frame_id;
     uint16_t symbol_id;
     uint16_t ue_id;
-    uint16_t datalen;
-    uint16_t crc;
-    uint16_t rsvd[3];
-    char data[];
+    uint16_t datalen; // length of payload in bytes or array data[]
+    uint16_t crc; // 16 bits CRC over calculated for the data[] array
+    uint16_t rsvd[3]; // reserved for future use
+    char data[]; // Mac packet payload data
     MacPacket(int f, int s, int u, int d,
         int cc) // TODO: Should be unsigned integers
         : frame_id(f)
