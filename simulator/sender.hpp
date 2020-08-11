@@ -59,7 +59,11 @@ private:
     void* master_thread(int tid);
     void* data_update_thread(int tid);
     void* worker_thread(int tid);
-    void init_IQ_from_file();
+
+    /// Read 32-bit floating-point IQ samples from filename and populate
+    /// iq_data_short_ by converting to 16-bit fixed-point samples
+    void init_iq_from_file(std::string filename);
+
     size_t get_max_symbol_id() const;
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
@@ -108,7 +112,7 @@ private:
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
-    Table<ushort> iq_data_short_;
+    Table<unsigned short> iq_data_short_;
 
     // Number of packets transmitted for each symbol in a frame
     size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
