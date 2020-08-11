@@ -25,11 +25,12 @@ void delay_ticks(uint64_t start, uint64_t ticks)
         _mm_pause();
 }
 
-inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
+inline size_t Sender::get_idx_in_tx_buffers(
+    size_t frame_id, size_t symbol_idx, size_t ant_id) const
 {
-    const size_t frame_slot = tag.frame_id % SOCKET_BUFFER_FRAME_NUM;
+    const size_t frame_slot = frame_id % SOCKET_BUFFER_FRAME_NUM;
     return (frame_slot * (get_max_symbol_id() * cfg->BS_ANT_NUM))
-        + (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
+        + (symbol_idx * cfg->BS_ANT_NUM) + ant_id;
 }
 
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
@@ -230,26 +231,26 @@ void* Sender::data_update_thread(int)
     printf("Data update thread running on core %d\n", sched_getcpu());
 
     while (true) {
-        size_t tag = 0;
-        if (!data_update_queue_.try_dequeue(tag))
+        gen_tag_t tag = 0;
+        if (!data_update_queue_.try_dequeue(tag._tag))
             continue;
+
         for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-            auto tag_for_ant = gen_tag_t::frm_sym_ant(
-                ((gen_tag_t)tag).frame_id, ((gen_tag_t)tag).symbol_id, i);
-            update_tx_buffer(tag_for_ant);
+            update_tx_buffer(tag.frame_id, tag.symbol_id, i);
         }
     }
 }
 
-void Sender::update_tx_buffer(gen_tag_t tag)
+void Sender::update_tx_buffer(size_t frame_id, size_t symbol_id, size_t ant_id)
 {
-    auto* pkt = (Packet*)(tx_buffers_[tag_to_tx_buffers_index(tag)]);
-    pkt->frame_id = tag.frame_id;
-    pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
+    auto* pkt = (Packet*)(tx_buffers_[get_idx_in_tx_buffers(
+        frame_id, symbol_id, ant_id)]);
+    pkt->frame_id = frame_id;
+    pkt->symbol_id = cfg->getSymbolId(symbol_id);
     pkt->cell_id = 0;
-    pkt->ant_id = tag.ant_id;
+    pkt->ant_id = ant_id;
 
-    size_t data_index = (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
+    size_t data_index = (symbol_id * cfg->BS_ANT_NUM) + ant_id;
     memcpy(pkt->data, (char*)iq_data_short_[data_index],
         cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 }
@@ -286,10 +287,11 @@ void* Sender::worker_thread(int tid)
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
     int radio_id = radio_lo;
     while (true) {
-        size_t tag = 0;
-        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag))
+        gen_tag_t tag = 0;
+        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
             continue;
-        const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
+        const size_t tx_bufs_idx
+            = get_idx_in_tx_buffers(tag.frame_id, tag.symbol_id, tag.ant_id);
 
         size_t start_tsc_send = rdtsc();
 #ifdef USE_DPDK
@@ -336,7 +338,8 @@ void* Sender::worker_thread(int tid)
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
         }
 
-        rt_assert(completion_queue_.enqueue(tag), "Completion enqueue failed");
+        rt_assert(
+            completion_queue_.enqueue(tag._tag), "Completion enqueue failed");
 
         total_tx_packets_rolling++;
         total_tx_packets++;
