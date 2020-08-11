@@ -57,7 +57,9 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     tx_buffers_.calloc(
         SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM,
         cfg->packet_length, 64);
-    init_IQ_from_file();
+    init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
+        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
+        + ".bin");
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
         64, thread_num * sizeof(moodycamel::ProducerToken*));
@@ -366,18 +368,13 @@ size_t Sender::get_max_symbol_id() const
     return max_symbol_id;
 }
 
-void Sender::init_IQ_from_file()
+void Sender::init_iq_from_file(std::string filename)
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
     iq_data_short_.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
 
     Table<float> iq_data_float;
     iq_data_float.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
-
-    const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-
-    std::string filename = cur_directory + "/data/LDPC_rx_data_2048_ant"
-        + std::to_string(cfg->BS_ANT_NUM) + ".bin";
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
@@ -387,10 +384,12 @@ void Sender::init_IQ_from_file()
         const size_t actual_bytes
             = fread(iq_data_float[i], sizeof(float), expect_bytes, fp);
         if (expect_bytes != actual_bytes) {
-            printf("read file failed: %s\n", filename.c_str());
-            printf("i: %zu, expected: %zu, actual: %zu\n", i, expect_bytes,
-                actual_bytes);
-            std::cerr << "Error: " << strerror(errno) << std::endl;
+            fprintf(stderr,
+                "Sender: Failed to read IQ data file %s. Packet %zu, bytes "
+                "expected %zu, bytes read %zu. errno %s\n",
+                filename.c_str(), i, expect_bytes, actual_bytes,
+                strerror(errno));
+            exit(-1);
         }
         for (size_t j = 0; j < cfg->OFDM_FRAME_LEN * 2; j++) {
             iq_data_short_[i][j]
