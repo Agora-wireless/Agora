@@ -43,10 +43,22 @@
 class Sender {
 
 public:
-    Sender(Config* config, size_t thread_num, size_t core_offset = 30,
+    /**
+   * @brief Create and optionally start a Sender that sends IQ packets to a
+   * server with MAC address [server_mac_addr_str]
+   *
+   * @param config The Millipede config
+   * @param num_worker_threads Number of worker threads sending packets 
+   * @param core_offset
+   * @param delay
+   * @param enable_slow_start
+   * @param server_mac_addr_str
+   */
+    Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
         size_t delay = 0, bool enable_slow_start = true,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
+
     ~Sender();
 
     void startTX();
@@ -84,7 +96,7 @@ private:
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
-    const size_t thread_num; // Number of worker threads sending packets
+    const size_t num_worker_threads_; // Number of worker threads sending pkts
     const bool enable_slow_start; // Send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
