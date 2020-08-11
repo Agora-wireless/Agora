@@ -69,8 +69,8 @@ public:
         }
     }
 
-    UDPServer() {}
     UDPServer& operator=(const UDPServer&) = delete;
+    UDPServer(const UDPServer&) = delete;
 
     ~UDPServer()
     {
