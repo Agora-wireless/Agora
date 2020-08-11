@@ -1,6 +1,8 @@
 #include "phy-ue.hpp"
 #include "utils_ldpc.hpp"
 
+static constexpr bool kDebugPrintPacketsFromMac = false;
+
 Phy_UE::Phy_UE(Config* config)
 {
     srand(time(NULL));
@@ -357,29 +359,18 @@ void Phy_UE::start()
                     "Incorrect frame ID from MAC");
                 expected_frame_id_from_mac_++;
 
-                /*
-                std::stringstream ss;
-                ss << "PhyUE kPacketFromMac, frame ID " << pkt->frame_id
-                   << ", bytes: ";
-                for (size_t i = 0; i < 4; i++) {
-                    ss << std::to_string(
-                              (reinterpret_cast<uint8_t*>(pkt->data)[i]))
-                       << ", ";
+                if (kDebugPrintPacketsFromMac) {
+                    std::stringstream ss;
+                    ss << "PhyUE kPacketFromMac, frame ID " << pkt->frame_id
+                       << ", bytes: ";
+                    for (size_t i = 0; i < 4; i++) {
+                        ss << std::to_string(
+                                  (reinterpret_cast<uint8_t*>(pkt->data)[i]))
+                           << ", ";
+                    }
+                    printf("%s\n", ss.str().c_str());
                 }
-                printf("%s\n", ss.str().c_str());
-                */
 
-                // if (kDebugPrintPerFrameDone)
-                //     printf("Main thread: frame: %zu, finished mapping "
-                //            "uplink data for user %zu\n",
-                //         frame_id, ue_id);
-            } break;
-
-            case EventType::kMapBits: {
-                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                if (kDebugPrintPerFrameDone)
-                    printf("Main thread: MAC data ready for frame: %zu \n",
-                        frame_id);
             } break;
 
             case EventType::kEncode: {
@@ -748,25 +739,13 @@ void Phy_UE::doEncode(int tid, size_t tag)
              cb_id++) {
             int8_t* input_ptr;
             if (kEnableMac) {
-                uint8_t* pkt = ul_bits_buffer_[ue_id]
+                uint8_t* ul_bits = ul_bits_buffer_[ue_id]
                     + frame_slot * config_->mac_bytes_num_perframe;
-
-                /*
-                std::stringstream ss;
-                ss << "PhyUE doEncode, frame ID " << pkt->frame_id
-                   << ", bytes: ";
-                for (size_t i = 0; i < 4; i++) {
-                    ss << std::to_string(
-                              (reinterpret_cast<uint8_t*>(pkt->data)[i]))
-                       << ", ";
-                }
-                printf("%s\n", ss.str().c_str());
-                */
 
                 int input_offset = bytes_per_block
                         * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
                     + bytes_per_block * cb_id;
-                input_ptr = (int8_t*)pkt + input_offset;
+                input_ptr = (int8_t*)ul_bits + input_offset;
             } else {
                 size_t cb_offset
                     = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
