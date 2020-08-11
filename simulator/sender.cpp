@@ -10,8 +10,8 @@
 
 bool keep_running = true;
 
-// A spinning barrier to synchronize the start of Sender threads
-std::atomic<size_t> num_threads_ready_atomic;
+// A spinning barrier to synchronize the start of worker threads
+std::atomic<size_t> num_workers_ready_atomic;
 
 void interrupt_handler(int)
 {
@@ -32,13 +32,13 @@ inline size_t Sender::tag_to_tx_buffers_index(gen_tag_t tag) const
         + (tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id;
 }
 
-Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
-    bool enable_slow_start, std::string server_mac_addr_str,
+Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
+    size_t delay, bool enable_slow_start, std::string server_mac_addr_str,
     bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
-    , thread_num(thread_num)
+    , num_worker_threads_(num_worker_threads_)
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
     , delay(delay)
@@ -62,8 +62,8 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         + ".bin");
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
-        64, thread_num * sizeof(moodycamel::ProducerToken*));
-    for (size_t i = 0; i < thread_num; i++)
+        64, num_worker_threads_ * sizeof(moodycamel::ProducerToken*));
+    for (size_t i = 0; i < num_worker_threads_; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
     // Start a thread to update data buffer
@@ -74,16 +74,14 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     // when sender is started from simulator
     if (create_thread_for_master)
         create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
-            thread_num, thread_num + 1);
+            num_worker_threads_, num_worker_threads_ + 1);
 
 #ifdef USE_DPDK
-    DpdkTransport::dpdk_init(core_offset, thread_num);
-
+    DpdkTransport::dpdk_init(core_offset, num_worker_threads_);
     mbuf_pool = DpdkTransport::create_mempool();
 
-    uint16_t portid = 0;
-
-    if (DpdkTransport::nic_init(portid, mbuf_pool, thread_num) != 0)
+    uint16_t portid = 0; // For now, hard-code to port zero
+    if (DpdkTransport::nic_init(portid, mbuf_pool, num_worker_threads_) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
@@ -98,10 +96,9 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
-
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 #endif
-    num_threads_ready_atomic = 0;
+    num_workers_ready_atomic = 0;
 }
 
 Sender::~Sender()
@@ -118,8 +115,8 @@ void Sender::startTX()
     frame_start = new double[kNumStatsFrames]();
     frame_end = new double[kNumStatsFrames]();
 
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
+    create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
+        num_worker_threads_);
     master_thread(0); // Start the master thread
 }
 
@@ -128,8 +125,8 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0, thread_num);
+    create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
+        num_worker_threads_);
 }
 
 void* Sender::master_thread(int)
@@ -137,9 +134,8 @@ void* Sender::master_thread(int)
     signal(SIGINT, interrupt_handler);
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
 
-    // Wait for all Sender threads (including master) to start runnung
-    num_threads_ready_atomic++;
-    while (num_threads_ready_atomic != thread_num + 1) {
+    // Wait for all worker threads to be ready
+    while (num_workers_ready_atomic != num_worker_threads_) {
         // Wait
     }
 
@@ -157,7 +153,8 @@ void* Sender::master_thread(int)
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
-        rt_assert(send_queue_.enqueue(*task_ptok[i % thread_num], req_tag._tag),
+        rt_assert(send_queue_.enqueue(
+                      *task_ptok[i % num_worker_threads_], req_tag._tag),
             "Send task enqueue failed");
     }
 
@@ -212,8 +209,9 @@ void* Sender::master_thread(int)
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
-                rt_assert(send_queue_.enqueue(
-                              *task_ptok[i % thread_num], req_tag._tag),
+                rt_assert(
+                    send_queue_.enqueue(
+                        *task_ptok[i % num_worker_threads_], req_tag._tag),
                     "Send task enqueue failed");
             }
             auto req_tag_for_data
@@ -262,8 +260,8 @@ void* Sender::worker_thread(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
     // Wait for all Sender threads (including master) to start runnung
-    num_threads_ready_atomic++;
-    while (num_threads_ready_atomic != thread_num + 1) {
+    num_workers_ready_atomic++;
+    while (num_workers_ready_atomic != num_worker_threads_) {
         // Wait
     }
 
@@ -280,12 +278,12 @@ void* Sender::worker_thread(int tid)
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
     size_t max_symbol_id = get_max_symbol_id();
-    int radio_lo = tid * cfg->nRadios / thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / thread_num;
-    size_t ant_num_this_thread = cfg->BS_ANT_NUM / thread_num
-        + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
+    int radio_lo = tid * cfg->nRadios / num_worker_threads_;
+    int radio_hi = (tid + 1) * cfg->nRadios / num_worker_threads_;
+    size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
+        + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
-        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
+        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
     int radio_id = radio_lo;
     while (true) {
         size_t tag = 0;
@@ -298,7 +296,8 @@ void* Sender::worker_thread(int tid)
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
             server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
-            cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
+            cfg->bs_port + rand() % cfg->socket_num_worker_threads_,
+            buffer_length);
         auto* payload = (uint8_t*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
