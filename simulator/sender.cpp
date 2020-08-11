@@ -312,10 +312,10 @@ void* Sender::worker_thread(int tid)
         size_t start_tsc_send = rdtsc();
 #ifdef USE_DPDK
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
-        tx_bufs[0]
-            = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
-                server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
-                cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
+        auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
+        tx_bufs[0] = DpdkTransport::generate_udp_header(mbuf_pool,
+            sender_mac_addr, server_mac_addr, sender_addr, server_addr,
+            cfg->ue_tx_port, cfg->bs_port + pkt->ant_id, buffer_length);
         auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 

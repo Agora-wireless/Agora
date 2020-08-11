@@ -162,9 +162,9 @@ public:
 
         switch (event_type) {
         case EventType::kCSI:
-            // TODO: should be modified, just one event per worker
-            num_events = cfg->worker_thread_num;
-            block_size = cfg->OFDM_DATA_NUM / num_events;
+            // TODO: should be modified, just one event per worker (It is incorrect, should be per dosubcarriers)
+            num_events = cfg->OFDM_DATA_NUM / subcarrier_block_size_;
+            block_size = subcarrier_block_size_;
             break;
         case EventType::kDemul:
         case EventType::kPrecode:

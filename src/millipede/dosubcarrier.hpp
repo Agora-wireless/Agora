@@ -220,9 +220,17 @@ private:
         const size_t base_sc_id = gen_tag_t(tag).sc_id;
         const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
 
+        rt_assert(base_sc_id == subcarrier_range_.start,
+            "Received wrong task for CSI!");
+
+        complex_float converted_sc[kSCsPerCacheline];
+
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-                Packet* pkt; // TODO: find out the packet
+                auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
+                    + (frame_slot * cfg->symbol_num_perframe
+                          * cfg->packet_length)
+                    + i * cfg->packet_length); // TODO: find out the packet
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
                 size_t block_idx_start
                     = subcarrier_range_.start / kTransposeBlockSize;
@@ -237,8 +245,14 @@ private:
                          sc_j += kSCsPerCacheline) {
                         const size_t sc_idx
                             = (block_idx * kTransposeBlockSize) + sc_j;
-                        const complex_float*
-                            src; // TODO: find src pointer from pkt
+
+                        simd_convert_float16_to_float32(
+                            reinterpret_cast<const float*>(
+                                pkt->data[sc_idx * sizeof(short) * 2]),
+                            reinterpret_cast<float*>(converted_sc),
+                            kSCsPerCacheline * 2);
+                        const complex_float* src
+                            = converted_sc; // TODO: find src pointer from pkt
 
                         complex_float* dst
                             = cfg->get_csi_mat(csi_buffer_, frame_id, i);

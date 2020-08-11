@@ -235,11 +235,19 @@ void Millipede::start()
             // FFT processing is scheduled after falling through the switch
             switch (event.event_type) {
             case EventType::kPacketRX: {
-                size_t socket_thread_id = rx_tag_t(event.tags[0]).tid;
-                size_t sock_buf_offset = rx_tag_t(event.tags[0]).offset;
+                // size_t socket_thread_id = rx_tag_t(event.tags[0]).tid;
+                // size_t sock_buf_offset = rx_tag_t(event.tags[0]).offset;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+                size_t frame_slot = frame_id % SOCKET_BUFFER_FRAME_NUM;
 
-                auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
-                    + (sock_buf_offset * cfg->packet_length));
+                // auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
+                // + (sock_buf_offset * cfg->packet_length));
+                size_t sock_buf_offset
+                    = frame_slot * cfg->symbol_num_perframe + symbol_id;
+                auto* pkt = (Packet*)(socket_buffer_[ant_id]
+                    + sock_buf_offset * cfg->packet_length);
                 if (pkt->frame_id >= cur_frame_id + TASK_BUFFER_FRAME_NUM) {
                     std::cout
                         << "Error: Received packet for future frame beyond "
@@ -1137,18 +1145,25 @@ void Millipede::initialize_uplink_buffers()
 
     alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
 
+    // socket_buffer_status_size_
+    // = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
+    // socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
+
     socket_buffer_status_size_
-        = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
+        = SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
     printf("Millipede: Initializing uplink buffers: socket buffer size %zu, "
            "socket buffer status size %zu\n",
         socket_buffer_size_, socket_buffer_status_size_);
 
-    socket_buffer_.malloc(
-        cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
-    socket_buffer_status_.calloc(
-        cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
+    // socket_buffer_.malloc(
+    // cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
+    // socket_buffer_status_.calloc(
+    // cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
+    socket_buffer_.malloc(cfg->BS_ANT_NUM, socket_buffer_size_, 64);
+    socket_buffer_status_.malloc(
+        cfg->BS_ANT_NUM, socket_buffer_status_size_, 64);
 
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);

@@ -65,7 +65,8 @@ public:
     ~PacketTXRX();
 
 #ifdef USE_DPDK
-    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, size_t& rx_offset);
+    // uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, size_t& rx_offset);
+    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id);
 #endif
 
     /**
