@@ -81,12 +81,14 @@ private:
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
-    void update_tx_buffer(gen_tag_t tag);
+
+    void update_tx_buffer(size_t frame_id, size_t symbol_id, size_t ant_id);
+
     void write_stats_to_file(size_t tx_frame_count) const;
 
-    // Return the TX buffer for a tag. The tag must have frame, symbol, and
-    // antenna fields set
-    inline size_t tag_to_tx_buffers_index(gen_tag_t tag) const;
+    // Return the TX buffer index for this frame, symbol index, and antenna ID
+    inline size_t get_idx_in_tx_buffers(
+        size_t frame_id, size_t symbol_idx, size_t ant_id) const;
 
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
