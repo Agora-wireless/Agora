@@ -16,20 +16,19 @@
 #ifndef IPBRIDGE_H
 #define IPBRIDGE_H
 
-class IPbridge
-{
+class IPbridge {
 public:
     IPbridge();
     ~IPbridge();
 
-    void bridge_init(char const * dev_name);
-    int tuntap_alloc(char *dev, int flags);
-    int write_fragment(unsigned char * buf, int size);
-    int read_fragment(unsigned char * buf, int size);
+    void bridge_init(char const* dev_name);
+    int tuntap_alloc(char* dev, int flags);
+    int write_fragment(unsigned char* buf, int size);
+    int read_fragment(unsigned char* buf, int size);
 
     // Parameters
     //const long maxInSize = 2048;
-    const int radioMTU = 1500;              // max bytes in one radio frame
+    const int radioMTU = 1500; // max bytes in one radio frame
 
 private:
     //const int RADIO_HEADER_LENGTH = 2;
@@ -39,7 +38,6 @@ private:
     //const bool USE_RADIO = true;
 
     int tuntap_fd;
-
 };
 
 #endif
