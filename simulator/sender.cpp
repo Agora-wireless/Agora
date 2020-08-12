@@ -294,8 +294,7 @@ void* Sender::worker_thread(int tid)
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
             server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
-            cfg->bs_port + rand() % cfg->socket_num_worker_threads_,
-            cfg->packet_length);
+            cfg->bs_port + rand() % cfg->socket_thread_num, cfg->packet_length);
         auto* payload = (uint8_t*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
