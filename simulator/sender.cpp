@@ -67,12 +67,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     for (size_t i = 0; i < num_worker_threads_; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
-    // Start a thread to update data buffer
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
-
-    // Create a separate thread for master thread
-    // when sender is started from simulator
+    // Create a master thread when started from simulator
     if (create_thread_for_master)
         create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
             num_worker_threads_, num_worker_threads_ + 1);
@@ -141,16 +136,7 @@ void* Sender::master_thread(int)
     }
 
     const size_t max_symbol_id = get_max_symbol_id();
-    // Load data of the first frame
-    // Schedule one task for all antennas to avoid queue overflow
-    for (size_t i = 0; i < max_symbol_id; i++) {
-        auto req_tag = gen_tag_t::frm_sym(0, i);
-        data_update_queue_.try_enqueue(req_tag._tag);
-        // update_tx_buffer(req_tag);
-    }
 
-    // add some delay to ensure data update is finished
-    sleep(1);
     // Push tasks of the first symbol into task queue
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
@@ -181,7 +167,24 @@ void* Sender::master_thread(int)
 
             packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
             packet_count_per_frame[comp_frame_slot]++;
-            delay_for_symbol(ctag.frame_id, tick_start);
+
+            // Add inter-symbol delay
+            if (enable_slow_start) {
+                if (ctag.frame_id <= 5) {
+                    delay_ticks(tick_start, ticks_5);
+                } else if (ctag.frame_id < 100) {
+                    delay_ticks(tick_start, ticks_100);
+                } else if (ctag.frame_id < 200) {
+                    delay_ticks(tick_start, ticks_200);
+                } else if (ctag.frame_id < 500) {
+                    delay_ticks(tick_start, ticks_500);
+                } else {
+                    delay_ticks(tick_start, ticks_all);
+                }
+            } else {
+                delay_ticks(tick_start, ticks_all);
+            }
+
             tick_start = rdtsc();
 
             const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
@@ -200,7 +203,17 @@ void* Sender::master_thread(int)
                 frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
 
-                delay_for_frame(ctag.frame_id, tick_start);
+                // Add end-of-frame delay
+                if (cfg->downlink_mode) {
+                    if (ctag.frame_id < 500) {
+                        delay_ticks(tick_start,
+                            2 * cfg->data_symbol_num_perframe * ticks_all);
+                    } else {
+                        delay_ticks(tick_start,
+                            cfg->data_symbol_num_perframe * ticks_all);
+                    }
+                }
+
                 tick_start = rdtsc();
                 frame_start[next_frame_id % kNumStatsFrames] = get_time();
             } else {
@@ -215,44 +228,10 @@ void* Sender::master_thread(int)
                         *task_ptok[i % num_worker_threads_], req_tag._tag),
                     "Send task enqueue failed");
             }
-            auto req_tag_for_data
-                = gen_tag_t::frm_sym(ctag.frame_id + 1, ctag.symbol_id);
-            data_update_queue_.try_enqueue(req_tag_for_data._tag);
         }
     }
     write_stats_to_file(cfg->frames_to_test);
     exit(0);
-}
-
-void* Sender::data_update_thread(int)
-{
-    // Sender get better performance when this thread is not pinned to core
-    // pin_to_core_with_offset(ThreadType::kWorker, 13, 0);
-    printf("Data update thread running on core %d\n", sched_getcpu());
-
-    while (true) {
-        gen_tag_t tag = 0;
-        if (!data_update_queue_.try_dequeue(tag._tag))
-            continue;
-
-        for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-            update_tx_buffer(tag.frame_id, tag.symbol_id, i);
-        }
-    }
-}
-
-void Sender::update_tx_buffer(size_t frame_id, size_t symbol_id, size_t ant_id)
-{
-    auto* pkt = (Packet*)(tx_buffers_[get_idx_in_tx_buffers(
-        frame_id, symbol_id, ant_id)]);
-    pkt->frame_id = frame_id;
-    pkt->symbol_id = cfg->getSymbolId(symbol_id);
-    pkt->cell_id = 0;
-    pkt->ant_id = ant_id;
-
-    size_t data_index = (symbol_id * cfg->BS_ANT_NUM) + ant_id;
-    memcpy(pkt->data, (char*)iq_data_short_[data_index],
-        cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 }
 
 void* Sender::worker_thread(int tid)
@@ -274,32 +253,49 @@ void* Sender::worker_thread(int tid)
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     DftiCommitDescriptor(mkl_handle);
 
-    const size_t buffer_length = cfg->packet_length;
+    const size_t max_symbol_id = get_max_symbol_id();
+    const size_t radio_lo = tid * cfg->nRadios / num_worker_threads_;
+    const size_t radio_hi = (tid + 1) * cfg->nRadios / num_worker_threads_;
+
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
-    size_t max_symbol_id = get_max_symbol_id();
-    int radio_lo = tid * cfg->nRadios / num_worker_threads_;
-    int radio_hi = (tid + 1) * cfg->nRadios / num_worker_threads_;
+
     size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
         + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
-    int radio_id = radio_lo;
+
+    size_t cur_radio = radio_lo;
+
     while (true) {
         gen_tag_t tag = 0;
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
             continue;
+
+        // Update the TX buffer
+        auto* pkt = (Packet*)(tx_buffers_[get_idx_in_tx_buffers(
+            tag.frame_id, tag.symbol_id, tag.ant_id)]);
+        pkt->frame_id = tag.frame_id;
+        pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
+        pkt->cell_id = 0;
+        pkt->ant_id = tag.ant_id;
+        memcpy(pkt->data,
+            iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
+            cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
+
         const size_t tx_bufs_idx
             = get_idx_in_tx_buffers(tag.frame_id, tag.symbol_id, tag.ant_id);
 
         size_t start_tsc_send = rdtsc();
+
+        // Send a message to the server. We assume that the server is running.
 #ifdef USE_DPDK
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
             server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
             cfg->bs_port + rand() % cfg->socket_num_worker_threads_,
-            buffer_length);
+            cfg->packet_length);
         auto* payload = (uint8_t*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
@@ -307,26 +303,24 @@ void* Sender::worker_thread(int tid)
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
         } else {
-            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], cfg->packet_length);
         }
 
-        // Send a message to the server. We assume that the server is running.
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
         rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
 #else
-        // Send a message to the server. We assume that the server is running.
         if (cfg->fft_in_rru) {
             uint8_t* payload
-                = reinterpret_cast<uint8_t*>(malloc(buffer_length));
+                = reinterpret_cast<uint8_t*>(malloc(cfg->packet_length));
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
-            udp_client.send(cfg->server_addr, cfg->bs_port + radio_id, payload,
-                buffer_length);
+            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio, payload,
+                cfg->packet_length);
             free(payload);
         } else {
-            udp_client.send(cfg->server_addr, cfg->bs_port + radio_id,
+            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
                 reinterpret_cast<uint8_t*>(tx_buffers_[tx_bufs_idx]),
-                buffer_length);
+                cfg->packet_length);
         }
 #endif
         if (kDebugSenderReceiver) {
@@ -346,8 +340,8 @@ void* Sender::worker_thread(int tid)
         if (total_tx_packets_rolling
             == ant_num_this_thread * max_symbol_id * 1000) {
             double end = get_time();
-            double byte_len
-                = buffer_length * ant_num_this_thread * max_symbol_id * 1000.f;
+            double byte_len = cfg->packet_length * ant_num_this_thread
+                * max_symbol_id * 1000.f;
             double diff = end - begin;
             printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
                 (size_t)tid,
@@ -357,8 +351,8 @@ void* Sender::worker_thread(int tid)
             total_tx_packets_rolling = 0;
         }
 
-        if (++radio_id == radio_hi)
-            radio_id = radio_lo;
+        if (++cur_radio == radio_hi)
+            cur_radio = radio_lo;
     }
 }
 
@@ -400,37 +394,6 @@ void Sender::init_iq_from_file(std::string filename)
     }
     fclose(fp);
     iq_data_float.free();
-}
-
-void Sender::delay_for_symbol(size_t tx_frame_count, uint64_t tick_start)
-{
-    if (enable_slow_start) {
-        if (tx_frame_count <= 5) {
-            delay_ticks(tick_start, ticks_5);
-        } else if (tx_frame_count < 100) {
-            delay_ticks(tick_start, ticks_100);
-        } else if (tx_frame_count < 200) {
-            delay_ticks(tick_start, ticks_200);
-        } else if (tx_frame_count < 500) {
-            delay_ticks(tick_start, ticks_500);
-        } else {
-            delay_ticks(tick_start, ticks_all);
-        }
-    } else {
-        delay_ticks(tick_start, ticks_all);
-    }
-}
-
-void Sender::delay_for_frame(size_t tx_frame_count, uint64_t tick_start)
-{
-    if (cfg->downlink_mode) {
-        if (tx_frame_count < 500) {
-            delay_ticks(
-                tick_start, 2 * cfg->data_symbol_num_perframe * ticks_all);
-        } else {
-            delay_ticks(tick_start, cfg->data_symbol_num_perframe * ticks_all);
-        }
-    }
 }
 
 void Sender::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
