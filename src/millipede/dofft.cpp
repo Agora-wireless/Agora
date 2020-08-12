@@ -293,8 +293,8 @@ void DoFFT::partial_transpose(
                 fft_result1
                     = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
             }
-            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
-            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
+            _mm256_store_ps(reinterpret_cast<float*>(dst), fft_result0);
+            _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
         }
     }

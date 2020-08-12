@@ -322,7 +322,6 @@ void* Sender::worker_thread(int tid)
         }
 #endif
         if (kDebugSenderReceiver) {
-            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
             printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
                    "TX buffer: %zu, TX time: %.3f us\n",
                 tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
