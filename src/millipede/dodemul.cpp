@@ -41,8 +41,20 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
 
-    // BER calculation data
-    // ber_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+#if USE_MKL_JIT
+    MKL_Complex8 alpha = { 1, 0 };
+    MKL_Complex8 beta = { 0, 0 };
+
+    mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter, MKL_COL_MAJOR,
+        MKL_NOTRANS, MKL_NOTRANS, cfg->UE_NUM, 1, cfg->BS_ANT_NUM, &alpha,
+        cfg->UE_NUM, cfg->BS_ANT_NUM, &beta, cfg->UE_NUM);
+    if (MKL_JIT_ERROR == status) {
+        fprintf(stderr,
+            "Error: insufficient memory to JIT and store the DGEMM kernel\n");
+        exit(1);
+    }
+    mkl_jit_cgemm = mkl_jit_get_cgemm_ptr(jitter);
+#endif
 }
 
 DoDemul::~DoDemul()
@@ -121,14 +133,6 @@ Event_data DoDemul::launch(size_t tag, UNUSED EventType event_type)
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
             // size_t start_tsc1 = worker_rdtsc();
             const size_t cur_sc_id = base_sc_id + i + j;
-            const cx_fmat mat_data(
-                reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]),
-                cfg->BS_ANT_NUM, 1, false);
-
-            const cx_fmat mat_ul_zf(
-                reinterpret_cast<cx_float*>(
-                    cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id)),
-                cfg->UE_NUM, cfg->BS_ANT_NUM, false);
 
             cx_float* equal_ptr = nullptr;
             if (kExportConstellation) {
@@ -140,11 +144,23 @@ Event_data DoDemul::launch(size_t tag, UNUSED EventType event_type)
                     = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
                         * cfg->UE_NUM]);
             }
-            // Equalization
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+
+            cx_float* data_ptr
+                = reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]);
+            cx_float* ul_zf_ptr = reinterpret_cast<cx_float*>(
+                cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id));
+
             size_t start_tsc2 = worker_rdtsc();
-            // duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
+#if USE_MKL_JIT
+            mkl_jit_cgemm(jitter, (MKL_Complex8*)ul_zf_ptr,
+                (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+#else
+            const cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+            const cx_fmat mat_ul_zf(
+                ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
             mat_equaled = mat_ul_zf * mat_data;
+#endif
 
             if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
@@ -219,10 +235,9 @@ Event_data DoDemul::launch(size_t tag, UNUSED EventType event_type)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        int8_t* demul_ptr
-            = (&demod_soft_buffer_[total_data_symbol_idx_ul]
-                                  [(cfg->OFDM_DATA_NUM * i + base_sc_id)
-                                      * cfg->mod_type]);
+        int8_t* demul_ptr = cfg->get_demod_buf(
+            demod_soft_buffer_, frame_id, symbol_idx_ul, i, base_sc_id);
+
         switch (cfg->mod_type) {
         case (CommsLib::QAM16):
             demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);

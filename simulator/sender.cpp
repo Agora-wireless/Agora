@@ -65,10 +65,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     for (size_t i = 0; i < thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
-    // Start a thread to update data buffer
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
-
     // Create a separate thread for master thread
     // when sender is started from simulator
     if (create_thread_for_master)
@@ -100,6 +96,10 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 #else
+    // Start a thread to update data buffer
+    create_threads(
+        pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
+
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
             socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
@@ -163,11 +163,14 @@ void* Sender::master_thread(int)
     const size_t max_symbol_id = get_max_symbol_id();
     // Load data of the first frame
     // Schedule one task for all antennas to avoid queue overflow
+    // When DPDK is enabled, data update happens in worker thread
+#ifndef USE_DPDK
     for (size_t i = 0; i < max_symbol_id; i++) {
         auto req_tag = gen_tag_t::frm_sym(0, i);
         data_update_queue_.try_enqueue(req_tag._tag);
         // update_tx_buffer(req_tag);
     }
+#endif
 
     // add some delay to ensure data update is finished
     sleep(1);
@@ -233,9 +236,11 @@ void* Sender::master_thread(int)
                               *task_ptok[i % thread_num], req_tag._tag),
                     "Send task enqueue failed");
             }
+#ifndef USE_DPDK
             auto req_tag_for_data
                 = gen_tag_t::frm_sym(ctag.frame_id + 1, ctag.symbol_id);
             data_update_queue_.try_enqueue(req_tag_for_data._tag);
+#endif
         }
     }
     write_stats_to_file(cfg->frames_to_test);
@@ -310,6 +315,7 @@ void* Sender::worker_thread(int tid)
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
+        char* payload;
 #ifdef USE_DPDK
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
@@ -319,11 +325,22 @@ void* Sender::worker_thread(int tid)
         auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
+        auto* pkt = reinterpret_cast<Packet*>(payload);
+        auto cur_tag = gen_tag_t(tag);
+        pkt->frame_id = cur_tag.frame_id;
+        pkt->symbol_id = cfg->getSymbolId(cur_tag.symbol_id);
+        pkt->cell_id = 0;
+        pkt->ant_id = cur_tag.ant_id;
+
+        size_t data_index
+            = (cur_tag.symbol_id * cfg->BS_ANT_NUM) + cur_tag.ant_id;
+
         if (cfg->fft_in_rru) {
-            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                fft_inout, mkl_handle, payload);
+            run_fft((short*)IQ_data_coded[data_index], fft_inout, mkl_handle,
+                (char*)pkt->data);
         } else {
-            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+            rte_memcpy(pkt->data, (char*)IQ_data_coded[data_index],
+                cfg->OFDM_FRAME_LEN * sizeof(short) * 2);
         }
 
         // Send a message to the server. We assume that the server is running.
@@ -331,27 +348,24 @@ void* Sender::worker_thread(int tid)
         rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
 #else
         // Send a message to the server. We assume that the server is running.
-        int ret;
-        char* payload;
         if (cfg->fft_in_rru) {
             payload = reinterpret_cast<char*>(malloc(buffer_length));
-            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                fft_inout, mkl_handle, payload);
+            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
+            memcpy(payload, pkt, Packet::kOffsetOfData);
+            run_fft(pkt->data, fft_inout, mkl_handle,
+                payload + Packet::kOffsetOfData);
+        } else {
+            payload = tx_buffers_[tx_bufs_idx];
         }
 
         // Use the correct send function based on whether Millipede uses DPDK
-        // and whether uses fft in sender
-        if (cfg->fft_in_rru) {
-            ret = send(socket_[radio_id], payload, buffer_length, 0);
+        int ret = send(socket_[radio_id], payload, buffer_length, 0);
+        if (cfg->fft_in_rru)
             free(payload);
-        } else {
-            ret = send(
-                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
-        }
         rt_assert(ret >= 0, "Worker: sendto() failed");
 #endif
         if (kDebugSenderReceiver) {
-            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
+            auto* pkt = reinterpret_cast<Packet*>(payload);
             printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
                    "TX buffer: %zu, TX time: %.3f us\n",
                 tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
@@ -479,17 +493,15 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     }
 }
 
-void Sender::run_fft(const Packet* pkt, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const
+void Sender::run_fft(short* IQ_data, complex_float* fft_inout,
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload_data) const
 {
-    simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+    simd_convert_short_to_float(&IQ_data[2 * cfg->OFDM_PREFIX_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     DftiComputeForward(mkl_handle,
         reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
 
-    memcpy(payload, pkt, Packet::kOffsetOfData);
     simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
-        reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
-        cfg->OFDM_CA_NUM * 2);
+        reinterpret_cast<float*>(payload_data), cfg->OFDM_CA_NUM * 2);
 }
