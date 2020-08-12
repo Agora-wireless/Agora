@@ -20,7 +20,7 @@ TEST(SIMD, float_32_to_16)
 
     float* out_buf
         = reinterpret_cast<float*>(memalign(64, kSIMDTestNum * sizeof(float)));
-    simd_convert_float16_to_float32(medium, out_buf, kSIMDTestNum);
+    simd_convert_float16_to_float32(out_buf, medium, kSIMDTestNum);
 
     for (size_t i = 0; i < kSIMDTestNum; i++) {
         ASSERT_LE(abs(in_buf[i] - out_buf[i]), allowed_error);
