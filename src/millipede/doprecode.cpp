@@ -77,7 +77,7 @@ Event_data DoPrecode::launch(size_t tag)
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
                     int8_t* raw_data_ptr
                         = &dl_raw_data[total_data_symbol_idx][cur_sc_id
-                            + cfg->OFDM_DATA_NUM * user_id];
+                            + cfg->OFDM_DATA_NUM_pad * user_id];
                     if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
                         data_ptr[user_id]
                             = cfg->ue_specific_pilot[user_id][cur_sc_id];
@@ -124,7 +124,7 @@ Event_data DoPrecode::launch(size_t tag)
                 = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
             __m256d t_data
                 = _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
-            _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);
+            _mm256_store_pd((double*)(ifft_ptr + i * 8), t_data);
         }
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;

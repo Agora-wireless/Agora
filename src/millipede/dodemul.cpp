@@ -40,9 +40,6 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
-
-    // BER calculation data
-    // ber_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
 }
 
 DoDemul::~DoDemul()
@@ -219,10 +216,9 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        int8_t* demul_ptr
-            = (&demod_soft_buffer_[total_data_symbol_idx_ul]
-                                  [(cfg->OFDM_DATA_NUM * i + base_sc_id)
-                                      * cfg->mod_type]);
+        int8_t* demul_ptr = cfg->get_demod_buf(
+            demod_soft_buffer_, frame_id, symbol_idx_ul, i, base_sc_id);
+
         switch (cfg->mod_type) {
         case (CommsLib::QAM16):
             demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);

@@ -1069,13 +1069,11 @@ void Millipede::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
-    size_t mod_type = config_->mod_type;
-    demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
-        mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
-        >> 3 * config_->LDPC_config.nblocksInSymbol;
-    decoded_buffer_.calloc(
-        task_buffer_symbol_num_ul, decoded_bytes * cfg->UE_NUM, 64);
+    demod_soft_buffer_.malloc(
+        task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    size_t decoded_bytes = cfg->num_bytes_per_cb_pad
+        * cfg->LDPC_config.nblocksInSymbol * cfg->UE_NUM;
+    decoded_buffer_.calloc(task_buffer_symbol_num_ul, decoded_bytes, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1133,7 +1131,7 @@ void Millipede::initialize_downlink_buffers()
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(
-        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num, cfg->OFDM_DATA_NUM_pad * cfg->UE_NUM, 64);
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
@@ -1185,7 +1183,8 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
     auto& cfg = config_;
     size_t num_decoded_bytes
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
-
+    size_t num_decoded_bytes_pad = (((cfg->LDPC_config.cbLen + 7) >> 3) + 63)
+        / 64 * 64 * cfg->LDPC_config.nblocksInSymbol;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
     printf("Saving decode data to %s\n", filename.c_str());
@@ -1196,7 +1195,9 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
                 * cfg->ul_data_symbol_num_perframe
             + i;
         uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
-        fwrite(ptr, cfg->UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
+        for (size_t j = 0; j < cfg->UE_NUM; j++)
+            fwrite(ptr + j * num_decoded_bytes_pad, num_decoded_bytes,
+                sizeof(uint8_t), fp);
     }
     fclose(fp);
 }
