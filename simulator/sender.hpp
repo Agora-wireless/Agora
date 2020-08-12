@@ -69,7 +69,6 @@ public:
 
 private:
     void* master_thread(int tid);
-    void* data_update_thread(int tid);
     void* worker_thread(int tid);
 
     /// Read 32-bit floating-point IQ samples from filename and populate
@@ -81,8 +80,6 @@ private:
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
-
-    void update_tx_buffer(size_t frame_id, size_t symbol_id, size_t ant_id);
 
     void write_stats_to_file(size_t tx_frame_count) const;
 
