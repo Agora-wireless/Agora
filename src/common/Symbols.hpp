@@ -44,6 +44,7 @@ enum class EventType : int {
     kPrecode,
     kPacketTX,
     kDecode,
+    kDecodeLast,
     kEncode,
     kRC,
     kRXSymbol,

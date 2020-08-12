@@ -140,6 +140,7 @@ public:
     size_t UE_ANT_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
+    size_t OFDM_DATA_NUM_pad; // Pad for cache line size (64 bytes)
     size_t OFDM_PILOT_NUM;
     size_t OFDM_PILOT_SPACING;
     size_t OFDM_DATA_START;
@@ -195,6 +196,10 @@ public:
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;
+    // Number of bytes per code block
+    size_t num_bytes_per_cb;
+    // Number of bytes per code block padded for cache line size (64 bytes)
+    size_t num_bytes_per_cb_pad;
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
@@ -300,6 +305,47 @@ public:
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
+    }
+
+    /// Get the soft demodulation buffer for this frame, symbol,
+    /// user and subcarrier ID
+    inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
+        size_t symbol_id, size_t ue_id, size_t sc_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &demod_buffer[total_data_symbol_id]
+                            [OFDM_DATA_NUM * 8 * ue_id + sc_id * mod_type];
+    }
+
+    /// Get the decode buffer for this frame, symbol,
+    /// user and code block ID
+    inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &decoded_buffer[total_data_symbol_id][num_bytes_per_cb_pad
+            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    /// Get ul_bits for this symbol, user and code block ID
+    inline int8_t* get_info_bits(Table<int8_t>& info_bits, size_t symbol_id,
+        size_t ue_id, size_t cb_id) const
+    {
+        return &info_bits[symbol_id][num_bytes_per_cb_pad
+            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    /// Get encoded_buffer for this frame, symbol, user and code block ID
+    inline int8_t* get_encoded_buf(Table<int8_t>& encoded_buffer,
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx(frame_id, symbol_id);
+        size_t num_encoded_bytes_per_cb = LDPC_config.cbCodewLen / mod_type;
+        return &encoded_buffer[total_data_symbol_id][OFDM_DATA_NUM_pad * ue_id
+            + num_encoded_bytes_per_cb * cb_id];
     }
 
     Config(std::string);
