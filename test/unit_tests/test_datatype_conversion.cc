@@ -16,7 +16,7 @@ TEST(SIMD, float_32_to_16)
 
     float* medium = reinterpret_cast<float*>(
         memalign(64, kSIMDTestNum / 2 * sizeof(float)));
-    simd_convert_float32_to_float16(in_buf, medium, kSIMDTestNum);
+    simd_convert_float32_to_float16(medium, in_buf, kSIMDTestNum);
 
     float* out_buf
         = reinterpret_cast<float*>(memalign(64, kSIMDTestNum * sizeof(float)));
