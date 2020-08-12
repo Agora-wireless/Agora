@@ -87,7 +87,7 @@ static inline void simd_convert_float16_to_float32(
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16
 static inline void simd_convert_float32_to_float16(
-    const float* in_buf, float* out_buf, size_t n_elems)
+    float* out_buf, const float* in_buf, size_t n_elems)
 {
 #ifdef __AVX512F__
     for (size_t i = 0; i < n_elems; i += 16) {
