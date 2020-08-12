@@ -58,9 +58,11 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    * In one terminal, run `./build/millipede data/tddconfig-sim-ul.json` to start
      Millipede with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
-     --delay=5000 --enable_slow_start=false
+     --delay=5000 --enable_slow_start=true
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
+   * Note: make sure Millipede and sender are using different set of cores, 
+     otherwise there will be performance slow down.
 
  * Run Millipede with DPDK
    * Run `cmake -DUSE_DPDK=1` to enable DPDK in the build.
