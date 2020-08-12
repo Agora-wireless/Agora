@@ -65,6 +65,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
  * Run Millipede with DPDK
    * Run `cmake -DUSE_LDPC=1` to enable DPDK in the build.
    * For Intel NICs, run `cmake -DUSE_LDPC=1 -DUSE_MLX_NIC=0` to exclude Mellnox libraries in the build.
+   * When running the sender with DPDK, it is required to set the MAC address of the NIC used by Millipede. To do this, add an option `--server_mac_addr=` to `./build/sender`.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    "Hardware mode" section below.
