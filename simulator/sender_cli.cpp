@@ -12,7 +12,7 @@ DEFINE_uint64(delay, 5000, "Frame duration in microseconds");
 DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
     "MAC address of the remote Millipede server to send data to");
 DEFINE_string(conf_file,
-    TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-dl.json",
+    TOSTRING(PROJECT_DIRECTORY) "./data/tddconfig-sim-dl.json",
     "Config filename");
 DEFINE_bool(enable_slow_start, true, "Send frames slowly at first.");
 

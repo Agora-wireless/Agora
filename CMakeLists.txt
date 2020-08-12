@@ -59,6 +59,13 @@ add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
 find_package(Armadillo)
 
+# Find and link in Boost libraries.
+find_package(Boost 1.65.0 REQUIRED COMPONENTS system filesystem serialization)
+include_directories(${Boost_INCLUDE_DIRS})
+link_directories(${Boost_LIBRARY_DIRS})
+link_libraries(${Boost_LIBRARIES})
+
+
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
@@ -254,6 +261,19 @@ add_executable(millipede
   $<TARGET_OBJECTS:millipede_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(millipede ${COMMON_LIBS})
+
+# For building Millipede as a distributed, multi-process application.
+option(DISTRIBUTED_ARCH "Build Millipede as a distributed, multi-process architecture" OFF)
+if (DISTRIBUTED_ARCH)
+  message(STATUS "Distributed, multi-process architecture is enabled.")
+  add_definitions(-DDISTRIBUTED_ARCH)
+  add_executable(remote_subcarrier 
+    src/millipede/remote_subcarrier_cli.cpp
+    $<TARGET_OBJECTS:millipede_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>
+  )
+  target_link_libraries(remote_subcarrier ${COMMON_LIBS})
+endif()
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp

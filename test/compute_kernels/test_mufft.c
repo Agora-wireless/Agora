@@ -1,5 +1,5 @@
 #include "mufft/fft.h"
-#include <complex.h>
+#include <complex>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
