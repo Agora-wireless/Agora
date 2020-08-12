@@ -247,10 +247,10 @@ private:
                             = (block_idx * kTransposeBlockSize) + sc_j;
 
                         simd_convert_float16_to_float32(
-                            reinterpret_cast<const float*>(
-                                pkt->data[sc_idx * sizeof(short) * 2]),
+                            reinterpret_cast<float*>(pkt->data + sc_idx * 2),
                             reinterpret_cast<float*>(converted_sc),
                             kSCsPerCacheline * 2);
+
                         const complex_float* src
                             = converted_sc; // TODO: find src pointer from pkt
 

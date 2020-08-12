@@ -10,6 +10,7 @@
 #include "Symbols.hpp"
 #include "concurrentqueue.h"
 #include "memory_manage.h"
+#include "utils.h"
 #include <sstream>
 #include <vector>
 
@@ -201,7 +202,7 @@ struct Event_data {
 };
 static_assert(sizeof(Event_data) == 64, "");
 
-/// A struct pair containing a concurrent event queue 
+/// A struct pair containing a concurrent event queue
 /// and a pointer to that queue's producer token.
 struct sched_info_t {
     moodycamel::ConcurrentQueue<Event_data> concurrent_q;
@@ -299,6 +300,38 @@ public:
         num_pilot_pkts.fill(0);
         num_reciprocity_pkts.fill(0);
     }
+};
+
+class CSI_stats {
+public:
+    size_t num_tasks;
+    bool last_task(size_t frame_id)
+    {
+        rt_assert(
+            frame_id >= min_frame_id, "Invalid CSI task from previous frame!");
+        rt_assert(frame_id < min_frame_id + TASK_BUFFER_FRAME_NUM,
+            "CSI task buffer overflow!");
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        if (++task_count[frame_slot] == num_tasks) {
+            task_count[frame_slot] = 0;
+            rt_assert(
+                frame_id == min_frame_id, "Future CSI tasks complete first!");
+            min_frame_id++;
+            return true;
+        }
+        return false;
+    }
+
+    void init(size_t _num_tasks)
+    {
+        num_tasks = _num_tasks;
+        min_frame_id = 0;
+        task_count.fill(0);
+    }
+
+private:
+    std::array<size_t, TASK_BUFFER_FRAME_NUM> task_count;
+    size_t min_frame_id;
 };
 
 class Frame_stats {

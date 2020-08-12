@@ -289,11 +289,13 @@ void Millipede::start()
             } break;
 
             case EventType::kCSI: {
-                size_t frame_id = event.tags[0];
-                // TODO: add stats updates and reports
-                subcarrier_manager_->schedule_subcarriers(
-                    EventType::kZF, frame_id, 0);
-            }
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                if (csi_stats_.last_task(frame_id)) {
+                    // TODO: add stats updates and reports
+                    subcarrier_manager_->schedule_subcarriers(
+                        EventType::kZF, frame_id, 0);
+                }
+            } break;
 
             case EventType::kRC: {
                 size_t frame_id = event.tags[0];
@@ -689,6 +691,7 @@ void* Millipede::worker(int tid)
             case EventType::kRC:
                 doer = computeReciprocity;
                 break;
+            case EventType::kCSI:
             case EventType::kZF:
             case EventType::kDemul:
             case EventType::kPrecode:
@@ -1182,6 +1185,9 @@ void Millipede::initialize_uplink_buffers()
     rx_counters_.num_pilot_pkts_per_frame
         = cfg->BS_ANT_NUM * cfg->pilot_symbol_num_perframe;
     rx_counters_.num_reciprocity_pkts_per_frame = cfg->BS_ANT_NUM;
+
+    csi_stats_.init(
+        cfg->OFDM_DATA_NUM / lcm(cfg->demul_block_size, cfg->zf_block_size));
 
     fft_created_count = 0;
     fft_stats_.init(cfg->BS_ANT_NUM, cfg->pilot_symbol_num_perframe,

@@ -210,6 +210,7 @@ private:
     Table<uint8_t> decoded_buffer_;
 
     RxCounters rx_counters_;
+    CSI_stats csi_stats_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
