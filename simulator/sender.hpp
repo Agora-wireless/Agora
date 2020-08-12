@@ -44,16 +44,22 @@ class Sender {
 
 public:
     /**
-   * @brief Create and optionally start a Sender that sends IQ packets to a
-   * server with MAC address [server_mac_addr_str]
-   *
-   * @param config The Millipede config
-   * @param num_worker_threads Number of worker threads sending packets 
-   * @param core_offset
-   * @param delay
-   * @param enable_slow_start
-   * @param server_mac_addr_str
-   */
+     * @brief Create and optionally start a Sender that sends IQ packets to a
+     * server with MAC address [server_mac_addr_str]
+     *
+     * @param config The Millipede config @param num_worker_threads Number of
+     * worker threads sending packets 
+     *
+     * @param core_offset The master thread runs on core [core_offset]. Worker
+     * thread #i runs on core [core_offset + i]
+     *
+     * @param delay The TTI slot duration
+     *
+     * @param enable_slow_start If true, initially frames are sent in a duration
+     * larger than the TTI
+     *
+     * @param server_mac_addr_str The MAC address of the server's NIC
+     */
     Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
         size_t delay = 0, bool enable_slow_start = true,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
@@ -76,8 +82,10 @@ private:
     void init_iq_from_file(std::string filename);
 
     size_t get_max_symbol_id() const;
-    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
+
+    // Launch threads to run worker with thread IDs from tid_start to tid_end
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
 
@@ -116,8 +124,6 @@ private:
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ConcurrentQueue<size_t> completion_queue_
-        = moodycamel::ConcurrentQueue<size_t>(1024);
-    moodycamel::ConcurrentQueue<size_t> data_update_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
