@@ -1102,9 +1102,10 @@ void Millipede::initialize_uplink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
     demod_soft_buffer_.malloc(
         task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t decoded_bytes = cfg->num_bytes_per_cb_pad
-        * cfg->LDPC_config.nblocksInSymbol * cfg->UE_NUM;
-    decoded_buffer_.calloc(task_buffer_symbol_num_ul, decoded_bytes, 64);
+    decoded_buffer_.calloc(task_buffer_symbol_num_ul,
+        roundup<64>(cfg->num_bytes_per_cb) * cfg->LDPC_config.nblocksInSymbol
+            * cfg->UE_NUM,
+        64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1161,8 +1162,8 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    dl_encoded_buffer_.calloc(
-        task_buffer_symbol_num, cfg->OFDM_DATA_NUM_pad * cfg->UE_NUM, 64);
+    dl_encoded_buffer_.calloc(task_buffer_symbol_num,
+        roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
