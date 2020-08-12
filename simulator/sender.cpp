@@ -273,9 +273,11 @@ void* Sender::worker_thread(int tid)
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
             continue;
 
+        const size_t tx_bufs_idx
+            = get_idx_in_tx_buffers(tag.frame_id, tag.symbol_id, tag.ant_id);
+
         // Update the TX buffer
-        auto* pkt = (Packet*)(tx_buffers_[get_idx_in_tx_buffers(
-            tag.frame_id, tag.symbol_id, tag.ant_id)]);
+        auto* pkt = (Packet*)(tx_buffers_[tx_bufs_idx]);
         pkt->frame_id = tag.frame_id;
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
         pkt->cell_id = 0;
@@ -283,9 +285,6 @@ void* Sender::worker_thread(int tid)
         memcpy(pkt->data,
             iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
-
-        const size_t tx_bufs_idx
-            = get_idx_in_tx_buffers(tag.frame_id, tag.symbol_id, tag.ant_id);
 
         size_t start_tsc_send = rdtsc();
 
@@ -359,7 +358,7 @@ size_t Sender::get_max_symbol_id() const
 {
     size_t max_symbol_id = cfg->downlink_mode
         ? cfg->pilot_symbol_num_perframe
-        : cfg->pilot_symbol_num_perframe + cfg->data_symbol_num_perframe;
+        : cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe;
     return max_symbol_id;
 }
 
