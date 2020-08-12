@@ -35,14 +35,6 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
 
 ## Millipede quickstart
 
- * Run the tests
-    ```
-    cd test/test_millipede
-    cmake .
-    make -j
-    ./test_millipede.sh 100 out % Runs the test for 100 iterations
-    ```
-
  * Build Millipede
     ```
     cd Millipede
@@ -50,6 +42,11 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     cd build
     cmake ..
     make -j
+    ```
+
+ * Run end-to-end tests
+    ```
+    ./test/test_millipede/test_millipede.sh 100 out % Runs the test for 100 iterations
     ```
 
  * To include LDPC in the build, run `cmake -DUSE_LDPC=1`.
