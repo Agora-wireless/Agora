@@ -1203,28 +1203,12 @@ void Millipede::initialize_uplink_buffers()
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-<<<<<<< HEAD
-    demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
-        cfg->mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
 
-    size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
-        >> 3 * config_->LDPC_config.nblocksInSymbol;
-    decoded_buffer_.calloc(
-        task_buffer_symbol_num_ul, decoded_bytes * cfg->UE_NUM, 64);
-=======
-    ul_zf_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-
-    equal_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    ue_spec_pilot_buffer_.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
     demod_soft_buffer_.malloc(
         task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     size_t decoded_bytes = cfg->num_bytes_per_cb_pad
         * cfg->LDPC_config.nblocksInSymbol * cfg->UE_NUM;
     decoded_buffer_.calloc(task_buffer_symbol_num_ul, decoded_bytes, 64);
->>>>>>> develop
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
