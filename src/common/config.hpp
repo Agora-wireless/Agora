@@ -148,7 +148,6 @@ public:
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
-    size_t OFDM_SYM_LEN;
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
