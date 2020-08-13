@@ -147,8 +147,8 @@ void Millipede::schedule_antennas(
 void Millipede::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
-    assert(
-        event_type == EventType::kEncode or event_type == EventType::kDecode);
+    // assert(
+    //     event_type == EventType::kEncode or event_type == EventType::kDecode);
     auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_id, 0);
 
     for (size_t i = 0;
@@ -175,6 +175,19 @@ void Millipede::schedule_users(
                 + i % config_->mac_socket_thread_num],
             Event_data(event_type, base_tag._tag));
         base_tag.ue_id++;
+    }
+}
+
+void Millipede::move_events_between_queues(
+    EventType event_type1, EventType event_type2)
+{
+    auto q1 = get_conq(event_type1);
+    auto q2 = get_conq(event_type2);
+    Event_data events_list[16];
+    // printf("%zu elements in decode queue\n", q1->size_approx());
+    while (q1->size_approx() > 0) {
+        size_t num_events = q1->try_dequeue_bulk(events_list, 16);
+        q2->try_enqueue_bulk(events_list, num_events);
     }
 }
 
@@ -218,11 +231,12 @@ void Millipede::start()
                     kDequeueBulkSizeTXRX);
             }
         } else {
-            for (size_t i = 0; i < cfg->worker_thread_num; i++) {
-                num_events
-                    += complete_task_queue_.try_dequeue_bulk_from_producer(
-                        *(worker_ptoks_ptr[i]), events_list + num_events,
-                        kDequeueBulkSizeWorker);
+            if (!cfg->downlink_mode)
+                num_events += complete_decode_task_queue_.try_dequeue_bulk(
+                    events_list + num_events, max_events_needed);
+            if (num_events == 0) {
+                num_events += complete_task_queue_.try_dequeue_bulk(
+                    events_list + num_events, max_events_needed);
             }
         }
         is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
@@ -314,12 +328,25 @@ void Millipede::start()
                     PrintType::kDemul, frame_id, symbol_idx_ul, base_sc_id);
                 /* If this symbol is ready */
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
-                    schedule_codeblocks(
-                        EventType::kDecode, frame_id, symbol_idx_ul);
+                    if (demul_stats_.get_symbol_count(frame_id)
+                        < demul_stats_.max_symbol_count - 1)
+                        schedule_codeblocks(
+                            EventType::kDecode, frame_id, symbol_idx_ul);
                     print_per_symbol_done(
                         PrintType::kDemul, frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
                         max_equaled_frame = frame_id;
+                        if (!cfg->bigstation_mode) {
+                            assert(cur_frame_id == frame_id);
+                            cur_frame_id++;
+                            move_events_between_queues(
+                                EventType::kDecode, EventType::kDecodeLast);
+                            schedule_codeblocks(EventType::kDecodeLast,
+                                frame_id, symbol_idx_ul);
+                        } else {
+                            schedule_codeblocks(
+                                EventType::kDecode, frame_id, symbol_idx_ul);
+                        }
                         stats->master_set_tsc(TsType::kDemulDone, frame_id);
                         print_per_frame_done(PrintType::kDemul, frame_id);
                     }
@@ -355,8 +382,8 @@ void Millipede::start()
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {
                         if (!kEnableMac) {
-                            assert(cur_frame_id == frame_id);
-                            cur_frame_id++;
+                            // assert(cur_frame_id == frame_id);
+                            // cur_frame_id++;
                             stats->update_stats_in_functions_uplink(frame_id);
                             if (stats->last_frame_id == cfg->frames_to_test - 1)
                                 goto finish;
@@ -626,6 +653,11 @@ void* Millipede::worker(int tid)
             complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
             decoded_buffer_, phy_stats, stats);
 
+    auto computeDecodingLast = new DoDecode(config_, tid, freq_ghz,
+        *get_conq(EventType::kDecodeLast), complete_decode_task_queue_,
+        decode_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, phy_stats,
+        stats);
+
     /// TODO: move this into the subcarrier manager/doer infrastructure.
     ///       It's currently in the SubcarrierDoer but yet used there.
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
@@ -633,8 +665,7 @@ void* Millipede::worker(int tid)
         calib_buffer_, recip_buffer_, stats);
 
     // Allocate subcarrier Doers for subcarrier ranges this worker handles
-    SubcarrierManager* sc_mgr = subcarrier_manager_; // Just a rename
-
+    SubcarrierManager* sc_mgr = subcarrier_manager_;
     std::vector<Doer*> sc_doers_vec(sc_mgr->num_subcarrier_ranges());
     for (auto& sc_range : sc_mgr->get_subcarrier_ranges_for_worker_tid(tid)) {
         size_t doer_idx = sc_mgr->index_for_subcarrier_id(sc_range.start);
@@ -645,13 +676,19 @@ void* Millipede::worker(int tid)
                   "worker Doer index %zu\n",
             tid, sc_range.to_string().c_str(), doer_idx);
     }
+    std::vector<Doer*> computers_vec = { computeIFFT, computeDecodingLast,
+        computeFFT, computeReciprocity, computeDecoding, computeEncoding };
 
     while (true) {
         Event_data req_event;
         if (sched_info_arr[tid].concurrent_q.try_dequeue(req_event)) {
             Event_data resp_event;
             resp_event.num_tags = req_event.num_tags;
+
             Doer* doer = nullptr;
+            mt_queue_t* completion_queue = &complete_task_queue_;
+            moodycamel::ProducerToken* completion_queue_ptok = 
+                worker_ptoks_ptr[tid];
 
             switch (req_event.event_type) {
             case EventType::kFFT:
@@ -672,6 +709,11 @@ void* Millipede::worker(int tid)
             case EventType::kDecode:
                 doer = computeDecoding;
                 break;
+            case EventType::kDecodeLast:
+                doer = computeDecodingLast;
+                completion_queue = &complete_decode_task_queue_;
+                completion_queue_ptok = decode_ptoks_ptr[tid];
+                break;
             case EventType::kEncode:
                 doer = computeEncoding;
                 break;
@@ -688,7 +730,7 @@ void* Millipede::worker(int tid)
             }
 
             try_enqueue_fallback(
-                &complete_task_queue_, worker_ptoks_ptr[tid], resp_event);
+                completion_queue, completion_queue_ptok, resp_event);
 
             continue;
         }
@@ -1068,6 +1110,7 @@ void Millipede::initialize_queues()
     int data_symbol_num_perframe = config_->data_symbol_num_perframe;
     message_queue_ = mt_queue_t(512 * data_symbol_num_perframe);
     complete_task_queue_ = mt_queue_t(512 * data_symbol_num_perframe * 4);
+    complete_decode_task_queue_ = mt_queue_t(2048);
 
     // Create concurrent queues for each Doer
     // for (sched_info_t& s : sched_info_arr) {
@@ -1089,15 +1132,12 @@ void Millipede::initialize_queues()
                                            : EventType::kPacketToMac));
     }
 
-    // for (size_t i = 0; i < config_->mac_socket_thread_num; i++) {
-    //     rx_ptoks_mac_ptr[i] = new moodycamel::ProducerToken(message_queue_);
-    //     tx_ptoks_mac_ptr[i]
-    //         = new moodycamel::ProducerToken(*get_conq(EventType::kPacketToMac));
-    // }
-
-    for (size_t i = 0; i < config_->worker_thread_num; i++)
+    for (size_t i = 0; i < config_->worker_thread_num; i++) {
         worker_ptoks_ptr[i]
             = new moodycamel::ProducerToken(complete_task_queue_);
+        decode_ptoks_ptr[i]
+            = new moodycamel::ProducerToken(complete_decode_task_queue_);
+    }
 }
 
 void Millipede::initialize_uplink_buffers()
@@ -1125,13 +1165,11 @@ void Millipede::initialize_uplink_buffers()
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    demod_soft_buffer_.malloc(task_buffer_symbol_num_ul,
-        cfg->mod_type * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-
-    size_t decoded_bytes = (config_->LDPC_config.cbLen + 7)
-        >> 3 * config_->LDPC_config.nblocksInSymbol;
-    decoded_buffer_.calloc(
-        task_buffer_symbol_num_ul, decoded_bytes * cfg->UE_NUM, 64);
+    demod_soft_buffer_.malloc(
+        task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    size_t decoded_bytes = cfg->num_bytes_per_cb_pad
+        * cfg->LDPC_config.nblocksInSymbol * cfg->UE_NUM;
+    decoded_buffer_.calloc(task_buffer_symbol_num_ul, decoded_bytes, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1187,7 +1225,7 @@ void Millipede::initialize_downlink_buffers()
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(
-        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num, cfg->OFDM_DATA_NUM_pad * cfg->UE_NUM, 64);
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
@@ -1236,7 +1274,8 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
     auto& cfg = config_;
     size_t num_decoded_bytes
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
-
+    size_t num_decoded_bytes_pad = (((cfg->LDPC_config.cbLen + 7) >> 3) + 63)
+        / 64 * 64 * cfg->LDPC_config.nblocksInSymbol;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
     printf("Saving decode data to %s\n", filename.c_str());
@@ -1247,7 +1286,9 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
                 * cfg->ul_data_symbol_num_perframe
             + i;
         uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
-        fwrite(ptr, cfg->UE_NUM * num_decoded_bytes, sizeof(uint8_t), fp);
+        for (size_t j = 0; j < cfg->UE_NUM; j++)
+            fwrite(ptr + j * num_decoded_bytes_pad, num_decoded_bytes,
+                sizeof(uint8_t), fp);
     }
     fclose(fp);
 }

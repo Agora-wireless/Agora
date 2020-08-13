@@ -79,8 +79,8 @@ private:
 
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
-    void run_fft(const Packet* pkt, complex_float* fft_inout,
-        DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const;
+    void run_fft(short* pkt, complex_float* fft_inout,
+        DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload_data) const;
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz

@@ -83,6 +83,7 @@ Config::Config(std::string jsonfile)
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
+    OFDM_DATA_NUM_pad = (OFDM_DATA_NUM + 63) >> 6 << 6;
     OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
     OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
@@ -226,6 +227,10 @@ Config::Config(std::string jsonfile)
         : LDPC_config.Zc * (LDPC_config.nRows + 8);
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+
+    num_bytes_per_cb = ((LDPC_config.cbLen + 7) >> 3);
+    num_bytes_per_cb_pad = (((LDPC_config.cbLen + 7) >> 3) + 63) >> 6 << 6;
+
     rt_assert(LDPC_config.nblocksInSymbol > 0,
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
@@ -375,23 +380,24 @@ void Config::genData()
     }
 
     // Get uplink and downlink raw bits either from file or random numbers
-    size_t num_bytes_per_ue
-        = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
+    size_t num_bytes_per_ue = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
+    size_t num_bytes_per_ue_pad
+        = num_bytes_per_cb_pad * LDPC_config.nblocksInSymbol;
     dl_bits.malloc(
-        dl_data_symbol_num_perframe, num_bytes_per_ue * UE_ANT_NUM, 64);
+        dl_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
     dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     dl_iq_t.calloc(
         dl_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
     ul_bits.malloc(
-        ul_data_symbol_num_perframe, num_bytes_per_ue * UE_ANT_NUM, 64);
+        ul_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
     ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
-        for (size_t j = 0; j < num_bytes_per_ue; j++) {
+        for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
             int cur_offset = j * UE_ANT_NUM + ue_id;
             for (size_t i = 0; i < ul_data_symbol_num_perframe; i++)
                 ul_bits[i][cur_offset] = rand() % mod_order;
@@ -414,11 +420,13 @@ void Config::genData()
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
             return;
-        size_t r = fread(
-            ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
-        if (r < num_bytes_per_ue * UE_ANT_NUM)
-            printf(
-                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            size_t r = fread(ul_bits[i] + j * num_bytes_per_ue_pad,
+                sizeof(int8_t), num_bytes_per_ue, fd);
+            if (r < num_bytes_per_ue)
+                printf("bad read from file %s (batch %zu) \n",
+                    filename1.c_str(), i);
+        }
         if (fseek(fd,
                 num_bytes_per_ue
                     * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM),
@@ -427,11 +435,13 @@ void Config::genData()
             return;
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        size_t r = fread(
-            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
-        if (r < num_bytes_per_ue * UE_ANT_NUM)
-            printf(
-                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            size_t r = fread(dl_bits[i] + j * num_bytes_per_ue_pad,
+                sizeof(int8_t), num_bytes_per_ue, fd);
+            if (r < num_bytes_per_ue)
+                printf("bad read from file %s (batch %zu) \n",
+                    filename1.c_str(), i);
+        }
     }
     fclose(fd);
 #endif

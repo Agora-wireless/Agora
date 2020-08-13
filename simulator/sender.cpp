@@ -8,7 +8,7 @@
 #include <thread>
 
 #include <mutex>
-std::mutex temp_mutex;
+std::mutex temp_printing_mutex;
 
 bool keep_running = true;
 
@@ -68,10 +68,6 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
     for (size_t i = 0; i < thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
-    // Start a thread to update data buffer
-    create_threads(
-        pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
-
     // Create a separate thread for master thread
     // when sender is started from simulator
     if (create_thread_for_master)
@@ -103,6 +99,10 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 #else
+    // Start a thread to update data buffer
+    create_threads(
+        pthread_fun_wrapper<Sender, &Sender::data_update_thread>, 0, 1);
+
     // If subcarrier_endpoints is empty, we setup multiple sockets to 
     // the single remote Millipede process. 
     if (cfg->subcarrier_endpoints.empty()) {
@@ -121,7 +121,7 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
                 sizeof(servaddr_ipv4[i]));
             rt_assert(ret == 0, "UDP socket connect failed");
             printf("UDP socket %zu connected\n", i);
-        }
+        } 
     } 
     // Else if subcarrier_endpoints is not empty, we set up a socket to each
     // of the remote subcarrier endpoint processes.
@@ -195,11 +195,14 @@ void* Sender::master_thread(int)
     const size_t max_symbol_id = get_max_symbol_id();
     // Load data of the first frame
     // Schedule one task for all antennas to avoid queue overflow
+    // When DPDK is enabled, data update happens in worker thread
+#ifndef USE_DPDK
     for (size_t i = 0; i < max_symbol_id; i++) {
         auto req_tag = gen_tag_t::frm_sym(0, i);
         data_update_queue_.try_enqueue(req_tag._tag);
         // update_tx_buffer(req_tag);
     }
+#endif
 
     // add some delay to ensure data update is finished
     sleep(1);
@@ -265,9 +268,11 @@ void* Sender::master_thread(int)
                               *task_ptok[i % thread_num], req_tag._tag),
                     "Send task enqueue failed");
             }
+#ifndef USE_DPDK
             auto req_tag_for_data
                 = gen_tag_t::frm_sym(ctag.frame_id + 1, ctag.symbol_id);
             data_update_queue_.try_enqueue(req_tag_for_data._tag);
+#endif
         }
     }
     write_stats_to_file(cfg->frames_to_test);
@@ -344,20 +349,33 @@ void* Sender::worker_thread(int tid)
         const size_t tx_bufs_idx = tag_to_tx_buffers_index(tag);
 
         size_t start_tsc_send = rdtsc();
+        char* payload;
+        int ret;
 #ifdef USE_DPDK
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0]
             = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
                 server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
                 cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
-        auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
+        payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
 
+        auto* pkt = reinterpret_cast<Packet*>(payload);
+        auto cur_tag = gen_tag_t(tag);
+        pkt->frame_id = cur_tag.frame_id;
+        pkt->symbol_id = cfg->getSymbolId(cur_tag.symbol_id);
+        pkt->cell_id = 0;
+        pkt->ant_id = cur_tag.ant_id;
+
+        size_t data_index
+            = (cur_tag.symbol_id * cfg->BS_ANT_NUM) + cur_tag.ant_id;
+
         if (cfg->fft_in_rru) {
-            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                fft_inout, mkl_handle, payload);
+            run_fft((short*)IQ_data_coded[data_index], fft_inout, mkl_handle,
+                (char*)pkt->data);
         } else {
-            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], buffer_length);
+            rte_memcpy(pkt->data, (char*)IQ_data_coded[data_index],
+                cfg->OFDM_FRAME_LEN * sizeof(short) * 2);
         }
 
         // Send a message to the server. We assume that the server is running.
@@ -365,52 +383,53 @@ void* Sender::worker_thread(int tid)
         rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
 #else
         // Send a message to the server. We assume that the server is running.
-        int ret;
-        char* payload;
-
-        // If we're doing FFT on the sender side, do that FFT now.
         if (cfg->fft_in_rru) {
             payload = reinterpret_cast<char*>(malloc(buffer_length));
-            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                fft_inout, mkl_handle, payload);
-
-            // If subcarrier_endpoints is empty, we send all data
-            // to a single Millipede process as normal.
-            if (cfg->subcarrier_endpoints.empty()) {
-                ret = send(socket_[radio_id], payload, buffer_length, 0);
-            } 
-            // Else if subcarrier_endpoints is not empty, then we send 
-            // the proper per-subcarrier data to each endpoint. 
-            else {
-                for (size_t i = 0; i < sc_endpoint_sockets_.size(); i++) {
-                    Range& sc_range = cfg->subcarrier_endpoints[i].sc_range;
-                    // `payload_offset` is the offset into the payload where
-                    // the data for the given `sc_range` starts.
-                    int payload_offset = buffer_length * sc_range.start / 
-                        cfg->OFDM_DATA_NUM;
-                    int sc_buffer_length = buffer_length *
-                        (sc_range.end - sc_range.start) / cfg->OFDM_DATA_NUM;
-
-                    std::lock_guard<std::mutex> lock(temp_mutex);
-
-                    std::cout << "Sending payload at offset " << payload_offset
-                              << " of length " << sc_buffer_length
-                              << " for sc_range " << sc_range.to_string() 
-                              << std::endl;
-
-                    // ret = send(sc_endpoint_sockets_[i], 
-                    //     payload + payload_offset, sc_buffer_length, 0);
-                }
-            }
-            free(payload);
+            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
+            memcpy(payload, pkt, Packet::kOffsetOfData);
+            run_fft(pkt->data, fft_inout, mkl_handle,
+                payload + Packet::kOffsetOfData);
         } else {
-            ret = send(
-                socket_[radio_id], tx_buffers_[tx_bufs_idx], buffer_length, 0);
+            payload = tx_buffers_[tx_bufs_idx];
         }
-        rt_assert(ret >= 0, "Worker: sendto() failed");
+
+        // If subcarrier_endpoints is empty, we send all data
+        // to a single Millipede process endpoint as normal.
+        if (cfg->subcarrier_endpoints.empty()) {
+            ret = send(socket_[radio_id], payload, buffer_length, 0);
+        } 
+        // Else if subcarrier_endpoints is not empty, then we send 
+        // the proper per-subcarrier data to each endpoint. 
+        else {
+            for (size_t i = 0; i < sc_endpoint_sockets_.size(); i++) {
+                Range& sc_range = cfg->subcarrier_endpoints[i].sc_range;
+                // `payload_offset` is the offset into the payload where
+                // the data for the given `sc_range` starts.
+                int payload_offset = buffer_length * sc_range.start / 
+                    cfg->OFDM_DATA_NUM;
+                int sc_buffer_length = buffer_length *
+                    (sc_range.end - sc_range.start) / cfg->OFDM_DATA_NUM;
+
+                // Remove later. Prevents interleaving of printed log messages. 
+                std::lock_guard<std::mutex> lock(temp_printing_mutex);
+
+                std::cout << "Sending payload at offset " << payload_offset
+                            << " of length " << sc_buffer_length
+                            << " for sc_range " << sc_range.to_string() 
+                            << std::endl;
+
+                // ret += send(sc_endpoint_sockets_[i], 
+                //     payload + payload_offset, sc_buffer_length, 0);
+            }
+        }
+
+        if (cfg->fft_in_rru)
+            free(payload);
+        rt_assert(ret >= 0, 
+            std::string("Worker: sendto() failed. Error: ") + strerror(errno));
 #endif
         if (kDebugSenderReceiver) {
-            auto* pkt = reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]);
+            auto* pkt = reinterpret_cast<Packet*>(payload);
             printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
                    "TX buffer: %zu, TX time: %.3f us\n",
                 tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
@@ -538,17 +557,15 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     }
 }
 
-void Sender::run_fft(const Packet* pkt, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload) const
+void Sender::run_fft(short* IQ_data, complex_float* fft_inout,
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload_data) const
 {
-    simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+    simd_convert_short_to_float(&IQ_data[2 * cfg->OFDM_PREFIX_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     DftiComputeForward(mkl_handle,
         reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
 
-    memcpy(payload, pkt, Packet::kOffsetOfData);
     simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
-        reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
-        cfg->OFDM_CA_NUM * 2);
+        reinterpret_cast<float*>(payload_data), cfg->OFDM_CA_NUM * 2);
 }

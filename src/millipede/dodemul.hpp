@@ -17,10 +17,12 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
+#include <mkl.h>
+#include <stdio.h>
+#include <string.h>
 #include <vector>
-// #include "mkl_dfti.h"
+
+#define USE_MKL_JIT 0 // JIT for cgemm is only available after MKL 2019 update 3
 
 using namespace arma;
 class DoDemul : public Doer {
@@ -81,6 +83,11 @@ private:
     complex_float* equaled_buffer_temp_transposed;
     cx_fmat ue_pilot_data;
     int ue_num_simd256;
+
+#if USE_MKL_JIT
+    void* jitter;
+    cgemm_jit_kernel_t mkl_jit_cgemm;
+#endif
 };
 
 #endif
