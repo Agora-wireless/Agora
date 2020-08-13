@@ -155,6 +155,11 @@ struct Range {
         return (value >= start) && (value < end);
     }
 
+    /// Returns the size or length of this range, i.e., `end - start`.
+    size_t size() const {
+        return end - start;
+    }
+
     std::string to_string() const
     {
         std::ostringstream ret;

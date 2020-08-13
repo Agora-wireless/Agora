@@ -14,12 +14,12 @@
  "subcarrier_endpoints": [
     {
         "sc_start": 0,
-        "sc_end": 600,
+        "sc_end": 576,
         "ip_addr": "127.0.0.1",
         "port": 8800
     }, 
     {
-        "sc_start": 600,
+        "sc_start": 576,
         "sc_end": 1200,
         "ip_addr": "127.0.0.1",
         "port": 8810

@@ -13,9 +13,9 @@
 #include "signalHandler.hpp"
 #include <gflags/gflags.h>
 
-
-DEFINE_string(ldpc_worker_ip_addr, "127.0.0.1",
-    "IP address of the remote LDPC worker to send demodulated data to");
+DEFINE_uint32(sc_endpoint_index, 0, "The index into the "
+    "\"subcarrier_endpoints\" array in the JSON \"conf_file\" "
+    "that this remote subcarrier instance represents.");
 DEFINE_string(conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/config-remote-subcarrier-sim-ul.json",
     "Path to configuration file");
@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
         signalHandler.setupSignalHandlers();
 
         // Create the RemoteWorker instance that represents this process
-        RemoteSubcarrier rsc(cfg);
+        RemoteSubcarrier rsc(cfg, FLAGS_sc_endpoint_index);
 
         sleep(5);
 

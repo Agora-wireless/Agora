@@ -407,8 +407,8 @@ void* Sender::worker_thread(int tid)
                 // the data for the given `sc_range` starts.
                 int payload_offset = buffer_length * sc_range.start / 
                     cfg->OFDM_DATA_NUM;
-                int sc_buffer_length = buffer_length *
-                    (sc_range.end - sc_range.start) / cfg->OFDM_DATA_NUM;
+                int sc_buffer_length = buffer_length * sc_range.size() /
+                    cfg->OFDM_DATA_NUM;
 
                 // Remove later. Prevents interleaving of printed log messages. 
                 std::lock_guard<std::mutex> lock(temp_printing_mutex);

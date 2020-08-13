@@ -59,9 +59,9 @@ Millipede::Millipede(Config* cfg)
     // since the worker threads will use information from the subcarrier manager
     // to determine which subcarrier doers each worker thread should use/create.
     subcarrier_manager_ = new SubcarrierManager(this->config_, freq_ghz,
-        sched_info_arr, complete_task_queue_, csi_buffer_, recip_buffer_,
-        calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
-        dl_ifft_buffer_, phy_stats, stats);
+        Range(0, cfg->OFDM_DATA_NUM), sched_info_arr, complete_task_queue_, 
+        csi_buffer_, recip_buffer_, calib_buffer_, dl_encoded_buffer_, 
+        data_buffer_, demod_soft_buffer_, dl_ifft_buffer_, phy_stats, stats);
 
     /* Create worker threads */
     if (config_->bigstation_mode) {

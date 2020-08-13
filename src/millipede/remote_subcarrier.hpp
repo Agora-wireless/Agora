@@ -43,13 +43,21 @@ public:
 
     /// Creates a new `RemoteSubcarrier`, which initializes its I/O sockets, 
     /// buffers, master thread, worker threads, and event queues.
-    RemoteSubcarrier(Config* cfg)
+    RemoteSubcarrier(Config* cfg, size_t sc_endpoint_index)
         : running_(true)
         , cfg_(cfg)
         , freq_ghz_(measure_rdtsc_freq())
         , base_worker_core_offset(cfg_->core_offset + 1 + cfg_->socket_thread_num)
         , cur_tid(0)
     {
+        rt_assert(sc_endpoint_index < cfg->subcarrier_endpoints.size(), 
+            std::string("sc_endpoint index (")
+            + std::to_string(sc_endpoint_index)
+            + std::string(") is out of bounds in subcarrier endpoints list (")
+            + std::to_string(cfg->subcarrier_endpoints.size())
+            + std::string(") in the JSON config file."));
+        auto& sc_ep = cfg->subcarrier_endpoints[sc_endpoint_index];
+
         MLPD_INFO("[RemoteSubcarrier]: Measured RDTSC frequency = %.2f\n",
             freq_ghz_);
 
@@ -83,9 +91,9 @@ public:
         // creating the worker threads, as worker threads will use information 
         // from the subcarrier manager to determine which subcarrier doers 
         // each worker thread should use and create.
-        sc_mgr_ = new SubcarrierManager(this->cfg_, freq_ghz_, sched_info_arr,
-            complete_task_queue_, csi_buffer_, recip_buffer_, calib_buffer_,
-            dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
+        sc_mgr_ = new SubcarrierManager(this->cfg_, freq_ghz_, sc_ep.sc_range,
+            sched_info_arr, complete_task_queue_, csi_buffer_, recip_buffer_, 
+            calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
             dl_ifft_buffer_, phy_stats_, stats_); 
 
 

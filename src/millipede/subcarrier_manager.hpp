@@ -42,6 +42,7 @@ using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
 class SubcarrierManager {
 public:
     SubcarrierManager(Config* config, double freq_ghz,
+        Range sc_range,
         sched_info_t (&sched_info_arr)[kMaxThreads],
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         // input buffers
@@ -55,9 +56,9 @@ public:
         , freq_ghz_(freq_ghz)
         , phy_stats_(phy_stats)
         , stats_(stats)
+        , sc_range_(sc_range)
         , sched_info_arr_(sched_info_arr)
         , complete_task_queue_(complete_task_queue)
-        , subcarrier_block_size_(lcm(cfg->demul_block_size, cfg->zf_block_size))
         , csi_buffer_(csi_buffer)
         , recip_buffer_(recip_buffer)
         , calib_buffer_(calib_buffer)
@@ -86,7 +87,7 @@ public:
         // so that we can insert the real subcarrier doers at the correct index.
         MLPD_INFO("[SubcarrierManager]: subcarrier block size is %zu, "
                   "requires %zu subcarrier doers.",
-            subcarrier_block_size_, num_subcarrier_ranges());
+            cfg->subcarrier_block_size, num_subcarrier_ranges());
         subcarrier_doers_.reserve(num_subcarrier_ranges());
         for (size_t i = 0; i < num_subcarrier_ranges(); i++) {
             subcarrier_doers_.emplace_back(
@@ -94,11 +95,11 @@ public:
         }
 
         // Calculate the mapping from worker tid to subcarrier doer instance.
-        for (size_t sc_base = 0; sc_base < cfg->OFDM_DATA_NUM;
-             sc_base += subcarrier_block_size_) {
-            Range range_to_insert(sc_base, sc_base + subcarrier_block_size_);
+        for (size_t sc_base = sc_range_.start; sc_base < sc_range_.end;
+             sc_base += cfg->subcarrier_block_size) {
+            Range worker_sc(sc_base, sc_base + cfg->subcarrier_block_size);
             size_t tid = worker_tid_for_subcarrier(sc_base);
-            worker_tid_to_subcarrier_range_[tid].emplace_back(range_to_insert);
+            worker_tid_to_subcarrier_range_[tid].emplace_back(worker_sc);
         }
 
         MLPD_INFO(
@@ -119,12 +120,12 @@ public:
         // thread scheduling, we let the worker threads create the subcarrier
         // instances themselves.
         /*
-        for (size_t sc_base = 0; sc_base < cfg->OFDM_DATA_NUM;
-             sc_base += subcarrier_block_size_) {
+        for (size_t sc_base = sc_range_.start; sc_base < cfg->sc_range_.end;
+             sc_base += cfg->subcarrier_block_size) {
             auto computeSubcarrier = new DoSubcarrier(cfg, subcarrier_doer_tid,
                 freq_ghz, *get_conq(EventType::kSubcarrier),
                 complete_task_queue_, worker_ptoks_ptr[tid], sc_base,
-                subcarrier_block_size_, csi_buffer_, recip_buffer_,
+                cfg->subcarrier_block_size, csi_buffer_, recip_buffer_,
                 calib_buffer_, dl_encoded_buffer_, data_buffer_,
                 demod_soft_buffer_, dl_ifft_buffer_, ue_spec_pilot_buffer_,
                 equal_buffer_, ul_zf_buffer_, dl_zf_buffer_, phy_stats, stats);
@@ -191,18 +192,18 @@ public:
     /// This function also creates an event queue for each subcarrier doer
     /// such that this subcarrier manager can schedule tasks for those doers.
     DoSubcarrier* create_subcarrier_doer(int worker_tid,
-        moodycamel::ProducerToken* worker_producer_token, Range sc_range)
+        moodycamel::ProducerToken* worker_ptok, Range doer_sc_range)
     {
-        rt_assert((sc_range.start) / subcarrier_block_size_
-                == (sc_range.end - 1) / subcarrier_block_size_,
+        rt_assert((doer_sc_range.start) / cfg->subcarrier_block_size
+                == (doer_sc_range.end - 1) / cfg->subcarrier_block_size,
             "Invalid subcarrier range, all subcarrier IDs within the range "
             "do not map to the same index into the subcarrier doers list");
 
         std::lock_guard<std::mutex> lock(subcarrier_doers_mutex_);
 
         MLPD_INFO("SubcarrierManager [create_subcarrier_doer]: worker_tid %d, "
-                  "range %s, worker_producer_token %p\n",
-            worker_tid, sc_range.to_string().c_str(), worker_producer_token);
+                  "range %s, worker_ptok %p\n",
+            worker_tid, doer_sc_range.to_string().c_str(), worker_ptok);
 
         // Not sure how large this queue needs to be;
         // the size was taken from Millipede::initialize_queues().
@@ -210,7 +211,7 @@ public:
 
         // First, move the sched_info_t and its queue into `subcarrier_doers_`,
         // using a temporary nullptr in place of the real doer instance.
-        const size_t dest_index = index_for_subcarrier_id(sc_range.start);
+        const size_t dest_index = index_for_subcarrier_id(doer_sc_range.start);
         subcarrier_doers_[dest_index]
             = std::make_pair(sched_info_t(mt_queue_t(queue_size)),
                 nullptr /* This nullptr will be replaced below */);
@@ -223,7 +224,7 @@ public:
             = subcarrier_doers_[dest_index];
         auto computeSubcarrier = new DoSubcarrier(cfg, worker_tid, freq_ghz_,
             inserted_sched.first.concurrent_q, complete_task_queue_,
-            worker_producer_token, sc_range, csi_buffer_, recip_buffer_,
+            worker_ptok, doer_sc_range, csi_buffer_, recip_buffer_,
             calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
             dl_ifft_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
             ul_zf_buffer_, dl_zf_buffer_, phy_stats_, stats_);
@@ -252,20 +253,13 @@ public:
     /// subcarrier id.
     inline size_t index_for_subcarrier_id(size_t subcarrier_id) const
     {
-        return subcarrier_id / subcarrier_block_size_;
+        return subcarrier_id / cfg->subcarrier_block_size;
     }
 
-    /// Returns the subcarrier block size, which is the least common multiple
-    /// of the zeroforcing block size and the demodulation block size.
-    inline size_t subcarrier_block_size() const
-    {
-        return subcarrier_block_size_;
-    }
-
-    /// Returns the total  number of subcarrier ranges system-wide
+    /// Returns the total number of subcarrier ranges handled by this process.
     inline size_t num_subcarrier_ranges() const
     {
-        return cfg->OFDM_DATA_NUM / subcarrier_block_size_;
+        return sc_range_.size() / cfg->subcarrier_block_size;
     }
 
     /// Return the internal equalization buffer.
@@ -278,6 +272,10 @@ private:
     PhyStats* phy_stats_;
     Stats* stats_;
 
+    /// The subcarrier range handled by this process, which may equal to 
+    /// or a subset of the total number of subcarriers `cfg->OFDM_DATA_NUM`.
+    Range sc_range_;
+
     /// A reference to the array of worker thread queues used by Millipede's
     /// master thread to schedule tasks.
     sched_info_t (&sched_info_arr_)[kMaxThreads];
@@ -286,11 +284,6 @@ private:
     /// Push events onto this queue to inform Millipede's master thread
     /// that a given task has been completed.
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue_;
-
-    /// The range of subcarrier frequencies handled by each subcarrier doer.
-    /// This block size dictates how many subcarrier doers there are, with one
-    /// `DoSubcarrier` instance for each block-sized range of subcarriers.
-    size_t subcarrier_block_size_;
 
     /// The mappings from a given worker thread ID (the index into this array)
     /// to the list of subcarrier ranges for which that worker thread
@@ -304,7 +297,7 @@ private:
     /// if the `subcarrier_block_size` is 48, then:
     /// - element 0 will be the subcarrier doer that handles subcarriers 0-47
     /// - element 1 will be the subcarrier doer that handles subcarriers 48-95
-    /// - etc, until the end of the subcarriers, given by `cfg->OFDM_DATA_NUM`.
+    /// - etc, until the end of the subcarriers, given by `sc_range_`.
     ///
     /// ## Usage ##
     /// - When mutating this list, the `subcarrier_doers_mutex_` should be held.

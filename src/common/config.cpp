@@ -206,6 +206,7 @@ Config::Config(std::string jsonfile)
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
     fft_block_size = tddConf.value("fft_block_size", 4);
+    subcarrier_block_size = lcm(demul_block_size, zf_block_size);
 
     /* Modulation configurations */
     mod_type = modulation == "64QAM"
@@ -248,13 +249,23 @@ Config::Config(std::string jsonfile)
 
     // Parse the array of subcarrier endpoints, if it exists. 
     if (tddConf.find("subcarrier_endpoints") != tddConf.end()) {
+        size_t prev_sc_range_end = 0;
         for (auto& json_ep : tddConf["subcarrier_endpoints"]) {
-            SubcarrierEndpoint new_ep = {
-                .sc_range = Range(json_ep["sc_start"], json_ep["sc_end"]),
+            Range sc_range(json_ep["sc_start"], json_ep["sc_end"]);
+            // Sanity check the range values. 
+            rt_assert(sc_range.start == prev_sc_range_end, "subcarrier endpoint "
+                "ranges must be contiguous and in ascending order.");
+            prev_sc_range_end = sc_range.end;
+            rt_assert(sc_range.size() % subcarrier_block_size == 0,
+                "Each subcarrier endpoint range must be a multiple of the "
+                "subcarrier block size");
+
+            SubcarrierEndpoint new_sc_ep = {
+                .sc_range = sc_range,
                 .ip_addr  = json_ep.value("addr", "127.0.0.1"),
                 .port     = json_ep.value("port", 8800),
             };
-            subcarrier_endpoints.push_back(new_ep);
+            subcarrier_endpoints.push_back(new_sc_ep);
         }
     }
 

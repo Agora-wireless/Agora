@@ -79,7 +79,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         /// The range of subcarriers handled by this subcarrier doer.
-        struct Range subcarrier_range,
+        struct Range sc_range,
         // input buffers
         Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
@@ -92,7 +92,7 @@ public:
         Table<complex_float>& dl_zf_buffer, PhyStats* phy_stats, Stats* stats)
         : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
               worker_producer_token)
-        , subcarrier_range_(subcarrier_range)
+        , sc_range_(sc_range)
         , csi_buffer_(csi_buffer)
         , recip_buffer_(recip_buffer)
         , calib_buffer_(calib_buffer)
@@ -136,9 +136,9 @@ public:
 
     Event_data launch(size_t tag, EventType event_type)
     {
-        rt_assert(subcarrier_range_.contains(gen_tag_t(tag).sc_id),
+        rt_assert(sc_range_.contains(gen_tag_t(tag).sc_id),
             std::string("BUG: DoSubcarrier for ")
-                + subcarrier_range_.to_string()
+                + sc_range_.to_string()
                 + " tried to handle wrong subcarrier ID: "
                 + std::to_string(gen_tag_t(tag).sc_id) + ", event_type "
                 + std::to_string((int)event_type));
@@ -172,11 +172,11 @@ public:
     }
 
     // Returns the range of subcarrier IDs handled by this subcarrier doer.
-    Range& subcarrier_range() { return subcarrier_range_; }
+    Range& sc_range() { return sc_range_; }
 
 private:
     /// The subcarrier range handled by this subcarrier doer.
-    struct Range subcarrier_range_;
+    struct Range sc_range_;
 
     // TODO: We should use owned objects here instead of pointers, but these
     // buffers depend on some Tables beine malloc-ed

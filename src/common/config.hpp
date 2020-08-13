@@ -214,6 +214,13 @@ public:
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
+    /// The range of subcarrier frequencies handled by each subcarrier doer,
+    /// which is defined to be the least common multiple (lcm) of the 
+    /// demodulation block size and the zeroforcing block size.
+    /// This block size dictates how many subcarrier doers there are, with one
+    /// `DoSubcarrier` instance for each block-sized range of subcarriers.
+    size_t subcarrier_block_size;
+
     /// The list of remote subcarrier handler endpoints and the 
     /// ranges of subcarriers that they handle. 
     /// If this list is not empty, then the sender will use it
@@ -221,16 +228,18 @@ public:
     ///
     /// Below is an example json entry for two subcarrier endpoints.
     /// Note that "ip_addr" and "port" are optional.
+    /// Ranges must be contiguous and specified in ascending order,
+    /// and the span of each range must be a multiple of subcarrier block size.
     /// ------------------------------------------------------------
     ///     "subcarrier_endpoints": [
     ///        {
     ///            "sc_start": 0,
-    ///            "sc_end": 600,
+    ///            "sc_end": 576,
     ///            "ip_addr": "127.0.0.1",
     ///            "port": 8800
     ///        }, 
     ///        {
-    ///            "sc_start": 600,
+    ///            "sc_start": 576,
     ///            "sc_end": 1200,
     ///            "ip_addr": "127.0.0.1",
     ///            "port": 8810
