@@ -29,6 +29,17 @@ using json = nlohmann::json;
 typedef unsigned char uchar;
 typedef unsigned short ushort;
 
+
+/// Metadata that describes a remote Subcarrier handler endpoint.
+/// The remote subcarrier endpoint handles the given range of subcarriers
+/// and is listening at the given IP address on the given port.
+struct SubcarrierEndpoint {
+    Range sc_range;
+    std::string ip_addr;
+    int port;
+};
+
+
 class Config {
 public:
     size_t sampsPerSymbol;
@@ -197,6 +208,31 @@ public:
     LDPCconfig LDPC_config;
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
+
+    /// The list of remote subcarrier handler endpoints and the 
+    /// ranges of subcarriers that they handle. 
+    /// If this list is not empty, then the sender will use it
+    /// to send subcarrier-specific packets to the proper handler endpoint.
+    ///
+    /// Below is an example json entry for two subcarrier endpoints.
+    /// Note that "ip_addr" and "port" are optional.
+    /// ------------------------------------------------------------
+    ///     "subcarrier_endpoints": [
+    ///        {
+    ///            "sc_start": 0,
+    ///            "sc_end": 600,
+    ///            "ip_addr": "127.0.0.1",
+    ///            "port": 8800
+    ///        }, 
+    ///        {
+    ///            "sc_start": 600,
+    ///            "sc_end": 1200,
+    ///            "ip_addr": "127.0.0.1",
+    ///            "port": 8810
+    ///        }
+    ///     ]
+    ///
+    std::vector<SubcarrierEndpoint> subcarrier_endpoints;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

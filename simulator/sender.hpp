@@ -105,6 +105,14 @@ private:
     sockaddr_in6 cliaddr_ipv6; // Client address for IPv6
     int socket_[kMaxNumSockets]; // Network sockets
 
+    /// The list of sockets connected to remote subcarrier endpoints.
+    /// This will be the same length as `Config::subcarrier_endpoints`,
+    /// as it is based on the endpoints defined in that list.
+    std::vector<int> sc_endpoint_sockets_; 
+    /// Similar to `sc_endpoint_sockets_`, but contains `sockaddr_in` structs
+    /// for each remote subcarrier endpoint instead of socket file descriptors.
+    std::vector<sockaddr_in> sc_endpoint_sockaddrs_; 
+
     // First dimension:
     //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
     // Second dimension: buffer_length (real and imag)

@@ -7,6 +7,9 @@
 #include "datatype_conversion.h"
 #include <thread>
 
+#include <mutex>
+std::mutex temp_mutex;
+
 bool keep_running = true;
 
 // A spinning barrier to synchronize the start of Sender threads
@@ -100,21 +103,50 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 #else
-    for (size_t i = 0; i < socket_num; i++) {
-        if (kUseIPv4) {
-            socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
-            setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->bs_port + i, cfg->server_addr.c_str());
-        } else {
-            socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
-            setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
-                "fe80::f436:d735:b04a:864a");
-        }
+    // If subcarrier_endpoints is empty, we setup multiple sockets to 
+    // the single remote Millipede process. 
+    if (cfg->subcarrier_endpoints.empty()) {
+        for (size_t i = 0; i < socket_num; i++) {
+            if (kUseIPv4) {
+                socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
+                setup_sockaddr_remote_ipv4(&servaddr_ipv4[i], cfg->bs_port + i, 
+                    cfg->server_addr.c_str());
+            } else {
+                socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
+                setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
+                    "fe80::f436:d735:b04a:864a");
+            }
 
-        int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
-            sizeof(servaddr_ipv4[i]));
-        rt_assert(ret == 0, "UDP socket connect failed");
-        printf("UDP socket %zu connected\n", i);
+            int ret = connect(socket_[i], (struct sockaddr*)&servaddr_ipv4[i],
+                sizeof(servaddr_ipv4[i]));
+            rt_assert(ret == 0, "UDP socket connect failed");
+            printf("UDP socket %zu connected\n", i);
+        }
+    } 
+    // Else if subcarrier_endpoints is not empty, we set up a socket to each
+    // of the remote subcarrier endpoint processes.
+    else {
+        int local_tx_port = cfg->ue_tx_port;
+        for (SubcarrierEndpoint& sc_ep: cfg->subcarrier_endpoints) {
+            // create a local socket for tx to the subcarrier endpoint
+            int socket_fd = setup_socket_ipv4(local_tx_port, false, 0);
+            sc_endpoint_sockets_.push_back(socket_fd);
+            
+            // configure that local socket
+            sc_endpoint_sockaddrs_.push_back(sockaddr_in());
+            sockaddr_in& sockaddr = sc_endpoint_sockaddrs_.back();
+            setup_sockaddr_remote_ipv4(&sockaddr, sc_ep.port, 
+                cfg->server_addr.c_str());
+
+            int ret = connect(socket_fd, (struct sockaddr*)&sockaddr,
+                sizeof(sockaddr));
+            rt_assert(ret == 0,
+                "Failed to connect UDP socket to subcarrier endpoint");
+            printf("UDP socket on tx port %d \"connected\" to endpoint %s:%d\n",
+                local_tx_port, sc_ep.ip_addr.c_str(), sc_ep.port);
+
+            local_tx_port++;
+        }
     }
 #endif
     num_threads_ready_atomic = 0;
@@ -300,8 +332,10 @@ void* Sender::worker_thread(int tid)
     int radio_hi = (tid + 1) * cfg->nRadios / thread_num;
     size_t ant_num_this_thread = cfg->BS_ANT_NUM / thread_num
         + ((size_t)tid < cfg->BS_ANT_NUM % thread_num ? 1 : 0);
-    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
-        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num);
+    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu, "
+        "radio_lo: %d, radio_hi: %d\n",
+        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, thread_num,
+        radio_lo, radio_hi);
     int radio_id = radio_lo;
     while (true) {
         size_t tag = 0;
@@ -333,16 +367,41 @@ void* Sender::worker_thread(int tid)
         // Send a message to the server. We assume that the server is running.
         int ret;
         char* payload;
+
+        // If we're doing FFT on the sender side, do that FFT now.
         if (cfg->fft_in_rru) {
             payload = reinterpret_cast<char*>(malloc(buffer_length));
             run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
                 fft_inout, mkl_handle, payload);
-        }
 
-        // Use the correct send function based on whether Millipede uses DPDK
-        // and whether uses fft in sender
-        if (cfg->fft_in_rru) {
-            ret = send(socket_[radio_id], payload, buffer_length, 0);
+            // If subcarrier_endpoints is empty, we send all data
+            // to a single Millipede process as normal.
+            if (cfg->subcarrier_endpoints.empty()) {
+                ret = send(socket_[radio_id], payload, buffer_length, 0);
+            } 
+            // Else if subcarrier_endpoints is not empty, then we send 
+            // the proper per-subcarrier data to each endpoint. 
+            else {
+                for (size_t i = 0; i < sc_endpoint_sockets_.size(); i++) {
+                    Range& sc_range = cfg->subcarrier_endpoints[i].sc_range;
+                    // `payload_offset` is the offset into the payload where
+                    // the data for the given `sc_range` starts.
+                    int payload_offset = buffer_length * sc_range.start / 
+                        cfg->OFDM_DATA_NUM;
+                    int sc_buffer_length = buffer_length *
+                        (sc_range.end - sc_range.start) / cfg->OFDM_DATA_NUM;
+
+                    std::lock_guard<std::mutex> lock(temp_mutex);
+
+                    std::cout << "Sending payload at offset " << payload_offset
+                              << " of length " << sc_buffer_length
+                              << " for sc_range " << sc_range.to_string() 
+                              << std::endl;
+
+                    // ret = send(sc_endpoint_sockets_[i], 
+                    //     payload + payload_offset, sc_buffer_length, 0);
+                }
+            }
             free(payload);
         } else {
             ret = send(

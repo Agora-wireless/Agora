@@ -241,6 +241,18 @@ Config::Config(std::string jsonfile)
 
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
+    // Parse the array of subcarrier endpoints, if it exists. 
+    if (tddConf.find("subcarrier_endpoints") != tddConf.end()) {
+        for (auto& json_ep : tddConf["subcarrier_endpoints"]) {
+            SubcarrierEndpoint new_ep = {
+                .sc_range = Range(json_ep["sc_start"], json_ep["sc_end"]),
+                .ip_addr  = json_ep.value("addr", "127.0.0.1"),
+                .port     = json_ep.value("port", 8800),
+            };
+            subcarrier_endpoints.push_back(new_ep);
+        }
+    }
+
     OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
     sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
@@ -264,8 +276,9 @@ Config::Config(std::string jsonfile)
               << ", PILOT SYM NUM " << pilot_symbol_num_perframe
               << ", UL SYM NUM " << ul_data_symbol_num_perframe
               << ", DL SYM NUM " << dl_data_symbol_num_perframe
-              << ", OFDM_CA_NUM " << OFDM_CA_NUM << ", OFDM_DATA_NUM "
-              << OFDM_DATA_NUM << ", packet length " << packet_length
+              << ", OFDM_CA_NUM " << OFDM_CA_NUM
+              << ", OFDM_DATA_NUM "<< OFDM_DATA_NUM
+              << ", packet_length " << packet_length
               << std::endl;
 
     if (packet_length >= 9000) {

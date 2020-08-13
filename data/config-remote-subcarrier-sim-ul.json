@@ -1,0 +1,29 @@
+{
+ "symbol_size" : 1,
+ "prefix" : 0,
+ "postfix" : 0,
+ "ofdm_ca_num" : 2048,
+ "ofdm_data_num" : 1200,
+ "cp_len" : 0,
+ "tx_prefix_len" : 0,
+ "ofdm_prefix_len" : 0,
+ "worker_thread_num" : 12,
+ "demul_block_size" : 48,
+ "antenna_num": 8,
+ "fft_in_rru": true,
+ "subcarrier_endpoints": [
+    {
+        "sc_start": 0,
+        "sc_end": 600,
+        "ip_addr": "127.0.0.1",
+        "port": 8800
+    }, 
+    {
+        "sc_start": 600,
+        "sc_end": 1200,
+        "ip_addr": "127.0.0.1",
+        "port": 8810
+    }
+ ]
+}
+
