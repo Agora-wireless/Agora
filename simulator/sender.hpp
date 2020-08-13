@@ -77,8 +77,13 @@ private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
 
-    /// Read 32-bit floating-point IQ samples from filename and populate
-    /// iq_data_short_ by converting to 16-bit fixed-point samples
+    /**
+     * @brief  Read 32-bit floating-point IQ samples from filename and populate
+     * iq_data_short_ by converting to 16-bit fixed-point samples
+     *
+     * filename must contain data for one frame. For every symbol and antenna,
+     * the file must provide `Config::OFDM_FRAME_LEN` IQ samples.
+     */
     void init_iq_from_file(std::string filename);
 
     size_t get_max_symbol_id() const;
@@ -91,14 +96,10 @@ private:
 
     void write_stats_to_file(size_t tx_frame_count) const;
 
-    // Return the TX buffer index for this frame, symbol index, and antenna ID
-    inline size_t get_idx_in_tx_buffers(
-        size_t frame_id, size_t symbol_idx, size_t ant_id) const;
-
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
-    void run_fft(const Packet* pkt, complex_float* fft_inout,
-        DFTI_DESCRIPTOR_HANDLE mkl_handle, uint8_t* payload) const;
+    void run_fft(Packet* pkt, complex_float* fft_inout,
+        DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
@@ -115,11 +116,6 @@ private:
     const uint64_t ticks_100;
     const uint64_t ticks_200;
     const uint64_t ticks_500;
-
-    // First dimension:
-    //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
-    // Second dimension: buffer_length (real and imag)
-    Table<char> tx_buffers_;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
