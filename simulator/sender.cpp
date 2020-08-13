@@ -25,14 +25,6 @@ void delay_ticks(uint64_t start, uint64_t ticks)
         _mm_pause();
 }
 
-inline size_t Sender::get_idx_in_tx_buffers(
-    size_t frame_id, size_t symbol_idx, size_t ant_id) const
-{
-    const size_t frame_slot = frame_id % SOCKET_BUFFER_FRAME_NUM;
-    return (frame_slot * (get_max_symbol_id() * cfg->BS_ANT_NUM))
-        + (symbol_idx * cfg->BS_ANT_NUM) + ant_id;
-}
-
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     size_t delay, bool enable_slow_start, std::string server_mac_addr_str,
     bool create_thread_for_master)
@@ -55,9 +47,6 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     }
     memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
-    tx_buffers_.calloc(
-        SOCKET_BUFFER_FRAME_NUM * get_max_symbol_id() * cfg->BS_ANT_NUM,
-        cfg->packet_length, 64);
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
@@ -100,7 +89,6 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
 Sender::~Sender()
 {
     iq_data_short_.free();
-    tx_buffers_.free();
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         free(packet_count_per_symbol[i]);
     }
@@ -236,7 +224,6 @@ void* Sender::master_thread(int)
 
 void* Sender::worker_thread(int tid)
 {
-    UDPClient udp_client;
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
 
     // Wait for all Sender threads (including master) to start runnung
@@ -244,9 +231,6 @@ void* Sender::worker_thread(int tid)
     while (num_workers_ready_atomic != num_worker_threads_) {
         // Wait
     }
-
-    auto fft_inout = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
 
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     DftiCreateDescriptor(
@@ -256,28 +240,43 @@ void* Sender::worker_thread(int tid)
     const size_t max_symbol_id = get_max_symbol_id();
     const size_t radio_lo = tid * cfg->nRadios / num_worker_threads_;
     const size_t radio_hi = (tid + 1) * cfg->nRadios / num_worker_threads_;
+    const size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
+        + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
+
+    UDPClient udp_client;
+    auto fft_inout = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+    auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
 
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
+    size_t cur_radio = radio_lo;
 
-    size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
-        + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
 
-    size_t cur_radio = radio_lo;
+    // The relationship between packet_length and OFDM_FRAME_LEN is unclear
+    rt_assert(
+        cfg->packet_length >= cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
 
     while (true) {
         gen_tag_t tag = 0;
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
             continue;
 
-        const size_t tx_bufs_idx
-            = get_idx_in_tx_buffers(tag.frame_id, tag.symbol_id, tag.ant_id);
+        size_t start_tsc_send = rdtsc();
+
+        // Send a message to the server. We assume that the server is running.
+        Packet* pkt = socks_pkt_buf;
+#ifdef USE_DPDK
+        rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
+            server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
+            cfg->bs_port + tag.ant_id, cfg->packet_length);
+        pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
+#endif
 
         // Update the TX buffer
-        auto* pkt = (Packet*)(tx_buffers_[tx_bufs_idx]);
         pkt->frame_id = tag.frame_id;
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
         pkt->cell_id = 0;
@@ -285,47 +284,23 @@ void* Sender::worker_thread(int tid)
         memcpy(pkt->data,
             iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
+        if (cfg->fft_in_rru) {
+            run_fft(pkt, fft_inout, mkl_handle);
+        }
 
-        size_t start_tsc_send = rdtsc();
-
-        // Send a message to the server. We assume that the server is running.
 #ifdef USE_DPDK
-        rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
-        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
-            cfg->bs_port + rand() % cfg->socket_thread_num, cfg->packet_length);
-        auto* payload = (uint8_t*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
-            + kPayloadOffset;
-
-        if (cfg->fft_in_rru) {
-            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                fft_inout, mkl_handle, payload);
-        } else {
-            rte_memcpy(payload, tx_buffers_[tx_bufs_idx], cfg->packet_length);
-        }
-
-        size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-        rt_assert(nb_tx_new == 1, "rte_eth_tx_burst() failed");
+        rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
+            "rte_eth_tx_burst() failed");
 #else
-        if (cfg->fft_in_rru) {
-            uint8_t* payload
-                = reinterpret_cast<uint8_t*>(malloc(cfg->packet_length));
-            run_fft(reinterpret_cast<Packet*>(tx_buffers_[tx_bufs_idx]),
-                fft_inout, mkl_handle, payload);
-            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio, payload,
-                cfg->packet_length);
-            free(payload);
-        } else {
-            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
-                reinterpret_cast<uint8_t*>(tx_buffers_[tx_bufs_idx]),
-                cfg->packet_length);
-        }
+        udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
+            reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
 #endif
+
         if (kDebugSenderReceiver) {
             printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
-                   "TX buffer: %zu, TX time: %.3f us\n",
+                   "TX time: %.3f us\n",
                 tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
-                pkt->symbol_id, pkt->ant_id, tx_bufs_idx,
+                pkt->symbol_id, pkt->ant_id,
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
         }
 
@@ -418,17 +393,16 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     }
 }
 
-void Sender::run_fft(const Packet* pkt, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle, uint8_t* payload) const
+void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
+    DFTI_DESCRIPTOR_HANDLE mkl_handle) const
 {
+    // pkt->data has OFDM_FRAME_LEN short samples. After FFT, we'll remove
+    // OFDM_PREFIX_LEN initial samples and have OFDM_CA_NUM short samples.
     simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    DftiComputeForward(mkl_handle,
-        reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
-    memcpy(payload, pkt, Packet::kOffsetOfData);
-    simd_convert_float32_to_float16(reinterpret_cast<float*>(fft_inout),
-        reinterpret_cast<float*>(payload + Packet::kOffsetOfData),
-        cfg->OFDM_CA_NUM * 2);
+    simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data),
+        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 }
