@@ -24,6 +24,8 @@
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
 
+#define MAX_NUM_SYMBOL_PER_FRAME 70
+
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
