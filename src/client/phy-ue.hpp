@@ -365,11 +365,7 @@ private:
     // long long* demul_output;
     // float* equal_output;
     size_t record_frame = SIZE_MAX;
-#if USE_IPV4
     struct sockaddr_in* servaddr_; /* server address */
-#else
-    struct sockaddr_in6* servaddr_; /* server address */
-#endif
     int* socket_;
 };
 #endif
