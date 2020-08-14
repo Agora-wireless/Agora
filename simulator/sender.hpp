@@ -6,29 +6,6 @@
 #ifndef SENDER
 #define SENDER
 
-#include <arpa/inet.h>
-#include <iostream>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <vector>
-// #include <ctime>
-#include <algorithm>
-#include <boost/align/aligned_allocator.hpp>
-#include <chrono>
-#include <emmintrin.h>
-#include <immintrin.h>
-#include <malloc.h>
-#include <numeric>
-#include <pthread.h>
-#include <signal.h>
-#include <thread>
-#include <time.h>
-#include <unistd.h>
-
 #include "Symbols.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
@@ -37,6 +14,26 @@
 #include "mkl_dfti.h"
 #include "net.hpp"
 #include "utils.h"
+#include <algorithm>
+#include <arpa/inet.h>
+#include <boost/align/aligned_allocator.hpp>
+#include <chrono>
+#include <emmintrin.h>
+#include <immintrin.h>
+#include <iostream>
+#include <malloc.h>
+#include <numeric>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <thread>
+#include <time.h>
+#include <unistd.h>
+#include <vector>
 
 #ifdef USE_DPDK
 #include "dpdk_transport.hpp"
@@ -44,14 +41,30 @@
 #endif
 
 class Sender {
-public:
-    static constexpr size_t kMaxNumSockets = 128; // Max network sockets
 
 public:
-    Sender(Config* config, size_t thread_num, size_t core_offset = 30,
+    /**
+     * @brief Create and optionally start a Sender that sends IQ packets to a
+     * server with MAC address [server_mac_addr_str]
+     *
+     * @param config The Millipede config @param num_worker_threads Number of
+     * worker threads sending packets 
+     *
+     * @param core_offset The master thread runs on core [core_offset]. Worker
+     * thread #i runs on core [core_offset + i]
+     *
+     * @param delay The TTI slot duration
+     *
+     * @param enable_slow_start If true, initially frames are sent in a duration
+     * larger than the TTI
+     *
+     * @param server_mac_addr_str The MAC address of the server's NIC
+     */
+    Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
         size_t delay = 0, bool enable_slow_start = true,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
+
     ~Sender();
 
     void startTX();
@@ -62,31 +75,36 @@ public:
 
 private:
     void* master_thread(int tid);
-    void* data_update_thread(int tid);
     void* worker_thread(int tid);
-    void init_IQ_from_file();
+
+    /**
+     * @brief  Read 32-bit floating-point IQ samples from filename and populate
+     * iq_data_short_ by converting to 16-bit fixed-point samples
+     *
+     * filename must contain data for one frame. For every symbol and antenna,
+     * the file must provide `Config::OFDM_FRAME_LEN` IQ samples.
+     */
+    void init_iq_from_file(std::string filename);
+
     size_t get_max_symbol_id() const;
-    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
+
+    // Launch threads to run worker with thread IDs from tid_start to tid_end
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+
     void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
     void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
-    void update_tx_buffer(gen_tag_t tag);
-    void write_stats_to_file(size_t tx_frame_count) const;
 
-    // Return the TX buffer for a tag. The tag must have frame, symbol, and
-    // antenna fields set
-    inline size_t tag_to_tx_buffers_index(gen_tag_t tag) const;
+    void write_stats_to_file(size_t tx_frame_count) const;
 
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
-    void run_fft(short* pkt, complex_float* fft_inout,
-        DFTI_DESCRIPTOR_HANDLE mkl_handle, char* payload_data) const;
+    void run_fft(Packet* pkt, complex_float* fft_inout,
+        DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
-    const size_t thread_num; // Number of worker threads sending packets
-    const size_t socket_num; // Total network sockets across worker threads
+    const size_t num_worker_threads_; // Number of worker threads sending pkts
     const bool enable_slow_start; // Send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
@@ -99,29 +117,15 @@ private:
     const uint64_t ticks_200;
     const uint64_t ticks_500;
 
-    sockaddr_in servaddr_ipv4[kMaxNumSockets]; // Server address for IPv4
-    sockaddr_in cliaddr_ipv4; // Client address for IPv4
-    sockaddr_in6 servaddr_ipv6[kMaxNumSockets]; // Server address for IPv6
-    sockaddr_in6 cliaddr_ipv6; // Client address for IPv6
-    int socket_[kMaxNumSockets]; // Network sockets
-
-    // First dimension:
-    //   SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
-    // Second dimension: buffer_length (real and imag)
-    Table<char> tx_buffers_;
-
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ConcurrentQueue<size_t> completion_queue_
-        = moodycamel::ConcurrentQueue<size_t>(1024);
-    moodycamel::ConcurrentQueue<size_t> data_update_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
     moodycamel::ProducerToken** task_ptok;
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
-    Table<float> IQ_data;
-    Table<ushort> IQ_data_coded;
+    Table<unsigned short> iq_data_short_;
 
     // Number of packets transmitted for each symbol in a frame
     size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
