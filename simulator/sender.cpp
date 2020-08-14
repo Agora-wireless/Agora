@@ -317,15 +317,15 @@ void* Sender::worker_thread(int tid)
         else {
             for (SubcarrierEndpoint& sc_ep : cfg->subcarrier_endpoints) {
                 Range& sc_range = sc_ep.sc_range;
-                int max_data_len = cfg->packet_length - Packet::kOffsetOfData;
-                // The offset into the packet's data where the data for
-                // the given `sc_range` begins.
+                // Calculate the offset into the packet's data where the data
+                // for this `sc_range` begins, and the length of that data.
+                
+                // FIXME: these aren't clean modulos of pkt->data's length,
+                //        so it won't always send the right slice of pkt->data.
                 int sc_data_offset
-                    = max_data_len * sc_range.start / cfg->OFDM_DATA_NUM;
-                // The length of the subset of packet data that corresponds
-                // to the given `sc_range`.
+                    = data_len * sc_range.start / cfg->OFDM_DATA_NUM;
                 int sc_data_len
-                    = max_data_len * sc_range.size() / cfg->OFDM_DATA_NUM;
+                    = data_len * sc_range.size() / cfg->OFDM_DATA_NUM;
 
                 // Use memmove instead of memcpy due to potential overlap, as
                 // we copy a later part of the packet's data buffer
