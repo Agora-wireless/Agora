@@ -91,6 +91,15 @@ public:
         std::string name, size_t elem_size, size_t buffer_size, void* buff);
 };
 
+/// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
+/// a power of two.
+template <uint64_t PowerOfTwoNumber, typename T> static constexpr T roundup(T x)
+{
+    static_assert(is_power_of_two(PowerOfTwoNumber),
+        "PowerOfTwoNumber must be a power of 2");
+    return ((x) + T(PowerOfTwoNumber - 1)) & (~T(PowerOfTwoNumber - 1));
+}
+
 /// Check a condition at runtime. If the condition is false, throw exception.
 /// This is faster than rt_assert(cond, std::string) as it avoids string
 /// construction.

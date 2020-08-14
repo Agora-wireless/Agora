@@ -56,8 +56,9 @@ public:
     static void print_pkt(int src_ip, int dst_ip, uint16_t src_port,
         uint16_t dst_port, int len, int tid);
 
-    /// Return a fresh rte_mbuf with ethernet, ip, and udp header filled
-    static rte_mbuf* generate_udp_header(rte_mempool* mbuf_pool,
+    /// Allocate and return a fresh rte_mbuf with Ethernet, IPv4, and UDP
+    /// header filled
+    static rte_mbuf* alloc_udp(rte_mempool* mbuf_pool,
         rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
         uint32_t src_ip_addr, uint32_t dst_ip_addr, uint16_t src_udp_port,
         uint16_t dst_udp_port, size_t buffer_length);

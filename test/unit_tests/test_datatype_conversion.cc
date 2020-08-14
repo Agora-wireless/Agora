@@ -16,11 +16,11 @@ TEST(SIMD, float_32_to_16)
 
     float* medium = reinterpret_cast<float*>(
         memalign(64, kSIMDTestNum / 2 * sizeof(float)));
-    simd_convert_float32_to_float16(in_buf, medium, kSIMDTestNum);
+    simd_convert_float32_to_float16(medium, in_buf, kSIMDTestNum);
 
     float* out_buf
         = reinterpret_cast<float*>(memalign(64, kSIMDTestNum * sizeof(float)));
-    simd_convert_float16_to_float32(medium, out_buf, kSIMDTestNum);
+    simd_convert_float16_to_float32(out_buf, medium, kSIMDTestNum);
 
     for (size_t i = 0; i < kSIMDTestNum; i++) {
         ASSERT_LE(abs(in_buf[i] - out_buf[i]), allowed_error);

@@ -151,7 +151,6 @@ public:
     size_t UE_ANT_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
-    size_t OFDM_DATA_NUM_pad; // Pad for cache line size (64 bytes)
     size_t OFDM_PILOT_NUM;
     size_t OFDM_PILOT_SPACING;
     size_t OFDM_DATA_START;
@@ -160,7 +159,6 @@ public:
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
-    size_t OFDM_SYM_LEN;
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
@@ -207,10 +205,9 @@ public:
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;
+
     // Number of bytes per code block
     size_t num_bytes_per_cb;
-    // Number of bytes per code block padded for cache line size (64 bytes)
-    size_t num_bytes_per_cb_pad;
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
@@ -370,7 +367,8 @@ public:
     {
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        return &decoded_buffer[total_data_symbol_id][num_bytes_per_cb_pad
+        return &decoded_buffer[total_data_symbol_id][roundup<64>(
+                                                         num_bytes_per_cb)
             * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
     }
 
@@ -378,7 +376,7 @@ public:
     inline int8_t* get_info_bits(Table<int8_t>& info_bits, size_t symbol_id,
         size_t ue_id, size_t cb_id) const
     {
-        return &info_bits[symbol_id][num_bytes_per_cb_pad
+        return &info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
             * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
     }
 
@@ -389,8 +387,9 @@ public:
         size_t total_data_symbol_id
             = get_total_data_symbol_idx(frame_id, symbol_id);
         size_t num_encoded_bytes_per_cb = LDPC_config.cbCodewLen / mod_type;
-        return &encoded_buffer[total_data_symbol_id][OFDM_DATA_NUM_pad * ue_id
-            + num_encoded_bytes_per_cb * cb_id];
+        return &encoded_buffer[total_data_symbol_id]
+                              [roundup<64>(OFDM_DATA_NUM) * ue_id
+                                  + num_encoded_bytes_per_cb * cb_id];
     }
 
     Config(std::string);

@@ -83,7 +83,6 @@ Config::Config(std::string jsonfile)
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
-    OFDM_DATA_NUM_pad = (OFDM_DATA_NUM + 63) >> 6 << 6;
     OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
     OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
@@ -221,16 +220,13 @@ Config::Config(std::string jsonfile)
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
     LDPC_config.Zc = tddConf.value("Zc", 72);
     LDPC_config.nRows = tddConf.value("nRows", (LDPC_config.Bg == 1) ? 46 : 42);
-    LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
-    LDPC_config.cbLen = LDPC_config.Zc * ldpc_num_input_cols(LDPC_config.Bg);
-    LDPC_config.cbCodewLen = (LDPC_config.Bg == 1)
-        ? LDPC_config.Zc * (LDPC_config.nRows + 20)
-        : LDPC_config.Zc * (LDPC_config.nRows + 8);
+    LDPC_config.cbLen = ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc);
+    LDPC_config.cbCodewLen = ldpc_num_encoded_bits(
+        LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows);
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
-    num_bytes_per_cb = ((LDPC_config.cbLen + 7) >> 3);
-    num_bytes_per_cb_pad = (((LDPC_config.cbLen + 7) >> 3) + 63) >> 6 << 6;
+    num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
 
     rt_assert(LDPC_config.nblocksInSymbol > 0,
         "LDPC expansion factor is too large for number of OFDM data "
@@ -253,8 +249,8 @@ Config::Config(std::string jsonfile)
         for (auto& json_ep : tddConf["subcarrier_endpoints"]) {
             Range sc_range(json_ep["sc_start"], json_ep["sc_end"]);
             // Sanity check the range values. 
-            rt_assert(sc_range.start == prev_sc_range_end, "subcarrier endpoint "
-                "ranges must be contiguous and in ascending order.");
+            rt_assert(sc_range.start == prev_sc_range_end, "subcarrier endpoint"
+                " ranges must be contiguous and in ascending order.");
             prev_sc_range_end = sc_range.end;
             rt_assert(sc_range.size() % subcarrier_block_size == 0,
                 "Each subcarrier endpoint range must be a multiple of the "
@@ -269,10 +265,10 @@ Config::Config(std::string jsonfile)
         }
     }
 
-    OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
-    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
-    sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
+    sampsPerSymbol = symbolSize * (OFDM_CA_NUM + CP_LEN) + prefix + postfix;
     packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
+
+    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
 
     data_bytes_num_persymbol
         = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
@@ -393,7 +389,7 @@ void Config::genData()
     // Get uplink and downlink raw bits either from file or random numbers
     size_t num_bytes_per_ue = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     size_t num_bytes_per_ue_pad
-        = num_bytes_per_cb_pad * LDPC_config.nblocksInSymbol;
+        = roundup<64>(num_bytes_per_cb) * LDPC_config.nblocksInSymbol;
     dl_bits.malloc(
         dl_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
     dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
