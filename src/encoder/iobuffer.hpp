@@ -1,6 +1,7 @@
 #ifndef _IOBUFFER_H_
 #define _IOBUFFER_H_
 
+#include "encoder.hpp"
 #include <immintrin.h>
 #include <math.h>
 #include <stdint.h>

@@ -5,8 +5,11 @@
 #include "encoder.hpp"
 #include "iobuffer.hpp"
 #include "phy_ldpc_encoder_5gnr.h"
+#include "utils.h"
 #include <assert.h>
 #include <malloc.h>
+
+LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize, uint8_t num_ways);
 
 template <typename T>
 T* aligned_malloc(const int size, const unsigned alignment)
@@ -119,30 +122,29 @@ static inline uint8_t select_base_matrix_entry(uint16_t Zc)
 }
 
 // Return the number of bytes needed to store n_bits bits
-static inline size_t bits_to_bytes(size_t n_bits) { return (n_bits + 7) >> 3; }
+static inline size_t bits_to_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
 
 // Return the number of non-expanded base graph columns used for information
 // bits for this base graph
 static inline size_t ldpc_num_input_cols(size_t base_graph)
 {
-    return (
-        base_graph == 1 ? avx2enc::BG1_COL_INF_NUM : avx2enc::BG2_COL_INF_NUM);
+    return (base_graph == 1 ? BG1_COL_INF_NUM : BG2_COL_INF_NUM);
 }
 
 // Return the maximum number of rows in this non-expanded base graph
 static inline size_t ldpc_max_num_rows(size_t base_graph)
 {
-    return (base_graph == 1 ? avx2enc::BG1_ROW_TOTAL : avx2enc::BG2_ROW_TOTAL);
+    return (base_graph == 1 ? BG1_ROW_TOTAL : BG2_ROW_TOTAL);
 }
 
-// Return the number of input information bits per code block with this base
+// Return the number of input information bits per codeword with this base
 // graph and expansion factor
 static inline size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
 {
     return zc * ldpc_num_input_cols(base_graph);
 }
 
-// Return the number of parity bits per code block with this base graph and
+// Return the number of parity bits per codeword with this base graph and
 // expansion factor
 static inline size_t ldpc_max_num_parity_bits(size_t base_graph, size_t zc)
 {
@@ -155,12 +157,12 @@ static inline size_t ldpc_max_num_encoded_bits(size_t base_graph, size_t zc)
 {
     static size_t num_punctured_cols = 2;
     return zc
-        * (base_graph == 1 ? (avx2enc::BG1_COL_TOTAL - num_punctured_cols)
-                           : (avx2enc::BG2_COL_TOTAL - num_punctured_cols));
+        * (base_graph == 1 ? (BG1_COL_TOTAL - num_punctured_cols)
+                           : (BG2_COL_TOTAL - num_punctured_cols));
 }
 
-// Return the number of total bits per code block with this base graph and
-// expansion factor
+// Return the number of total bits per codeword (i.e., including both input
+// bits and parity bits) with this base graph and expansion factor
 static inline size_t ldpc_num_encoded_bits(
     size_t base_graph, size_t zc, size_t nRows)
 {
@@ -172,18 +174,17 @@ static inline size_t ldpc_num_encoded_bits(
 // encoding
 static inline size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
 {
-    // We add avx2enc::PROC_BYTES as padding for the encoder's scatter function
-    return bits_to_bytes(ldpc_num_input_bits(base_graph, zc))
-        + avx2enc::PROC_BYTES;
+    // We add kMaxProcBytes as padding for the encoder's scatter function
+    return bits_to_bytes(ldpc_num_input_bits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the parity buffer used for LDPC
 // encoding
 static inline size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
 {
-    // We add avx2enc::PROC_BYTES as padding for the encoder's gather function
+    // We add kMaxProcBytes as padding for the encoder's gather function
     return bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc))
-        + avx2enc::PROC_BYTES;
+        + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the output encoded codeword buffer
@@ -191,9 +192,18 @@ static inline size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
 static inline size_t ldpc_encoding_encoded_buf_size(
     size_t base_graph, size_t zc)
 {
-    // We add avx2enc::PROC_BYTES as padding for the encoder's gather function
+    // We add kMaxProcBytes as padding for the encoder's gather function
     return bits_to_bytes(ldpc_max_num_encoded_bits(base_graph, zc))
-        + avx2enc::PROC_BYTES;
+        + kMaxProcBytes;
+}
+
+// Return the minimum LDPC expansion factor supported
+static inline size_t ldpc_get_min_zc() { return kUseAVX2Encoder ? 2 : 6; }
+
+// Return the maximum LDPC expansion factor supported
+static inline size_t ldpc_get_max_zc()
+{
+    return kUseAVX2Encoder ? avx2enc::kZcMax : ZC_MAX;
 }
 
 // Generate the codeword output and parity buffer for this input buffer
@@ -204,16 +214,18 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     const size_t num_input_bits = ldpc_num_input_bits(base_graph, zc);
     const size_t num_parity_bits = nRows * zc;
 
-    avx2enc::bblib_ldpc_encoder_5gnr_request req;
-    avx2enc::bblib_ldpc_encoder_5gnr_response resp;
+    bblib_ldpc_encoder_5gnr_request req;
+    bblib_ldpc_encoder_5gnr_response resp;
     req.baseGraph = base_graph;
+    req.nRows = kUseAVX2Encoder ? ldpc_max_num_rows(base_graph) : nRows;
     req.Zc = zc;
     req.nRows = nRows;
     req.numberCodeblocks = 1;
     req.input[0] = const_cast<int8_t*>(input_buffer);
     resp.output[0] = parity_buffer;
 
-    avx2enc::ldpc_encoder_avx2(&req, &resp);
+    kUseAVX2Encoder ? avx2enc::bblib_ldpc_encoder_5gnr(&req, &resp)
+                    : bblib_ldpc_encoder_5gnr(&req, &resp);
 
     // Copy punctured input bits from the encoding request, and parity bits from
     // the encoding response into encoded_buffer
@@ -233,92 +245,24 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     } else {
         // Otherwise, we need to memcpy from/to byte-unaligned locations. A
         // simple but perhaps inefficient way to do this is to use the encoder's
-        // internal scatter/gather functions.
-        ALIGNED_(avx2enc::PROC_BYTES)
-        int8_t internal_buffer0[avx2enc::BG1_COL_INF_NUM * avx2enc::PROC_BYTES]
+        // internal scatter/gather functions. We don't have access to these
+        // functions for FlexRAN's internal AVX-512 encoder.
+        if (zc >= avx2enc::kProcBytes * 8) {
+            fprintf(stderr,
+                "Zc values >= %zu that are not multiples of four are not "
+                "supported yet.\n",
+                zc);
+            exit(-1);
+        }
+
+        __attribute__((aligned(avx2enc::kProcBytes)))
+        int8_t internal_buffer0[BG1_COL_INF_NUM * avx2enc::kProcBytes]
             = { 0 };
-        ALIGNED_(avx2enc::PROC_BYTES)
-        int8_t internal_buffer1[avx2enc::BG1_ROW_TOTAL * avx2enc::PROC_BYTES]
+        __attribute__((aligned(avx2enc::kProcBytes)))
+        int8_t internal_buffer1[BG1_ROW_TOTAL * avx2enc::kProcBytes]
             = { 0 };
-        ALIGNED_(avx2enc::PROC_BYTES)
-        int8_t internal_buffer2[avx2enc::BG1_COL_TOTAL * avx2enc::PROC_BYTES]
-            = { 0 };
-
-        auto adapter_func = avx2enc::ldpc_select_adapter_func(zc);
-
-        // Scatter input and parity into zc-bit chunks
-        adapter_func(
-            (int8_t*)input_buffer, internal_buffer0, zc, num_input_bits, 1);
-        adapter_func(parity_buffer, internal_buffer1, zc, num_parity_bits, 1);
-
-        // Concactenate the chunks for input and parity
-        memcpy(internal_buffer2,
-            internal_buffer0 + kNumPuncturedCols * avx2enc::PROC_BYTES,
-            (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
-                * avx2enc::PROC_BYTES);
-        memcpy(internal_buffer2
-                + (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
-                    * avx2enc::PROC_BYTES,
-            internal_buffer1,
-            ldpc_max_num_rows(base_graph) * avx2enc::PROC_BYTES);
-
-        // Gather the concatenated chunks to create the encoded buffer
-        adapter_func(encoded_buffer, internal_buffer2, zc,
-            ldpc_num_encoded_bits(base_graph, zc, nRows), 0);
-    }
-}
-
-// Generate the codeword output and parity buffer for this input buffer
-static inline void ldpc_encode_helper_avx512(size_t base_graph, size_t zc,
-    size_t nRows, int8_t* encoded_buffer, int8_t* parity_buffer,
-    int8_t* input_buffer)
-{
-    const size_t num_input_bits = ldpc_num_input_bits(base_graph, zc);
-    const size_t num_parity_bits = nRows * zc;
-    struct bblib_ldpc_encoder_5gnr_request ldpc_encoder_5gnr_request {
-    };
-    struct bblib_ldpc_encoder_5gnr_response ldpc_encoder_5gnr_response {
-    };
-
-    ldpc_encoder_5gnr_request.Zc = zc;
-    ldpc_encoder_5gnr_request.baseGraph = base_graph;
-    ldpc_encoder_5gnr_request.nRows = nRows;
-    ldpc_encoder_5gnr_request.numberCodeblocks = 1;
-
-    ldpc_encoder_5gnr_request.input[0] = input_buffer;
-    ldpc_encoder_5gnr_response.output[0] = parity_buffer;
-
-    bblib_ldpc_encoder_5gnr(
-        &ldpc_encoder_5gnr_request, &ldpc_encoder_5gnr_response);
-
-    // Copy punctured input bits from the encoding request, and parity bits from
-    // the encoding response into encoded_buffer
-    static size_t kNumPuncturedCols = 2;
-    if (zc % 4 == 0) {
-        // In this case, the start and end of punctured input bits is
-        // byte-aligned, so we can memcpy
-        const size_t num_punctured_bytes
-            = bits_to_bytes(zc * kNumPuncturedCols);
-        const size_t num_input_bytes_to_copy
-            = bits_to_bytes(num_input_bits) - num_punctured_bytes;
-
-        memcpy(encoded_buffer, input_buffer + num_punctured_bytes,
-            num_input_bytes_to_copy);
-        memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
-            bits_to_bytes(num_parity_bits));
-    } else {
-        // Otherwise, we need to memcpy from/to byte-unaligned locations. A
-        // simple but perhaps inefficient way to do this is to use the encoder's
-        // internal scatter/gather functions.
-        // TODO: use adapter function from FlexRAN (time will reduce around 1 us)
-        ALIGNED_(avx2enc::PROC_BYTES)
-        int8_t internal_buffer0[avx2enc::BG1_COL_INF_NUM * avx2enc::PROC_BYTES]
-            = { 0 };
-        ALIGNED_(avx2enc::PROC_BYTES)
-        int8_t internal_buffer1[avx2enc::BG1_ROW_TOTAL * avx2enc::PROC_BYTES]
-            = { 0 };
-        ALIGNED_(avx2enc::PROC_BYTES)
-        int8_t internal_buffer2[avx2enc::BG1_COL_TOTAL * avx2enc::PROC_BYTES]
+        __attribute__((aligned(avx2enc::kProcBytes)))
+        int8_t internal_buffer2[BG1_COL_TOTAL * avx2enc::kProcBytes]
             = { 0 };
 
         auto adapter_func = avx2enc::ldpc_select_adapter_func(zc);
@@ -330,14 +274,14 @@ static inline void ldpc_encode_helper_avx512(size_t base_graph, size_t zc,
 
         // Concactenate the chunks for input and parity
         memcpy(internal_buffer2,
-            internal_buffer0 + kNumPuncturedCols * avx2enc::PROC_BYTES,
+            internal_buffer0 + kNumPuncturedCols * avx2enc::kProcBytes,
             (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
-                * avx2enc::PROC_BYTES);
+                * avx2enc::kProcBytes);
         memcpy(internal_buffer2
                 + (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
-                    * avx2enc::PROC_BYTES,
+                    * avx2enc::kProcBytes,
             internal_buffer1,
-            ldpc_max_num_rows(base_graph) * avx2enc::PROC_BYTES);
+            ldpc_max_num_rows(base_graph) * avx2enc::kProcBytes);
 
         // Gather the concatenated chunks to create the encoded buffer
         adapter_func(encoded_buffer, internal_buffer2, zc,

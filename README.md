@@ -33,15 +33,13 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
        /opt -name compilervars.sh) intel64`. After running this command, ensure
        that `icc --version` reports 19.0.4.
 
-## Millipede quickstart
+   * Optinal: DPDK 
+     * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
+       Intel 40 GbE and Mellanox 100 GbE NICs in Millipede.
+     * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
+       DESTDIR=/usr -j`
 
- * Run the tests
-    ```
-    cd test/test_millipede
-    cmake .
-    make -j
-    ./test_millipede.sh 100 out % Runs the test for 100 iterations
-    ```
+## Millipede quickstart
 
  * Build Millipede
     ```
@@ -52,17 +50,31 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
     make -j
     ```
 
- * To include LDPC in the build, run `cmake -DUSE_LDPC=1`.
+ * Run end-to-end tests
+    ```
+    ./test/test_millipede/test_millipede.sh 100 out % Runs test for 100 iterations
+    ```
 
  * Run Millipede with simulated client traffic
-   * First, return to the base directory (`cd ..`), then run `./build/data_generator data/tddconfig-sim-ul.json` to generate data
+   * First, return to the base directory (`cd ..`), then run
+     `./build/data_generator data/tddconfig-sim-ul.json` to generate data
      files.
-   * In one terminal, run `./build/millipede data/tddconfig-sim-ul.json` to start
-     Millipede with uplink configuration.
+   * In one terminal, run `./build/millipede data/tddconfig-sim-ul.json` to
+     start Millipede with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
-     --delay=5000 --enable_slow_start=false
+     --delay=5000 --enable_slow_start=true
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
+   * Note: make sure Millipede and sender are using different set of cores, 
+     otherwise there will be performance slow down.
+
+ * Run Millipede with DPDK
+   * Run `cmake -DUSE_DPDK=1` to enable DPDK in the build.
+   * For Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0` to exclude
+     Mellanox libraries in the build.
+   * When running the sender with DPDK, it is required to set the MAC address
+     of the NIC used by Millipede. To do this, pass `--server_mac_addr=` to
+     `./build/sender`.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    "Hardware mode" section below.
@@ -102,7 +114,6 @@ traffic with hardware UEs (e.g., Iris devices)
 
  * Run the client on a machine connected to the Iris UEs
    * Rebuild the code
-     * Set `kConnectUDP = false` in `src/common/Symbols.hpp`
      * Pass `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.

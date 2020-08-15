@@ -12,7 +12,7 @@ then
     ISA_SELECT="-DISA_AVX2=1"
 fi
 
-# Generate makefiles
-rm -rf CMakeFiles/
-rm CMakeCache.txt
-cmake -G "Unix Makefiles" $ISA_SELECT . || exit 1
+# Uncomment to generate makefiles if needed
+#rm -rf CMakeFiles/
+#rm CMakeCache.txt
+#cmake -G "Unix Makefiles" $ISA_SELECT . || exit 1

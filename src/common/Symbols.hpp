@@ -44,6 +44,7 @@ enum class EventType : int {
     kPrecode,
     kPacketTX,
     kDecode,
+    kDecodeLast,
     kEncode,
     kRC,
     kRXSymbol,
@@ -94,13 +95,6 @@ enum class PrintType : int {
 static constexpr size_t kEnableThreadPinning = true;
 
 #define BIGSTATION 0
-#define USE_IPV4 1
-#if USE_IPV4
-static constexpr bool kUseIPv4 = true;
-#else
-static constexpr bool kUseIPv4 = false;
-#endif
-
 #ifdef USE_DPDK
 static constexpr bool kUseDPDK = true;
 #else
@@ -119,7 +113,6 @@ static constexpr bool kUseArgos = true;
 static constexpr bool kUseArgos = false;
 #endif
 
-static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 
@@ -188,19 +181,21 @@ static inline std::string thread_type_str(ThreadType thread_type)
 
 enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
-struct LDPCconfig {
-    uint16_t Bg;
+class LDPCconfig {
+public:
+    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
+    uint16_t Zc; /// The 5G NR LDPC expansion factor
+    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
+
+    /// Allow the LDPC decoder to terminate without completing all iterations
+    /// if it decodes the codeblock eariler
     bool earlyTermination;
-    int16_t decoderIter;
-    uint16_t Zc;
-    size_t nRows;
-    uint32_t cbEncLen;
-    uint32_t cbLen;
-    uint32_t cbCodewLen;
+
+    size_t nRows; /// Number of rows in the LDPC base graph to use
+    uint32_t cbLen; /// Number of information bits input to LDPC encoding
+    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
     size_t nblocksInSymbol;
 };
-
-typedef struct LDPCconfig LDPCconfig;
 
 // Maximum number of symbols per frame allowed by Millipede
 static constexpr size_t kMaxSymbolsPerFrame = 1400;
@@ -234,10 +229,10 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
-#ifdef USE_LDPC
-static constexpr bool kUseLDPC = true;
+#ifdef USE_AVX2_ENCODER
+static constexpr bool kUseAVX2Encoder = true;
 #else
-static constexpr bool kUseLDPC = false;
+static constexpr bool kUseAVX2Encoder = false;
 #endif
 
 #if defined USE_REMOTE

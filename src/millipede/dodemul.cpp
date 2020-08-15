@@ -15,16 +15,14 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
-    Table<complex_float>& equal_buffer, Table<uint8_t>& demod_hard_buffer,
-    Table<int8_t>& demod_soft_buffer, PhyStats* in_phy_stats,
-    Stats* stats_manager)
+    Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
+    PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
     , ul_zf_buffer_(ul_zf_buffer)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
-    , demod_hard_buffer_(demod_hard_buffer)
     , demod_soft_buffer_(demod_soft_buffer)
     , phy_stats(in_phy_stats)
 {
@@ -43,8 +41,20 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
         ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
     ue_pilot_data = mat_pilot_data.st();
 
-    // BER calculation data
-    // ber_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+#if USE_MKL_JIT
+    MKL_Complex8 alpha = { 1, 0 };
+    MKL_Complex8 beta = { 0, 0 };
+
+    mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter, MKL_COL_MAJOR,
+        MKL_NOTRANS, MKL_NOTRANS, cfg->UE_NUM, 1, cfg->BS_ANT_NUM, &alpha,
+        cfg->UE_NUM, cfg->BS_ANT_NUM, &beta, cfg->UE_NUM);
+    if (MKL_JIT_ERROR == status) {
+        fprintf(stderr,
+            "Error: insufficient memory to JIT and store the DGEMM kernel\n");
+        exit(1);
+    }
+    mkl_jit_cgemm = mkl_jit_get_cgemm_ptr(jitter);
+#endif
 }
 
 DoDemul::~DoDemul()
@@ -123,14 +133,6 @@ Event_data DoDemul::launch(size_t tag)
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
             // size_t start_tsc1 = worker_rdtsc();
             const size_t cur_sc_id = base_sc_id + i + j;
-            const cx_fmat mat_data(
-                reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]),
-                cfg->BS_ANT_NUM, 1, false);
-
-            const cx_fmat mat_ul_zf(
-                reinterpret_cast<cx_float*>(
-                    cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id)),
-                cfg->UE_NUM, cfg->BS_ANT_NUM, false);
 
             cx_float* equal_ptr = nullptr;
             if (kExportConstellation) {
@@ -142,11 +144,23 @@ Event_data DoDemul::launch(size_t tag)
                     = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
                         * cfg->UE_NUM]);
             }
-            // Equalization
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+
+            cx_float* data_ptr
+                = reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]);
+            cx_float* ul_zf_ptr = reinterpret_cast<cx_float*>(
+                cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id));
+
             size_t start_tsc2 = worker_rdtsc();
-            // duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
+#if USE_MKL_JIT
+            mkl_jit_cgemm(jitter, (MKL_Complex8*)ul_zf_ptr,
+                (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+#else
+            const cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+            const cx_fmat mat_ul_zf(
+                ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
             mat_equaled = mat_ul_zf * mat_data;
+#endif
 
             if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
@@ -196,27 +210,10 @@ Event_data DoDemul::launch(size_t tag)
 
             size_t start_tsc3 = worker_rdtsc();
             duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
-
-            // if (!kUseLDPC) {
-            //     // Decode with hard decision
-            //     uint8_t* demul_ptr
-            //         = (&demod_hard_buffer_[total_data_symbol_idx_ul]
-            //                               [cur_sc_id * cfg->UE_NUM]);
-            //     demod_16qam_hard_avx2(
-            //         (float*)equal_ptr, demul_ptr, cfg->UE_NUM);
-            //     // cout<< "Demuled data:";
-            //     // for (int ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++)
-            //     //     cout<<+*(demul_ptr+ue_idx)<<" ";
-            //     // cout<<endl;
-            //     // cout<<endl;
-            //     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
-            // }
-
             duration_stat->task_count++;
         }
     }
 
-    // if (kUseLDPC) {
     size_t start_tsc3 = worker_rdtsc();
     __m256i index2 = _mm256_setr_epi32(0, 1, cfg->UE_NUM * 2,
         cfg->UE_NUM * 2 + 1, cfg->UE_NUM * 4, cfg->UE_NUM * 4 + 1,
@@ -238,72 +235,30 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        if (kUseLDPC) {
-            int8_t* demul_ptr
-                = (&demod_soft_buffer_[total_data_symbol_idx_ul]
-                                      [(cfg->OFDM_DATA_NUM * i + base_sc_id)
-                                          * cfg->mod_type]);
-            switch (cfg->mod_type) {
-            case (CommsLib::QAM16):
-                demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
-                break;
-            case (CommsLib::QAM64):
-                demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
-                break;
-            default:
-                printf("Demodulation: modulation type %s not supported!\n",
-                    cfg->modulation.c_str());
-            }
-            // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
-            //     tid, frame_id, symbol_idx_ul, base_sc_id);
-            // cout << "Demuled data : \n ";
-            // cout << " UE " << i << ": ";
-            // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
-            //     printf("%i ", demul_ptr[k]);
-            // cout << endl;
-        } else {
-            size_t demod_sym_offset = cfg->OFDM_DATA_NUM * i + base_sc_id;
-            uint8_t* demul_ptr = (&demod_hard_buffer_[total_data_symbol_idx_ul]
-                                                     [demod_sym_offset]);
-            switch (cfg->mod_type) {
-            case (CommsLib::QAM16):
-                demod_16qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
-                break;
-            case (CommsLib::QAM64):
-                demod_64qam_hard_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
-                break;
-            default:
-                printf("Demodulation: modulation type %s not supported!\n",
-                    cfg->modulation.c_str());
-            }
-            if (!kEnableMac && kPrintPhyStats
-                && symbol_idx_ul >= cfg->UL_PILOT_SYMS) {
-                phy_stats->update_uncoded_bits(
-                    i, total_data_symbol_idx_ul, max_sc_ite * cfg->mod_type);
-                phy_stats->increment_decoded_blocks(
-                    i, total_data_symbol_idx_ul);
-                size_t block_error(0);
-                for (size_t sc = 0; sc < max_sc_ite; sc++) {
-                    uint8_t mod_symbol
-                        = cfg->ul_bits[symbol_idx_ul][demod_sym_offset + sc];
-                    uint8_t demod_symbol = *(demul_ptr + sc);
-                    phy_stats->update_uncoded_bit_errors(i,
-                        total_data_symbol_idx_ul, cfg->mod_type, mod_symbol,
-                        demod_symbol);
-                    if (mod_symbol != demod_symbol)
-                        block_error++;
-                }
-                phy_stats->update_block_errors(
-                    i, total_data_symbol_idx_ul, block_error);
-            }
+        int8_t* demul_ptr = cfg->get_demod_buf(
+            demod_soft_buffer_, frame_id, symbol_idx_ul, i, base_sc_id);
+
+        switch (cfg->mod_type) {
+        case (CommsLib::QAM16):
+            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            break;
+        case (CommsLib::QAM64):
+            demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            break;
+        default:
+            printf("Demodulation: modulation type %s not supported!\n",
+                cfg->modulation.c_str());
         }
+        // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
+        //     tid, frame_id, symbol_idx_ul, base_sc_id);
+        // cout << "Demuled data : \n ";
+        // cout << " UE " << i << ": ";
+        // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
+        //     printf("%i ", demul_ptr[k]);
+        // cout << endl;
     }
+
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
-    // }
-
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    // if (duration > 500)
-    //     printf("Thread %d Demul takes %.2f\n", tid, duration);
-
     return Event_data(EventType::kDemul, tag);
 }
