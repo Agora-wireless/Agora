@@ -142,7 +142,7 @@ public:
         std::sort(zc_vec.begin(), zc_vec.end());
 
         for (const size_t& zc : zc_vec) {
-            if (zc > avx2enc::ZC_MAX) {
+            if (zc > ZC_MAX) {
                 fprintf(stderr,
                     "Zc value %zu not supported by avx2enc. Skipping.\n", zc);
                 continue;
@@ -251,7 +251,7 @@ public:
     }
 
 private:
-    static constexpr size_t kNumIters = 5;
+    size_t kNumIters = 5;
     Config* cfg;
     moodycamel::ConcurrentQueue<Event_data> event_queue;
     moodycamel::ConcurrentQueue<Event_data> comp_queue;
