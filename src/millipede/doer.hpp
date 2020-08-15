@@ -66,8 +66,6 @@ protected:
     {
     }
 
-    /// This is required because this `Doer` class acts as a base class
-    /// that provides virtual functions to its child classes.
     virtual ~Doer() = default;
 
     Config* cfg;
