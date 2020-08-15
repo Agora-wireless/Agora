@@ -267,7 +267,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
 set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
-  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} ${ERPC_LIBRARIES} util gflags gtest)
+  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main millipede executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
@@ -276,7 +276,7 @@ add_executable(millipede
   src/millipede/main.cpp
   $<TARGET_OBJECTS:millipede_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(millipede ${COMMON_LIBS})
+target_link_libraries(millipede ${COMMON_LIBS} ${ERPC_LIBRARIES})
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
@@ -312,14 +312,14 @@ if(${USE_REMOTE})
     src/remote/remote_ldpc.cpp
     src/remote/ldpc_main.cpp
     $<TARGET_OBJECTS:common_sources_lib>)
-  target_link_libraries(remote_ldpc ${COMMON_LIBS})
+  target_link_libraries(remote_ldpc ${COMMON_LIBS} ${ERPC_LIBRARIES})
 
   add_executable(test_remote_ldpc test/unit_tests/test_remote_ldpc.cc
     ${COMMON_SOURCES}
     src/remote/remote_ldpc.cpp
     $<TARGET_OBJECTS:common_sources_lib>
     $<TARGET_OBJECTS:millipede_sources_lib>)
-    target_link_libraries(test_remote_ldpc ${COMMON_LIBS})
+    target_link_libraries(test_remote_ldpc ${COMMON_LIBS} ${ERPC_LIBRARIES})
   add_test(NAME test_remote_ldpc COMMAND test_remote_ldpc)
 endif()
 
@@ -344,20 +344,20 @@ add_executable(test_millipede
   test/test_millipede/main.cpp
   $<TARGET_OBJECTS:millipede_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_millipede ${COMMON_LIBS})
+target_link_libraries(test_millipede ${COMMON_LIBS} ${ERPC_LIBRARIES})
 
 # The tests to run using ctest
 add_executable(test_zf
   test/unit_tests/test_zf.cc
   $<TARGET_OBJECTS:millipede_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_zf ${COMMON_LIBS})
+target_link_libraries(test_zf ${COMMON_LIBS} ${ERPC_LIBRARIES})
 add_test(NAME test_zf COMMAND test_zf)
 
 add_executable(test_ldpc
   test/compute_kernels/ldpc/test_ldpc.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_ldpc ${COMMON_LIBS})
+target_link_libraries(test_ldpc ${COMMON_LIBS} ${ERPC_LIBRARIES})
 add_test(NAME test_ldpc COMMAND test_ldpc)
 
 add_executable(test_datatype_conversion
