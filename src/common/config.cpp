@@ -83,12 +83,11 @@ Config::Config(std::string jsonfile)
     OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
-    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
-    OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
         "Transpose block size must divide number of OFDM data subcarriers");
+    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
     OFDM_DATA_START
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     OFDM_DATA_STOP = OFDM_DATA_START + OFDM_DATA_NUM;
@@ -242,8 +241,9 @@ Config::Config(std::string jsonfile)
 
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
-    sampsPerSymbol = symbolSize * (OFDM_CA_NUM + CP_LEN) + prefix + postfix;
-    packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
+    sampsPerSymbol = (symbolSize * (OFDM_CA_NUM + CP_LEN)) + prefix + postfix;
+    packet_length
+        = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
     OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
 
