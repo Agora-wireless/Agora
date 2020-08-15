@@ -3,7 +3,7 @@
 #define CONFIG_HEADER
 
 #include <boost/range/algorithm/count.hpp>
-#include <complex.h>
+#include <complex>
 #include <emmintrin.h>
 #include <fstream> // std::ifstream
 #include <immintrin.h>

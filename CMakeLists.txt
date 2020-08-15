@@ -314,11 +314,13 @@ if(${USE_REMOTE})
     $<TARGET_OBJECTS:common_sources_lib>)
   target_link_libraries(remote_ldpc ${COMMON_LIBS} ${ERPC_LIBRARIES})
 
-  add_executable(test_remote_ldpc test/unit_tests/test_remote_ldpc.cc
-    ${COMMON_SOURCES}
+  add_executable(test_remote_ldpc 
+    test/unit_tests/test_remote_ldpc.cc
     src/remote/remote_ldpc.cpp
-    $<TARGET_OBJECTS:common_sources_lib>
-    $<TARGET_OBJECTS:millipede_sources_lib>)
+    src/millipede/stats.cpp
+    src/millipede/docoding.cpp
+    src/millipede/phy_stats.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
     target_link_libraries(test_remote_ldpc ${COMMON_LIBS} ${ERPC_LIBRARIES})
   add_test(NAME test_remote_ldpc COMMAND test_remote_ldpc)
 endif()
