@@ -5,6 +5,7 @@
  */
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
+#include "datatype_conversion.h"
 #include <malloc.h>
 
 using namespace arma;
@@ -142,18 +143,24 @@ Event_data DoFFT::launch(size_t tag)
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
-    convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+    if (cfg->fft_in_rru) {
+        simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
+            reinterpret_cast<float*>(&pkt->data[2 * cfg->OFDM_PREFIX_LEN]),
+            cfg->OFDM_CA_NUM * 2);
+    } else {
+        convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    if (kDebugPrintInTask) {
-        printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
-            frame_id, symbol_id, ant_id);
-        if (kPrintFFTInput) {
-            printf("FFT input\n");
-            for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-                printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
+        if (kDebugPrintInTask) {
+            printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
+                tid, frame_id, symbol_id, ant_id);
+            if (kPrintFFTInput) {
+                printf("FFT input\n");
+                for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+                    printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     }
 
@@ -171,8 +178,10 @@ Event_data DoFFT::launch(size_t tag)
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    DftiComputeForward(mkl_handle,
-        reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    if (!cfg->fft_in_rru) {
+        DftiComputeForward(mkl_handle,
+            reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    }
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -284,8 +293,8 @@ void DoFFT::partial_transpose(
                 fft_result1
                     = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
             }
-            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
-            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
+            _mm256_store_ps(reinterpret_cast<float*>(dst), fft_result0);
+            _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
         }
     }

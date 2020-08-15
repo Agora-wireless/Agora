@@ -64,10 +64,15 @@ Phy_UE::Phy_UE(Config* config)
     ru_.reset(new RadioTXRX(config_, rx_thread_num, config_->core_offset + 1,
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
-    if (kEnableMac)
-        mac_receiver_.reset(new PacketTXRX(config_, rx_thread_num,
-            config_->core_offset + 1 + rx_thread_num, &message_queue_,
-            &to_mac_queue_, mac_rx_ptoks_ptr, mac_tx_ptoks_ptr));
+    if (kEnableMac) {
+        const size_t mac_cpu_core = config_->core_offset + 1 + rx_thread_num;
+        mac_thread_ = new MacThread(MacThread::Mode::kClient, config_,
+            mac_cpu_core, &ul_bits_buffer_, &ul_bits_buffer_status_,
+            nullptr /* dl bits buffer */, nullptr /* dl bits buffer status */,
+            &message_queue_, &to_mac_queue_);
+
+        mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
+    }
 
     printf("initializing buffers...\n");
 
@@ -150,25 +155,14 @@ Phy_UE::Phy_UE(Config* config)
 
     // l2 sockets setup
     socket_ = new int[antenna_num];
-#if USE_IPV4
     servaddr_ = new struct sockaddr_in[antenna_num];
-#else
-    servaddr_ = new struct sockaddr_in6[antenna_num];
-#endif
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (size_t user_id = 0; user_id < antenna_num; ++user_id) {
         int local_port_id = config_->bs_port + user_id;
-#if USE_IPV4
         socket_[user_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[user_id],
             config_->ue_rx_port + user_id, config_->sender_addr.c_str());
-#else
-        socket_[user_id]
-            = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-        setup_sockaddr_remote_ipv6(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->sender_addr.c_str());
-#endif
         fcntl(socket_[user_id], F_SETFL, O_NONBLOCK);
     }
 
@@ -193,6 +187,10 @@ Phy_UE::~Phy_UE()
     // release FFT_buffer
     fft_buffer_.free();
     ifft_buffer_.free();
+
+    if (kEnableMac)
+        mac_std_thread_.join();
+    delete mac_thread_;
 }
 
 void Phy_UE::schedule_task(Event_data do_task,
@@ -226,13 +224,6 @@ void Phy_UE::start()
     if (!ru_->startTXRX(rx_buffer_, rx_buffer_status_, rx_buffer_status_size,
             rx_buffer_size, tx_buffer_, tx_buffer_status_,
             tx_buffer_status_size, tx_buffer_size)) {
-        this->stop();
-        return;
-    }
-
-    if (kEnableMac
-        && !mac_receiver_->startTXRX(ul_bits_buffer_, ul_bits_buffer_status_,
-               TASK_BUFFER_FRAME_NUM, ul_bits_buffer_size_, NULL, NULL, 0, 0)) {
         this->stop();
         return;
     }
@@ -308,22 +299,11 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe > 0
                     && symbol_id == config_->DLSymbols[0].front()
                     && ant_id % config_->nChannels == 0) {
-                    if (kEnableMac)
-                        mac_receiver_->wakeup_mac();
-                    if (kUseLDPC) {
-                        Event_data do_encode_task(EventType::kEncode,
-                            gen_tag_t::frm_sym_ue(frame_id, symbol_id,
-                                ant_id / config_->nChannels)
-                                ._tag);
-                        schedule_task(
-                            do_encode_task, &encode_queue_, ptok_encode);
-                    } else {
-                        Event_data do_modul_task(EventType::kModul,
-                            gen_tag_t::frm_sym_ue(frame_id, symbol_id,
-                                ant_id / config_->nChannels)
-                                ._tag);
-                        schedule_task(do_modul_task, &modul_queue_, ptok_modul);
-                    }
+                    Event_data do_encode_task(EventType::kEncode,
+                        gen_tag_t::frm_sym_ue(
+                            frame_id, symbol_id, ant_id / config_->nChannels)
+                            ._tag);
+                    schedule_task(do_encode_task, &encode_queue_, ptok_encode);
                 }
 
                 if (dl_data_symbol_perframe > 0
@@ -356,17 +336,11 @@ void Phy_UE::start()
 
             case EventType::kPacketFromMac: {
                 // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                // size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
-                if (!kUseLDPC) {
-                    Event_data do_map_task(EventType::kModul, event.tags[0]);
-                    schedule_task(do_map_task, &map_queue_, ptok_map);
-                } else {
-                    size_t ue_id = rx_tag_t(event.tags[0]).tid;
-                    size_t offset_in_current_buffer
-                        = rx_tag_t(event.tags[0]).offset;
+                size_t ue_id = rx_tag_t(event.tags[0]).tid;
+                size_t offset_in_current_buffer
+                    = rx_tag_t(event.tags[0]).offset;
 
-                    ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
-                }
+                ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
                 // if (kDebugPrintPerFrameDone)
                 //     printf("Main thread: frame: %zu, finished mapping "
                 //            "uplink data for user %zu\n",
@@ -840,15 +814,11 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf
                 = &modul_buffer_[total_ul_symbol_id][ant_id * data_sc_len];
-            int8_t* ul_bits = kEnableMac || kUseLDPC
+            int8_t* ul_bits = kEnableMac
                 ? (int8_t*)&ul_syms_buffer_[ant_id]
                                            [total_ul_symbol_id * data_sc_len]
-                //: (kUseLDPC
-                //          ? (int8_t*)&config_->ul_mod_input[ul_symbol_id
-                //                + config_->UL_PILOT_SYMS][ant_id * data_sc_len]
                 : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
                                    [ant_id * data_sc_len];
-            //);
             for (size_t sc = 0; sc < data_sc_len; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);

@@ -4,7 +4,11 @@
  *
  */
 
+#ifdef USE_DPDK
+
 #include "dpdk_transport.hpp"
+#include "utils.h"
+#include <string>
 
 inline const struct rte_eth_conf port_conf_default()
 {
@@ -233,3 +237,80 @@ struct rte_flow* DpdkTransport::generate_ipv4_flow(uint16_t port_id,
         flow = rte_flow_create(port_id, &attr, pattern, action, error);
     return flow;
 }
+
+rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
+    rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
+    uint32_t src_ip_addr, uint32_t dst_ip_addr, uint16_t src_udp_port,
+    uint16_t dst_udp_port, size_t buffer_length)
+{
+    rte_mbuf* tx_buf __attribute__((aligned(64)));
+    tx_buf = rte_pktmbuf_alloc(mbuf_pool);
+
+    rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_buf, rte_ether_hdr*);
+    eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+    memcpy(eth_hdr->s_addr.addr_bytes, src_mac_addr.addr_bytes,
+        RTE_ETHER_ADDR_LEN);
+    memcpy(eth_hdr->d_addr.addr_bytes, dst_mac_addr.addr_bytes,
+        RTE_ETHER_ADDR_LEN);
+
+    auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
+    ip_h->src_addr = src_ip_addr;
+    ip_h->dst_addr = dst_ip_addr;
+    ip_h->next_proto_id = IPPROTO_UDP;
+    ip_h->version_ihl = 0x45;
+    ip_h->type_of_service = 0;
+    ip_h->total_length = rte_cpu_to_be_16(
+        buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
+    ip_h->packet_id = 0;
+    ip_h->fragment_offset = 0;
+    ip_h->time_to_live = 64;
+    ip_h->hdr_checksum = 0;
+
+    auto* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
+    udp_h->src_port = rte_cpu_to_be_16(src_udp_port);
+    udp_h->dst_port = rte_cpu_to_be_16(dst_udp_port);
+    udp_h->dgram_len = rte_cpu_to_be_16(buffer_length + kPayloadOffset
+        - sizeof(rte_ether_hdr) - sizeof(rte_ipv4_hdr));
+
+    tx_buf->pkt_len = buffer_length + kPayloadOffset;
+    tx_buf->data_len = buffer_length + kPayloadOffset;
+    tx_buf->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
+
+    return tx_buf;
+}
+
+void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
+{
+    // DPDK setup
+    std::string core_list = std::to_string(core_offset) + "-"
+        + std::to_string(core_offset + thread_num);
+    // n: channels, m: maximum memory in megabytes
+    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
+    int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
+
+    printf("rte_eal_init argv: ");
+    for (int i = 0; i < rte_argc; i++) {
+        printf("%s, ", rte_argv[i]);
+    }
+    printf("\n");
+
+    // Initialize DPDK environment
+    int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
+    rt_assert(ret >= 0, "Failed to initialize DPDK");
+}
+
+rte_mempool* DpdkTransport::create_mempool()
+{
+    unsigned int nb_ports = rte_eth_dev_count_avail();
+    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
+
+    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
+        NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
+
+    rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+
+    return mbuf_pool;
+}
+
+#endif

@@ -1,0 +1,5 @@
+# Don't commit build objects 
+/build/
+/test/
+/data/
+/FlexRAN-FEC-SDK-19-04/

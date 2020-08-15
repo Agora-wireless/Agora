@@ -148,7 +148,6 @@ public:
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
-    size_t OFDM_SYM_LEN;
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
@@ -200,12 +199,14 @@ public:
 
     // IPv4 address of a remote server available for LDPC
     std::string remote_ldpc_addr;
-
     // Number of LDPC-decoding threads per remote LDPC server
     size_t remote_ldpc_num_threads;
-
     // Remote LDPC thread i runs on core remote_ldpc_core_offset + i
     size_t remote_ldpc_core_offset;
+    // Number of bytes per code block
+    size_t num_bytes_per_cb;
+
+    bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
@@ -315,6 +316,49 @@ public:
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
+    }
+
+    /// Get the soft demodulation buffer for this frame, symbol,
+    /// user and subcarrier ID
+    inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
+        size_t symbol_id, size_t ue_id, size_t sc_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &demod_buffer[total_data_symbol_id]
+                            [OFDM_DATA_NUM * 8 * ue_id + sc_id * mod_type];
+    }
+
+    /// Get the decode buffer for this frame, symbol,
+    /// user and code block ID
+    inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &decoded_buffer[total_data_symbol_id][roundup<64>(
+                                                         num_bytes_per_cb)
+            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    /// Get ul_bits for this symbol, user and code block ID
+    inline int8_t* get_info_bits(Table<int8_t>& info_bits, size_t symbol_id,
+        size_t ue_id, size_t cb_id) const
+    {
+        return &info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
+            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    /// Get encoded_buffer for this frame, symbol, user and code block ID
+    inline int8_t* get_encoded_buf(Table<int8_t>& encoded_buffer,
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx(frame_id, symbol_id);
+        size_t num_encoded_bytes_per_cb = LDPC_config.cbCodewLen / mod_type;
+        return &encoded_buffer[total_data_symbol_id]
+                              [roundup<64>(OFDM_DATA_NUM) * ue_id
+                                  + num_encoded_bytes_per_cb * cb_id];
     }
 
     Config(std::string);
