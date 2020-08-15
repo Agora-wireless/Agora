@@ -21,7 +21,6 @@ void decode_cont_func(void* _context, void* _tag)
 
     auto symbol_offset = tag->symbol_offset;
     auto output_offset = tag->output_offset;
-    auto tid = tag->tid;
     uint8_t* out_buf
         = static_cast<uint8_t*>(computeDecoding->decoded_buffer_[symbol_offset])
         + output_offset;
