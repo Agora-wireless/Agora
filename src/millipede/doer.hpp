@@ -20,8 +20,7 @@ public:
             resp_event.num_tags = req_event.num_tags;
 
             for (size_t i = 0; i < req_event.num_tags; i++) {
-                Event_data resp_i
-                    = launch(req_event.tags[i], req_event.event_type);
+                Event_data resp_i = launch(req_event.tags[i]);
                 rt_assert(resp_i.num_tags == 1, "Invalid num_tags in resp");
                 resp_event.tags[i] = resp_i.tags[0];
                 resp_event.event_type = resp_i.event_type;
@@ -35,7 +34,23 @@ public:
     }
 
     /// The main event handling function that performs Doer-specific work.
-    virtual Event_data launch(size_t tag, EventType event_type) = 0;
+    /// Doers that handle only one event type use this signature.
+    virtual Event_data launch(size_t tag)
+    {
+        _unused(tag);
+        rt_assert(false, "Doer: launch(tag) not implemented");
+        return Event_data();
+    }
+
+    /// The main event handling function that performs Doer-specific work.
+    /// Doers that handle multiple event types use this signature.
+    virtual Event_data launch(size_t tag, EventType event_type)
+    {
+        _unused(tag);
+        _unused(event_type);
+        rt_assert(false, "Doer: launch(tag, event_type) not implemented");
+        return Event_data();
+    }
 
 protected:
     Doer(Config* in_config, int in_tid, double freq_ghz,

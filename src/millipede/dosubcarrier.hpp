@@ -152,13 +152,13 @@ public:
             return run_csi(tag);
         } break;
         case EventType::kZF: {
-            return computeZF_->launch(tag, event_type);
+            return computeZF_->launch(tag);
         } break;
         case EventType::kDemul: {
-            return computeDemul_->launch(tag, event_type);
+            return computeDemul_->launch(tag);
         } break;
         case EventType::kPrecode: {
-            return computePrecode_->launch(tag, event_type);
+            return computePrecode_->launch(tag);
         } break;
         /// TODO: move reciprocity into Subcarrier doers.
         // case EventType::kRc: {

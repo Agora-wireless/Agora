@@ -41,7 +41,7 @@ DoZF::~DoZF()
     free(csi_gather_buffer);
 }
 
-Event_data DoZF::launch(size_t tag, UNUSED EventType event_type)
+Event_data DoZF::launch(size_t tag)
 {
     if (cfg->freq_orthogonal_pilot)
         ZF_freq_orthogonal(tag);
