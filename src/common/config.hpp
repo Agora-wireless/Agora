@@ -31,10 +31,6 @@ typedef unsigned short ushort;
 
 class Config {
 public:
-    size_t sampsPerSymbol;
-    size_t dl_prefix;
-    size_t prefix;
-    size_t postfix;
     std::string modulation;
     size_t mod_type;
     size_t mod_order;
@@ -138,16 +134,49 @@ public:
     size_t BS_ANT_NUM;
     size_t UE_NUM;
     size_t UE_ANT_NUM;
+
+    // The total number of OFDM subcarriers, which is a power of two
     size_t OFDM_CA_NUM;
+
+    // The number of OFDM subcarriers that are non-zero in the frequency domain
     size_t OFDM_DATA_NUM;
-    size_t OFDM_PILOT_NUM;
-    size_t OFDM_PILOT_SPACING;
+
+    // The index of the first non-zero OFDM subcarrier (in the frequency domain)
+    // in block of OFDM_CA_NUM subcarriers.
     size_t OFDM_DATA_START;
+
+    // The index of the last non-zero OFDM subcarrier (in the frequency domain)
+    // in block of OFDM_CA_NUM subcarriers.
     size_t OFDM_DATA_STOP;
-    size_t TX_PREFIX_LEN;
+
+    // The number of cyclic prefix IQ samples from the tail of the time-domain
+    // OFDM samples prepended to the beginning
     size_t CP_LEN;
+
+    // The number of zero IQ samples prepended to a time-domain symbol. This is
+    // in addition to the cyclic prefix.
+    size_t prefix;
+
+    // The number of zero IQ samples appended to a time-domain symbol
+    size_t postfix;
+
+    // The total number of IQ samples received or sent by Millipede when the
+    // RRU does not perform FFT/IFFT
+    size_t sampsPerSymbol;
+
+    // The number of bytes in a packet received or sent by Millipede when the
+    // RRU does not perform FFT/IFFT
+    size_t packet_length;
+
+    // The number of IQ samples to skip from the beginning of symbol received by
+    // Millipede
     size_t OFDM_PREFIX_LEN;
+
+    size_t dl_prefix;
     size_t OFDM_FRAME_LEN;
+    size_t OFDM_PILOT_SPACING;
+    size_t TX_PREFIX_LEN;
+
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
@@ -167,7 +196,6 @@ public:
     bool bigstation_mode;
     bool correct_phase_shift;
 
-    size_t packet_length;
     size_t data_bytes_num_persymbol;
     size_t data_bytes_num_perframe;
     size_t mac_data_bytes_num_perframe;
@@ -345,6 +373,12 @@ public:
         return &encoded_buffer[total_data_symbol_id]
                               [roundup<64>(OFDM_DATA_NUM) * ue_id
                                   + num_encoded_bytes_per_cb * cb_id];
+    }
+
+    // TODO: Add documentation
+    inline size_t get_ofdm_pilot_num() const
+    {
+        return OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     }
 
     Config(std::string);

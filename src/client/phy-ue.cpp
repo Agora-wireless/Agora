@@ -624,7 +624,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 theta += arg(pilot_eq * cx_float(p.re, -p.im));
             }
         }
-        theta /= config_->OFDM_PILOT_NUM;
+        theta /= config_->get_ofdm_pilot_num();
         auto phc = exp(cx_float(0, -theta));
         for (size_t j = 0; j < non_null_sc_len; j++) {
             if (j % config_->OFDM_PILOT_SPACING != 0) {
@@ -639,7 +639,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
             }
         }
         evm = std::sqrt(
-            evm / (config_->OFDM_DATA_NUM - config_->OFDM_PILOT_NUM));
+            evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
         if (kPrintPhyStats)
             std::cout << "Frame: " << frame_id << " EVM: " << 100 * evm
                       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
