@@ -5,6 +5,7 @@
 # through PHY layer. packet_size argument should correspond to the
 # number of bits per PHY layer frame in Millipede. delay argument
 # specifies the delay between transmission of two consecutive packets.
+# Running example: ./python/client_app.py --delay 0.00242 --packet-size 66
 
 import socket
 import sys
@@ -21,7 +22,7 @@ def bs_datagen_app(dly, size):
 
     signal.signal(signal.SIGINT, signal_handler)
     while(True):
-        message = bytearray(random.getrandbits(8) for _ in xrange(size))
+        message = bytearray(random.getrandbits(8) for _ in range(size))
         print("{}".format(list(message)))
         sock.sendto(message, server_address)
         time.sleep(dly)

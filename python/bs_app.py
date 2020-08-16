@@ -3,7 +3,7 @@
 # BS-side application that receives data packets from Millepede MAC
 # packet_size argument should correspond to the number of bits per
 # PHY layer frame in Millipede
-# running examples: 
+# Running example: ./python/bs_app.py --packet-size 66
 
 import socket
 import sys
@@ -21,7 +21,7 @@ def bs_datagen_app(size):
     signal.signal(signal.SIGINT, signal_handler)
     while(True):
         message, server = sock.recvfrom(size)
-        print("{}".format(map(lambda x: ord(x), list(message))))
+        print("{}".format(list(message)))
 
 
 def signal_handler(signal, frame):
