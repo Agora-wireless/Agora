@@ -1,8 +1,16 @@
+#!/usr/bin/python3
+
+# BS-side application that receives data packets from Millepede MAC
+# packet_size argument should correspond to the number of bits per
+# PHY layer frame in Millipede
+# running examples: 
+
 import socket
 import sys
 import time
 from optparse import OptionParser
 import signal
+
 
 def bs_datagen_app(size):
     # Create a UDP socket
@@ -13,18 +21,21 @@ def bs_datagen_app(size):
     signal.signal(signal.SIGINT, signal_handler)
     while(True):
         message, server = sock.recvfrom(size)
-        print("{}".format(map(lambda x:ord(x), list(message) )))
+        print("{}".format(map(lambda x: ord(x), list(message))))
+
 
 def signal_handler(signal, frame):
     sys.exit(0)
 
+
 def main():
     parser = OptionParser()
-    parser.add_option("--packet-size", type="int", dest="packet_size", help="size of packets in bytes", default=66)
+    parser.add_option("--packet-size", type="int", dest="packet_size",
+                      help="size of packets in bytes", default=66)
     (options, args) = parser.parse_args()
 
     bs_datagen_app(options.packet_size)
 
+
 if __name__ == '__main__':
     main()
-
