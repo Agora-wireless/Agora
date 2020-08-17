@@ -218,6 +218,7 @@ private:
     // The frame ID of the next MAC packet we expect to receive from the MAC
     // thread
     size_t expected_frame_id_from_mac_ = 0;
+    size_t current_frame_user_num_ = 0;
 
     // num_frames_consumed_[i] is the number of frames on the uplink completely
     // processed (i.e., including radio transmissing) by the PHY for UE #i

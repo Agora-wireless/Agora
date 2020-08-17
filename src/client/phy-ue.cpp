@@ -357,7 +357,10 @@ void Phy_UE::start()
                         * config_->mac_bytes_num_perframe]);
                 rt_assert(pkt->frame_id == expected_frame_id_from_mac_,
                     "Incorrect frame ID from MAC");
-                expected_frame_id_from_mac_++;
+                current_frame_user_num_
+                    = (current_frame_user_num_ + 1) % config_->UE_ANT_NUM;
+                if (current_frame_user_num_ == 0)
+                    expected_frame_id_from_mac_++;
 
                 if (kDebugPrintPacketsFromMac) {
                     std::stringstream ss;
