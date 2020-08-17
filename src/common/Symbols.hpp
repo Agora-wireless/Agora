@@ -90,7 +90,7 @@ enum class PrintType : int {
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Millipede on machines
 // with insufficient cores, disable this flag.
-static constexpr size_t kEnableThreadPinning = true;
+static constexpr size_t kEnableThreadPinning = false;
 
 #define BIGSTATION 0
 #ifdef USE_DPDK
