@@ -302,26 +302,36 @@ public:
     }
 };
 
-// RxStats is shared by socket thread and subcarrier workers
+// We use one RxStatus object to track packet reception status.
+// This object is shared between socket threads and subcarrier workers.
 class RxStats {
 public:
     // num_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of packets
     // received for frame i (may be removed if not used)
     std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pkts;
 
-    // num_pilots_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of pilot
+    // num_pilot_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of pilot
     // packets received for frame i
     std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
 
-    // num_data_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of data
-    // packets received for frame i
-    std::array<std::array<size_t, kMaxNumSymbolPerFrame>, TASK_BUFFER_FRAME_NUM>
+    // num_data_pkts[i % TASK_BUFFER_FRAME_NUM][j] is the total number of data
+    // packets received for frame i and symbol j
+    std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
+        TASK_BUFFER_FRAME_NUM>
         num_data_pkts;
 
-    size_t cur_frame; // Current frame being processed
-    size_t next_data_symbol; // The first data symbol lacking packets
-    size_t latest_frame; // Latest frame arrived
+    // Millipede processes one frame at a time (roughly speaking). cur_frame is
+    // the frame currently being processed.
+    size_t cur_frame = 0;
 
+    // The max frame number for which socket I/O threads have received any packet
+    size_t latest_frame = 0;
+
+    // The first data symbol for which the socket I/O threads have not received
+    // all packets
+    size_t next_data_symbol = 0;
+
+    // Copies of Config variables
     const size_t num_pilot_pkts_per_frame;
     const size_t num_data_symbol_per_frame;
     const size_t num_pkts_per_symbol;
@@ -337,9 +347,6 @@ public:
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
             num_data_pkts[i].fill(0);
         }
-        cur_frame = 0;
-        next_data_symbol = 0;
-        latest_frame = 0;
     }
 };
 

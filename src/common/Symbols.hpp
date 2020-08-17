@@ -27,7 +27,7 @@
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
-static constexpr size_t kMaxNumSymbolPerFrame = 70;
+static constexpr size_t kMaxNumSymbolsPerFrame = 70;
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T> static constexpr inline bool is_power_of_two(T x)
@@ -39,7 +39,7 @@ template <typename T> static constexpr inline bool is_power_of_two(T x)
 enum class EventType : int {
     kPacketRX,
     kFFT,
-    kCSI,
+    kCSI, // Request or response for a channel state information task
     kZF,
     kDemul,
     kIFFT,

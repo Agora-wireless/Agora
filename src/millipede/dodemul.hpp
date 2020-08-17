@@ -43,8 +43,8 @@ public:
      * ptok
      * @param offset: offset of the first subcarrier in the block in
      * data_buffer_ Buffers: data_buffer_, spm_buffer_, precoder_buffer_,
-     * equal_buffer_, Input buffer: data_buffer_,
-     * precoder_buffer_  Intermediate buffer:
+     * equal_buffer_, demod_hard_buffer_ Input buffer: data_buffer_,
+     * precoder_buffer_ Output buffer: demod_hard_buffer_ Intermediate buffer:
      * spm_buffer, equal_buffer_ Offsets: data_buffer_: dim1: frame index * # of
      * data symbols per frame + data symbol index dim2: transpose block
      * index * block size * # of antennas + antenna index * block size
