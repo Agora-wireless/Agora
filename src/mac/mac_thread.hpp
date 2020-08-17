@@ -121,7 +121,7 @@ private:
     struct {
         // ul_bits_buffer_id_[i] is the index of the uplink data bits buffer to
         // next use for radio #i
-        std::array<size_t, kMaxAntennas> ul_bits_buffer_id_;
+        std::array<size_t, kMaxUEs> ul_bits_buffer_id_;
 
     } client_;
 
