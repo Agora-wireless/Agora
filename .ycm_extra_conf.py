@@ -39,6 +39,8 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
+    '-DMLPD_LOG_LEVEL=MLPD_LOG_LEVEL_TRACE',
+    '-DUSE_DPDK=on',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_decoder_5gnr',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_encoder_5gnr',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_common',
@@ -48,6 +50,8 @@ flags = [
     '-I' + str(home_dir) + '/Millipede/src/mac',
     '-I' + str(home_dir) + '/Millipede/src/encoder',
     '-I' + str(home_dir) + '/Millipede/src/millipede/txrx',
+    '-isystem' + '/usr/include/dpdk',
+    '-isystem' + '/usr/local/include/dpdk',
     '-Wall',
     '-Wsign-compare',
     '-std=c++11',

@@ -144,9 +144,9 @@ Event_data DoFFT::launch(size_t tag)
     size_t ant_id = pkt->ant_id;
 
     if (cfg->fft_in_rru) {
-        simd_convert_float16_to_float32(
+        simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
             reinterpret_cast<float*>(&pkt->data[2 * cfg->OFDM_PREFIX_LEN]),
-            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+            cfg->OFDM_CA_NUM * 2);
     } else {
         convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
             reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
@@ -293,8 +293,8 @@ void DoFFT::partial_transpose(
                 fft_result1
                     = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
             }
-            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
-            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
+            _mm256_store_ps(reinterpret_cast<float*>(dst), fft_result0);
+            _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
         }
     }
