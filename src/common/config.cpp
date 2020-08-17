@@ -74,6 +74,7 @@ Config::Config(std::string jsonfile)
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
+    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     auto symbolSize = tddConf.value("symbol_size", 1);
     prefix = tddConf.value("prefix", 0);
     dl_prefix = tddConf.value("dl_prefix", 0);
@@ -184,8 +185,6 @@ Config::Config(std::string jsonfile)
     core_offset = tddConf.value("core_offset", 18);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
-    mac_socket_thread_num
-        = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
     fft_thread_num = tddConf.value("fft_thread_num", 5);
     demul_thread_num = tddConf.value("demul_thread_num", 5);
     decode_thread_num = tddConf.value("decode_thread_num", 10);
@@ -249,24 +248,22 @@ Config::Config(std::string jsonfile)
 
     data_bytes_num_persymbol
         = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
-    data_bytes_num_perframe = data_bytes_num_persymbol
-        * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
-    mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
-    // The current implementation only supports the case when  MAC packet size
-    // is multiples of data_bytes_num_perframe
-    if (data_bytes_num_perframe != 0)
-        rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
-            "MAC packet size need to be multiples of data_bytes_num_perframe!");
+    mac_packet_length = data_bytes_num_persymbol;
+    mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
+    mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
+    mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
+    mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
     std::cout << "Config: "
-              << "BS_ANT_NUM " << BS_ANT_NUM << ", UE_ANT_NUM " << UE_ANT_NUM
-              << ", PILOT SYM NUM " << pilot_symbol_num_perframe
-              << ", UL SYM NUM " << ul_data_symbol_num_perframe
-              << ", DL SYM NUM " << dl_data_symbol_num_perframe
-              << ", OFDM_CA_NUM " << OFDM_CA_NUM << ", OFDM_DATA_NUM "
-              << OFDM_DATA_NUM << ", packet length " << packet_length
+              << "\n  BS_ANT_NUM: " << BS_ANT_NUM << "\n  UE_ANT_NUM: " << UE_ANT_NUM
+              << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
+              << "\n  ul_data_symbol_num_perframe: " << ul_data_symbol_num_perframe
+              << "\n  dl_data_symbol_num_perframe: " << dl_data_symbol_num_perframe
+              << "\n  OFDM_CA_NUM " << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: "
+              << OFDM_DATA_NUM 
+              << "\n  mac_data_bytes_num_perframe: " << mac_data_bytes_num_perframe
+              << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
               << std::endl;
 
     if (packet_length >= 9000) {

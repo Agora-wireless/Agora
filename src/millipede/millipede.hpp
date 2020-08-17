@@ -284,6 +284,12 @@ private:
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
 
+    // Master-to-worker queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
+
+    // Worker-to-master queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
+
     // Master thread's message queue for event completion from Doers;
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
 
