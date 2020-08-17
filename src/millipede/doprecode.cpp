@@ -37,7 +37,7 @@ DoPrecode::~DoPrecode()
     free_buffer_1d(&precoded_buffer_temp);
 }
 
-Event_data DoPrecode::launch(size_t tag, UNUSED EventType event_type)
+Event_data DoPrecode::launch(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t base_sc_id = gen_tag_t(tag).sc_id;

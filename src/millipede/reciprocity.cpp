@@ -25,7 +25,7 @@ Reciprocity::Reciprocity(Config* in_config, int in_tid, double freq_ghz,
 
 Reciprocity::~Reciprocity() {}
 
-Event_data Reciprocity::launch(size_t offset, UNUSED EventType event_type)
+Event_data Reciprocity::launch(size_t offset)
 {
     if (kDebugPrintInTask)
         printf("In doRecip thread %d: frame: %zu, \n", tid, offset);

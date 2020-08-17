@@ -14,8 +14,8 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "stats.hpp"
 #include "phy_stats.hpp"
+#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -36,7 +36,7 @@ public:
         Stats* in_stats_manager);
     ~DoEncode();
 
-    Event_data launch(size_t tag, EventType event_type);
+    Event_data launch(size_t tag);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -59,7 +59,7 @@ public:
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDecode();
 
-    Event_data launch(size_t tag, EventType event_type);
+    Event_data launch(size_t tag);
 
 private:
     int16_t* resp_var_nodes;
