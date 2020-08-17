@@ -85,7 +85,6 @@ public:
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
-    void doMapBits(int, size_t);
     void doEncode(int, size_t);
     void doModul(int, size_t);
     void doIFFT(int, size_t);
@@ -216,6 +215,16 @@ private:
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
 
+    // The frame ID of the next MAC packet we expect to receive from the MAC
+    // thread
+    size_t expected_frame_id_from_mac_ = 0;
+    size_t current_frame_user_num_ = 0;
+
+    // num_frames_consumed_[i] is the number of frames on the uplink completely
+    // processed (i.e., including radio transmissing) by the PHY for UE #i
+    size_t num_frames_consumed_[kMaxUEs] = {};
+
+
     /*****************************************************
      * Uplink
      *****************************************************/
@@ -330,7 +339,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> modul_queue_;
-    moodycamel::ConcurrentQueue<Event_data> map_queue_;
 
     pthread_t task_threads[kMaxThreads];
 
