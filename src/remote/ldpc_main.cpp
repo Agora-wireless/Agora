@@ -15,13 +15,13 @@ void run_remote(Config* cfg, size_t tid, erpc::Nexus* nexus)
 int main(int argc, char** argv)
 {
     std::string confFile;
-    if (argc == 2)
-        confFile = std::string("/") + std::string(argv[1]);
-    else
-        confFile = "/data/tddconfig-sim-ul.json";
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename = cur_directory + confFile;
-    auto* cfg = new Config(filename.c_str());
+    if (argc == 2) {
+        confFile = std::string(argv[1]);
+    } else {
+        confFile = TOSTRING(PROJECT_DIRECTORY)
+            + std::string("/data/tddconfig-sim-ul.json");
+    }
+    auto* cfg = new Config(confFile.c_str());
     cfg->genData();
 
     constexpr int kReqType = 2;
