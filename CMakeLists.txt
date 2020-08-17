@@ -309,8 +309,8 @@ target_link_libraries(sim ${COMMON_LIBS})
 # Add the remote LDPC executable
 if(${USE_REMOTE})
   add_executable(remote_ldpc
-    src/remote/remote_ldpc.cpp
     src/remote/ldpc_main.cpp
+    src/remote/remote_ldpc.cpp
     $<TARGET_OBJECTS:common_sources_lib>)
   target_link_libraries(remote_ldpc ${COMMON_LIBS} ${ERPC_LIBRARIES})
 
