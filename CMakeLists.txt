@@ -330,3 +330,9 @@ add_executable(test_udp_client_server
   test/unit_tests/test_udp_client_server.cc)
 target_link_libraries(test_udp_client_server ${COMMON_LIBS})
 add_test(NAME test_udp_client_server COMMAND test_udp_client_server)
+
+add_executable(test_concurrent_queue
+  test/unit_tests/test_concurrent_queue.cc
+   $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_concurrent_queue ${COMMON_LIBS})
+add_test(NAME test_concurrent_queue COMMAND test_concurrent_queue)
