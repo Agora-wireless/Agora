@@ -8,10 +8,11 @@
 
 static constexpr bool kDebugDPDK = false;
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStats* rx_stats)
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
+    , rx_stats_(rx_stats)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
 
@@ -206,6 +207,44 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(int tid, int& prev_frame_id)
         }
         // printf("thread %d received packet frame %u, symbol %u, ant %u\n",
         //     tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id);
+
+        // Update shared states
+        // (Could add an if statement)
+        {
+            if (pkt->frame_id >= rx_stats_->cur_frame + TASK_BUFFER_FRAME_NUM) {
+                std::cout << "Error: Received packet for future frame beyond "
+                             "frame "
+                          << "window. This can happen if Millipede is running "
+                          << "slowly, e.g., in debug mode\n";
+                cfg->running = false;
+            }
+            size_t frame_slot = pkt->frame_id % TASK_BUFFER_FRAME_NUM;
+            size_t symbol_id = pkt->symbol_id;
+            rx_stats_->num_pkts[frame_slot]++;
+            // TODO
+            // 1. Move those statements into functions in RxCounters
+            // 2. Check invalid packets
+            if (symbol_id < cfg->pilot_symbol_num_perframe) {
+                rx_stats_->num_pilot_pkts[frame_slot]++;
+            } else {
+                rx_stats_->num_data_pkts[frame_slot][symbol_id]++;
+            }
+            if (pkt->frame_id > rx_stats_->latest_frame) {
+                rx_stats_->latest_frame = pkt->frame_id;
+            }
+            if (pkt->frame_id == rx_stats_->cur_frame
+                && symbol_id == rx_stats_->next_data_symbol) {
+                while (rx_stats_->num_data_pkts[frame_slot][symbol_id]
+                    == rx_stats_->num_pkts_per_symbol) {
+                    rx_stats_->num_data_pkts[frame_slot][symbol_id] = 0;
+                    symbol_id++;
+                    if (symbol_id == rx_stats_->num_data_symbol_per_frame) {
+                        break;
+                    }
+                }
+                rx_stats_->next_data_symbol = symbol_id;
+            }
+        }
 
         // get the position in rx_buffer
         // move ptr & set status to full

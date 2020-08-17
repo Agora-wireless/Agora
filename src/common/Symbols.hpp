@@ -24,10 +24,10 @@
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
 
-#define MAX_NUM_SYMBOL_PER_FRAME 70
-
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
+
+static constexpr size_t kMaxNumSymbolPerFrame = 70;
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T> static constexpr inline bool is_power_of_two(T x)

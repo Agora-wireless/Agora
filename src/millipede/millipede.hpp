@@ -285,6 +285,11 @@ private:
 
     size_t cur_tid; // TODO (junzhi): Add documentation
     moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
+
+    // Shared states between socket threads and dosubcarriers
+    RxCounters rx_counters_;
+
+    // Shared states between dosubcarriers and dodecoders
 };
 
 #endif

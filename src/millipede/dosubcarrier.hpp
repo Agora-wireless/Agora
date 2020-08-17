@@ -91,7 +91,8 @@ public:
         // intermediate buffers owned by SubcarrierManager
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer, Table<complex_float>& ul_zf_buffer,
-        Table<complex_float>& dl_zf_buffer, PhyStats* phy_stats, Stats* stats)
+        Table<complex_float>& dl_zf_buffer, PhyStats* phy_stats, Stats* stats,
+        RxStats* rx_stats)
         : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
               worker_producer_token)
         , subcarrier_range_(subcarrier_range)
@@ -108,6 +109,7 @@ public:
         , equal_buffer_(equal_buffer)
         , ul_zf_buffer_(ul_zf_buffer)
         , dl_zf_buffer_(dl_zf_buffer)
+        , rx_stats_(rx_stats)
     {
 
         // Create the requisite Doers
@@ -128,6 +130,14 @@ public:
         // computeReciprocity_ = new Reciprocity(this->cfg, tid, freq_ghz,
         //     this->task_queue_, this->complete_task_queue,
         //     this->worker_producer_token, calib_buffer_, recip_buffer_, stats);
+
+        // Init internal states
+        csi_cur_frame = 0;
+        zf_cur_frame = 0;
+        num_zf_task_completed = 0;
+        demul_cur_frame = 0;
+        demul_cur_symbol_to_process = cfg->pilot_symbol_num_perframe;
+        num_demul_task_completed = 0;
     }
 
     ~DoSubcarrier()
@@ -212,6 +222,63 @@ private:
         res = _mm256_permute_ps(res, 0xd8);
 
         return res;
+    }
+
+    void start_work()
+    {
+        num_zf_task_required = (subcarrier_range_.end - subcarrier_range_.start)
+            / cfg->zf_block_size;
+        num_demul_task_required
+            = (subcarrier_range_.end - subcarrier_range_.start)
+            / cfg->demul_block_size;
+
+        // TODO
+        // 1. Integrate some statements into functions in RxStats
+        // 2. Change the meaning of cur_frame in RxStats
+        while (cfg->running && !SignalHandler::gotExitSignal()) {
+            if (rx_counters_
+                    ->num_pilot_pkts[csi_cur_frame % TASK_BUFFER_FRAME_NUM]
+                == rx_counters_->num_pilot_pkts_per_frame) {
+                run_csi(gen_tag_t::frm_sym_sc(
+                    csi_cur_frame, 0, subcarrier_range_.start)
+                            ._tag);
+                csi_cur_frame++;
+            }
+            if (csi_cur_frame > zf_cur_frame) {
+                computeZF_->launch(
+                    gen_tag_t::frm_sym_sc(zf_cur_frame, 0,
+                        subcarrier_range_.start + num_zf_task_completed)
+                        ._tag,
+                    EventType::kZF);
+                num_zf_task_completed += cfg->zf_block_size;
+                if (num_zf_task_completed == num_zf_task_required) {
+                    num_zf_task_completed = 0;
+                    zf_cur_frame++;
+                }
+            }
+            if (zf_cur_frame > demul_cur_frame
+                && demul_cur_frame == rx_stats_->cur_frame) {
+                if (rx_stats_->next_data_symbol > demul_cur_symbol_to_process) {
+                    computeDemul_->launch(
+                        gen_tag_t::frm_sym_sc(demul_cur_frame,
+                            demul_cur_symbol_to_process,
+                            subcarrier_range_.start + num_demul_task_completed)
+                            ._tag,
+                        EventType::kDemul);
+                    num_demul_task_completed += cfg->demul_block_size;
+                    if (num_demul_task_completed == num_demul_task_required) {
+                        num_demul_task_completed = 0;
+                        demul_cur_symbol_to_process++;
+                        if (demul_cur_symbol_to_process
+                            == cfg->symbol_num_perframe) {
+                            demul_cur_symbol_to_process
+                                = cfg->pilot_symbol_num_perframe;
+                            demul_cur_frame++;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Event_data run_csi(size_t tag)
@@ -359,6 +426,21 @@ private:
     Table<complex_float>& equal_buffer_;
     Table<complex_float>& ul_zf_buffer_;
     Table<complex_float>& dl_zf_buffer_;
+
+    // Shared states with TXRX threads
+    RxStats* rx_stats_;
+
+    // Internal CSI states
+    size_t csi_cur_frame;
+
+    // Internal ZF states
+    size_t zf_cur_frame; // Current frame waiting for CSI matrix
+    size_t num_zf_task_completed;
+
+    // Internal Demul states
+    size_t demul_cur_frame; // Current frame waiting for ZF matrix
+    size_t demul_cur_symbol_to_process; // Current data symbol wait to process
+    size_t num_demul_task_completed;
 };
 
 #endif // DOSUBCARRIER_HPP

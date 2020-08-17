@@ -305,17 +305,26 @@ public:
 // RxStats is shared by socket thread and subcarrier workers
 class RxStats {
 public:
+    // num_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of packets
+    // received for frame i (may be removed if not used)
     std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pkts;
+
+    // num_pilots_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of pilot
+    // packets received for frame i
     std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
-    std::array<std::array<size_t, MAX_NUM_SYMBOL_PER_FRAME>,
-        TASK_BUFFER_FRAME_NUM>
+
+    // num_data_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of data
+    // packets received for frame i
+    std::array<std::array<size_t, kMaxNumSymbolPerFrame>, TASK_BUFFER_FRAME_NUM>
         num_data_pkts;
+
     size_t cur_frame; // Current frame being processed
     size_t next_data_symbol; // The first data symbol lacking packets
     size_t latest_frame; // Latest frame arrived
-    size_t num_pilot_pkts_per_frame;
-    size_t num_data_symbol_per_frame;
-    size_t num_pkts_per_symbol;
+
+    const size_t num_pilot_pkts_per_frame;
+    const size_t num_data_symbol_per_frame;
+    const size_t num_pkts_per_symbol;
 
     RxStats(size_t _num_pilot_pkts_per_frame, size_t _num_data_symbol_per_frame,
         size_t _num_pkts_per_symbol)
@@ -331,45 +340,6 @@ public:
         cur_frame = 0;
         next_data_symbol = 0;
         latest_frame = 0;
-    }
-};
-
-// Internal CSI states in subcarrier workers
-// Run CSI task once for each frame
-class CSIStats {
-public:
-    size_t cur_frame; // Current frame waiting for CSI data
-
-    CSIStats() { cur_frame = 0; }
-};
-
-// Internal ZF states in subcarrier workers
-class ZFStats {
-public:
-    size_t cur_frame; // Current frame waiting for CSI matrix
-    size_t num_zf_task_completed;
-    size_t num_zf_task_required;
-
-    ZFStats(size_t _num_zf_task_required)
-        : num_zf_task_required(_num_zf_task_required)
-    {
-        cur_frame = 0;
-        num_zf_task_completed = 0;
-    }
-};
-
-// Internal Demul stats in subcarrier workers
-class DemulStats {
-public:
-    size_t cur_frame; // Current frame waiting for ZF matrix
-    size_t cur_symbol_to_process; // Current data symbol wait to process
-    size_t num_data_symbol_per_frame;
-
-    DemulStats(size_t _num_data_symbol_per_frame)
-        : num_data_symbol_per_frame(_num_data_symbol_per_frame)
-    {
-        cur_frame = 0;
-        cur_symbol_to_process = 0;
     }
 };
 
