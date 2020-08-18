@@ -24,7 +24,7 @@
 
 using namespace arma;
 
-static const float NOISE_LEVEL = 1.0 / 200;
+static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr bool kVerbose = false;
 
 float rand_float(float min, float max)
@@ -232,8 +232,8 @@ int main(int argc, char* argv[])
             = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
         // printf("noise of ant %d, ue %d\n", i % cfg->BS_ANT_NUM, i / cfg->BS_ANT_NUM );
         for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-            complex_float noise = { rand_float_from_short(-1, 1) * NOISE_LEVEL,
-                rand_float_from_short(-1, 1) * NOISE_LEVEL };
+            complex_float noise = { rand_float_from_short(-1, 1) * kNoiseLevel,
+                rand_float_from_short(-1, 1) * kNoiseLevel };
             // printf("%.4f+%.4fi ", noise.re, noise.im);
             CSI_matrix[j][i].re = csi.re + noise.re;
             CSI_matrix[j][i].im = csi.im + noise.im;
