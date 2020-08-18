@@ -287,7 +287,7 @@ private:
     moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 
     // Shared states between socket threads and dosubcarriers
-    RxCounters rx_counters_;
+    RxStatus rx_status_;
 
     // Shared states between dosubcarriers and dodecoders
 };

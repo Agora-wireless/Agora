@@ -56,10 +56,13 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
-        PhyStats* in_phy_stats, Stats* in_stats_manager);
+        PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
+        DemulStatus* demul_status);
     ~DoDecode();
 
     Event_data launch(size_t tag);
+
+    void start_work();
 
 private:
     int16_t* resp_var_nodes;
@@ -69,6 +72,10 @@ private:
     //Table<int> error_bits_count_;
     PhyStats* phy_stats;
     DurationStat* duration_stat;
+    RxStatus* rx_status_;
+    DemulStatus* demul_status_;
+    size_t cur_frame;
+    size_t cur_symbol;
 };
 
 #endif

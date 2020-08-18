@@ -53,8 +53,8 @@ typedef unsigned short ushort;
  */
 class PacketTXRX {
 public:
-    PacketTXRX(Config* cfg, size_t in_core_offset = 1,
-        RxCounters* rx_counters = nullptr);
+    PacketTXRX(
+        Config* cfg, size_t in_core_offset = 1, RxStatus* rx_status_ = nullptr);
     /**
      * queue_message: message queue to communicate with main thread
      */
@@ -117,7 +117,7 @@ private:
 
     RadioConfig* radioconfig_; // Used only in Argos mode
 
-    RxStats* rx_stats_; // Shared states with workers
+    RxStatus* rx_status_; // Shared states with workers
 };
 
 #endif

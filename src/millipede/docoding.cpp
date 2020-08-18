@@ -93,7 +93,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
     //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
-    PhyStats* in_phy_stats, Stats* in_stats_manager)
+    PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
+    DemulStatus* demul_status)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , llr_buffer_(in_demod_buffer)
@@ -101,6 +102,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     //, decoded_bits_count_(in_decoded_bits_count)
     //, error_bits_count_(in_error_bits_count)
     , phy_stats(in_phy_stats)
+    , rx_status_(rx_status)
+    , demul_status_(demul_status)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
@@ -208,4 +211,11 @@ Event_data DoDecode::launch(size_t tag)
     }
 
     return Event_data(EventType::kDecode, tag);
+}
+
+void DoDecode::start_work()
+{
+    while (cfg->running && !SignalHandler::gotExitSignal()) {
+        if (demul_status_->ready_to_decode())
+    }
 }

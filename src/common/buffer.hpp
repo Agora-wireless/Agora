@@ -11,6 +11,7 @@
 #include "concurrentqueue.h"
 #include "memory_manage.h"
 #include "utils.h"
+#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -304,7 +305,7 @@ public:
 
 // We use one RxStatus object to track packet reception status.
 // This object is shared between socket threads and subcarrier workers.
-class RxStats {
+class RxStatus {
 public:
     // num_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of packets
     // received for frame i (may be removed if not used)
@@ -333,12 +334,15 @@ public:
 
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame;
+    const size_t num_pilot_symbols_per_frame;
     const size_t num_data_symbol_per_frame;
     const size_t num_pkts_per_symbol;
 
-    RxStats(size_t _num_pilot_pkts_per_frame, size_t _num_data_symbol_per_frame,
+    RxStatus(size_t _num_pilot_pkts_per_frame,
+        size_t _num_pilot_symbols_per_frame, size_t _num_data_symbol_per_frame,
         size_t _num_pkts_per_symbol)
         : num_pilot_pkts_per_frame(_num_pilot_pkts_per_frame)
+        , num_pilot_symbols_per_frame(_num_pilot_symbols_per_frame)
         , num_data_symbol_per_frame(_num_data_symbol_per_frame)
         , num_pkts_per_symbol(_num_pkts_per_symbol)
     {
@@ -347,6 +351,99 @@ public:
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
             num_data_pkts[i].fill(0);
         }
+    }
+
+    bool add_new_packet(size_t frame_id, size_t symbol_id)
+    {
+        if (frame_id >= cur_frame + TASK_BUFFER_FRAME_NUM) {
+            std::cout << "Error: Received packet for future frame beyond "
+                         "frame "
+                      << "window. This can happen if Millipede is running "
+                      << "slowly, e.g., in debug mode\n";
+            return false;
+        }
+        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        num_pkts[frame_slot]++;
+        // TODO
+        // 1. Move those statements into functions in RxStatus
+        // 2. Check invalid packets
+        if (symbol_id < num_pilot_symbols_per_frame) {
+            num_pilot_pkts[frame_slot]++;
+        } else {
+            num_data_pkts[frame_slot][symbol_id]++;
+        }
+        if (frame_id > latest_frame) {
+            latest_frame = frame_id;
+        }
+        if (frame_id == cur_frame && symbol_id == next_data_symbol) {
+            while (
+                num_data_pkts[frame_slot][symbol_id] == num_pkts_per_symbol) {
+                num_data_pkts[frame_slot][symbol_id] = 0;
+                symbol_id++;
+                if (symbol_id == num_data_symbol_per_frame) {
+                    break;
+                }
+            }
+            next_data_symbol = symbol_id;
+        }
+        return true;
+    }
+
+    bool is_pilot_ready(size_t frame_id)
+    {
+        if (frame_id < cur_frame
+            || frame_id >= cur_frame + TASK_BUFFER_FRAME_NUM) {
+            return false;
+        }
+        return num_pilot_pkts[frame_id % TASK_BUFFER_FRAME_NUM]
+            == num_pilot_pkts_per_frame;
+    }
+
+    bool is_demod_ready(size_t frame_id, size_t symbol_id)
+    {
+        return frame_id == cur_frame && next_data_symbol > symbol_id;
+    }
+};
+
+// We use DecodeStatus to track # completed demul tasks for each symbol
+// This object is shared between all dosubcarriers and dodecoders
+class DemulStatus {
+public:
+    // num_demul_tasks_completed[i % TASK_BUFFER_FRAME_NUM][j] is
+    // the number of subcarriers completed for demul tasks in
+    // frame i and symbol j
+    std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
+        TASK_BUFFER_FRAME_NUM>
+        num_demul_tasks_completed;
+
+    // # subcarriers required to demul for each symbol
+    const size_t num_demul_tasks_required;
+
+    // Create a mutex for each symbol
+    // to synchronize the update for each dosubcarrier
+    std::array<std::mutex, kMaxNumSymbolsPerFrame> mutex_list;
+
+    DemulStatus(size_t _num_demul_tasks_required)
+        : num_demul_tasks_required(_num_demul_tasks_required)
+    {
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+            num_demul_tasks_completed[i].fill(0);
+        }
+    }
+
+    void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
+    {
+        mutex_list[symbol_id].lock();
+        num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+            += num_tasks;
+        mutex_list[symbol_id].unlock();
+    }
+
+    bool ready_to_decode(size_t frame_id, size_t symbol_id)
+    {
+        return num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM]
+                                        [symbol_id]
+            == num_demul_tasks_required;
     }
 };
 
