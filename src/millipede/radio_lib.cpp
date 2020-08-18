@@ -303,8 +303,8 @@ bool RadioConfig::radioStart()
     conf["frame_mode"] = "free_running";
     conf["max_frame"] = 0;
     conf["symbol_size"] = _cfg->sampsPerSymbol;
-    conf["beacon_start"] = _cfg->prefix;
-    conf["beacon_stop"] = _cfg->prefix + _cfg->beacon_len;
+    conf["beacon_start"] = _cfg->ofdm_tx_zero_prefix_;
+    conf["beacon_stop"] = _cfg->ofdm_tx_zero_prefix_ + _cfg->beacon_len;
 
     size_t ndx = 0;
     for (size_t i = 0; i < this->_radioNum; i++) {
@@ -362,8 +362,10 @@ bool RadioConfig::radioStart()
                 // exclude reference board from beamforming
             } else {
                 std::vector<std::complex<float>> recipCalDlPilot;
-                std::vector<std::complex<float>> pre(_cfg->prefix, 0);
-                std::vector<std::complex<float>> post(_cfg->postfix, 0);
+                std::vector<std::complex<float>> pre(
+                    _cfg->ofdm_tx_zero_prefix_, 0);
+                std::vector<std::complex<float>> post(
+                    _cfg->ofdm_tx_zero_prefix_, 0);
                 recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
                     _cfg->nChannels * i, _cfg->BS_ANT_NUM, _cfg->OFDM_CA_NUM,
                     _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START, _cfg->CP_LEN);

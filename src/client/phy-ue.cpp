@@ -19,8 +19,8 @@ Phy_UE::Phy_UE(Config* config)
 
     ue_pilot_vec.resize(antenna_num);
     for (size_t i = 0; i < antenna_num; i++) {
-        for (size_t j = prefix_len; j < config_->sampsPerSymbol - postfix_len;
-             j++) {
+        for (size_t j = config->ofdm_tx_zero_prefix_;
+             j < config_->sampsPerSymbol - config->ofdm_tx_zero_postfix_; j++) {
             ue_pilot_vec[i].push_back(std::complex<float>(
                 config_->ue_specific_pilot_t[i][j].real() / 32768.0,
                 config_->ue_specific_pilot_t[i][j].imag() / 32768.0));
@@ -561,7 +561,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     size_t FFT_buffer_target_id = total_dl_symbol_id * antenna_num + ant_id;
 
     // transfer ushort to float
-    size_t delay_offset = (dl_prefix_len + CP_LEN) * 2;
+    size_t delay_offset = (config_->ofdm_rx_zero_prefix_dl_ + CP_LEN) * 2;
     float* cur_fft_buffer_float = (float*)fft_buffer_[FFT_buffer_target_id];
 
     for (size_t i = 0; i < (FFT_LEN)*2; i++)
@@ -872,8 +872,8 @@ void Phy_UE::doIFFT(int tid, size_t tag)
             char* cur_tx_buffer = &tx_buffer_[tx_offset];
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
             std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data;
-            CommsLib::ifft2tx(ifft_buff, tx_data_ptr, FFT_LEN, prefix_len,
-                CP_LEN, config_->scale);
+            CommsLib::ifft2tx(ifft_buff, tx_data_ptr, FFT_LEN,
+                config_->ofdm_tx_zero_prefix_, CP_LEN, config_->scale);
         }
     }
 
@@ -896,10 +896,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
-    prefix_len = config_->prefix;
-    dl_prefix_len = config_->dl_prefix;
-    postfix_len = config_->postfix;
-    symbol_len = config_->sampsPerSymbol - prefix_len - postfix_len;
+    symbol_len = config_->sampsPerSymbol - config_->ofdm_tx_zero_prefix_
+        - config_->ofdm_tx_zero_postfix_;
     CP_LEN = config_->CP_LEN;
     FFT_LEN = config_->OFDM_CA_NUM;
     ofdm_syms = (int)(symbol_len / (FFT_LEN + CP_LEN));

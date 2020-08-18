@@ -78,11 +78,11 @@ private:
     void* worker_thread(int tid);
 
     /**
-     * @brief  Read 32-bit floating-point IQ samples from filename and populate
-     * iq_data_short_ by converting to 16-bit fixed-point samples
+     * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
+     * and populate iq_data_short_ by converting to 16-bit fixed-point samples
      *
-     * filename must contain data for one frame. For every symbol and antenna,
-     * the file must provide `Config::OFDM_FRAME_LEN` IQ samples.
+     * [filename] must contain data for one frame. For every symbol and antenna,
+     * the file must provide (CP_LEN + OFDM_CA_NUM) IQ samples.
      */
     void init_iq_from_file(std::string filename);
 
@@ -124,7 +124,7 @@ private:
     moodycamel::ProducerToken** task_ptok;
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
-    // Second dimension: OFDM_FRAME_LEN * 2 (real and imag)
+    // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2
     Table<unsigned short> iq_data_short_;
 
     // Number of packets transmitted for each symbol in a frame

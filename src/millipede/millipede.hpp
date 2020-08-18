@@ -266,11 +266,12 @@ private:
 
     /**
      * Data for transmission
-     * First dimension of buffer (type: char): symbol_num_perframe *
-     * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * BS_ANT_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * First dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * SOCKET_BUFFER_FRAME_NUM
+     *
+     * Number of downlink socket buffers and status entries:
+     * SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
+     *
+     * Size of each downlink socket buffer entry: packet_length bytes
+     * Size of each downlink socket buffer status entry: one integer
      */
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
