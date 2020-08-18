@@ -57,9 +57,11 @@ public:
     static const int kDequeueBulkSizeTXRX = 8;
     static const int kDequeueBulkSizeWorker = 4;
 
-    /* eRPC request type, UDP port and maximum message size */
-    static const size_t kRpcReqType = 2;
-    static const size_t kRpcPort = 31850;
+    /* Port on the Millipede server that listens for eRPC responses */
+    static const size_t kRpcPortLocal = 31850;
+    /* Port on the remote LDPC worker process that listens for eRPC requests */
+    static const size_t kRpcPortRemote = kRpcPortLocal + 1;
+    /* Maximum size of an eRPC message */
     static const size_t kRpcMaxMsgSize = (1 << 20);
 
     /**
