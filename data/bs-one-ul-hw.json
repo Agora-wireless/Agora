@@ -17,13 +17,10 @@
  "cp_len" : 32,
  "ofdm_rx_zero_prefix_ul" : 220,
  "Zc" : 18,
- "beamsweep" : true,
+ "beamsweep" : false,
  "beacon_antenna" : 0,
- "sample_calibrate" : false,
- "calTxGainA" : 30,
- "calTxGainB" : 30,
  "frames" : [
-     "BGGGGGPGGGUUUG"
+     "BGGGGGPGGUUUUG"
  ],
  "downlink_mode": false,
  "client_ul_pilot_syms" : 2,

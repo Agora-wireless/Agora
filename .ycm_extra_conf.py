@@ -39,6 +39,7 @@ home_dir = expanduser("~")
 flags = [
     '-x',
     'c++',
+    '-DMLPD_LOG_LEVEL=MLPD_LOG_LEVEL_TRACE',
     '-DUSE_DPDK=on',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_decoder_5gnr',
     '-I'+ '/opt/FlexRAN-FEC-SDK-19-04/sdk/source/phy/lib_ldpc_encoder_5gnr',

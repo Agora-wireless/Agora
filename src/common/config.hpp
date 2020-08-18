@@ -114,7 +114,6 @@ public:
     size_t core_offset;
     size_t worker_thread_num;
     size_t socket_thread_num;
-    size_t mac_socket_thread_num;
     size_t fft_thread_num;
     size_t demul_thread_num;
     size_t decode_thread_num;
@@ -208,9 +207,11 @@ public:
     size_t data_bytes_num_persymbol;
     size_t data_bytes_num_perframe;
     size_t mac_data_bytes_num_perframe;
+    size_t mac_bytes_num_perframe;
     size_t mac_packet_length;
-    size_t num_frames_per_mac_packet;
-    size_t sym_packet_length;
+    size_t mac_payload_length;
+    size_t mac_packets_perframe;
+    bool ip_bridge_enable;
 
     std::string server_addr; // IP address of the Millipede server
     std::string sender_addr; // IP address of the simulator sender
@@ -288,6 +289,12 @@ public:
                    * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }
+  
+    /// Return the frame duration in seconds
+    inline double get_frame_duration_sec()
+    {
+        return symbol_num_perframe * sampsPerSymbol / rate;
+    }
 
     /// Fetch the channel state information matrix for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
@@ -341,6 +348,7 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
+    
     /// Get the soft demodulation buffer for this frame, symbol,
     /// user and subcarrier ID
     inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
