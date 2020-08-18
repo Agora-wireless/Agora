@@ -322,7 +322,7 @@ int main(int argc, char* argv[])
         cfg->OFDM_CA_NUM * cfg->UE_ANT_NUM, 64);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
-            if (i <= cfg->DL_PILOT_SYMS - 1) {
+            if (cfg->DL_PILOT_SYMS > 0 and i <= cfg->DL_PILOT_SYMS - 1) {
                 for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++)
                     dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
                         + cfg->OFDM_DATA_START]
