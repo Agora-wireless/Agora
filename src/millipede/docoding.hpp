@@ -14,8 +14,8 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "stats.hpp"
 #include "phy_stats.hpp"
+#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
