@@ -74,9 +74,11 @@ private:
     DurationStat* duration_stat;
     RxStatus* rx_status_;
     DemulStatus* demul_status_;
-    size_t cur_frame;
-    size_t cur_symbol;
-    size_t cur_cb;
+
+    // decoder process one code block at a time
+    size_t cur_frame; // Current frame to decode
+    size_t cur_symbol; // Current symbol to decode
+    size_t cur_cb; // Current code block id to decode
 };
 
 #endif

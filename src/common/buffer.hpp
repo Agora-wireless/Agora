@@ -431,6 +431,8 @@ public:
         }
     }
 
+    // A dosubcarrier launch this function to notify some subcarriers
+    // are completed for demul tasks in a symbol of a frame
     void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
     {
         mutex_list[symbol_id].lock();
@@ -439,6 +441,8 @@ public:
         mutex_list[symbol_id].unlock();
     }
 
+    // A dodecode checks whether all subcarriers in a symbol complete their
+    // demul tasks so that it could start to decode
     bool ready_to_decode(size_t frame_id, size_t symbol_id)
     {
         return num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM]

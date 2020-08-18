@@ -234,9 +234,6 @@ private:
             = (subcarrier_range_.end - subcarrier_range_.start)
             / cfg->demul_block_size;
 
-        // TODO
-        // 1. Integrate some statements into functions in RxStatus
-        // 2. Change the meaning of cur_frame in RxStatus
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             if (rx_status_->is_pilot_ready(csi_cur_frame)) {
                 run_csi(gen_tag_t::frm_sym_sc(
