@@ -61,7 +61,7 @@ Millipede::Millipede(Config* cfg)
     }
 
     if (kUseRemote) {
-        auto uri = config_->server_addr + ":" + std::to_string(kRpcPort);
+        auto uri = config_->server_addr + ":" + std::to_string(kRpcPortLocal);
         nexus = new erpc::Nexus(uri, 0, 0);
     }
 
@@ -684,7 +684,8 @@ void* Millipede::worker(int tid)
         rpc = new erpc::Rpc<erpc::CTransport>(
             nexus, static_cast<void*>(computeDecoding), tid, basic_sm_handler);
         rpc->retry_connect_on_invalid_rpc_id = true;
-        auto uri = config_->remote_ldpc_addr + ":" + std::to_string(kRpcPort);
+        auto uri
+            = config_->remote_ldpc_addr + ":" + std::to_string(kRpcPortRemote);
         int session
             = rpc->create_session(uri, tid % config_->remote_ldpc_num_threads);
         rt_assert(session >= 0, "Connect failed!");

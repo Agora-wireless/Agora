@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     cfg->genData();
 
     constexpr int kReqType = 2;
-    constexpr int kUDPPort = 31850;
+    constexpr int kUDPPort = 31850 + 1;
 
     auto* task_threads = new std::thread*[cfg->remote_ldpc_num_threads];
 
