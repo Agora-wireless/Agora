@@ -76,6 +76,7 @@ private:
     DemulStatus* demul_status_;
     size_t cur_frame;
     size_t cur_symbol;
+    size_t cur_cb;
 };
 
 #endif

@@ -7,6 +7,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "signalHandler.hpp"
 #include <malloc.h>
 
 static constexpr bool kPrintEncodedData = false;
@@ -108,6 +109,9 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
+    cur_frame = 0;
+    cur_symbol = cfg->pilot_symbol_num_perframe;
+    cur_cb = 0;
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
@@ -216,6 +220,22 @@ Event_data DoDecode::launch(size_t tag)
 void DoDecode::start_work()
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
-        if (demul_status_->ready_to_decode())
+        if (cur_cb > 0
+            || demul_status_->ready_to_decode(cur_frame, cur_symbol)) {
+            launch(gen_tag_t::frm_sym_cb(cur_frame, cur_symbol,
+                cur_cb + tid * cfg->LDPC_config.nblocksInSymbol)
+                       ._tag);
+            cur_cb++;
+            if (cur_cb == cfg->LDPC_config.nblocksInSymbol) {
+                cur_cb = 0;
+                cur_symbol++;
+                if (cur_symbol
+                    == cfg->ul_data_symbol_num_perframe
+                        + cfg->pilot_symbol_num_perframe) {
+                    cur_symbol = 0;
+                    cur_frame++;
+                }
+            }
+        }
     }
 }
