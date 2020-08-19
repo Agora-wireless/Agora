@@ -112,9 +112,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    Table<uint8_t> mod_input;
     Table<complex_float> mod_output;
-    mod_input.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 32);
     mod_output.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 32);
     Table<float> mod_table;
     init_modulation_table(mod_table, cfg->mod_type);
@@ -122,11 +120,11 @@ int main(int argc, char* argv[])
     for (size_t n = 0; n < num_codeblocks; n++) {
         const size_t encoded_bytes_per_cb = bits_to_bytes(ldpc_num_encoded_bits(
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc, cfg->LDPC_config.nRows));
-        adapt_bits_for_mod(
-            encoded[n], mod_input[n], encoded_bytes_per_cb, cfg->mod_type);
+        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+        adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded[n]),
+            &mod_input[0], encoded_bytes_per_cb, cfg->mod_type);
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++)
-            mod_output[n][i]
-                = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
+            mod_output[n][i] = mod_single_uint8(mod_input[i], mod_table);
     }
 
     // Convert data into time domain
@@ -424,7 +422,6 @@ int main(int argc, char* argv[])
         delete[] encoded[n];
     }
 
-    mod_input.free();
     mod_output.free();
     IFFT_data.free();
     CSI_matrix.free();
