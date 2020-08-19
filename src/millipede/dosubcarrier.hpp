@@ -17,6 +17,7 @@
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "reciprocity.hpp"
+#include "signalHandler.hpp"
 
 #include "gettime.h"
 #include "modulation.hpp"
@@ -92,7 +93,7 @@ public:
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer, Table<complex_float>& ul_zf_buffer,
         Table<complex_float>& dl_zf_buffer, PhyStats* phy_stats, Stats* stats,
-        RxStatus* rx_status, DemulStatus* demul_status)
+        RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr)
         : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
               worker_producer_token)
         , subcarrier_range_(subcarrier_range)
@@ -192,39 +193,6 @@ public:
     // Returns the range of subcarrier IDs handled by this subcarrier doer.
     Range& subcarrier_range() { return subcarrier_range_; }
 
-private:
-    static inline __m256 __m256_complex_cf32_mult(
-        __m256 data1, __m256 data2, bool conj)
-    {
-        __m256 prod0 __attribute__((aligned(32)));
-        __m256 prod1 __attribute__((aligned(32)));
-        __m256 res __attribute__((aligned(32)));
-
-        // https://stackoverflow.com/questions/39509746
-        const __m256 neg0
-            = _mm256_setr_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
-        const __m256 neg1
-            = _mm256_set_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
-        prod0 = _mm256_mul_ps(data1, data2); // q1*q2, i1*i2, ...
-
-        /* Step 2: Negate the imaginary elements of vec2 */
-        data2 = _mm256_mul_ps(data2, conj ? neg0 : neg1);
-
-        /* Step 3: Switch the real and imaginary elements of vec2 */
-        data2 = _mm256_permute_ps(data2, 0xb1);
-
-        /* Step 4: Multiply vec1 and the modified vec2 */
-        prod1 = _mm256_mul_ps(data1, data2); // i2*q1, -i1*q2, ...
-
-        /* Horizontally add the elements in vec3 and vec4 */
-        res = conj
-            ? _mm256_hadd_ps(prod0, prod1)
-            : _mm256_hsub_ps(prod0, prod1); // i2*q1+-i1*q2, i1*i2+-q1*q2, ...
-        res = _mm256_permute_ps(res, 0xd8);
-
-        return res;
-    }
-
     void start_work()
     {
         const size_t num_zf_task_required
@@ -273,6 +241,39 @@ private:
                 }
             }
         }
+    }
+
+private:
+    static inline __m256 __m256_complex_cf32_mult(
+        __m256 data1, __m256 data2, bool conj)
+    {
+        __m256 prod0 __attribute__((aligned(32)));
+        __m256 prod1 __attribute__((aligned(32)));
+        __m256 res __attribute__((aligned(32)));
+
+        // https://stackoverflow.com/questions/39509746
+        const __m256 neg0
+            = _mm256_setr_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+        const __m256 neg1
+            = _mm256_set_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+        prod0 = _mm256_mul_ps(data1, data2); // q1*q2, i1*i2, ...
+
+        /* Step 2: Negate the imaginary elements of vec2 */
+        data2 = _mm256_mul_ps(data2, conj ? neg0 : neg1);
+
+        /* Step 3: Switch the real and imaginary elements of vec2 */
+        data2 = _mm256_permute_ps(data2, 0xb1);
+
+        /* Step 4: Multiply vec1 and the modified vec2 */
+        prod1 = _mm256_mul_ps(data1, data2); // i2*q1, -i1*q2, ...
+
+        /* Horizontally add the elements in vec3 and vec4 */
+        res = conj
+            ? _mm256_hadd_ps(prod0, prod1)
+            : _mm256_hsub_ps(prod0, prod1); // i2*q1+-i1*q2, i1*i2+-q1*q2, ...
+        res = _mm256_permute_ps(res, 0xd8);
+
+        return res;
     }
 
     Event_data run_csi(size_t tag)

@@ -73,6 +73,8 @@ public:
     void* worker_demul(int tid);
 #endif // BIGSTATION
     void* worker(int tid);
+    void* subcarrier_worker(int tid);
+    void* decode_worker(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
@@ -201,6 +203,16 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
+    // Calculated uplink zeroforcing detection matrices
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
+    // 2nd dimension: number of antennas * number of UEs
+    Table<complex_float> ul_zf_buffer_;
+
+    // Data after equalization
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 2nd dimension: number of OFDM data subcarriers * number of UEs
+    Table<complex_float> equal_buffer_;
+
     // Data after soft demodulation
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
@@ -210,6 +222,8 @@ private:
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: decoded bytes per UE * number of UEs
     Table<uint8_t> decoded_buffer_;
+
+    Table<complex_float> ue_spec_pilot_buffer_;
 
     RxCounters rx_counters_;
     CSI_stats csi_stats_;
@@ -234,6 +248,11 @@ private:
     // data symbols per frame
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
+
+    // Calculated zeroforcing precoders for downlink beamforming
+    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
+    // 2nd dimension: number of antennas * number of UEs
+    Table<complex_float> dl_zf_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
@@ -290,6 +309,7 @@ private:
     RxStatus rx_status_;
 
     // Shared states between dosubcarriers and dodecoders
+    DemulStatus demul_status_;
 };
 
 #endif

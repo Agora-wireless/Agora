@@ -241,6 +241,12 @@ Config::Config(std::string jsonfile)
         LDPC_config.nRows);
 
     fft_in_rru = tddConf.value("fft_in_rru", false);
+    disable_master = tddConf.value("disable_master", false);
+    subcarrier_block_size = tddConf.value(
+        "subcarrier_block_size", lcm(zf_block_size, demul_block_size));
+    rt_assert(subcarrier_block_size % lcm(zf_block_size, demul_block_size) == 0,
+        "Subcarrier block size should be a multiple of lcm(zf_block_size, "
+        "demul_block_size)!");
 
     sampsPerSymbol = symbolSize * (OFDM_CA_NUM + CP_LEN) + prefix + postfix;
     packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;

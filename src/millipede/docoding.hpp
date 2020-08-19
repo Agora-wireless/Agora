@@ -56,8 +56,8 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
-        PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
-        DemulStatus* demul_status);
+        PhyStats* in_phy_stats, Stats* in_stats_manager,
+        RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr);
     ~DoDecode();
 
     Event_data launch(size_t tag);

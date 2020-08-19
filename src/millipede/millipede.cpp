@@ -9,6 +9,10 @@ using namespace std;
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
+    , rx_status_(RxStatus(cfg->pilot_symbol_num_perframe * cfg->UE_ANT_NUM,
+          cfg->pilot_symbol_num_perframe, cfg->data_symbol_num_perframe,
+          cfg->UE_ANT_NUM))
+    , demul_status_(DemulStatus(cfg->OFDM_DATA_NUM))
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -76,8 +80,17 @@ Millipede::Millipede(Config* cfg)
             cfg->fft_thread_num + cfg->zf_thread_num, cfg->worker_thread_num);
 #endif // BIGSTATION
     } else {
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>, 0,
-            cfg->worker_thread_num);
+        if (cfg->disable_master) {
+            create_threads(
+                pthread_fun_wrapper<Millipede, &Millipede::subcarrier_worker>,
+                0, cfg->OFDM_DATA_NUM / cfg->subcarrier_block_size);
+            create_threads(
+                pthread_fun_wrapper<Millipede, &Millipede::decode_worker>, 0,
+                cfg->UE_ANT_NUM);
+        } else {
+            create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>,
+                0, cfg->worker_thread_num);
+        }
     }
 }
 
@@ -196,6 +209,13 @@ void Millipede::start()
 {
     auto& cfg = config_;
     cur_tid = 0;
+
+    if (cfg->disable_master) {
+        while (cfg->running && !SignalHandler::gotExitSignal()) {
+            sleep(3);
+        }
+        return;
+    }
 
     // Start packet I/O
     if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
@@ -656,6 +676,35 @@ void Millipede::handle_event_fft(size_t tag)
                 EventType::kRC, rc_stats_.max_task_count, frame_id);
         }
     }
+}
+
+void* Millipede::subcarrier_worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+
+    auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
+        *get_conq(EventType::kCSI), complete_task_queue_, nullptr,
+        Range(tid * config_->subcarrier_block_size,
+            (tid + 1) * config_->subcarrier_block_size),
+        socket_buffer_, socket_buffer_status_, csi_buffer_, recip_buffer_,
+        calib_buffer_, dl_encoded_buffer_, data_buffer_, demod_soft_buffer_,
+        dl_ifft_buffer_, ue_spec_pilot_buffer_, equal_buffer_, ul_zf_buffer_,
+        dl_zf_buffer_, phy_stats, stats, &rx_status_, &demul_status_);
+
+    computeSubcarrier->start_work();
+}
+
+void* Millipede::decode_worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset,
+        tid + config_->OFDM_DATA_NUM / config_->subcarrier_block_size);
+
+    auto computeDecoding
+        = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
+            complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
+            decoded_buffer_, phy_stats, stats, &rx_status_, &demul_status_);
+
+    computeDecoding->start_work();
 }
 
 void* Millipede::worker(int tid)
@@ -1204,6 +1253,15 @@ void Millipede::initialize_uplink_buffers()
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
+    if (cfg->disable_master) {
+        ul_zf_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+            cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
+        equal_buffer_.malloc(
+            task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        ue_spec_pilot_buffer_.calloc(
+            TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
+    }
+
     demod_soft_buffer_.malloc(
         task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     decoded_buffer_.calloc(task_buffer_symbol_num_ul,
@@ -1269,6 +1327,11 @@ void Millipede::initialize_downlink_buffers()
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
+
+    if (cfg->disable_master) {
+        dl_zf_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+            cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
+    }
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
