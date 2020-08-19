@@ -86,6 +86,7 @@ public:
 private:
     void* loop_tx_rx(int tid); // The TX/RX event loop
     int dequeue_send(int tid);
+    int poll_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
     void* loop_tx_rx_argos(int tid);

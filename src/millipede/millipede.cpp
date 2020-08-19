@@ -44,8 +44,13 @@ Millipede::Millipede(Config* cfg)
     phy_stats = new PhyStats(cfg);
 
     /* Initialize TXRX threads */
-    receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
-        get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
+    if (config_->disable_master) {
+        receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &rx_status_));
+    } else {
+        receiver_.reset(
+            new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
+                get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
+    }
 
     if (kEnableMac) {
         const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
