@@ -46,7 +46,6 @@ Event_data DoEncode::launch(size_t tag)
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
     size_t cb_id = gen_tag_t(tag).cb_id;
-    size_t symbol_offset = cfg->get_total_data_symbol_idx(frame_id, symbol_id);
     size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
     size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
     if (kDebugPrintInTask) {
@@ -57,21 +56,15 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    int cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
-    int input_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
-        + cbLenBytes * cur_cb_id;
-    int symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
-    int8_t* input_ptr
-        = (int8_t*)raw_data_buffer_[symbol_id_in_buffer] + input_offset;
+    size_t symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
+    int8_t* input_ptr = cfg->get_info_bits(
+        raw_data_buffer_, symbol_id_in_buffer, ue_id, cur_cb_id);
     int8_t* output_ptr = encoded_buffer_temp;
 
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
         output_ptr, parity_buffer, input_ptr);
-    int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
-    int output_offset = OFDM_DATA_NUM * ue_id + cbCodedBytes * cur_cb_id;
-    int8_t* final_output_ptr
-        = (int8_t*)encoded_buffer_[symbol_offset] + output_offset;
+    int8_t* final_output_ptr = cfg->get_encoded_buf(
+        encoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
     adapt_bits_for_mod(output_ptr, final_output_ptr,
         (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
 
@@ -83,7 +76,7 @@ Event_data DoEncode::launch(size_t tag)
     // }
     // printf("\n");
 
-    double duration = worker_rdtsc() - start_tsc;
+    size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
     if (cycles_to_us(duration, freq_ghz) > 500) {
@@ -157,26 +150,26 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    size_t input_offset
-        = cfg->OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
-    size_t llr_buffer_offset = input_offset * cfg->mod_type;
-    ldpc_decoder_5gnr_request.varNodes
-        = (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset;
-    size_t cbLenBytes = (LDPC_config.cbLen + 7) >> 3;
-    size_t output_offset = cbLenBytes * cfg->LDPC_config.nblocksInSymbol * ue_id
-        + cbLenBytes * cur_cb_id;
-    ldpc_decoder_5gnr_response.compactedMessageBytes
-        = (uint8_t*)decoded_buffer_[symbol_offset] + output_offset;
+    auto* llr_buffer_ptr = cfg->get_demod_buf(llr_buffer_, frame_id, symbol_id,
+        ue_id, LDPC_config.cbCodewLen * cur_cb_id);
+    auto* decoded_buffer_ptr = cfg->get_decode_buf(
+        decoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
+    ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
+
+    size_t start_tsc1 = worker_rdtsc();
+    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
+    size_t start_tsc2 = worker_rdtsc();
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+
     if (kPrintLLRData) {
-        printf("LLR data, symbol_offset: %zu, input offset: %zu\n",
-            symbol_offset, input_offset);
+        printf("LLR data, symbol_offset: %zu\n", symbol_offset);
         for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
-            printf(
-                "%d ", *(llr_buffer_[symbol_offset] + llr_buffer_offset + i));
+            printf("%d ", *(llr_buffer_ptr + i));
         }
         printf("\n");
     }
@@ -184,19 +177,20 @@ Event_data DoDecode::launch(size_t tag)
     if (kPrintDecodedData) {
         printf("Decoded data\n");
         for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
-            printf(
-                "%u ", *(decoded_buffer_[symbol_offset] + output_offset + i));
+            printf("%u ", *(decoded_buffer_ptr + i));
         }
         printf("\n");
     }
 
     if (!kEnableMac && kPrintPhyStats && symbol_id == cfg->UL_PILOT_SYMS) {
-        phy_stats->update_decoded_bits(ue_id, symbol_offset, cbLenBytes * 8);
+        phy_stats->update_decoded_bits(
+            ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
         size_t block_error(0);
-        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
-            uint8_t rx_byte = decoded_buffer_[symbol_offset][output_offset + i];
-            uint8_t tx_byte = cfg->ul_bits[symbol_id][output_offset + i];
+        for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
+            uint8_t rx_byte = decoded_buffer_ptr[i];
+            uint8_t tx_byte = (uint8_t)cfg->get_info_bits(
+                cfg->ul_bits, symbol_id, ue_id, cur_cb_id)[i];
             phy_stats->update_bit_errors(
                 ue_id, symbol_offset, tx_byte, rx_byte);
             if (rx_byte != tx_byte)

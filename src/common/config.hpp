@@ -118,7 +118,6 @@ public:
     size_t core_offset;
     size_t worker_thread_num;
     size_t socket_thread_num;
-    size_t mac_socket_thread_num;
     size_t fft_thread_num;
     size_t demul_thread_num;
     size_t decode_thread_num;
@@ -148,7 +147,6 @@ public:
     size_t CP_LEN;
     size_t OFDM_PREFIX_LEN;
     size_t OFDM_FRAME_LEN;
-    size_t OFDM_SYM_LEN;
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
     int cl_tx_advance;
@@ -172,9 +170,11 @@ public:
     size_t data_bytes_num_persymbol;
     size_t data_bytes_num_perframe;
     size_t mac_data_bytes_num_perframe;
+    size_t mac_bytes_num_perframe;
     size_t mac_packet_length;
-    size_t num_frames_per_mac_packet;
-    size_t sym_packet_length;
+    size_t mac_payload_length;
+    size_t mac_packets_perframe;
+    bool ip_bridge_enable;
 
     std::string server_addr; // IP address of the Millipede server
     std::string sender_addr; // IP address of the simulator sender
@@ -195,6 +195,9 @@ public:
 
     /* LDPC parameters */
     LDPCconfig LDPC_config;
+
+    // Number of bytes per code block
+    size_t num_bytes_per_cb;
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
 
@@ -249,6 +252,12 @@ public:
                    * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }
+  
+    /// Return the frame duration in seconds
+    inline double get_frame_duration_sec()
+    {
+        return symbol_num_perframe * sampsPerSymbol / rate;
+    }
 
     /// Fetch the channel state information matrix for this frame and symbol ID.
     /// The symbol must be a pilot symbol.
@@ -300,6 +309,50 @@ public:
     {
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
+    }
+
+    
+    /// Get the soft demodulation buffer for this frame, symbol,
+    /// user and subcarrier ID
+    inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
+        size_t symbol_id, size_t ue_id, size_t sc_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &demod_buffer[total_data_symbol_id]
+                            [OFDM_DATA_NUM * 8 * ue_id + sc_id * mod_type];
+    }
+
+    /// Get the decode buffer for this frame, symbol,
+    /// user and code block ID
+    inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &decoded_buffer[total_data_symbol_id][roundup<64>(
+                                                         num_bytes_per_cb)
+            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    /// Get ul_bits for this symbol, user and code block ID
+    inline int8_t* get_info_bits(Table<int8_t>& info_bits, size_t symbol_id,
+        size_t ue_id, size_t cb_id) const
+    {
+        return &info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
+            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    /// Get encoded_buffer for this frame, symbol, user and code block ID
+    inline int8_t* get_encoded_buf(Table<int8_t>& encoded_buffer,
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx(frame_id, symbol_id);
+        size_t num_encoded_bytes_per_cb = LDPC_config.cbCodewLen / mod_type;
+        return &encoded_buffer[total_data_symbol_id]
+                              [roundup<64>(OFDM_DATA_NUM) * ue_id
+                                  + num_encoded_bytes_per_cb * cb_id];
     }
 
     Config(std::string);

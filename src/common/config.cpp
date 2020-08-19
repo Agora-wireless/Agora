@@ -74,6 +74,7 @@ Config::Config(std::string jsonfile)
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
+    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     auto symbolSize = tddConf.value("symbol_size", 1);
     prefix = tddConf.value("prefix", 0);
     dl_prefix = tddConf.value("dl_prefix", 0);
@@ -184,8 +185,6 @@ Config::Config(std::string jsonfile)
     core_offset = tddConf.value("core_offset", 18);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
-    mac_socket_thread_num
-        = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
     fft_thread_num = tddConf.value("fft_thread_num", 5);
     demul_thread_num = tddConf.value("demul_thread_num", 5);
     decode_thread_num = tddConf.value("decode_thread_num", 10);
@@ -219,13 +218,14 @@ Config::Config(std::string jsonfile)
     LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
     LDPC_config.Zc = tddConf.value("Zc", 72);
     LDPC_config.nRows = tddConf.value("nRows", (LDPC_config.Bg == 1) ? 46 : 42);
-    LDPC_config.cbEncLen = LDPC_config.nRows * LDPC_config.Zc;
-    LDPC_config.cbLen = LDPC_config.Zc * ldpc_num_input_cols(LDPC_config.Bg);
-    LDPC_config.cbCodewLen = (LDPC_config.Bg == 1)
-        ? LDPC_config.Zc * (LDPC_config.nRows + 20)
-        : LDPC_config.Zc * (LDPC_config.nRows + 8);
+    LDPC_config.cbLen = ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc);
+    LDPC_config.cbCodewLen = ldpc_num_encoded_bits(
+        LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows);
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+
+    num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
+
     rt_assert(LDPC_config.nblocksInSymbol > 0,
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
@@ -241,31 +241,29 @@ Config::Config(std::string jsonfile)
 
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
-    OFDM_SYM_LEN = OFDM_CA_NUM + CP_LEN;
-    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
-    sampsPerSymbol = symbolSize * OFDM_SYM_LEN + prefix + postfix;
+    sampsPerSymbol = symbolSize * (OFDM_CA_NUM + CP_LEN) + prefix + postfix;
     packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
+
+    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
 
     data_bytes_num_persymbol
         = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
-    data_bytes_num_perframe = data_bytes_num_persymbol
-        * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
-    mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
-    // The current implementation only supports the case when  MAC packet size
-    // is multiples of data_bytes_num_perframe
-    if (data_bytes_num_perframe != 0)
-        rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
-            "MAC packet size need to be multiples of data_bytes_num_perframe!");
+    mac_packet_length = data_bytes_num_persymbol;
+    mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
+    mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
+    mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
+    mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
     std::cout << "Config: "
-              << "BS_ANT_NUM " << BS_ANT_NUM << ", UE_ANT_NUM " << UE_ANT_NUM
-              << ", PILOT SYM NUM " << pilot_symbol_num_perframe
-              << ", UL SYM NUM " << ul_data_symbol_num_perframe
-              << ", DL SYM NUM " << dl_data_symbol_num_perframe
-              << ", OFDM_CA_NUM " << OFDM_CA_NUM << ", OFDM_DATA_NUM "
-              << OFDM_DATA_NUM << ", packet length " << packet_length
+              << "\n  BS_ANT_NUM: " << BS_ANT_NUM << "\n  UE_ANT_NUM: " << UE_ANT_NUM
+              << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
+              << "\n  ul_data_symbol_num_perframe: " << ul_data_symbol_num_perframe
+              << "\n  dl_data_symbol_num_perframe: " << dl_data_symbol_num_perframe
+              << "\n  OFDM_CA_NUM " << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: "
+              << OFDM_DATA_NUM 
+              << "\n  mac_data_bytes_num_perframe: " << mac_data_bytes_num_perframe
+              << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
               << std::endl;
 
     if (packet_length >= 9000) {
@@ -362,23 +360,24 @@ void Config::genData()
     }
 
     // Get uplink and downlink raw bits either from file or random numbers
-    size_t num_bytes_per_ue
-        = (LDPC_config.cbLen + 7) >> 3 * LDPC_config.nblocksInSymbol;
+    size_t num_bytes_per_ue = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
+    size_t num_bytes_per_ue_pad
+        = roundup<64>(num_bytes_per_cb) * LDPC_config.nblocksInSymbol;
     dl_bits.malloc(
-        dl_data_symbol_num_perframe, num_bytes_per_ue * UE_ANT_NUM, 64);
+        dl_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
     dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     dl_iq_t.calloc(
         dl_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
     ul_bits.malloc(
-        ul_data_symbol_num_perframe, num_bytes_per_ue * UE_ANT_NUM, 64);
+        ul_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
     ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
-        for (size_t j = 0; j < num_bytes_per_ue; j++) {
+        for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
             int cur_offset = j * UE_ANT_NUM + ue_id;
             for (size_t i = 0; i < ul_data_symbol_num_perframe; i++)
                 ul_bits[i][cur_offset] = rand() % mod_order;
@@ -401,11 +400,13 @@ void Config::genData()
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
             return;
-        size_t r = fread(
-            ul_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
-        if (r < num_bytes_per_ue * UE_ANT_NUM)
-            printf(
-                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            size_t r = fread(ul_bits[i] + j * num_bytes_per_ue_pad,
+                sizeof(int8_t), num_bytes_per_ue, fd);
+            if (r < num_bytes_per_ue)
+                printf("bad read from file %s (batch %zu) \n",
+                    filename1.c_str(), i);
+        }
         if (fseek(fd,
                 num_bytes_per_ue
                     * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM),
@@ -414,11 +415,13 @@ void Config::genData()
             return;
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        size_t r = fread(
-            dl_bits[i], sizeof(int8_t), num_bytes_per_ue * UE_ANT_NUM, fd);
-        if (r < num_bytes_per_ue * UE_ANT_NUM)
-            printf(
-                "bad read from file %s (batch %zu) \n", filename1.c_str(), i);
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            size_t r = fread(dl_bits[i] + j * num_bytes_per_ue_pad,
+                sizeof(int8_t), num_bytes_per_ue, fd);
+            if (r < num_bytes_per_ue)
+                printf("bad read from file %s (batch %zu) \n",
+                    filename1.c_str(), i);
+        }
     }
     fclose(fd);
 #endif
