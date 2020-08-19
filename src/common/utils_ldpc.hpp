@@ -47,23 +47,7 @@ static inline uint8_t bitreverse8(uint8_t x)
  * at least 8*len/m bytes.
  */
 static inline void adapt_bits_for_mod(
-    const int8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
-{
-    int bits_avail = 0;
-    uint16_t bits = 0;
-    for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
-        bits_avail += 8;
-        while (bits_avail >= mod_type) {
-            *vec_out++ = bits >> (16 - mod_type);
-            bits <<= mod_type;
-            bits_avail -= mod_type;
-        }
-    }
-}
-
-static inline void adapt_bits_for_mod(
-    const int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
+    const uint8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
 {
     int bits_avail = 0;
     uint16_t bits = 0;
