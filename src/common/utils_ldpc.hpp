@@ -46,8 +46,12 @@ static inline uint8_t bitreverse8(uint8_t x)
  * taken from the bit sequence \p bit_seq_in
  *
  * \param bit_seq_in The input bit sequence
- * \param bytes_out The output byte array with \p mod_type bits per byte
+ *
+ * \param bytes_out The output byte array with \p mod_type bits per byte. It
+ * must have space for ceil(len * 8.0 / mod_type) bytes.
+ *
  * \param len The number of bytes in \p bit_seq_in
+ *
  * \param mod_type The number of bits in one modulated symbol (e.g., mod_type =
  * 6 for 64-QAM modulation)
  */
