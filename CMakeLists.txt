@@ -46,8 +46,8 @@ find_package(GTest REQUIRED)
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 else()
   message(STATUS "Debugging is enabled. Performance will be low")
 endif()
@@ -317,15 +317,14 @@ add_test(NAME test_ldpc COMMAND test_ldpc)
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf)
 
-# Unit tests should pass without memory errors
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
     test/unit_tests/${test_name}.cc
     $<TARGET_OBJECTS:millipede_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
 
+  # Unit tests should pass without memory errors
+  set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
   target_link_libraries(${test_name} ${COMMON_LIBS})
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
