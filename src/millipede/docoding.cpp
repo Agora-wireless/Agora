@@ -39,6 +39,8 @@ void decode_cont_func(void* _context, void* _tag)
     computeDecoding->vec_resp_msgbuf.push_back(tag->resp_msgbuf);
     delete tag;
 
+    printf("Docoding: Received eRPC response %zu\n",
+        computeDecoding->num_responses_received);
     computeDecoding->num_responses_received++;
 }
 
@@ -190,7 +192,9 @@ Event_data DoDecode::launch(size_t tag)
             = ldpc_max_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
 
         while (vec_req_msgbuf.size() == 0) {
-            printf("Ran out of request message buffers!\n");
+            printf("Docoding: Running RPC event loop, rpc is %p\n", rpc);
+            rt_assert(rpc != nullptr, "RPC is null");
+            // printf("Ran out of request message buffers!\n");
             rpc->run_event_loop_once();
         }
         auto* req_msgbuf = vec_req_msgbuf.back();
@@ -204,6 +208,7 @@ Event_data DoDecode::launch(size_t tag)
         rpc->resize_msg_buffer(req_msgbuf, data_bytes);
         memcpy(req_msgbuf->buf, send_buf, data_bytes);
 
+        printf("Docoding: Issuing eRPC request %zu\n", num_requests_issued);
         rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
             decode_cont_func, decode_tag);
         num_requests_issued++;
@@ -230,7 +235,7 @@ Event_data DoDecode::launch(size_t tag)
         ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-        auto* llr_buffer_ptr = cfg->get_demod_buf(llr_buffer_, frame_id, 
+        auto* llr_buffer_ptr = cfg->get_demod_buf(llr_buffer_, frame_id,
             symbol_id, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
         auto* decoded_buffer_ptr = cfg->get_decode_buf(
             decoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);

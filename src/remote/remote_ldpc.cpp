@@ -30,6 +30,9 @@ void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
     auto* remote = static_cast<RemoteLDPC*>(_context);
     auto* in_buf = reinterpret_cast<int8_t*>(req_handle->get_req_msgbuf()->buf);
 
+    remote->num_reqs_recvd++;
+    printf("RemoteLDPC: Received eRPC request %zu\n", remote->num_reqs_recvd);
+
     req_handle->dyn_resp_msgbuf
         = remote->rpc->alloc_msg_buffer(remote->decoded_bits);
     auto* out_buf = reinterpret_cast<uint8_t*>(req_handle->dyn_resp_msgbuf.buf);

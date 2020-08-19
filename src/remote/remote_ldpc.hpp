@@ -57,6 +57,7 @@ private:
     // The buffer used to store the code word 16-bit LLR outputs for FlexRAN lib
     int16_t* resp_var_nodes;
 
+    size_t num_reqs_recvd = 0;
     bool stop;
 };
 
