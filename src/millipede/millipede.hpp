@@ -61,8 +61,6 @@ public:
     static const size_t kRpcPortLocal = 31850;
     /* Port on the remote LDPC worker process that listens for eRPC requests */
     static const size_t kRpcPortRemote = kRpcPortLocal + 1;
-    /* Maximum size of an eRPC message */
-    static const size_t kRpcMaxMsgSize = (1 << 20);
 
     /**
      * @brief Create a Millipede object and start the worker threads

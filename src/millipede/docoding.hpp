@@ -85,13 +85,13 @@ private:
 
     // #ifdef USE_REMOTE
     /// Number of preallocated msgbufs to hold pending eRPC requests
-    static const size_t kRpcMaxMsgBufNum = 64;
+    static const size_t kRpcMaxMsgBufNum = 640;
 
     /// eRPC request type for remote LDPC decoding
     static const size_t kRpcReqType = 2;
 
     /// Maximum size of preallocated msgbufs
-    static const size_t kRpcMaxMsgSize = (1 << 20);
+    static const size_t kRpcMaxMsgSize = (1 << 15);
 
     erpc::Rpc<erpc::CTransport>* rpc;
     std::vector<erpc::MsgBuffer*> vec_req_msgbuf;

@@ -7,7 +7,8 @@
  "cp_len" : 0,
  "tx_prefix_len" : 0,
  "ofdm_prefix_len" : 0,
- "worker_thread_num" : 25,
+ "worker_thread_num" : 1,
+ "remote_ldpc_num_threads" : 1,
  "demul_block_size" : 48,
  "antenna_num": 8
 }
