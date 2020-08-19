@@ -76,6 +76,11 @@ void MacThread::process_snr_report_from_master(Event_data event)
     server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
 }
 
+void MacThread::push_ran_config_update(Event_data event, RanConfig rc)
+{
+    assert(event.event_type == EventType::kRANUpdate);
+}
+
 void MacThread::process_codeblocks_from_master(Event_data event)
 {
     assert(event.event_type == EventType::kPacketToMac);
