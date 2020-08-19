@@ -72,10 +72,10 @@ int main(int argc, char* argv[])
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)];
     }
 
-    const size_t num_input_bytes = bits_to_bytes(
+    const size_t input_bytes_per_cb = bits_to_bytes(
         ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
     for (size_t n = 0; n < num_codeblocks; n++) {
-        for (size_t i = 0; i < num_input_bytes; i++) {
+        for (size_t i = 0; i < input_bytes_per_cb; i++) {
             input[n][i] = (int8_t)rand();
         }
     }
@@ -87,10 +87,8 @@ int main(int argc, char* argv[])
                 printf("Symbol %zu\n", n / cfg->UE_ANT_NUM);
             }
             printf("UE %zu\n", n % cfg->UE_ANT_NUM);
-
-            for (size_t i = 0; i < num_input_bytes; i++) {
+            for (size_t i = 0; i < input_bytes_per_cb; i++) {
                 printf("%u ", (uint8_t)input[n][i]);
-                printf("\n");
             }
             printf("\n");
         }
@@ -124,10 +122,8 @@ int main(int argc, char* argv[])
     printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
     FILE* fp_input = fopen(filename_input.c_str(), "wb");
     for (size_t i = 0; i < num_codeblocks; i++) {
-        uint8_t* ptr = (uint8_t*)input[i];
-        const size_t num_input_bytes = bits_to_bytes(
-            ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-        fwrite(ptr, num_input_bytes, sizeof(uint8_t), fp_input);
+        fwrite(reinterpret_cast<uint8_t*>(input[i]), input_bytes_per_cb,
+            sizeof(uint8_t), fp_input);
     }
     fclose(fp_input);
 
