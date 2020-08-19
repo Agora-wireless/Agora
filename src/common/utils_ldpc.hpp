@@ -68,7 +68,7 @@ static inline void adapt_bits_for_mod(
  * Storage at vec_out must be at least (m*len+7)/8 bytes.
  */
 static inline void adapt_bits_from_mod(
-    int8_t* vec_in, int8_t* vec_out, int len, int mod_type)
+    const uint8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
 {
     int bits_avail = 0;
     uint16_t bits = 0;

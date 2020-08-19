@@ -123,8 +123,10 @@ int main(int argc, char* argv[])
         std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
         adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded[n]),
             &mod_input[0], encoded_bytes_per_cb, cfg->mod_type);
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++)
+
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
             mod_output[n][i] = mod_single_uint8(mod_input[i], mod_table);
+        }
     }
 
     // Convert data into time domain
