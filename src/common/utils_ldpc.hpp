@@ -41,24 +41,34 @@ static inline uint8_t bitreverse8(uint8_t x)
 #endif
 }
 
-/*
- * Copy unpacked, bit-reversed m-bit fields (m == mod_type) stored in
- * vec_in[0..len-1] into packed vec_out.  Storage at vec_out must be
- * at least 8*len/m bytes.
+/**
+ * \brief Fill-in the bytes of \p bytes_out with \p mod_type bits per byte,
+ * taken from the bit sequence \p bit_seq_in
+ *
+ * \param bit_seq_in The input bit sequence
+ * \param bytes_out The output byte array with \p mod_type bits per byte
+ * \param len The number of bytes in \p bit_seq_in
+ * \param mod_type The number of bits in one modulated symbol (e.g., mod_type =
+ * 6 for 64-QAM modulation)
  */
 static inline void adapt_bits_for_mod(
-    const uint8_t* vec_in, uint8_t* vec_out, int len, int mod_type)
+    const uint8_t* bit_seq_in, uint8_t* bytes_out, size_t len, size_t mod_type)
 {
-    int bits_avail = 0;
-    uint16_t bits = 0;
-    for (int i = 0; i < len; i++) {
-        bits |= bitreverse8(vec_in[i]) << (8 - bits_avail);
+    uint16_t bits = 0; // Bits collected from the input
+    size_t bits_avail = 0; // Number of valid bits filled into [bits]
+    for (size_t i = 0; i < len; i++) {
+        bits |= static_cast<uint32_t>(bitreverse8(bit_seq_in[i]))
+            << (8 - bits_avail);
         bits_avail += 8;
         while (bits_avail >= mod_type) {
-            *vec_out++ = bits >> (16 - mod_type);
+            *bytes_out++ = bits >> (16 - mod_type);
             bits <<= mod_type;
             bits_avail -= mod_type;
         }
+    }
+
+    if (bits_avail > 0) {
+        *bytes_out++ = bits >> (16 - mod_type);
     }
 }
 
