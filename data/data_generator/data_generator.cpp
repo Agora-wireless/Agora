@@ -144,16 +144,10 @@ int main(int argc, char* argv[])
     auto zc_common_pilot = CommsLib::seqCyclicShift(
         zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
 
-    complex_float* pilots_f = (complex_float*)aligned_alloc(
-        64, cfg->OFDM_DATA_NUM * sizeof(complex_float));
+    std::vector<complex_float> pilots_time(cfg->OFDM_CA_NUM);
     for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-        pilots_f[i] = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
-    }
-
-    complex_float* pilots_t;
-    alloc_buffer_1d(&pilots_t, cfg->OFDM_CA_NUM, 64, 1);
-    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-        pilots_t[i + cfg->OFDM_DATA_START] = pilots_f[i];
+        pilots_time[i + cfg->OFDM_DATA_START]
+            = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
     }
 
     // Generate UE-specific pilot data
@@ -187,15 +181,15 @@ int main(int argc, char* argv[])
             for (size_t j = cfg->OFDM_DATA_START;
                  j < cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM;
                  j += cfg->UE_ANT_NUM) {
-                pilots_t_ue[i + j] = pilots_t[i + j];
+                pilots_t_ue[i + j] = pilots_time[i + j];
             }
             memcpy(tx_data_all_symbols[0] + i * cfg->OFDM_CA_NUM, pilots_t_ue,
                 cfg->OFDM_CA_NUM * sizeof(complex_float));
         }
     } else {
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)
-            memcpy(tx_data_all_symbols[i] + i * cfg->OFDM_CA_NUM, pilots_t,
-                cfg->OFDM_CA_NUM * sizeof(complex_float));
+            memcpy(tx_data_all_symbols[i] + i * cfg->OFDM_CA_NUM,
+                &pilots_time[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
     }
 
     for (size_t i = cfg->pilot_symbol_num_perframe;
@@ -236,13 +230,13 @@ int main(int argc, char* argv[])
     rx_data_all_symbols.calloc(
         cfg->symbol_num_perframe, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
-        cx_float* ptr_in_data = (cx_float*)tx_data_all_symbols[i];
+        auto* ptr_in_data = (cx_float*)tx_data_all_symbols[i];
         cx_fmat mat_input_data(
             ptr_in_data, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-        cx_float* ptr_out = (cx_float*)rx_data_all_symbols[i];
+        auto* ptr_out = (cx_float*)rx_data_all_symbols[i];
         cx_fmat mat_output(ptr_out, cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
         for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-            cx_float* ptr_in_csi = (cx_float*)CSI_matrix[j];
+            auto* ptr_in_csi = (cx_float*)CSI_matrix[j];
             cx_fmat mat_csi(ptr_in_csi, cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
             mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
         }
@@ -258,7 +252,7 @@ int main(int argc, char* argv[])
     printf("Saving rx data to %s\n", filename_rx.c_str());
     FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
     for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
-        float* ptr = (float*)rx_data_all_symbols[i];
+        auto* ptr = (float*)rx_data_all_symbols[i];
         fwrite(
             ptr, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM * 2, sizeof(float), fp_rx);
     }
@@ -284,9 +278,9 @@ int main(int argc, char* argv[])
     Table<complex_float> precoder;
     precoder.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
     for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-        cx_float* ptr_in = (cx_float*)CSI_matrix[i];
+        auto* ptr_in = (cx_float*)CSI_matrix[i];
         cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_ANT_NUM, false);
-        cx_float* ptr_out = (cx_float*)precoder[i];
+        auto* ptr_out = (cx_float*)precoder[i];
         cx_fmat mat_output(ptr_out, cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
         pinv(mat_output, mat_input, 1e-2, "dc");
     }
@@ -352,14 +346,14 @@ int main(int argc, char* argv[])
     dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe,
         2 * cfg->sampsPerSymbol * cfg->BS_ANT_NUM, 64);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        cx_float* ptr_in_data = (cx_float*)dl_mod_data[i];
+        auto* ptr_in_data = (cx_float*)dl_mod_data[i];
         cx_fmat mat_input_data(
             ptr_in_data, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-        cx_float* ptr_out = (cx_float*)dl_ifft_data[i];
+        auto* ptr_out = (cx_float*)dl_ifft_data[i];
         cx_fmat mat_output(ptr_out, cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
         for (size_t j = cfg->OFDM_DATA_START;
              j < cfg->OFDM_DATA_NUM + cfg->OFDM_DATA_START; j++) {
-            cx_float* ptr_in_precoder = (cx_float*)precoder[j];
+            auto* ptr_in_precoder = (cx_float*)precoder[j];
             cx_fmat mat_precoder(
                 ptr_in_precoder, cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
@@ -432,8 +426,6 @@ int main(int argc, char* argv[])
     mod_output.free();
     IFFT_data.free();
     CSI_matrix.free();
-    free_buffer_1d(&pilots_f);
-    free_buffer_1d(&pilots_t);
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
     ue_specific_pilot.free();
