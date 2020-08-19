@@ -39,7 +39,8 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
 
-    udp_server = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_server
+        = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
     udp_client = new UDPClient();
 
     crc_obj = new DoCRC();
@@ -51,11 +52,32 @@ MacThread::~MacThread()
     MLPD_INFO("MAC thread destroyed\n");
 }
 
-void MacThread::process_codeblocks_from_master()
+void MacThread::process_rx_from_master()
 {
     Event_data event;
     if (!rx_queue_->try_dequeue(event))
         return;
+
+    if (event.event_type == EventType::kPacketToMac)
+        process_codeblocks_from_master(event);
+    else if (event.event_type == EventType::kSNRReport)
+        process_snr_report_from_master(event);
+}
+
+void MacThread::process_snr_report_from_master(Event_data event)
+{
+    assert(event.event_type == EventType::kSNRReport);
+
+    const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+    if (server_.snr_[ue_id].size() == kSNRWindowSize) {
+        server_.snr_[ue_id].pop();
+    }
+
+    server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
+}
+
+void MacThread::process_codeblocks_from_master(Event_data event)
+{
     assert(event.event_type == EventType::kPacketToMac);
 
     const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
@@ -74,18 +96,18 @@ void MacThread::process_codeblocks_from_master()
     if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
         auto* pkt = (struct MacPacket*)ul_data_ptr;
 
-	// we send data to app irrespective of CRC condition
-	// TODO: enable ARQ and ensure reliable data goes to app
-        const size_t frame_data__offset = (symbol_idx_ul - cfg_->UL_PILOT_SYMS)
-            * cfg_->mac_payload_length;
+        // we send data to app irrespective of CRC condition
+        // TODO: enable ARQ and ensure reliable data goes to app
+        const size_t frame_data__offset
+            = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
         memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
             cfg_->mac_payload_length);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
 
         // Check CRC
         uint16_t crc
-            = (uint16_t)(crc_obj->calculateCRC24(
-                             (unsigned char*)pkt->data, cfg_->mac_payload_length)
+            = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
+                             cfg_->mac_payload_length)
                 & 0xFFFF);
         if (crc == pkt->crc) {
 
@@ -100,8 +122,8 @@ void MacThread::process_codeblocks_from_master()
                 ss << "Header Info:\n"
                    << "FRAME_ID: " << pkt->frame_id
                    << "\nSYMBOL_ID: " << pkt->symbol_id
-                   << "\nUE_ID: " << pkt->ue_id
-                   << "\nDATLEN: " << pkt->datalen << "\nPAYLOAD:\n";
+                   << "\nUE_ID: " << pkt->ue_id << "\nDATLEN: " << pkt->datalen
+                   << "\nPAYLOAD:\n";
                 for (size_t i = 0; i < cfg_->mac_payload_length; i++) {
                     ss << std::to_string(ul_data_ptr[i]) << " ";
                 }
@@ -114,7 +136,8 @@ void MacThread::process_codeblocks_from_master()
     }
 
     // When the frame is full, send it to the application
-    if (server_.n_filled_in_frame_[ue_id] == cfg_->mac_data_bytes_num_perframe) {
+    if (server_.n_filled_in_frame_[ue_id]
+        == cfg_->mac_data_bytes_num_perframe) {
         server_.n_filled_in_frame_[ue_id] = 0;
 
         udp_client->send(kRemoteHostname, kBaseRemotePort + ue_id,
@@ -150,7 +173,7 @@ void MacThread::process_udp_packets_from_apps()
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
     mode_ == Mode::kServer ? process_udp_packets_from_apps_server(pkt)
-                           : process_udp_packets_from_apps_client((char *)pkt);
+                           : process_udp_packets_from_apps_client((char*)pkt);
 }
 
 void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
@@ -202,15 +225,16 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
             next_frame_id_, next_radio_id_, cfg_->mac_data_bytes_num_perframe);
 
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string((uint8_t)(payload[i]))
-               << " ";
+            ss << std::to_string((uint8_t)(payload[i])) << " ";
         }
         fprintf(log_file_, "%s\n", ss.str().c_str());
     }
 
     for (size_t pkt_id = 0; pkt_id < cfg_->mac_packets_perframe; pkt_id++) {
-        size_t data_offset = radio_buf_id * cfg_->mac_bytes_num_perframe + pkt_id * cfg_->mac_packet_length;
-        MacPacket* pkt = (MacPacket*)(&(*ul_bits_buffer_)[next_radio_id_][data_offset]);
+        size_t data_offset = radio_buf_id * cfg_->mac_bytes_num_perframe
+            + pkt_id * cfg_->mac_packet_length;
+        MacPacket* pkt
+            = (MacPacket*)(&(*ul_bits_buffer_)[next_radio_id_][data_offset]);
         pkt->frame_id = next_frame_id_;
         pkt->symbol_id = pkt_id;
         pkt->ue_id = next_radio_id_;
@@ -220,13 +244,12 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
         pkt->rsvd[2] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->crc = 0;
 
-        memcpy(pkt->data,
-            payload + pkt_id * cfg_->mac_payload_length, cfg_->mac_payload_length);
+        memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
+            cfg_->mac_payload_length);
         // Insert CRC
         pkt->crc = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
                                   cfg_->mac_payload_length)
             & 0xFFFF);
-
     }
 
     (*ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
@@ -234,10 +257,11 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
         EventType::kPacketFromMac, rx_tag_t(next_radio_id_, radio_buf_id)._tag);
     rt_assert(
         tx_queue_->enqueue(msg), "MAC thread: Failed to enqueue uplink packet");
-    
+
     radio_buf_id = (radio_buf_id + 1) % TASK_BUFFER_FRAME_NUM;
     next_radio_id_ = (next_radio_id_ + 1) % cfg_->UE_ANT_NUM;
-    if (next_radio_id_ == 0) next_frame_id_++;
+    if (next_radio_id_ == 0)
+        next_frame_id_++;
 }
 
 void MacThread::run_event_loop()
@@ -248,7 +272,7 @@ void MacThread::run_event_loop()
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
     while (cfg_->running) {
-        process_codeblocks_from_master();
+        process_rx_from_master();
         if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
             process_udp_packets_from_apps();
             last_mac_pkt_rx_tsc_ = rdtsc();
