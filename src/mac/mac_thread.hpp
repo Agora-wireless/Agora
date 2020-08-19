@@ -7,6 +7,7 @@
 #include "crc.hpp"
 #include "gettime.h"
 #include "net.hpp"
+#include "ran_config.h"
 #include "udp_client.h"
 #include "udp_server.h"
 #include <queue>
@@ -74,6 +75,9 @@ private:
     // Receive SNR report from PHY master thread. Use for RB scheduling.
     // TODO: process CQI report here as well.
     void process_snr_report_from_master(Event_data event);
+
+    // Push RAN config update to PHY master thread.
+    void push_ran_config_update(Event_data event, RanConfig rc);
 
     // Receive user data bits (downlink bits at the MAC thread running at the
     // server, uplink bits at the MAC thread running at the client) and forward
