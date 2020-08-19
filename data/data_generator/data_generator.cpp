@@ -26,6 +26,7 @@ using namespace arma;
 
 static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr bool kVerbose = false;
+static constexpr bool kPrintUplinkInformationBytes = false;
 
 float rand_float(float min, float max)
 {
@@ -54,17 +55,17 @@ int main(int argc, char* argv[])
     printf("Generating encoded and modulated data\n");
     srand(time(NULL));
 
-    // Randomly generate input
+    // Step 1: Generate the information buffers and LDPC-encoded buffers for
+    // uplink
     const size_t num_codeblocks = cfg->data_symbol_num_perframe
         * cfg->LDPC_config.nblocksInSymbol * cfg->UE_ANT_NUM;
     printf("Total number of blocks: %zu\n", num_codeblocks);
 
-    // Initialize buffers
-    std::vector<int8_t*> input(num_codeblocks);
+    std::vector<int8_t*> information(num_codeblocks);
     std::vector<int8_t*> parity(num_codeblocks);
     std::vector<int8_t*> encoded(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-        input[i] = new int8_t[ldpc_encoding_input_buf_size(
+        information[i] = new int8_t[ldpc_encoding_input_buf_size(
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)];
         parity[i] = new int8_t[ldpc_encoding_parity_buf_size(
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)];
@@ -76,27 +77,39 @@ int main(int argc, char* argv[])
         ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
     for (size_t n = 0; n < num_codeblocks; n++) {
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
-            input[n][i] = (int8_t)rand();
-        }
-    }
-
-    if (kVerbose) {
-        printf("Raw input\n");
-        for (size_t n = 0; n < num_codeblocks; n++) {
-            if (n % cfg->UE_ANT_NUM == 0) {
-                printf("Symbol %zu\n", n / cfg->UE_ANT_NUM);
-            }
-            printf("UE %zu\n", n % cfg->UE_ANT_NUM);
-            for (size_t i = 0; i < input_bytes_per_cb; i++) {
-                printf("%u ", (uint8_t)input[n][i]);
-            }
-            printf("\n");
+            information[n][i] = (int8_t)rand();
         }
     }
 
     for (size_t n = 0; n < num_codeblocks; n++) {
         ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-            cfg->LDPC_config.nRows, encoded[n], parity[n], input[n]);
+            cfg->LDPC_config.nRows, encoded[n], parity[n], information[n]);
+    }
+
+    {
+        // Save uplink information bytes to file
+        const std::string filename_input = cur_directory
+            + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
+            + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
+        printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
+        FILE* fp_input = fopen(filename_input.c_str(), "wb");
+        for (size_t i = 0; i < num_codeblocks; i++) {
+            fwrite(reinterpret_cast<uint8_t*>(information[i]),
+                input_bytes_per_cb, sizeof(uint8_t), fp_input);
+        }
+        fclose(fp_input);
+
+        if (kPrintUplinkInformationBytes) {
+            printf("Uplink information bytes\n");
+            for (size_t n = 0; n < num_codeblocks; n++) {
+                printf("Symbol %zu, UE %zu\n", n / cfg->UE_ANT_NUM,
+                    n % cfg->UE_ANT_NUM);
+                for (size_t i = 0; i < input_bytes_per_cb; i++) {
+                    printf("%u ", (uint8_t)information[n][i]);
+                }
+                printf("\n");
+            }
+        }
     }
 
     Table<uint8_t> mod_input;
@@ -107,25 +120,14 @@ int main(int argc, char* argv[])
     init_modulation_table(mod_table, cfg->mod_type);
 
     for (size_t n = 0; n < num_codeblocks; n++) {
-        adapt_bits_for_mod(encoded[n], mod_input[n],
-            bits_to_bytes(ldpc_num_encoded_bits(cfg->LDPC_config.Bg,
-                cfg->LDPC_config.Zc, cfg->LDPC_config.nRows)),
-            cfg->mod_type);
+        const size_t encoded_bytes_per_cb = bits_to_bytes(ldpc_num_encoded_bits(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc, cfg->LDPC_config.nRows));
+        adapt_bits_for_mod(
+            encoded[n], mod_input[n], encoded_bytes_per_cb, cfg->mod_type);
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++)
             mod_output[n][i]
                 = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
     }
-
-    std::string filename_input = cur_directory + "/data/LDPC_orig_data_"
-        + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
-        + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-    printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
-    FILE* fp_input = fopen(filename_input.c_str(), "wb");
-    for (size_t i = 0; i < num_codeblocks; i++) {
-        fwrite(reinterpret_cast<uint8_t*>(input[i]), input_bytes_per_cb,
-            sizeof(uint8_t), fp_input);
-    }
-    fclose(fp_input);
 
     // Convert data into time domain
     Table<complex_float> IFFT_data;
@@ -417,7 +419,7 @@ int main(int argc, char* argv[])
     // printf("\n");
 
     for (size_t n = 0; n < num_codeblocks; n++) {
-        delete[] input[n];
+        delete[] information[n];
         delete[] parity[n];
         delete[] encoded[n];
     }
