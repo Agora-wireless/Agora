@@ -88,6 +88,8 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    void move_events_between_queues(
+        EventType event_type1, EventType event_type2);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -282,14 +284,22 @@ private:
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
 
+    // Master-to-worker queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
+
+    // Worker-to-master queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
+
     // Master thread's message queue for event completion from Doers;
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
 
+    // Master thread's message queue for event completion from DoDecode;
+    moodycamel::ConcurrentQueue<Event_data> complete_decode_task_queue_;
+
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    // moodycamel::ProducerToken* rx_ptoks_mac_ptr[kMaxThreads];
-    // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 };
 
 #endif

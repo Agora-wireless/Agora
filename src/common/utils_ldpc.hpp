@@ -137,14 +137,14 @@ static inline size_t ldpc_max_num_rows(size_t base_graph)
     return (base_graph == 1 ? BG1_ROW_TOTAL : BG2_ROW_TOTAL);
 }
 
-// Return the number of input information bits per code block with this base
+// Return the number of input information bits per codeword with this base
 // graph and expansion factor
 static inline size_t ldpc_num_input_bits(size_t base_graph, size_t zc)
 {
     return zc * ldpc_num_input_cols(base_graph);
 }
 
-// Return the number of parity bits per code block with this base graph and
+// Return the number of parity bits per codeword with this base graph and
 // expansion factor
 static inline size_t ldpc_max_num_parity_bits(size_t base_graph, size_t zc)
 {
@@ -161,8 +161,8 @@ static inline size_t ldpc_max_num_encoded_bits(size_t base_graph, size_t zc)
                            : (BG2_COL_TOTAL - num_punctured_cols));
 }
 
-// Return the number of total bits per code block with this base graph and
-// expansion factor
+// Return the number of total bits per codeword (i.e., including both input
+// bits and parity bits) with this base graph and expansion factor
 static inline size_t ldpc_num_encoded_bits(
     size_t base_graph, size_t zc, size_t nRows)
 {
@@ -183,7 +183,8 @@ static inline size_t ldpc_encoding_input_buf_size(size_t base_graph, size_t zc)
 static inline size_t ldpc_encoding_parity_buf_size(size_t base_graph, size_t zc)
 {
     // We add kMaxProcBytes as padding for the encoder's gather function
-    return bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc)) + kMaxProcBytes;
+    return bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc))
+        + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the output encoded codeword buffer
@@ -192,7 +193,8 @@ static inline size_t ldpc_encoding_encoded_buf_size(
     size_t base_graph, size_t zc)
 {
     // We add kMaxProcBytes as padding for the encoder's gather function
-    return bits_to_bytes(ldpc_max_num_encoded_bits(base_graph, zc)) + kMaxProcBytes;
+    return bits_to_bytes(ldpc_max_num_encoded_bits(base_graph, zc))
+        + kMaxProcBytes;
 }
 
 // Return the minimum LDPC expansion factor supported

@@ -95,7 +95,6 @@ void* PacketTXRX::loop_tx_rx(int tid)
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
         int local_port_id = cfg->bs_port + radio_id;
-#if USE_IPV4
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
@@ -104,12 +103,6 @@ void* PacketTXRX::loop_tx_rx(int tid)
                " with remote address %s:%d \n",
             tid, local_port_id, cfg->sender_addr.c_str(),
             cfg->ue_rx_port + radio_id);
-#else
-        socket_[radio_id]
-            = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-        setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
-            cfg->ue_rx_port + radio_id, cfg->sender_addr.c_str());
-#endif
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
