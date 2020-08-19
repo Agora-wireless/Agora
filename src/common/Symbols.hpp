@@ -49,7 +49,8 @@ enum class EventType : int {
     kRXSymbol,
     kModul,
     kPacketFromMac,
-    kPacketToMac
+    kPacketToMac,
+    kSNRReport
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;
@@ -113,6 +114,7 @@ static constexpr bool kUseArgos = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
+static constexpr bool kCollectPhyStats = true;
 
 #define COMBINE_EQUAL_DECODE 1
 

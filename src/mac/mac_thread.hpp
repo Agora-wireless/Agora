@@ -4,11 +4,12 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "crc.hpp"
 #include "gettime.h"
 #include "net.hpp"
 #include "udp_client.h"
 #include "udp_server.h"
-#include "crc.hpp"
+#include <queue>
 
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Millipede
@@ -44,6 +45,10 @@ public:
     // buffer space for
     static constexpr size_t kMaxPktsPerUE = 64;
 
+    // Length of SNR moving average window
+    // TODO: map this to time?
+    static constexpr size_t kSNRWindowSize = 100;
+
     MacThread(Mode mode, Config* cfg, size_t core_offset,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
         Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
@@ -58,9 +63,17 @@ public:
     void run_event_loop();
 
 private:
+    // Receive events from Millipede PHY master thread. Forwards
+    // to appropriate function in MAC.
+    void process_rx_from_master();
+
     // Receive decoded codeblocks from the PHY master thread. Send
     // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
-    void process_codeblocks_from_master();
+    void process_codeblocks_from_master(Event_data event);
+
+    // Receive SNR report from PHY master thread. Use for RB scheduling.
+    // TODO: process CQI report here as well.
+    void process_snr_report_from_master(Event_data event);
 
     // Receive user data bits (downlink bits at the MAC thread running at the
     // server, uplink bits at the MAC thread running at the client) and forward
@@ -106,7 +119,7 @@ private:
     size_t next_radio_id_ = 0;
 
     FastRand fast_rand_;
- 
+
     // Server-only members
     struct {
         // Staging buffers to accumulate decoded uplink code blocks for each UE
@@ -115,6 +128,9 @@ private:
         // n_filled_in_frame_[i] is the number of bytes received in the current
         // frame for UE #i
         std::array<size_t, kMaxUEs> n_filled_in_frame_;
+
+        // snr_[i] contains a moving window of SNR measurement for UE #i
+        std::array<std::queue<float>, kMaxUEs> snr_;
     } server_;
 
     // Client-only members
@@ -133,5 +149,4 @@ private:
 
     // CRC
     DoCRC* crc_obj;
-
 };

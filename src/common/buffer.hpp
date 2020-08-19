@@ -193,6 +193,15 @@ struct Event_data {
         tags[0] = tag;
     }
 
+    // Create an event with two tags (second tag for SNR)
+    Event_data(EventType event_type, size_t tag, float snr)
+        : event_type(event_type)
+        , num_tags(2)
+    {
+        tags[0] = tag;
+        *reinterpret_cast<float*>(&tags[1]) = snr;
+    }
+
     Event_data()
         : num_tags(0)
     {
