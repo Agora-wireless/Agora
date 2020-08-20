@@ -64,9 +64,9 @@ int main(int argc, char* argv[])
     printf("Total number of blocks: %zu\n", num_codeblocks);
 
     std::vector<std::vector<int8_t>> information(num_codeblocks);
-    std::vector<std::vector<int8_t>> encoded(num_codeblocks);
+    std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-        data_generator.gen_codeblock_ul(information[i], encoded[i]);
+        data_generator.gen_codeblock_ul(information[i], encoded_codewords[i]);
     }
 
     {
@@ -98,19 +98,20 @@ int main(int argc, char* argv[])
         }
     }
 
-    std::vector<std::vector<complex_float>> mod_output(num_codeblocks);
+    // Modulate the encoded codewords
+    std::vector<std::vector<complex_float>> modulated_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-        mod_output[i] = data_generator.get_modulation(encoded[i]);
+        modulated_codewords[i]
+            = data_generator.get_modulation(encoded_codewords[i]);
     }
 
-    // Convert data into time domain
-    Table<complex_float> IFFT_data;
-    IFFT_data.calloc(
-        cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe, cfg->OFDM_CA_NUM, 64);
-    for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe;
-         i++) {
-        memcpy(IFFT_data[i] + cfg->OFDM_DATA_START, &mod_output[i][0],
-            cfg->OFDM_DATA_NUM * sizeof(complex_float));
+    // Place modulated uplink data codewords into central IFFT bins
+    rt_assert(cfg->LDPC_config.nblocksInSymbol == 1);
+    std::vector<std::vector<complex_float>> pre_ifft_symbols(
+        cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
+    for (size_t i = 0; i < pre_ifft_symbols.size(); i++) {
+        pre_ifft_symbols[i]
+            = data_generator.get_pre_ifft_symbol(modulated_codewords[i]);
     }
 
     // Generate pilots and convert to time domain
@@ -172,15 +173,16 @@ int main(int argc, char* argv[])
          i < cfg->symbol_num_perframe; i++) {
         size_t data_symbol_id = (i - cfg->pilot_symbol_num_perframe);
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
-            if (data_symbol_id < cfg->UL_PILOT_SYMS)
+            if (data_symbol_id < cfg->UL_PILOT_SYMS) {
                 memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM
                         + cfg->OFDM_DATA_START,
                     ue_specific_pilot[j],
                     cfg->OFDM_DATA_NUM * sizeof(complex_float));
-            else
+            } else {
                 memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM,
-                    IFFT_data[data_symbol_id * cfg->UE_ANT_NUM + j],
+                    &pre_ifft_symbols[data_symbol_id * cfg->UE_ANT_NUM + j][0],
                     cfg->OFDM_CA_NUM * sizeof(complex_float));
+            }
         }
     }
 
@@ -293,7 +295,7 @@ int main(int argc, char* argv[])
                         + cfg->OFDM_DATA_START]
                         = (sc_id % cfg->OFDM_PILOT_SPACING == 0)
                         ? ue_specific_pilot[j][sc_id]
-                        : mod_output[i * cfg->UE_ANT_NUM + j][sc_id];
+                        : modulated_codewords[i * cfg->UE_ANT_NUM + j][sc_id];
             }
         }
     }
@@ -392,7 +394,6 @@ int main(int argc, char* argv[])
     // }
     // printf("\n");
 
-    IFFT_data.free();
     CSI_matrix.free();
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
