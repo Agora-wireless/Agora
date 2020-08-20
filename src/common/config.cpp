@@ -63,14 +63,14 @@ Config::Config(std::string jsonfile)
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "16QAM");
 
-    server_addr = tddConf.value("server_addr", "127.0.0.1");
-    sender_addr = tddConf.value("sender_addr", "127.0.0.1");
-    ue_tx_addr = tddConf.value("ue_tx_addr", "127.0.0.1");
+    bs_addr = tddConf.value("bs_addr", "127.0.0.1");
+    rru_addr = tddConf.value("rru_addr", "127.0.0.1");
+    ue_addr = tddConf.value("ue_addr", "127.0.0.1");
     tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
     bs_port = tddConf.value("bs_port", 8000);
-    bs_tx_port = tddConf.value("bs_tx_port", 8000);
-    ue_rx_port = tddConf.value("ue_rx_port", 7000);
-    ue_tx_port = tddConf.value("ue_tx_port", 6000);
+    bs_rru_port = tddConf.value("bs_rru_port", 8000);
+    ue_rru_port = tddConf.value("ue_rru_port", 7000);
+    ue_port = tddConf.value("ue_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
     init_mac_running = tddConf.value("init_mac_running", false);
@@ -257,13 +257,16 @@ Config::Config(std::string jsonfile)
 
     running = true;
     std::cout << "Config: "
-              << "\n  BS_ANT_NUM: " << BS_ANT_NUM << "\n  UE_ANT_NUM: " << UE_ANT_NUM
+              << "\n  BS_ANT_NUM: " << BS_ANT_NUM
+              << "\n  UE_ANT_NUM: " << UE_ANT_NUM
               << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
-              << "\n  ul_data_symbol_num_perframe: " << ul_data_symbol_num_perframe
-              << "\n  dl_data_symbol_num_perframe: " << dl_data_symbol_num_perframe
-              << "\n  OFDM_CA_NUM " << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: "
-              << OFDM_DATA_NUM 
-              << "\n  mac_data_bytes_num_perframe: " << mac_data_bytes_num_perframe
+              << "\n  ul_data_symbol_num_perframe: "
+              << ul_data_symbol_num_perframe
+              << "\n  dl_data_symbol_num_perframe: "
+              << dl_data_symbol_num_perframe << "\n  OFDM_CA_NUM "
+              << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: " << OFDM_DATA_NUM
+              << "\n  mac_data_bytes_num_perframe: "
+              << mac_data_bytes_num_perframe
               << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
               << std::endl;
 

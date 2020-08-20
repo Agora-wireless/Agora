@@ -28,10 +28,10 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     const size_t udp_pkt_len = bscfg->packet_length;
     for (size_t i = 0; i < user_socket_num; i++)
         udp_server_uerx.push_back(
-            new UDPServer(uecfg->ue_tx_port + i, udp_pkt_len * kMaxUEs * 64));
+            new UDPServer(uecfg->ue_rru_port + i, udp_pkt_len * kMaxUEs * 64));
     for (size_t i = 0; i < bs_socket_num; i++)
         udp_server_bsrx.push_back(
-            new UDPServer(bscfg->bs_tx_port, udp_pkt_len * kMaxAntennas * 64));
+            new UDPServer(bscfg->bs_rru_port + i, udp_pkt_len * kMaxAntennas * 64));
     udp_client = new UDPClient();
 
     task_queue_bs = moodycamel::ConcurrentQueue<Event_data>(
@@ -158,7 +158,7 @@ void ChannelSim::start()
     // send a dummy packet to user to start
     struct Packet* start_pkt = (struct Packet*)malloc(bscfg->packet_length);
     new (start_pkt) Packet(0, 0, 0, 0);
-    udp_client->send(uecfg->sender_addr, uecfg->ue_rx_port, (uint8_t*)start_pkt,
+    udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)start_pkt,
         bscfg->packet_length);
     free(start_pkt);
 
@@ -385,7 +385,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         memcpy(pkt->data,
             (void*)(tx_buffer_bs + total_offset_bs + ant_id * payload_len),
             payload_len);
-        udp_client->send(bscfg->server_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
+        udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
             bscfg->packet_length);
     }
     free((void*)pkt);
@@ -430,7 +430,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         memcpy(pkt->data,
             (void*)(tx_buffer_ue + total_offset_ue + ant_id * payload_len),
             payload_len);
-        udp_client->send(uecfg->sender_addr, uecfg->ue_rx_port + ant_id, (uint8_t*)pkt,
+        udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, (uint8_t*)pkt,
             uecfg->packet_length);
     }
     free((void*)pkt);
