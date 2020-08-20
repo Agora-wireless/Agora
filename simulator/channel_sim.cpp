@@ -26,10 +26,12 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     pilot_symbol_perframe = bscfg->pilot_symbol_num_perframe;
     ul_symbol_perframe = ul_data_symbol_perframe + pilot_symbol_perframe;
     const size_t udp_pkt_len = bscfg->packet_length;
-    udp_server_uerx
-        = new UDPServer(uecfg->ue_tx_port, udp_pkt_len * kMaxUEs * 64);
-    udp_server_bsrx
-        = new UDPServer(bscfg->bs_tx_port, udp_pkt_len * kMaxAntennas * 64);
+    for (size_t i = 0; i < user_socket_num; i++)
+        udp_server_uerx.push_back(
+            new UDPServer(uecfg->ue_tx_port + i, udp_pkt_len * kMaxUEs * 64));
+    for (size_t i = 0; i < bs_socket_num; i++)
+        udp_server_bsrx.push_back(
+            new UDPServer(bscfg->bs_tx_port, udp_pkt_len * kMaxAntennas * 64));
     udp_client = new UDPClient();
 
     task_queue_bs = moodycamel::ConcurrentQueue<Event_data>(
@@ -242,13 +244,16 @@ void* ChannelSim::bs_rx_loop(int tid)
 {
     int frame_samp_size = payload_len * numAntennas * dl_symbol_perframe;
     int symbol_samp_size = payload_len * numAntennas;
+    int socket_lo = tid * bs_socket_num / bs_thread_num;
+    int socket_hi = (tid + 1) * bs_socket_num / bs_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1 + tid, tid);
 
     struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    int socket_id = socket_lo;
     while (running) {
-        ssize_t ret = udp_server_bsrx->recv_nonblocking(
+        ssize_t ret = udp_server_bsrx[socket_id]->recv_nonblocking(
             (uint8_t*)pkt, bscfg->packet_length);
         if (ret == 0) {
             continue; // No data received
@@ -279,6 +284,8 @@ void* ChannelSim::bs_rx_loop(int tid)
             printf("socket message enqueue failed\n");
             exit(0);
         }
+        if (++socket_id == socket_hi)
+            socket_id = socket_lo;
     }
     free((void*)pkt);
     return 0;
@@ -289,13 +296,16 @@ void* ChannelSim::ue_rx_loop(int tid)
     size_t ul_symbol_perframe = ul_data_symbol_perframe;
     size_t frame_samp_size = payload_len * nUEs * ul_symbol_perframe;
     size_t symbol_samp_size = payload_len * nUEs;
+    int socket_lo = tid * user_socket_num / user_thread_num;
+    int socket_hi = (tid + 1) * user_socket_num / user_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
 
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1, tid);
     struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    int socket_id = socket_lo;
     while (running) {
-        ssize_t ret = udp_server_uerx->recv_nonblocking(
+        ssize_t ret = udp_server_uerx[socket_id]->recv_nonblocking(
             (uint8_t*)pkt, bscfg->packet_length);
         if (ret == 0) {
             continue; // No data received
@@ -332,6 +342,8 @@ void* ChannelSim::ue_rx_loop(int tid)
             printf("socket message enqueue failed\n");
             exit(0);
         }
+        if (++socket_id == socket_hi)
+            socket_id = socket_lo;
     }
     free((void*)pkt);
     return 0;
@@ -373,7 +385,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         memcpy(pkt->data,
             (void*)(tx_buffer_bs + total_offset_bs + ant_id * payload_len),
             payload_len);
-        udp_client->send(bscfg->server_addr, bscfg->bs_port, (uint8_t*)pkt,
+        udp_client->send(bscfg->server_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
             bscfg->packet_length);
     }
     free((void*)pkt);
@@ -418,7 +430,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         memcpy(pkt->data,
             (void*)(tx_buffer_ue + total_offset_ue + ant_id * payload_len),
             payload_len);
-        udp_client->send(uecfg->sender_addr, uecfg->ue_rx_port, (uint8_t*)pkt,
+        udp_client->send(uecfg->sender_addr, uecfg->ue_rx_port + ant_id, (uint8_t*)pkt,
             uecfg->packet_length);
     }
     free((void*)pkt);
