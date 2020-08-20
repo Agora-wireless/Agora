@@ -177,11 +177,13 @@ public:
     size_t mac_packets_perframe;
     bool ip_bridge_enable;
 
+    std::string ue_tx_addr; // IP address of UE transmission
     std::string server_addr; // IP address of the Millipede server
     std::string sender_addr; // IP address of the simulator sender
     std::string tx_addr_to_mac;
     // Port ID at Millipede side
     int bs_port;
+    int bs_tx_port;
     int ue_rx_port; // UDP port used by UEs to receive data
     int ue_tx_port; // UDP port used by UEs to transmit data
 

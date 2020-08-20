@@ -38,6 +38,7 @@ union rx_tag_t {
 
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
+enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 
 // A generic tag type for Millipede tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
