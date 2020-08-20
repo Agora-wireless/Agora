@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
             = data_generator.get_pre_ifft_symbol(modulated_codewords[i]);
     }
 
-    std::vector<complex_float> pilots_time
+    std::vector<complex_float> pilot_td
         = data_generator.get_common_pilot_time_domain();
 
     // Generate UE-specific pilots
@@ -149,15 +149,15 @@ int main(int argc, char* argv[])
             for (size_t j = cfg->OFDM_DATA_START;
                  j < cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM;
                  j += cfg->UE_ANT_NUM) {
-                pilots_t_ue[i + j] = pilots_time[i + j];
+                pilots_t_ue[i + j] = pilot_td[i + j];
             }
             memcpy(tx_data_all_symbols[0] + i * cfg->OFDM_CA_NUM, pilots_t_ue,
                 cfg->OFDM_CA_NUM * sizeof(complex_float));
         }
     } else {
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)
-            memcpy(tx_data_all_symbols[i] + i * cfg->OFDM_CA_NUM,
-                &pilots_time[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
+            memcpy(tx_data_all_symbols[i] + i * cfg->OFDM_CA_NUM, &pilot_td[0],
+                cfg->OFDM_CA_NUM * sizeof(complex_float));
     }
 
     for (size_t i = cfg->pilot_symbol_num_perframe;

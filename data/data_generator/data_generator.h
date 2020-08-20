@@ -15,44 +15,48 @@ public:
         }
     }
 
+    /**
+     * @brief Generate one information bit sequence and the corresponding
+     * encoded bit sequence for one code block for the active LDPC configuration
+     *
+     * @param information The generated input bit sequence
+     * @param encoded_codeword The generated encoded codeword bit sequence
+     */
     void gen_codeblock_ul(
         std::vector<int8_t>& information, std::vector<int8_t>& encoded_codeword)
     {
+        const LDPCconfig& lc = cfg->LDPC_config;
         std::vector<int8_t> parity;
-        information.resize(ldpc_encoding_input_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-        parity.resize(ldpc_encoding_parity_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-        encoded_codeword.resize(ldpc_encoding_encoded_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+        parity.resize(ldpc_encoding_parity_buf_size(lc.Bg, lc.Zc));
 
-        const size_t input_bytes_per_cb = bits_to_bytes(
-            ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-        for (size_t i = 0; i < input_bytes_per_cb; i++) {
+        information.resize(ldpc_encoding_input_buf_size(lc.Bg, lc.Zc));
+        encoded_codeword.resize(ldpc_encoding_encoded_buf_size(lc.Bg, lc.Zc));
+
+        for (size_t i = 0; i < lc.num_input_bytes(); i++) {
             information[i] = static_cast<int8_t>(fast_rand.next_u32());
         }
 
         ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
             cfg->LDPC_config.nRows, &encoded_codeword[0], &parity[0],
             &information[0]);
+
+        information.resize(lc.num_input_bytes());
+        encoded_codeword.resize(lc.num_encoded_bytes());
     }
 
     std::vector<complex_float> get_modulation(
         const std::vector<int8_t>& encoded_codeword)
     {
         std::vector<complex_float> modulated_codeword(cfg->OFDM_DATA_NUM);
-
-        const size_t encoded_bytes_per_cb = bits_to_bytes(ldpc_num_encoded_bits(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc, cfg->LDPC_config.nRows));
         std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], encoded_bytes_per_cb, cfg->mod_type);
+            &mod_input[0], cfg->LDPC_config.num_encoded_bytes(), cfg->mod_type);
 
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
             modulated_codeword[i] = mod_single_uint8(mod_input[i], mod_table);
         }
-
         return modulated_codeword;
     }
 
