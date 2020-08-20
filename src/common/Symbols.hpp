@@ -45,7 +45,6 @@ enum class EventType : int {
     kDecode,
     kEncode,
     kRC,
-    kRXSymbol,
     kModul,
     kPacketFromMac,
     kPacketToMac

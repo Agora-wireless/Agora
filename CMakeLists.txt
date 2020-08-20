@@ -284,6 +284,12 @@ add_executable(sim
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
+add_executable(chsim
+  simulator/chsim_main.cpp
+  simulator/channel_sim.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(chsim ${COMMON_LIBS})
+
 if(NOT ${USE_DPDK})
   # Create shared libraries for Python
   # DPDK is currently not supported
