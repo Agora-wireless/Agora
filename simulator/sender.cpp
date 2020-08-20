@@ -86,9 +86,9 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
@@ -102,11 +102,11 @@ Sender::Sender(Config* cfg, size_t thread_num, size_t core_offset, size_t delay,
 #else
     for (size_t i = 0; i < socket_num; i++) {
         if (kUseIPv4) {
-            socket_[i] = setup_socket_ipv4(cfg->ue_tx_port + i, false, 0);
+            socket_[i] = setup_socket_ipv4(cfg->bs_rru_port + i, false, 0);
             setup_sockaddr_remote_ipv4(
-                &servaddr_ipv4[i], cfg->bs_port + i, cfg->server_addr.c_str());
+                &servaddr_ipv4[i], cfg->bs_port + i, cfg->bs_addr.c_str());
         } else {
-            socket_[i] = setup_socket_ipv6(cfg->ue_tx_port + i, false, 0);
+            socket_[i] = setup_socket_ipv6(cfg->bs_rru_port + i, false, 0);
             setup_sockaddr_remote_ipv6(&servaddr_ipv6[i], cfg->bs_port + i,
                 "fe80::f436:d735:b04a:864a");
         }
@@ -314,7 +314,7 @@ void* Sender::worker_thread(int tid)
         rte_mbuf* tx_bufs[1] __attribute__((aligned(64)));
         tx_bufs[0]
             = DpdkTransport::generate_udp_header(mbuf_pool, sender_mac_addr,
-                server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
+                server_mac_addr, rru_addr, bs_addr, cfg->bs_rru_port,
                 cfg->bs_port + rand() % cfg->socket_thread_num, buffer_length);
         auto* payload = (char*)rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*)
             + kPayloadOffset;
