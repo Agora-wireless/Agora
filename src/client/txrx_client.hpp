@@ -5,11 +5,14 @@
 #include "client_radio.hpp"
 #include "concurrentqueue.h"
 #include "utils.h"
+#include "net.hpp"
 #include <arpa/inet.h>
 #include <complex>
 #include <fstream>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <vector>
@@ -59,20 +62,24 @@ public:
      * receive thread
      * context: PackageReceiverContext type
      */
+    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
     int dequeue_send(int tid);
-    void* loopTXRX(int tid);
-    void* loopSYNC_TXRX(int tid);
+    int dequeue_send_argos(int tid);
+    void* loop_tx_rx(int tid);
+    void* loop_tx_rx_argos(int tid);
+    void* loop_tx_rx_argos_sync(int tid);
 
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     Config* config_;
     ClientRadioConfig* radioconfig_; // Used only in Argos mode
-    struct sockaddr_in servaddr_[10]; /* server address */
-    struct sockaddr_in servaddr_tx_[10]; /* server address for tx*/
-    struct sockaddr_in cliaddr_[10]; /* client address */
-    int* rx_socket_;
-    int* tx_socket_;
+#if USE_IPV4
+    std::vector<struct sockaddr_in> servaddr_; /* server address */
+#else
+    std::vector<struct sockaddr_in6> servaddr_; /* server address */
+#endif
+    std::vector<int> socket_;
 
     Table<char>* buffer_;
     Table<int>* buffer_status_;
