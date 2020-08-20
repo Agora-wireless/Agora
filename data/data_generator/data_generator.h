@@ -15,38 +15,44 @@ public:
         }
     }
 
-    void gen_codeblocks_ul(std::vector<std::vector<int8_t>>& information,
-        std::vector<std::vector<int8_t>>& encoded, size_t num_codeblocks)
+    void gen_codeblock_ul(
+        std::vector<int8_t>& information, std::vector<int8_t>& encoded)
     {
-        information.resize(num_codeblocks);
-        encoded.resize(num_codeblocks);
-        std::vector<std::vector<int8_t>> parity(num_codeblocks);
-
-        for (size_t i = 0; i < num_codeblocks; i++) {
-            information[i].resize(ldpc_encoding_input_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-            parity[i].resize(ldpc_encoding_parity_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-            encoded[i].resize(ldpc_encoding_encoded_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-        }
+        std::vector<int8_t> parity;
+        information.resize(ldpc_encoding_input_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+        parity.resize(ldpc_encoding_parity_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+        encoded.resize(ldpc_encoding_encoded_buf_size(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
         const size_t input_bytes_per_cb = bits_to_bytes(
             ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-        for (size_t n = 0; n < num_codeblocks; n++) {
-            for (size_t i = 0; i < input_bytes_per_cb; i++) {
-                information[n][i] = static_cast<int8_t>(fast_rand.next_u32());
-            }
+        for (size_t i = 0; i < input_bytes_per_cb; i++) {
+            information[i] = static_cast<int8_t>(fast_rand.next_u32());
         }
 
-        for (size_t n = 0; n < num_codeblocks; n++) {
-            ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-                cfg->LDPC_config.nRows, &encoded[n][0], &parity[n][0],
-                &information[n][0]);
-        }
+        ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
+            cfg->LDPC_config.nRows, &encoded[0], &parity[0], &information[0]);
     }
 
-    void gen_mod_output(std::vector<int8_t*>& encoded, std::vector<uint8_t*>) {}
+    std::vector<complex_float> get_modulation(
+        const std::vector<int8_t>& encoded)
+    {
+        std::vector<complex_float> mod_output(cfg->OFDM_DATA_NUM);
+
+        const size_t encoded_bytes_per_cb = bits_to_bytes(ldpc_num_encoded_bits(
+            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc, cfg->LDPC_config.nRows));
+        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+        adapt_bits_for_mod(reinterpret_cast<const uint8_t*>(&encoded[0]),
+            &mod_input[0], encoded_bytes_per_cb, cfg->mod_type);
+
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+            mod_output[i] = mod_single_uint8(mod_input[i], mod_table);
+        }
+
+        return mod_output;
+    }
 
 private:
     FastRand fast_rand;

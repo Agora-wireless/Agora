@@ -63,9 +63,11 @@ int main(int argc, char* argv[])
         * cfg->LDPC_config.nblocksInSymbol * cfg->UE_ANT_NUM;
     printf("Total number of blocks: %zu\n", num_codeblocks);
 
-    std::vector<std::vector<int8_t>> information;
-    std::vector<std::vector<int8_t>> encoded;
-    data_generator.gen_codeblocks_ul(information, encoded, num_codeblocks);
+    std::vector<std::vector<int8_t>> information(num_codeblocks);
+    std::vector<std::vector<int8_t>> encoded(num_codeblocks);
+    for (size_t i = 0; i < num_codeblocks; i++) {
+        data_generator.gen_codeblock_ul(information[i], encoded[i]);
+    }
 
     {
         // Save uplink information bytes to file
@@ -96,21 +98,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    Table<complex_float> mod_output;
-    mod_output.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 32);
-    Table<float> mod_table;
-    init_modulation_table(mod_table, cfg->mod_type);
-
-    for (size_t n = 0; n < num_codeblocks; n++) {
-        const size_t encoded_bytes_per_cb = bits_to_bytes(ldpc_num_encoded_bits(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc, cfg->LDPC_config.nRows));
-        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
-        adapt_bits_for_mod(reinterpret_cast<uint8_t*>(&encoded[n][0]),
-            &mod_input[0], encoded_bytes_per_cb, cfg->mod_type);
-
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-            mod_output[n][i] = mod_single_uint8(mod_input[i], mod_table);
-        }
+    std::vector<std::vector<complex_float>> mod_output(num_codeblocks);
+    for (size_t i = 0; i < num_codeblocks; i++) {
+        mod_output[i] = data_generator.get_modulation(encoded[i]);
     }
 
     // Convert data into time domain
@@ -119,7 +109,7 @@ int main(int argc, char* argv[])
         cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe, cfg->OFDM_CA_NUM, 64);
     for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe;
          i++) {
-        memcpy(IFFT_data[i] + cfg->OFDM_DATA_START, mod_output[i],
+        memcpy(IFFT_data[i] + cfg->OFDM_DATA_START, &mod_output[i][0],
             cfg->OFDM_DATA_NUM * sizeof(complex_float));
     }
 
@@ -402,7 +392,6 @@ int main(int argc, char* argv[])
     // }
     // printf("\n");
 
-    mod_output.free();
     IFFT_data.free();
     CSI_matrix.free();
     tx_data_all_symbols.free();
