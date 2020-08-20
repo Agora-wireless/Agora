@@ -199,6 +199,8 @@ void MacThread::process_control_information()
     msg.tags[0] = ci->tti;
     msg.tags[1] = ci->ue_id;
     msg.tags[2] = ci->mod_type;
+    printf("MAC thread: received control packet for tti %zu, ue %zu, mod %zu",
+        ci->tti, ci->ue_id, ci->mod_type);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: fail to send control packet to PHY");
 }
