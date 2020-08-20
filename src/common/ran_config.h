@@ -3,19 +3,13 @@
 
 class RanConfig {
 public:
-    size_t nAntennas; /// Number of antennas
+    size_t n_antennas; /// Number of active antennas at the base station
 };
 
-struct ControlPacket {
-    size_t tti; // TTI index
-    size_t ue_id; // UE ID
-    size_t mod_type; // modulation type
-    ControlPacket(size_t t, size_t u, size_t m)
-        : tti(t)
-        , ue_id(u)
-        , mod_type(m)
-    {
-    }
+class ControlPacket {
+public:
+    size_t ue_id; /// UE ID
+    size_t mod_type; /// modulation type
 };
 
 #endif

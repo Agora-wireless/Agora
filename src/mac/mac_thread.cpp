@@ -173,7 +173,9 @@ void MacThread::handle_control_information()
 
 void MacThread::send_control_information()
 {
-    ControlPacket ci(next_frame_id_, next_radio_id_, CommsLib::QAM64);
+    ControlPacket ci;
+    ci.ue_id = next_radio_id_;
+    ci.mod_type = CommsLib::QAM64;
     udp_client->send(kClientHostname, kBaseClientPort + ci.ue_id, (uint8_t*)&ci,
         sizeof(ControlPacket));
 }
@@ -195,12 +197,11 @@ void MacThread::process_control_information()
 
     const auto* ci = reinterpret_cast<ControlPacket*>(&udp_control_buf_[0]);
     Event_data msg(EventType::kControlPacket);
-    msg.num_tags = 3;
-    msg.tags[0] = ci->tti;
-    msg.tags[1] = ci->ue_id;
-    msg.tags[2] = ci->mod_type;
-    printf("MAC thread: received control packet for tti %zu, ue %zu, mod %zu",
-        ci->tti, ci->ue_id, ci->mod_type);
+    msg.num_tags = 2;
+    msg.tags[0] = ci->ue_id;
+    msg.tags[1] = ci->mod_type;
+    printf("MAC thread: received control packet for ue %zu, mod %zu", ci->ue_id,
+        ci->mod_type);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: fail to send control packet to PHY");
 }
@@ -323,7 +324,7 @@ void MacThread::run_event_loop()
         process_rx_from_master();
         if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
             process_udp_packets_from_apps();
-            //handle_control_information();
+            handle_control_information();
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
 
