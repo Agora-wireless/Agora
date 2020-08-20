@@ -154,30 +154,6 @@ Phy_UE::Phy_UE(Config* config)
         }
     }
 
-    // l2 sockets setup
-    socket_ = new int[antenna_num];
-#if USE_IPV4
-    servaddr_ = new struct sockaddr_in[antenna_num];
-#else
-    servaddr_ = new struct sockaddr_in6[antenna_num];
-#endif
-    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    for (size_t user_id = 0; user_id < antenna_num; ++user_id) {
-        int local_port_id = config_->bs_port + user_id;
-#if USE_IPV4
-        socket_[user_id]
-            = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-        setup_sockaddr_remote_ipv4(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->sender_addr.c_str());
-#else
-        socket_[user_id]
-            = setup_socket_ipv6(local_port_id, true, sock_buf_size);
-        setup_sockaddr_remote_ipv6(&servaddr_[user_id],
-            config_->ue_rx_port + user_id, config_->sender_addr.c_str());
-#endif
-        fcntl(socket_[user_id], F_SETFL, O_NONBLOCK);
-    }
-
     // create task thread
     for (size_t i = 0; i < worker_thread_num; i++) {
         auto* context = new EventHandlerContext();
