@@ -4,6 +4,7 @@
  * and correctness tests
  */
 
+#include "data_generator.h"
 #include "comms-lib.h"
 #include "config.hpp"
 #include "memory_manage.h"
@@ -48,6 +49,7 @@ int main(int argc, char* argv[])
     if (argc == 2)
         confFile = std::string(argv[1]);
     auto* cfg = new Config(confFile.c_str());
+    DataGenerator data_generator(cfg);
 
     printf("Config file: %s\n", confFile.c_str());
     printf("Using %s-orthogonal pilots\n",
@@ -61,32 +63,15 @@ int main(int argc, char* argv[])
         * cfg->LDPC_config.nblocksInSymbol * cfg->UE_ANT_NUM;
     printf("Total number of blocks: %zu\n", num_codeblocks);
 
-    std::vector<int8_t*> information(num_codeblocks);
-    std::vector<int8_t*> parity(num_codeblocks);
-    std::vector<int8_t*> encoded(num_codeblocks);
-    for (size_t i = 0; i < num_codeblocks; i++) {
-        information[i] = new int8_t[ldpc_encoding_input_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)];
-        parity[i] = new int8_t[ldpc_encoding_parity_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)];
-        encoded[i] = new int8_t[ldpc_encoding_encoded_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)];
-    }
-
-    const size_t input_bytes_per_cb = bits_to_bytes(
-        ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-    for (size_t n = 0; n < num_codeblocks; n++) {
-        for (size_t i = 0; i < input_bytes_per_cb; i++) {
-            information[n][i] = (int8_t)rand();
-        }
-    }
-
-    for (size_t n = 0; n < num_codeblocks; n++) {
-        ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-            cfg->LDPC_config.nRows, encoded[n], parity[n], information[n]);
-    }
+    std::vector<int8_t*> information;
+    std::vector<int8_t*> encoded;
+    data_generator.gen_rand_information_codeblocks_ul(
+        information, encoded, num_codeblocks);
 
     {
+        const size_t input_bytes_per_cb = bits_to_bytes(
+            ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+
         // Save uplink information bytes to file
         const std::string filename_input = cur_directory
             + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
@@ -420,7 +405,6 @@ int main(int argc, char* argv[])
 
     for (size_t n = 0; n < num_codeblocks; n++) {
         delete[] information[n];
-        delete[] parity[n];
         delete[] encoded[n];
     }
 
