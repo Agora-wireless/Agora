@@ -89,12 +89,11 @@ private:
     void send_ran_config_update(Event_data event, RanConfig rc);
 
     // Send control information over (out-of-band) control channel
-    // from BS to UE
+    // from BS to UE; and process control information received from control
+    // channel and forward to PHY UE, so it transmits data in the scheduled
+    // time slots.
+    void handle_control_information();
     void send_control_information();
-
-    // Process control information received from (out-of-band) control
-    // channel, and forward to PHY UE, so it transmits data in the
-    // scheduled time slots.
     void process_control_information();
 
     // Receive user data bits (downlink bits at the MAC thread running at the

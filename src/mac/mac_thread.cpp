@@ -165,6 +165,12 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         "Socket message enqueue failed\n");
 }
 
+void MacThread::handle_control_information()
+{
+    mode_ == Mode::kServer ? send_control_information()
+                           : process_control_information();
+}
+
 void MacThread::send_control_information()
 {
     ControlPacket ci(next_frame_id_, next_radio_id_, CommsLib::QAM64);
@@ -315,7 +321,7 @@ void MacThread::run_event_loop()
         process_rx_from_master();
         if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
             process_udp_packets_from_apps();
-            send_control_information();
+            handle_control_information();
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
 
