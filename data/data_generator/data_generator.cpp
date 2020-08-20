@@ -115,11 +115,10 @@ int main(int argc, char* argv[])
     }
 
     // Generate pilots and convert to time domain
-    auto zc_common_pilot_double
-        = CommsLib::getSequence(cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_common_pilot_seq = Utils::double_to_cfloat(zc_common_pilot_double);
-    auto zc_common_pilot = CommsLib::seqCyclicShift(
-        zc_common_pilot_seq, M_PI / 4); // Used in LTE SRS
+    auto zc_seq = Utils::double_to_cfloat(
+        CommsLib::getSequence(cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU));
+    auto zc_common_pilot
+        = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
 
     std::vector<complex_float> pilots_time(cfg->OFDM_CA_NUM);
     for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
@@ -130,12 +129,9 @@ int main(int argc, char* argv[])
     // Generate UE-specific pilot data
     Table<complex_float> ue_specific_pilot;
     ue_specific_pilot.malloc(cfg->UE_ANT_NUM, cfg->OFDM_DATA_NUM, 64);
-    auto zc_ue_pilot_double
-        = CommsLib::getSequence(cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
-    auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
     for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
-        auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
-            zc_ue_pilot, i * (float)M_PI / 6); // LTE DMRS
+        auto zc_ue_pilot_i
+            = CommsLib::seqCyclicShift(zc_seq, i * M_PI / 6.0); // LTE DMRS
         for (size_t j = 0; j < cfg->OFDM_DATA_NUM; j++) {
             ue_specific_pilot[i][j]
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
