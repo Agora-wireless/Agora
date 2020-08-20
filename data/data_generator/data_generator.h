@@ -57,7 +57,7 @@ public:
     }
 
     std::vector<complex_float> get_pre_ifft_symbol(
-        const std::vector<complex_float> modulated_codeword)
+        const std::vector<complex_float> modulated_codeword) const
     {
         std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM);
         memset(
@@ -66,6 +66,26 @@ public:
             cfg->OFDM_DATA_NUM * sizeof(complex_float));
 
         return pre_ifft_symbol;
+    }
+
+    std::vector<complex_float> get_common_pilot_time_domain() const
+    {
+        const std::vector<std::complex<float>> zc_seq
+            = Utils::double_to_cfloat(CommsLib::getSequence(
+                cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU));
+
+        const std::vector<std::complex<float>> zc_common_pilot
+            = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
+
+        std::vector<complex_float> ret(cfg->OFDM_CA_NUM);
+        memset(&ret[0], 0, cfg->OFDM_CA_NUM * sizeof(complex_float));
+
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+            ret[i + cfg->OFDM_DATA_START]
+                = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
+        }
+
+        return ret;
     }
 
 private:
