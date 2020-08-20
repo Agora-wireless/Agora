@@ -365,6 +365,14 @@ void Phy_UE::start()
 
             } break;
 
+            case EventType::kControlPacket: {
+                ControlPacket ci(event.tags[0], event.tags[1], event.tags[2]);
+                printf("Main thread: received control packet for tti %zu, ue "
+                       "%zu, mod %zu",
+                    ci.tti, ci.ue_id, ci.mod_type);
+                // TODO: clock PHY sender appropriately
+            } break;
+
             case EventType::kEncode: {
                 //size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 //size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;

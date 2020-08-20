@@ -42,6 +42,15 @@ public:
     // server, uplink packets at the client) on kLocalPort
     static constexpr size_t kLocalPort = 8070;
 
+    // Control information messages are sent via an out-of-band control
+    // channel (UDP connection)
+    // TODO: need to generalize for hostname, port pairs for each client
+    const char* kClientHostname = "mnr-5g-nuc1";
+
+    // UE #i runs a UDP server, at kBaseClientPort + i, to receive control
+    // information messages from the base station
+    static constexpr size_t kBaseClientPort = 8090;
+
     // Maximum number of outstanding UDP packets per UE that we allocate recv()
     // buffer space for
     static constexpr size_t kMaxPktsPerUE = 64;
@@ -77,7 +86,16 @@ private:
     void process_snr_report_from_master(Event_data event);
 
     // Push RAN config update to PHY master thread.
-    void push_ran_config_update(Event_data event, RanConfig rc);
+    void send_ran_config_update(Event_data event, RanConfig rc);
+
+    // Send control information over (out-of-band) control channel
+    // from BS to UE
+    void send_control_information();
+
+    // Process control information received from (out-of-band) control
+    // channel, and forward to PHY UE, so it transmits data in the
+    // scheduled time slots.
+    void process_control_information();
 
     // Receive user data bits (downlink bits at the MAC thread running at the
     // server, uplink bits at the MAC thread running at the client) and forward
@@ -112,6 +130,10 @@ private:
 
     // A preallocated buffer to store UDP packets received via recv()
     std::vector<uint8_t> udp_pkt_buf_;
+
+    // A preallocated buffer to store UDP control information
+    // received via recv()
+    std::vector<uint8_t> udp_control_buf_;
 
     // The timestamp at which we last received a UDP packet from an application
     size_t last_mac_pkt_rx_tsc_ = 0;
