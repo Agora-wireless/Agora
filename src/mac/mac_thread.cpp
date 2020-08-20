@@ -323,7 +323,7 @@ void MacThread::run_event_loop()
         process_rx_from_master();
         if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
             process_udp_packets_from_apps();
-            handle_control_information();
+            //handle_control_information();
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
 
