@@ -56,9 +56,9 @@ public:
 
 private:
     UDPClient* udp_client; // UDP endpoint used for sending messages
-    UDPServer*
+    std::vector<UDPServer*>
         udp_server_uerx; // UDP endpoint used for receiving messages from client phy
-    UDPServer*
+    std::vector<UDPServer*>
         udp_server_bsrx; // UDP endpoint used for receiving messages from base station phy
 
     Config* bscfg;
