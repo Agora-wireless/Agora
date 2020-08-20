@@ -35,13 +35,13 @@ void decode_cont_func(void* _context, void* _tag)
     try_enqueue_fallback(&computeDecoding->complete_task_queue,
         computeDecoding->worker_producer_token, resp_event);
 
-    computeDecoding->vec_req_msgbuf.push_back(tag->req_msgbuf);
-    computeDecoding->vec_resp_msgbuf.push_back(tag->resp_msgbuf);
+    computeDecoding->rpc_context_->vec_req_msgbuf.push_back(tag->req_msgbuf);
+    computeDecoding->rpc_context_->vec_resp_msgbuf.push_back(tag->resp_msgbuf);
     delete tag;
 
     printf("Docoding: Received eRPC response %zu\n",
-        computeDecoding->num_responses_received);
-    computeDecoding->num_responses_received++;
+        computeDecoding->rpc_context_->num_responses_received);
+    computeDecoding->rpc_context_->num_responses_received++;
 }
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
@@ -138,22 +138,11 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
-void DoDecode::initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
+RpcContext* DoDecode::initialize_erpc(
+    erpc::Rpc<erpc::CTransport>* rpc, int session)
 {
-    rpc = rpc_;
-    session = session_;
-    for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
-        auto* req_msgbuf = new erpc::MsgBuffer;
-        *req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
-        vec_req_msgbuf.push_back(req_msgbuf);
-    }
-    for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
-        auto* resp_msgbuf = new erpc::MsgBuffer;
-        *resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
-        vec_resp_msgbuf.push_back(resp_msgbuf);
-    }
-    num_requests_issued = 0;
-    num_responses_received = 0;
+    rpc_context_ = new RpcContext(rpc, session);
+    return rpc_context_;
 }
 
 Event_data DoDecode::launch(size_t tag)
@@ -191,27 +180,28 @@ Event_data DoDecode::launch(size_t tag)
         size_t data_bytes
             = ldpc_max_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
 
-        while (vec_req_msgbuf.size() == 0) {
-            printf("Docoding: Running RPC event loop, rpc is %p\n", rpc);
-            rt_assert(rpc != nullptr, "RPC is null");
+        while (rpc_context_->vec_req_msgbuf.size() == 0) {
+            // printf("Docoding: Running RPC event loop, rpc is %p\n", rpc);
+            // rt_assert(rpc != nullptr, "RPC is null");
             // printf("Ran out of request message buffers!\n");
-            rpc->run_event_loop_once();
+            rpc_context_->rpc->run_event_loop_once();
         }
-        auto* req_msgbuf = vec_req_msgbuf.back();
-        vec_req_msgbuf.pop_back();
-        auto* resp_msgbuf = vec_resp_msgbuf.back();
-        vec_resp_msgbuf.pop_back();
+        auto* req_msgbuf = rpc_context_->vec_req_msgbuf.back();
+        rpc_context_->vec_req_msgbuf.pop_back();
+        auto* resp_msgbuf = rpc_context_->vec_resp_msgbuf.back();
+        rpc_context_->vec_resp_msgbuf.pop_back();
 
         decode_tag->req_msgbuf = req_msgbuf;
         decode_tag->resp_msgbuf = resp_msgbuf;
-        decode_tag->rpc = rpc;
-        rpc->resize_msg_buffer(req_msgbuf, data_bytes);
+        decode_tag->rpc = rpc_context_->rpc;
+        rpc_context_->rpc->resize_msg_buffer(req_msgbuf, data_bytes);
         memcpy(req_msgbuf->buf, send_buf, data_bytes);
 
-        printf("Docoding: Issuing eRPC request %zu\n", num_requests_issued);
-        rpc->enqueue_request(session, kRpcReqType, req_msgbuf, resp_msgbuf,
-            decode_cont_func, decode_tag);
-        num_requests_issued++;
+        printf("Docoding: Issuing eRPC request %zu\n",
+            rpc_context_->num_requests_issued);
+        rpc_context_->rpc->enqueue_request(rpc_context_->session, kRpcReqType,
+            req_msgbuf, resp_msgbuf, decode_cont_func, decode_tag);
+        rpc_context_->num_requests_issued++;
     } else {
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
