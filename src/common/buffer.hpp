@@ -9,6 +9,7 @@
 
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include "ran_config.h"
 #include <sstream>
 #include <vector>
 

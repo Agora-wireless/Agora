@@ -39,6 +39,9 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
 
+    const size_t udp_control_len = sizeof(ControlPacket);
+    udp_control_buf_.resize(sizeof(udp_control_len));
+
     udp_server
         = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
     udp_client = new UDPClient();
@@ -76,7 +79,7 @@ void MacThread::process_snr_report_from_master(Event_data event)
     server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
 }
 
-void MacThread::push_ran_config_update(Event_data event, RanConfig rc)
+void MacThread::send_ran_config_update(Event_data event, RanConfig rc)
 {
     assert(event.event_type == EventType::kRANUpdate);
 }
@@ -160,6 +163,38 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     rt_assert(
         tx_queue_->enqueue(Event_data(EventType::kPacketToMac, event.tags[0])),
         "Socket message enqueue failed\n");
+}
+
+void MacThread::send_control_information()
+{
+    ControlPacket ci(next_frame_id_, next_radio_id_, CommsLib::QAM64);
+    udp_client->send(kClientHostname, kBaseClientPort + ci.ue_id, (uint8_t*)&ci,
+        sizeof(ControlPacket));
+}
+
+void MacThread::process_control_information()
+{
+    memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
+    ssize_t ret = udp_server->recv_nonblocking(
+        &udp_control_buf_[0], udp_control_buf_.size());
+    if (ret == 0) {
+        return; // No data received
+    } else if (ret == -1) {
+        // There was an error in receiving
+        cfg_->running = false;
+        return;
+    }
+
+    rt_assert(static_cast<size_t>(ret) == sizeof(ControlPacket));
+
+    const auto* ci = reinterpret_cast<ControlPacket*>(&udp_control_buf_[0]);
+    Event_data msg(EventType::kControlPacket);
+    msg.num_tags = 3;
+    msg.tags[0] = ci->tti;
+    msg.tags[1] = ci->ue_id;
+    msg.tags[2] = ci->mod_type;
+    rt_assert(tx_queue_->enqueue(msg),
+        "MAC thread: fail to send control packet to PHY");
 }
 
 void MacThread::process_udp_packets_from_apps()
@@ -280,6 +315,7 @@ void MacThread::run_event_loop()
         process_rx_from_master();
         if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
             process_udp_packets_from_apps();
+            send_control_information();
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
 

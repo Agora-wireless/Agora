@@ -399,6 +399,11 @@ void Millipede::start()
                 }
             } break;
 
+            case EventType::kRANUpdate: {
+                printf("received RAN config update");
+                // TODO: update RAN config
+            } break;
+
             case EventType::kPacketToMac: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
