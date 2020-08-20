@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
     }
 
     // Place modulated uplink data codewords into central IFFT bins
-    rt_assert(cfg->LDPC_config.nblocksInSymbol == 1);
+    rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
     std::vector<std::vector<complex_float>> pre_ifft_symbols(
         cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
     for (size_t i = 0; i < pre_ifft_symbols.size(); i++) {
@@ -139,20 +139,15 @@ int main(int argc, char* argv[])
         cfg->symbol_num_perframe, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, 64);
 
     if (cfg->freq_orthogonal_pilot) {
-        complex_float* pilots_t_ue;
-        alloc_buffer_1d(&pilots_t_ue, cfg->OFDM_CA_NUM, 64, 1);
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
-            /* TODO: fix user pilots distribution in pilot symbols */
-            /* Right now we assume one pilot symbol hold all user pilots
-             * in freqency orthogonal pilot */
-            memset(pilots_t_ue, 0, cfg->OFDM_CA_NUM * sizeof(complex_float));
+            std::vector<complex_float> pilots_t_ue(cfg->OFDM_CA_NUM); // Zeroed
             for (size_t j = cfg->OFDM_DATA_START;
                  j < cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM;
                  j += cfg->UE_ANT_NUM) {
                 pilots_t_ue[i + j] = pilot_td[i + j];
             }
-            memcpy(tx_data_all_symbols[0] + i * cfg->OFDM_CA_NUM, pilots_t_ue,
-                cfg->OFDM_CA_NUM * sizeof(complex_float));
+            memcpy(tx_data_all_symbols[0] + i * cfg->OFDM_CA_NUM,
+                &pilots_t_ue[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
         }
     } else {
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)

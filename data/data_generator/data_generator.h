@@ -74,9 +74,7 @@ public:
     std::vector<complex_float> get_pre_ifft_symbol(
         const std::vector<complex_float> modulated_codeword) const
     {
-        std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM);
-        memset(
-            &pre_ifft_symbol[0], 0, cfg->OFDM_CA_NUM * sizeof(complex_float));
+        std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM); // Zeroed
         memcpy(&pre_ifft_symbol[cfg->OFDM_DATA_START], &modulated_codeword[0],
             cfg->OFDM_DATA_NUM * sizeof(complex_float));
 
