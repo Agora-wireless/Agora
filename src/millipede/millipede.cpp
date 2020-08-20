@@ -692,7 +692,8 @@ void* Millipede::worker(int tid)
         while (!rpc->is_connected(session)) {
             rpc->run_event_loop_once();
         }
-        static_cast<DoDecode*>(computeDecoding)->initialize_erpc(rpc, session);
+        RpcContext* inited_ctx = computeDecoding->initialize_erpc(rpc, session);
+        computeDecodingLast->set_initialized_rpc_context(inited_ctx);
     }
 
     while (true) {

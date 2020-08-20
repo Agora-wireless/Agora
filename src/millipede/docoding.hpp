@@ -28,6 +28,46 @@
 
 // #ifdef USE_REMOTE
 #include "rpc.h"
+
+/// The state of an ePRC connection to a remote LDPC worker,
+/// including request/receive message buffers and counters.
+/// A single instance of this is shared between the two `DoDecode` instances
+/// in each worker thread.
+class RpcContext {
+public:
+    RpcContext(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
+        : rpc(rpc_)
+        , session(session_)
+        , num_requests_issued(0)
+        , num_responses_received(0)
+    {
+        rpc = rpc_;
+        session = session_;
+        for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
+            auto* req_msgbuf = new erpc::MsgBuffer;
+            *req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
+            vec_req_msgbuf.push_back(req_msgbuf);
+        }
+        for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
+            auto* resp_msgbuf = new erpc::MsgBuffer;
+            *resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
+            vec_resp_msgbuf.push_back(resp_msgbuf);
+        }
+    }
+
+public:
+    /// Number of preallocated msgbufs to hold pending eRPC requests
+    static const size_t kRpcMaxMsgBufNum = 6400;
+    /// Maximum size of preallocated msgbufs
+    static const size_t kRpcMaxMsgSize = (1 << 15);
+
+    erpc::Rpc<erpc::CTransport>* rpc;
+    std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
+    std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
+    int session;
+    size_t num_requests_issued;
+    size_t num_responses_received;
+};
 // #endif
 
 class DoEncode : public Doer {
@@ -66,14 +106,37 @@ public:
     Event_data launch(size_t tag);
 
     // #ifdef USE_REMOTE
-    void initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
 
-    inline size_t get_num_requests() { return num_requests_issued; }
-    inline size_t get_num_responses() { return num_responses_received; }
+    /// Creates and returns a new `RpcContext` that this doer will use to
+    /// communicate with the remote LDPC worker.
+    /// The returned `RpcContext` can be shared with other doers;
+    /// see the `set_initialized_rpc_context()` method.
+    RpcContext* initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
+
+    inline size_t get_num_requests()
+    {
+        return rpc_context_->num_requests_issued;
+    }
+    inline size_t get_num_responses()
+    {
+        return rpc_context_->num_responses_received;
+    }
 
     friend void decode_cont_func(void* _context, void* _tag);
+
+    /// Sets this doer's `RpcContext` to an already-initialized instance.
+    /// This is useful because a single worker thread creates **two** instances
+    /// of `DoDecode`, and they must share a single Rpc context.
+    void set_initialized_rpc_context(RpcContext* rpc_context)
+    {
+        rpc_context_ = rpc_context;
+    }
     // #endif
 
+public:
+    /// eRPC request type for remote LDPC decoding
+    static const size_t kRpcReqType = 2;
+    
 private:
     int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
@@ -84,21 +147,8 @@ private:
     DurationStat* duration_stat;
 
     // #ifdef USE_REMOTE
-    /// Number of preallocated msgbufs to hold pending eRPC requests
-    static const size_t kRpcMaxMsgBufNum = 640;
 
-    /// eRPC request type for remote LDPC decoding
-    static const size_t kRpcReqType = 2;
-
-    /// Maximum size of preallocated msgbufs
-    static const size_t kRpcMaxMsgSize = (1 << 15);
-
-    erpc::Rpc<erpc::CTransport>* rpc;
-    std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
-    std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
-    int session;
-    size_t num_requests_issued;
-    size_t num_responses_received;
+    RpcContext* rpc_context_;
     // #endif
 };
 
