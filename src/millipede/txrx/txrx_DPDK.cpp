@@ -135,8 +135,9 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(int tid, int& prev_frame_id)
     // int* rx_buffer_status = (*buffer_status_)[tid];
     // size_t* rx_frame_start = (*frame_start_)[tid];
     // use token to speed up
+    moodycamel::ProducerToken* local_ptok = nullptr;
     if (!cfg->disable_master) {
-        moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+        local_ptok = rx_ptoks_[tid];
     }
     struct rte_mbuf* rx_bufs[kRxBatchSize] __attribute__((aligned(64)));
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
