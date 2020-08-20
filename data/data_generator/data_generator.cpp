@@ -63,23 +63,22 @@ int main(int argc, char* argv[])
         * cfg->LDPC_config.nblocksInSymbol * cfg->UE_ANT_NUM;
     printf("Total number of blocks: %zu\n", num_codeblocks);
 
-    std::vector<int8_t*> information;
-    std::vector<int8_t*> encoded;
-    data_generator.gen_rand_information_codeblocks_ul(
-        information, encoded, num_codeblocks);
+    std::vector<std::vector<int8_t>> information;
+    std::vector<std::vector<int8_t>> encoded;
+    data_generator.gen_codeblocks_ul(information, encoded, num_codeblocks);
 
     {
+        // Save uplink information bytes to file
         const size_t input_bytes_per_cb = bits_to_bytes(
             ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
-        // Save uplink information bytes to file
         const std::string filename_input = cur_directory
             + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_codeblocks; i++) {
-            fwrite(reinterpret_cast<uint8_t*>(information[i]),
+            fwrite(reinterpret_cast<uint8_t*>(&information[i][0]),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
         }
         fclose(fp_input);
@@ -106,7 +105,7 @@ int main(int argc, char* argv[])
         const size_t encoded_bytes_per_cb = bits_to_bytes(ldpc_num_encoded_bits(
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc, cfg->LDPC_config.nRows));
         std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
-        adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded[n]),
+        adapt_bits_for_mod(reinterpret_cast<uint8_t*>(&encoded[n][0]),
             &mod_input[0], encoded_bytes_per_cb, cfg->mod_type);
 
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
@@ -402,11 +401,6 @@ int main(int argc, char* argv[])
     //     }
     // }
     // printf("\n");
-
-    for (size_t n = 0; n < num_codeblocks; n++) {
-        delete[] information[n];
-        delete[] encoded[n];
-    }
 
     mod_output.free();
     IFFT_data.free();
