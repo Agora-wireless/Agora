@@ -21,6 +21,7 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
+#include "utils_ldpc.hpp"
 #include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
@@ -28,6 +29,35 @@ using json = nlohmann::json;
 #endif
 typedef unsigned char uchar;
 typedef unsigned short ushort;
+
+class LDPCconfig {
+public:
+    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
+    uint16_t Zc; /// The 5G NR LDPC expansion factor
+    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
+
+    /// Allow the LDPC decoder to terminate without completing all iterations
+    /// if it decodes the codeblock eariler
+    bool earlyTermination;
+
+    size_t nRows; /// Number of rows in the LDPC base graph to use
+    uint32_t cbLen; /// Number of information bits input to LDPC encoding
+    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
+    size_t nblocksInSymbol;
+
+    // Return the number of bytes in the information bit sequence for LDPC
+    // encoding of one code block
+    size_t num_input_bytes() const
+    {
+        return bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
+    }
+
+    // Return the number of bytes in the encoded LDPC code word
+    size_t num_encoded_bytes() const
+    {
+        return bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows));
+    }
+};
 
 class Config {
 public:
@@ -289,7 +319,7 @@ public:
                    * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }
-  
+
     /// Return the frame duration in seconds
     inline double get_frame_duration_sec()
     {
@@ -348,7 +378,6 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    
     /// Get the soft demodulation buffer for this frame, symbol,
     /// user and subcarrier ID
     inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
