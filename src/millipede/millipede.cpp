@@ -120,9 +120,11 @@ void Millipede::send_snr_report(
     assert(event_type == EventType::kSNRReport);
     auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
     for (size_t i = 0; i < config_->UE_NUM; i++) {
-        try_enqueue_fallback(&mac_request_queue_,
-            Event_data(EventType::kSNRReport, base_tag._tag,
-                phy_stats->get_evm_snr(frame_id, i)));
+        Event_data snr_report(EventType::kSNRReport, base_tag._tag);
+        snr_report.num_tags = 2;
+        *reinterpret_cast<float*>(&snr_report.tags[1])
+            = phy_stats->get_evm_snr(frame_id, i);
+        try_enqueue_fallback(&mac_request_queue_, snr_report);
         base_tag.ue_id++;
     }
 }
