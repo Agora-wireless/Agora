@@ -3,12 +3,16 @@
 #include "config.hpp"
 
 RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
+    : config_(cfg)
+    , thread_num_(n_threads)
+    , core_id_(in_core_id)
 {
-    config_ = cfg;
-    radioconfig_ = new ClientRadioConfig(config_);
-
-    thread_num_ = n_threads;
-    core_id_ = in_core_id;
+    if (!kUseArgos) {
+        socket_.resize(config_->nRadios);
+        servaddr_.resize(config_->nRadios);
+    } else {
+        radioconfig_ = new ClientRadioConfig(config_);
+    }
 
     /* initialize random seed: */
     srand(time(NULL));
@@ -29,8 +33,10 @@ RadioTXRX::RadioTXRX(Config* config, int n_threads, int in_core_id,
 
 RadioTXRX::~RadioTXRX()
 {
-    radioconfig_->radioStop();
-    delete radioconfig_;
+    if (kUseArgos) {
+        radioconfig_->radioStop();
+        delete radioconfig_;
+    }
     delete config_;
 }
 
@@ -61,17 +67,27 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         context->obj_ptr = this;
         context->id = i;
         // start socket thread
-        if (config_->hw_framer) {
-            if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopTXRX>,
-                    context)
-                != 0) {
-                perror("socket thread create failed");
-                exit(0);
+        if (kUseArgos) {
+            if (config_->hw_framer) {
+                if (pthread_create(&txrx_thread, NULL,
+                        pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loop_tx_rx_argos>,
+                        context)
+                    != 0) {
+                    perror("socket thread create failed");
+                    exit(0);
+                }
+            } else {
+                if (pthread_create(&txrx_thread, NULL,
+                        pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loop_tx_rx_argos_sync>,
+                        context)
+                    != 0) {
+                    perror("socket thread create failed");
+                    exit(0);
+                }
             }
         } else {
             if (pthread_create(&txrx_thread, NULL,
-                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loopSYNC_TXRX>,
+                    pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loop_tx_rx>,
                     context)
                 != 0) {
                 perror("socket thread create failed");
@@ -87,7 +103,134 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     return true;
 }
 
+struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
+{
+    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    char* rx_buffer = (*buffer_)[tid];
+    int* rx_buffer_status = (*buffer_status_)[tid];
+    int packet_length = config_->packet_length;
+
+    // if rx_buffer is full, exit
+    if (rx_buffer_status[rx_offset] == 1) {
+        printf(
+            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        config_->running = false;
+        return (NULL);
+    }
+    struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
+    if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
+        if (errno != EAGAIN && config_->running) {
+            perror("recv failed");
+            exit(0);
+        }
+        return (NULL);
+    }
+
+    // get the position in rx_buffer
+    // move ptr & set status to full
+    rx_buffer_status[rx_offset] = 1;
+
+    // Push kPacketRX event into the queue.
+    Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
+    if (!message_queue_->enqueue(*local_ptok, rx_message)) {
+        printf("socket message enqueue failed\n");
+        exit(0);
+    }
+    return pkt;
+}
+
 int RadioTXRX::dequeue_send(int tid)
+{
+    auto& c = config_;
+    Event_data event;
+    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+        return -1;
+
+    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    assert(event.event_type == EventType::kPacketTX);
+
+    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+    for (size_t symbol_idx = 0; symbol_idx < c->ul_data_symbol_num_perframe;
+         symbol_idx++) {
+
+        size_t offset = (c->get_total_data_symbol_idx(frame_id, symbol_idx)
+                            * c->UE_ANT_NUM)
+            + ant_id;
+
+        if (kDebugPrintInTask) {
+            printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+                   "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+                tid, frame_id, symbol_idx, ant_id,
+                gen_tag_t(event.tags[0])._tag, offset,
+                message_queue_->size_approx());
+        }
+
+        size_t socket_symbol_offset = offset
+            % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
+                  * c->UE_ANT_NUM);
+        char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
+        auto* pkt = (Packet*)cur_buffer_ptr;
+        new (pkt) Packet(frame_id, symbol_idx, 0 /* cell_id */, ant_id);
+
+        // Send data (one OFDM symbol)
+        ssize_t ret = sendto(socket_[ant_id % thread_num_],
+            cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
+            sizeof(servaddr_[tid]));
+        rt_assert(ret > 0, "sendto() failed");
+    }
+    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                  Event_data(EventType::kPacketTX, event.tags[0])),
+        "Socket message enqueue failed\n");
+    return event.tags[0];
+}
+
+void* RadioTXRX::loop_tx_rx(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
+    size_t rx_offset = 0;
+    int radio_lo = tid * config_->nRadios / thread_num_;
+    int radio_hi = (tid + 1) * config_->nRadios / thread_num_;
+    printf("Receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+    for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
+        int local_port_id = config_->ue_rx_port + radio_id;
+#if USE_IPV4
+        socket_[radio_id]
+            = setup_socket_ipv4(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
+            config_->ue_tx_port + radio_id, config_->server_addr.c_str());
+        printf("TXRX thread %d: set up UDP socket server listening to port %d"
+               " with remote address %s:%d \n",
+            tid, local_port_id, config_->server_addr.c_str(),
+            config_->ue_rx_port + radio_id);
+#else
+        socket_[radio_id]
+            = setup_socket_ipv6(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv6(&servaddr_[radio_id],
+            config_->ue_rx_port + radio_id, config_->sender_addr.c_str());
+#endif
+        fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
+    }
+
+    int radio_id = radio_lo;
+    while (config_->running) {
+        if (-1 != dequeue_send(tid))
+            continue;
+        // receive data
+        struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
+        if (pkt == NULL)
+            continue;
+        rx_offset = (rx_offset + 1) % buffer_frame_num_;
+
+        if (++radio_id == radio_hi)
+            radio_id = radio_lo;
+    }
+    return 0;
+}
+
+int RadioTXRX::dequeue_send_argos(int tid)
 {
     auto& c = config_;
     auto& radio = radioconfig_;
@@ -132,7 +275,7 @@ int RadioTXRX::dequeue_send(int tid)
     return event.tags[0];
 }
 
-void* RadioTXRX::loopTXRX(int tid)
+void* RadioTXRX::loop_tx_rx_argos(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
     auto& c = config_;
@@ -233,7 +376,7 @@ void* RadioTXRX::loopTXRX(int tid)
     return 0;
 }
 
-void* RadioTXRX::loopSYNC_TXRX(int tid)
+void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
 {
     // FIXME: This only works when there is 1 radio per thread.
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_id_, tid);
