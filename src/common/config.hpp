@@ -163,16 +163,16 @@ public:
     size_t ofdm_tx_zero_postfix_;
 
     // The number of IQ samples to skip from the beginning of symbol received by
-    // Millipede on the uplink. Due to over-the-air and RF delays, this can be
-    // different from (prefix + CP_LEN), and is currently calculated by manual
-    // tuning.
-    size_t ofdm_rx_zero_prefix_ul_;
+    // Millipede on the uplink at the base station. Due to over-the-air and RF
+    // delays, this can be different from (prefix + CP_LEN), and is currently
+    // calculated by manual tuning.
+    size_t ofdm_rx_zero_prefix_bs_;
 
     // The number of IQ samples to skip from the beginning of symbol received by
-    // Millipede on the downlink. Due to over-the-air and RF delays, this can be
-    // different from (prefix + CP_LEN), and is currently calculated by manual
-    // tuning.
-    size_t ofdm_rx_zero_prefix_dl_;
+    // Millipede on the downlink at the client. Due to over-the-air and RF
+    // delays, this can be different from (prefix + CP_LEN), and is currently
+    // calculated by manual tuning.
+    size_t ofdm_rx_zero_prefix_client_;
 
     // The total number of IQ samples received or sent by Millipede when the
     // RRU does not perform FFT/IFFT
@@ -289,7 +289,7 @@ public:
                    * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }
-  
+
     /// Return the frame duration in seconds
     inline double get_frame_duration_sec()
     {
@@ -348,7 +348,6 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    
     /// Get the soft demodulation buffer for this frame, symbol,
     /// user and subcarrier ID
     inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
