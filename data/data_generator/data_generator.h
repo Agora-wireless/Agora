@@ -44,6 +44,11 @@ public:
         encoded_codeword.resize(lc.num_encoded_bytes());
     }
 
+    /**
+     * @brief Return the output of modulating the encoded codeword
+     * @param encoded_codeword The encoded LDPC codeword bit sequence
+     * @return An array of complex floats with OFDM_DATA_NUM elements
+     */
     std::vector<complex_float> get_modulation(
         const std::vector<int8_t>& encoded_codeword)
     {
@@ -60,6 +65,12 @@ public:
         return modulated_codeword;
     }
 
+    /**
+     * @param modulated_codeword The modulated codeword with OFDM_DATA_NUM
+     * elements
+     * @brief An array with OFDM_CA_NUM elements with the modulated elements
+     * placed at the center
+     */
     std::vector<complex_float> get_pre_ifft_symbol(
         const std::vector<complex_float> modulated_codeword) const
     {
