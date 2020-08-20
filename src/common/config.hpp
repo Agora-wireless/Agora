@@ -174,12 +174,13 @@ public:
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_client_;
 
-    // The total number of IQ samples received or sent by Millipede when the
-    // RRU does not perform FFT/IFFT
+    // The total number of IQ samples in one physical layer time-domain packet
+    // received or sent by Millipede
     size_t sampsPerSymbol;
 
-    // The number of bytes in a packet received or sent by Millipede when the
-    // RRU does not perform FFT/IFFT
+    // The number of bytes in one physical layer time-domain packet received or
+    // sent by Millipede. This includes Millipede's acket header, but not the
+    // Ethernet/IP/UDP headers.
     size_t packet_length;
 
     size_t OFDM_PILOT_SPACING;
@@ -391,7 +392,8 @@ public:
                                   + num_encoded_bytes_per_cb * cb_id];
     }
 
-    // TODO: Add documentation
+    // Returns the number of pilot subcarriers in downlink symbols used for
+    // phase tracking
     inline size_t get_ofdm_pilot_num() const
     {
         return OFDM_DATA_NUM / OFDM_PILOT_SPACING;
