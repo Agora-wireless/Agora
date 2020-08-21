@@ -369,8 +369,8 @@ void Phy_UE::start()
                 RBIndicator ri;
                 ri.ue_id = event.tags[0];
                 ri.mod_type = event.tags[1];
-                printf(
-                    "Main thread: received control packet for ue %zu, mod %zu",
+                printf("Main thread: received control packet for ue %zu, mod "
+                       "%zu\n",
                     ri.ue_id, ri.mod_type);
                 // TODO: clock PHY sender appropriately
             } break;
