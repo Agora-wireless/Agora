@@ -248,7 +248,7 @@ void* ChannelSim::bs_rx_loop(int tid)
     int socket_hi = (tid + 1) * bs_socket_num / bs_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1 + tid, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1, tid);
 
     struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
     int socket_id = socket_lo;

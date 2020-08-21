@@ -87,7 +87,6 @@ private:
     int buffer_frame_num_;
 
     char* tx_buffer_;
-    char* pilot_buffer_;
     int* tx_buffer_status_;
     int tx_buffer_frame_num_;
     int tx_buffer_length_;
