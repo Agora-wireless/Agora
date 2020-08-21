@@ -207,35 +207,56 @@ public:
                 run_csi(gen_tag_t::frm_sym_sc(
                     csi_cur_frame, 0, subcarrier_range_.start)
                             ._tag);
+                // exit(0);
+                printf(
+                    "Main thread: pilot frame: %lu, finished CSI for all pilot "
+                    "symbols\n",
+                    csi_cur_frame);
                 csi_cur_frame++;
             }
             if (csi_cur_frame > zf_cur_frame) {
                 computeZF_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame, 0,
-                    subcarrier_range_.start + num_zf_task_completed)
+                    subcarrier_range_.start
+                        + num_zf_task_completed * cfg->zf_block_size)
                                        ._tag);
-                num_zf_task_completed += cfg->zf_block_size;
+                // exit(0);
+                num_zf_task_completed++;
                 if (num_zf_task_completed == num_zf_task_required) {
                     num_zf_task_completed = 0;
+                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame);
                     zf_cur_frame++;
                 }
             }
             if (zf_cur_frame > demul_cur_frame
                 && rx_status_->is_demod_ready(
                        demul_cur_frame, demul_cur_symbol_to_process)) {
+                // if (demul_cur_frame == 0) {
+                //     printf("Run demod on frame %lu symbol %lu sc %lu\n",
+                //         demul_cur_frame, demul_cur_symbol_to_process,
+                //         subcarrier_range_.start
+                //             + num_demul_task_completed * cfg->demul_block_size);
+                // }
                 computeDemul_->launch(gen_tag_t::frm_sym_sc(demul_cur_frame,
                     demul_cur_symbol_to_process,
-                    subcarrier_range_.start + num_demul_task_completed)
+                    subcarrier_range_.start
+                        + num_demul_task_completed * cfg->demul_block_size)
                                           ._tag);
-                num_demul_task_completed += cfg->demul_block_size;
+                num_demul_task_completed++;
                 if (num_demul_task_completed == num_demul_task_required) {
                     num_demul_task_completed = 0;
-                    demul_cur_symbol_to_process++;
                     demul_status_->demul_complete(demul_cur_frame,
                         demul_cur_symbol_to_process, num_demul_task_required);
+                    demul_cur_symbol_to_process++;
                     if (demul_cur_symbol_to_process
                         == cfg->symbol_num_perframe) {
                         demul_cur_symbol_to_process
                             = cfg->pilot_symbol_num_perframe;
+                        printf("Main thread: Demodulation done frame: %lu "
+                               "(%lu "
+                               "UL symbols)\n",
+                            demul_cur_frame,
+                            cfg->symbol_num_perframe
+                                - cfg->pilot_symbol_num_perframe);
                         demul_cur_frame++;
                     }
                 }
@@ -287,6 +308,12 @@ private:
 
         complex_float converted_sc[kSCsPerCacheline];
 
+        // printf("Run CSI: (%x %x)\n",
+        //     *(reinterpret_cast<short*>(&socket_buffer_[0][cfg->packet_length
+        //         + Packet::kOffsetOfData])),
+        //     *(reinterpret_cast<short*>(&socket_buffer_[0][cfg->packet_length
+        //         + Packet::kOffsetOfData + 2])));
+
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
@@ -308,13 +335,32 @@ private:
                         const size_t sc_idx
                             = (block_idx * kTransposeBlockSize) + sc_j;
 
+                        // if (j == 0 && i == 1 && sc_idx == 0) {
+                        //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
+                        //         printf("(%x %x) ", pkt->data[(sc_idx + t) * 2],
+                        //             pkt->data[(sc_idx + t) * 2 + 1]);
+                        //     }
+                        //     printf("\n");
+                        // }
+
                         simd_convert_float16_to_float32(
-                            reinterpret_cast<float*>(pkt->data + sc_idx * 2),
                             reinterpret_cast<float*>(converted_sc),
+                            reinterpret_cast<float*>(pkt->data + sc_idx * 2),
                             kSCsPerCacheline * 2);
+
+                        // for (size_t t = 0; t < kSCsPerCacheline; t++) {
+                        //     printf("(%f %f) ", converted_sc[t].re,
+                        //         converted_sc[t].im);
+                        // }
+                        // printf("\n");
+                        // exit(0);
 
                         const complex_float* src
                             = converted_sc; // TODO: find src pointer from pkt
+
+                        // if (j == 0 && i == 1 && sc_idx == 0) {
+                        //     printf("src data: (%f %f)\n", src[0].re, src[0].im);
+                        // }
 
                         complex_float* dst
                             = cfg->get_csi_mat(csi_buffer_, frame_id, i);
@@ -385,6 +431,7 @@ private:
                 }
             }
         }
+        // printf("(%f %f)\n", csi_buffer_[1][0].re, csi_buffer_[1][0].im);
         return Event_data(EventType::kCSI, tag);
     }
 

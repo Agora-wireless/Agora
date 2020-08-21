@@ -9,10 +9,10 @@ using namespace std;
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , rx_status_(RxStatus(cfg->pilot_symbol_num_perframe * cfg->UE_ANT_NUM,
+    , rx_status_(RxStatus(cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM,
           cfg->pilot_symbol_num_perframe, cfg->data_symbol_num_perframe,
-          cfg->UE_ANT_NUM))
-    , demul_status_(DemulStatus(cfg->OFDM_DATA_NUM))
+          cfg->BS_ANT_NUM, cfg->UE_ANT_NUM))
+    , demul_status_(DemulStatus(cfg->OFDM_DATA_NUM / cfg->demul_block_size))
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -215,18 +215,18 @@ void Millipede::start()
     auto& cfg = config_;
     cur_tid = 0;
 
-    if (cfg->disable_master) {
-        while (cfg->running && !SignalHandler::gotExitSignal()) {
-            sleep(3);
-        }
-        return;
-    }
-
     // Start packet I/O
     if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
             socket_buffer_status_size_, stats->frame_start,
             dl_socket_buffer_)) {
         this->stop();
+        return;
+    }
+
+    if (cfg->disable_master) {
+        while (cfg->running && !SignalHandler::gotExitSignal()) {
+            sleep(3);
+        }
         return;
     }
 

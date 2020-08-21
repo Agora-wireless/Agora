@@ -309,15 +309,15 @@ class RxStatus {
 public:
     // num_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of packets
     // received for frame i (may be removed if not used)
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pkts;
+    std::array<std::atomic<size_t>, TASK_BUFFER_FRAME_NUM> num_pkts;
 
     // num_pilot_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of pilot
     // packets received for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
+    std::array<std::atomic<size_t>, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
 
     // num_data_pkts[i % TASK_BUFFER_FRAME_NUM][j] is the total number of data
     // packets received for frame i and symbol j
-    std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
+    std::array<std::array<std::atomic<size_t>, kMaxNumSymbolsPerFrame>,
         TASK_BUFFER_FRAME_NUM>
         num_data_pkts;
 
@@ -330,27 +330,44 @@ public:
 
     // The first data symbol for which the socket I/O threads have not received
     // all packets
-    size_t next_data_symbol = 0;
+    // size_t next_data_symbol = 0;
+
+    // Atomic counter for # completed decode tasks
+    // cur_frame will be incremented in all tasks are completed
+    size_t num_decode_tasks_completed;
+    std::mutex decode_mutex;
 
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame;
     const size_t num_pilot_symbols_per_frame;
     const size_t num_data_symbol_per_frame;
     const size_t num_pkts_per_symbol;
+    const size_t num_decode_tasks_per_frame;
 
     RxStatus(size_t _num_pilot_pkts_per_frame,
         size_t _num_pilot_symbols_per_frame, size_t _num_data_symbol_per_frame,
-        size_t _num_pkts_per_symbol)
+        size_t _num_pkts_per_symbol, size_t _num_decode_tasks_per_frame)
         : num_pilot_pkts_per_frame(_num_pilot_pkts_per_frame)
         , num_pilot_symbols_per_frame(_num_pilot_symbols_per_frame)
         , num_data_symbol_per_frame(_num_data_symbol_per_frame)
         , num_pkts_per_symbol(_num_pkts_per_symbol)
+        , num_decode_tasks_per_frame(_num_decode_tasks_per_frame)
     {
-        num_pkts.fill(0);
-        num_pilot_pkts.fill(0);
+        // num_pkts.fill(0);
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
-            num_data_pkts[i].fill(0);
+            num_pkts[i].store(0);
         }
+        // num_pilot_pkts.fill(0);
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+            num_pilot_pkts[i].store(0);
+        }
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+            // num_data_pkts[i].fill(0);
+            for (size_t j = 0; j < kMaxNumSymbolsPerFrame; j++) {
+                num_data_pkts[i][j].store(0);
+            }
+        }
+        // next_data_symbol = num_pilot_symbols_per_frame;
     }
 
     bool add_new_packet(size_t frame_id, size_t symbol_id)
@@ -364,44 +381,85 @@ public:
         }
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         num_pkts[frame_slot]++;
+        if (num_pkts[frame_slot].load()
+            == num_pkts_per_symbol
+                * (num_pilot_symbols_per_frame + num_data_symbol_per_frame)) {
+            printf(
+                "Main thread: received all packets in frame: %lu\n", frame_id);
+        }
         // TODO
         // 1. Move those statements into functions in RxStatus
         // 2. Check invalid packets
         if (symbol_id < num_pilot_symbols_per_frame) {
             num_pilot_pkts[frame_slot]++;
+            if (num_pilot_pkts[frame_slot].load() == num_pilot_pkts_per_frame) {
+                printf("Main thread: received all pilots in frame: %zu\n",
+                    frame_id);
+            }
         } else {
             num_data_pkts[frame_slot][symbol_id]++;
         }
         if (frame_id > latest_frame) {
+            // NOTE: race condition could happen here but the impact is small
             latest_frame = frame_id;
         }
-        if (frame_id == cur_frame && symbol_id == next_data_symbol) {
-            while (
-                num_data_pkts[frame_slot][symbol_id] == num_pkts_per_symbol) {
-                num_data_pkts[frame_slot][symbol_id] = 0;
-                symbol_id++;
-                if (symbol_id == num_data_symbol_per_frame) {
-                    break;
-                }
-            }
-            next_data_symbol = symbol_id;
-        }
+        // if (frame_id == cur_frame && symbol_id == next_data_symbol) {
+        //     while (
+        //         num_data_pkts[frame_slot][symbol_id] == num_pkts_per_symbol) {
+        //         num_data_pkts[frame_slot][symbol_id] = 0;
+        //         symbol_id++;
+        //         if (symbol_id == num_data_symbol_per_frame) {
+        //             break;
+        //         }
+        //     }
+        //     next_data_symbol = symbol_id;
+        // }
         return true;
     }
 
     bool is_pilot_ready(size_t frame_id)
     {
+        // if (frame_id == 1) {
+        //     printf("check pilot in frame 1 %lu %lu cur_frame %lu\n",
+        //         num_pilot_pkts[1], num_pilot_pkts_per_frame, cur_frame);
+        // }
         if (frame_id < cur_frame
             || frame_id >= cur_frame + TASK_BUFFER_FRAME_NUM) {
             return false;
         }
-        return num_pilot_pkts[frame_id % TASK_BUFFER_FRAME_NUM]
+        return num_pilot_pkts[frame_id % TASK_BUFFER_FRAME_NUM].load()
             == num_pilot_pkts_per_frame;
     }
 
     bool is_demod_ready(size_t frame_id, size_t symbol_id)
     {
-        return frame_id == cur_frame && next_data_symbol > symbol_id;
+        // return frame_id == cur_frame && next_data_symbol > symbol_id;
+        if (frame_id < cur_frame
+            || frame_id >= cur_frame + TASK_BUFFER_FRAME_NUM) {
+            return false;
+        }
+        return num_data_pkts[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id].load()
+            == num_pkts_per_symbol;
+    }
+
+    void decode_done(size_t frame_id)
+    {
+        rt_assert(frame_id == cur_frame, "Wrong completed decode task!");
+        decode_mutex.lock();
+        num_decode_tasks_completed++;
+        if (num_decode_tasks_completed == num_decode_tasks_per_frame) {
+            cur_frame++;
+            num_decode_tasks_completed = 0;
+            size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+            num_pkts[frame_slot].store(0);
+            num_pilot_pkts[frame_slot].store(0);
+            // num_data_pkts[frame_slot].fill(0);
+            for (size_t j = 0; j < kMaxNumSymbolsPerFrame; j++) {
+                num_data_pkts[frame_slot][j].store(0);
+            }
+            printf("Main thread: Decode done frame: %lu\n", cur_frame - 1);
+        }
+        decode_mutex.unlock();
     }
 };
 
@@ -423,18 +481,24 @@ public:
     // to synchronize the update for each dosubcarrier
     std::array<std::mutex, kMaxNumSymbolsPerFrame> mutex_list;
 
+    size_t cur_frame;
+    std::mutex cur_frame_mutex;
+
     DemulStatus(size_t _num_demul_tasks_required)
         : num_demul_tasks_required(_num_demul_tasks_required)
     {
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
             num_demul_tasks_completed[i].fill(0);
         }
+        cur_frame = 0;
     }
 
     // A dosubcarrier launch this function to notify some subcarriers
     // are completed for demul tasks in a symbol of a frame
     void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
     {
+        rt_assert(
+            frame_id < cur_frame + TASK_BUFFER_FRAME_NUM, "Decode too slow!");
         mutex_list[symbol_id].lock();
         num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
             += num_tasks;
@@ -445,6 +509,15 @@ public:
     // demul tasks so that it could start to decode
     bool ready_to_decode(size_t frame_id, size_t symbol_id)
     {
+        if (frame_id > cur_frame) {
+            cur_frame_mutex.lock();
+            if (frame_id > cur_frame) {
+                num_demul_tasks_completed[cur_frame % TASK_BUFFER_FRAME_NUM]
+                    .fill(0);
+                cur_frame++;
+            }
+            cur_frame_mutex.unlock();
+        }
         return num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM]
                                         [symbol_id]
             == num_demul_tasks_required;

@@ -201,8 +201,22 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(int tid, int& prev_frame_id)
             = (frame_id % SOCKET_BUFFER_FRAME_NUM) * cfg->symbol_num_perframe
             + symbol_id;
 
+        // if (ant_id == 0 && frame_id == 0 && symbol_id == 1) {
+        //     printf("rx_offset = %u, PacketRX: (%x %x)\n", rx_offset,
+        //         pkt->data[0], pkt->data[1]);
+        // }
+
         auto* dst = (Packet*)&rx_buffer[rx_offset * cfg->packet_length];
         DpdkTransport::fastMemcpy((char*)dst, payload, cfg->packet_length);
+
+        // if (ant_id == 0 && frame_id == 0 && symbol_id == 1) {
+        //     printf("PacketRX: (%x %x)\n",
+        //         *(reinterpret_cast<short*>(
+        //             &rx_buffer[cfg->packet_length + Packet::kOffsetOfData])),
+        //         *(reinterpret_cast<short*>(&rx_buffer[cfg->packet_length
+        //             + Packet::kOffsetOfData + 2])));
+        // }
+
         // rte_memcpy((char*)pkt, payload, c->packet_length);
         rte_pktmbuf_free(rx_bufs[i]);
 
@@ -218,7 +232,7 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(int tid, int& prev_frame_id)
 
         // Update shared states
         // (Could add an if statement)
-        {
+        if (cfg->disable_master) {
             if (!rx_status_->add_new_packet(frame_id, symbol_id)) {
                 cfg->running = false;
             }

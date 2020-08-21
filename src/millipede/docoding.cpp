@@ -232,7 +232,8 @@ void DoDecode::start_work()
                 if (cur_symbol
                     == cfg->ul_data_symbol_num_perframe
                         + cfg->pilot_symbol_num_perframe) {
-                    cur_symbol = 0;
+                    cur_symbol = cfg->pilot_symbol_num_perframe;
+                    rx_status_->decode_done(cur_frame);
                     cur_frame++;
                 }
             }
