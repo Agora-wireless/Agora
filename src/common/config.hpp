@@ -252,7 +252,7 @@ public:
                    * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }
-  
+
     /// Return the frame duration in seconds
     inline double get_frame_duration_sec()
     {
@@ -311,7 +311,6 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    
     /// Get the soft demodulation buffer for this frame, symbol,
     /// user and subcarrier ID
     inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
