@@ -81,9 +81,22 @@ void MacThread::process_snr_report_from_master(Event_data event)
     server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
 }
 
-void MacThread::send_ran_config_update(Event_data event, RanConfig rc)
+void MacThread::send_ran_config_update(Event_data event)
 {
     assert(event.event_type == EventType::kRANUpdate);
+
+    RanConfig rc;
+    if (next_frame_id_ % 10 == 0)
+        rc.mod_type = CommsLib::QAM64;
+    else
+        rc.mod_type = CommsLib::QAM16;
+
+    Event_data msg(EventType::kRANUpdate);
+    msg.num_tags = 2;
+    msg.tags[0] = rc.n_antennas;
+    msg.tags[1] = rc.mod_type;
+    rt_assert(tx_queue_->enqueue(msg),
+        "MAC thread: failed to send RAN update to Millipede");
 }
 
 void MacThread::process_codeblocks_from_master(Event_data event)
@@ -203,7 +216,7 @@ void MacThread::process_control_information()
     msg.tags[0] = ri->ue_id;
     msg.tags[1] = ri->mod_type;
     rt_assert(tx_queue_->enqueue(msg),
-        "MAC thread: fail to send control packet to PHY");
+        "MAC thread: failed to send control packet to PHY");
 }
 
 void MacThread::process_udp_packets_from_apps()
