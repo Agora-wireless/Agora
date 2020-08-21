@@ -107,10 +107,10 @@ int main(int argc, char* argv[])
 
     // Place modulated uplink data codewords into central IFFT bins
     rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
-    std::vector<std::vector<complex_float>> pre_ifft_symbols(
+    std::vector<std::vector<complex_float>> pre_ifft_data_syms(
         cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
-    for (size_t i = 0; i < pre_ifft_symbols.size(); i++) {
-        pre_ifft_symbols[i]
+    for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
+        pre_ifft_data_syms[i]
             = data_generator.get_pre_ifft_symbol(modulated_codewords[i]);
     }
 
@@ -157,16 +157,16 @@ int main(int argc, char* argv[])
 
     for (size_t i = cfg->pilot_symbol_num_perframe;
          i < cfg->symbol_num_perframe; i++) {
-        size_t data_symbol_id = (i - cfg->pilot_symbol_num_perframe);
+        const size_t data_sym_id = (i - cfg->pilot_symbol_num_perframe);
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
-            if (data_symbol_id < cfg->UL_PILOT_SYMS) {
+            if (data_sym_id < cfg->UL_PILOT_SYMS) {
                 memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM
                         + cfg->OFDM_DATA_START,
                     ue_specific_pilot[j],
                     cfg->OFDM_DATA_NUM * sizeof(complex_float));
             } else {
                 memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM,
-                    &pre_ifft_symbols[data_symbol_id * cfg->UE_ANT_NUM + j][0],
+                    &pre_ifft_data_syms[data_sym_id * cfg->UE_ANT_NUM + j][0],
                     cfg->OFDM_CA_NUM * sizeof(complex_float));
             }
         }

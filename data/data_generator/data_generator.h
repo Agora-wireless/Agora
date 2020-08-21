@@ -91,8 +91,6 @@ public:
             = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
 
         std::vector<complex_float> ret(cfg->OFDM_CA_NUM);
-        memset(&ret[0], 0, cfg->OFDM_CA_NUM * sizeof(complex_float));
-
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
             ret[i + cfg->OFDM_DATA_START]
                 = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
