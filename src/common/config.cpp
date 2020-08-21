@@ -37,7 +37,7 @@ Config::Config(std::string jsonfile)
                 BS_ANT_NUM = nAntennas;
         }
     } else
-        nRadios = tddConf.value("radio_num", BS_ANT_NUM);
+        nRadios = tddConf.value("radio_num", isUE ? UE_ANT_NUM : BS_ANT_NUM);
 
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
@@ -68,7 +68,7 @@ Config::Config(std::string jsonfile)
     ue_addr = tddConf.value("ue_addr", "127.0.0.1");
     tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
     bs_port = tddConf.value("bs_port", 8000);
-    bs_rru_port = tddConf.value("bs_rru_port", 8000);
+    bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
     ue_port = tddConf.value("ue_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
@@ -184,7 +184,7 @@ Config::Config(std::string jsonfile)
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
-    core_offset = tddConf.value("core_offset", 18);
+    core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     fft_thread_num = tddConf.value("fft_thread_num", 5);

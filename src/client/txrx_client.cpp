@@ -57,8 +57,9 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     tx_buffer_ = in_tx_buffer;
     tx_buffer_status_ = in_tx_buffer_status;
 
-    if (!radioconfig_->radioStart())
-        return false;
+    if (kUseArgos)
+        if (!radioconfig_->radioStart())
+            return false;
 
     for (int i = 0; i < thread_num_; i++) {
         pthread_t txrx_thread;
