@@ -402,7 +402,6 @@ void Millipede::start()
             } break;
 
             case EventType::kRANUpdate: {
-                printf("received RAN config update");
                 RanConfig rc;
                 rc.n_antennas = event.tags[0];
                 rc.mod_type = event.tags[1];
