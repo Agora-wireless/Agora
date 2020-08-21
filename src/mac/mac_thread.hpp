@@ -99,9 +99,10 @@ private:
     // Receive user data bits (downlink bits at the MAC thread running at the
     // server, uplink bits at the MAC thread running at the client) and forward
     // them to the PHY.
-    void process_udp_packets_from_apps();
-    void process_udp_packets_from_apps_server(const MacPacket* pkt);
-    void process_udp_packets_from_apps_client(const char* pkt);
+    void process_udp_packets_from_apps(RBIndicator ri);
+    void process_udp_packets_from_apps_server(
+        const MacPacket* pkt, RBIndicator ri);
+    void process_udp_packets_from_apps_client(const char* pkt, RBIndicator ri);
 
     // If Mode::kServer, this thread is running at the Millipede server. Else at
     // the client.
@@ -144,6 +145,12 @@ private:
 
     // The radio ID of the next MAC packet we'll hand over to the PHY
     size_t next_radio_id_ = 0;
+
+    // The timestamp at which we last scheduled a TTI (frame)
+    size_t last_frame_tx_tsc_ = 0;
+
+    // The frame ID of the next TTI that the scheduler plans for
+    size_t scheduler_next_frame_id_ = 0;
 
     FastRand fast_rand_;
 

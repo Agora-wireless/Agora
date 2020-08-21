@@ -86,17 +86,23 @@ void MacThread::send_ran_config_update(Event_data event)
     assert(event.event_type == EventType::kRANUpdate);
 
     RanConfig rc;
-    if (next_frame_id_ % 10 == 0)
+    if (scheduler_next_frame_id_ % 10 == 0)
         rc.mod_type = CommsLib::QAM64;
     else
         rc.mod_type = CommsLib::QAM16;
+    rc.frame_id = scheduler_next_frame_id_;
 
     Event_data msg(EventType::kRANUpdate);
-    msg.num_tags = 2;
+    msg.num_tags = 3;
     msg.tags[0] = rc.n_antennas;
     msg.tags[1] = rc.mod_type;
+    msg.tags[2] = rc.frame_id;
+    printf("MAC thread: prepared RAN config update for frame %zu, mod %zu\n",
+        scheduler_next_frame_id_, rc.mod_type);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: failed to send RAN update to Millipede");
+
+    scheduler_next_frame_id_++;
 }
 
 void MacThread::process_codeblocks_from_master(Event_data event)
@@ -215,15 +221,17 @@ void MacThread::process_control_information()
     rt_assert(static_cast<size_t>(ret) == sizeof(RBIndicator));
 
     const auto* ri = reinterpret_cast<RBIndicator*>(&udp_control_buf_[0]);
-    Event_data msg(EventType::kRBIndicator);
-    msg.num_tags = 2;
-    msg.tags[0] = ri->ue_id;
-    msg.tags[1] = ri->mod_type;
-    rt_assert(tx_queue_->enqueue(msg),
-        "MAC thread: failed to send control packet to PHY");
+    process_udp_packets_from_apps(*ri);
+
+    //Event_data msg(EventType::kRBIndicator);
+    //msg.num_tags = 2;
+    //msg.tags[0] = ri->ue_id;
+    //msg.tags[1] = ri->mod_type;
+    //rt_assert(tx_queue_->enqueue(msg),
+    //    "MAC thread: failed to send control packet to PHY");
 }
 
-void MacThread::process_udp_packets_from_apps()
+void MacThread::process_udp_packets_from_apps(RBIndicator ri)
 {
     memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
     ssize_t ret
@@ -238,11 +246,13 @@ void MacThread::process_udp_packets_from_apps()
     rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe);
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-    mode_ == Mode::kServer ? process_udp_packets_from_apps_server(pkt)
-                           : process_udp_packets_from_apps_client((char*)pkt);
+    mode_ == Mode::kServer
+        ? process_udp_packets_from_apps_server(pkt, ri)
+        : process_udp_packets_from_apps_client((char*)pkt, ri);
 }
 
-void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
+void MacThread::process_udp_packets_from_apps_server(
+    const MacPacket* pkt, RBIndicator ri)
 {
     // We've received bits for the downlink
     const size_t total_symbol_idx
@@ -269,7 +279,8 @@ void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
         "MAC thread: Failed to enqueue downlink packet");
 }
 
-void MacThread::process_udp_packets_from_apps_client(const char* payload)
+void MacThread::process_udp_packets_from_apps_client(
+    const char* payload, RBIndicator ri)
 {
     // We've received bits for the uplink. The received MAC packet does not
     // specify a radio ID, send to radios in round-robin order
@@ -309,6 +320,7 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
         pkt->rsvd[1] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->rsvd[2] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->crc = 0;
+        pkt->rb_indicator = ri;
 
         memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
             cfg_->mac_payload_length);
@@ -339,10 +351,14 @@ void MacThread::run_event_loop()
 
     while (cfg_->running) {
         process_rx_from_master();
-        if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
-            process_udp_packets_from_apps();
-            handle_control_information();
-            last_mac_pkt_rx_tsc_ = rdtsc();
+
+        if (mode_ == Mode::kServer) {
+            if (rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
+                send_control_information();
+                last_frame_tx_tsc_ = rdtsc();
+            }
+        } else {
+            process_control_information();
         }
 
         if (next_frame_id_ == cfg_->frames_to_test) {

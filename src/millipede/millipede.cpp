@@ -405,6 +405,7 @@ void Millipede::start()
                 RanConfig rc;
                 rc.n_antennas = event.tags[0];
                 rc.mod_type = event.tags[1];
+                rc.frame_id = event.tags[2];
                 update_ran_config(rc);
             } break;
 
@@ -779,7 +780,8 @@ void Millipede::create_threads(
 void Millipede::update_ran_config(RanConfig rc)
 {
     config_->mod_type = rc.mod_type;
-    printf("Main thread: changing modulation type to %zu\n", config_->mod_type);
+    printf("Main thread: frame %zu, changing modulation type to %zu\n",
+        rc.frame_id, config_->mod_type);
 }
 
 void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)

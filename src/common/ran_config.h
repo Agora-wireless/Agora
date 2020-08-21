@@ -13,6 +13,7 @@ class RanConfig {
 public:
     size_t n_antennas; /// Number of active antennas at the base station
     size_t mod_type; /// modulation type
+    size_t frame_id; /// frame ID
 };
 
 /**
