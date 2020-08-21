@@ -188,11 +188,15 @@ void MacThread::handle_control_information()
 
 void MacThread::send_control_information()
 {
+    // send RAN control information UE
     RBIndicator ri;
     ri.ue_id = next_radio_id_;
     ri.mod_type = CommsLib::QAM64;
     udp_client->send(kClientHostname, kBaseClientPort + ri.ue_id, (uint8_t*)&ri,
         sizeof(RBIndicator));
+
+    // update RAN config within Millipede
+    send_ran_config_update(Event_data(EventType::kRANUpdate));
 }
 
 void MacThread::process_control_information()
