@@ -9,9 +9,9 @@
  "symbol_size" : 1,
  "ofdm_ca_num" : 512,
  "ofdm_data_num" : 304,
- "prefix" : 160,
- "postfix" : 160,
- "dl_prefix" : 240,
+ "ofdm_tx_zero_prefix" : 160,
+ "ofdm_tx_zero_postfix" : 160,
+ "ofdm_rx_zero_prefix_client" : 240,
  "cp_len" : 32,
  "frames" : [
      "BGGGGGPGGGDDDG"
