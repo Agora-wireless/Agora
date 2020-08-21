@@ -39,7 +39,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
 
-    const size_t udp_control_len = sizeof(ControlPacket);
+    const size_t udp_control_len = sizeof(RBIndicator);
     udp_control_buf_.resize(udp_control_len);
 
     udp_server
@@ -175,11 +175,11 @@ void MacThread::handle_control_information()
 
 void MacThread::send_control_information()
 {
-    ControlPacket ci;
-    ci.ue_id = next_radio_id_;
-    ci.mod_type = CommsLib::QAM64;
-    udp_client->send(kClientHostname, kBaseClientPort + ci.ue_id, (uint8_t*)&ci,
-        sizeof(ControlPacket));
+    RBIndicator ri;
+    ri.ue_id = next_radio_id_;
+    ri.mod_type = CommsLib::QAM64;
+    udp_client->send(kClientHostname, kBaseClientPort + ri.ue_id, (uint8_t*)&ri,
+        sizeof(RBIndicator));
 }
 
 void MacThread::process_control_information()
@@ -195,15 +195,15 @@ void MacThread::process_control_information()
         return;
     }
 
-    rt_assert(static_cast<size_t>(ret) == sizeof(ControlPacket));
+    rt_assert(static_cast<size_t>(ret) == sizeof(RBIndicator));
 
-    const auto* ci = reinterpret_cast<ControlPacket*>(&udp_control_buf_[0]);
-    Event_data msg(EventType::kControlPacket);
+    const auto* ri = reinterpret_cast<RBIndicator*>(&udp_control_buf_[0]);
+    Event_data msg(EventType::kRBIndicator);
     msg.num_tags = 2;
-    msg.tags[0] = ci->ue_id;
-    msg.tags[1] = ci->mod_type;
-    printf("MAC thread: received control packet for ue %zu, mod %zu", ci->ue_id,
-        ci->mod_type);
+    msg.tags[0] = ri->ue_id;
+    msg.tags[1] = ri->mod_type;
+    printf("MAC thread: received control packet for ue %zu, mod %zu", ri->ue_id,
+        ri->mod_type);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: fail to send control packet to PHY");
 }

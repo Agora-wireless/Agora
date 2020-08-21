@@ -365,13 +365,13 @@ void Phy_UE::start()
 
             } break;
 
-            case EventType::kControlPacket: {
-                ControlPacket ci;
-                ci.ue_id = event.tags[0];
-                ci.mod_type = event.tags[1];
+            case EventType::kRBIndicator: {
+                RBIndicator ri;
+                ri.ue_id = event.tags[0];
+                ri.mod_type = event.tags[1];
                 printf(
                     "Main thread: received control packet for ue %zu, mod %zu",
-                    ci.ue_id, ci.mod_type);
+                    ri.ue_id, ri.mod_type);
                 // TODO: clock PHY sender appropriately
             } break;
 
