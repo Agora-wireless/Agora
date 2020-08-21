@@ -40,7 +40,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     udp_pkt_buf_.resize(udp_pkt_len);
 
     const size_t udp_control_len = sizeof(ControlPacket);
-    udp_control_buf_.resize(sizeof(udp_control_len));
+    udp_control_buf_.resize(udp_control_len);
 
     udp_server
         = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
