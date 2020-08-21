@@ -49,7 +49,7 @@ public:
 
     // UE #i runs a UDP server, at kBaseClientPort + i, to receive control
     // information messages from the base station
-    static constexpr size_t kBaseClientPort = 8090;
+    static constexpr size_t kBaseClientPort = 7070;
 
     // Maximum number of outstanding UDP packets per UE that we allocate recv()
     // buffer space for
@@ -120,6 +120,8 @@ private:
 
     UDPClient* udp_client; // UDP endpoint used for sending messages
     UDPServer* udp_server; // UDP endpoint used for receiving messages
+    UDPServer*
+        udp_control_channel; // UDP endpoint for receiving control channel messages
 
     Table<uint8_t>* ul_bits_buffer_;
     Table<uint8_t>* ul_bits_buffer_status_;

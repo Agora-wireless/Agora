@@ -44,6 +44,8 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
 
     udp_server
         = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_control_channel = new UDPServer(
+        kBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
     udp_client = new UDPClient();
 
     crc_obj = new DoCRC();
@@ -183,7 +185,7 @@ void MacThread::send_control_information()
 void MacThread::process_control_information()
 {
     memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
-    ssize_t ret = udp_server->recv_nonblocking(
+    ssize_t ret = udp_control_channel->recv_nonblocking(
         &udp_control_buf_[0], udp_control_buf_.size());
     if (ret == 0) {
         return; // No data received
