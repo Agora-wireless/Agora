@@ -454,7 +454,7 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     refRefDev->setFrequency(SOAPY_SDR_RX, channel, "RF", centerRfFreq);
     refRefDev->setFrequency(SOAPY_SDR_RX, channel, "BB",
         -toneBBFreq); // Should this be nagative if we need
-        // centerRfFreq-toneBBFreq at true center?
+    // centerRfFreq-toneBBFreq at true center?
     refDev->setFrequency(SOAPY_SDR_TX, channel, "RF", centerRfFreq);
     refDev->setFrequency(SOAPY_SDR_TX, channel, "BB", txToneBBFreq);
     refDev->writeSetting(
@@ -481,7 +481,7 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     // refDev->setFrequency(SOAPY_SDR_RX, channel, "RF", centerRfFreq);
     refDev->setFrequency(SOAPY_SDR_RX, channel, "BB",
         -toneBBFreq); // Should this be nagative if we need
-        // centerRfFreq-toneBBFreq at true center?
+    // centerRfFreq-toneBBFreq at true center?
     for (size_t r = 0; r < radioSize - 1; r++) {
         allButRefDevs[r]->setFrequency(
             SOAPY_SDR_TX, channel, "RF", centerRfFreq);

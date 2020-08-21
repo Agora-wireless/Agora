@@ -224,7 +224,6 @@ private:
     // processed (i.e., including radio transmissing) by the PHY for UE #i
     size_t num_frames_consumed_[kMaxUEs] = {};
 
-
     /*****************************************************
      * Uplink
      *****************************************************/

@@ -256,13 +256,16 @@ Config::Config(std::string jsonfile)
 
     running = true;
     std::cout << "Config: "
-              << "\n  BS_ANT_NUM: " << BS_ANT_NUM << "\n  UE_ANT_NUM: " << UE_ANT_NUM
+              << "\n  BS_ANT_NUM: " << BS_ANT_NUM
+              << "\n  UE_ANT_NUM: " << UE_ANT_NUM
               << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
-              << "\n  ul_data_symbol_num_perframe: " << ul_data_symbol_num_perframe
-              << "\n  dl_data_symbol_num_perframe: " << dl_data_symbol_num_perframe
-              << "\n  OFDM_CA_NUM " << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: "
-              << OFDM_DATA_NUM 
-              << "\n  mac_data_bytes_num_perframe: " << mac_data_bytes_num_perframe
+              << "\n  ul_data_symbol_num_perframe: "
+              << ul_data_symbol_num_perframe
+              << "\n  dl_data_symbol_num_perframe: "
+              << dl_data_symbol_num_perframe << "\n  OFDM_CA_NUM "
+              << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: " << OFDM_DATA_NUM
+              << "\n  mac_data_bytes_num_perframe: "
+              << mac_data_bytes_num_perframe
               << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
               << std::endl;
 
