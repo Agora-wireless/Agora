@@ -15,7 +15,7 @@
  "cp_len" : 32,
  "Zc" : 18,
  "frames" : [
-     "GGDDGGPGGGUUUG"
+     "GGDDGGPGGUUUUG"
  ],
  "hw_framer": false,
  "tx_advance" : 78,

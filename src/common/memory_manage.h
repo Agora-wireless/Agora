@@ -46,6 +46,21 @@ public:
             base[i] = distribution(generator);
         }
     }
+
+    // Allocate the table and fill it with random complex floating point values
+    // between -1.0 and 1.0
+    void rand_alloc_cx_float(size_t dim1, size_t dim2, size_t aligned_bytes)
+    {
+        std::default_random_engine generator;
+        std::uniform_real_distribution<float> distribution(-1.0, 1.0);
+
+        malloc(dim1, dim2, aligned_bytes);
+        auto* base = reinterpret_cast<float*>(data);
+        for (size_t i = 0; i < dim1 * dim2 * 2; i++) {
+            base[i] = distribution(generator);
+        }
+    }
+
     void free(void)
     {
         std::free(data);
