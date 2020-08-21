@@ -81,6 +81,9 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
+    // Update Millipede config of RAN parameters
+    void update_ran_config(RanConfig rc);
+
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(

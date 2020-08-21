@@ -86,7 +86,7 @@ private:
     void process_snr_report_from_master(Event_data event);
 
     // Push RAN config update to PHY master thread.
-    void send_ran_config_update(Event_data event, RanConfig rc);
+    void send_ran_config_update(Event_data event);
 
     // Send control information over (out-of-band) control channel
     // from BS to UE; and process control information received from control

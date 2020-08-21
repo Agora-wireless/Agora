@@ -403,7 +403,10 @@ void Millipede::start()
 
             case EventType::kRANUpdate: {
                 printf("received RAN config update");
-                // TODO: update RAN config
+                RanConfig rc;
+                rc.n_antennas = event.tags[0];
+                rc.mod_type = event.tags[1];
+                update_ran_config(rc);
             } break;
 
             case EventType::kPacketToMac: {
@@ -772,6 +775,12 @@ void Millipede::create_threads(
             exit(0);
         }
     }
+}
+
+void Millipede::update_ran_config(RanConfig rc)
+{
+    config_->mod_type = rc.mod_type;
+    printf("Main thread: changing modulation type to %zu\n", config_->mod_type);
 }
 
 void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
