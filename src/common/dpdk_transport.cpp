@@ -301,14 +301,9 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
     std::string core_list = std::to_string(core_offset) + "-"
         + std::to_string(core_offset + thread_num);
     // n: channels, m: maximum memory in megabytes
-    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
+    const char* rte_argv[]
+        = { "txrx", "-l", core_list.c_str(), "--log-level", "0", nullptr };
     int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
-
-    printf("rte_eal_init argv: ");
-    for (int i = 0; i < rte_argc; i++) {
-        printf("%s, ", rte_argv[i]);
-    }
-    printf("\n");
 
     // Initialize DPDK environment
     int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
