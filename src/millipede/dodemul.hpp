@@ -34,7 +34,8 @@ public:
         Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
-        PhyStats* in_phy_stats, Stats* in_stats_manager);
+        PhyStats* in_phy_stats, Stats* in_stats_manager,
+        Table<char>* socket_buffer_);
     ~DoDemul();
 
     /**
@@ -64,6 +65,7 @@ public:
      * completion of this task
      */
     Event_data launch(size_t tag);
+    void independent_launch(size_t tag);
 
 private:
     Table<complex_float>& data_buffer_;
@@ -71,6 +73,7 @@ private:
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     Table<int8_t>& demod_soft_buffer_;
+    Table<char>* socket_buffer_;
     DurationStat* duration_stat;
     PhyStats* phy_stats;
 

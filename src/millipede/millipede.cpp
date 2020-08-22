@@ -223,13 +223,6 @@ void Millipede::start()
         return;
     }
 
-    if (cfg->disable_master) {
-        while (cfg->running && !SignalHandler::gotExitSignal()) {
-            sleep(3);
-        }
-        return;
-    }
-
     // Millipede processes a frame after processing for previous frames is
     // complete. cur_frame_id is the frame that is currently being processed.
     size_t cur_frame_id = 0;
@@ -245,6 +238,17 @@ void Millipede::start()
             * (cfg->socket_thread_num + cfg->mac_socket_thread_num),
         kDequeueBulkSizeWorker * cfg->worker_thread_num);
     Event_data events_list[max_events_needed];
+
+    if (cfg->disable_master) {
+        while (cfg->running && !SignalHandler::gotExitSignal()) {
+            if (rx_status_.cur_frame == cfg->frames_to_test) {
+                cfg->running = false;
+                goto finish;
+            }
+            sleep(1);
+        }
+        return;
+    }
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         /* Get a batch of events */
@@ -620,10 +624,19 @@ finish:
     stats->print_summary();
     stats->save_to_file();
     if (flags.enable_save_decode_data_to_file) {
-        save_decode_data_to_file(stats->last_frame_id);
+        if (!cfg->disable_master) {
+            save_decode_data_to_file(stats->last_frame_id);
+        } else {
+            save_decode_data_to_file(0);
+        }
     }
-    if (flags.enable_save_tx_data_to_file)
-        save_tx_data_to_file(stats->last_frame_id);
+    if (flags.enable_save_tx_data_to_file) {
+        if (!cfg->disable_master) {
+            save_tx_data_to_file(stats->last_frame_id);
+        } else {
+            save_tx_data_to_file(0);
+        }
+    }
 
     // Calculate and print per-user BER
     if (!kEnableMac && kPrintPhyStats) {
@@ -1087,10 +1100,10 @@ void Millipede::print_per_symbol_done(
             frame_id, symbol_id, fft_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kFFTData):
-        printf(
-            "Main thread: data FFT done frame %zu, symbol %zu, precoder "
-            "status: %d, fft queue: %zu, zf queue: %zu, demul queue: %zu, in "
-            "%.2f\n",
+        printf("Main thread: data FFT done frame %zu, symbol %zu, precoder "
+               "status: %d, fft queue: %zu, zf queue: %zu, demul queue: "
+               "%zu, in "
+               "%.2f\n",
             frame_id, symbol_id, zf_stats_.coded_frame == frame_id,
             get_conq(EventType::kFFT)->size_approx(),
             get_conq(EventType::kZF)->size_approx(),
@@ -1396,6 +1409,7 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
         int total_data_symbol_id = (frame_id % TASK_BUFFER_FRAME_NUM)
                 * cfg->ul_data_symbol_num_perframe
             + i;
+        // printf("Print data idx %lu\n", total_data_symbol_id);
         uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
         for (size_t j = 0; j < cfg->UE_NUM; j++)
             fwrite(ptr + j * num_decoded_bytes_pad, num_decoded_bytes,

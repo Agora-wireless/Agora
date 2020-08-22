@@ -173,6 +173,22 @@ Event_data DoDecode::launch(size_t tag)
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
+    // if (symbol_id == cfg->pilot_symbol_num_perframe) {
+    //     uint8_t* ptr = decoded_buffer_[0];
+    //     size_t num_decoded_bytes = (cfg->LDPC_config.cbLen + 7)
+    //         >> 3 * cfg->LDPC_config.nblocksInSymbol;
+    //     size_t num_decoded_bytes_pad
+    //         = (((cfg->LDPC_config.cbLen + 7) >> 3) + 63) / 64 * 64
+    //         * cfg->LDPC_config.nblocksInSymbol;
+    //     for (size_t j = 0; j < cfg->UE_NUM; j++) {
+    //         printf("Data UE %u: ", j);
+    //         for (size_t t = 0; t < num_decoded_bytes; t++) {
+    //             printf("%x ", ptr[j * num_decoded_bytes_pad + t]);
+    //         }
+    //         printf("\n");
+    //     }
+    // }
+
     if (kPrintLLRData) {
         printf("LLR data, symbol_offset: %zu\n", symbol_offset);
         for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
@@ -222,7 +238,8 @@ void DoDecode::start_work()
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb > 0
             || demul_status_->ready_to_decode(cur_frame, cur_symbol)) {
-            launch(gen_tag_t::frm_sym_cb(cur_frame, cur_symbol,
+            launch(gen_tag_t::frm_sym_cb(cur_frame,
+                cur_symbol - cfg->pilot_symbol_num_perframe,
                 cur_cb + tid * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             cur_cb++;

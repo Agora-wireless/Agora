@@ -96,6 +96,18 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     size_t num_subcarriers
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
 
+    // if (frame_id == 0 && base_sc_id == 0) {
+    //     complex_float* mtx = csi_buffer_[0];
+    //     printf("CSI gather buf is:\n");
+    //     for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+    //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+    //             printf("(%f %f) ", mtx[i * cfg->BS_ANT_NUM + j].re,
+    //                 mtx[i * cfg->BS_ANT_NUM + j].im);
+    //         }
+    //         printf("\n");
+    //     }
+    // }
+
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
         size_t start_tsc1 = worker_rdtsc();
@@ -163,6 +175,18 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+
+        // if (frame_id == 0 && cur_sc_id == 0) {
+        //     complex_float* mtx = csi_gather_buffer;
+        //     printf("CSI gather buf is:\n");
+        //     for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+        //             printf("(%f %f) ", mtx[i * cfg->BS_ANT_NUM + j].re,
+        //                 mtx[i * cfg->BS_ANT_NUM + j].im);
+        //         }
+        //         printf("\n");
+        //     }
+        // }
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
         compute_precoder(mat_csi,
@@ -182,6 +206,19 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
     }
+
+    // if (frame_id == 0 && base_sc_id == 0) {
+    //     complex_float* mtx
+    //         = cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, base_sc_id);
+    //     printf("ZF Matx is:\n");
+    //     for (size_t i = 0; i < cfg->UE_NUM; i++) {
+    //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+    //             printf("(%f %f) ", mtx[i * cfg->BS_ANT_NUM + j].re,
+    //                 mtx[i * cfg->BS_ANT_NUM + j].im);
+    //         }
+    //         printf("\n");
+    //     }
+    // }
 }
 
 void DoZF::ZF_freq_orthogonal(size_t tag)

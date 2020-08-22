@@ -122,7 +122,7 @@ public:
         computeDemul_ = new DoDemul(this->cfg, tid, freq_ghz, this->task_queue_,
             this->complete_task_queue, this->worker_producer_token,
             data_buffer_, ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats);
+            demod_soft_buffer_, phy_stats, stats, &socket_buffer_);
 
         computePrecode_
             = new DoPrecode(this->cfg, tid, freq_ghz, this->task_queue_,
@@ -236,11 +236,19 @@ public:
                 //         subcarrier_range_.start
                 //             + num_demul_task_completed * cfg->demul_block_size);
                 // }
-                computeDemul_->launch(gen_tag_t::frm_sym_sc(demul_cur_frame,
-                    demul_cur_symbol_to_process,
-                    subcarrier_range_.start
-                        + num_demul_task_completed * cfg->demul_block_size)
-                                          ._tag);
+                // computeDemul_->launch(gen_tag_t::frm_sym_sc(demul_cur_frame,
+                //     demul_cur_symbol_to_process
+                //         - cfg->pilot_symbol_num_perframe,
+                //     subcarrier_range_.start
+                //         + num_demul_task_completed * cfg->demul_block_size)
+                //                           ._tag);
+                computeDemul_->independent_launch(
+                    gen_tag_t::frm_sym_sc(demul_cur_frame,
+                        demul_cur_symbol_to_process
+                            - cfg->pilot_symbol_num_perframe,
+                        subcarrier_range_.start
+                            + num_demul_task_completed * cfg->demul_block_size)
+                        ._tag);
                 num_demul_task_completed++;
                 if (num_demul_task_completed == num_demul_task_required) {
                     num_demul_task_completed = 0;
@@ -345,20 +353,23 @@ private:
 
                         simd_convert_float16_to_float32(
                             reinterpret_cast<float*>(converted_sc),
-                            reinterpret_cast<float*>(pkt->data + sc_idx * 2),
+                            reinterpret_cast<float*>(pkt->data
+                                + (sc_idx + cfg->OFDM_DATA_START) * 2),
                             kSCsPerCacheline * 2);
 
-                        // for (size_t t = 0; t < kSCsPerCacheline; t++) {
-                        //     printf("(%f %f) ", converted_sc[t].re,
-                        //         converted_sc[t].im);
+                        // if (i == 0 && j == 0) {
+                        //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
+                        //         printf("(%f %f) ", converted_sc[t].re,
+                        //             converted_sc[t].im);
+                        //     }
+                        //     printf("\n");
+                        //     // exit(0);
                         // }
-                        // printf("\n");
-                        // exit(0);
 
                         const complex_float* src
                             = converted_sc; // TODO: find src pointer from pkt
 
-                        // if (j == 0 && i == 1 && sc_idx == 0) {
+                        // if (j == 0 && i == 0 && sc_idx == 0) {
                         //     printf("src data: (%f %f)\n", src[0].re, src[0].im);
                         // }
 
@@ -427,6 +438,13 @@ private:
                         _mm256_stream_ps(
                             reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
+                        // if (i == 0 && j == 0) {
+                        //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
+                        //         printf("(%f %f) ", dst[t].re, dst[t].im);
+                        //     }
+                        //     printf("\n");
+                        //     exit(0);
+                        // }
                     }
                 }
             }

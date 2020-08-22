@@ -8,10 +8,11 @@
 
 #include "txrx.hpp"
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status)
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
+    , rx_status_(rx_status)
 {
     if (!kUseArgos) {
         socket_.resize(cfg->nRadios);
@@ -109,8 +110,13 @@ void* PacketTXRX::loop_tx_rx(int tid)
     int prev_frame_id = -1;
     int radio_id = radio_lo;
     while (cfg->running) {
-        if (-1 != dequeue_send(tid))
-            continue;
+        if (cfg->disable_master) {
+            if (-1 != poll_send(tid))
+                continue;
+        } else {
+            if (-1 != dequeue_send(tid))
+                continue;
+        }
         // receive data
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
@@ -133,39 +139,67 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
 struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 {
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    char* rx_buffer = (*buffer_)[tid];
-    int* rx_buffer_status = (*buffer_status_)[tid];
-    int packet_length = cfg->packet_length;
+    // moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
+    moodycamel::ProducerToken* local_ptok = nullptr;
+    if (!cfg->disable_master) {
+        local_ptok = rx_ptoks_[tid];
+    }
+    // char* rx_buffer = (*buffer_)[tid];
+    // int* rx_buffer_status = (*buffer_status_)[tid];
+    // int packet_length = cfg->packet_length;
 
     // if rx_buffer is full, exit
-    if (rx_buffer_status[rx_offset] == 1) {
-        printf(
-            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-        cfg->running = false;
-        return (NULL);
-    }
-    struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
-    if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
+    // if (rx_buffer_status[rx_offset] == 1) {
+    //     printf(
+    //         "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+    //     cfg->running = false;
+    //     return (NULL);
+    // }
+    char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
+    // struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
+    auto* pkt = reinterpret_cast<Packet*>(buf);
+    if (-1 == recv(socket_[radio_id], (char*)pkt, cfg->packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {
             perror("recv failed");
             exit(0);
         }
+        free(buf);
         return (NULL);
     }
 
+    char* rx_buffer = (*buffer_)[pkt->ant_id];
+    int* rx_buffer_status = (*buffer_status_)[pkt->ant_id];
+    int packet_length = cfg->packet_length;
+    size_t frame_id = pkt->frame_id;
+    size_t symbol_id = pkt->symbol_id;
+    size_t rx_offset_
+        = (frame_id % SOCKET_BUFFER_FRAME_NUM) * cfg->symbol_num_perframe
+        + symbol_id;
+
+    memcpy(&rx_buffer[rx_offset_ * packet_length], buf, packet_length);
+    free(buf);
+
     // get the position in rx_buffer
     // move ptr & set status to full
-    rx_buffer_status[rx_offset] = 1;
+    // rx_buffer_status[rx_offset] = 1;
 
-    // Push kPacketRX event into the queue.
-    Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
-    if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
+    if (cfg->disable_master) {
+        if (!rx_status_->add_new_packet(frame_id, symbol_id)) {
+            cfg->running = false;
+        }
+    } else {
+        // Push kPacketRX event into the queue.
+        Event_data rx_message(
+            EventType::kPacketRX, rx_tag_t(tid, rx_offset_)._tag);
+        if (!message_queue_->enqueue(*local_ptok, rx_message)) {
+            printf("socket message enqueue failed\n");
+            exit(0);
+        }
     }
     return pkt;
 }
+
+int PacketTXRX::poll_send(int tid) { return -1; }
 
 int PacketTXRX::dequeue_send(int tid)
 {
