@@ -1,6 +1,8 @@
 #include "phy-ue.hpp"
 #include "utils_ldpc.hpp"
 
+static constexpr bool kDebugPrintPacketsFromMac = false;
+
 Phy_UE::Phy_UE(Config* config)
 {
     srand(time(NULL));
@@ -33,8 +35,6 @@ Phy_UE::Phy_UE(Config* config)
         TASK_BUFFER_FRAME_NUM * dl_data_symbol_perframe * antenna_num * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * symbol_perframe * antenna_num * 36);
-    map_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        TASK_BUFFER_FRAME_NUM * nUEs * 36);
     encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * nUEs * 36);
     modul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
@@ -69,7 +69,7 @@ Phy_UE::Phy_UE(Config* config)
         mac_thread_ = new MacThread(MacThread::Mode::kClient, config_,
             mac_cpu_core, &ul_bits_buffer_, &ul_bits_buffer_status_,
             nullptr /* dl bits buffer */, nullptr /* dl bits buffer status */,
-            &message_queue_, &to_mac_queue_);
+            &to_mac_queue_, &message_queue_);
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
@@ -83,7 +83,8 @@ Phy_UE::Phy_UE(Config* config)
     // initialize ul data buffer
     // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
     // ul_data_symbol_perframe);
-    ul_bits_buffer_size_ = TASK_BUFFER_FRAME_NUM * config_->mac_packet_length;
+    ul_bits_buffer_size_
+        = TASK_BUFFER_FRAME_NUM * config_->mac_bytes_num_perframe;
     ul_bits_buffer_.malloc(antenna_num, ul_bits_buffer_size_, 64);
     ul_bits_buffer_status_.calloc(antenna_num, TASK_BUFFER_FRAME_NUM, 64);
     ul_syms_buffer_size_
@@ -238,7 +239,6 @@ void Phy_UE::start()
     moodycamel::ProducerToken ptok_modul(modul_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
-    moodycamel::ProducerToken ptok_map(map_queue_);
     moodycamel::ProducerToken ptok_encode(encode_queue_);
 
     // for message_queue, main thread is a consumer, it is multiple producers
@@ -337,21 +337,32 @@ void Phy_UE::start()
             case EventType::kPacketFromMac: {
                 // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = rx_tag_t(event.tags[0]).tid;
-                size_t offset_in_current_buffer
-                    = rx_tag_t(event.tags[0]).offset;
+                size_t radio_buf_id = rx_tag_t(event.tags[0]).offset;
+                rt_assert(radio_buf_id
+                    == expected_frame_id_from_mac_ % TASK_BUFFER_FRAME_NUM);
 
-                ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
-                // if (kDebugPrintPerFrameDone)
-                //     printf("Main thread: frame: %zu, finished mapping "
-                //            "uplink data for user %zu\n",
-                //         frame_id, ue_id);
-            } break;
+                MacPacket* pkt = reinterpret_cast<MacPacket*>(
+                    &ul_bits_buffer_[ue_id][radio_buf_id
+                        * config_->mac_bytes_num_perframe]);
+                rt_assert(pkt->frame_id == expected_frame_id_from_mac_,
+                    "Incorrect frame ID from MAC");
+                current_frame_user_num_
+                    = (current_frame_user_num_ + 1) % config_->UE_ANT_NUM;
+                if (current_frame_user_num_ == 0)
+                    expected_frame_id_from_mac_++;
 
-            case EventType::kMapBits: {
-                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                if (kDebugPrintPerFrameDone)
-                    printf("Main thread: MAC data ready for frame: %zu \n",
-                        frame_id);
+                if (kDebugPrintPacketsFromMac) {
+                    std::stringstream ss;
+                    ss << "PhyUE kPacketFromMac, frame ID " << pkt->frame_id
+                       << ", bytes: ";
+                    for (size_t i = 0; i < 4; i++) {
+                        ss << std::to_string(
+                                  (reinterpret_cast<uint8_t*>(pkt->data)[i]))
+                           << ", ";
+                    }
+                    printf("%s\n", ss.str().c_str());
+                }
+
             } break;
 
             case EventType::kEncode: {
@@ -436,10 +447,20 @@ void Phy_UE::start()
 
             case EventType::kPacketTX: {
                 cur_frame_id++;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+
+                rt_assert(frame_id == num_frames_consumed_[ue_id]);
+
+                // printf("PhyUE kPacketTX: Freeing buffer %zu for UE %zu\n",
+                //    num_frames_consumed_[ue_id] % TASK_BUFFER_FRAME_NUM, ue_id);
+                ul_bits_buffer_status_[ue_id][num_frames_consumed_[ue_id]
+                    % TASK_BUFFER_FRAME_NUM]
+                    = 0;
+                num_frames_consumed_[ue_id]++;
+
                 if (kDebugPrintPerSymbolDone) {
-                    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-                    size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
                     printf("Main thread: finished TX for frame %zu, symbol "
                            "%zu, user %zu\n",
                         frame_id, symbol_id, ue_id);
@@ -482,8 +503,6 @@ void Phy_UE::taskThread(int tid)
             doIFFT(tid, event.tags[0]);
         if (modul_queue_.try_dequeue(event))
             doModul(tid, event.tags[0]);
-        if (map_queue_.try_dequeue(event))
-            doMapBits(tid, event.tags[0]);
         if (encode_queue_.try_dequeue(event))
             doEncode(tid, event.tags[0]);
         else if (fft_queue_.try_dequeue(event))
@@ -683,54 +702,6 @@ void Phy_UE::doDemul(int tid, size_t tag)
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
 
-void Phy_UE::doMapBits(int tid, size_t tag)
-{
-    size_t ue_id = rx_tag_t(tag).tid;
-    size_t offset_in_current_buffer = rx_tag_t(tag).offset;
-
-    struct MacPacket* pkt = (struct MacPacket*)(ul_bits_buffer_[ue_id]
-        + offset_in_current_buffer * config_->mac_packet_length);
-    size_t mac_frame_id = pkt->frame_id;
-    rt_assert((size_t)pkt->ue_id == ue_id,
-        "UE index in tag does not match that in received packet!");
-
-    size_t num_frames_per_mac_packet = config_->mac_data_bytes_num_perframe
-        / config_->data_bytes_num_perframe;
-    for (size_t i = 0; i < num_frames_per_mac_packet; i++) {
-        size_t frame_id = mac_frame_id * num_frames_per_mac_packet + i;
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
-             ul_symbol_id++) {
-            char* raw_bits_ptr = ((char*)pkt->data)
-                + config_->data_bytes_num_persymbol
-                    * (i * ul_data_symbol_perframe + ul_symbol_id);
-            size_t total_ul_symbol_id
-                = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
-            int8_t* bits_for_mod_ptr
-                = (int8_t*)&ul_syms_buffer_[ue_id]
-                                           [total_ul_symbol_id * data_sc_len];
-            adapt_bits_for_mod((int8_t*)raw_bits_ptr, bits_for_mod_ptr,
-                config_->data_bytes_num_persymbol, config_->mod_type);
-
-            // complex_float* modul_buf
-            //     = &modul_buffer_[total_ul_symbol_id][ue_id * data_sc_len];
-            // for (size_t sc = 0; sc < data_sc_len; sc++) {
-            //     modul_buf[sc] = mod_single_uint8(
-            //         (uint8_t)bits_for_mod_ptr[sc], qam_table);
-            // }
-        }
-        // Send a message to the master thread after one frame is done
-        Event_data map_event(EventType::kMapBits,
-            gen_tag_t::frm_sym_ue(frame_id, 0, ue_id)._tag);
-
-        if (!message_queue_.enqueue(*task_ptok[tid], map_event)) {
-            printf("Muliplexing message enqueue failed\n");
-            exit(0);
-        }
-    }
-    ul_bits_buffer_status_[ue_id][offset_in_current_buffer] = 0;
-}
-
 void Phy_UE::doEncode(int tid, size_t tag)
 {
     LDPCconfig LDPC_config = config_->LDPC_config;
@@ -760,13 +731,13 @@ void Phy_UE::doEncode(int tid, size_t tag)
              cb_id++) {
             int8_t* input_ptr;
             if (kEnableMac) {
-                struct MacPacket* pkt
-                    = (struct MacPacket*)(ul_bits_buffer_[ue_id]
-                        + frame_slot * config_->mac_packet_length);
+                uint8_t* ul_bits = ul_bits_buffer_[ue_id]
+                    + frame_slot * config_->mac_bytes_num_perframe;
+
                 int input_offset = bytes_per_block
                         * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
                     + bytes_per_block * cb_id;
-                input_ptr = (int8_t*)pkt->data + input_offset;
+                input_ptr = (int8_t*)ul_bits + input_offset;
             } else {
                 size_t cb_offset
                     = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)

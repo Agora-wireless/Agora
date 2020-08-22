@@ -194,6 +194,7 @@ set(COMMON_SOURCES
   src/common/signalHandler.cpp
   src/common/modulation.cpp
   src/common/net.cpp
+  src/common/crc.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)

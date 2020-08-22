@@ -43,7 +43,6 @@ enum class EventType : int {
     kZF,
     kDemul,
     kIFFT,
-    kMapBits,
     kPrecode,
     kPacketTX,
     kDecode,

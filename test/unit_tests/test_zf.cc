@@ -21,14 +21,14 @@ TEST(TestZF, Perf)
     auto ptok = new moodycamel::ProducerToken(comp_queue);
 
     Table<complex_float> csi_buffer, ul_zf_buffer, dl_zf_buffer, recip_buffer;
-    csi_buffer.rand_alloc_float(
+    csi_buffer.rand_alloc_cx_float(
         cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
-    ul_zf_buffer.rand_alloc_float(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    ul_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-    dl_zf_buffer.rand_alloc_float(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
+    dl_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
         cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
-    recip_buffer.rand_alloc_float(
+    recip_buffer.rand_alloc_cx_float(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);

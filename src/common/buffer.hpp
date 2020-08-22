@@ -245,22 +245,24 @@ struct Packet {
     }
 };
 
-// TODO: merge Packet and MacPacket into one struct
 struct MacPacket {
     // The packet's data starts at kOffsetOfData bytes from the start
-    static constexpr size_t kOffsetOfData = 64;
+    static constexpr size_t kOffsetOfData = 16;
 
-    uint32_t frame_id;
-    uint32_t symbol_id;
-    uint32_t cell_id;
-    uint32_t ue_id;
-    uint32_t fill[12]; // Padding for 64-byte alignment needed for SIMD
-    short data[]; // Elements sent by antennae are two bytes (I/Q samples)
-    MacPacket(int f, int s, int c, int a) // TODO: Should be unsigned integers
+    uint16_t frame_id;
+    uint16_t symbol_id;
+    uint16_t ue_id;
+    uint16_t datalen; // length of payload in bytes or array data[]
+    uint16_t crc; // 16 bits CRC over calculated for the data[] array
+    uint16_t rsvd[3]; // reserved for future use
+    char data[]; // Mac packet payload data
+    MacPacket(int f, int s, int u, int d,
+        int cc) // TODO: Should be unsigned integers
         : frame_id(f)
         , symbol_id(s)
-        , cell_id(c)
-        , ue_id(a)
+        , ue_id(u)
+        , datalen(d)
+        , crc(cc)
     {
     }
 
@@ -268,7 +270,7 @@ struct MacPacket {
     {
         std::ostringstream ret;
         ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
-            << ", cell ID " << cell_id << ", user ID " << ue_id << "]";
+            << ", user ID " << ue_id << "]";
         return ret.str();
     }
 };
