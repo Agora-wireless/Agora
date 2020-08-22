@@ -7,6 +7,8 @@
 #ifdef USE_DPDK
 
 #include "dpdk_transport.hpp"
+#include "buffer.hpp"
+#include "eth_common.h"
 #include "utils.h"
 #include <string>
 
@@ -129,6 +131,20 @@ void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
         _mm256_stream_si256(pDest, loaded);
     }
     _mm_sfence();
+}
+
+std::string DpdkTransport::pkt_to_string(const rte_mbuf* pkt)
+{
+    const uint8_t* buf = rte_pktmbuf_mtod(pkt, uint8_t*);
+
+    std::ostringstream ret;
+    ret << frame_header_to_string(buf) << " [ "
+        << std::to_string(kPayloadOffset - kInetHdrsTotSize)
+        << " unused bytes ] ";
+
+    auto* packet = reinterpret_cast<const Packet*>(buf + kPayloadOffset);
+    ret << packet->to_string();
+    return ret.str();
 }
 
 void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,

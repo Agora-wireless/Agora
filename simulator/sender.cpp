@@ -290,6 +290,8 @@ void* Sender::worker_thread(int tid)
         }
 
 #ifdef USE_DPDK
+        printf("Sending packet %s\n",
+            DpdkTransport::pkt_to_string(tx_mbuf).c_str());
         rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
