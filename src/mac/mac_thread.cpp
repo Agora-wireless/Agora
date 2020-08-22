@@ -336,14 +336,18 @@ void MacThread::run_event_loop()
     while (cfg_->running) {
         process_rx_from_master();
 
-        if (mode_ == Mode::kServer) {
-            if (rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
-                send_control_information();
-                last_frame_tx_tsc_ = rdtsc();
-            }
-        } else {
-            process_control_information();
+        if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
+            process_udp_packets_from_apps(RBIndicator());
+            last_mac_pkt_rx_tsc_ = rdtsc();
         }
+        //if (mode_ == Mode::kServer) {
+        //    if (rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
+        //        send_control_information();
+        //        last_frame_tx_tsc_ = rdtsc();
+        //    }
+        //} else {
+        //    process_control_information();
+        //}
 
         if (next_frame_id_ == cfg_->frames_to_test) {
             MLPD_WARN("MAC thread stopping. Next frame ID = %zu, configured "
