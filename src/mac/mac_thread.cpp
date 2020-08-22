@@ -86,10 +86,11 @@ void MacThread::send_ran_config_update(Event_data event)
     assert(event.event_type == EventType::kRANUpdate);
 
     RanConfig rc;
-    if (scheduler_next_frame_id_ % 10 == 0)
-        rc.mod_type = CommsLib::QAM64;
-    else
-        rc.mod_type = CommsLib::QAM16;
+    //if (scheduler_next_frame_id_ % 10 == 0)
+    //    rc.mod_type = CommsLib::QAM64;
+    //else
+    //    rc.mod_type = CommsLib::QAM16;
+    rc.mod_type = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
 
     Event_data msg(EventType::kRANUpdate);
@@ -186,18 +187,12 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         "Socket message enqueue failed\n");
 }
 
-void MacThread::handle_control_information()
-{
-    mode_ == Mode::kServer ? send_control_information()
-                           : process_control_information();
-}
-
 void MacThread::send_control_information()
 {
     // send RAN control information UE
     RBIndicator ri;
     ri.ue_id = next_radio_id_;
-    ri.mod_type = CommsLib::QAM64;
+    ri.mod_type = CommsLib::QAM16;
     udp_client->send(kClientHostname, kBaseClientPort + ri.ue_id, (uint8_t*)&ri,
         sizeof(RBIndicator));
 
@@ -222,13 +217,6 @@ void MacThread::process_control_information()
 
     const auto* ri = reinterpret_cast<RBIndicator*>(&udp_control_buf_[0]);
     process_udp_packets_from_apps(*ri);
-
-    //Event_data msg(EventType::kRBIndicator);
-    //msg.num_tags = 2;
-    //msg.tags[0] = ri->ue_id;
-    //msg.tags[1] = ri->mod_type;
-    //rt_assert(tx_queue_->enqueue(msg),
-    //    "MAC thread: failed to send control packet to PHY");
 }
 
 void MacThread::process_udp_packets_from_apps(RBIndicator ri)
