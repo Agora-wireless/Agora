@@ -55,11 +55,15 @@ public:
     void* taskThread(int tid);
 
 private:
-    UDPClient* udp_client; // UDP endpoint used for sending messages
-    std::vector<UDPServer*>
-        udp_server_uerx; // UDP endpoint used for receiving messages from client phy
-    std::vector<UDPServer*>
-        udp_server_bsrx; // UDP endpoint used for receiving messages from base station phy
+    //UDPClient* udp_client; // UDP endpoint used for sending messages
+    //std::vector<UDPServer*>
+    //    udp_server_uerx; // UDP endpoint used for receiving messages from client phy
+    //std::vector<UDPServer*>
+    //    udp_server_bsrx; // UDP endpoint used for receiving messages from base station phy
+    std::vector<struct sockaddr_in> servaddr_bs_; /* server address */
+    std::vector<int> socket_bs_;
+    std::vector<struct sockaddr_in> servaddr_ue_; /* server address */
+    std::vector<int> socket_ue_;
 
     Config* bscfg;
     Config* uecfg;
@@ -74,7 +78,7 @@ private:
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ProducerToken* task_ptok[kMaxThreads];
 
-    pthread_t task_threads[kMaxThreads];
+    pthread_t* task_threads;
 
     size_t symbol_perframe;
     size_t ul_data_symbol_perframe;

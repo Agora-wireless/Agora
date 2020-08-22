@@ -1,5 +1,5 @@
-#include "config.hpp"
 #include "channel_sim.hpp"
+#include "config.hpp"
 
 int main(int argc, char const* argv[])
 {
@@ -40,8 +40,8 @@ int main(int argc, char const* argv[])
     Config* bs_config = new Config(bs_conf_file);
     Config* ue_config = new Config(ue_conf_file);
     ChannelSim* sim
-        = new ChannelSim(bs_config, ue_config, bs_thread_num, ue_thread_num,
-            bs_socket_num, ue_socket_num, worker_thread_num, core_offset);
+        = new ChannelSim(bs_config, ue_config, bs_socket_num, ue_socket_num,
+            bs_thread_num, ue_thread_num, worker_thread_num, core_offset);
     sim->start();
     return 0;
 }
