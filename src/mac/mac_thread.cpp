@@ -193,7 +193,7 @@ void MacThread::send_control_information()
         sizeof(RBIndicator));
 
     // update RAN config within Millipede
-    send_ran_config_update(Event_data(EventType::kRANUpdate));
+    //send_ran_config_update(Event_data(EventType::kRANUpdate));
 }
 
 void MacThread::process_control_information()
