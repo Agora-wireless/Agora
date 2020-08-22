@@ -92,7 +92,6 @@ private:
     // from BS to UE; and process control information received from control
     // channel and forward to PHY UE, so it transmits data in the scheduled
     // time slots.
-    void handle_control_information();
     void send_control_information();
     void process_control_information();
 
