@@ -86,10 +86,6 @@ void MacThread::send_ran_config_update(Event_data event)
     assert(event.event_type == EventType::kRANUpdate);
 
     RanConfig rc;
-    //if (scheduler_next_frame_id_ % 10 == 0)
-    //    rc.mod_type = CommsLib::QAM64;
-    //else
-    //    rc.mod_type = CommsLib::QAM16;
     rc.mod_type = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
 
@@ -197,7 +193,7 @@ void MacThread::send_control_information()
         sizeof(RBIndicator));
 
     // update RAN config within Millipede
-    send_ran_config_update(Event_data(EventType::kRANUpdate));
+    //send_ran_config_update(Event_data(EventType::kRANUpdate));
 }
 
 void MacThread::process_control_information()
