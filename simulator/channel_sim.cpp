@@ -166,9 +166,9 @@ void ChannelSim::start()
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     //udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)&udp_pkt_buf[0],
     //    udp_pkt_buf.size());
-    ssize_t r = sendto(socket_ue_[0],
-        (char*)udp_pkt_buf.data(), bscfg->packet_length , 0, (struct sockaddr*)&servaddr_ue_[0],
-        sizeof(servaddr_ue_[0]));
+    ssize_t r
+        = sendto(socket_ue_[0], (char*)udp_pkt_buf.data(), bscfg->packet_length,
+            0, (struct sockaddr*)&servaddr_ue_[0], sizeof(servaddr_ue_[0]));
     rt_assert(r > 0, "sendto() failed");
 
     int ret = 0;
@@ -185,10 +185,16 @@ void ChannelSim::start()
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
-                    int ul_symbol_id
-                        = bscfg->get_ul_symbol_idx(frame_id, symbol_id);
-                    int frame_offset
-                        = (frame_id % TASK_BUFFER_FRAME_NUM) * ul_symbol_id;
+                    size_t pilot_symbol_id
+                        = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
+                    size_t ul_symbol_id
+                        = uecfg->get_ul_symbol_idx(frame_id, symbol_id);
+                    size_t total_symbol_id = pilot_symbol_id;
+                    if (pilot_symbol_id == SIZE_MAX)
+                        total_symbol_id = ul_symbol_id + pilot_symbol_perframe;
+                    size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
+                            * ul_symbol_perframe
+                        + total_symbol_id;
                     user_rx_counter_[frame_offset]++;
                     if (user_rx_counter_[frame_offset] == nUEs) {
                         user_rx_counter_[frame_offset] = 0;
@@ -198,10 +204,11 @@ void ChannelSim::start()
                     }
                 } else if (gen_tag_t(event.tags[0]).tag_type
                     == TagType::kAntennas) {
-                    int dl_symbol_id
+                    size_t dl_symbol_id
                         = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
-                    int frame_offset
-                        = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_id;
+                    size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
+                            * dl_symbol_perframe
+                        + dl_symbol_id;
                     bs_rx_counter_[frame_offset]++;
                     if (bs_rx_counter_[frame_offset] == numAntennas) {
                         bs_rx_counter_[frame_offset] = 0;
@@ -214,17 +221,24 @@ void ChannelSim::start()
             } break;
 
             case EventType::kPacketTX: {
-                size_t offset
-                    = gen_tag_t(event.tags[0]).frame_id % TASK_BUFFER_FRAME_NUM;
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t offset = frame_id % TASK_BUFFER_FRAME_NUM;
                 if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
                     user_tx_counter_[offset]++;
-                    if (user_tx_counter_[offset] == nUEs)
+                    if (user_tx_counter_[offset] == dl_symbol_perframe) {
+                        printf("Finished sending frame %zu to %zu users\n",
+                            frame_id, nUEs);
                         user_tx_counter_[offset] = 0;
+                    }
                 } else if (gen_tag_t(event.tags[0]).tag_type
                     == TagType::kAntennas) {
                     bs_tx_counter_[offset]++;
-                    if (bs_tx_counter_[offset] == numAntennas)
+                    if (bs_tx_counter_[offset] == ul_symbol_perframe) {
+                        printf(
+                            "Finished sending frame %zu to %zu basestation\n",
+                            frame_id, numAntennas);
                         bs_tx_counter_[offset] = 0;
+                    }
                 }
             } break;
             default:
@@ -254,8 +268,6 @@ void* ChannelSim::taskThread(int tid)
 
 void* ChannelSim::bs_rx_loop(int tid)
 {
-    int frame_samp_size = payload_len * numAntennas * dl_symbol_perframe;
-    int symbol_samp_size = payload_len * numAntennas;
     int socket_lo = tid * bs_socket_num / bs_thread_num;
     int socket_hi = (tid + 1) * bs_socket_num / bs_thread_num;
 
@@ -289,25 +301,28 @@ void* ChannelSim::bs_rx_loop(int tid)
         //    break;
         //}
         //rt_assert(static_cast<size_t>(ret) == bscfg->packet_length);
-        if (-1 == recv(socket_bs_[socket_id], (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0)) {
+        if (-1
+            == recv(socket_bs_[socket_id], (char*)udp_pkt_buf.data(),
+                   udp_pkt_buf.size(), 0)) {
             if (errno != EAGAIN && running) {
-                printf("Thread %d socket_id %d recv bs failed\n", tid, socket_id);
+                printf(
+                    "Thread %d socket_id %d recv bs failed\n", tid, socket_id);
                 exit(0);
             }
             return (NULL);
         }
         const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-        // calc offset
         size_t frame_id = pkt->frame_id;
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
         printf("Received bs packet frame %zu symbol %zu ant %zu\n", frame_id,
             symbol_id, ant_id);
         size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
-        size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM);
-        size_t offset = frame_offset * frame_samp_size
-            + dl_symbol_id * symbol_samp_size + ant_id * payload_len;
+        size_t symbol_offset
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_perframe
+            + dl_symbol_id;
+        size_t offset = symbol_offset * numAntennas + ant_id;
         memcpy((void*)(rx_buffer_bs + offset * payload_len), pkt->data,
             payload_len);
 
@@ -326,14 +341,12 @@ void* ChannelSim::bs_rx_loop(int tid)
 
 void* ChannelSim::ue_rx_loop(int tid)
 {
-    size_t ul_symbol_perframe = ul_data_symbol_perframe;
-    size_t frame_samp_size = payload_len * nUEs * ul_symbol_perframe;
-    size_t symbol_samp_size = payload_len * nUEs;
     int socket_lo = tid * user_socket_num / user_thread_num;
     int socket_hi = (tid + 1) * user_socket_num / user_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1 + bs_thread_num, tid);
+    pin_to_core_with_offset(
+        ThreadType::kWorkerTXRX, core_offset + 1 + bs_thread_num, tid);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
@@ -362,16 +375,18 @@ void* ChannelSim::ue_rx_loop(int tid)
         //    break;
         //}
         //rt_assert(static_cast<size_t>(ret) == uecfg->packet_length);
-        if (-1 == recv(socket_ue_[socket_id], (char*)&udp_pkt_buf[0], udp_pkt_buf.size(), 0)) {
+        if (-1
+            == recv(socket_ue_[socket_id], (char*)&udp_pkt_buf[0],
+                   udp_pkt_buf.size(), 0)) {
             if (errno != EAGAIN && running) {
-                printf("Thread %d socket_id %d recv ue failed\n", tid, socket_id);
+                printf(
+                    "Thread %d socket_id %d recv ue failed\n", tid, socket_id);
                 exit(0);
             }
             return (NULL);
         }
         const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-        // calc offse
         size_t frame_id = pkt->frame_id;
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
@@ -379,15 +394,16 @@ void* ChannelSim::ue_rx_loop(int tid)
         size_t pilot_symbol_id
             = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
         size_t ul_symbol_id = uecfg->get_ul_symbol_idx(frame_id, symbol_id);
-        size_t sym_id = pilot_symbol_id;
+        size_t total_symbol_id = pilot_symbol_id;
         if (pilot_symbol_id == SIZE_MAX)
-            sym_id = ul_symbol_id + pilot_symbol_perframe;
+            total_symbol_id = ul_symbol_id + pilot_symbol_perframe;
         printf("Received ue packet frame %zu symbol %zu ant %zu\n", frame_id,
             symbol_id, ant_id);
-        size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM); // * sym_id;
-        size_t offset = frame_offset * frame_samp_size
-            + sym_id * symbol_samp_size + ant_id * payload_len;
-        memcpy((void*)(rx_buffer_ue + offset * uecfg->packet_length), pkt->data,
+        size_t symbol_offset
+            = (frame_id % TASK_BUFFER_FRAME_NUM) * ul_symbol_perframe
+            + total_symbol_id;
+        size_t offset = symbol_offset * nUEs + ant_id;
+        memcpy((void*)(rx_buffer_ue + offset * payload_len), pkt->data,
             payload_len);
 
         // push an event here
@@ -410,21 +426,15 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
 
     size_t pilot_symbol_id = bscfg->get_pilot_symbol_idx(frame_id, symbol_id);
     size_t ul_symbol_id = bscfg->get_ul_symbol_idx(frame_id, symbol_id);
-    size_t sym_id = pilot_symbol_id;
+    size_t total_symbol_id = pilot_symbol_id;
     if (pilot_symbol_id == SIZE_MAX)
-        sym_id = ul_symbol_id + pilot_symbol_perframe;
+        total_symbol_id = ul_symbol_id + pilot_symbol_perframe;
 
-    size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM); // * sym_id;
-
-    size_t frame_samp_ue = payload_len * nUEs * ul_symbol_perframe;
-    size_t symbol_samp_ue = payload_len * nUEs;
-    size_t total_offset_ue
-        = frame_offset * frame_samp_ue + sym_id * symbol_samp_ue;
-
-    size_t frame_samp_bs = payload_len * numAntennas * ul_symbol_perframe;
-    size_t symbol_samp_bs = payload_len * numAntennas;
-    size_t total_offset_bs
-        = frame_offset * frame_samp_bs + sym_id * symbol_samp_bs;
+    size_t symbol_offset
+        = (frame_id % TASK_BUFFER_FRAME_NUM) * ul_symbol_perframe
+        + total_symbol_id;
+    size_t total_offset_ue = symbol_offset * payload_len * nUEs;
+    size_t total_offset_bs = symbol_offset * payload_len * numAntennas;
 
     cx_float* src_ptr = (cx_float*)(rx_buffer_ue + total_offset_ue);
     cx_fmat mat_src(src_ptr, payload_len, nUEs, false);
@@ -441,8 +451,8 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         memcpy(pkt->data,
             (void*)(tx_buffer_bs + total_offset_bs + ant_id * payload_len),
             payload_len);
-        ssize_t ret = sendto(socket_bs_[ant_id],
-            (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_bs_[ant_id],
+        ssize_t ret = sendto(socket_bs_[ant_id], (char*)udp_pkt_buf.data(),
+            udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_bs_[ant_id],
             sizeof(servaddr_bs_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
         //udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
@@ -464,18 +474,13 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t sym_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM); // * dl_symbol_id;
+    size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
 
-    size_t frame_samp_ue = payload_len * nUEs * dl_symbol_perframe;
-    size_t symbol_samp_ue = payload_len * nUEs;
-    size_t total_offset_ue
-        = frame_offset * frame_samp_ue + sym_id * symbol_samp_ue;
-
-    size_t frame_samp_bs = payload_len * numAntennas * dl_symbol_perframe;
-    size_t symbol_samp_bs = payload_len * numAntennas;
-    size_t total_offset_bs
-        = frame_offset * frame_samp_bs + sym_id * symbol_samp_bs;
+    size_t symbol_offset
+        = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_perframe
+        + dl_symbol_id;
+    size_t total_offset_ue = symbol_offset * payload_len * nUEs;
+    size_t total_offset_bs = symbol_offset * payload_len * numAntennas;
 
     cx_float* src_ptr = (cx_float*)(rx_buffer_bs + total_offset_bs);
     cx_fmat mat_src(src_ptr, payload_len, numAntennas, false);
@@ -492,8 +497,8 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         memcpy(pkt->data,
             (void*)(tx_buffer_ue + total_offset_ue + ant_id * payload_len),
             payload_len);
-        ssize_t ret = sendto(socket_ue_[ant_id],
-            (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_ue_[ant_id],
+        ssize_t ret = sendto(socket_ue_[ant_id], (char*)udp_pkt_buf.data(),
+            udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_ue_[ant_id],
             sizeof(servaddr_ue_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
         //udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, (uint8_t*)pkt,
