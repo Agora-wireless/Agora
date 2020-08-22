@@ -205,7 +205,7 @@ void* RadioTXRX::loop_tx_rx(int tid)
         printf("TXRX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%d \n",
             tid, local_port_id, config_->rru_addr.c_str(),
-            config_->ue_port + radio_id);
+            config_->ue_rru_port + radio_id);
 #else
         socket_[radio_id]
             = setup_socket_ipv6(local_port_id, true, sock_buf_size);

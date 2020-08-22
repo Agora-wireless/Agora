@@ -25,14 +25,18 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     ul_data_symbol_perframe = bscfg->ul_data_symbol_num_perframe;
     pilot_symbol_perframe = bscfg->pilot_symbol_num_perframe;
     ul_symbol_perframe = ul_data_symbol_perframe + pilot_symbol_perframe;
-    const size_t udp_pkt_len = bscfg->packet_length;
-    for (size_t i = 0; i < user_socket_num; i++)
-        udp_server_uerx.push_back(
-            new UDPServer(uecfg->ue_rru_port + i, udp_pkt_len * kMaxUEs * 64));
-    for (size_t i = 0; i < bs_socket_num; i++)
-        udp_server_bsrx.push_back(
-            new UDPServer(bscfg->bs_rru_port + i, udp_pkt_len * kMaxAntennas * 64));
-    udp_client = new UDPClient();
+    //const size_t udp_pkt_len = bscfg->packet_length;
+    //for (size_t i = 0; i < user_socket_num; i++)
+    //    udp_server_uerx.push_back(
+    //        new UDPServer(uecfg->ue_rru_port + i, udp_pkt_len * kMaxUEs * 64));
+    //for (size_t i = 0; i < bs_socket_num; i++)
+    //    udp_server_bsrx.push_back(new UDPServer(
+    //        bscfg->bs_rru_port + i, udp_pkt_len * kMaxAntennas * 64));
+    //udp_client = new UDPClient();
+    socket_bs_.resize(bs_socket_num);
+    servaddr_bs_.resize(bs_socket_num);
+    socket_ue_.resize(user_socket_num);
+    servaddr_ue_.resize(user_socket_num);
 
     task_queue_bs = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * dl_symbol_perframe * numAntennas * 36);
@@ -41,6 +45,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         TASK_BUFFER_FRAME_NUM * symbol_perframe * (numAntennas + nUEs) * 36);
 
+    assert(bscfg->packet_length == uecfg->packet_legnth);
     payload_len = bscfg->packet_length - Packet::kOffsetOfData;
 
     // initialize buffers
@@ -76,8 +81,8 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
 
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
-        ;
     }
+    alloc_buffer_1d(&task_threads, worker_thread_num, 64, 0);
 
     // create task thread
     for (size_t i = 0; i < worker_thread_num; i++) {
@@ -86,7 +91,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
         context->id = i;
         if (pthread_create(&task_threads[i], NULL,
                 pthread_fun_wrapper<ChannelSim, &ChannelSim::taskThread>,
-                &context[i])
+                context)
             != 0) {
             perror("task thread create failed");
             exit(0);
@@ -144,7 +149,7 @@ void ChannelSim::start()
 
         auto ue_context = new EventHandlerContext<ChannelSim>;
         ue_context->obj_ptr = this;
-        ue_context->id = i + bs_thread_num;
+        ue_context->id = i;
 
         if (pthread_create(&recv_thread_ue, NULL,
                 pthread_fun_wrapper<ChannelSim, &ChannelSim::ue_rx_loop>,
@@ -155,12 +160,16 @@ void ChannelSim::start()
         }
     }
 
+    sleep(1);
+
     // send a dummy packet to user to start
-    struct Packet* start_pkt = (struct Packet*)malloc(bscfg->packet_length);
-    new (start_pkt) Packet(0, 0, 0, 0);
-    udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)start_pkt,
-        bscfg->packet_length);
-    free(start_pkt);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    //udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)&udp_pkt_buf[0],
+    //    udp_pkt_buf.size());
+    ssize_t r = sendto(socket_ue_[0],
+        (char*)udp_pkt_buf.data(), bscfg->packet_length , 0, (struct sockaddr*)&servaddr_ue_[0],
+        sizeof(servaddr_ue_[0]));
+    rt_assert(r > 0, "sendto() failed");
 
     int ret = 0;
     Event_data events_list[dequeue_bulk_size];
@@ -187,7 +196,8 @@ void ChannelSim::start()
                             EventType::kPacketTX, event.tags[0]);
                         schedule_task(do_tx_bs_task, &task_queue_bs, ptok_bs);
                     }
-                } else if (gen_tag_t(event.tags[0]).tag_type == TagType::kAntennas) {
+                } else if (gen_tag_t(event.tags[0]).tag_type
+                    == TagType::kAntennas) {
                     int dl_symbol_id
                         = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
                     int frame_offset
@@ -197,7 +207,8 @@ void ChannelSim::start()
                         bs_rx_counter_[frame_offset] = 0;
                         Event_data do_tx_user_task(
                             EventType::kPacketTX, event.tags[0]);
-                        schedule_task(do_tx_user_task, &task_queue_user, ptok_user);
+                        schedule_task(
+                            do_tx_user_task, &task_queue_user, ptok_user);
                     }
                 }
             } break;
@@ -209,7 +220,8 @@ void ChannelSim::start()
                     user_tx_counter_[offset]++;
                     if (user_tx_counter_[offset] == nUEs)
                         user_tx_counter_[offset] = 0;
-                } else if (gen_tag_t(event.tags[0]).tag_type == TagType::kAntennas) {
+                } else if (gen_tag_t(event.tags[0]).tag_type
+                    == TagType::kAntennas) {
                     bs_tx_counter_[offset]++;
                     if (bs_tx_counter_[offset] == numAntennas)
                         bs_tx_counter_[offset] = 0;
@@ -250,19 +262,41 @@ void* ChannelSim::bs_rx_loop(int tid)
     moodycamel::ProducerToken local_ptok(message_queue_);
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1, tid);
 
-    struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+    for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
+        int local_port_id = bscfg->bs_rru_port + socket_id;
+        socket_bs_[socket_id]
+            = setup_socket_ipv4(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(&servaddr_bs_[socket_id],
+            bscfg->bs_port + socket_id, bscfg->bs_addr.c_str());
+        printf("BS RX thread %d: set up UDP socket server listening to port %d"
+               " with remote address %s:%d \n",
+            tid, local_port_id, bscfg->bs_addr.c_str(),
+            bscfg->bs_port + socket_id);
+        fcntl(socket_bs_[socket_id], F_SETFL, O_NONBLOCK);
+    }
+
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     int socket_id = socket_lo;
     while (running) {
-        ssize_t ret = udp_server_bsrx[socket_id]->recv_nonblocking(
-            (uint8_t*)pkt, bscfg->packet_length);
-        if (ret == 0) {
-            continue; // No data received
-        } else if (ret == -1) {
-            // There was an error in receiving
-            running = false;
-            break;
+        //ssize_t ret = udp_server_bsrx[socket_id]->recv_nonblocking(
+        //    &udp_pkt_buf[0], udp_pkt_buf.size());
+        //if (ret == 0) {
+        //    continue; // No data received
+        //} else if (ret == -1) {
+        //    // There was an error in receiving
+        //    running = false;
+        //    break;
+        //}
+        //rt_assert(static_cast<size_t>(ret) == bscfg->packet_length);
+        if (-1 == recv(socket_bs_[socket_id], (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0)) {
+            if (errno != EAGAIN && running) {
+                printf("Thread %d socket_id %d recv bs failed\n", tid, socket_id);
+                exit(0);
+            }
+            return (NULL);
         }
-        rt_assert(static_cast<size_t>(ret) == bscfg->packet_length);
+        const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
         // calc offset
         size_t frame_id = pkt->frame_id;
@@ -287,7 +321,6 @@ void* ChannelSim::bs_rx_loop(int tid)
         if (++socket_id == socket_hi)
             socket_id = socket_lo;
     }
-    free((void*)pkt);
     return 0;
 }
 
@@ -300,23 +333,45 @@ void* ChannelSim::ue_rx_loop(int tid)
     int socket_hi = (tid + 1) * user_socket_num / user_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
+    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1 + bs_thread_num, tid);
 
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1, tid);
-    struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+    for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
+        int local_port_id = uecfg->ue_rru_port + socket_id;
+        socket_ue_[socket_id]
+            = setup_socket_ipv4(local_port_id, true, sock_buf_size);
+        setup_sockaddr_remote_ipv4(&servaddr_ue_[socket_id],
+            uecfg->ue_port + socket_id, uecfg->ue_addr.c_str());
+        printf("UE RX thread %d: set up UDP socket server listening to port %d"
+               " with remote address %s:%d \n",
+            tid, local_port_id, uecfg->ue_addr.c_str(),
+            uecfg->ue_port + socket_id);
+        fcntl(socket_ue_[socket_id], F_SETFL, O_NONBLOCK);
+    }
+
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     int socket_id = socket_lo;
     while (running) {
-        ssize_t ret = udp_server_uerx[socket_id]->recv_nonblocking(
-            (uint8_t*)pkt, bscfg->packet_length);
-        if (ret == 0) {
-            continue; // No data received
-        } else if (ret == -1) {
-            // There was an error in receiving
-            running = false;
-            break;
+        //ssize_t ret = udp_server_uerx[socket_id]->recv_nonblocking(
+        //    &udp_pkt_buf[0], udp_pkt_buf.size());
+        //if (ret == 0) {
+        //    continue; // No data received
+        //} else if (ret == -1) {
+        //    // There was an error in receiving
+        //    running = false;
+        //    break;
+        //}
+        //rt_assert(static_cast<size_t>(ret) == uecfg->packet_length);
+        if (-1 == recv(socket_ue_[socket_id], (char*)&udp_pkt_buf[0], udp_pkt_buf.size(), 0)) {
+            if (errno != EAGAIN && running) {
+                printf("Thread %d socket_id %d recv ue failed\n", tid, socket_id);
+                exit(0);
+            }
+            return (NULL);
         }
-        rt_assert(static_cast<size_t>(ret) == uecfg->packet_length);
+        const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-        // calc offset
+        // calc offse
         size_t frame_id = pkt->frame_id;
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
@@ -345,7 +400,6 @@ void* ChannelSim::ue_rx_loop(int tid)
         if (++socket_id == socket_hi)
             socket_id = socket_lo;
     }
-    free((void*)pkt);
     return 0;
 }
 
@@ -379,20 +433,26 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     cx_fmat mat_dst(dst_ptr, payload_len, numAntennas, false);
 
     mat_dst = mat_src * channel;
-    struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    //struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < numAntennas; ant_id++) {
         new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
         memcpy(pkt->data,
             (void*)(tx_buffer_bs + total_offset_bs + ant_id * payload_len),
             payload_len);
-        udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
-            bscfg->packet_length);
+        ssize_t ret = sendto(socket_bs_[ant_id],
+            (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_bs_[ant_id],
+            sizeof(servaddr_bs_[ant_id]));
+        rt_assert(ret > 0, "sendto() failed");
+        //udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
+        //    bscfg->packet_length);
     }
-    free((void*)pkt);
+    //free((void*)pkt);
 
     // push an event here
-    Event_data bs_tx_message(
-        EventType::kPacketTX, gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0)._tag);
+    Event_data bs_tx_message(EventType::kPacketTX,
+        gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0)._tag);
     //bs_tx_message.data = frame_id % TASK_BUFFER_FRAME_NUM;
     if (!message_queue_.enqueue(*task_ptok[tid], bs_tx_message)) {
         printf("bs tx message enqueue failed\n");
@@ -424,20 +484,26 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     cx_fmat mat_dst(dst_ptr, payload_len, nUEs, false);
 
     mat_dst = mat_src * channel.st();
-    struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    //struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < nUEs; ant_id++) {
         new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
         memcpy(pkt->data,
             (void*)(tx_buffer_ue + total_offset_ue + ant_id * payload_len),
             payload_len);
-        udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, (uint8_t*)pkt,
-            uecfg->packet_length);
+        ssize_t ret = sendto(socket_ue_[ant_id],
+            (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_ue_[ant_id],
+            sizeof(servaddr_ue_[ant_id]));
+        rt_assert(ret > 0, "sendto() failed");
+        //udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, (uint8_t*)pkt,
+        //    uecfg->packet_length);
     }
-    free((void*)pkt);
+    //free((void*)pkt);
 
     // push an event here
-    Event_data user_tx_message(
-        EventType::kPacketTX, gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0)._tag);
+    Event_data user_tx_message(EventType::kPacketTX,
+        gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0)._tag);
     //user_tx_message.data = frame_id % TASK_BUFFER_FRAME_NUM;
     if (!message_queue_.enqueue(*task_ptok[tid], user_tx_message)) {
         printf("user tx message enqueue failed\n");
