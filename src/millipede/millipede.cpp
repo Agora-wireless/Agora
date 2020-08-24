@@ -710,6 +710,7 @@ void* Millipede::subcarrier_worker(int tid)
 
     computeSubcarrier->start_work();
     delete computeSubcarrier;
+    return nullptr;
 }
 
 void* Millipede::decode_worker(int tid)
@@ -724,6 +725,7 @@ void* Millipede::decode_worker(int tid)
 
     computeDecoding->start_work();
     delete computeDecoding;
+    return nullptr;
 }
 
 void* Millipede::worker(int tid)
