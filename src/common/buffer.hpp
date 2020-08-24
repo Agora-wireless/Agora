@@ -236,11 +236,12 @@ struct Packet {
     {
     }
 
-    std::string to_string()
+    std::string to_string() const
     {
         std::ostringstream ret;
         ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
-            << ", cell ID " << cell_id << ", antenna ID " << ant_id << "]";
+            << ", cell ID " << cell_id << ", antenna ID " << ant_id << ", "
+            << sizeof(fill) << " empty bytes]";
         return ret.str();
     }
 };
@@ -266,7 +267,7 @@ struct MacPacket {
     {
     }
 
-    std::string to_string()
+    std::string to_string() const
     {
         std::ostringstream ret;
         ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
