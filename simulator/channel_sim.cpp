@@ -2,6 +2,72 @@
 
 static bool running = true;
 
+static void convert_short_to_float_simd(
+    short* in_buf, float* out_buf, size_t length)
+{
+#ifdef __AVX512F__
+    const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+    const __m512i magic_i = _mm512_castps_si512(magic);
+    for (size_t i = 0; i < length; i += 16) {
+        /* get input */
+        __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
+        /* interleave with 0x0000 */
+        __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
+        /* convert by xor-ing and subtracting magic value:
+         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
+        __m512i val_f_int
+            = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
+        __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
+        __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
+        _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
+    }
+#else
+    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+    const __m256i magic_i = _mm256_castps_si256(magic);
+    for (size_t i = 0; i < length; i += 16) {
+        /* get input */
+        __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
+
+        __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
+        /* interleave with 0x0000 */
+        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
+        /* convert by xor-ing and subtracting magic value:
+         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
+        __m256i val_f_int
+            = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
+        __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
+        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
+        _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
+
+        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
+        __m256i val_f_int1
+            = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
+        __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
+        __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
+        _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
+    }
+#endif
+    for (size_t i = length / 16; i < length; i++) {
+        out_buf[i] = (float)(in_buf[i] / 32768.0);
+    }
+}
+
+static void convert_float_to_short_simd(float* in_buf, short* out_buf, size_t length)
+{
+    for (size_t i = 0; i < length; i += 16) {
+        __m256 data1 = _mm256_load_ps(in_buf + i);
+        __m256 data2 = _mm256_load_ps(in_buf + i + 8);
+        __m256i integer1 = _mm256_cvtps_epi32(data1);
+        __m256i integer2 = _mm256_cvtps_epi32(data2);
+        integer1 = _mm256_packs_epi32(integer1, integer2);
+        integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
+        _mm256_stream_si256(
+            (__m256i*)&out_buf[i], integer1);
+    }
+    for (size_t i = length / 16; i < length; i++) {
+        out_buf[i] = (short)(in_buf[i] * 32768.0);
+    }
+}
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     size_t bs_socket_num, size_t user_socket_num, size_t bs_thread_num,
     size_t user_thread_num, size_t worker_thread_num, size_t in_core_offset)
@@ -198,6 +264,8 @@ void ChannelSim::start()
                     user_rx_counter_[frame_offset]++;
                     if (user_rx_counter_[frame_offset] == nUEs) {
                         user_rx_counter_[frame_offset] = 0;
+                        printf("Scheduling transmission of frame %zu from %zu users to bs\n",
+                            frame_id, nUEs);
                         Event_data do_tx_bs_task(
                             EventType::kPacketTX, event.tags[0]);
                         schedule_task(do_tx_bs_task, &task_queue_bs, ptok_bs);
@@ -212,6 +280,8 @@ void ChannelSim::start()
                     bs_rx_counter_[frame_offset]++;
                     if (bs_rx_counter_[frame_offset] == numAntennas) {
                         bs_rx_counter_[frame_offset] = 0;
+                        printf("Scheduling transmission of frame %zu from %zu bs antennas to  %zu users\n",
+                            frame_id, numAntennas, nUEs);
                         Event_data do_tx_user_task(
                             EventType::kPacketTX, event.tags[0]);
                         schedule_task(
@@ -259,9 +329,8 @@ void* ChannelSim::taskThread(int tid)
     while (running) {
         if (task_queue_bs.try_dequeue(event))
             do_tx_bs(tid, event.tags[0]);
-        else
-            (task_queue_user.try_dequeue(event));
-        do_tx_user(tid, event.tags[0]);
+        else if (task_queue_user.try_dequeue(event))
+            do_tx_user(tid, event.tags[0]);
     }
     return 0;
 }
@@ -309,7 +378,7 @@ void* ChannelSim::bs_rx_loop(int tid)
                     "Thread %d socket_id %d recv bs failed\n", tid, socket_id);
                 exit(0);
             }
-            return (NULL);
+            continue;
         }
         const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
@@ -383,8 +452,9 @@ void* ChannelSim::ue_rx_loop(int tid)
                     "Thread %d socket_id %d recv ue failed\n", tid, socket_id);
                 exit(0);
             }
-            return (NULL);
+            continue;
         }
+
         const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
         size_t frame_id = pkt->frame_id;
@@ -436,14 +506,17 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     size_t total_offset_ue = symbol_offset * payload_len * nUEs;
     size_t total_offset_bs = symbol_offset * payload_len * numAntennas;
 
-    cx_float* src_ptr = (cx_float*)(rx_buffer_ue + total_offset_ue);
-    cx_fmat mat_src(src_ptr, payload_len, nUEs, false);
+    short* src_ptr = (short*)(rx_buffer_ue + total_offset_ue);
 
-    cx_float* dst_ptr = (cx_float*)(tx_buffer_bs + total_offset_bs);
-    cx_fmat mat_dst(dst_ptr, payload_len, numAntennas, false);
+    cx_fmat fmat_src = zeros<cx_fmat>(payload_len, nUEs);
+    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_len * nUEs);
 
-    mat_dst = mat_src * channel;
-    //struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    cx_fmat fmat_dst = fmat_src * channel;
+
+    short* dst_ptr = (short*)(tx_buffer_bs + total_offset_bs);
+    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_len * numAntennas);
+
+    // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < numAntennas; ant_id++) {
@@ -455,15 +528,12 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
             udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_bs_[ant_id],
             sizeof(servaddr_bs_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
-        //udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, (uint8_t*)pkt,
-        //    bscfg->packet_length);
+        //udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, &udp_pkt_buf[0],
+        //    udp_pkt_buf.size());
     }
-    //free((void*)pkt);
 
-    // push an event here
     Event_data bs_tx_message(EventType::kPacketTX,
         gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0)._tag);
-    //bs_tx_message.data = frame_id % TASK_BUFFER_FRAME_NUM;
     if (!message_queue_.enqueue(*task_ptok[tid], bs_tx_message)) {
         printf("bs tx message enqueue failed\n");
         exit(0);
@@ -482,14 +552,17 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     size_t total_offset_ue = symbol_offset * payload_len * nUEs;
     size_t total_offset_bs = symbol_offset * payload_len * numAntennas;
 
-    cx_float* src_ptr = (cx_float*)(rx_buffer_bs + total_offset_bs);
-    cx_fmat mat_src(src_ptr, payload_len, numAntennas, false);
+    short* src_ptr = (short*)(rx_buffer_bs + total_offset_bs);
 
-    cx_float* dst_ptr = (cx_float*)(tx_buffer_ue + total_offset_ue);
-    cx_fmat mat_dst(dst_ptr, payload_len, nUEs, false);
+    cx_fmat fmat_src = zeros<cx_fmat>(payload_len, nUEs);
+    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_len * numAntennas);
 
-    mat_dst = mat_src * channel.st();
-    //struct Packet* pkt = (struct Packet*)malloc(bscfg->packet_length);
+    cx_fmat fmat_dst = fmat_src * channel.st();
+
+    short* dst_ptr = (short*)(tx_buffer_ue + total_offset_ue);
+    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_len * nUEs);
+
+    // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < nUEs; ant_id++) {
@@ -501,15 +574,12 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
             udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_ue_[ant_id],
             sizeof(servaddr_ue_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
-        //udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, (uint8_t*)pkt,
-        //    uecfg->packet_length);
+        //udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, &udp_pkt_buf[0],
+        //    udp_pkt_buf.size());
     }
-    //free((void*)pkt);
 
-    // push an event here
     Event_data user_tx_message(EventType::kPacketTX,
         gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0)._tag);
-    //user_tx_message.data = frame_id % TASK_BUFFER_FRAME_NUM;
     if (!message_queue_.enqueue(*task_ptok[tid], user_tx_message)) {
         printf("user tx message enqueue failed\n");
         exit(0);
