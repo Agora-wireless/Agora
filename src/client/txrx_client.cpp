@@ -152,6 +152,25 @@ int RadioTXRX::dequeue_send(int tid)
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+    std::vector<char> zeros(c->packet_length, 0);
+    std::vector<char> pilot(c->packet_length, 0);
+    memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(), c->packet_length - Packet::kOffsetOfData);
+    for (size_t symbol_idx = 0; symbol_idx < c->pilot_symbol_num_perframe;
+         symbol_idx++) {
+        if (kDebugPrintInTask) {
+            printf("In TX thread %d: Transmitted pilot in frame %zu, symbol %zu, "
+                   "ant %zu\n",
+                tid, frame_id, symbol_idx, ant_id);
+        }
+
+        auto* pkt = (symbol_idx == ant_id) ? (Packet*)pilot.data() : (Packet*)zeros.data();
+        new (pkt) Packet(frame_id, symbol_idx, 0 /* cell_id */, ant_id);
+        // Send pilots
+        ssize_t ret = sendto(socket_[ant_id % thread_num_],
+            (char*)pkt, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
+            sizeof(servaddr_[tid]));
+        rt_assert(ret > 0, "sendto() failed");
+    }
     for (size_t symbol_idx = 0; symbol_idx < c->ul_data_symbol_num_perframe;
          symbol_idx++) {
 
@@ -160,7 +179,7 @@ int RadioTXRX::dequeue_send(int tid)
             + ant_id;
 
         if (kDebugPrintInTask) {
-            printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+            printf("In TX thread %d: Transmitted frame %zu, data symbol %zu, "
                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
                 tid, frame_id, symbol_idx, ant_id,
                 gen_tag_t(event.tags[0])._tag, offset,
@@ -223,7 +242,9 @@ void* RadioTXRX::loop_tx_rx(int tid)
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
+	printf("current rx_offset %zu, buffer_frame_num_ %d \n", rx_offset, buffer_frame_num_);
         rx_offset = (rx_offset + 1) % buffer_frame_num_;
+	printf("next rx_offset %zu\n", rx_offset);
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
