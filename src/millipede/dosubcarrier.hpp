@@ -160,18 +160,14 @@ public:
                 + std::to_string((int)event_type));
 
         switch (event_type) {
-        case EventType::kCSI: {
+        case EventType::kCSI:
             return run_csi(tag);
-        } break;
-        case EventType::kZF: {
+        case EventType::kZF:
             return computeZF_->launch(tag);
-        } break;
-        case EventType::kDemul: {
+        case EventType::kDemul:
             return computeDemul_->launch(tag);
-        } break;
-        case EventType::kPrecode: {
+        case EventType::kPrecode:
             return computePrecode_->launch(tag);
-        } break;
         /// TODO: move reciprocity into Subcarrier doers.
         // case EventType::kRc: {
         //     return computeReciprocity_->launch(tag, event_type);
@@ -182,11 +178,9 @@ public:
             break;
         }
 
-        std::cerr << "[DoSubcarrier::launch] error, unexpected event type "
-                  << (int)event_type << std::endl;
-        rt_assert(
-            false, "[DoSubcarrier::launch] error, unexpected event type.");
-
+        rt_assert(false,
+            std::string("[DoSubcarrier::launch] error, unexpected event type ")
+                + std::to_string(static_cast<int>(event_type)));
         return Event_data();
     }
 
@@ -383,32 +377,8 @@ private:
 
                         // With either of AVX-512 or AVX2, load one cacheline =
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
+                        // TODO: AVX512 complex multiply support below
 
-#if 0
-                        // AVX-512. Disabled for now because we don't have a working
-                        // complex multiply for __m512 type.
-                        __m512 fft_result
-                            = _mm512_load_ps(reinterpret_cast<const float*>(src));
-                        if (symbol_type == SymbolType::kPilot) {
-                            __m512 pilot_tx = _mm512_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                                cfg->pilots_sgn_[sc_idx + 7].re,
-                                cfg->pilots_sgn_[sc_idx + 6].im,
-                                cfg->pilots_sgn_[sc_idx + 6].re,
-                                cfg->pilots_sgn_[sc_idx + 5].im,
-                                cfg->pilots_sgn_[sc_idx + 5].re,
-                                cfg->pilots_sgn_[sc_idx + 4].im,
-                                cfg->pilots_sgn_[sc_idx + 4].re,
-                                cfg->pilots_sgn_[sc_idx + 3].im,
-                                cfg->pilots_sgn_[sc_idx + 3].re,
-                                cfg->pilots_sgn_[sc_idx + 2].im,
-                                cfg->pilots_sgn_[sc_idx + 2].re,
-                                cfg->pilots_sgn_[sc_idx + 1].im,
-                                cfg->pilots_sgn_[sc_idx + 1].re,
-                                cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
-                            fft_result = _mm512_mul_ps(fft_result, pilot_tx);
-                        }
-                        _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
-#else
                         __m256 fft_result0 = _mm256_load_ps(
                             reinterpret_cast<const float*>(src));
                         __m256 fft_result1 = _mm256_load_ps(
@@ -440,7 +410,6 @@ private:
                             reinterpret_cast<float*>(dst), fft_result0);
                         _mm256_stream_ps(
                             reinterpret_cast<float*>(dst + 4), fft_result1);
-#endif
                         // if (i == 0 && j == 0) {
                         //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
                         //         printf("(%f %f) ", dst[t].re, dst[t].im);
