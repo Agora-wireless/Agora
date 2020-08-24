@@ -93,22 +93,23 @@ private:
     std::unique_ptr<Sender> sender_;
     pthread_t* task_threads;
     EventHandlerContext* context;
-    /*****************************************************
-     * Buffers
-     *****************************************************/
-    /* Uplink */
-    /**
-     * received data
-     * Frist dimension: SOCKET_THREAD_NUM
-     * Second dimension of buffer (type: char): packet_length *
-     * symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * Second dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * SOCKET_BUFFER_FRAME_NUM
-     */
 
+    // Uplink buffers
+
+    /**
+     * Received data
+     * 
+     * First dimension: SOCKET_THREAD_NUM
+     *
+     * Second dimension of socket_buffer: SOCKET_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * symbol_num_perframe * packet_length
+     *
+     * Second dimension of buffer status: SOCKET_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * symbol_num_perframe
+     */
     Table<char> socket_buffer_;
     Table<int> socket_buffer_status_;
+
     size_t socket_buffer_size_;
     size_t socket_buffer_status_size_;
 

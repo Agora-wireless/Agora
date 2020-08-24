@@ -18,11 +18,6 @@ class RadioConfig;
 
 class RadioTXRX {
 public:
-    // static const int OFDM_FRAME_LEN = SYMBOL_LEN; //OFDM_CA_NUM +
-    // OFDM_PREFIX_LEN + OFDM_POSTFIX_LEN; header 4 int for: frame_id,
-    // symbol_id, cell_id, ant_id ushort for: I/Q samples static const int
-    // package_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-    // use for create pthread
     struct RadioTXRXContext {
         RadioTXRX* ptr;
         int tid;
