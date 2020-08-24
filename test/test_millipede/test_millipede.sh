@@ -69,19 +69,19 @@ for i in `seq 1 $num_iters`; do
     sleep 1; ./build/sender --num_threads 4 --core_offset 10 --delay 5000 --conf_file "data/tddconfig-correctness-test-ul.json"
     wait
 
-    echo "==========================================="
-    echo "Generating data for downlink correctness test $i......"
-    echo -e "===========================================\n"
-    ./build/data_generator data/tddconfig-correctness-test-dl.json
+    # echo "==========================================="
+    # echo "Generating data for downlink correctness test $i......"
+    # echo -e "===========================================\n"
+    # ./build/data_generator data/tddconfig-correctness-test-dl.json
 
-    echo -e "-------------------------------------------------------\n\n\n"
-    echo "======================================"
-    echo "Running downlink correctness test $i......"
-    echo -e "======================================\n"
-    ./build/test_millipede data/tddconfig-correctness-test-dl.json &
-    sleep 1; ./build/sender --num_threads 4 --core_offset 10 --delay 5000 --conf_file "data/tddconfig-correctness-test-dl.json"
-    echo -e "-------------------------------------------------------\n\n\n"
-    wait
+    # echo -e "-------------------------------------------------------\n\n\n"
+    # echo "======================================"
+    # echo "Running downlink correctness test $i......"
+    # echo -e "======================================\n"
+    # ./build/test_millipede data/tddconfig-correctness-test-dl.json &
+    # sleep 1; ./build/sender --num_threads 4 --core_offset 10 --delay 5000 --conf_file "data/tddconfig-correctness-test-dl.json"
+    # echo -e "-------------------------------------------------------\n\n\n"
+    # wait
   } >> $out_file
 
   # If the user supplied an output file, print pass/fail summary analysis

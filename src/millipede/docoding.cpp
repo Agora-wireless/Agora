@@ -251,6 +251,7 @@ void DoDecode::start_work()
                         + cfg->pilot_symbol_num_perframe) {
                     cur_symbol = cfg->pilot_symbol_num_perframe;
                     rx_status_->decode_done(cur_frame);
+                    // printf("Decode %d done for frame %lu\n", tid, cur_frame);
                     cur_frame++;
                 }
             }

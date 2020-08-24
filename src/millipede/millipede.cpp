@@ -709,6 +709,7 @@ void* Millipede::subcarrier_worker(int tid)
         dl_zf_buffer_, phy_stats, stats, &rx_status_, &demul_status_);
 
     computeSubcarrier->start_work();
+    delete computeSubcarrier;
 }
 
 void* Millipede::decode_worker(int tid)
@@ -722,6 +723,7 @@ void* Millipede::decode_worker(int tid)
             decoded_buffer_, phy_stats, stats, &rx_status_, &demul_status_);
 
     computeDecoding->start_work();
+    delete computeDecoding;
 }
 
 void* Millipede::worker(int tid)

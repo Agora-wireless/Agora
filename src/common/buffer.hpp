@@ -483,8 +483,8 @@ public:
     // to synchronize the update for each dosubcarrier
     std::array<std::mutex, kMaxNumSymbolsPerFrame> mutex_list;
 
-    size_t cur_frame;
-    std::mutex cur_frame_mutex;
+    size_t max_frame;
+    std::mutex max_frame_mutex;
 
     DemulStatus(size_t _num_demul_tasks_required)
         : num_demul_tasks_required(_num_demul_tasks_required)
@@ -492,15 +492,27 @@ public:
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
             num_demul_tasks_completed[i].fill(0);
         }
-        cur_frame = 0;
+        max_frame = 0;
     }
 
     // A dosubcarrier launch this function to notify some subcarriers
     // are completed for demul tasks in a symbol of a frame
     void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
     {
-        rt_assert(
-            frame_id < cur_frame + TASK_BUFFER_FRAME_NUM, "Decode too slow!");
+        // rt_assert(
+        //     frame_id < cur_frame + TASK_BUFFER_FRAME_NUM, "Decode too slow!");
+        if (frame_id > max_frame) {
+            max_frame_mutex.lock();
+            if (frame_id > max_frame) {
+                max_frame++;
+                num_demul_tasks_completed[max_frame % TASK_BUFFER_FRAME_NUM]
+                    .fill(0);
+            }
+            max_frame_mutex.unlock();
+        }
+        rt_assert(frame_id <= max_frame
+                && frame_id + TASK_BUFFER_FRAME_NUM > max_frame,
+            "Complete a wrong frame in demul!");
         mutex_list[symbol_id].lock();
         num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
             += num_tasks;
@@ -511,14 +523,19 @@ public:
     // demul tasks so that it could start to decode
     bool ready_to_decode(size_t frame_id, size_t symbol_id)
     {
-        if (frame_id > cur_frame) {
-            cur_frame_mutex.lock();
-            if (frame_id > cur_frame) {
-                num_demul_tasks_completed[cur_frame % TASK_BUFFER_FRAME_NUM]
-                    .fill(0);
-                cur_frame++;
-            }
-            cur_frame_mutex.unlock();
+        // if (frame_id > cur_frame) {
+        //     cur_frame_mutex.lock();
+        //     if (frame_id > cur_frame) {
+        //         num_demul_tasks_completed[cur_frame % TASK_BUFFER_FRAME_NUM]
+        //             .fill(0);
+        //         cur_frame++;
+        //     }
+        //     cur_frame_mutex.unlock();
+        // }
+        rt_assert(
+            frame_id + TASK_BUFFER_FRAME_NUM > max_frame, "Decode too slow!");
+        if (frame_id > max_frame) {
+            return false;
         }
         return num_demul_tasks_completed[frame_id % TASK_BUFFER_FRAME_NUM]
                                         [symbol_id]
