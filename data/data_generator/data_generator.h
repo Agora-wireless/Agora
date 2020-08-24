@@ -6,8 +6,16 @@
 
 class DataGenerator {
 public:
-    DataGenerator(Config* cfg, uint64_t seed = 0)
+    // The profile of the input information bits
+    enum class Profile {
+        kRandom, // The input information bytes are chosen at random
+        k123 // The input informatioon bytes are 1, 2, 3, 1, 2, 3, ...
+    };
+
+    DataGenerator(
+        Config* cfg, uint64_t seed = 0, Profile profile = Profile::kRandom)
         : cfg(cfg)
+        , profile(profile)
     {
         init_modulation_table(mod_table, cfg->mod_type);
         if (seed != 0) {
@@ -33,7 +41,11 @@ public:
         encoded_codeword.resize(ldpc_encoding_encoded_buf_size(lc.Bg, lc.Zc));
 
         for (size_t i = 0; i < lc.num_input_bytes(); i++) {
-            information[i] = static_cast<int8_t>(fast_rand.next_u32());
+            if (profile == Profile::kRandom) {
+                information[i] = static_cast<int8_t>(fast_rand.next_u32());
+            } else if (profile == Profile::k123) {
+                information[i] = (i % 3) + 1;
+            }
         }
 
         ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
@@ -68,10 +80,10 @@ public:
     /**
      * @param modulated_codeword The modulated codeword with OFDM_DATA_NUM
      * elements
-     * @brief An array with OFDM_CA_NUM elements with the modulated elements
-     * placed at the center
+     * @brief An array with OFDM_CA_NUM elements with the OFDM_DATA_NUM
+     * modulated elements binned at the center
      */
-    std::vector<complex_float> get_pre_ifft_symbol(
+    std::vector<complex_float> bin_for_ifft(
         const std::vector<complex_float> modulated_codeword) const
     {
         std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM); // Zeroed
@@ -102,5 +114,6 @@ public:
 private:
     FastRand fast_rand;
     Config* cfg;
+    const Profile profile;
     Table<float> mod_table;
 };

@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
         cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
         pre_ifft_data_syms[i]
-            = data_generator.get_pre_ifft_symbol(modulated_codewords[i]);
+            = data_generator.bin_for_ifft(modulated_codewords[i]);
     }
 
     std::vector<complex_float> pilot_td
