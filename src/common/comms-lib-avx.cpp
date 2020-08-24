@@ -172,8 +172,7 @@ std::vector<std::complex<int16_t>> CommsLib::complex_mult_avx(
     return out;
 }
 
-inline __m256 CommsLib::__m256_complex_cf32_mult(
-    __m256 data1, __m256 data2, bool conj)
+__m256 CommsLib::__m256_complex_cf32_mult(__m256 data1, __m256 data2, bool conj)
 {
     __m256 prod0 __attribute__((aligned(ALIGNMENT)));
     __m256 prod1 __attribute__((aligned(ALIGNMENT)));
