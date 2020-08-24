@@ -9,10 +9,10 @@ using namespace std;
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , rx_status_(RxStatus(cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM,
+    , rx_status_(cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM,
           cfg->pilot_symbol_num_perframe, cfg->data_symbol_num_perframe,
-          cfg->BS_ANT_NUM, cfg->UE_ANT_NUM))
-    , demul_status_(DemulStatus(cfg->OFDM_DATA_NUM / cfg->demul_block_size))
+          cfg->BS_ANT_NUM, cfg->UE_ANT_NUM)
+    , demul_status_(cfg->OFDM_DATA_NUM / cfg->demul_block_size)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
