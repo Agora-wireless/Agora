@@ -580,7 +580,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     size_t FFT_buffer_target_id = total_dl_symbol_id * antenna_num + ant_id;
 
     // transfer ushort to float
-    size_t delay_offset = (config_->ofdm_rx_zero_prefix_dl_ + CP_LEN) * 2;
+    size_t delay_offset = (config_->ofdm_rx_zero_prefix_client_ + CP_LEN) * 2;
     float* cur_fft_buffer_float = (float*)fft_buffer_[FFT_buffer_target_id];
 
     for (size_t i = 0; i < (FFT_LEN)*2; i++)

@@ -15,7 +15,7 @@
  "ofdm_ca_num" : 512,
  "ofdm_data_num" : 304,
  "cp_len" : 32,
- "ofdm_rx_zero_prefix_ul" : 220,
+ "ofdm_rx_zero_prefix_bs" : 220,
  "Zc" : 18,
  "beamsweep" : true,
  "beacon_antenna" : 0,
