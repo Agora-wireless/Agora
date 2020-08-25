@@ -4,6 +4,10 @@
 #include "utils_ldpc.hpp"
 #include <string>
 
+/**
+ * @brief Building blocks for generating end-to-end or unit test workloads for
+ * Millipede
+ */
 class DataGenerator {
 public:
     // The profile of the input information bits
@@ -113,8 +117,10 @@ public:
     }
 
 private:
-    FastRand fast_rand;
-    Config* cfg;
-    const Profile profile;
+    FastRand fast_rand; // A fast random number generator
+    Config* cfg; // The global Millipede config
+    const Profile profile; // The pattern of the input byte sequence
+
+    // Pre-computed modulation table for the config's modulation order
     Table<float> mod_table;
 };
