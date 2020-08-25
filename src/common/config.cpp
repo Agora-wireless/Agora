@@ -179,6 +179,25 @@ Config::Config(std::string jsonfile)
     ue_ant_offset = tddConf.value("ue_ant_offset", 0);
     total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
 
+    /* Distributed & normal mode options */
+    fft_in_rru = tddConf.value("fft_in_rru", false);
+    disable_master = tddConf.value("disable_master", false);
+    subcarrier_block_size = tddConf.value(
+        "subcarrier_block_size", lcm(zf_block_size, demul_block_size));
+    rt_assert(subcarrier_block_size % lcm(zf_block_size, demul_block_size) == 0,
+        "Subcarrier block size should be a multiple of lcm(zf_block_size, "
+        "demul_block_size)!");
+
+    is_distributed = tddConf.value("is_distributed", false);
+    server_addr_list
+        = tddConf.value("server_addr_list", std::vector<std::string>());
+    server_addr_idx = tddConf.value("server_addr_idx", 0);
+    subcarrier_start = tddConf.value("subcarrier_start", OFDM_DATA_START);
+    subcarrier_end = tddConf.value("subcarrier_end", OFDM_DATA_STOP);
+    rt_assert((subcarrier_end - subcarrier_start) % subcarrier_block_size == 0,
+        "Invalid subcarrier range and subcarrier block size!");
+    OFDM_CONTROL_NUM = subcarrier_end - subcarrier_start;
+
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
     core_offset = tddConf.value("core_offset", 18);
@@ -196,11 +215,19 @@ Config::Config(std::string jsonfile)
         "cacheline");
     rt_assert(demul_block_size % kTransposeBlockSize == 0,
         "Demodulation block size must be a multiple of transpose block size");
-    demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+    if (is_distributed) {
+        demul_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / demul_block_size;
+    } else {
+        demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
+    }
 
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
-    zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+    if (is_distributed) {
+        zf_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / zf_block_size;
+    } else {
+        zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
+    }
 
     fft_block_size = tddConf.value("fft_block_size", 4);
 
@@ -237,23 +264,6 @@ Config::Config(std::string jsonfile)
         1.f * ldpc_num_input_cols(LDPC_config.Bg)
             / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
         LDPC_config.nRows);
-
-    fft_in_rru = tddConf.value("fft_in_rru", false);
-    disable_master = tddConf.value("disable_master", false);
-    subcarrier_block_size = tddConf.value(
-        "subcarrier_block_size", lcm(zf_block_size, demul_block_size));
-    rt_assert(subcarrier_block_size % lcm(zf_block_size, demul_block_size) == 0,
-        "Subcarrier block size should be a multiple of lcm(zf_block_size, "
-        "demul_block_size)!");
-
-    is_distributed = tddConf.value("is_distributed", false);
-    server_addr_list
-        = tddConf.value("server_addr_list", std::vector<std::string>());
-    server_addr_idx = tddConf.value("server_addr_idx", 0);
-    subcarrier_start = tddConf.value("subcarrier_start", OFDM_DATA_START);
-    subcarrier_end = tddConf.value("subcarrier_end", OFDM_DATA_STOP);
-    rt_assert((subcarrier_end - subcarrier_start) % subcarrier_block_size == 0,
-        "Invalid subcarrier range and subcarrier block size!");
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;

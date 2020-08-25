@@ -88,8 +88,14 @@ Event_data DoDemul::launch(size_t tag)
             tid, frame_id, symbol_idx_ul, base_sc_id);
     }
 
-    size_t max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+    size_t max_sc_ite;
+    if (cfg->is_distributed) {
+        max_sc_ite = std::min(
+            cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
+    } else {
+        max_sc_ite
+            = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+    }
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
@@ -288,8 +294,14 @@ void DoDemul::independent_launch(size_t tag)
             tid, frame_id, symbol_idx_ul, base_sc_id);
     }
 
-    size_t max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+    size_t max_sc_ite;
+    if (cfg->is_distributed) {
+        max_sc_ite = std::min(
+            cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
+    } else {
+        max_sc_ite
+            = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+    }
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];
