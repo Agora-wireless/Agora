@@ -80,9 +80,10 @@ Config::Config(std::string jsonfile)
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
     ofdm_tx_zero_prefix_ = tddConf.value("ofdm_tx_zero_prefix", 0);
     ofdm_tx_zero_postfix_ = tddConf.value("ofdm_tx_zero_postfix", 0);
-    ofdm_rx_zero_prefix_ul_
-        = tddConf.value("ofdm_rx_zero_prefix_ul", 0) + CP_LEN;
-    ofdm_rx_zero_prefix_dl_ = tddConf.value("ofdm_rx_zero_prefix_dl", 0);
+    ofdm_rx_zero_prefix_bs_
+        = tddConf.value("ofdm_rx_zero_prefix_bs", 0) + CP_LEN;
+    ofdm_rx_zero_prefix_client_
+        = tddConf.value("ofdm_rx_zero_prefix_client", 0);
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
