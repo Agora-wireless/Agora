@@ -179,6 +179,27 @@ Config::Config(std::string jsonfile)
     ue_ant_offset = tddConf.value("ue_ant_offset", 0);
     total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
 
+    /* Millipede configurations */
+    frames_to_test = tddConf.value("frames_to_test", 9600);
+    core_offset = tddConf.value("core_offset", 18);
+    worker_thread_num = tddConf.value("worker_thread_num", 25);
+    socket_thread_num = tddConf.value("socket_thread_num", 4);
+    fft_thread_num = tddConf.value("fft_thread_num", 5);
+    demul_thread_num = tddConf.value("demul_thread_num", 5);
+    decode_thread_num = tddConf.value("decode_thread_num", 10);
+    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
+        - decode_thread_num;
+
+    demul_block_size = tddConf.value("demul_block_size", 48);
+    rt_assert(demul_block_size % kSCsPerCacheline == 0,
+        "Demodulation block size must be a multiple of subcarriers per "
+        "cacheline");
+    rt_assert(demul_block_size % kTransposeBlockSize == 0,
+        "Demodulation block size must be a multiple of transpose block size");
+
+    zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
+                                          : tddConf.value("zf_block_size", 1);
+
     /* Distributed & normal mode options */
     fft_in_rru = tddConf.value("fft_in_rru", false);
     disable_master = tddConf.value("disable_master", false);
@@ -198,31 +219,11 @@ Config::Config(std::string jsonfile)
         "Invalid subcarrier range and subcarrier block size!");
     OFDM_CONTROL_NUM = subcarrier_end - subcarrier_start;
 
-    /* Millipede configurations */
-    frames_to_test = tddConf.value("frames_to_test", 9600);
-    core_offset = tddConf.value("core_offset", 18);
-    worker_thread_num = tddConf.value("worker_thread_num", 25);
-    socket_thread_num = tddConf.value("socket_thread_num", 4);
-    fft_thread_num = tddConf.value("fft_thread_num", 5);
-    demul_thread_num = tddConf.value("demul_thread_num", 5);
-    decode_thread_num = tddConf.value("decode_thread_num", 10);
-    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
-        - decode_thread_num;
-
-    demul_block_size = tddConf.value("demul_block_size", 48);
-    rt_assert(demul_block_size % kSCsPerCacheline == 0,
-        "Demodulation block size must be a multiple of subcarriers per "
-        "cacheline");
-    rt_assert(demul_block_size % kTransposeBlockSize == 0,
-        "Demodulation block size must be a multiple of transpose block size");
     if (is_distributed) {
         demul_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / demul_block_size;
     } else {
         demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
     }
-
-    zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
-                                          : tddConf.value("zf_block_size", 1);
     if (is_distributed) {
         zf_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / zf_block_size;
     } else {
