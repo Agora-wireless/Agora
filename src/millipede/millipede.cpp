@@ -11,7 +11,11 @@ Millipede::Millipede(Config* cfg)
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , rx_status_(cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM,
           cfg->pilot_symbol_num_perframe, cfg->data_symbol_num_perframe,
-          cfg->BS_ANT_NUM, cfg->UE_ANT_NUM)
+          cfg->BS_ANT_NUM,
+          // cfg->UE_ANT_NUM
+          cfg->is_distributed
+              ? cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size
+              : cfg->OFDM_DATA_NUM / cfg->subcarrier_block_size)
     , demul_status_(cfg->is_distributed
               ? cfg->OFDM_CONTROL_NUM / cfg->demul_block_size
               : cfg->OFDM_DATA_NUM / cfg->demul_block_size)

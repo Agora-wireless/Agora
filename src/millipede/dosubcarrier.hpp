@@ -260,11 +260,11 @@ public:
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);
                         demul_cur_frame++;
-                        for (size_t i = 0; i
-                             < cfg->UE_ANT_NUM / (cfg->server_addr_list.size());
-                             i++) {
-                            rx_status_->decode_done(demul_cur_frame - 1);
-                        }
+                        // for (size_t i = 0; i
+                        //      < cfg->UE_ANT_NUM / (cfg->server_addr_list.size());
+                        //      i++) {
+                        rx_status_->decode_done(demul_cur_frame - 1);
+                        // }
                     }
                 }
             }
