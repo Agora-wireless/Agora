@@ -31,4 +31,3 @@ function fix_variable_case() {
 fix_class_case
 fix_member_case
 fix_variable_case
-
