@@ -48,7 +48,7 @@ static void convert_short_to_float_simd(
     }
 #endif
     for (size_t i = length / 16; i < length; i++) {
-        out_buf[i] = (float)(in_buf[i] / 32768.0);
+        out_buf[i] = (float)(in_buf[i] / 32768.f);
     }
 }
 
@@ -65,7 +65,7 @@ static void convert_float_to_short_simd(float* in_buf, short* out_buf, size_t le
             (__m256i*)&out_buf[i], integer1);
     }
     for (size_t i = length / 16; i < length; i++) {
-        out_buf[i] = (short)(in_buf[i] * 32768.0);
+        out_buf[i] = (short)(in_buf[i] * 32768.f);
     }
 }
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
@@ -87,7 +87,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     nUEs = bscfg->UE_ANT_NUM;
     samps_persymbol = bscfg->sampsPerSymbol;
     symbol_perframe = bscfg->symbol_num_perframe;
-    dl_symbol_perframe = bscfg->dl_data_symbol_num_perframe;
+    dl_symbol_perframe = bscfg->dl_data_symbol_num_perframe + 1; // plus beacon
     ul_data_symbol_perframe = bscfg->ul_data_symbol_num_perframe;
     pilot_symbol_perframe = bscfg->pilot_symbol_num_perframe;
     ul_symbol_perframe = ul_data_symbol_perframe + pilot_symbol_perframe;
@@ -228,15 +228,6 @@ void ChannelSim::start()
 
     sleep(1);
 
-    // send a dummy packet to user to start
-    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
-    //udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)&udp_pkt_buf[0],
-    //    udp_pkt_buf.size());
-    ssize_t r
-        = sendto(socket_ue_[0], (char*)udp_pkt_buf.data(), bscfg->packet_length,
-            0, (struct sockaddr*)&servaddr_ue_[0], sizeof(servaddr_ue_[0]));
-    rt_assert(r > 0, "sendto() failed");
-
     int ret = 0;
     Event_data events_list[dequeue_bulk_size];
     while (true) {
@@ -295,7 +286,7 @@ void ChannelSim::start()
                 size_t offset = frame_id % TASK_BUFFER_FRAME_NUM;
                 if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
                     user_tx_counter_[offset]++;
-                    if (user_tx_counter_[offset] == dl_symbol_perframe) {
+                    if (user_tx_counter_[offset] == dl_symbol_perframe - 1) {
                         printf("Finished sending frame %zu to %zu users\n",
                             frame_id, nUEs);
                         user_tx_counter_[offset] = 0;
@@ -385,8 +376,8 @@ void* ChannelSim::bs_rx_loop(int tid)
         size_t frame_id = pkt->frame_id;
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
-        printf("Received bs packet frame %zu symbol %zu ant %zu\n", frame_id,
-            symbol_id, ant_id);
+        printf("Received bs packet frame %zu symbol %zu ant %zu from socket %d\n", frame_id,
+            symbol_id, ant_id, socket_id);
         size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
         size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_perframe
@@ -554,7 +545,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 
     short* src_ptr = (short*)(rx_buffer_bs + total_offset_bs);
 
-    cx_fmat fmat_src = zeros<cx_fmat>(payload_len, nUEs);
+    cx_fmat fmat_src = zeros<cx_fmat>(payload_len, numAntennas);
     convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_len * numAntennas);
 
     cx_fmat fmat_dst = fmat_src * channel.st();

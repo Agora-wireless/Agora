@@ -113,7 +113,21 @@ void* PacketTXRX::loop_tx_rx(int tid)
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
+    // send a beacon packet in the downlink to trigger user pilot
+    std::vector<uint8_t> udp_pkt_buf(cfg->packet_length, 0);
+    auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+    for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
+        new (pkt) Packet(0, 0, 0 /* cell_id */, ant_id);
+        //udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)&udp_pkt_buf[0],
+        //    udp_pkt_buf.size());
+	printf("sending frame 0 beacon from antenna %d\n", ant_id);
+        ssize_t r = sendto(socket_[ant_id],
+            (char*)udp_pkt_buf.data(), cfg->packet_length, 0,
+            (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
+        rt_assert(r > 0, "sendto() failed");
+    }
     int prev_frame_id = -1;
+    size_t symbol_count = 0;
     int radio_id = radio_lo;
     while (cfg->running) {
         if (-1 != dequeue_send(tid))
@@ -132,8 +146,27 @@ void* PacketTXRX::loop_tx_rx(int tid)
             }
         }
 
-        if (++radio_id == radio_hi)
+        if (++radio_id == radio_hi) {
             radio_id = radio_lo;
+            symbol_count++;
+	    // after receiving all symbols, send beacon for next frame
+            if (++symbol_count
+                == cfg->pilot_symbol_num_perframe
+                    + cfg->ul_data_symbol_num_perframe) {
+                symbol_count = 0;
+                for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
+                    new (pkt) Packet(pkt->frame_id + 1, 0, 0 /* cell_id */, ant_id);
+                    //udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)&udp_pkt_buf[0],
+                    //    udp_pkt_buf.size());
+	            printf("sending frame %d beacon from antenna %d\n", pkt->frame_id + 1, ant_id);
+                    ssize_t r = sendto(socket_[ant_id],
+                        (char*)udp_pkt_buf.data(), cfg->packet_length, 0,
+                        (struct sockaddr*)&servaddr_[ant_id],
+                        sizeof(servaddr_[ant_id]));
+                    rt_assert(r > 0, "sendto() failed");
+                }
+            }
+        }
     }
     return 0;
 }

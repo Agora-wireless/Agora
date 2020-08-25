@@ -58,7 +58,6 @@ Phy_UE::Phy_UE(Config* config)
 
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
-        ;
     }
 
     ru_.reset(new RadioTXRX(config_, rx_thread_num, config_->core_offset + 1,
@@ -283,8 +282,11 @@ void Phy_UE::start()
                     "window. This can happen if Millipede is running "
                     "slowly, e.g., in debug mode");
 
+		size_t dl_symbol_id = 0;
+                if (config_->DLSymbols.size() > 0 && config_->DLSymbols[0].size() > 0)
+		    dl_symbol_id = config_->DLSymbols[0][0];
                 if (ul_data_symbol_perframe > 0
-                    && symbol_id == config_->DLSymbols[0].front()
+                    && (symbol_id == 0 || symbol_id == dl_symbol_id)
                     && ant_id % config_->nChannels == 0) {
                     Event_data do_encode_task(EventType::kEncode,
                         gen_tag_t::frm_sym_ue(
@@ -851,8 +853,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_pilot_symbol_perframe = config_->DL_PILOT_SYMS;
     ul_pilot_symbol_perframe = config_->UL_PILOT_SYMS;
     ul_symbol_perframe = config_->ul_data_symbol_num_perframe;
-    dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
-    dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
+    dl_symbol_perframe = config_->dl_data_symbol_num_perframe + 1; // plus beacon
+    dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe - 1;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     prefix_len = config_->prefix;
     dl_prefix_len = config_->dl_prefix;
