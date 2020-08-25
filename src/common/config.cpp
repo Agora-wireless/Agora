@@ -250,6 +250,10 @@ Config::Config(std::string jsonfile)
     server_addr_list
         = tddConf.value("server_addr_list", std::vector<std::string>());
     server_addr_idx = tddConf.value("server_addr_idx", 0);
+    subcarrier_start = tddConf.value("subcarrier_start", OFDM_DATA_START);
+    subcarrier_end = tddConf.value("subcarrier_end", OFDM_DATA_STOP);
+    rt_assert((subcarrier_end - subcarrier_start) % subcarrier_block_size == 0,
+        "Invalid subcarrier range and subcarrier block size!");
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;

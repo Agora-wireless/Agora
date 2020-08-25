@@ -260,9 +260,9 @@ public:
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);
                         demul_cur_frame++;
-                        for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
-                            rx_status_->decode_done(demul_cur_frame - 1);
-                        }
+                        // for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
+                        //     rx_status_->decode_done(demul_cur_frame - 1);
+                        // }
                     }
                 }
             }
@@ -316,11 +316,19 @@ private:
                         //     printf("\n");
                         // }
 
-                        simd_convert_float16_to_float32(
-                            reinterpret_cast<float*>(converted_sc),
-                            reinterpret_cast<float*>(pkt->data
-                                + (sc_idx + cfg->OFDM_DATA_START) * 2),
-                            kSCsPerCacheline * 2);
+                        if (cfg->is_distributed) {
+                            simd_convert_float16_to_float32(
+                                reinterpret_cast<float*>(converted_sc),
+                                reinterpret_cast<float*>(pkt->data
+                                    + (sc_idx + cfg->subcarrier_start) * 2),
+                                kSCsPerCacheline * 2);
+                        } else {
+                            simd_convert_float16_to_float32(
+                                reinterpret_cast<float*>(converted_sc),
+                                reinterpret_cast<float*>(pkt->data
+                                    + (sc_idx + cfg->OFDM_DATA_START) * 2),
+                                kSCsPerCacheline * 2);
+                        }
 
                         // if (i == 0 && j == 0) {
                         //     for (size_t t = 0; t < kSCsPerCacheline; t++) {

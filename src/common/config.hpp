@@ -246,6 +246,8 @@ public:
     bool is_distributed;
     std::vector<std::string> server_addr_list;
     size_t server_addr_idx;
+    size_t subcarrier_start;
+    size_t subcarrier_end;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

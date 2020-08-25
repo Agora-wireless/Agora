@@ -89,9 +89,9 @@ Millipede::Millipede(Config* cfg)
             create_threads(
                 pthread_fun_wrapper<Millipede, &Millipede::subcarrier_worker>,
                 0, cfg->OFDM_DATA_NUM / cfg->subcarrier_block_size);
-            // create_threads(
-            //     pthread_fun_wrapper<Millipede, &Millipede::decode_worker>, 0,
-            //     cfg->UE_ANT_NUM);
+            create_threads(
+                pthread_fun_wrapper<Millipede, &Millipede::decode_worker>, 0,
+                cfg->UE_ANT_NUM);
         } else {
             create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>,
                 0, cfg->worker_thread_num);
