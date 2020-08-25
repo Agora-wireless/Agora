@@ -109,15 +109,15 @@ Config::Config(std::string jsonfile)
         pilot_symbol_num_perframe
             = tddConf.value("pilot_num", pilot_num_default);
         data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
-            symbol_num_perframe - pilot_symbol_num_perframe);
+            symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
             downlink_mode ? 0
-                          : symbol_num_perframe - pilot_symbol_num_perframe);
+                          : symbol_num_perframe - pilot_symbol_num_perframe - 1);
         dl_data_symbol_num_perframe
             = tddConf.value("dl_symbol_num_perframe", downlink_mode ? 10 : 0);
         dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
         dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
-        std::string sched("");
+        std::string sched("B");
         for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
             sched += "P";
         // Below it is assumed either dl or ul to be active at one time
@@ -628,7 +628,9 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     const auto it
         = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
-        return it - DLSymbols[fid].begin();
+        return it - DLSymbols[fid].begin() + 1;
+    else if (symbol_id == 0)
+	return 0;
     else
         return SIZE_MAX;
 }
@@ -728,6 +730,8 @@ SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
     assert(!isUE); // Currently implemented for only the Millipede server
     char s = frames[frame_id % frames.size()][symbol_id];
     switch (s) {
+    case 'B':
+        return SymbolType::kBeacon;
     case 'D':
         return SymbolType::kDL;
     case 'U':

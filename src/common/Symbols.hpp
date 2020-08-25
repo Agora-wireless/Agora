@@ -129,7 +129,7 @@ static constexpr bool kDebugPrintPerFrameStart = false;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
-static constexpr bool kDebugPrintInTask = false;
+static constexpr bool kDebugPrintInTask = true;
 static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugBSSender = false;
 static constexpr bool kDebugBSReceiver = true;
@@ -182,7 +182,7 @@ static inline std::string thread_type_str(ThreadType thread_type)
     return "Invalid thread type";
 }
 
-enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
+enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
 struct LDPCconfig {
     uint16_t Bg;
