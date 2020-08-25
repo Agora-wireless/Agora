@@ -64,6 +64,15 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
 
+ * Run Millipede with channel simulator and clients
+   * First, return to the base directory (`cd ..`), then run `./build/data_generator data/bs-sim.json` to generate data
+     files.
+   * In one terminal, run `./build/user data/ue-sim.json` to start
+     Clients with uplink configuration.
+   * In another terminal, run  `./build/chsim 8 2 1 1 2 24 bs-sim.json ue-sim.json`
+   * In another terminal, run `./build/millipede data/bs-sim.json` to start
+     Millipede with uplink configuration.
+
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    "Hardware mode" section below.
 
