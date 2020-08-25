@@ -243,6 +243,10 @@ public:
     // lcm(zf_block_size, demul_block_size)
     size_t subcarrier_block_size;
 
+    bool is_distributed;
+    std::vector<std::string> server_addr_list;
+    size_t server_addr_idx;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

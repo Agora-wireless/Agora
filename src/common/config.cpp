@@ -246,6 +246,11 @@ Config::Config(std::string jsonfile)
         "Subcarrier block size should be a multiple of lcm(zf_block_size, "
         "demul_block_size)!");
 
+    is_distributed = tddConf.value("is_distributed", false);
+    server_addr_list
+        = tddConf.value("server_addr_list", std::vector<std::string>());
+    server_addr_idx = tddConf.value("server_addr_idx", 0);
+
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length

@@ -25,7 +25,12 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status)
 
     int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    if (cfg->is_distributed) {
+        ret = inet_pton(AF_INET,
+            cfg->server_addr_list[cfg->server_addr_idx].c_str(), &server_addr);
+    } else {
+        ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    }
     rt_assert(ret == 1, "Invalid server IP address");
 
     rte_flow_error error;
