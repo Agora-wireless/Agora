@@ -93,6 +93,7 @@ public:
         return pre_ifft_symbol;
     }
 
+    /// Return the time-domain pilot symbol with OFDM_CA_NUM complex floats
     std::vector<complex_float> get_common_pilot_time_domain() const
     {
         const std::vector<std::complex<float>> zc_seq
@@ -102,7 +103,7 @@ public:
         const std::vector<std::complex<float>> zc_common_pilot
             = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
 
-        std::vector<complex_float> ret(cfg->OFDM_CA_NUM);
+        std::vector<complex_float> ret(cfg->OFDM_CA_NUM); // Zeroed
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
             ret[i + cfg->OFDM_DATA_START]
                 = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
