@@ -71,7 +71,8 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         if (kUseArgos) {
             if (config_->hw_framer) {
                 if (pthread_create(&txrx_thread, NULL,
-                        pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loop_tx_rx_argos>,
+                        pthread_fun_wrapper<RadioTXRX,
+                            &RadioTXRX::loop_tx_rx_argos>,
                         context)
                     != 0) {
                     perror("socket thread create failed");
@@ -79,7 +80,8 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                 }
             } else {
                 if (pthread_create(&txrx_thread, NULL,
-                        pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loop_tx_rx_argos_sync>,
+                        pthread_fun_wrapper<RadioTXRX,
+                            &RadioTXRX::loop_tx_rx_argos_sync>,
                         context)
                     != 0) {
                     perror("socket thread create failed");
@@ -154,20 +156,24 @@ int RadioTXRX::dequeue_send(int tid)
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     std::vector<char> zeros(c->packet_length, 0);
     std::vector<char> pilot(c->packet_length, 0);
-    memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(), c->packet_length - Packet::kOffsetOfData);
+    memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(),
+        c->packet_length - Packet::kOffsetOfData);
     for (size_t symbol_idx = 0; symbol_idx < c->pilot_symbol_num_perframe;
          symbol_idx++) {
         if (kDebugPrintInTask) {
-            printf("In TX thread %d: Transmitted pilot in frame %zu, symbol %zu, "
-                   "ant %zu\n",
-                tid, frame_id, symbol_idx, ant_id);
+            printf(
+                "In TX thread %d: Transmitted pilot in frame %zu, symbol %zu, "
+                "ant %zu\n",
+                tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
         }
 
-        auto* pkt = (symbol_idx == ant_id) ? (Packet*)pilot.data() : (Packet*)zeros.data();
-        new (pkt) Packet(frame_id, symbol_idx, 0 /* cell_id */, ant_id);
+        auto* pkt = (symbol_idx == ant_id) ? (Packet*)pilot.data()
+                                           : (Packet*)zeros.data();
+        new (pkt) Packet(
+            frame_id, c->pilotSymbols[0][symbol_idx], 0 /* cell_id */, ant_id);
         // Send pilots
-        ssize_t ret = sendto(socket_[ant_id % thread_num_],
-            (char*)pkt, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
+        ssize_t ret = sendto(socket_[ant_id % thread_num_], (char*)pkt,
+            c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
             sizeof(servaddr_[tid]));
         rt_assert(ret > 0, "sendto() failed");
     }
@@ -181,7 +187,7 @@ int RadioTXRX::dequeue_send(int tid)
         if (kDebugPrintInTask) {
             printf("In TX thread %d: Transmitted frame %zu, data symbol %zu, "
                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-                tid, frame_id, symbol_idx, ant_id,
+                tid, frame_id, c->ULSymbols[0][symbol_idx], ant_id,
                 gen_tag_t(event.tags[0])._tag, offset,
                 message_queue_->size_approx());
         }
@@ -189,14 +195,15 @@ int RadioTXRX::dequeue_send(int tid)
         size_t socket_symbol_offset = offset
             % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
                   * c->UE_ANT_NUM);
-        char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
+        char* cur_buffer_ptr
+            = tx_buffer_ + socket_symbol_offset * c->packet_length;
         auto* pkt = (Packet*)cur_buffer_ptr;
-        new (pkt) Packet(frame_id, symbol_idx, 0 /* cell_id */, ant_id);
+        new (pkt) Packet(
+            frame_id, c->ULSymbols[0][symbol_idx], 0 /* cell_id */, ant_id);
 
         // Send data (one OFDM symbol)
-        ssize_t ret = sendto(socket_[ant_id % thread_num_],
-            cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-            sizeof(servaddr_[tid]));
+        ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length,
+            0, (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
     }
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
@@ -242,9 +249,10 @@ void* RadioTXRX::loop_tx_rx(int tid)
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
-	printf("current rx_offset %zu, buffer_frame_num_ %d \n", rx_offset, buffer_frame_num_);
+        printf("current rx_offset %zu, buffer_frame_num_ %d \n", rx_offset,
+            buffer_frame_num_);
         rx_offset = (rx_offset + 1) % buffer_frame_num_;
-	printf("next rx_offset %zu\n", rx_offset);
+        printf("next rx_offset %zu\n", rx_offset);
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
