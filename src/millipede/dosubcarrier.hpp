@@ -263,11 +263,12 @@ public:
                         // for (size_t i = 0; i
                         //      < cfg->UE_ANT_NUM / (cfg->server_addr_list.size());
                         //      i++) {
-                        size_t sc_sum = cfg->is_distributed
-                            ? cfg->OFDM_CONTROL_NUM
-                            : cfg->OFDM_DATA_NUM;
+                        // size_t sc_sum = cfg->is_distributed
+                        //     ? cfg->OFDM_CONTROL_NUM
+                        //     : cfg->OFDM_DATA_NUM;
                         for (size_t i = 0; i < cfg->UE_NUM; i++) {
-                            for (size_t j = 0; j < sc_sum; j++) {
+                            for (size_t j = subcarrier_range_.start;
+                                 j < subcarrier_range_.end; j++) {
                                 print_demod_data(demul_cur_frame - 1,
                                     cfg->pilot_symbol_num_perframe, i, j);
                             }
