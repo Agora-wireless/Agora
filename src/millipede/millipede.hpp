@@ -277,11 +277,12 @@ private:
 
     /**
      * Data for transmission
-     * First dimension of buffer (type: char): symbol_num_perframe *
-     * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * BS_ANT_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * First dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * SOCKET_BUFFER_FRAME_NUM
+     *
+     * Number of downlink socket buffers and status entries:
+     * SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
+     *
+     * Size of each downlink socket buffer entry: packet_length bytes
+     * Size of each downlink socket buffer status entry: one integer
      */
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
@@ -294,6 +295,12 @@ private:
 
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
+
+    // Master-to-worker queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
+
+    // Worker-to-master queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
 
     // Master thread's message queue for event completion from Doers;
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
