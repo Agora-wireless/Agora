@@ -6,11 +6,13 @@
 #include "millipede.hpp"
 using namespace std;
 
+#ifdef USE_REMOTE
 void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
     erpc::SmErrType sm_err_type, void* _context)
 {
     printf("Connected session: %d\n", session_num);
 }
+#endif // USE_REMOTE
 
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -61,8 +63,10 @@ Millipede::Millipede(Config* cfg)
     }
 
     if (kUseRemote) {
+#ifdef USE_REMOTE
         auto uri = config_->server_addr + ":" + std::to_string(kRpcPortLocal);
         nexus = new erpc::Nexus(uri, 0, 0);
+#endif // USE_REMOTE
     }
 
     /* Create worker threads */
@@ -678,6 +682,7 @@ void* Millipede::worker(int tid)
         computeDecodingLast, computeZF, computeFFT, computeReciprocity,
         computeDecoding, computeDemul, computeEncoding };
 
+#ifdef USE_REMOTE
     erpc::Rpc<erpc::CTransport>* rpc;
     if (kUseRemote) {
         rpc = new erpc::Rpc<erpc::CTransport>(
@@ -694,11 +699,14 @@ void* Millipede::worker(int tid)
         RpcContext* inited_ctx = computeDecoding->initialize_erpc(rpc, session);
         computeDecodingLast->set_initialized_rpc_context(inited_ctx);
     }
+#endif // USE_REMOTE
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
             if (kUseRemote) {
+#ifdef USE_REMOTE
                 rpc->run_event_loop_once();
+#endif // USE_REMOTE
             }
             if (computers_vec[i]->try_launch())
                 break;

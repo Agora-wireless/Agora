@@ -14,6 +14,7 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
+#ifdef USE_REMOTE
 void decode_cont_func(void* _context, void* _tag)
 {
     auto* computeDecoding = static_cast<DoDecode*>(_context);
@@ -43,6 +44,7 @@ void decode_cont_func(void* _context, void* _tag)
         computeDecoding->rpc_context_->num_responses_received);
     computeDecoding->rpc_context_->num_responses_received++;
 }
+#endif // USE_REMOTE
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
@@ -138,12 +140,14 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
 
+#ifdef USE_REMOTE
 RpcContext* DoDecode::initialize_erpc(
     erpc::Rpc<erpc::CTransport>* rpc, int session)
 {
     rpc_context_ = new RpcContext(rpc, session);
     return rpc_context_;
 }
+#endif // USE_REMOTE
 
 Event_data DoDecode::launch(size_t tag)
 {
@@ -165,6 +169,7 @@ Event_data DoDecode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kUseRemote) {
+#ifdef USE_REMOTE
         size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
         size_t llr_buffer_offset = input_offset * cfg->mod_type;
         size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
@@ -202,6 +207,7 @@ Event_data DoDecode::launch(size_t tag)
         rpc_context_->rpc->enqueue_request(rpc_context_->session, kRpcReqType,
             req_msgbuf, resp_msgbuf, decode_cont_func, decode_tag);
         rpc_context_->num_requests_issued++;
+#endif // USE_REMOTE
     } else {
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
