@@ -337,7 +337,7 @@ void MacThread::run_event_loop()
         process_rx_from_master();
 
         if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
-            process_udp_packets_from_apps();
+            process_udp_packets_from_apps(RBIndicator());
             last_mac_pkt_rx_tsc_ = rdtsc();
         }
         //if (mode_ == Mode::kServer) {
