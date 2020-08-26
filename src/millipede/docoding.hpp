@@ -26,7 +26,7 @@
 #include "iobuffer.hpp"
 #include "utils_ldpc.hpp"
 
-// #ifdef USE_REMOTE
+#ifdef USE_REMOTE
 #include "rpc.h"
 
 /// The state of an ePRC connection to a remote LDPC worker,
@@ -68,7 +68,20 @@ public:
     size_t num_requests_issued;
     size_t num_responses_received;
 };
-// #endif
+
+/// Local eRPC request tag used for processing responses of decoding tasks
+class DecodeTag {
+public:
+    size_t symbol_offset;
+    size_t output_offset;
+    size_t tag;
+    int tid;
+    erpc::MsgBuffer* req_msgbuf;
+    erpc::MsgBuffer* resp_msgbuf;
+    erpc::Rpc<erpc::CTransport>* rpc;
+};
+#endif // USE_REMOTE
+
 
 class DoEncode : public Doer {
 public:
@@ -105,8 +118,7 @@ public:
 
     Event_data launch(size_t tag);
 
-    // #ifdef USE_REMOTE
-
+#ifdef USE_REMOTE
     /// Creates and returns a new `RpcContext` that this doer will use to
     /// communicate with the remote LDPC worker.
     /// The returned `RpcContext` can be shared with other doers;
@@ -131,11 +143,14 @@ public:
     {
         rpc_context_ = rpc_context;
     }
-    // #endif
 
 public:
     /// eRPC request type for remote LDPC decoding
     static const size_t kRpcReqType = 2;
+private:
+    RpcContext* rpc_context_;
+#endif // USE_REMOTE
+
     
 private:
     int16_t* resp_var_nodes;
@@ -146,24 +161,6 @@ private:
     PhyStats* phy_stats;
     DurationStat* duration_stat;
 
-    // #ifdef USE_REMOTE
-
-    RpcContext* rpc_context_;
-    // #endif
 };
 
-// #ifdef USE_REMOTE
-/// Local eRPC request tag used for processing responses of decoding tasks
-class DecodeTag {
-public:
-    size_t symbol_offset;
-    size_t output_offset;
-    size_t tag;
-    int tid;
-    erpc::MsgBuffer* req_msgbuf;
-    erpc::MsgBuffer* resp_msgbuf;
-    erpc::Rpc<erpc::CTransport>* rpc;
-};
-// #endif
-
-#endif
+#endif // DOCODING
