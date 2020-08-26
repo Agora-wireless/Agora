@@ -93,7 +93,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     this->bscfg = config_bs;
     this->uecfg = config_ue;
 
-    /* initialize random seed: */
+    // initialize parameters from config
     srand(time(NULL));
     numAntennas = bscfg->BS_ANT_NUM;
     nUEs = bscfg->UE_ANT_NUM;
@@ -119,7 +119,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     payload_len = bscfg->packet_length - Packet::kOffsetOfData;
     payload_samps = bscfg->sampsPerSymbol;
 
-    // initialize buffers
+    // initialize bs-facing and client-facing data buffers
     size_t tx_buffer_ue_size
         = TASK_BUFFER_FRAME_NUM * dl_symbol_perframe * nUEs * payload_len;
     alloc_buffer_1d(&tx_buffer_ue, tx_buffer_ue_size, 64, 1);
@@ -136,6 +136,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
         * numAntennas * payload_len;
     alloc_buffer_1d(&rx_buffer_bs, rx_buffer_bs_size, 64, 1);
 
+    // initilize rx and tx counters
     bs_rx_counter_ = new size_t[dl_symbol_perframe * TASK_BUFFER_FRAME_NUM];
     memset(bs_rx_counter_, 0,
         sizeof(size_t) * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM);
@@ -147,9 +148,9 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     memset(bs_tx_counter_, 0, sizeof(size_t) * TASK_BUFFER_FRAME_NUM);
     memset(user_tx_counter_, 0, sizeof(size_t) * TASK_BUFFER_FRAME_NUM);
 
+    // initialize channel as random matrix of size nUEs * numAntennas
     cx_fmat H(randn<fmat>(nUEs, numAntennas), randn<fmat>(nUEs, numAntennas));
     channel = H / abs(H).max();
-    std::cout << "Channel: " << channel << std::endl;
 
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
@@ -247,6 +248,7 @@ void ChannelSim::start()
             case EventType::kPacketRX: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                // received a packet from a client antenna
                 if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
                     size_t pilot_symbol_id
                         = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
@@ -259,15 +261,19 @@ void ChannelSim::start()
                             * ul_symbol_perframe
                         + total_symbol_id;
                     user_rx_counter_[frame_offset]++;
+                    // when received all client antennas on this symbol, kick-off BS TX
                     if (user_rx_counter_[frame_offset] == nUEs) {
                         user_rx_counter_[frame_offset] = 0;
-                        printf("Scheduling transmission of frame %zu from %zu "
-                               "users to bs\n",
-                            frame_id, nUEs);
+                        if (kDebugPrintPerFrameDone)
+                            printf(
+                                "Scheduling transmission of frame %zu from %zu "
+                                "users to bs\n",
+                                frame_id, nUEs);
                         Event_data do_tx_bs_task(
                             EventType::kPacketTX, event.tags[0]);
                         schedule_task(do_tx_bs_task, &task_queue_bs, ptok_bs);
                     }
+                    // received a packet from a BS antenna
                 } else if (gen_tag_t(event.tags[0]).tag_type
                     == TagType::kAntennas) {
                     size_t dl_symbol_id
@@ -276,11 +282,15 @@ void ChannelSim::start()
                             * dl_symbol_perframe
                         + dl_symbol_id;
                     bs_rx_counter_[frame_offset]++;
+
+                    // when received all BS antennas on this symbol, kick-off client TX
                     if (bs_rx_counter_[frame_offset] == numAntennas) {
                         bs_rx_counter_[frame_offset] = 0;
-                        printf("Scheduling transmission of frame %zu from %zu "
-                               "bs antennas to  %zu users\n",
-                            frame_id, numAntennas, nUEs);
+                        if (kDebugPrintPerFrameDone)
+                            printf(
+                                "Scheduling transmission of frame %zu from %zu "
+                                "bs antennas to  %zu users\n",
+                                frame_id, numAntennas, nUEs);
                         Event_data do_tx_user_task(
                             EventType::kPacketTX, event.tags[0]);
                         schedule_task(
@@ -295,17 +305,19 @@ void ChannelSim::start()
                 if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
                     user_tx_counter_[offset]++;
                     if (user_tx_counter_[offset] == dl_symbol_perframe - 1) {
-                        printf("Finished sending frame %zu to %zu users\n",
-                            frame_id, nUEs);
+                        if (kDebugPrintPerFrameDone)
+                            printf("Finished sending frame %zu to %zu users\n",
+                                frame_id, nUEs);
                         user_tx_counter_[offset] = 0;
                     }
                 } else if (gen_tag_t(event.tags[0]).tag_type
                     == TagType::kAntennas) {
                     bs_tx_counter_[offset]++;
                     if (bs_tx_counter_[offset] == ul_symbol_perframe) {
-                        printf(
-                            "Finished sending frame %zu to %zu basestation\n",
-                            frame_id, numAntennas);
+                        if (kDebugPrintPerFrameDone)
+                            printf("Finished sending frame %zu to %zu "
+                                   "basestation\n",
+                                frame_id, numAntennas);
                         bs_tx_counter_[offset] = 0;
                     }
                 }
@@ -342,6 +354,7 @@ void* ChannelSim::bs_rx_loop(int tid)
     moodycamel::ProducerToken local_ptok(message_queue_);
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1, tid);
 
+    // initialize bs-facing sockets
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
         int local_port_id = bscfg->bs_rru_port + socket_id;
@@ -374,9 +387,10 @@ void* ChannelSim::bs_rx_loop(int tid)
         size_t frame_id = pkt->frame_id;
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
-        printf(
-            "Received bs packet frame %zu symbol %zu ant %zu from socket %d\n",
-            frame_id, symbol_id, ant_id, socket_id);
+        if (kDebugPrintInTask)
+            printf("Received bs packet frame %zu symbol %zu ant %zu from "
+                   "socket %d\n",
+                frame_id, symbol_id, ant_id, socket_id);
         size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
         size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_perframe
@@ -406,6 +420,7 @@ void* ChannelSim::ue_rx_loop(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerTXRX, core_offset + 1 + bs_thread_num, tid);
 
+    // initialize client-facing sockets
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
         int local_port_id = uecfg->ue_rru_port + socket_id;
@@ -446,8 +461,9 @@ void* ChannelSim::ue_rx_loop(int tid)
         size_t total_symbol_id = pilot_symbol_id;
         if (pilot_symbol_id == SIZE_MAX)
             total_symbol_id = ul_symbol_id + pilot_symbol_perframe;
-        printf("Received ue packet frame %zu symbol %zu ant %zu\n", frame_id,
-            symbol_id, ant_id);
+        if (kDebugPrintInTask)
+            printf("Received ue packet frame %zu symbol %zu ant %zu\n",
+                frame_id, symbol_id, ant_id);
         size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * ul_symbol_perframe
             + total_symbol_id;
@@ -486,6 +502,8 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
 
     short* src_ptr = (short*)(rx_buffer_ue + total_offset_ue);
 
+    // convert received data to complex float,
+    // apply channel, convert back to complex short to TX
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, nUEs);
     convert_short_to_float_simd(
         src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * nUEs);
@@ -533,6 +551,8 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 
     short* src_ptr = (short*)(rx_buffer_bs + total_offset_bs);
 
+    // convert received data to complex float,
+    // apply channel, convert back to complex short to TX
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, numAntennas);
     convert_short_to_float_simd(
         src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * numAntennas);
