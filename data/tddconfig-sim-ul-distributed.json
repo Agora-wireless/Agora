@@ -4,14 +4,13 @@
     "postfix": 0,
     "ofdm_ca_num": 2048,
     "ofdm_data_num": 1200,
-    "ofdm_data_start": 424,
     "cp_len": 0,
     "tx_prefix_len": 0,
     "ofdm_prefix_len": 0,
     "socket_thread_num": 1,
     "worker_thread_num": 1,
-    "subcarrier_block_size": 1200,
-    "demul_block_size": 48,
+    "subcarrier_block_size": 200,
+    "demul_block_size": 40,
     "antenna_num": 16,
     "ue_num": 4,
     "sender_addr": "192.168.21.184",
@@ -20,7 +19,10 @@
     "disable_master": true,
     "is_distributed": true,
     "server_addr_list": [
+        "192.168.21.184",
         "192.168.21.183"
     ],
-    "server_addr_idx": 0
+    "server_addr_idx": 0,
+    "subcarrier_start": 1024,
+    "subcarrier_end": 1624
 }
