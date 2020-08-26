@@ -34,12 +34,12 @@ public:
     // server, downlink at the client), we send UDP packets to kRemoteHostname
     const char* kRemoteHostname = "127.0.0.1";
 
-    // UDP packets for UE #i (uplink packets at the server, downlink packets at
-    // the client) are sent to kBaseRemotePort + i
+    // Millipede sends UDP packets for UE #i (uplink packets at the server,
+    // downlink packets at the client) with destination port kBaseRemotePort + i
     static constexpr size_t kBaseRemotePort = 8080;
 
-    // We listen for UDP packets from applications (downlink packets at the
-    // server, uplink packets at the client) on kLocalPort
+    // Millipede listens for UDP packets from applications (downlink packets at
+    // the server, uplink packets at the client) on kLocalPort
     static constexpr size_t kLocalPort = 8070;
 
     // Control information messages are sent via an out-of-band control

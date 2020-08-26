@@ -24,6 +24,5 @@
     "client_dl_pilot_syms": 2,
     "modulation": "16QAM",
     "worker_thread_num": 1,
-    "demul_block_size": 48,
-    "frames_to_test": 50000
+    "demul_block_size": 48
 }

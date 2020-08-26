@@ -145,10 +145,12 @@ Event_data DoFFT::launch(size_t tag)
 
     if (cfg->fft_in_rru) {
         simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
-            reinterpret_cast<float*>(&pkt->data[2 * cfg->OFDM_PREFIX_LEN]),
+            reinterpret_cast<float*>(
+                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_]),
             cfg->OFDM_CA_NUM * 2);
     } else {
-        convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+        convert_short_to_float_simd(
+            &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
             reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
         if (kDebugPrintInTask) {
