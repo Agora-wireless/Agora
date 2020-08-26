@@ -263,6 +263,15 @@ public:
                         // for (size_t i = 0; i
                         //      < cfg->UE_ANT_NUM / (cfg->server_addr_list.size());
                         //      i++) {
+                        size_t sc_sum = cfg->is_distributed
+                            ? cfg->OFDM_CONTROL_NUM
+                            : cfg->OFDM_DATA_NUM;
+                        for (size_t i = 0; i < cfg->UE_NUM; i++) {
+                            for (size_t j = 0; j < sc_sum; j++) {
+                                print_demod_data(demul_cur_frame - 1,
+                                    cfg->pilot_symbol_num_perframe, i, j);
+                            }
+                        }
                         rx_status_->decode_done(demul_cur_frame - 1);
                         // }
                     }
@@ -401,6 +410,18 @@ private:
         }
         // printf("(%f %f)\n", csi_buffer_[1][0].re, csi_buffer_[1][0].im);
         return Event_data(EventType::kCSI, tag);
+    }
+
+    void print_demod_data(
+        size_t frame_id, size_t symbol_id, size_t ue_id, size_t sc_id)
+    {
+        int8_t* demul_ptr = cfg->get_demod_buf(demod_soft_buffer_, frame_id,
+            symbol_id - cfg->pilot_symbol_num_perframe, ue_id, sc_id);
+        printf("(");
+        for (size_t i = 0; i < cfg->mod_type; i++) {
+            printf("%x ", demul_ptr[i]);
+        }
+        printf(")\n");
     }
 
     /// The subcarrier range handled by this subcarrier doer.
