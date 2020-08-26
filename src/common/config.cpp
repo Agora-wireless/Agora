@@ -74,21 +74,21 @@ Config::Config(std::string jsonfile)
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
-    auto symbolSize = tddConf.value("symbol_size", 1);
-    prefix = tddConf.value("prefix", 0);
-    dl_prefix = tddConf.value("dl_prefix", 0);
-    postfix = tddConf.value("postfix", 0);
-    TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 0);
+    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     CP_LEN = tddConf.value("cp_len", 0);
-    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
-    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
-    OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
+    ofdm_tx_zero_prefix_ = tddConf.value("ofdm_tx_zero_prefix", 0);
+    ofdm_tx_zero_postfix_ = tddConf.value("ofdm_tx_zero_postfix", 0);
+    ofdm_rx_zero_prefix_bs_
+        = tddConf.value("ofdm_rx_zero_prefix_bs", 0) + CP_LEN;
+    ofdm_rx_zero_prefix_client_
+        = tddConf.value("ofdm_rx_zero_prefix_client", 0);
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
         "Transpose block size must divide number of OFDM data subcarriers");
+    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
     OFDM_DATA_START
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     OFDM_DATA_STOP = OFDM_DATA_START + OFDM_DATA_NUM;
@@ -184,8 +184,6 @@ Config::Config(std::string jsonfile)
     core_offset = tddConf.value("core_offset", 18);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
-    mac_socket_thread_num
-        = tddConf.value("mac_socket_thread_num", kEnableMac ? 1 : 0);
     fft_thread_num = tddConf.value("fft_thread_num", 5);
     demul_thread_num = tddConf.value("demul_thread_num", 5);
     decode_thread_num = tddConf.value("decode_thread_num", 10);
@@ -246,31 +244,32 @@ Config::Config(std::string jsonfile)
     
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
-    sampsPerSymbol = symbolSize * (OFDM_CA_NUM + CP_LEN) + prefix + postfix;
-    packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
-
-    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+    sampsPerSymbol
+        = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
+    packet_length
+        = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
     data_bytes_num_persymbol
         = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
-    data_bytes_num_perframe = data_bytes_num_persymbol
-        * (ul_data_symbol_num_perframe - UL_PILOT_SYMS);
-    mac_data_bytes_num_perframe = data_bytes_num_perframe;
-    mac_packet_length = Packet::kOffsetOfData + mac_data_bytes_num_perframe;
-    // The current implementation only supports the case when  MAC packet size
-    // is multiples of data_bytes_num_perframe
-    if (data_bytes_num_perframe != 0)
-        rt_assert(mac_data_bytes_num_perframe % data_bytes_num_perframe == 0,
-            "MAC packet size need to be multiples of data_bytes_num_perframe!");
+    mac_packet_length = data_bytes_num_persymbol;
+    mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
+    mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
+    mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
+    mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
     std::cout << "Config: "
-              << "BS_ANT_NUM " << BS_ANT_NUM << ", UE_ANT_NUM " << UE_ANT_NUM
-              << ", PILOT SYM NUM " << pilot_symbol_num_perframe
-              << ", UL SYM NUM " << ul_data_symbol_num_perframe
-              << ", DL SYM NUM " << dl_data_symbol_num_perframe
-              << ", OFDM_CA_NUM " << OFDM_CA_NUM << ", OFDM_DATA_NUM "
-              << OFDM_DATA_NUM << ", packet length " << packet_length
+              << "\n  BS_ANT_NUM: " << BS_ANT_NUM
+              << "\n  UE_ANT_NUM: " << UE_ANT_NUM
+              << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
+              << "\n  ul_data_symbol_num_perframe: "
+              << ul_data_symbol_num_perframe
+              << "\n  dl_data_symbol_num_perframe: "
+              << dl_data_symbol_num_perframe << "\n  OFDM_CA_NUM "
+              << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: " << OFDM_DATA_NUM
+              << "\n  mac_data_bytes_num_perframe: "
+              << mac_data_bytes_num_perframe
+              << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
               << std::endl;
 
     if (packet_length >= 9000) {
@@ -314,7 +313,8 @@ void Config::genData()
 
         beacon_len = beacon_ci16.size();
 
-        if (sampsPerSymbol < beacon_len + prefix + postfix) {
+        if (sampsPerSymbol
+            < beacon_len + ofdm_tx_zero_prefix_ + ofdm_tx_zero_postfix_) {
             std::string msg = "Minimum supported symbol_size is ";
             msg += std::to_string(beacon_len);
             throw std::invalid_argument(msg);
@@ -568,7 +568,7 @@ void Config::genData()
             size_t q = u * OFDM_CA_NUM;
             size_t r = u * sampsPerSymbol;
             CommsLib::ifft2tx(&dl_iq_ifft[i][q], &dl_iq_t[i][r], OFDM_CA_NUM,
-                prefix, CP_LEN, scale);
+                ofdm_tx_zero_prefix_, CP_LEN, scale);
         }
     }
 
@@ -578,19 +578,19 @@ void Config::genData()
             size_t q = u * OFDM_CA_NUM;
             size_t r = u * sampsPerSymbol;
             CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t[i][r], OFDM_CA_NUM,
-                prefix, CP_LEN, scale);
+                ofdm_tx_zero_prefix_, CP_LEN, scale);
         }
     }
 
     // Generate time domain ue-specific pilot symbols
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
-            prefix, CP_LEN, scale);
+            ofdm_tx_zero_prefix_, CP_LEN, scale);
     }
 
     pilot_ci16.resize(sampsPerSymbol, 0);
     CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)pilot_ci16.data(),
-        OFDM_CA_NUM, prefix, CP_LEN, scale);
+        OFDM_CA_NUM, ofdm_tx_zero_prefix_, CP_LEN, scale);
 
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilot_cf32.push_back(std::complex<float>(
@@ -601,7 +601,7 @@ void Config::genData()
     // generate a UINT32 version to write to FPGA buffers
     pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
 
-    std::vector<uint32_t> pre_uint32(prefix, 0);
+    std::vector<uint32_t> pre_uint32(ofdm_tx_zero_prefix_, 0);
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
     pilot.resize(sampsPerSymbol);
 

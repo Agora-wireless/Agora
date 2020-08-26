@@ -7,6 +7,8 @@
 #ifdef USE_DPDK
 
 #include "dpdk_transport.hpp"
+#include "buffer.hpp"
+#include "eth_common.h"
 #include "utils.h"
 #include <string>
 
@@ -129,6 +131,20 @@ void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
         _mm256_stream_si256(pDest, loaded);
     }
     _mm_sfence();
+}
+
+std::string DpdkTransport::pkt_to_string(const rte_mbuf* pkt)
+{
+    const uint8_t* buf = rte_pktmbuf_mtod(pkt, uint8_t*);
+
+    std::ostringstream ret;
+    ret << frame_header_to_string(buf) << " [ "
+        << std::to_string(kPayloadOffset - kInetHdrsTotSize)
+        << " unused bytes ] ";
+
+    auto* packet = reinterpret_cast<const Packet*>(buf + kPayloadOffset);
+    ret << packet->to_string();
+    return ret.str();
 }
 
 void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,
@@ -285,14 +301,9 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
     std::string core_list = std::to_string(core_offset) + "-"
         + std::to_string(core_offset + thread_num);
     // n: channels, m: maximum memory in megabytes
-    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
+    const char* rte_argv[]
+        = { "txrx", "-l", core_list.c_str(), "--log-level", "0", nullptr };
     int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
-
-    printf("rte_eal_init argv: ");
-    for (int i = 0; i < rte_argc; i++) {
-        printf("%s, ", rte_argv[i]);
-    }
-    printf("\n");
 
     // Initialize DPDK environment
     int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));

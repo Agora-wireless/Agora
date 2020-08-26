@@ -85,7 +85,6 @@ public:
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
-    void doMapBits(int, size_t);
     void doEncode(int, size_t);
     void doModul(int, size_t);
     void doIFFT(int, size_t);
@@ -187,9 +186,6 @@ private:
     size_t dl_symbol_perframe;
     size_t tx_symbol_perframe;
     size_t symbol_len; // samples in sym without prefix and postfix
-    size_t dl_prefix_len;
-    size_t prefix_len;
-    size_t postfix_len;
     size_t ofdm_syms; // number of OFDM symbols in general symbol (i.e. symbol)
     size_t FFT_LEN;
     size_t CP_LEN;
@@ -216,22 +212,29 @@ private:
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
 
+    // The frame ID of the next MAC packet we expect to receive from the MAC
+    // thread
+    size_t expected_frame_id_from_mac_ = 0;
+    size_t current_frame_user_num_ = 0;
+
+    // num_frames_consumed_[i] is the number of frames on the uplink completely
+    // processed (i.e., including radio transmissing) by the PHY for UE #i
+    size_t num_frames_consumed_[kMaxUEs] = {};
+
+
     /*****************************************************
      * Uplink
      *****************************************************/
 
-    // std::unique_ptr<L2> l2_;
-
     /**
-     * transmit data
-     * Frist dimension: TX_THREAD_NUM
-     * Second dimension of buffer (type: uchar): packet_length * UE_NUM *
-     * DL_SYM_PER_FRAME * TX_BUFFER_FRAME_NUM packet_length = sizeof(int) * 4 +
-     * sizeof(uchar) * OFDM_FRAME_LEN; Second dimension of buffer_status:
-     * DL_SYM_PER_FRAME * UE_NUM * TX_BUFFER_FRAME_NUM
+     * Transmit data
+     *
+     * Number of transmit buffers (size = packet_length) and buffer status
+     * entries: TX_THREAD_NUM * TX_BUFFER_FRAME_NUM * UE_NUM * DL_SYM_PER_FRAME
      */
     char* tx_buffer_;
     int* tx_buffer_status_;
+
     int tx_buffer_size;
     int tx_buffer_status_size;
 
@@ -269,16 +272,15 @@ private:
     std::unique_ptr<RadioTXRX> ru_;
 
     /**
-     * received data
-     * Frist dimension: RX_THREAD_NUM
-     * Second dimension of buffer (type: char): packet_length *
-     * symbol_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM packet_length =
-     * sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2; Second dimension
-     * of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * RX_BUFFER_FRAME_NUM
+     * Received data
+     *
+     * Number of RX buffers (size = packet_length) and buffer status
+     * entries: RX_THREAD_NUM * RX_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * symbol_num_perframe
      */
     Table<char> rx_buffer_;
     Table<int> rx_buffer_status_;
+
     int rx_buffer_size;
     int rx_buffer_status_size;
 
@@ -330,7 +332,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> modul_queue_;
-    moodycamel::ConcurrentQueue<Event_data> map_queue_;
 
     pthread_t task_threads[kMaxThreads];
 

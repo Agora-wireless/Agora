@@ -34,8 +34,26 @@ public:
         return false;
     }
 
+    /// The main event handling function that performs Doer-specific work.
+    /// Doers that handle only one event type use this signature.
+    virtual Event_data launch(size_t tag)
+    {
+        _unused(tag);
+        rt_assert(false, "Doer: launch(tag) not implemented");
+        return Event_data();
+    }
+
+    /// The main event handling function that performs Doer-specific work.
+    /// Doers that handle multiple event types use this signature.
+    virtual Event_data launch(size_t tag, EventType event_type)
+    {
+        _unused(tag);
+        _unused(event_type);
+        rt_assert(false, "Doer: launch(tag, event_type) not implemented");
+        return Event_data();
+    }
+
 protected:
-    virtual Event_data launch(size_t tag) = 0;
     Doer(Config* in_config, int in_tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -48,6 +66,8 @@ protected:
         , worker_producer_token(worker_producer_token)
     {
     }
+
+    virtual ~Doer() = default;
 
     Config* cfg;
     int tid; // Thread ID of this Doer
