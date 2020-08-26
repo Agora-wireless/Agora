@@ -90,6 +90,7 @@ private:
     size_t samps_persymbol;
     size_t nUEs;
     size_t payload_len;
+    size_t payload_samps;
 
     size_t bs_thread_num;
     size_t user_thread_num;

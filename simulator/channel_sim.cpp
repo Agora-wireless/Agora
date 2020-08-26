@@ -5,6 +5,7 @@ static bool running = true;
 static void convert_short_to_float_simd(
     short* in_buf, float* out_buf, size_t length)
 {
+#if SIMD
 #ifdef __AVX512F__
     const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
     const __m512i magic_i = _mm512_castps_si512(magic);
@@ -50,10 +51,16 @@ static void convert_short_to_float_simd(
     for (size_t i = length / 16; i < length; i++) {
         out_buf[i] = (float)(in_buf[i] / 32768.f);
     }
+#else
+    for (size_t i = 0; i < length; i++) {
+        out_buf[i] = (float)(in_buf[i] / 32768.f);
+    }
+#endif
 }
 
 static void convert_float_to_short_simd(float* in_buf, short* out_buf, size_t length)
 {
+	/*
     for (size_t i = 0; i < length; i += 16) {
         __m256 data1 = _mm256_load_ps(in_buf + i);
         __m256 data2 = _mm256_load_ps(in_buf + i + 8);
@@ -65,6 +72,10 @@ static void convert_float_to_short_simd(float* in_buf, short* out_buf, size_t le
             (__m256i*)&out_buf[i], integer1);
     }
     for (size_t i = length / 16; i < length; i++) {
+        out_buf[i] = (short)(in_buf[i] * 32768.f);
+    }
+    */
+    for (size_t i = 0; i < length; i++) {
         out_buf[i] = (short)(in_buf[i] * 32768.f);
     }
 }
@@ -91,14 +102,6 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     ul_data_symbol_perframe = bscfg->ul_data_symbol_num_perframe;
     pilot_symbol_perframe = bscfg->pilot_symbol_num_perframe;
     ul_symbol_perframe = ul_data_symbol_perframe + pilot_symbol_perframe;
-    //const size_t udp_pkt_len = bscfg->packet_length;
-    //for (size_t i = 0; i < user_socket_num; i++)
-    //    udp_server_uerx.push_back(
-    //        new UDPServer(uecfg->ue_rru_port + i, udp_pkt_len * kMaxUEs * 64));
-    //for (size_t i = 0; i < bs_socket_num; i++)
-    //    udp_server_bsrx.push_back(new UDPServer(
-    //        bscfg->bs_rru_port + i, udp_pkt_len * kMaxAntennas * 64));
-    //udp_client = new UDPClient();
     socket_bs_.resize(bs_socket_num);
     servaddr_bs_.resize(bs_socket_num);
     socket_ue_.resize(user_socket_num);
@@ -113,6 +116,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
 
     assert(bscfg->packet_length == uecfg->packet_legnth);
     payload_len = bscfg->packet_length - Packet::kOffsetOfData;
+    payload_samps = bscfg->sampsPerSymbol;
 
     // initialize buffers
     size_t tx_buffer_ue_size
@@ -143,14 +147,15 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     memset(user_tx_counter_, 0, sizeof(size_t) * TASK_BUFFER_FRAME_NUM);
 
     cx_fmat H(randn<fmat>(nUEs, numAntennas), randn<fmat>(nUEs, numAntennas));
-    channel = H;
+    channel = H / abs(H).max();
+    std::cout << "Channel: " << channel << std::endl;
 
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
     }
     alloc_buffer_1d(&task_threads, worker_thread_num, 64, 0);
 
-    // create task thread
+    // create task threads (transmit to base station and client antennas)
     for (size_t i = 0; i < worker_thread_num; i++) {
         auto context = new EventHandlerContext<ChannelSim>;
         context->obj_ptr = this;
@@ -351,16 +356,6 @@ void* ChannelSim::bs_rx_loop(int tid)
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     int socket_id = socket_lo;
     while (running) {
-        //ssize_t ret = udp_server_bsrx[socket_id]->recv_nonblocking(
-        //    &udp_pkt_buf[0], udp_pkt_buf.size());
-        //if (ret == 0) {
-        //    continue; // No data received
-        //} else if (ret == -1) {
-        //    // There was an error in receiving
-        //    running = false;
-        //    break;
-        //}
-        //rt_assert(static_cast<size_t>(ret) == bscfg->packet_length);
         if (-1
             == recv(socket_bs_[socket_id], (char*)udp_pkt_buf.data(),
                    udp_pkt_buf.size(), 0)) {
@@ -386,7 +381,6 @@ void* ChannelSim::bs_rx_loop(int tid)
         memcpy((void*)(rx_buffer_bs + offset * payload_len), pkt->data,
             payload_len);
 
-        // push an event here
         Event_data bs_rx_message(EventType::kPacketRX,
             gen_tag_t::frm_sym_ant(frame_id, symbol_id, ant_id)._tag);
         if (!message_queue_.enqueue(local_ptok, bs_rx_message)) {
@@ -425,16 +419,6 @@ void* ChannelSim::ue_rx_loop(int tid)
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     int socket_id = socket_lo;
     while (running) {
-        //ssize_t ret = udp_server_uerx[socket_id]->recv_nonblocking(
-        //    &udp_pkt_buf[0], udp_pkt_buf.size());
-        //if (ret == 0) {
-        //    continue; // No data received
-        //} else if (ret == -1) {
-        //    // There was an error in receiving
-        //    running = false;
-        //    break;
-        //}
-        //rt_assert(static_cast<size_t>(ret) == uecfg->packet_length);
         if (-1
             == recv(socket_ue_[socket_id], (char*)&udp_pkt_buf[0],
                    udp_pkt_buf.size(), 0)) {
@@ -467,7 +451,6 @@ void* ChannelSim::ue_rx_loop(int tid)
         memcpy((void*)(rx_buffer_ue + offset * payload_len), pkt->data,
             payload_len);
 
-        // push an event here
         Event_data user_rx_message(EventType::kPacketRX,
             gen_tag_t::frm_sym_ue(frame_id, symbol_id, ant_id)._tag);
         if (!message_queue_.enqueue(local_ptok, user_rx_message)) {
@@ -499,13 +482,14 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
 
     short* src_ptr = (short*)(rx_buffer_ue + total_offset_ue);
 
-    cx_fmat fmat_src = zeros<cx_fmat>(payload_len, nUEs);
-    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_len * nUEs);
+    cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, nUEs);
+    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * nUEs);
 
     cx_fmat fmat_dst = fmat_src * channel;
 
     short* dst_ptr = (short*)(tx_buffer_bs + total_offset_bs);
-    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_len * numAntennas);
+    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_samps * numAntennas);
+    std::stringstream ss;
 
     // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
@@ -519,8 +503,6 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
             udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_bs_[ant_id],
             sizeof(servaddr_bs_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
-        //udp_client->send(bscfg->bs_addr, bscfg->bs_port + ant_id, &udp_pkt_buf[0],
-        //    udp_pkt_buf.size());
     }
 
     Event_data bs_tx_message(EventType::kPacketTX,
@@ -545,13 +527,13 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 
     short* src_ptr = (short*)(rx_buffer_bs + total_offset_bs);
 
-    cx_fmat fmat_src = zeros<cx_fmat>(payload_len, numAntennas);
-    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_len * numAntennas);
+    cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, numAntennas);
+    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * numAntennas);
 
     cx_fmat fmat_dst = fmat_src * channel.st();
 
     short* dst_ptr = (short*)(tx_buffer_ue + total_offset_ue);
-    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_len * nUEs);
+    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_samps * nUEs);
 
     // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
@@ -565,8 +547,6 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
             udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_ue_[ant_id],
             sizeof(servaddr_ue_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
-        //udp_client->send(uecfg->ue_addr, uecfg->ue_port + ant_id, &udp_pkt_buf[0],
-        //    udp_pkt_buf.size());
     }
 
     Event_data user_tx_message(EventType::kPacketTX,
