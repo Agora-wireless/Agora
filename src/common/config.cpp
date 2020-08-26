@@ -75,21 +75,20 @@ Config::Config(std::string jsonfile)
 
     /* frame configurations */
     ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
-    auto symbolSize = tddConf.value("symbol_size", 1);
-    prefix = tddConf.value("prefix", 0);
-    dl_prefix = tddConf.value("dl_prefix", 0);
-    postfix = tddConf.value("postfix", 0);
-    TX_PREFIX_LEN = tddConf.value("tx_prefix_len", 0);
     CP_LEN = tddConf.value("cp_len", 0);
-    OFDM_PREFIX_LEN = tddConf.value("ofdm_prefix_len", 0) + CP_LEN;
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
-    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
-    OFDM_PILOT_NUM = OFDM_DATA_NUM / OFDM_PILOT_SPACING;
+    ofdm_tx_zero_prefix_ = tddConf.value("ofdm_tx_zero_prefix", 0);
+    ofdm_tx_zero_postfix_ = tddConf.value("ofdm_tx_zero_postfix", 0);
+    ofdm_rx_zero_prefix_bs_
+        = tddConf.value("ofdm_rx_zero_prefix_bs", 0) + CP_LEN;
+    ofdm_rx_zero_prefix_client_
+        = tddConf.value("ofdm_rx_zero_prefix_client", 0);
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
         "Transpose block size must divide number of OFDM data subcarriers");
+    OFDM_PILOT_SPACING = tddConf.value("ofdm_pilot_spacing", 16);
     OFDM_DATA_START
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     OFDM_DATA_STOP = OFDM_DATA_START + OFDM_DATA_NUM;
@@ -241,10 +240,10 @@ Config::Config(std::string jsonfile)
 
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
-    sampsPerSymbol = symbolSize * (OFDM_CA_NUM + CP_LEN) + prefix + postfix;
-    packet_length = Packet::kOffsetOfData + sizeof(short) * sampsPerSymbol * 2;
-
-    OFDM_FRAME_LEN = OFDM_CA_NUM + OFDM_PREFIX_LEN;
+    sampsPerSymbol
+        = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
+    packet_length
+        = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
     data_bytes_num_persymbol
         = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
@@ -310,7 +309,8 @@ void Config::genData()
 
         beacon_len = beacon_ci16.size();
 
-        if (sampsPerSymbol < beacon_len + prefix + postfix) {
+        if (sampsPerSymbol
+            < beacon_len + ofdm_tx_zero_prefix_ + ofdm_tx_zero_postfix_) {
             std::string msg = "Minimum supported symbol_size is ";
             msg += std::to_string(beacon_len);
             throw std::invalid_argument(msg);
@@ -564,7 +564,7 @@ void Config::genData()
             size_t q = u * OFDM_CA_NUM;
             size_t r = u * sampsPerSymbol;
             CommsLib::ifft2tx(&dl_iq_ifft[i][q], &dl_iq_t[i][r], OFDM_CA_NUM,
-                prefix, CP_LEN, scale);
+                ofdm_tx_zero_prefix_, CP_LEN, scale);
         }
     }
 
@@ -574,19 +574,19 @@ void Config::genData()
             size_t q = u * OFDM_CA_NUM;
             size_t r = u * sampsPerSymbol;
             CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t[i][r], OFDM_CA_NUM,
-                prefix, CP_LEN, scale);
+                ofdm_tx_zero_prefix_, CP_LEN, scale);
         }
     }
 
     // Generate time domain ue-specific pilot symbols
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
-            prefix, CP_LEN, scale);
+            ofdm_tx_zero_prefix_, CP_LEN, scale);
     }
 
     pilot_ci16.resize(sampsPerSymbol, 0);
     CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)pilot_ci16.data(),
-        OFDM_CA_NUM, prefix, CP_LEN, scale);
+        OFDM_CA_NUM, ofdm_tx_zero_prefix_, CP_LEN, scale);
 
     for (size_t i = 0; i < OFDM_CA_NUM; i++)
         pilot_cf32.push_back(std::complex<float>(
@@ -597,7 +597,7 @@ void Config::genData()
     // generate a UINT32 version to write to FPGA buffers
     pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
 
-    std::vector<uint32_t> pre_uint32(prefix, 0);
+    std::vector<uint32_t> pre_uint32(ofdm_tx_zero_prefix_, 0);
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
     pilot.resize(sampsPerSymbol);
 
