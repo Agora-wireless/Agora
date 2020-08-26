@@ -249,10 +249,7 @@ void* RadioTXRX::loop_tx_rx(int tid)
         struct Packet* pkt = recv_enqueue(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
-        printf("current rx_offset %zu, buffer_frame_num_ %d \n", rx_offset,
-            buffer_frame_num_);
         rx_offset = (rx_offset + 1) % buffer_frame_num_;
-        printf("next rx_offset %zu\n", rx_offset);
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;

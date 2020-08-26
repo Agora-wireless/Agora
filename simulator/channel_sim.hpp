@@ -30,11 +30,6 @@ class ChannelSim {
 public:
     static const int dequeue_bulk_size = 5;
 
-    //struct ChannelSimContext {
-    //    ChannelSim* ptr;
-    //    int tid;
-    //};
-
 public:
     ChannelSim(Config* bscfg, Config* uecfg, size_t bs_socket_num,
         size_t ue_socket_num, size_t bs_thread_num, size_t user_thread_num,
@@ -43,10 +38,14 @@ public:
 
     void start();
 
+    // loop thread receiving symbols from client antennas
     void* ue_rx_loop(int tid);
+    // loop thread receiving symbols from BS antennas
     void* bs_rx_loop(int tid);
 
+    // transmits symbols to BS antennas after applying channel
     void do_tx_bs(int tid, size_t tag);
+    // transmits symbols to client antennas after applying channel
     void do_tx_user(int tid, size_t tag);
 
     void schedule_task(Event_data do_task,
@@ -55,26 +54,38 @@ public:
     void* taskThread(int tid);
 
 private:
-    //UDPClient* udp_client; // UDP endpoint used for sending messages
-    //std::vector<UDPServer*>
-    //    udp_server_uerx; // UDP endpoint used for receiving messages from client phy
-    //std::vector<UDPServer*>
-    //    udp_server_bsrx; // UDP endpoint used for receiving messages from base station phy
-    std::vector<struct sockaddr_in> servaddr_bs_; /* server address */
+    // bs-facing servers addresses
+    std::vector<struct sockaddr_in> servaddr_bs_;
+    // bs-facing sockets
     std::vector<int> socket_bs_;
-    std::vector<struct sockaddr_in> servaddr_ue_; /* server address */
+    // ue-facing servers addresses
+    std::vector<struct sockaddr_in> servaddr_ue_;
+    // ue-facing sockets
     std::vector<int> socket_ue_;
 
     Config* bscfg;
     Config* uecfg;
     cx_fmat channel;
+
+    // data buffer for symbols to be transmitted to BS antennas (uplink)
     char* tx_buffer_bs;
+
+    // data buffer for symbols to be transmitted to client antennas (downlink)
     char* tx_buffer_ue;
+
+    // data buffer for received symbols from BS antennas (downlink)
     char* rx_buffer_bs;
+
+    // data buffer for received symbols from client antennas (uplink)
     char* rx_buffer_ue;
 
+    // Task Queue for tasks related to incoming BS packets
     moodycamel::ConcurrentQueue<Event_data> task_queue_bs;
+
+    // Task Queue for tasks related to incoming Users' packets
     moodycamel::ConcurrentQueue<Event_data> task_queue_user;
+
+    // Master thread's message queue for event completions;
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ProducerToken* task_ptok[kMaxThreads];
 

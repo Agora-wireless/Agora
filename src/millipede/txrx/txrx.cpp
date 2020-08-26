@@ -92,9 +92,6 @@ void PacketTXRX::sendBeacon(int tid, size_t frame_id)
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
         new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
-        //udp_client->send(uecfg->ue_addr, uecfg->ue_port, (uint8_t*)&udp_pkt_buf[0],
-        //    udp_pkt_buf.size());
-        printf("sending frame 0 beacon from antenna %d\n", ant_id);
         ssize_t r = sendto(socket_[ant_id], (char*)udp_pkt_buf.data(),
             cfg->packet_length, 0, (struct sockaddr*)&servaddr_[ant_id],
             sizeof(servaddr_[ant_id]));
