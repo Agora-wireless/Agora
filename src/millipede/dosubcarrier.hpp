@@ -417,7 +417,7 @@ private:
     {
         int8_t* demul_ptr = cfg->get_demod_buf(demod_soft_buffer_, frame_id,
             symbol_id - cfg->pilot_symbol_num_perframe, ue_id, sc_id);
-        printf("(");
+        printf("(%lu %lu %lu %lu): (", frame_id, symbol_id, ue_id, sc_id);
         for (size_t i = 0; i < cfg->mod_type; i++) {
             printf("%02x ", (uint8_t)demul_ptr[i]);
         }
