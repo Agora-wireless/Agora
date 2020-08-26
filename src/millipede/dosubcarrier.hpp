@@ -422,6 +422,7 @@ private:
             printf("%02x ", (uint8_t)demul_ptr[i]);
         }
         printf(")\n");
+        fflush(stdout);
     }
 
     /// The subcarrier range handled by this subcarrier doer.
