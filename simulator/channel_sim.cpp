@@ -58,9 +58,10 @@ static void convert_short_to_float_simd(
 #endif
 }
 
-static void convert_float_to_short_simd(float* in_buf, short* out_buf, size_t length)
+static void convert_float_to_short_simd(
+    float* in_buf, short* out_buf, size_t length)
 {
-	/*
+    /*
     for (size_t i = 0; i < length; i += 16) {
         __m256 data1 = _mm256_load_ps(in_buf + i);
         __m256 data2 = _mm256_load_ps(in_buf + i + 8);
@@ -260,7 +261,8 @@ void ChannelSim::start()
                     user_rx_counter_[frame_offset]++;
                     if (user_rx_counter_[frame_offset] == nUEs) {
                         user_rx_counter_[frame_offset] = 0;
-                        printf("Scheduling transmission of frame %zu from %zu users to bs\n",
+                        printf("Scheduling transmission of frame %zu from %zu "
+                               "users to bs\n",
                             frame_id, nUEs);
                         Event_data do_tx_bs_task(
                             EventType::kPacketTX, event.tags[0]);
@@ -276,7 +278,8 @@ void ChannelSim::start()
                     bs_rx_counter_[frame_offset]++;
                     if (bs_rx_counter_[frame_offset] == numAntennas) {
                         bs_rx_counter_[frame_offset] = 0;
-                        printf("Scheduling transmission of frame %zu from %zu bs antennas to  %zu users\n",
+                        printf("Scheduling transmission of frame %zu from %zu "
+                               "bs antennas to  %zu users\n",
                             frame_id, numAntennas, nUEs);
                         Event_data do_tx_user_task(
                             EventType::kPacketTX, event.tags[0]);
@@ -371,8 +374,9 @@ void* ChannelSim::bs_rx_loop(int tid)
         size_t frame_id = pkt->frame_id;
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
-        printf("Received bs packet frame %zu symbol %zu ant %zu from socket %d\n", frame_id,
-            symbol_id, ant_id, socket_id);
+        printf(
+            "Received bs packet frame %zu symbol %zu ant %zu from socket %d\n",
+            frame_id, symbol_id, ant_id, socket_id);
         size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
         size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_perframe
@@ -483,12 +487,14 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     short* src_ptr = (short*)(rx_buffer_ue + total_offset_ue);
 
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, nUEs);
-    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * nUEs);
+    convert_short_to_float_simd(
+        src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * nUEs);
 
     cx_fmat fmat_dst = fmat_src * channel;
 
     short* dst_ptr = (short*)(tx_buffer_bs + total_offset_bs);
-    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_samps * numAntennas);
+    convert_float_to_short_simd(
+        (float*)fmat_dst.memptr(), dst_ptr, 2 * payload_samps * numAntennas);
     std::stringstream ss;
 
     // send the symbol to all base station antennas
@@ -528,12 +534,14 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     short* src_ptr = (short*)(rx_buffer_bs + total_offset_bs);
 
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, numAntennas);
-    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * numAntennas);
+    convert_short_to_float_simd(
+        src_ptr, (float*)fmat_src.memptr(), 2 * payload_samps * numAntennas);
 
     cx_fmat fmat_dst = fmat_src * channel.st();
 
     short* dst_ptr = (short*)(tx_buffer_ue + total_offset_ue);
-    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr, 2 * payload_samps * nUEs);
+    convert_float_to_short_simd(
+        (float*)fmat_dst.memptr(), dst_ptr, 2 * payload_samps * nUEs);
 
     // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
