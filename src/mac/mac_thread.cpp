@@ -94,8 +94,6 @@ void MacThread::send_ran_config_update(Event_data event)
     msg.tags[0] = rc.n_antennas;
     msg.tags[1] = rc.mod_type;
     msg.tags[2] = rc.frame_id;
-    printf("MAC thread: prepared RAN config update for frame %zu, mod %zu\n",
-        scheduler_next_frame_id_, rc.mod_type);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: failed to send RAN update to Millipede");
 
