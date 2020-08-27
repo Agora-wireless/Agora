@@ -780,8 +780,6 @@ void Millipede::create_threads(
 void Millipede::update_ran_config(RanConfig rc)
 {
     config_->mod_type = rc.mod_type;
-    printf("Main thread: frame %zu, changing modulation type to %zu\n",
-        rc.frame_id, config_->mod_type);
 }
 
 void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
