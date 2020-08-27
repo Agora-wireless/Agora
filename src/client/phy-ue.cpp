@@ -351,9 +351,9 @@ void Phy_UE::start()
                 if (current_frame_user_num_ == 0)
                     expected_frame_id_from_mac_++;
 
-                //printf("Main thread: received packet for frame %zu with "
-                //       "modulation %zu\n",
-                //    pkt->frame_id, pkt->rb_indicator.mod_type);
+                printf("Main thread: received packet for frame %zu with "
+                       "modulation %zu\n",
+                    pkt->frame_id, pkt->rb_indicator.mod_type);
                 if (kDebugPrintPacketsFromMac) {
                     std::stringstream ss;
                     ss << "PhyUE kPacketFromMac, frame ID " << pkt->frame_id

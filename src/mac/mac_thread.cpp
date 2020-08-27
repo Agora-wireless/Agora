@@ -304,7 +304,7 @@ void MacThread::process_udp_packets_from_apps_client(
         pkt->rsvd[1] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->rsvd[2] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->crc = 0;
-        //pkt->rb_indicator = ri;
+        pkt->rb_indicator = ri;
 
         memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
             cfg_->mac_payload_length);
