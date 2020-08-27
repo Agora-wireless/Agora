@@ -212,6 +212,7 @@ Config::Config(std::string jsonfile)
     is_distributed = tddConf.value("is_distributed", false);
     server_addr_list
         = tddConf.value("server_addr_list", std::vector<std::string>());
+    rt_assert(server_addr_list.size() > 0, "Address list is 0!");
     server_addr_idx = tddConf.value("server_addr_idx", 0);
     subcarrier_start = tddConf.value("subcarrier_start", OFDM_DATA_START);
     subcarrier_end = tddConf.value("subcarrier_end", OFDM_DATA_STOP);

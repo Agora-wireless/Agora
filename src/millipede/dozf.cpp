@@ -168,15 +168,17 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         // printf("sc %u, frame %u\n", cur_sc_id, frame_id);
         // printf("(%f %f)\n", csi_buffer_[1][0].re, csi_buffer_[1][0].re);
 
-        // for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        //     for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-        //         printf("(%f %f) ",
-        //             csi_gather_buffer[i * cfg->BS_ANT_NUM + j].re,
-        //             csi_gather_buffer[i * cfg->BS_ANT_NUM + j].im);
+        // if (cur_sc_id == 0 && frame_id == 0) {
+        //     for (size_t i = 0; i < cfg->UE_NUM; i++) {
+        //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+        //             printf("(%f %f) ",
+        //                 csi_gather_buffer[i * cfg->BS_ANT_NUM + j].re,
+        //                 csi_gather_buffer[i * cfg->BS_ANT_NUM + j].im);
+        //         }
+        //         printf("\n");
         //     }
         //     printf("\n");
         // }
-        // printf("\n");
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,

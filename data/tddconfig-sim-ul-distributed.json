@@ -13,16 +13,18 @@
     "demul_block_size": 40,
     "antenna_num": 16,
     "ue_num": 4,
-    "sender_addr": "192.168.21.184",
+    "sender_addr": "192.168.21.183",
     "core_offset": 2,
     "fft_in_rru": true,
     "disable_master": true,
     "is_distributed": true,
     "server_addr_list": [
-        "192.168.21.184",
         "192.168.21.183"
     ],
-    "server_addr_idx": 1,
+    "server_addr_idx": 0,
     "subcarrier_start": 424,
-    "subcarrier_end": 1024
+    "subcarrier_end": 1624,
+    "bs_port": 11000,
+    "ue_rx_port": 10000,
+    "ue_tx_port": 9000
 }

@@ -140,6 +140,8 @@ public:
         demul_cur_frame = 0;
         demul_cur_symbol_to_process = cfg->pilot_symbol_num_perframe;
         num_demul_task_completed = 0;
+
+        log = fopen("log1.txt", "w");
     }
 
     ~DoSubcarrier()
@@ -219,6 +221,9 @@ public:
                     num_zf_task_completed = 0;
                     printf("Main thread: ZF done frame: %lu\n", zf_cur_frame);
                     zf_cur_frame++;
+                    if (subcarrier_range_.start == 0) {
+                        // print_ul_zf_buf(zf_cur_frame - 1, 600);
+                    }
                 }
             }
             if (zf_cur_frame > demul_cur_frame
@@ -266,6 +271,7 @@ public:
                         // size_t sc_sum = cfg->is_distributed
                         //     ? cfg->OFDM_CONTROL_NUM
                         //     : cfg->OFDM_DATA_NUM;
+
                         for (size_t i = 0; i < cfg->UE_NUM; i++) {
                             for (size_t j = subcarrier_range_.start;
                                  j < subcarrier_range_.end; j++) {
@@ -306,6 +312,15 @@ private:
                           * cfg->packet_length)
                     + i * cfg->packet_length); // TODO: find out the packet
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
+
+                // if (frame_id == 0 && subcarrier_range_.start == 600) {
+                //     printf("(%04x %04x) ", (unsigned short)pkt->data[1024 * 2],
+                //         (unsigned short)pkt->data[1024 * 2 + 1]);
+                //     if (j == cfg->BS_ANT_NUM - 1) {
+                //         printf("\n");
+                //     }
+                // }
+
                 size_t block_idx_start
                     = subcarrier_range_.start / kTransposeBlockSize;
                 size_t block_idx_end
@@ -321,11 +336,11 @@ private:
                             = (block_idx * kTransposeBlockSize) + sc_j;
 
                         // if (j == 0 && i == 1 && sc_idx == 0) {
-                        //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
-                        //         printf("(%x %x) ", pkt->data[(sc_idx + t) * 2],
-                        //             pkt->data[(sc_idx + t) * 2 + 1]);
-                        //     }
-                        //     printf("\n");
+                        // for (size_t t = 0; t < kSCsPerCacheline; t++) {
+                        //     printf("(%x %x) ", pkt->data[(sc_idx + t) * 2],
+                        //         pkt->data[(sc_idx + t) * 2 + 1]);
+                        // }
+                        // printf("\n");
                         // }
 
                         if (cfg->is_distributed) {
@@ -351,6 +366,14 @@ private:
                         //     // exit(0);
                         // }
 
+                        // if (sc_idx == 0 && frame_id == 0) {
+                        //     printf("(%f %f) ", converted_sc[0].re,
+                        //         converted_sc[0].im);
+                        //     if (j == cfg->BS_ANT_NUM - 1) {
+                        //         printf("\n");
+                        //     }
+                        // }
+
                         const complex_float* src
                             = converted_sc; // TODO: find src pointer from pkt
 
@@ -366,32 +389,40 @@ private:
                         // With either of AVX-512 or AVX2, load one cacheline =
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
                         // TODO: AVX512 complex multiply support below
+                        size_t pilots_sgn_offset = 0;
+                        if (cfg->is_distributed) {
+                            size_t sc_block_size = cfg->OFDM_DATA_NUM
+                                / cfg->server_addr_list.size();
+                            pilots_sgn_offset
+                                = cfg->server_addr_idx * sc_block_size;
+                        }
 
                         __m256 fft_result0 = _mm256_load_ps(
                             reinterpret_cast<const float*>(src));
                         __m256 fft_result1 = _mm256_load_ps(
                             reinterpret_cast<const float*>(src + 4));
-                        __m256 pilot_tx0
-                            = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 3].im,
-                                cfg->pilots_sgn_[sc_idx + 3].re,
-                                cfg->pilots_sgn_[sc_idx + 2].im,
-                                cfg->pilots_sgn_[sc_idx + 2].re,
-                                cfg->pilots_sgn_[sc_idx + 1].im,
-                                cfg->pilots_sgn_[sc_idx + 1].re,
-                                cfg->pilots_sgn_[sc_idx].im,
-                                cfg->pilots_sgn_[sc_idx].re);
+                        __m256 pilot_tx0 = _mm256_set_ps(
+                            cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].re,
+                            cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].re,
+                            cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].re,
+                            cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].re);
                         fft_result0 = CommsLib::__m256_complex_cf32_mult(
                             fft_result0, pilot_tx0, true);
 
-                        __m256 pilot_tx1
-                            = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                                cfg->pilots_sgn_[sc_idx + 7].re,
-                                cfg->pilots_sgn_[sc_idx + 6].im,
-                                cfg->pilots_sgn_[sc_idx + 6].re,
-                                cfg->pilots_sgn_[sc_idx + 5].im,
-                                cfg->pilots_sgn_[sc_idx + 5].re,
-                                cfg->pilots_sgn_[sc_idx + 4].im,
-                                cfg->pilots_sgn_[sc_idx + 4].re);
+                        __m256 pilot_tx1 = _mm256_set_ps(
+                            cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].re,
+                            cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].re,
+                            cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].re,
+                            cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].im,
+                            cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset]
+                                .re);
                         fft_result1 = CommsLib::__m256_complex_cf32_mult(
                             fft_result1, pilot_tx1, true);
                         _mm256_stream_ps(
@@ -404,6 +435,12 @@ private:
                         //     }
                         //     printf("\n");
                         //     exit(0);
+                        // }
+                        // if (sc_idx == 0 && frame_id == 0) {
+                        //     printf("(%f %f) ", dst[0].re, dst[0].im);
+                        //     if (j == cfg->BS_ANT_NUM - 1) {
+                        //         printf("\n");
+                        //     }
                         // }
                     }
                 }
@@ -424,6 +461,20 @@ private:
         }
         printf(")\n");
         fflush(stdout);
+    }
+
+    void print_ul_zf_buf(size_t frame_id, size_t sc_id)
+    {
+        fprintf(log, "UL ZF buffer for (%lu %lu):\n", frame_id, sc_id);
+        complex_float* ptr = cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, sc_id);
+        for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+            for (size_t j = 0; j < cfg->UE_NUM; j++) {
+                fprintf(log, "(%lf %lf) ", ptr[i * cfg->UE_NUM + j].re,
+                    ptr[i * cfg->UE_NUM + j].im);
+            }
+            fprintf(log, "\n");
+        }
+        fprintf(log, "\n");
     }
 
     /// The subcarrier range handled by this subcarrier doer.
@@ -477,6 +528,8 @@ private:
 
     // Shared status with Decode threads
     DemulStatus* demul_status_;
+
+    FILE* log;
 };
 
 #endif // DOSUBCARRIER_HPP
