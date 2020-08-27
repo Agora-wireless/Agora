@@ -167,42 +167,37 @@ int RadioTXRX::dequeue_send(int tid)
                 tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
         }
 
-        auto* pkt = (symbol_idx == ant_id) ? (Packet*)pilot.data()
-                                           : (Packet*)zeros.data();
+        auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
+                                           : (struct Packet*)zeros.data();
         new (pkt) Packet(
             frame_id, c->pilotSymbols[0][symbol_idx], 0 /* cell_id */, ant_id);
         // Send pilots
-        ssize_t ret = sendto(socket_[ant_id % thread_num_], (char*)pkt,
+        ssize_t ret = sendto(socket_[ant_id], (char*)pkt,
             c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
             sizeof(servaddr_[tid]));
         rt_assert(ret > 0, "sendto() failed");
     }
-    for (size_t symbol_idx = 0; symbol_idx < c->ul_data_symbol_num_perframe;
-         symbol_idx++) {
+    for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
+         symbol_id++) {
 
-        size_t offset = (c->get_total_data_symbol_idx(frame_id, symbol_idx)
+        size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
                             * c->UE_ANT_NUM)
             + ant_id;
 
         if (kDebugPrintInTask) {
             printf("In TX thread %d: Transmitted frame %zu, data symbol %zu, "
                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-                tid, frame_id, c->ULSymbols[0][symbol_idx], ant_id,
+                tid, frame_id, c->ULSymbols[0][symbol_id], ant_id,
                 gen_tag_t(event.tags[0])._tag, offset,
                 message_queue_->size_approx());
         }
 
-        size_t socket_symbol_offset = offset
-            % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-                  * c->UE_ANT_NUM);
-        char* cur_buffer_ptr
-            = tx_buffer_ + socket_symbol_offset * c->packet_length;
-        auto* pkt = (Packet*)cur_buffer_ptr;
+        auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->packet_length);
         new (pkt) Packet(
-            frame_id, c->ULSymbols[0][symbol_idx], 0 /* cell_id */, ant_id);
+            frame_id, c->ULSymbols[0][symbol_id], 0 /* cell_id */, ant_id);
 
         // Send data (one OFDM symbol)
-        ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length,
+        ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
             0, (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
     }
