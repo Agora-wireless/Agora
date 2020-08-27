@@ -247,6 +247,7 @@ void* Sender::worker_thread(int tid)
     auto fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
     auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
+    char* data_buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
 
     double begin = get_time();
     size_t total_tx_packets = 0;
@@ -288,17 +289,29 @@ void* Sender::worker_thread(int tid)
         if (cfg->fft_in_rru) {
             run_fft(pkt, fft_inout, mkl_handle);
         }
+        if (cfg->is_distributed) {
+            memcpy(data_buf, pkt->data,
+                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+        }
 
 #ifdef USE_DPDK
         rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
         if (cfg->is_distributed) {
+            size_t block_size
+                = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
             for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+                memcpy(pkt->data,
+                    data_buf
+                        + (i * block_size + cfg->OFDM_DATA_START)
+                            * sizeof(unsigned short) * 2,
+                    block_size * sizeof(unsigned short) * 2);
                 udp_client.send(cfg->server_addr_list[i],
                     cfg->bs_port + cur_radio,
                     reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                    cfg->packet_length);
+                    Packet::kOffsetOfData
+                        + 2 * sizeof(unsigned short) * block_size);
             }
         } else {
             udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
