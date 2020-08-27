@@ -30,9 +30,9 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)));
+        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     csi_gather_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)));
+        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
@@ -152,9 +152,6 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
-        cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id);
-        cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id);
-        cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, cur_sc_id);
         compute_precoder(mat_csi,
             cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id),
             cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id),
