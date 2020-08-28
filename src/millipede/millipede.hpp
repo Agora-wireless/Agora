@@ -310,6 +310,10 @@ private:
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
 
     size_t cur_tid; // TODO (junzhi): Add documentation
+
+    // Threads running the subcarrier-parallel processing
+    std::vector<std::thread> do_subcarrier_threads_;
+
     moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 
     // Shared states between socket threads and dosubcarriers

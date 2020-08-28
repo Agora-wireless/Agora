@@ -92,15 +92,14 @@ Millipede::Millipede(Config* cfg)
 #endif // BIGSTATION
     } else {
         if (cfg->disable_master) {
-            create_threads(
-                pthread_fun_wrapper<Millipede, &Millipede::subcarrier_worker>,
-                0,
-                cfg->is_distributed
+            do_subcarrier_threads_.resize(cfg->is_distributed
                     ? cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size
                     : cfg->OFDM_DATA_NUM / cfg->subcarrier_block_size);
-            // create_threads(
-            //     pthread_fun_wrapper<Millipede, &Millipede::decode_worker>, 0,
-            //     cfg->UE_ANT_NUM);
+
+            for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
+                do_subcarrier_threads_[i]
+                    = std::thread(&Millipede::subcarrier_worker, this, i);
+            }
         } else {
             create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>,
                 0, cfg->worker_thread_num);
@@ -118,6 +117,12 @@ Millipede::~Millipede()
     if (kEnableMac)
         mac_std_thread_.join();
     delete mac_thread_;
+
+    if (config_->disable_master) {
+        for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
+            do_subcarrier_threads_[i].join();
+        }
+    }
 
     delete subcarrier_manager_;
 }
