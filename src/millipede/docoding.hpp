@@ -16,6 +16,7 @@
 #include "modulation.hpp"
 #include "phy_stats.hpp"
 #include "stats.hpp"
+#include "udp_client.h"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -27,32 +28,26 @@
 #include "utils_ldpc.hpp"
 
 #ifdef USE_REMOTE
-#include "rpc.h"
+/// A forward declaration of the function used to handle decode responses
+/// from remote LDPC workers.
+void decode_response_loop(Config* cfg);
 
-/// The state of an ePRC connection to a remote LDPC worker,
-/// including request/receive message buffers and counters.
+/// A connection to a remote LDPC worker, including request/receive buffers
+/// and counters.
 /// A single instance of this is shared between the two `DoDecode` instances
 /// in each worker thread.
-class RpcContext {
+class RemoteLdpcStub {
 public:
-    RpcContext(erpc::Rpc<erpc::CTransport>* rpc_, int session_)
-        : rpc(rpc_)
-        , session(session_)
-        , num_requests_issued(0)
+    RemoteLdpcStub()
+        : num_requests_issued(0)
         , num_responses_received(0)
     {
-        rpc = rpc_;
-        session = session_;
-        for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
-            auto* req_msgbuf = new erpc::MsgBuffer;
-            *req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
-            vec_req_msgbuf.push_back(req_msgbuf);
-        }
-        for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
-            auto* resp_msgbuf = new erpc::MsgBuffer;
-            *resp_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
-            vec_resp_msgbuf.push_back(resp_msgbuf);
-        }
+        // TODO: previously, eRPC req/resp buffers were pre-allocated here.
+        // for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
+        //     auto* req_msgbuf = new erpc::MsgBuffer;
+        //     *req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
+        //     vec_req_msgbuf.push_back(req_msgbuf);
+        // }
     }
 
 public:
@@ -61,27 +56,12 @@ public:
     /// Maximum size of preallocated msgbufs
     static const size_t kRpcMaxMsgSize = (1 << 15);
 
-    erpc::Rpc<erpc::CTransport>* rpc;
-    std::vector<erpc::MsgBuffer*> vec_req_msgbuf;
-    std::vector<erpc::MsgBuffer*> vec_resp_msgbuf;
-    int session;
+    /// The UDP socket used to send decode requests to the remote LDPC worker.
+    UDPClient udp_client;
     size_t num_requests_issued;
     size_t num_responses_received;
 };
-
-/// Local eRPC request tag used for processing responses of decoding tasks
-class DecodeTag {
-public:
-    size_t symbol_offset;
-    size_t output_offset;
-    size_t tag;
-    int tid;
-    erpc::MsgBuffer* req_msgbuf;
-    erpc::MsgBuffer* resp_msgbuf;
-    erpc::Rpc<erpc::CTransport>* rpc;
-};
 #endif // USE_REMOTE
-
 
 class DoEncode : public Doer {
 public:
@@ -119,39 +99,40 @@ public:
     Event_data launch(size_t tag);
 
 #ifdef USE_REMOTE
-    /// Creates and returns a new `RpcContext` that this doer will use to
-    /// communicate with the remote LDPC worker.
-    /// The returned `RpcContext` can be shared with other doers;
-    /// see the `set_initialized_rpc_context()` method.
-    RpcContext* initialize_erpc(erpc::Rpc<erpc::CTransport>* rpc, int session);
+public:
+    /// Returns the `RemoteLdpcStub` that this doer uses to communicate
+    /// with a remote LDPC worker.
+    /// The returned `RemoteLdpcStub` can be shared with other doers;
+    /// see the `set_initialized_remote_ldpc_stub()` method.
+    RemoteLdpcStub* initialize_remote_ldpc_stub()
+    {
+        remote_ldpc_stub_ = new RemoteLdpcStub();
+        return remote_ldpc_stub_;
+    }
 
     inline size_t get_num_requests()
     {
-        return rpc_context_->num_requests_issued;
+        return remote_ldpc_stub_->num_requests_issued;
     }
     inline size_t get_num_responses()
     {
-        return rpc_context_->num_responses_received;
+        return remote_ldpc_stub_->num_responses_received;
     }
 
-    friend void decode_cont_func(void* _context, void* _tag);
+    friend void decode_response_loop(Config* cfg);
 
-    /// Sets this doer's `RpcContext` to an already-initialized instance.
+    /// Sets this doer's `RemoteLdpcStub` to an already-initialized instance.
     /// This is useful because a single worker thread creates **two** instances
-    /// of `DoDecode`, and they must share a single Rpc context.
-    void set_initialized_rpc_context(RpcContext* rpc_context)
+    /// of `DoDecode`, and they must share a single `RemoteLdpcStub` context.
+    void set_initialized_remote_ldpc_stub(RemoteLdpcStub* stub)
     {
-        rpc_context_ = rpc_context;
+        remote_ldpc_stub_ = stub;
     }
 
-public:
-    /// eRPC request type for remote LDPC decoding
-    static const size_t kRpcReqType = 2;
 private:
-    RpcContext* rpc_context_;
+    RemoteLdpcStub* remote_ldpc_stub_;
 #endif // USE_REMOTE
 
-    
 private:
     int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
@@ -160,7 +141,50 @@ private:
     //Table<int> error_bits_count_;
     PhyStats* phy_stats;
     DurationStat* duration_stat;
-
 };
+
+#ifdef USE_REMOTE
+struct DecodeMsg; // forward declaration
+
+/// A context object used when receiving responses from the remote LDPC worker.
+class DecodeContext {
+public:
+    size_t symbol_offset;
+    size_t output_offset;
+    size_t tag;
+    int tid;
+    /// The DoDecode instance that sent the request.
+    DoDecode* doer;
+    std::vector<DecodeMsg*> request_buffer_pool;
+
+    DecodeContext(size_t symbol_offset, size_t output_offset, size_t tag,
+        int tid, DoDecode* doer)
+        : symbol_offset(symbol_offset)
+        , output_offset(output_offset)
+        , tag(tag)
+        , tid(tid)
+        , doer(doer)
+    {
+    }
+};
+
+/// The "packet" format of a decode request or response sent between
+/// Millipede and a remote LDPC worker.
+struct DecodeMsg {
+    /// The context of this decode request, which is only validly accessible
+    /// from the Millipede side where the `DoDecode` instance was created.
+    /// NOTE: THIS IS NOT VALID from within the remote LDPC worker side.
+    DecodeContext* context;
+    /// The dynamically-sized data in the message.
+    uint8_t data[];
+
+    /// Returns the size of the "header" of this message, i.e.,
+    /// everything before the dynamically-sized data.
+    static size_t size_without_data()
+    {
+        return offsetof(DecodeMsg, data);
+    }
+};
+#endif // USE_REMOTE
 
 #endif // DOCODING

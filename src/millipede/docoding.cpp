@@ -7,6 +7,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "udp_server.h"
 #include "utils_ldpc.hpp"
 #include <malloc.h>
 
@@ -14,35 +15,74 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
+/// TODO: FIXME: what size?
+static constexpr size_t kRxBufSize = 64 * 1024 * 1024;
+
 #ifdef USE_REMOTE
-void decode_cont_func(void* _context, void* _tag)
+/// This function should be run on its own thread to endlessly receive
+/// decode responses from remote LDPC workers and trigger the proper completion
+/// events expected by the rest of Millipede.
+/// There should only be one instance of this function running for the entire
+/// Millipede process.
+void decode_response_loop(Config* cfg)
 {
-    auto* computeDecoding = static_cast<DoDecode*>(_context);
-    auto* tag = static_cast<DecodeTag*>(_tag);
+    UDPServer udp_server(cfg->remote_ldpc_completion_port, kRxBufSize);
+    size_t decoded_bits = ldpc_encoding_input_buf_size(
+        cfg->LDPC_config.Bg, cfg->LDPC_config.Zc);
+    // The number of bytes that we receive at one time from the LDPC worker
+    // is defined by the `DecodeMsg` struct.
+    size_t rx_buf_len = DecodeMsg::size_without_data() + decoded_bits;
+    uint8_t* rx_buf = new uint8_t[rx_buf_len];
+    DecodeMsg* msg = reinterpret_cast<DecodeMsg*>(rx_buf);
 
-    auto symbol_offset = tag->symbol_offset;
-    auto output_offset = tag->output_offset;
-    uint8_t* out_buf
-        = static_cast<uint8_t*>(computeDecoding->decoded_buffer_[symbol_offset])
-        + output_offset;
+    while (cfg->running) {
+        ssize_t bytes_rcvd = udp_server.recv_nonblocking(rx_buf, rx_buf_len);
+        if (bytes_rcvd == 0) {
+            // no data received
+            continue;
+        } else if (bytes_rcvd == -1) {
+            // There was a socket receive error
+            cfg->running = false;
+            break;
+        }
 
-    memcpy(out_buf, tag->resp_msgbuf->buf, tag->resp_msgbuf->get_data_size());
+        rt_assert(bytes_rcvd == (ssize_t)rx_buf_len,
+            "Rcvd wrong decode response len");
+        DecodeContext* context = msg->context;
+        DoDecode* computeDecoding = context->doer;
+        rt_assert(
+            context->tid == computeDecoding->tid, "DoDecode tid mismatch");
 
-    Event_data resp_event;
-    resp_event.num_tags = 1;
-    resp_event.tags[0] = tag->tag;
-    resp_event.event_type = EventType::kDecode;
+        // Copy the decoded buffer received from the remote LDPC worker
+        // into the appropriate location in the decode doer's decoded buffer.
+        uint8_t* out_buf
+            = static_cast<uint8_t*>(
+                  computeDecoding->decoded_buffer_[context->symbol_offset])
+            + context->output_offset;
+        memcpy(out_buf, msg->data, decoded_bits);
 
-    try_enqueue_fallback(&computeDecoding->complete_task_queue,
-        computeDecoding->worker_producer_token, resp_event);
+        Event_data resp_event;
+        resp_event.num_tags = 1;
+        resp_event.tags[0] = context->tag;
+        /// TODO: FIXME: is this right? We never send a kDecodeLast event.
+        resp_event.event_type = EventType::kDecode;
 
-    computeDecoding->rpc_context_->vec_req_msgbuf.push_back(tag->req_msgbuf);
-    computeDecoding->rpc_context_->vec_resp_msgbuf.push_back(tag->resp_msgbuf);
-    delete tag;
+        try_enqueue_fallback(&computeDecoding->complete_task_queue,
+            computeDecoding->worker_producer_token, resp_event);
 
-    printf("Docoding: Received eRPC response %zu\n",
-        computeDecoding->rpc_context_->num_responses_received);
-    computeDecoding->rpc_context_->num_responses_received++;
+        // TODO: here, return msg buffers to the pool
+
+        // The message (rx_buf) will be reused, only delete the DecodeContext
+        // that was allocated by the DoDecode doer when the request was sent.
+        delete context;
+
+        printf("Docoding: Received response %zu\n",
+            computeDecoding->remote_ldpc_stub_->num_responses_received);
+        computeDecoding->remote_ldpc_stub_->num_responses_received++;
+    }
+
+    printf("Exiting decode_response_loop()\n");
+    delete rx_buf;
 }
 #endif // USE_REMOTE
 
@@ -138,16 +178,13 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
 }
 
-DoDecode::~DoDecode() { free(resp_var_nodes); }
-
-#ifdef USE_REMOTE
-RpcContext* DoDecode::initialize_erpc(
-    erpc::Rpc<erpc::CTransport>* rpc, int session)
+DoDecode::~DoDecode()
 {
-    rpc_context_ = new RpcContext(rpc, session);
-    return rpc_context_;
+    free(resp_var_nodes);
+    // NOTE: currently, the remote_ldpc_stub_ pointer may be shared with other
+    // DoDecode instances. Therefore, we cannot free it here, but rather
+    // we can only free it safely from within the worker thread.
 }
-#endif // USE_REMOTE
 
 Event_data DoDecode::launch(size_t tag)
 {
@@ -176,37 +213,35 @@ Event_data DoDecode::launch(size_t tag)
 
         auto* send_buf = reinterpret_cast<char*>(
             (int8_t*)llr_buffer_[symbol_offset] + llr_buffer_offset);
-        auto* decode_tag = new DecodeTag;
-        decode_tag->symbol_offset = symbol_offset;
-        decode_tag->output_offset = output_offset;
-        decode_tag->tag = tag;
-        decode_tag->tid = tid;
+        auto* decode_context
+            = new DecodeContext(symbol_offset, output_offset, tag, tid, this);
 
         size_t data_bytes
             = ldpc_max_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
 
-        while (rpc_context_->vec_req_msgbuf.size() == 0) {
-            // printf("Docoding: Running RPC event loop, rpc is %p\n", rpc);
-            // rt_assert(rpc != nullptr, "RPC is null");
-            // printf("Ran out of request message buffers!\n");
-            rpc_context_->rpc->run_event_loop_once();
-        }
-        auto* req_msgbuf = rpc_context_->vec_req_msgbuf.back();
-        rpc_context_->vec_req_msgbuf.pop_back();
-        auto* resp_msgbuf = rpc_context_->vec_resp_msgbuf.back();
-        rpc_context_->vec_resp_msgbuf.pop_back();
+        // TODO: pre-allocate a pool of request buffers to avoid this
+        //       temporary allocation on the critical data path.
+        size_t msg_len = DecodeMsg::size_without_data() + data_bytes;
+        uint8_t* new_buf = new uint8_t[msg_len];
+        auto* request = reinterpret_cast<DecodeMsg*>(new_buf);
+        request->context = decode_context;
+        memcpy(request->data, send_buf, data_bytes);
 
-        decode_tag->req_msgbuf = req_msgbuf;
-        decode_tag->resp_msgbuf = resp_msgbuf;
-        decode_tag->rpc = rpc_context_->rpc;
-        rpc_context_->rpc->resize_msg_buffer(req_msgbuf, data_bytes);
-        memcpy(req_msgbuf->buf, send_buf, data_bytes);
+        // while (rpc_context_->vec_req_msgbuf.size() == 0) {
+        //     // printf("Docoding: Running RPC event loop, rpc is %p\n", rpc);
+        //     // rt_assert(rpc != nullptr, "RPC is null");
+        //     // printf("Ran out of request message buffers!\n");
+        //     rpc_context_->rpc->run_event_loop_once();
+        // }
+        // auto* req_msgbuf = rpc_context_->vec_req_msgbuf.back();
+        // rpc_context_->vec_req_msgbuf.pop_back();
 
-        printf("Docoding: Issuing eRPC request %zu\n",
-            rpc_context_->num_requests_issued);
-        rpc_context_->rpc->enqueue_request(rpc_context_->session, kRpcReqType,
-            req_msgbuf, resp_msgbuf, decode_cont_func, decode_tag);
-        rpc_context_->num_requests_issued++;
+        printf("Docoding: Issuing request %zu, context: %p\n",
+            remote_ldpc_stub_->num_requests_issued, request->context);
+        remote_ldpc_stub_->udp_client.send(cfg->remote_ldpc_addr,
+            cfg->remote_ldpc_base_port + tid, new_buf, msg_len);
+        remote_ldpc_stub_->num_requests_issued++;
+        delete[] new_buf; // TODO: remove this once we use request buf pools
 #endif // USE_REMOTE
     } else {
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
@@ -289,7 +324,7 @@ Event_data DoDecode::launch(size_t tag)
             cycles_to_us(duration, freq_ghz));
     }
 
-    // When using eRPC, we ship the decoding task asynchronously to a
+    // When using remote LDPC, we ship the decoding task asynchronously to a
     // remote server and return immediately
     if (kUseRemote)
         return Event_data(EventType::kPendingToRemote, tag);

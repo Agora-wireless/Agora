@@ -9,56 +9,67 @@
 #include "config.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-#include "rpc.h"
+#include "udp_client.h"
+#include "udp_server.h"
+#include "docoding.hpp"
 #include <cstdint>
-
-// The eRPC request handler function to process remote LDPC decode tasks
-void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
-
-// The eRPC SM handler function
-void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
-    erpc::SmErrType sm_err_type, void* _context);
 
 /**
  * @brief This class is used to process LDPC decoding tasks 
- * from remote Millipede servers
+ * from remote Millipede servers. 
+ * 
+ * There is one instance of this class per remote worker thread,
+ * .
  */
 class RemoteLDPC {
 public:
     /**
-     * @brief Create an RemoteLDPC class and initialize the eRPC object
+     * @brief Initialize a RemoteLDPC worker and spawn a thread for it.
      * 
-     * @param LDPC_config The configurations for RemoteLDPC
-     * @param tid The eRPC thread ID to help identify the eRPC object
-     * @param nexus The nexus object used in eRPC
+     * @param cfg The main Millipede-wide configuration info.
+     * @param tid The thread ID on which this LDPC worker runs. 
+     *            This will also determine which UDP port to listen on.
+     * @param rx_buf_size The size of this worker's rx socket buffer, in bytes.
+     * 
      */
-    RemoteLDPC(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus);
+    RemoteLDPC(Config* cfg, int tid, size_t rx_buf_size);
     ~RemoteLDPC();
-
-    /// Continuosly poll for incoming RPC requests and process them
-    void run_erpc_event_loop_forever();
 
     /// LDPC-decode data from in_buffer and place it in out_buffer
     void decode(int8_t* in_buffer, uint8_t* out_buffer);
 
-    void stop_loop() { stop = true; }
+    void worker_loop(size_t tid);
 
-    friend void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context);
+    /// Join this LDPC worker's thread, i.e. wait for it to complete.
+    void join()
+    {
+        if (worker_thread.joinable()) {
+            worker_thread.join();
+        }
+    }
 
-    friend void ldpc_req_handler_test(
-        erpc::ReqHandle* req_handle, void* _context);
+    friend void ldpc_req_handler_test();
 
 private:
-    const int tid; // Thread ID as defined by eRPC
-    const size_t decoded_bits; // Number of decoded bits for each decoding round
-    LDPCconfig LDPC_config; // Configurations for RemoteLDPC
-    erpc::Rpc<erpc::CTransport>* rpc;
+    /// main Millipede-wide configuration info.
+    Config* cfg;
+    /// Configurations for RemoteLDPC
+    LDPCconfig LDPC_config;
+    /// The ID of the thread on which this `RemoteLDPC` instance runs on
+    const int tid;
+    /// The worker thread
+    std::thread worker_thread;
+    /// Number of decoded bits for each decoding round
+    const size_t decoded_bits;
+    /// The UDP socket on which we receive LDPC requests
+    UDPServer udp_server;
+    /// The UDP socket on which we send back LDPC responses.
+    UDPClient udp_client;
 
     // The buffer used to store the code word 16-bit LLR outputs for FlexRAN lib
     int16_t* resp_var_nodes;
 
     size_t num_reqs_recvd = 0;
-    bool stop;
 };
 
 #endif

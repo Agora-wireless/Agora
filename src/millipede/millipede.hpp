@@ -43,10 +43,6 @@
 #include <unistd.h>
 #include <vector>
 
-#ifdef USE_REMOTE
-#include "rpc.h"
-#endif // USE_REMOTE
-
 class Millipede {
 public:
     /* optimization parameters for block transpose (see the slides for more
@@ -56,11 +52,6 @@ public:
      */
     static const int kDequeueBulkSizeTXRX = 8;
     static const int kDequeueBulkSizeWorker = 4;
-
-    /* Port on the Millipede server that listens for eRPC responses */
-    static const size_t kRpcPortLocal = 31850;
-    /* Port on the remote LDPC worker process that listens for eRPC requests */
-    static const size_t kRpcPortRemote = kRpcPortLocal + 1;
 
     /**
      * @brief Create a Millipede object and start the worker threads
@@ -78,8 +69,6 @@ public:
     void* worker_zf(int tid);
     void* worker_demul(int tid);
     void* worker(int tid);
-    void* worker_rpc_server(int tid);
-    void* worker_rpc_client(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
@@ -314,8 +303,8 @@ private:
     moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 
 #ifdef USE_REMOTE
-    // Per-process eRPC initialization object
-    erpc::Nexus* nexus;
+    /// The thread that handles responses from remote LDPC workers.
+    std::thread remote_ldpc_response_receiver;
 #endif // USE_REMOTE
 };
 

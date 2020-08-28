@@ -1,53 +1,28 @@
 #include "remote_ldpc.hpp"
+#include "udp_server.h"
+#include "utils.h"
 #include "utils_ldpc.hpp"
+#include <arpa/inet.h>
 #include <malloc.h>
 #include <string>
+#include <thread>
+#include <vector>
 
-void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
-    erpc::SmErrType sm_err_type, void* _context)
-{
-    printf("Connected session: %d\n", session_num);
-}
+static constexpr size_t kRxBufSize = 9000; /// TODO: FIXME: what size?
+static bool is_running = true;
 
-RemoteLDPC::RemoteLDPC(LDPCconfig LDPC_config, int tid, erpc::Nexus* nexus)
-    : LDPC_config(LDPC_config)
+RemoteLDPC::RemoteLDPC(Config* cfg, int tid, size_t rx_buf_size)
+    : cfg(cfg)
+    , LDPC_config(cfg->LDPC_config)
     , tid(tid)
     , decoded_bits(ldpc_encoding_input_buf_size(LDPC_config.Bg, LDPC_config.Zc))
+    , udp_server(cfg->remote_ldpc_base_port + tid, rx_buf_size)
 {
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
-    rpc = new erpc::Rpc<erpc::CTransport>(
-        nexus, static_cast<void*>(this), tid, basic_sm_handler);
+    worker_thread = std::thread([=] { worker_loop(tid); });
 }
 
-RemoteLDPC::~RemoteLDPC()
-{
-    free(resp_var_nodes);
-    delete rpc;
-}
-
-void ldpc_req_handler(erpc::ReqHandle* req_handle, void* _context)
-{
-    auto* remote = static_cast<RemoteLDPC*>(_context);
-    auto* in_buf = reinterpret_cast<int8_t*>(req_handle->get_req_msgbuf()->buf);
-
-    remote->num_reqs_recvd++;
-    printf("RemoteLDPC: Received eRPC request %zu\n", remote->num_reqs_recvd);
-
-    req_handle->dyn_resp_msgbuf
-        = remote->rpc->alloc_msg_buffer(remote->decoded_bits);
-    auto* out_buf = reinterpret_cast<uint8_t*>(req_handle->dyn_resp_msgbuf.buf);
-    remote->decode(in_buf, out_buf);
-
-    remote->rpc->enqueue_response(req_handle, &req_handle->dyn_resp_msgbuf);
-}
-
-void RemoteLDPC::run_erpc_event_loop_forever()
-{
-    stop = false;
-    while (!stop) {
-        rpc->run_event_loop_once();
-    }
-}
+RemoteLDPC::~RemoteLDPC() { free(resp_var_nodes); }
 
 void RemoteLDPC::decode(int8_t* in_buffer, uint8_t* out_buffer)
 {
@@ -76,4 +51,95 @@ void RemoteLDPC::decode(int8_t* in_buffer, uint8_t* out_buffer)
     ldpc_response.compactedMessageBytes = out_buffer;
 
     bblib_ldpc_decoder_5gnr(&ldpc_request, &ldpc_response);
+}
+
+/// The main loop that continuously polls for incoming requests,
+/// processes them, and returns a response (if enabled).
+void RemoteLDPC::worker_loop(size_t tid)
+{
+    pin_to_core_with_offset(
+        ThreadType::kWorker, cfg->remote_ldpc_core_offset, tid);
+
+    // Create buffer for receiving a request
+    size_t data_bytes
+        = ldpc_max_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
+    size_t msg_len = DecodeMsg::size_without_data() + data_bytes;
+    uint8_t* rx_buf = new uint8_t[msg_len];
+    DecodeMsg* request = reinterpret_cast<DecodeMsg*>(rx_buf);
+    int8_t* in_buf = reinterpret_cast<int8_t*>(request->data);
+
+    // Create buffer for sending a response
+    size_t decoded_bits = ldpc_encoding_input_buf_size(
+        cfg->LDPC_config.Bg, cfg->LDPC_config.Zc);
+    size_t tx_buf_len = DecodeMsg::size_without_data() + decoded_bits;
+    uint8_t* tx_buf = new uint8_t[tx_buf_len];
+    DecodeMsg* response = reinterpret_cast<DecodeMsg*>(tx_buf);
+    uint8_t* out_buf = reinterpret_cast<uint8_t*>(response->data);
+
+    // Local variables for getting the IP addr of the sender
+    sockaddr from;
+    socklen_t addr_len = sizeof(sockaddr);
+    sockaddr_in* from_ipv4 = reinterpret_cast<sockaddr_in*>(&from);
+    char ipv4_addr[INET_ADDRSTRLEN];
+
+    while (is_running) {
+        ssize_t bytes_rcvd = udp_server.recvfrom_nonblocking(
+            rx_buf, msg_len, &from, &addr_len);
+        if (bytes_rcvd == 0) {
+            // no data received
+            continue;
+        } else if (bytes_rcvd == -1) {
+            // There was a socket receive error
+            is_running = false;
+            break;
+        }
+        rt_assert(
+            bytes_rcvd == (ssize_t)msg_len, "Received wrong size LDPC request");
+        rt_assert(from.sa_family == AF_INET, "Received non-IPv4 UDP packet");
+        inet_ntop(AF_INET, &from_ipv4->sin_addr, ipv4_addr, sizeof(ipv4_addr));
+        std::string response_dest_uri(ipv4_addr);
+
+        printf("RemoteLDPC: Received request %zu from %s, context %p\n",
+            num_reqs_recvd, response_dest_uri.c_str(), request->context);
+
+        decode(in_buf, out_buf);
+        response->context = request->context;
+        udp_client.send(response_dest_uri, cfg->remote_ldpc_completion_port,
+            tx_buf, tx_buf_len);
+
+        num_reqs_recvd++;
+    }
+
+    printf("RemoteLDPC worker %zu stopping now.\n", tid);
+    delete[] rx_buf;
+    delete[] tx_buf;
+}
+
+int main(int argc, char** argv)
+{
+    std::string confFile;
+    if (argc == 2) {
+        confFile = std::string(argv[1]);
+    } else {
+        confFile = TOSTRING(PROJECT_DIRECTORY)
+            + std::string("/data/tddconfig-sim-ul.json");
+    }
+    auto* cfg = new Config(confFile.c_str());
+    cfg->genData();
+
+    std::vector<RemoteLDPC*> remote_ldpc_workers;
+    remote_ldpc_workers.reserve(cfg->remote_ldpc_num_threads);
+    for (size_t tid = 0; tid < cfg->remote_ldpc_num_threads; tid++) {
+        remote_ldpc_workers.push_back(new RemoteLDPC(cfg, tid, kRxBufSize));
+    }
+
+    // Wait for all the remote LDPC workers to complete, then free them.
+    for (auto& r : remote_ldpc_workers) {
+        r->join();
+        delete r;
+    }
+
+    // TODO: set signal handler to stop threads upon interruption/kill
+
+    return 0;
 }

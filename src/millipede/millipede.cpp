@@ -6,14 +6,6 @@
 #include "millipede.hpp"
 using namespace std;
 
-#ifdef USE_REMOTE
-void basic_sm_handler(int session_num, erpc::SmEventType sm_event_type,
-    erpc::SmErrType sm_err_type, void* _context)
-{
-    printf("Connected session: %d\n", session_num);
-}
-#endif // USE_REMOTE
-
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
@@ -64,8 +56,8 @@ Millipede::Millipede(Config* cfg)
 
     if (kUseRemote) {
 #ifdef USE_REMOTE
-        auto uri = config_->server_addr + ":" + std::to_string(kRpcPortLocal);
-        nexus = new erpc::Nexus(uri, 0, 0);
+        // Start the thread that receives decode responses from LDPC workers.
+        remote_ldpc_response_receiver = std::thread(decode_response_loop, cfg);
 #endif // USE_REMOTE
     }
 
@@ -379,7 +371,8 @@ void Millipede::start()
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-
+                printf("kDecode done: frame %zu symbol %zu\n", frame_id,
+                    symbol_idx_ul);
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
                     if (kEnableMac) {
                         schedule_users(
@@ -399,6 +392,14 @@ void Millipede::start()
                         print_per_frame_done(PrintType::kDecode, frame_id);
                     }
                 }
+            } break;
+
+            // Kevin: not sure if this is right, it never gets triggered.
+            case EventType::kDecodeLast: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
+                printf("kDecodeLast done: frame %zu symbol %zu\n", frame_id,
+                    symbol_idx_ul);
             } break;
 
             case EventType::kPacketToMac: {
@@ -683,31 +684,14 @@ void* Millipede::worker(int tid)
         computeDecoding, computeDemul, computeEncoding };
 
 #ifdef USE_REMOTE
-    erpc::Rpc<erpc::CTransport>* rpc;
     if (kUseRemote) {
-        rpc = new erpc::Rpc<erpc::CTransport>(
-            nexus, static_cast<void*>(computeDecoding), tid, basic_sm_handler);
-        rpc->retry_connect_on_invalid_rpc_id = true;
-        auto uri
-            = config_->remote_ldpc_addr + ":" + std::to_string(kRpcPortRemote);
-        int session
-            = rpc->create_session(uri, tid % config_->remote_ldpc_num_threads);
-        rt_assert(session >= 0, "Connect failed!");
-        while (!rpc->is_connected(session)) {
-            rpc->run_event_loop_once();
-        }
-        RpcContext* inited_ctx = computeDecoding->initialize_erpc(rpc, session);
-        computeDecodingLast->set_initialized_rpc_context(inited_ctx);
+        RemoteLdpcStub* stub = computeDecoding->initialize_remote_ldpc_stub();
+        computeDecodingLast->set_initialized_remote_ldpc_stub(stub);
     }
 #endif // USE_REMOTE
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
-            if (kUseRemote) {
-#ifdef USE_REMOTE
-                rpc->run_event_loop_once();
-#endif // USE_REMOTE
-            }
             if (computers_vec[i]->try_launch())
                 break;
         }

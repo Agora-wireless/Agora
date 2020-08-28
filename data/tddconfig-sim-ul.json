@@ -8,6 +8,7 @@
  "ofdm_rx_zero_prefix_bs" : 0,
  "worker_thread_num" : 1,
  "remote_ldpc_num_threads" : 1,
+ "remote_ldpc_core_offset" : 55,
  "demul_block_size" : 48,
  "antenna_num": 8
 }

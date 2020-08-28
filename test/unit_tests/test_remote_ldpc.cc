@@ -5,7 +5,6 @@
 #include "docoding.hpp"
 #include "gettime.h"
 #include "remote_ldpc.hpp"
-#include "rpc.h"
 #include "utils.h"
 
 #include <algorithm>

@@ -239,9 +239,12 @@ Config::Config(std::string jsonfile)
         LDPC_config.nRows);
 
     remote_ldpc_addr = tddConf.value("remote_ldpc_addr", "127.0.0.1");
+    remote_ldpc_completion_port
+        = tddConf.value("remote_ldpc_completion_port", 31850);
+    remote_ldpc_base_port = tddConf.value("remote_ldpc_base_port", 31851);
     remote_ldpc_num_threads = tddConf.value("remote_ldpc_num_threads", 8);
     remote_ldpc_core_offset = tddConf.value("remote_ldpc_core_offset", 0);
-    
+
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
     sampsPerSymbol
