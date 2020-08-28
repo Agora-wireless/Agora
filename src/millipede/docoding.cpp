@@ -18,74 +18,6 @@ static constexpr bool kPrintDecodedData = false;
 /// TODO: FIXME: what size?
 static constexpr size_t kRxBufSize = 64 * 1024 * 1024;
 
-#ifdef USE_REMOTE
-/// This function should be run on its own thread to endlessly receive
-/// decode responses from remote LDPC workers and trigger the proper completion
-/// events expected by the rest of Millipede.
-/// There should only be one instance of this function running for the entire
-/// Millipede process.
-void decode_response_loop(Config* cfg)
-{
-    UDPServer udp_server(cfg->remote_ldpc_completion_port, kRxBufSize);
-    size_t decoded_bits = ldpc_encoding_input_buf_size(
-        cfg->LDPC_config.Bg, cfg->LDPC_config.Zc);
-    // The number of bytes that we receive at one time from the LDPC worker
-    // is defined by the `DecodeMsg` struct.
-    size_t rx_buf_len = DecodeMsg::size_without_data() + decoded_bits;
-    uint8_t* rx_buf = new uint8_t[rx_buf_len];
-    DecodeMsg* msg = reinterpret_cast<DecodeMsg*>(rx_buf);
-
-    while (cfg->running) {
-        ssize_t bytes_rcvd = udp_server.recv_nonblocking(rx_buf, rx_buf_len);
-        if (bytes_rcvd == 0) {
-            // no data received
-            continue;
-        } else if (bytes_rcvd == -1) {
-            // There was a socket receive error
-            cfg->running = false;
-            break;
-        }
-
-        rt_assert(bytes_rcvd == (ssize_t)rx_buf_len,
-            "Rcvd wrong decode response len");
-        DecodeContext* context = msg->context;
-        DoDecode* computeDecoding = context->doer;
-        rt_assert(
-            context->tid == computeDecoding->tid, "DoDecode tid mismatch");
-
-        // Copy the decoded buffer received from the remote LDPC worker
-        // into the appropriate location in the decode doer's decoded buffer.
-        uint8_t* out_buf
-            = static_cast<uint8_t*>(
-                  computeDecoding->decoded_buffer_[context->symbol_offset])
-            + context->output_offset;
-        memcpy(out_buf, msg->data, decoded_bits);
-
-        Event_data resp_event;
-        resp_event.num_tags = 1;
-        resp_event.tags[0] = context->tag;
-        /// TODO: FIXME: is this right? We never send a kDecodeLast event.
-        resp_event.event_type = EventType::kDecode;
-
-        try_enqueue_fallback(&computeDecoding->complete_task_queue,
-            computeDecoding->worker_producer_token, resp_event);
-
-        // TODO: here, return msg buffers to the pool
-
-        // The message (rx_buf) will be reused, only delete the DecodeContext
-        // that was allocated by the DoDecode doer when the request was sent.
-        delete context;
-
-        printf("Docoding: Received response %zu\n",
-            computeDecoding->remote_ldpc_stub_->num_responses_received);
-        computeDecoding->remote_ldpc_stub_->num_responses_received++;
-    }
-
-    printf("Exiting decode_response_loop()\n");
-    delete rx_buf;
-}
-#endif // USE_REMOTE
-
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -206,7 +138,6 @@ Event_data DoDecode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kUseRemote) {
-#ifdef USE_REMOTE
         size_t input_offset = cfg->get_ldpc_input_offset(cb_id);
         size_t llr_buffer_offset = input_offset * cfg->mod_type;
         size_t output_offset = cfg->get_ldpc_output_offset(cb_id);
@@ -242,7 +173,6 @@ Event_data DoDecode::launch(size_t tag)
             cfg->remote_ldpc_base_port + tid, new_buf, msg_len);
         remote_ldpc_stub_->num_requests_issued++;
         delete[] new_buf; // TODO: remove this once we use request buf pools
-#endif // USE_REMOTE
     } else {
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
@@ -330,4 +260,71 @@ Event_data DoDecode::launch(size_t tag)
         return Event_data(EventType::kPendingToRemote, tag);
     else
         return Event_data(EventType::kDecode, tag);
+}
+
+
+/// This function should be run on its own thread to endlessly receive
+/// decode responses from remote LDPC workers and trigger the proper completion
+/// events expected by the rest of Millipede.
+/// There should only be one thread instance of this function for the entire
+/// Millipede process.
+void decode_response_loop(Config* cfg)
+{
+    UDPServer udp_server(cfg->remote_ldpc_completion_port, kRxBufSize);
+    size_t decoded_bits = ldpc_encoding_input_buf_size(
+        cfg->LDPC_config.Bg, cfg->LDPC_config.Zc);
+    // The number of bytes that we receive at one time from the LDPC worker
+    // is defined by the `DecodeMsg` struct.
+    size_t rx_buf_len = DecodeMsg::size_without_data() + decoded_bits;
+    uint8_t* rx_buf = new uint8_t[rx_buf_len];
+    DecodeMsg* msg = reinterpret_cast<DecodeMsg*>(rx_buf);
+
+    while (cfg->running) {
+        ssize_t bytes_rcvd = udp_server.recv_nonblocking(rx_buf, rx_buf_len);
+        if (bytes_rcvd == 0) {
+            // no data received
+            continue;
+        } else if (bytes_rcvd == -1) {
+            // There was a socket receive error
+            cfg->running = false;
+            break;
+        }
+
+        rt_assert(bytes_rcvd == (ssize_t)rx_buf_len,
+            "Rcvd wrong decode response len");
+        DecodeContext* context = msg->context;
+        DoDecode* computeDecoding = context->doer;
+        rt_assert(
+            context->tid == computeDecoding->tid, "DoDecode tid mismatch");
+
+        // Copy the decoded buffer received from the remote LDPC worker
+        // into the appropriate location in the decode doer's decoded buffer.
+        uint8_t* out_buf
+            = static_cast<uint8_t*>(
+                  computeDecoding->decoded_buffer_[context->symbol_offset])
+            + context->output_offset;
+        memcpy(out_buf, msg->data, decoded_bits);
+
+        Event_data resp_event;
+        resp_event.num_tags = 1;
+        resp_event.tags[0] = context->tag;
+        /// TODO: FIXME: is this right? We never send a kDecodeLast event.
+        resp_event.event_type = EventType::kDecode;
+
+        try_enqueue_fallback(&computeDecoding->complete_task_queue,
+            computeDecoding->worker_producer_token, resp_event);
+
+        // TODO: here, return msg buffers to the pool
+
+        // The message (rx_buf) will be reused, only delete the DecodeContext
+        // that was allocated by the DoDecode doer when the request was sent.
+        delete context;
+
+        printf("Docoding: Received response %zu\n",
+            computeDecoding->remote_ldpc_stub_->num_responses_received);
+        computeDecoding->remote_ldpc_stub_->num_responses_received++;
+    }
+
+    printf("Exiting decode_response_loop()\n");
+    delete rx_buf;
 }

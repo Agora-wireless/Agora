@@ -234,7 +234,7 @@ static constexpr bool kUseAVX2Encoder = true;
 static constexpr bool kUseAVX2Encoder = false;
 #endif
 
-#if defined USE_REMOTE
+#ifdef USE_REMOTE
 static constexpr bool kUseRemote = true;
 #else
 static constexpr bool kUseRemote = false;

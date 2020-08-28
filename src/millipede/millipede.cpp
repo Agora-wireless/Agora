@@ -55,10 +55,8 @@ Millipede::Millipede(Config* cfg)
     }
 
     if (kUseRemote) {
-#ifdef USE_REMOTE
         // Start the thread that receives decode responses from LDPC workers.
         remote_ldpc_response_receiver = std::thread(decode_response_loop, cfg);
-#endif // USE_REMOTE
     }
 
     /* Create worker threads */
@@ -683,12 +681,10 @@ void* Millipede::worker(int tid)
         computeDecodingLast, computeZF, computeFFT, computeReciprocity,
         computeDecoding, computeDemul, computeEncoding };
 
-#ifdef USE_REMOTE
     if (kUseRemote) {
         RemoteLdpcStub* stub = computeDecoding->initialize_remote_ldpc_stub();
         computeDecodingLast->set_initialized_remote_ldpc_stub(stub);
     }
-#endif // USE_REMOTE
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {

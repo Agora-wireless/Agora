@@ -27,9 +27,7 @@
 #include "iobuffer.hpp"
 #include "utils_ldpc.hpp"
 
-#ifdef USE_REMOTE
-/// A forward declaration of the function used to handle decode responses
-/// from remote LDPC workers.
+/// A loop that handles decode responses from all remote LDPC workers.
 void decode_response_loop(Config* cfg);
 
 /// A connection to a remote LDPC worker, including request/receive buffers
@@ -61,7 +59,6 @@ public:
     size_t num_requests_issued;
     size_t num_responses_received;
 };
-#endif // USE_REMOTE
 
 class DoEncode : public Doer {
 public:
@@ -98,8 +95,6 @@ public:
 
     Event_data launch(size_t tag);
 
-#ifdef USE_REMOTE
-public:
     /// Returns the `RemoteLdpcStub` that this doer uses to communicate
     /// with a remote LDPC worker.
     /// The returned `RemoteLdpcStub` can be shared with other doers;
@@ -110,17 +105,6 @@ public:
         return remote_ldpc_stub_;
     }
 
-    inline size_t get_num_requests()
-    {
-        return remote_ldpc_stub_->num_requests_issued;
-    }
-    inline size_t get_num_responses()
-    {
-        return remote_ldpc_stub_->num_responses_received;
-    }
-
-    friend void decode_response_loop(Config* cfg);
-
     /// Sets this doer's `RemoteLdpcStub` to an already-initialized instance.
     /// This is useful because a single worker thread creates **two** instances
     /// of `DoDecode`, and they must share a single `RemoteLdpcStub` context.
@@ -129,21 +113,23 @@ public:
         remote_ldpc_stub_ = stub;
     }
 
-private:
-    RemoteLdpcStub* remote_ldpc_stub_;
-#endif // USE_REMOTE
+    /// The loop that runs to receive decode completion responses from
+    /// all remote LDPC workers. 
+    /// This is a friend method because it must access private member fields 
+    /// within `DoDecode`. 
+    friend void decode_response_loop(Config* cfg);
 
 private:
     int16_t* resp_var_nodes;
     Table<int8_t>& llr_buffer_;
     Table<uint8_t>& decoded_buffer_;
-    //Table<int> decoded_bits_count_;
-    //Table<int> error_bits_count_;
     PhyStats* phy_stats;
     DurationStat* duration_stat;
+    /// Represents the connection to a remote LDPC worker, which is only used
+    /// when `kUseRemote` is true.
+    RemoteLdpcStub* remote_ldpc_stub_;
 };
 
-#ifdef USE_REMOTE
 struct DecodeMsg; // forward declaration
 
 /// A context object used when receiving responses from the remote LDPC worker.
@@ -155,6 +141,7 @@ public:
     int tid;
     /// The DoDecode instance that sent the request.
     DoDecode* doer;
+    /// TODO: create and use this request buffer pool.
     std::vector<DecodeMsg*> request_buffer_pool;
 
     DecodeContext(size_t symbol_offset, size_t output_offset, size_t tag,
@@ -175,7 +162,9 @@ struct DecodeMsg {
     /// from the Millipede side where the `DoDecode` instance was created.
     /// NOTE: THIS IS NOT VALID from within the remote LDPC worker side.
     DecodeContext* context;
+
     /// The dynamically-sized data in the message.
+    /// NOTE: THIS MUST BE the last field in this struct.
     uint8_t data[];
 
     /// Returns the size of the "header" of this message, i.e.,
@@ -185,6 +174,5 @@ struct DecodeMsg {
         return offsetof(DecodeMsg, data);
     }
 };
-#endif // USE_REMOTE
 
 #endif // DOCODING

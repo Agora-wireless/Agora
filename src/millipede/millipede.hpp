@@ -302,10 +302,8 @@ private:
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 
-#ifdef USE_REMOTE
     /// The thread that handles responses from remote LDPC workers.
     std::thread remote_ldpc_response_receiver;
-#endif // USE_REMOTE
 };
 
 #endif
