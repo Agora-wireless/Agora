@@ -256,9 +256,10 @@ void* Sender::worker_thread(int tid)
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
 
-    // The relationship between packet_length and OFDM_FRAME_LEN is unclear
-    rt_assert(
-        cfg->packet_length >= cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
+    // We currently don't support zero-padding OFDM prefix and postfix
+    rt_assert(cfg->packet_length
+        == Packet::kOffsetOfData
+            + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
 
     while (true) {
         gen_tag_t tag = 0;
@@ -283,7 +284,7 @@ void* Sender::worker_thread(int tid)
         pkt->ant_id = tag.ant_id;
         memcpy(pkt->data,
             iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
-            cfg->OFDM_FRAME_LEN * sizeof(unsigned short) * 2);
+            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
         if (cfg->fft_in_rru) {
             run_fft(pkt, fft_inout, mkl_handle);
         }
@@ -339,29 +340,31 @@ size_t Sender::get_max_symbol_id() const
 void Sender::init_iq_from_file(std::string filename)
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
-    iq_data_short_.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
+    iq_data_short_.calloc(
+        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
 
     Table<float> iq_data_float;
-    iq_data_float.calloc(packets_per_frame, cfg->OFDM_FRAME_LEN * 2, 64);
+    iq_data_float.calloc(
+        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
 
     for (size_t i = 0; i < packets_per_frame; i++) {
-        const size_t expect_bytes = cfg->OFDM_FRAME_LEN * 2;
-        const size_t actual_bytes
-            = fread(iq_data_float[i], sizeof(float), expect_bytes, fp);
-        if (expect_bytes != actual_bytes) {
+        const size_t expected_count = (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2;
+        const size_t actual_count
+            = fread(iq_data_float[i], sizeof(float), expected_count, fp);
+        if (expected_count != actual_count) {
             fprintf(stderr,
-                "Sender: Failed to read IQ data file %s. Packet %zu, bytes "
-                "expected %zu, bytes read %zu. errno %s\n",
-                filename.c_str(), i, expect_bytes, actual_bytes,
+                "Sender: Failed to read IQ data file %s. Packet %zu: expected "
+                "%zu I/Q samples but read %zu. Errno %s\n",
+                filename.c_str(), i, expected_count, actual_count,
                 strerror(errno));
             exit(-1);
         }
-        for (size_t j = 0; j < cfg->OFDM_FRAME_LEN * 2; j++) {
+        for (size_t j = 0; j < expected_count; j++) {
             iq_data_short_[i][j]
-                = (unsigned short)(iq_data_float[i][j] * 32768);
+                = static_cast<unsigned short>(iq_data_float[i][j] * 32768);
         }
     }
     fclose(fp);
@@ -396,9 +399,9 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
     DFTI_DESCRIPTOR_HANDLE mkl_handle) const
 {
-    // pkt->data has OFDM_FRAME_LEN short samples. After FFT, we'll remove
-    // OFDM_PREFIX_LEN initial samples and have OFDM_CA_NUM short samples.
-    simd_convert_short_to_float(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
+    // pkt->data has (CP_LEN + OFDM_CA_NUM) unsigned short samples. After FFT,
+    // we'll remove the cyclic prefix and have OFDM_CA_NUM short samples left.
+    simd_convert_short_to_float(&pkt->data[2 * cfg->CP_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));

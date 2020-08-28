@@ -343,3 +343,12 @@ add_executable(test_concurrent_queue
    $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_concurrent_queue ${COMMON_LIBS})
 add_test(NAME test_concurrent_queue COMMAND test_concurrent_queue)
+
+add_executable(test_zf_threaded
+  test/unit_tests/test_zf_threaded.cc
+   $<TARGET_OBJECTS:millipede_sources_lib>
+   $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_zf_threaded ${COMMON_LIBS})
+add_test(NAME test_zf_threaded COMMAND test_zf_threaded)
+
+
