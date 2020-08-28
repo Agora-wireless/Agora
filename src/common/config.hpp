@@ -243,7 +243,6 @@ public:
     // lcm(zf_block_size, demul_block_size)
     size_t subcarrier_block_size;
 
-    bool is_distributed;
     std::vector<std::string> server_addr_list;
     size_t server_addr_idx;
     size_t subcarrier_start;
@@ -349,11 +348,7 @@ public:
         if (freq_orthogonal_pilot)
             sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        if (is_distributed) {
-            return ul_zf_buffers[(frame_slot * OFDM_CONTROL_NUM + sc_id)];
-        } else {
-            return ul_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
-        }
+        return ul_zf_buffers[(frame_slot * OFDM_CONTROL_NUM + sc_id)];
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
@@ -371,14 +366,8 @@ public:
     {
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        if (is_distributed) {
-            return &demod_buffer[total_data_symbol_id]
-                                [OFDM_CONTROL_NUM * 8 * ue_id
-                                    + sc_id * mod_type];
-        } else {
-            return &demod_buffer[total_data_symbol_id]
-                                [OFDM_DATA_NUM * 8 * ue_id + sc_id * mod_type];
-        }
+        return &demod_buffer[total_data_symbol_id]
+                            [OFDM_CONTROL_NUM * 8 * ue_id + sc_id * mod_type];
     }
 
     /// Get the decode buffer for this frame, symbol,

@@ -158,29 +158,17 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
     // struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
     auto* pkt = reinterpret_cast<Packet*>(buf);
-    size_t block_size = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
-    if (cfg->is_distributed) {
-        if (-1
-            == recv(socket_[radio_id], (char*)pkt,
-                   Packet::kOffsetOfData
-                       + block_size * 2 * sizeof(unsigned short),
-                   0)) {
-            if (errno != EAGAIN && cfg->running) {
-                perror("recv failed");
-                exit(0);
-            }
-            free(buf);
-            return (NULL);
+    if (-1
+        == recv(socket_[radio_id], (char*)pkt,
+               Packet::kOffsetOfData
+                   + cfg->OFDM_CONTROL_NUM * 2 * sizeof(unsigned short),
+               0)) {
+        if (errno != EAGAIN && cfg->running) {
+            perror("recv failed");
+            exit(0);
         }
-    } else {
-        if (-1 == recv(socket_[radio_id], (char*)pkt, cfg->packet_length, 0)) {
-            if (errno != EAGAIN && cfg->running) {
-                perror("recv failed");
-                exit(0);
-            }
-            free(buf);
-            return (NULL);
-        }
+        free(buf);
+        return (NULL);
     }
 
     char* rx_buffer = (*buffer_)[pkt->ant_id];
@@ -192,15 +180,16 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
         = (frame_id % SOCKET_BUFFER_FRAME_NUM) * cfg->symbol_num_perframe
         + symbol_id;
 
-    if (cfg->is_distributed) {
+    if (cfg->server_addr_list.size() > 1) {
         size_t sc_offset = Packet::kOffsetOfData
             + 2 * sizeof(unsigned short)
-                * (cfg->OFDM_DATA_START + cfg->server_addr_idx * block_size);
+                * (cfg->OFDM_DATA_START
+                      + cfg->server_addr_idx * cfg->OFDM_CONTROL_NUM);
         memcpy(
             &rx_buffer[rx_offset_ * packet_length], buf, Packet::kOffsetOfData);
         memcpy(&rx_buffer[rx_offset_ * packet_length + sc_offset],
             buf + Packet::kOffsetOfData,
-            block_size * 2 * sizeof(unsigned short));
+            cfg->OFDM_CONTROL_NUM * 2 * sizeof(unsigned short));
     } else {
         memcpy(&rx_buffer[rx_offset_ * packet_length], buf, packet_length);
     }

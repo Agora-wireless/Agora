@@ -89,13 +89,8 @@ Event_data DoDemul::launch(size_t tag)
     }
 
     size_t max_sc_ite;
-    if (cfg->is_distributed) {
-        max_sc_ite = std::min(
-            cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
-    } else {
-        max_sc_ite
-            = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
-    }
+    max_sc_ite
+        = std::min(cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
@@ -295,38 +290,20 @@ void DoDemul::independent_launch(size_t tag)
     }
 
     size_t max_sc_ite;
-    if (cfg->is_distributed) {
-        max_sc_ite = std::min(
-            cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
-    } else {
-        max_sc_ite
-            = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
-    }
+    max_sc_ite
+        = std::min(cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
             float* src;
-            if (cfg->is_distributed) {
-                src = reinterpret_cast<float*>((*socket_buffer_)[j]
-                    + frame_slot
-                        * (cfg->symbol_num_perframe * cfg->packet_length)
-                    + (symbol_idx_ul + cfg->pilot_symbol_num_perframe)
-                        * cfg->packet_length
-                    + Packet::kOffsetOfData
-                    + 2 * sizeof(short)
-                        * (i + base_sc_id + cfg->subcarrier_start));
-            } else {
-                src = reinterpret_cast<float*>((*socket_buffer_)[j]
-                    + frame_slot
-                        * (cfg->symbol_num_perframe * cfg->packet_length)
-                    + (symbol_idx_ul + cfg->pilot_symbol_num_perframe)
-                        * cfg->packet_length
-                    + Packet::kOffsetOfData
-                    + 2 * sizeof(short)
-                        * (i + base_sc_id + cfg->OFDM_DATA_START));
-            }
+            src = reinterpret_cast<float*>((*socket_buffer_)[j]
+                + frame_slot * (cfg->symbol_num_perframe * cfg->packet_length)
+                + (symbol_idx_ul + cfg->pilot_symbol_num_perframe)
+                    * cfg->packet_length
+                + Packet::kOffsetOfData
+                + 2 * sizeof(short) * (i + base_sc_id + cfg->subcarrier_start));
             simd_convert_float16_to_float32(
                 reinterpret_cast<float*>(tmp), src, kSCsPerCacheline * 2);
             for (size_t t = 0; t < kSCsPerCacheline; t++) {

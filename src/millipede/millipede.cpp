@@ -13,12 +13,8 @@ Millipede::Millipede(Config* cfg)
           cfg->pilot_symbol_num_perframe, cfg->data_symbol_num_perframe,
           cfg->BS_ANT_NUM,
           // cfg->UE_ANT_NUM
-          cfg->is_distributed
-              ? cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size
-              : cfg->OFDM_DATA_NUM / cfg->subcarrier_block_size)
-    , demul_status_(cfg->is_distributed
-              ? cfg->OFDM_CONTROL_NUM / cfg->demul_block_size
-              : cfg->OFDM_DATA_NUM / cfg->demul_block_size)
+          cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size)
+    , demul_status_(cfg->OFDM_CONTROL_NUM / cfg->demul_block_size)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -92,9 +88,8 @@ Millipede::Millipede(Config* cfg)
 #endif // BIGSTATION
     } else {
         if (cfg->disable_master) {
-            do_subcarrier_threads_.resize(cfg->is_distributed
-                    ? cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size
-                    : cfg->OFDM_DATA_NUM / cfg->subcarrier_block_size);
+            do_subcarrier_threads_.resize(
+                cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size);
 
             for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
                 do_subcarrier_threads_[i]
@@ -730,9 +725,7 @@ void* Millipede::subcarrier_worker(int tid)
 void* Millipede::decode_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset,
-        config_->is_distributed
-            ? tid + config_->OFDM_CONTROL_NUM / config_->subcarrier_block_size
-            : tid + config_->OFDM_DATA_NUM / config_->subcarrier_block_size);
+        tid + config_->OFDM_CONTROL_NUM / config_->subcarrier_block_size);
 
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),

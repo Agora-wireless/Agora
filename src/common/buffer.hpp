@@ -452,7 +452,7 @@ public:
         num_decode_tasks_completed++;
         if (num_decode_tasks_completed == num_decode_tasks_per_frame) {
             cur_frame++;
-            exit(0);
+            // exit(0);
             num_decode_tasks_completed = 0;
             size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
             num_pkts[frame_slot].store(0);

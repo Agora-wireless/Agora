@@ -209,27 +209,21 @@ Config::Config(std::string jsonfile)
         "Subcarrier block size should be a multiple of lcm(zf_block_size, "
         "demul_block_size)!");
 
-    is_distributed = tddConf.value("is_distributed", false);
     server_addr_list
         = tddConf.value("server_addr_list", std::vector<std::string>());
     rt_assert(server_addr_list.size() > 0, "Address list is 0!");
     server_addr_idx = tddConf.value("server_addr_idx", 0);
-    subcarrier_start = tddConf.value("subcarrier_start", OFDM_DATA_START);
-    subcarrier_end = tddConf.value("subcarrier_end", OFDM_DATA_STOP);
-    rt_assert((subcarrier_end - subcarrier_start) % subcarrier_block_size == 0,
+    rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
+        "OFDM_DATA_NUM % # servers should be 0!");
+    OFDM_CONTROL_NUM = OFDM_DATA_NUM / server_addr_list.size();
+    subcarrier_start = OFDM_DATA_START + server_addr_idx * OFDM_CONTROL_NUM;
+    subcarrier_end = OFDM_DATA_START + (server_addr_idx + 1) * OFDM_CONTROL_NUM;
+    rt_assert(OFDM_CONTROL_NUM % subcarrier_block_size == 0,
         "Invalid subcarrier range and subcarrier block size!");
-    OFDM_CONTROL_NUM = subcarrier_end - subcarrier_start;
 
-    if (is_distributed) {
-        demul_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / demul_block_size;
-    } else {
-        demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
-    }
-    if (is_distributed) {
-        zf_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / zf_block_size;
-    } else {
-        zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
-    }
+    demul_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / demul_block_size;
+
+    zf_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / zf_block_size;
 
     fft_block_size = tddConf.value("fft_block_size", 4);
 

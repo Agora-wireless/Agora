@@ -94,13 +94,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             frame_id, base_sc_id);
     }
     size_t num_subcarriers;
-    if (cfg->is_distributed) {
-        num_subcarriers
-            = std::min(cfg->zf_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
-    } else {
-        num_subcarriers
-            = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
-    }
+    num_subcarriers
+        = std::min(cfg->zf_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
 
     // if (frame_id == 0 && base_sc_id == 0) {
     //     complex_float* mtx = csi_buffer_[0];
@@ -316,15 +311,9 @@ void DoZF::Predict(size_t tag)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     size_t offset_in_buffer;
-    if (cfg->is_distributed) {
-        offset_in_buffer
-            = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_CONTROL_NUM)
-            + base_sc_id;
-    } else {
-        offset_in_buffer
-            = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
-            + base_sc_id;
-    }
+    offset_in_buffer
+        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_CONTROL_NUM)
+        + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
         sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);

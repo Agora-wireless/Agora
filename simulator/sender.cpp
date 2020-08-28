@@ -289,7 +289,7 @@ void* Sender::worker_thread(int tid)
         if (cfg->fft_in_rru) {
             run_fft(pkt, fft_inout, mkl_handle);
         }
-        if (cfg->is_distributed) {
+        if (cfg->server_addr_list.size() > 1) {
             memcpy(data_buf, pkt->data,
                 (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
         }
@@ -298,7 +298,7 @@ void* Sender::worker_thread(int tid)
         rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
-        if (cfg->is_distributed) {
+        if (cfg->server_addr_list.size() > 1) {
             size_t block_size
                 = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
             for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
@@ -314,7 +314,7 @@ void* Sender::worker_thread(int tid)
                         + 2 * sizeof(unsigned short) * block_size);
             }
         } else {
-            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
+            udp_client.send(cfg->server_addr_list[0], cfg->bs_port + cur_radio,
                 reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
         }
 #endif
