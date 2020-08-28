@@ -238,7 +238,7 @@ struct rte_flow* DpdkTransport::generate_ipv4_flow(uint16_t port_id,
     return flow;
 }
 
-rte_mbuf* DpdkTransport::generate_udp_header(rte_mempool* mbuf_pool,
+rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
     rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
     uint32_t src_ip_addr, uint32_t dst_ip_addr, uint16_t src_udp_port,
     uint16_t dst_udp_port, size_t buffer_length)
