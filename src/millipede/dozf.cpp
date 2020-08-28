@@ -30,9 +30,9 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)));
+        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     csi_gather_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)));
+        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
@@ -230,8 +230,10 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     if (kDebugPrintInTask) {
-        printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu\n",
-            tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM);
+        printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
+               "BS_ANT_NUM: %zu\n",
+            tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM,
+            cfg->BS_ANT_NUM);
     }
 
     double start_tsc1 = worker_rdtsc();
@@ -282,8 +284,9 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
         cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-    // cout<<"CSI matrix"<<endl;
-    // cout<<mat_input.st()<<endl;
+
+    // std::cout << "CSI matrix" << std::endl;
+    // std::cout << mat_csi.st() << std::endl;
     compute_precoder(mat_csi,
         cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
         cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, base_sc_id),
