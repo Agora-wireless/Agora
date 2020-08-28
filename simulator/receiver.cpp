@@ -59,18 +59,11 @@ void* Receiver::loopRecv(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-#if USE_IPV4
     struct sockaddr_in remote_addr;
     int socket_local
         = setup_socket_ipv4(cfg->bs_rru_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv4(
         &remote_addr, cfg->bs_port + tid, cfg->bs_addr.c_str());
-#else
-    int socket_local
-        = setup_socket_ipv6(cfg->bs_rru_port + tid, true, sock_buf_size);
-    setup_sockaddr_remote_ipv6(
-        &remote_addr, cfg->bs_port + tid, "fe80::f436:d735:b04a:864a");
-#endif
 
     /* use token to speed up */
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];

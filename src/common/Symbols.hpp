@@ -11,13 +11,6 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define CODED_LEN 32
-#define ORIG_CODE_LEN 16
-#define N_ITE 10
-#define NUM_CODE_BLOCK 36
-#define NUM_BITS 4
-#define MAX_CODED_SC 1152
-
 // Number of frames received that we allocate space for in worker threads
 #define TASK_BUFFER_FRAME_NUM 40
 
@@ -43,6 +36,7 @@ enum class EventType : int {
     kPrecode,
     kPacketTX,
     kDecode,
+    kDecodeLast,
     kEncode,
     kRC,
     kModul,
@@ -91,13 +85,6 @@ enum class PrintType : int {
 static constexpr size_t kEnableThreadPinning = true;
 
 #define BIGSTATION 0
-#define USE_IPV4 1
-#if USE_IPV4
-static constexpr bool kUseIPv4 = true;
-#else
-static constexpr bool kUseIPv4 = false;
-#endif
-
 #ifdef USE_DPDK
 static constexpr bool kUseDPDK = true;
 #else
@@ -184,19 +171,21 @@ static inline std::string thread_type_str(ThreadType thread_type)
 
 enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
-struct LDPCconfig {
-    uint16_t Bg;
+class LDPCconfig {
+public:
+    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
+    uint16_t Zc; /// The 5G NR LDPC expansion factor
+    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
+
+    /// Allow the LDPC decoder to terminate without completing all iterations
+    /// if it decodes the codeblock eariler
     bool earlyTermination;
-    int16_t decoderIter;
-    uint16_t Zc;
-    size_t nRows;
-    uint32_t cbEncLen;
-    uint32_t cbLen;
-    uint32_t cbCodewLen;
+
+    size_t nRows; /// Number of rows in the LDPC base graph to use
+    uint32_t cbLen; /// Number of information bits input to LDPC encoding
+    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
     size_t nblocksInSymbol;
 };
-
-typedef struct LDPCconfig LDPCconfig;
 
 // Maximum number of symbols per frame allowed by Millipede
 static constexpr size_t kMaxSymbolsPerFrame = 1400;

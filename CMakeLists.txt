@@ -26,7 +26,7 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64 -fPIC")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
-  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
+  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
@@ -88,7 +88,7 @@ if(USE_AVX2_ENCODER)
   message(STATUS "Using Millipede's (i.e., not FlexRAN's) AVX2 encoder")
   add_definitions(-DUSE_AVX2_ENCODER)
 else()
-  message(STATUS "Using FlexRAN's (i.e., not Millipede's) AVX2 encoder")
+  message(STATUS "Using FlexRAN's (i.e., not Millipede's) AVX512 encoder")
 endif()
 
 # DPDK
@@ -337,3 +337,9 @@ add_executable(test_udp_client_server
   test/unit_tests/test_udp_client_server.cc)
 target_link_libraries(test_udp_client_server ${COMMON_LIBS})
 add_test(NAME test_udp_client_server COMMAND test_udp_client_server)
+
+add_executable(test_concurrent_queue
+  test/unit_tests/test_concurrent_queue.cc
+   $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_concurrent_queue ${COMMON_LIBS})
+add_test(NAME test_concurrent_queue COMMAND test_concurrent_queue)
