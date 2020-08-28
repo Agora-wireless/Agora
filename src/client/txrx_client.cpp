@@ -460,7 +460,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
              << ", sync_index: " << sync_index << std::endl;
         std::cout << sout.str();
         sout.str(std::string()); // clear stringstream after print
-        rx_offset = sync_index - c->beacon_len - c->prefix;
+        rx_offset = sync_index - c->beacon_len - c->ofdm_tx_zero_prefix_;
     }
 
     // Read rx_offset to align with the begining of a frame
@@ -507,7 +507,8 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
                         frm_buff0[i].imag() / 32768.0));
             sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32);
             if (sync_index >= 0) {
-                rx_offset = sync_index - c->beacon_len - c->prefix;
+                rx_offset
+                    = sync_index - c->beacon_len - c->ofdm_tx_zero_prefix_;
                 time0 += rx_offset;
                 resync = false;
                 resync_retry_cnt = 0;

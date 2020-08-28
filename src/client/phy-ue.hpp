@@ -156,9 +156,6 @@ private:
     size_t dl_symbol_perframe;
     size_t tx_symbol_perframe;
     size_t symbol_len; // samples in sym without prefix and postfix
-    size_t dl_prefix_len;
-    size_t prefix_len;
-    size_t postfix_len;
     size_t ofdm_syms; // number of OFDM symbols in general symbol (i.e. symbol)
     size_t FFT_LEN;
     size_t CP_LEN;
@@ -199,18 +196,15 @@ private:
      * Uplink
      *****************************************************/
 
-    // std::unique_ptr<L2> l2_;
-
     /**
-     * transmit data
-     * Frist dimension: TX_THREAD_NUM
-     * Second dimension of buffer (type: uchar): packet_length * UE_NUM *
-     * DL_SYM_PER_FRAME * TX_BUFFER_FRAME_NUM packet_length = sizeof(int) * 4 +
-     * sizeof(uchar) * OFDM_FRAME_LEN; Second dimension of buffer_status:
-     * DL_SYM_PER_FRAME * UE_NUM * TX_BUFFER_FRAME_NUM
+     * Transmit data
+     *
+     * Number of transmit buffers (size = packet_length) and buffer status
+     * entries: TX_THREAD_NUM * TX_BUFFER_FRAME_NUM * UE_NUM * DL_SYM_PER_FRAME
      */
     char* tx_buffer_;
     int* tx_buffer_status_;
+
     int tx_buffer_size;
     int tx_buffer_status_size;
 
@@ -248,16 +242,15 @@ private:
     std::unique_ptr<RadioTXRX> ru_;
 
     /**
-     * received data
-     * Frist dimension: RX_THREAD_NUM
-     * Second dimension of buffer (type: char): packet_length *
-     * symbol_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM packet_length =
-     * sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2; Second dimension
-     * of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * RX_BUFFER_FRAME_NUM
+     * Received data
+     *
+     * Number of RX buffers (size = packet_length) and buffer status
+     * entries: RX_THREAD_NUM * RX_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * symbol_num_perframe
      */
     Table<char> rx_buffer_;
     Table<int> rx_buffer_status_;
+
     int rx_buffer_size;
     int rx_buffer_status_size;
 
