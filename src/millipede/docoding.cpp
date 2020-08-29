@@ -149,30 +149,42 @@ Event_data DoDecode::launch(size_t tag)
 
         size_t data_bytes
             = ldpc_max_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc);
+        size_t msg_len = DecodeMsg::size_without_data() + data_bytes;
+        uint16_t src_port = 31850 - 1; /// TODO: FIXME: use proper src port
+        uint16_t dest_port = cfg->remote_ldpc_base_port + tid;
 
+#ifdef USE_DPDK
+        rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(
+            remote_ldpc_stub_->mbuf_pool, remote_ldpc_stub_->local_mac_addr,
+            remote_ldpc_stub_->remote_mac_addr,
+            remote_ldpc_stub_->local_ip_addr, remote_ldpc_stub_->remote_ip_addr,
+            src_port, dest_port, msg_len);
+        // `msg_buf` points to where our payload starts in the DPDK `tx_mbuf`
+        uint8_t* msg_buf
+            = (rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
+#elif
         // TODO: pre-allocate a pool of request buffers to avoid this
         //       temporary allocation on the critical data path.
-        size_t msg_len = DecodeMsg::size_without_data() + data_bytes;
-        uint8_t* new_buf = new uint8_t[msg_len];
-        auto* request = reinterpret_cast<DecodeMsg*>(new_buf);
+        uint8_t* msg_buf = new uint8_t[msg_len];
+#endif // USE_DPDK
+
+        auto* request = reinterpret_cast<DecodeMsg*>(msg_buf);
         request->context = decode_context;
         memcpy(request->data, send_buf, data_bytes);
 
-        // while (rpc_context_->vec_req_msgbuf.size() == 0) {
-        //     // printf("Docoding: Running RPC event loop, rpc is %p\n", rpc);
-        //     // rt_assert(rpc != nullptr, "RPC is null");
-        //     // printf("Ran out of request message buffers!\n");
-        //     rpc_context_->rpc->run_event_loop_once();
-        // }
-        // auto* req_msgbuf = rpc_context_->vec_req_msgbuf.back();
-        // rpc_context_->vec_req_msgbuf.pop_back();
-
         printf("Docoding: Issuing request %zu, context: %p\n",
             remote_ldpc_stub_->num_requests_issued, request->context);
-        remote_ldpc_stub_->udp_client.send(cfg->remote_ldpc_addr,
-            cfg->remote_ldpc_base_port + tid, new_buf, msg_len);
         remote_ldpc_stub_->num_requests_issued++;
-        delete[] new_buf; // TODO: remove this once we use request buf pools
+
+#ifdef USE_DPDK
+        rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
+            "rte_eth_tx_burst() failed");
+#else
+        remote_ldpc_stub_->udp_client.send(cfg->remote_ldpc_ip_addr,
+            cfg->remote_ldpc_base_port + tid, msg_buf, msg_len);
+        delete[] msg_buf; // TODO: remove this once we use request buf pools
+#endif // USE_DPDK
+
     } else {
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
@@ -261,7 +273,6 @@ Event_data DoDecode::launch(size_t tag)
     else
         return Event_data(EventType::kDecode, tag);
 }
-
 
 /// This function should be run on its own thread to endlessly receive
 /// decode responses from remote LDPC workers and trigger the proper completion

@@ -237,19 +237,24 @@ public:
     /* Remote LDPC parameters */
 
     /// IPv4 address of a remote server available for LDPC
-    std::string remote_ldpc_addr;
+    std::string remote_ldpc_ip_addr;
     /// The port on which the main Millipede process listens for completion
     /// events being sent back from remote LDPC servers.
     int remote_ldpc_completion_port;
     /// The base port used for setting up remote LDPC listening sockets.
     /// The ith RemoteLPDC worker listens for requests on port P,
-    /// where `P = remote_ldpc_base_port + i`, 
+    /// where `P = remote_ldpc_base_port + i`,
     /// in which `i` ranges from `[0:remote_ldpc_num_threads)`.
     int remote_ldpc_base_port;
     /// Number of LDPC-decoding threads per remote LDPC server
     size_t remote_ldpc_num_threads;
     /// Remote LDPC thread `i` runs on core `remote_ldpc_core_offset + i`.
     size_t remote_ldpc_core_offset;
+    /// The MAC address on which the remote LDPC worker receives requests.
+    std::string remote_ldpc_mac_addr;
+    /// The local MAC address through which requests are sent to
+    /// the remote LDPC worker.
+    std::string local_mac_addr;
     /// Number of bytes per code block
     size_t num_bytes_per_cb;
 

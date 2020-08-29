@@ -27,6 +27,12 @@
 #include "iobuffer.hpp"
 #include "utils_ldpc.hpp"
 
+#ifdef USE_DPDK
+#include "dpdk_transport.hpp"
+#include <arpa/inet.h>
+#include <netinet/ether.h>
+#endif
+
 /// A loop that handles decode responses from all remote LDPC workers.
 void decode_response_loop(Config* cfg);
 
@@ -36,7 +42,7 @@ void decode_response_loop(Config* cfg);
 /// in each worker thread.
 class RemoteLdpcStub {
 public:
-    RemoteLdpcStub()
+    RemoteLdpcStub(Config* cfg)
         : num_requests_issued(0)
         , num_responses_received(0)
     {
@@ -46,6 +52,34 @@ public:
         //     *req_msgbuf = rpc->alloc_msg_buffer_or_die(kRpcMaxMsgSize);
         //     vec_req_msgbuf.push_back(req_msgbuf);
         // }
+
+#ifdef USE_DPDK
+        /// TODO: what's the proper core offset and worker thread num?
+        DpdkTransport::dpdk_init(cfg->core_offset, cfg->worker_thread_num);
+        mbuf_pool = DpdkTransport::create_mempool();
+
+        uint16_t portid = 0;
+        if (!DpdkTransport::nic_init(portid, mbuf_pool, cfg->worker_thread_num))
+        {
+            rte_exit(EXIT_FAILURE, "Cannot init NIC with port %u\n", portid);
+        }
+
+        // `server_addr` is this machine's local IP address, 
+        // because this code runs on the Millipede "server".
+        int ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &local_ip_addr);
+        rt_assert(ret == 1, "Invalid local IP address");
+        ret = inet_pton(
+            AF_INET, cfg->remote_ldpc_ip_addr.c_str(), &remote_ip_addr);
+        rt_assert(ret == 1, "Invalid remote IP address");
+
+        ether_addr* parsed_mac = ether_aton(cfg->remote_ldpc_mac_addr.c_str());
+        rt_assert(parsed_mac != NULL, "Invalid remote LDPC MAC address");
+        memcpy(&remote_mac_addr, parsed_mac, sizeof(ether_addr));
+
+        ret = rte_eth_macaddr_get(portid, &local_mac_addr);
+        rt_assert(ret == 0, "Cannot get MAC address of the port");
+        printf("Number of DPDK cores: %d\n", rte_lcore_count());
+#endif // USE_DPDK
     }
 
 public:
@@ -58,6 +92,19 @@ public:
     UDPClient udp_client;
     size_t num_requests_issued;
     size_t num_responses_received;
+
+#ifdef USE_DPDK
+    struct rte_mempool* mbuf_pool;
+    /// The IP address of this local machine.
+    uint32_t local_ip_addr;
+    /// The IP address of the remote LDPC machine.
+    uint32_t remote_ip_addr;
+    /// The MAC address of the NIC we're using on this local machine.
+    rte_ether_addr local_mac_addr;
+    /// The MAC address of the remote LDPC worker to which we send requests.
+    rte_ether_addr remote_mac_addr;
+
+#endif // USE_DPDK
 };
 
 class DoEncode : public Doer {
@@ -114,9 +161,9 @@ public:
     }
 
     /// The loop that runs to receive decode completion responses from
-    /// all remote LDPC workers. 
-    /// This is a friend method because it must access private member fields 
-    /// within `DoDecode`. 
+    /// all remote LDPC workers.
+    /// This is a friend method because it must access private member fields
+    /// within `DoDecode`.
     friend void decode_response_loop(Config* cfg);
 
 private:
@@ -169,10 +216,7 @@ struct DecodeMsg {
 
     /// Returns the size of the "header" of this message, i.e.,
     /// everything before the dynamically-sized data.
-    static size_t size_without_data()
-    {
-        return offsetof(DecodeMsg, data);
-    }
+    static size_t size_without_data() { return offsetof(DecodeMsg, data); }
 };
 
 #endif // DOCODING
