@@ -96,7 +96,7 @@ public:
         RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr)
         : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
               worker_producer_token)
-        , subcarrier_range_(subcarrier_range)
+        , sc_range_(subcarrier_range)
         , socket_buffer_(socket_buffer)
         , socket_buffer_status_(socket_buffer_status)
         , csi_buffer_(csi_buffer)
@@ -113,122 +113,76 @@ public:
         , rx_status_(rx_status)
         , demul_status_(demul_status)
     {
-
         // Create the requisite Doers
-        computeZF_ = new DoZF(this->cfg, tid, freq_ghz, this->task_queue_,
+        do_zf_ = new DoZF(this->cfg, tid, freq_ghz, this->task_queue_,
             this->complete_task_queue, this->worker_producer_token, csi_buffer_,
             recip_buffer_, ul_zf_buffer_, dl_zf_buffer_, stats);
 
-        computeDemul_ = new DoDemul(this->cfg, tid, freq_ghz, this->task_queue_,
+        do_demul_ = new DoDemul(this->cfg, tid, freq_ghz, this->task_queue_,
             this->complete_task_queue, this->worker_producer_token,
             data_buffer_, ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
             demod_soft_buffer_, phy_stats, stats, &socket_buffer_);
 
-        computePrecode_
-            = new DoPrecode(this->cfg, tid, freq_ghz, this->task_queue_,
-                this->complete_task_queue, this->worker_producer_token,
-                dl_zf_buffer_, dl_ifft_buffer_, dl_encoded_buffer_, stats);
+        do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, this->task_queue_,
+            this->complete_task_queue, this->worker_producer_token,
+            dl_zf_buffer_, dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
         // computeReciprocity_ = new Reciprocity(this->cfg, tid, freq_ghz,
         //     this->task_queue_, this->complete_task_queue,
         //     this->worker_producer_token, calib_buffer_, recip_buffer_, stats);
 
         // Init internal states
-        csi_cur_frame = 0;
-        zf_cur_frame = 0;
-        num_zf_task_completed = 0;
-        demul_cur_frame = 0;
-        demul_cur_symbol_to_process = cfg->pilot_symbol_num_perframe;
-        num_demul_task_completed = 0;
-
-        log = fopen("log1.txt", "w");
+        demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+        log_ = fopen("log1.txt", "w");
     }
 
     ~DoSubcarrier()
     {
-        delete computeZF_;
-        delete computeDemul_;
-        delete computePrecode_;
+        delete do_zf_;
+        delete do_demul_;
+        delete do_precode_;
         // delete computeReciprocity_;
     }
 
-    Event_data launch(size_t tag, EventType event_type)
-    {
-        rt_assert(subcarrier_range_.contains(gen_tag_t(tag).sc_id),
-            std::string("BUG: DoSubcarrier for ")
-                + subcarrier_range_.to_string()
-                + " tried to handle wrong subcarrier ID: "
-                + std::to_string(gen_tag_t(tag).sc_id) + ", event_type "
-                + std::to_string((int)event_type));
-
-        switch (event_type) {
-        case EventType::kCSI:
-            return run_csi(tag);
-        case EventType::kZF:
-            return computeZF_->launch(tag);
-        case EventType::kDemul:
-            return computeDemul_->launch(tag);
-        case EventType::kPrecode:
-            return computePrecode_->launch(tag);
-        /// TODO: move reciprocity into Subcarrier doers.
-        // case EventType::kRc: {
-        //     return computeReciprocity_->launch(tag, event_type);
-        // } break;
-
-        // Should never reach below here!
-        default:
-            break;
-        }
-
-        rt_assert(false,
-            std::string("[DoSubcarrier::launch] error, unexpected event type ")
-                + std::to_string(static_cast<int>(event_type)));
-        return Event_data();
-    }
-
     // Returns the range of subcarrier IDs handled by this subcarrier doer.
-    Range& subcarrier_range() { return subcarrier_range_; }
+    Range& subcarrier_range() { return sc_range_; }
 
     void start_work()
     {
-        const size_t num_zf_task_required
-            = (subcarrier_range_.end - subcarrier_range_.start)
-            / cfg->zf_block_size;
-        const size_t num_demul_task_required
-            = (subcarrier_range_.end - subcarrier_range_.start)
-            / cfg->demul_block_size;
+        const size_t n_zf_tasks_reqd
+            = (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
+        const size_t n_demul_tasks_reqd
+            = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
-            if (rx_status_->is_pilot_ready(csi_cur_frame)) {
-                run_csi(gen_tag_t::frm_sym_sc(
-                    csi_cur_frame, 0, subcarrier_range_.start)
-                            ._tag);
+            if (rx_status_->is_pilot_ready(csi_cur_frame_)) {
+                run_csi(csi_cur_frame_, sc_range_.start);
                 // exit(0);
                 printf(
                     "Main thread: pilot frame: %lu, finished CSI for all pilot "
                     "symbols\n",
-                    csi_cur_frame);
-                csi_cur_frame++;
+                    csi_cur_frame_);
+                csi_cur_frame_++;
             }
-            if (csi_cur_frame > zf_cur_frame) {
-                computeZF_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame, 0,
-                    subcarrier_range_.start
-                        + num_zf_task_completed * cfg->zf_block_size)
-                                       ._tag);
+
+            if (csi_cur_frame_ > zf_cur_frame_) {
+                do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
+                    sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
+                                   ._tag);
                 // exit(0);
-                num_zf_task_completed++;
-                if (num_zf_task_completed == num_zf_task_required) {
-                    num_zf_task_completed = 0;
-                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame);
-                    zf_cur_frame++;
-                    if (subcarrier_range_.start == 0) {
+                n_zf_tasks_done_++;
+                if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
+                    n_zf_tasks_done_ = 0;
+                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    zf_cur_frame_++;
+                    if (sc_range_.start == 0) {
                         // print_ul_zf_buf(zf_cur_frame - 1, 600);
                     }
                 }
             }
-            if (zf_cur_frame > demul_cur_frame
+            if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
-                       demul_cur_frame, demul_cur_symbol_to_process)) {
+                       demul_cur_frame_, demul_cur_sym_)) {
                 // if (demul_cur_frame == 0) {
                 //     printf("Run demod on frame %lu symbol %lu sc %lu\n",
                 //         demul_cur_frame, demul_cur_symbol_to_process,
@@ -241,30 +195,26 @@ public:
                 //     subcarrier_range_.start
                 //         + num_demul_task_completed * cfg->demul_block_size)
                 //                           ._tag);
-                computeDemul_->independent_launch(
-                    gen_tag_t::frm_sym_sc(demul_cur_frame,
-                        demul_cur_symbol_to_process
-                            - cfg->pilot_symbol_num_perframe,
-                        subcarrier_range_.start
-                            + num_demul_task_completed * cfg->demul_block_size)
+                do_demul_->independent_launch(
+                    gen_tag_t::frm_sym_sc(demul_cur_frame_,
+                        demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
+                        sc_range_.start
+                            + n_demul_tasks_done_ * cfg->demul_block_size)
                         ._tag);
-                num_demul_task_completed++;
-                if (num_demul_task_completed == num_demul_task_required) {
-                    num_demul_task_completed = 0;
-                    demul_status_->demul_complete(demul_cur_frame,
-                        demul_cur_symbol_to_process, num_demul_task_required);
-                    demul_cur_symbol_to_process++;
-                    if (demul_cur_symbol_to_process
-                        == cfg->symbol_num_perframe) {
-                        demul_cur_symbol_to_process
-                            = cfg->pilot_symbol_num_perframe;
+                n_demul_tasks_done_++;
+                if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
+                    n_demul_tasks_done_ = 0;
+                    demul_status_->demul_complete(
+                        demul_cur_frame_, demul_cur_sym_, n_demul_tasks_reqd);
+                    demul_cur_sym_++;
+                    if (demul_cur_sym_ == cfg->symbol_num_perframe) {
+                        demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
                         printf("Main thread: Demodulation done frame: %lu "
-                               "(%lu "
-                               "UL symbols)\n",
-                            demul_cur_frame,
+                               "(%lu UL symbols)\n",
+                            demul_cur_frame_,
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);
-                        demul_cur_frame++;
+                        demul_cur_frame_++;
 
                         // for (size_t i = 0; i < cfg->UE_NUM; i++) {
                         //     for (size_t j = subcarrier_range_.start;
@@ -273,7 +223,7 @@ public:
                         //             cfg->pilot_symbol_num_perframe, i, j);
                         //     }
                         // }
-                        rx_status_->decode_done(demul_cur_frame - 1);
+                        rx_status_->decode_done(demul_cur_frame_ - 1);
                     }
                 }
             }
@@ -281,14 +231,10 @@ public:
     }
 
 private:
-    Event_data run_csi(size_t tag)
+    void run_csi(size_t frame_id, size_t base_sc_id)
     {
-        const size_t frame_id = gen_tag_t(tag).frame_id;
-        const size_t base_sc_id = gen_tag_t(tag).sc_id;
         const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-
-        rt_assert(base_sc_id == subcarrier_range_.start,
-            "Received wrong task for CSI!");
+        rt_assert(base_sc_id == sc_range_.start, "Invalid SC in run_csi!");
 
         complex_float converted_sc[kSCsPerCacheline];
 
@@ -314,12 +260,9 @@ private:
                 //     }
                 // }
 
-                size_t block_idx_start
-                    = subcarrier_range_.start / kTransposeBlockSize;
-                size_t block_idx_end
-                    = subcarrier_range_.end / kTransposeBlockSize;
-                for (size_t block_idx = block_idx_start;
-                     block_idx < block_idx_end; block_idx++) {
+                for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
+                     block_idx < sc_range_.end / kTransposeBlockSize;
+                     block_idx++) {
                     const size_t block_base_offset
                         = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
 
@@ -359,8 +302,8 @@ private:
                         //     }
                         // }
 
-                        const complex_float* src
-                            = converted_sc; // TODO: find src pointer from pkt
+                        // TODO: find src pointer from pkt
+                        const complex_float* src = converted_sc;
 
                         // if (j == 0 && i == 0 && sc_idx == 0) {
                         //     printf("src data: (%f %f)\n", src[0].re, src[0].im);
@@ -426,8 +369,8 @@ private:
                 }
             }
         }
+
         // printf("(%f %f)\n", csi_buffer_[1][0].re, csi_buffer_[1][0].im);
-        return Event_data(EventType::kCSI, tag);
     }
 
     void print_demod_data(
@@ -445,26 +388,26 @@ private:
 
     void print_ul_zf_buf(size_t frame_id, size_t sc_id)
     {
-        fprintf(log, "UL ZF buffer for (%lu %lu):\n", frame_id, sc_id);
+        fprintf(log_, "UL ZF buffer for (%lu %lu):\n", frame_id, sc_id);
         complex_float* ptr = cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, sc_id);
         for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
             for (size_t j = 0; j < cfg->UE_NUM; j++) {
-                fprintf(log, "(%lf %lf) ", ptr[i * cfg->UE_NUM + j].re,
+                fprintf(log_, "(%lf %lf) ", ptr[i * cfg->UE_NUM + j].re,
                     ptr[i * cfg->UE_NUM + j].im);
             }
-            fprintf(log, "\n");
+            fprintf(log_, "\n");
         }
-        fprintf(log, "\n");
+        fprintf(log_, "\n");
     }
 
     /// The subcarrier range handled by this subcarrier doer.
-    struct Range subcarrier_range_;
+    struct Range sc_range_;
 
     // TODO: We should use owned objects here instead of pointers, but these
     // buffers depend on some Tables beine malloc-ed
-    DoZF* computeZF_;
-    DoDemul* computeDemul_;
-    DoPrecode* computePrecode_;
+    DoZF* do_zf_;
+    DoDemul* do_demul_;
+    DoPrecode* do_precode_;
     // Reciprocity*  computeReciprocity_;
 
     // For the following buffers, see the `SubcarrierManager`'s documentation.
@@ -495,21 +438,21 @@ private:
     RxStatus* rx_status_;
 
     // Internal CSI states
-    size_t csi_cur_frame;
+    size_t csi_cur_frame_ = 0;
 
     // Internal ZF states
-    size_t zf_cur_frame; // Current frame waiting for CSI matrix
-    size_t num_zf_task_completed;
+    size_t zf_cur_frame_ = 0; // Current frame waiting for CSI matrix
+    size_t n_zf_tasks_done_ = 0;
 
     // Internal Demul states
-    size_t demul_cur_frame; // Current frame waiting for ZF matrix
-    size_t demul_cur_symbol_to_process; // Current data symbol wait to process
-    size_t num_demul_task_completed;
+    size_t demul_cur_frame_; // Current frame waiting for ZF matrix
+    size_t demul_cur_sym_ = 0; // Current data symbol wait to process
+    size_t n_demul_tasks_done_ = 0;
 
     // Shared status with Decode threads
     DemulStatus* demul_status_;
 
-    FILE* log;
+    FILE* log_;
 };
 
 #endif // DOSUBCARRIER_HPP

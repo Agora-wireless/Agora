@@ -324,8 +324,7 @@ public:
         TASK_BUFFER_FRAME_NUM>
         num_data_pkts;
 
-    // Millipede processes one frame at a time (roughly speaking). cur_frame is
-    // the frame currently being processed.
+    // cur_frame is the first frame for which decoding is incomplete
     size_t cur_frame = 0;
 
     // The max frame number for which socket I/O threads have received any packet
