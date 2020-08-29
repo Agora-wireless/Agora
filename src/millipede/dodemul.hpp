@@ -65,7 +65,9 @@ public:
      * completion of this task
      */
     Event_data launch(size_t tag);
-    void independent_launch(size_t tag);
+
+    void independent_launch(
+        size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id);
 
 private:
     Table<complex_float>& data_buffer_;

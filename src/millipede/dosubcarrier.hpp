@@ -195,12 +195,11 @@ public:
                 //     subcarrier_range_.start
                 //         + num_demul_task_completed * cfg->demul_block_size)
                 //                           ._tag);
-                do_demul_->independent_launch(
-                    gen_tag_t::frm_sym_sc(demul_cur_frame_,
-                        demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
-                        sc_range_.start
-                            + n_demul_tasks_done_ * cfg->demul_block_size)
-                        ._tag);
+                do_demul_->independent_launch(demul_cur_frame_,
+                    demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
+                    sc_range_.start
+                        + (n_demul_tasks_done_ * cfg->demul_block_size));
+
                 n_demul_tasks_done_++;
                 if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
                     n_demul_tasks_done_ = 0;

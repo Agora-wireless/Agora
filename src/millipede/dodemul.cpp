@@ -272,11 +272,9 @@ Event_data DoDemul::launch(size_t tag)
     return Event_data(EventType::kDemul, tag);
 }
 
-void DoDemul::independent_launch(size_t tag)
+void DoDemul::independent_launch(
+    size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id)
 {
-    const size_t frame_id = gen_tag_t(tag).frame_id;
-    const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
-    const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t total_data_symbol_idx_ul
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
     const size_t frame_slot = frame_id % SOCKET_BUFFER_FRAME_NUM;
