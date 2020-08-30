@@ -707,9 +707,10 @@ void Millipede::handle_event_fft(size_t tag)
 void* Millipede::subcarrier_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+    moodycamel::ConcurrentQueue<Event_data> dummy_conq;
 
     auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
-        *get_conq(EventType::kCSI), complete_task_queue_, nullptr,
+        dummy_conq, dummy_conq, nullptr /* ptok */,
         Range(tid * config_->subcarrier_block_size,
             (tid + 1) * config_->subcarrier_block_size),
         socket_buffer_, socket_buffer_status_, csi_buffer_, recip_buffer_,

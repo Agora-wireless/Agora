@@ -77,9 +77,8 @@ class DoSubcarrier : public Doer {
 public:
     /// Construct a new Do Subcarrier object
     DoSubcarrier(Config* config, int tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
+        moodycamel::ConcurrentQueue<Event_data>&,
+        moodycamel::ConcurrentQueue<Event_data>&, moodycamel::ProducerToken*,
         /// The range of subcarriers handled by this subcarrier doer.
         struct Range subcarrier_range,
         // input buffers
@@ -94,8 +93,8 @@ public:
         Table<complex_float>& equal_buffer, Table<complex_float>& ul_zf_buffer,
         Table<complex_float>& dl_zf_buffer, PhyStats* phy_stats, Stats* stats,
         RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr)
-        : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
-              worker_producer_token)
+        : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
+              nullptr /* tok */)
         , sc_range_(subcarrier_range)
         , socket_buffer_(socket_buffer)
         , socket_buffer_status_(socket_buffer_status)
@@ -114,18 +113,18 @@ public:
         , demul_status_(demul_status)
     {
         // Create the requisite Doers
-        do_zf_ = new DoZF(this->cfg, tid, freq_ghz, this->task_queue_,
-            this->complete_task_queue, this->worker_producer_token, csi_buffer_,
-            recip_buffer_, ul_zf_buffer_, dl_zf_buffer_, stats);
+        do_zf_ = new DoZF(this->cfg, tid, freq_ghz, dummy_conq_, dummy_conq_,
+            nullptr /* ptok */, csi_buffer_, recip_buffer_, ul_zf_buffer_,
+            dl_zf_buffer_, stats);
 
-        do_demul_ = new DoDemul(this->cfg, tid, freq_ghz, this->task_queue_,
-            this->complete_task_queue, this->worker_producer_token,
-            data_buffer_, ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats, &socket_buffer_);
+        do_demul_ = new DoDemul(this->cfg, tid, freq_ghz, dummy_conq_,
+            dummy_conq_, nullptr /* ptok */, data_buffer_, ul_zf_buffer_,
+            ue_spec_pilot_buffer_, equal_buffer_, demod_soft_buffer_, phy_stats,
+            stats, &socket_buffer_);
 
-        do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, this->task_queue_,
-            this->complete_task_queue, this->worker_producer_token,
-            dl_zf_buffer_, dl_ifft_buffer_, dl_encoded_buffer_, stats);
+        do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dummy_conq_,
+            dummy_conq_, nullptr /* ptok */, dl_zf_buffer_, dl_ifft_buffer_,
+            dl_encoded_buffer_, stats);
 
         // computeReciprocity_ = new Reciprocity(this->cfg, tid, freq_ghz,
         //     this->task_queue_, this->complete_task_queue,
@@ -398,6 +397,8 @@ private:
         }
         fprintf(log_, "\n");
     }
+    /// An unused queue used for constructing Doers
+    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 
     /// The subcarrier range handled by this subcarrier doer.
     struct Range sc_range_;
