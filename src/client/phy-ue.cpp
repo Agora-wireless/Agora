@@ -719,7 +719,9 @@ void Phy_UE::doEncode(int tid, size_t tag)
         ldpc_encoding_parity_buf_size(
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
-    size_t bytes_per_block = (LDPC_config.cbLen) >> 3;
+    size_t bytes_per_block = kEnableMac
+        ? (LDPC_config.cbLen) >> 3
+        : roundup<64>(bits_to_bytes(LDPC_config.cbLen));
     size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
 
     for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
@@ -784,11 +786,9 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf = &modul_buffer_[total_ul_symbol_id][ant_id
                 * config_->OFDM_DATA_NUM];
-            int8_t* ul_bits = kEnableMac
-                ? (int8_t*)&ul_syms_buffer_[ant_id][total_ul_symbol_id
-                      * config_->OFDM_DATA_NUM]
-                : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
-                                   [ant_id * config_->OFDM_DATA_NUM];
+            int8_t* ul_bits
+                = (int8_t*)&ul_syms_buffer_[ant_id][total_ul_symbol_id
+                    * config_->OFDM_DATA_NUM];
             for (size_t sc = 0; sc < config_->OFDM_DATA_NUM; sc++) {
                 modul_buf[sc]
                     = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
@@ -839,6 +839,7 @@ void Phy_UE::doIFFT(int tid, size_t tag)
                 sizeof(complex_float) * config_->OFDM_DATA_START);
 
             CommsLib::IFFT(ifft_buff, config_->OFDM_CA_NUM, false);
+
             size_t tx_offset = buff_offset * config_->packet_length;
             char* cur_tx_buffer = &tx_buffer_[tx_offset];
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
