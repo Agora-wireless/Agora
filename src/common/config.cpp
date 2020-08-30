@@ -225,8 +225,6 @@ Config::Config(std::string jsonfile)
     LDPC_config.nblocksInSymbol
         = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
-    num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
-
     rt_assert(LDPC_config.nblocksInSymbol > 0,
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
@@ -247,8 +245,10 @@ Config::Config(std::string jsonfile)
     packet_length
         = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
+    num_bytes_per_cb = (LDPC_config.cbLen) >> 3;
+
     data_bytes_num_persymbol
-        = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
+        = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
     mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
