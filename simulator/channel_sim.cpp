@@ -1,6 +1,7 @@
 #include "channel_sim.hpp"
 
 static bool running = true;
+static constexpr bool kPrintChannelOutput = false;
 
 static void convert_short_to_float_simd(
     short* in_buf, float* out_buf, size_t length)
@@ -80,6 +81,21 @@ static void convert_float_to_short_simd(
         out_buf[i] = (short)(in_buf[i] * 32768.f);
     }
 }
+
+static inline void print_mat(cx_fmat c)
+{
+    std::stringstream so;
+    for (size_t i = 0; i < c.n_cols; i++) {
+        so << "row" << i << " = [";
+        for (size_t j = 0; j < c.n_rows; j++)
+            so << std::fixed << std::setw(5) << std::setprecision(3)
+               << c.at(j, i).real() << "+" << c.at(j, i).imag() << "i ";
+        so << "];\n";
+    }
+    so << std::endl;
+    std::cout << so.str();
+}
+
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     size_t bs_socket_num, size_t user_socket_num, size_t bs_thread_num,
     size_t user_thread_num, size_t worker_thread_num, size_t in_core_offset)
@@ -517,6 +533,8 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         2 * payload_samps * uecfg->UE_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel;
+    if (kPrintChannelOutput)
+        print_mat(fmat_dst);
 
     short* dst_ptr = (short*)(tx_buffer_bs + total_offset_bs);
     convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr,
@@ -566,6 +584,8 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         2 * payload_samps * bscfg->BS_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel.st();
+    if (kPrintChannelOutput)
+        print_mat(fmat_dst);
 
     short* dst_ptr = (short*)(tx_buffer_ue + total_offset_ue);
     convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr,

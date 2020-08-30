@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <iomanip>
 
 using namespace arma;
 
