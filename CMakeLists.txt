@@ -345,4 +345,11 @@ add_executable(test_zf_threaded
 target_link_libraries(test_zf_threaded ${COMMON_LIBS})
 add_test(NAME test_zf_threaded COMMAND test_zf_threaded)
 
+add_executable(test_demul_threaded
+  test/unit_tests/test_demul_threaded.cc
+   $<TARGET_OBJECTS:millipede_sources_lib>
+   $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_demul_threaded ${COMMON_LIBS})
+add_test(NAME test_demul_threaded COMMAND test_demul_threaded)
+
 

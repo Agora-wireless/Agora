@@ -28,12 +28,12 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
-    spm_buffer = reinterpret_cast<complex_float*>(memalign(
-        64, kSCsPerCacheline * cfg->BS_ANT_NUM * sizeof(complex_float)));
-    equaled_buffer_temp = reinterpret_cast<complex_float*>(memalign(
-        64, cfg->demul_block_size * cfg->UE_NUM * sizeof(complex_float)));
-    equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(memalign(
-        64, cfg->demul_block_size * cfg->UE_NUM * sizeof(complex_float)));
+    spm_buffer = reinterpret_cast<complex_float*>(
+        memalign(64, kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
+    equaled_buffer_temp = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+    equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
@@ -238,7 +238,7 @@ Event_data DoDemul::launch(size_t tag)
         int8_t* demul_ptr = cfg->get_demod_buf(
             demod_soft_buffer_, frame_id, symbol_idx_ul, i, base_sc_id);
 
-        switch (cfg->mod_type) {
+        switch (cfg->mod_order_bits) {
         case (CommsLib::QAM16):
             demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
             break;
@@ -253,7 +253,7 @@ Event_data DoDemul::launch(size_t tag)
         //     tid, frame_id, symbol_idx_ul, base_sc_id);
         // cout << "Demuled data : \n ";
         // cout << " UE " << i << ": ";
-        // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
+        // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits; k++)
         //     printf("%i ", demul_ptr[k]);
         // cout << endl;
     }

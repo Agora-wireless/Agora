@@ -139,8 +139,6 @@ Phy_UE::Phy_UE(Config* config)
             dl_data_buffer_[i].resize(data_sc_len);
     }
 
-    init_modulation_table(qam_table, config_->mod_type);
-
     // initilize all kinds of checkers
     memset(csi_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
     memset(data_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM * antenna_num);
@@ -749,13 +747,13 @@ void Phy_UE::doEncode(int tid, size_t tag)
 
             ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                 LDPC_config.nRows, output_ptr, parity_buffer, input_ptr);
-            int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
+            int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_order_bits;
             int output_offset
                 = total_ul_symbol_id * data_sc_len + cbCodedBytes * cb_id;
             int8_t* final_output_ptr
                 = (int8_t*)&ul_syms_buffer_[ue_id][output_offset];
             adapt_bits_for_mod(output_ptr, final_output_ptr,
-                encoded_bytes_per_block, cfg->mod_type);
+                encoded_bytes_per_block, cfg->mod_order_bits);
         }
     }
     //double duration = worker_rdtsc() - start_tsc;
@@ -791,8 +789,8 @@ void Phy_UE::doModul(int tid, size_t tag)
                 : &config_->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
                                    [ant_id * data_sc_len];
             for (size_t sc = 0; sc < data_sc_len; sc++) {
-                modul_buf[sc]
-                    = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
+                modul_buf[sc] = mod_single_uint8(
+                    (uint8_t)ul_bits[sc], config_->mod_table);
             }
         }
     }

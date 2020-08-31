@@ -66,11 +66,10 @@ Event_data DoEncode::launch(size_t tag)
     int8_t* final_output_ptr = cfg->get_encoded_buf(
         encoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
     adapt_bits_for_mod(output_ptr, final_output_ptr,
-        (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
+        (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_order_bits);
 
     // printf("Encoded data\n");
-    // int mod_type = cfg->mod_type;
-    // int num_mod = LDPC_config.cbCodewLen / mod_type;
+    // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
     // for(int i = 0; i < num_mod; i++) {
     //     printf("%u ", *(final_output_ptr + i));
     // }

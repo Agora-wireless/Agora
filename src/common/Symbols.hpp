@@ -205,7 +205,12 @@ static constexpr size_t k5GMaxSubcarriers = 3300;
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 1000;
+static constexpr size_t kMaxUEs = 64;
+
+// Maximum modulation (QAM256) supported by Millipede
+// Only up to QAM64 is implemented
+// Here using 8 helps reduce cache false sharing
+static constexpr size_t kMaxModType = 8;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
