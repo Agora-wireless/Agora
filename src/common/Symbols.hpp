@@ -179,22 +179,6 @@ static inline std::string thread_type_str(ThreadType thread_type)
 
 enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
-class LDPCconfig {
-public:
-    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
-    uint16_t Zc; /// The 5G NR LDPC expansion factor
-    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
-
-    /// Allow the LDPC decoder to terminate without completing all iterations
-    /// if it decodes the codeblock eariler
-    bool earlyTermination;
-
-    size_t nRows; /// Number of rows in the LDPC base graph to use
-    uint32_t cbLen; /// Number of information bits input to LDPC encoding
-    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
-    size_t nblocksInSymbol;
-};
-
 // Maximum number of symbols per frame allowed by Millipede
 static constexpr size_t kMaxSymbolsPerFrame = 1400;
 
