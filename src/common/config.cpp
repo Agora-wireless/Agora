@@ -479,8 +479,10 @@ void Config::genData()
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
-                adapt_bits_for_mod(ul_encoded_bits[i * num_blocks_per_symbol
-                                       + j * LDPC_config.nblocksInSymbol + k],
+                adapt_bits_for_mod(
+                    reinterpret_cast<uint8_t*>(
+                        ul_encoded_bits[i * num_blocks_per_symbol
+                            + j * LDPC_config.nblocksInSymbol + k]),
                     ul_mod_input[i] + j * OFDM_DATA_NUM
                         + k * encoded_bytes_per_block,
                     encoded_bytes_per_block, mod_type);
@@ -507,8 +509,10 @@ void Config::genData()
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
-                adapt_bits_for_mod(dl_encoded_bits[i * num_blocks_per_symbol
-                                       + j * LDPC_config.nblocksInSymbol + k],
+                adapt_bits_for_mod(
+                    reinterpret_cast<uint8_t*>(
+                        dl_encoded_bits[i * num_blocks_per_symbol
+                            + j * LDPC_config.nblocksInSymbol + k]),
                     dl_mod_input[i] + j * OFDM_DATA_NUM
                         + k * encoded_bytes_per_block,
                     encoded_bytes_per_block, mod_type);
