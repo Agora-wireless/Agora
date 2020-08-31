@@ -81,7 +81,7 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      files.
    * In one terminal, run `./build/user data/ue-sim.json` to start
      Clients with uplink configuration.
-   * In another terminal, run  `./build/chsim 8 2 1 1 2 24 bs-sim.json ue-sim.json`
+   * In another terminal, run  `./build/chsim 8 2 1 1 2 24 data/bs-sim.json data/ue-sim.json`
    * In another terminal, run `./build/millipede data/bs-sim.json` to start
      Millipede with uplink configuration.
 
