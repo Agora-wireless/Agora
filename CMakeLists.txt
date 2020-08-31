@@ -293,10 +293,10 @@ target_link_libraries(chsim ${COMMON_LIBS})
 if(NOT ${USE_DPDK})
   # Create shared libraries for Python
   # DPDK is currently not supported
-  add_library(comp MODULE
-    $<TARGET_OBJECTS:millipede_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>)
-  target_link_libraries(comp ${COMMON_LIBS})
+  #  add_library(comp MODULE
+  #    $<TARGET_OBJECTS:millipede_sources_lib>
+  #    $<TARGET_OBJECTS:common_sources_lib>)
+  #  target_link_libraries(comp ${COMMON_LIBS})
 
   add_library(ue_phy MODULE
     $<TARGET_OBJECTS:client_sources_lib>
