@@ -103,17 +103,15 @@ int main(int argc, char* argv[])
     Table<complex_float> mod_output;
     mod_input.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 32);
     mod_output.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 32);
-    Table<float> mod_table;
-    init_modulation_table(mod_table, cfg->mod_type);
 
     for (size_t n = 0; n < num_codeblocks; n++) {
         adapt_bits_for_mod(encoded[n], mod_input[n],
             bits_to_bytes(ldpc_num_encoded_bits(cfg->LDPC_config.Bg,
                 cfg->LDPC_config.Zc, cfg->LDPC_config.nRows)),
-            cfg->mod_type);
+            cfg->mod_order_bits);
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++)
             mod_output[n][i]
-                = mod_single_uint8((uint8_t)mod_input[n][i], mod_table);
+                = mod_single_uint8((uint8_t)mod_input[n][i], cfg->mod_table);
     }
 
     std::string filename_input = cur_directory + "/data/LDPC_orig_data_"

@@ -10,8 +10,8 @@ Config::Config(std::string jsonfile)
     const auto tddConf = json::parse(conf);
 
     /* antenna configurations */
-    hub_file = tddConf.value("hubs", "");
-    serial_file = tddConf.value("irises", "");
+    std::string hub_file = tddConf.value("hubs", "");
+    std::string serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
     channel = tddConf.value("channel", "A");
@@ -204,13 +204,6 @@ Config::Config(std::string jsonfile)
 
     fft_block_size = tddConf.value("fft_block_size", 4);
 
-    /* Modulation configurations */
-    mod_type = modulation == "64QAM"
-        ? CommsLib::QAM64
-        : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
-    printf("Modulation: %s\n", modulation.c_str());
-    mod_order = (size_t)pow(2, mod_type);
-
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
@@ -220,8 +213,12 @@ Config::Config(std::string jsonfile)
     LDPC_config.cbLen = ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc);
     LDPC_config.cbCodewLen = ldpc_num_encoded_bits(
         LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows);
-    LDPC_config.nblocksInSymbol
-        = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
+
+    /* Modulation configurations */
+    mod_order_bits = modulation == "64QAM"
+        ? CommsLib::QAM64
+        : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+    update_mod_cfgs(mod_order_bits);
 
     num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
 
@@ -266,7 +263,7 @@ Config::Config(std::string jsonfile)
               << "\n  mac_data_bytes_num_perframe: "
               << mac_data_bytes_num_perframe
               << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
-              << std::endl;
+              << "\n  Modulation: " << modulation.c_str() << std::endl;
 
     if (packet_length >= 9000) {
         std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
@@ -460,7 +457,7 @@ void Config::genData()
                                        + j * LDPC_config.nblocksInSymbol + k],
                     ul_mod_input[i] + j * OFDM_DATA_NUM
                         + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_type);
+                    encoded_bytes_per_block, mod_order_bits);
             }
         }
     }
@@ -488,13 +485,10 @@ void Config::genData()
                                        + j * LDPC_config.nblocksInSymbol + k],
                     dl_mod_input[i] + j * OFDM_DATA_NUM
                         + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_type);
+                    encoded_bytes_per_block, mod_order_bits);
             }
         }
     }
-
-    Table<float> qam_table;
-    init_modulation_table(qam_table, mod_type);
 
     // Generate freq-domain downlink symbols
     Table<complex_float> dl_iq_ifft;
@@ -510,7 +504,7 @@ void Config::genData()
                 size_t s = p + k;
                 if (k % OFDM_PILOT_SPACING != 0) {
                     dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_mod_input[i][s], qam_table);
+                        = mod_single_uint8(dl_mod_input[i][s], mod_table);
                 } else
                     dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
                 dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
@@ -533,7 +527,7 @@ void Config::genData()
                 size_t k = j - OFDM_DATA_START;
                 size_t s = p + k;
                 ul_iq_f[i][q + j]
-                    = mod_single_uint8(ul_mod_input[i][s], qam_table);
+                    = mod_single_uint8(ul_mod_input[i][s], mod_table);
                 ul_iq_ifft[i][q + j] = ul_iq_f[i][q + j];
             }
 
