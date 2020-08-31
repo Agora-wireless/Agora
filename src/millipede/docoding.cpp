@@ -59,14 +59,14 @@ Event_data DoEncode::launch(size_t tag)
     size_t symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
     int8_t* input_ptr = cfg->get_info_bits(
         raw_data_buffer_, symbol_id_in_buffer, ue_id, cur_cb_id);
-    int8_t* output_ptr = encoded_buffer_temp;
 
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
-        output_ptr, parity_buffer, input_ptr);
+        encoded_buffer_temp, parity_buffer, input_ptr);
     int8_t* final_output_ptr = cfg->get_encoded_buf(
         encoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
-    adapt_bits_for_mod(output_ptr, final_output_ptr,
-        (LDPC_config.cbCodewLen + 7) >> 3, cfg->mod_type);
+    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+        reinterpret_cast<uint8_t*>(final_output_ptr),
+        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_type);
 
     // printf("Encoded data\n");
     // int mod_type = cfg->mod_type;
