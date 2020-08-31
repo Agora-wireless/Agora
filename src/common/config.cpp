@@ -66,7 +66,6 @@ Config::Config(std::string jsonfile)
     bs_addr = tddConf.value("bs_addr", "127.0.0.1");
     rru_addr = tddConf.value("rru_addr", "127.0.0.1");
     ue_addr = tddConf.value("ue_addr", "127.0.0.1");
-    tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
     bs_port = tddConf.value("bs_port", 8000);
     bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
@@ -76,7 +75,6 @@ Config::Config(std::string jsonfile)
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
-    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     CP_LEN = tddConf.value("cp_len", 0);
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);

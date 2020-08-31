@@ -84,7 +84,7 @@ void MacThread::process_codeblocks_from_master()
 
         // Check CRC
         uint16_t crc
-            = (uint16_t)(crc_obj->calculateCRC24(
+            = (uint16_t)(crc_obj->calculate_crc24(
                              (unsigned char*)pkt->data, cfg_->mac_payload_length)
                 & 0xFFFF);
         if (crc == pkt->crc) {
@@ -223,7 +223,7 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
         memcpy(pkt->data,
             payload + pkt_id * cfg_->mac_payload_length, cfg_->mac_payload_length);
         // Insert CRC
-        pkt->crc = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
+        pkt->crc = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
                                   cfg_->mac_payload_length)
             & 0xFFFF);
 
