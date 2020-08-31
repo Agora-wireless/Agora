@@ -24,6 +24,7 @@
 
 #include "encoder.hpp"
 #include "iobuffer.hpp"
+#include "shared_counters.hpp"
 #include "utils_ldpc.hpp"
 
 class DoEncode : public Doer {

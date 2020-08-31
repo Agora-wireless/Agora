@@ -23,6 +23,7 @@
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
 #include "reciprocity.hpp"
+#include "shared_counters.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "subcarrier_manager.hpp"

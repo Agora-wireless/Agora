@@ -161,7 +161,7 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     if (-1
         == recv(socket_[radio_id], (char*)pkt,
                Packet::kOffsetOfData
-                   + cfg->OFDM_CONTROL_NUM * 2 * sizeof(unsigned short),
+                   + cfg->get_ofdm_control_num() * 2 * sizeof(unsigned short),
                0)) {
         if (errno != EAGAIN && cfg->running) {
             perror("recv failed");
@@ -184,12 +184,12 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
         size_t sc_offset = Packet::kOffsetOfData
             + 2 * sizeof(unsigned short)
                 * (cfg->OFDM_DATA_START
-                      + cfg->server_addr_idx * cfg->OFDM_CONTROL_NUM);
+                      + cfg->server_addr_idx * cfg->get_ofdm_control_num());
         memcpy(
             &rx_buffer[rx_offset_ * packet_length], buf, Packet::kOffsetOfData);
         memcpy(&rx_buffer[rx_offset_ * packet_length + sc_offset],
             buf + Packet::kOffsetOfData,
-            cfg->OFDM_CONTROL_NUM * 2 * sizeof(unsigned short));
+            cfg->get_ofdm_control_num() * 2 * sizeof(unsigned short));
     } else {
         memcpy(&rx_buffer[rx_offset_ * packet_length], buf, packet_length);
     }

@@ -246,8 +246,10 @@ void* Sender::worker_thread(int tid)
     UDPClient udp_client;
     auto fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
-    char* data_buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
+    auto* socks_pkt_buf
+        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
+    auto* data_buf
+        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
 
     double begin = get_time();
     size_t total_tx_packets = 0;
@@ -283,39 +285,28 @@ void* Sender::worker_thread(int tid)
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
         pkt->cell_id = 0;
         pkt->ant_id = tag.ant_id;
-        memcpy(pkt->data,
+
+        memcpy(data_buf->data,
             iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
         if (cfg->fft_in_rru) {
-            run_fft(pkt, fft_inout, mkl_handle);
-        }
-        if (cfg->server_addr_list.size() > 1) {
-            memcpy(data_buf, pkt->data,
-                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+            run_fft(reinterpret_cast<short*>(data_buf->data), fft_inout,
+                mkl_handle);
         }
 
 #ifdef USE_DPDK
         rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
-        if (cfg->server_addr_list.size() > 1) {
-            size_t block_size
-                = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
-            for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
-                memcpy(pkt->data,
-                    data_buf
-                        + (i * block_size + cfg->OFDM_DATA_START)
-                            * sizeof(unsigned short) * 2,
-                    block_size * sizeof(unsigned short) * 2);
-                udp_client.send(cfg->server_addr_list[i],
-                    cfg->bs_port + cur_radio,
-                    reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                    Packet::kOffsetOfData
-                        + 2 * sizeof(unsigned short) * block_size);
-            }
-        } else {
-            udp_client.send(cfg->server_addr_list[0], cfg->bs_port + cur_radio,
-                reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
+        size_t block_size = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
+        for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+            memcpy(pkt->data,
+                data_buf->data + (i * block_size + cfg->OFDM_DATA_START) * 2,
+                block_size * sizeof(unsigned short) * 2);
+            udp_client.send(cfg->server_addr_list[i], cfg->bs_port + cur_radio,
+                reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                Packet::kOffsetOfData
+                    + 2 * sizeof(unsigned short) * block_size);
         }
 #endif
 
@@ -418,16 +409,16 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     }
 }
 
-void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
+void Sender::run_fft(short* src, complex_float* fft_inout,
     DFTI_DESCRIPTOR_HANDLE mkl_handle) const
 {
     // pkt->data has (CP_LEN + OFDM_CA_NUM) unsigned short samples. After FFT,
     // we'll remove the cyclic prefix and have OFDM_CA_NUM short samples left.
-    simd_convert_short_to_float(&pkt->data[2 * cfg->CP_LEN],
+    simd_convert_short_to_float(&src[2 * cfg->CP_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
-    simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data),
+    simd_convert_float32_to_float16(reinterpret_cast<float*>(src),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 }

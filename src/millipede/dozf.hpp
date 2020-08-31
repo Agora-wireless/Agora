@@ -83,13 +83,13 @@ private:
     void Predict(size_t offset);
 
     Table<complex_float> csi_buffer_;
-    complex_float* pred_csi_buffer;
+    complex_float* pred_csi_buffer_;
     Table<complex_float> recip_buffer_;
     Table<complex_float> ul_zf_buffer_;
     Table<complex_float> dl_zf_buffer_;
-    DurationStat* duration_stat;
+    DurationStat* duration_stat_;
 
-    complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI
+    complex_float* csi_gather_buffer_; // Intermediate buffer to gather CSI
 };
 
 #endif

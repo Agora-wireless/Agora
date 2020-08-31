@@ -215,15 +215,17 @@ Config::Config(std::string jsonfile)
     server_addr_idx = tddConf.value("server_addr_idx", 0);
     rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
         "OFDM_DATA_NUM % # servers should be 0!");
-    OFDM_CONTROL_NUM = OFDM_DATA_NUM / server_addr_list.size();
-    subcarrier_start = OFDM_DATA_START + server_addr_idx * OFDM_CONTROL_NUM;
-    subcarrier_end = OFDM_DATA_START + (server_addr_idx + 1) * OFDM_CONTROL_NUM;
-    rt_assert(OFDM_CONTROL_NUM % subcarrier_block_size == 0,
+    subcarrier_start
+        = OFDM_DATA_START + server_addr_idx * get_ofdm_control_num();
+    subcarrier_end
+        = OFDM_DATA_START + (server_addr_idx + 1) * get_ofdm_control_num();
+    rt_assert(get_ofdm_control_num() % subcarrier_block_size == 0,
         "Invalid subcarrier range and subcarrier block size!");
 
-    demul_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / demul_block_size;
+    demul_events_per_symbol
+        = 1 + (get_ofdm_control_num() - 1) / demul_block_size;
 
-    zf_events_per_symbol = 1 + (OFDM_CONTROL_NUM - 1) / zf_block_size;
+    zf_events_per_symbol = 1 + (get_ofdm_control_num() - 1) / zf_block_size;
 
     fft_block_size = tddConf.value("fft_block_size", 4);
 

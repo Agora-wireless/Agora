@@ -13,8 +13,8 @@ Millipede::Millipede(Config* cfg)
           cfg->pilot_symbol_num_perframe, cfg->data_symbol_num_perframe,
           cfg->BS_ANT_NUM,
           // cfg->UE_ANT_NUM
-          cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size)
-    , demul_status_(cfg->OFDM_CONTROL_NUM / cfg->demul_block_size)
+          cfg->get_ofdm_control_num() / cfg->subcarrier_block_size)
+    , demul_status_(cfg->get_ofdm_control_num() / cfg->demul_block_size)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -89,7 +89,7 @@ Millipede::Millipede(Config* cfg)
     } else {
         if (cfg->disable_master) {
             do_subcarrier_threads_.resize(
-                cfg->OFDM_CONTROL_NUM / cfg->subcarrier_block_size);
+                cfg->get_ofdm_control_num() / cfg->subcarrier_block_size);
 
             for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
                 do_subcarrier_threads_[i]
@@ -130,19 +130,6 @@ void Millipede::stop()
     receiver_.reset();
 }
 
-/// Enqueue a batch of task_set_size tasks starting from task index
-/// (task_set_size * task_set_id).
-// static void schedule_task_set(EventType task_type, int task_set_size,
-//     int task_set_id, moodycamel::ConcurrentQueue<Event_data>* task_queue,
-//     moodycamel::ProducerToken* producer_token)
-// {
-//     Event_data task(task_type, task_set_size * task_set_id);
-//     for (int i = 0; i < task_set_size; i++) {
-//         try_enqueue_fallback(task_queue, producer_token, task);
-//         task.tags[0]++;
-//     }
-// }
-
 void Millipede::schedule_task_set(
     EventType task_type, int task_set_size, int task_set_id)
 {
@@ -162,8 +149,6 @@ void Millipede::schedule_antennas(
     auto base_tag = gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0);
 
     for (size_t i = 0; i < config_->BS_ANT_NUM; i++) {
-        // try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
-        // Event_data(event_type, base_tag._tag));
         try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
             sched_info_arr[cur_tid].ptok,
             Event_data(event_type, base_tag._tag));
@@ -175,14 +160,10 @@ void Millipede::schedule_antennas(
 void Millipede::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
-    // assert(
-    //     event_type == EventType::kEncode or event_type == EventType::kDecode);
     auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_id, 0);
 
     for (size_t i = 0;
          i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
-        // try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
-        // Event_data(event_type, base_tag._tag));
         try_enqueue_fallback(&sched_info_arr[cur_tid].concurrent_q,
             sched_info_arr[cur_tid].ptok,
             Event_data(event_type, base_tag._tag));
@@ -726,7 +707,7 @@ void* Millipede::subcarrier_worker(int tid)
 void* Millipede::decode_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset,
-        tid + config_->OFDM_CONTROL_NUM / config_->subcarrier_block_size);
+        tid + config_->get_ofdm_control_num() / config_->subcarrier_block_size);
 
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),

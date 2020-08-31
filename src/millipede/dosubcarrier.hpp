@@ -21,6 +21,7 @@
 #include "modulation.hpp"
 #include "phy_stats.hpp"
 #include "reciprocity.hpp"
+#include "shared_counters.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include <armadillo>
@@ -168,32 +169,16 @@ public:
                 do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
                     sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                                    ._tag);
-                // exit(0);
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
                     n_zf_tasks_done_ = 0;
                     printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
                     zf_cur_frame_++;
-                    if (sc_range_.start == 0) {
-                        // print_ul_zf_buf(zf_cur_frame - 1, 600);
-                    }
                 }
             }
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_)) {
-                // if (demul_cur_frame == 0) {
-                //     printf("Run demod on frame %lu symbol %lu sc %lu\n",
-                //         demul_cur_frame, demul_cur_symbol_to_process,
-                //         subcarrier_range_.start
-                //             + num_demul_task_completed * cfg->demul_block_size);
-                // }
-                // computeDemul_->launch(gen_tag_t::frm_sym_sc(demul_cur_frame,
-                //     demul_cur_symbol_to_process
-                //         - cfg->pilot_symbol_num_perframe,
-                //     subcarrier_range_.start
-                //         + num_demul_task_completed * cfg->demul_block_size)
-                //                           ._tag);
                 do_demul_->independent_launch(demul_cur_frame_,
                     demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
                     sc_range_.start
@@ -213,14 +198,6 @@ public:
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);
                         demul_cur_frame_++;
-
-                        // for (size_t i = 0; i < cfg->UE_NUM; i++) {
-                        //     for (size_t j = subcarrier_range_.start;
-                        //          j < subcarrier_range_.end; j++) {
-                        //         print_demod_data(demul_cur_frame - 1,
-                        //             cfg->pilot_symbol_num_perframe, i, j);
-                        //     }
-                        // }
                         rx_status_->decode_done(demul_cur_frame_ - 1);
                     }
                 }
@@ -236,28 +213,14 @@ private:
 
         complex_float converted_sc[kSCsPerCacheline];
 
-        // printf("Run CSI: (%x %x)\n",
-        //     *(reinterpret_cast<short*>(&socket_buffer_[0][cfg->packet_length
-        //         + Packet::kOffsetOfData])),
-        //     *(reinterpret_cast<short*>(&socket_buffer_[0][cfg->packet_length
-        //         + Packet::kOffsetOfData + 2])));
-
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
                     + (frame_slot * cfg->symbol_num_perframe
                           * cfg->packet_length)
-                    + i * cfg->packet_length); // TODO: find out the packet
+                    + i * cfg->packet_length);
+
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
-
-                // if (frame_id == 0 && subcarrier_range_.start == 600) {
-                //     printf("(%04x %04x) ", (unsigned short)pkt->data[1024 * 2],
-                //         (unsigned short)pkt->data[1024 * 2 + 1]);
-                //     if (j == cfg->BS_ANT_NUM - 1) {
-                //         printf("\n");
-                //     }
-                // }
-
                 for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
                      block_idx < sc_range_.end / kTransposeBlockSize;
                      block_idx++) {
@@ -269,43 +232,13 @@ private:
                         const size_t sc_idx
                             = (block_idx * kTransposeBlockSize) + sc_j;
 
-                        // if (j == 0 && i == 1 && sc_idx == 0) {
-                        // for (size_t t = 0; t < kSCsPerCacheline; t++) {
-                        //     printf("(%x %x) ", pkt->data[(sc_idx + t) * 2],
-                        //         pkt->data[(sc_idx + t) * 2 + 1]);
-                        // }
-                        // printf("\n");
-                        // }
-
                         simd_convert_float16_to_float32(
                             reinterpret_cast<float*>(converted_sc),
                             reinterpret_cast<float*>(pkt->data
                                 + (sc_idx + cfg->subcarrier_start) * 2),
                             kSCsPerCacheline * 2);
 
-                        // if (i == 0 && j == 0) {
-                        //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
-                        //         printf("(%f %f) ", converted_sc[t].re,
-                        //             converted_sc[t].im);
-                        //     }
-                        //     printf("\n");
-                        //     // exit(0);
-                        // }
-
-                        // if (sc_idx == 0 && frame_id == 0) {
-                        //     printf("(%f %f) ", converted_sc[0].re,
-                        //         converted_sc[0].im);
-                        //     if (j == cfg->BS_ANT_NUM - 1) {
-                        //         printf("\n");
-                        //     }
-                        // }
-
-                        // TODO: find src pointer from pkt
                         const complex_float* src = converted_sc;
-
-                        // if (j == 0 && i == 0 && sc_idx == 0) {
-                        //     printf("src data: (%f %f)\n", src[0].re, src[0].im);
-                        // }
 
                         complex_float* dst
                             = cfg->get_csi_mat(csi_buffer_, frame_id, i);
@@ -315,8 +248,8 @@ private:
                         // With either of AVX-512 or AVX2, load one cacheline =
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
                         // TODO: AVX512 complex multiply support below
-                        size_t pilots_sgn_offset
-                            = cfg->server_addr_idx * cfg->OFDM_CONTROL_NUM;
+                        size_t pilots_sgn_offset = cfg->server_addr_idx
+                            * cfg->get_ofdm_control_num();
 
                         __m256 fft_result0 = _mm256_load_ps(
                             reinterpret_cast<const float*>(src));
@@ -350,25 +283,10 @@ private:
                             reinterpret_cast<float*>(dst), fft_result0);
                         _mm256_stream_ps(
                             reinterpret_cast<float*>(dst + 4), fft_result1);
-                        // if (i == 0 && j == 0) {
-                        //     for (size_t t = 0; t < kSCsPerCacheline; t++) {
-                        //         printf("(%f %f) ", dst[t].re, dst[t].im);
-                        //     }
-                        //     printf("\n");
-                        //     exit(0);
-                        // }
-                        // if (sc_idx == 0 && frame_id == 0) {
-                        //     printf("(%f %f) ", dst[0].re, dst[0].im);
-                        //     if (j == cfg->BS_ANT_NUM - 1) {
-                        //         printf("\n");
-                        //     }
-                        // }
                     }
                 }
             }
         }
-
-        // printf("(%f %f)\n", csi_buffer_[1][0].re, csi_buffer_[1][0].im);
     }
 
     void print_demod_data(

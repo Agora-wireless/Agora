@@ -89,8 +89,8 @@ Event_data DoDemul::launch(size_t tag)
     }
 
     size_t max_sc_ite;
-    max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
+    max_sc_ite = std::min(
+        cfg->demul_block_size, cfg->get_ofdm_control_num() - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
@@ -258,13 +258,6 @@ Event_data DoDemul::launch(size_t tag)
             printf("Demodulation: modulation type %s not supported!\n",
                 cfg->modulation.c_str());
         }
-        // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
-        //     tid, frame_id, symbol_idx_ul, base_sc_id);
-        // cout << "Demuled data : \n ";
-        // cout << " UE " << i << ": ";
-        // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
-        //     printf("%i ", demul_ptr[k]);
-        // cout << endl;
     }
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
@@ -278,7 +271,6 @@ void DoDemul::independent_launch(
     const size_t total_data_symbol_idx_ul
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
     const size_t frame_slot = frame_id % SOCKET_BUFFER_FRAME_NUM;
-    // const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
     size_t start_tsc = worker_rdtsc();
 
@@ -288,8 +280,8 @@ void DoDemul::independent_launch(
     }
 
     size_t max_sc_ite;
-    max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_CONTROL_NUM - base_sc_id);
+    max_sc_ite = std::min(
+        cfg->demul_block_size, cfg->get_ofdm_control_num() - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];
@@ -420,13 +412,6 @@ void DoDemul::independent_launch(
             printf("Demodulation: modulation type %s not supported!\n",
                 cfg->modulation.c_str());
         }
-        // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
-        //     tid, frame_id, symbol_idx_ul, base_sc_id);
-        // cout << "Demuled data : \n ";
-        // cout << " UE " << i << ": ";
-        // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
-        //     printf("%i ", demul_ptr[k]);
-        // cout << endl;
     }
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;

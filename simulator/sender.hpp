@@ -98,7 +98,9 @@ private:
 
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
-    void run_fft(Packet* pkt, complex_float* fft_inout,
+    // void run_fft(Packet* pkt, complex_float* fft_inout,
+    //     DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
+    void run_fft(short* pkt, complex_float* fft_inout,
         DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
     Config* cfg;

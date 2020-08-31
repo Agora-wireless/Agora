@@ -243,11 +243,13 @@ public:
     // lcm(zf_block_size, demul_block_size)
     size_t subcarrier_block_size;
 
+    // The list of IP addresses of all Millipede servers
     std::vector<std::string> server_addr_list;
-    size_t server_addr_idx;
+    size_t server_addr_idx; // The index of this Millipede server in the list
+    // This Millipede server takes charge of subcarrier range
+    // [subcarrier_start, subcarrier_end]
     size_t subcarrier_start;
     size_t subcarrier_end;
-    size_t OFDM_CONTROL_NUM;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
@@ -275,6 +277,11 @@ public:
 
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
+
+    inline size_t get_ofdm_control_num() const
+    {
+        return OFDM_DATA_NUM / server_addr_list.size();
+    }
 
     // TODO: Documentation
     inline size_t get_total_data_symbol_idx(
@@ -348,7 +355,7 @@ public:
         if (freq_orthogonal_pilot)
             sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return ul_zf_buffers[(frame_slot * OFDM_CONTROL_NUM + sc_id)];
+        return ul_zf_buffers[(frame_slot * get_ofdm_control_num() + sc_id)];
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
@@ -367,7 +374,8 @@ public:
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
         return &demod_buffer[total_data_symbol_id]
-                            [OFDM_CONTROL_NUM * 8 * ue_id + sc_id * mod_type];
+                            [get_ofdm_control_num() * 8 * ue_id
+                                + sc_id * mod_type];
     }
 
     /// Get the decode buffer for this frame, symbol,
