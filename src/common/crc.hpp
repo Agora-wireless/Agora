@@ -95,22 +95,22 @@ public:
      * Not used at the moment. We decided to pre-generate the tables and
      * harcode them here. Left function just for reference
      */
-    static void initCRC24(uint32_t table[256]);
+    static void init_crc24(uint32_t table[256]);
 
     /**
      * Compute CRC 
      */
-    uint32_t calculateCRC24(unsigned char* data, int len);
+    uint32_t calculate_crc24(unsigned char* data, int len);
 
     /*
      * Compute and add CRC to packet
      */
-    void addCRC24(MacPacket* p);
+    void add_crc24(struct MacPacket* p);
 
     /*
      * Verify CRC
      */
-    bool checkCRC24(unsigned char* data, int len, uint32_t ref_crc);
+    bool check_crc24(unsigned char* data, int len, uint32_t ref_crc);
 };
 
 #endif
