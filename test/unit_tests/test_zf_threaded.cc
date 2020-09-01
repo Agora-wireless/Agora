@@ -52,10 +52,11 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     double freq_ghz, moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
-    PMat2D<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers,
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& recip_buffer,
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices,
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices, Stats* stats)
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
+    Stats* stats)
 {
     pin_to_core_with_offset(
         ThreadType::kWorker, cfg->core_offset + 1, worker_id);
@@ -118,12 +119,12 @@ TEST(TestZF, VaryingConfig)
 
     Table<complex_float> recip_buffer;
 
-    PMat2D<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers;
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
 
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
         cfg->BS_ANT_NUM * cfg->UE_NUM);
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
         cfg->UE_NUM * cfg->BS_ANT_NUM);
 
     recip_buffer.rand_alloc_cx_float(

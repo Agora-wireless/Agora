@@ -24,10 +24,10 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        PMat2D<kFrameWnd, kMaxUEs, complex_float> csi_buffers,
+        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& recip_buffer,
-        PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_,
-        PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_,
+        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
+        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
         Stats* stats_manager);
     ~DoZF();
 
@@ -84,11 +84,11 @@ private:
      */
     void Predict(size_t offset);
 
-    PMat2D<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     complex_float* pred_csi_buffer;
     Table<complex_float> recip_buffer_;
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
     DurationStat* duration_stat;
 
     complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI

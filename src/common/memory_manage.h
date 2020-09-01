@@ -84,36 +84,41 @@ static void alloc_buffer_1d(T** buffer, U dim, int aligned_bytes, int init_zero)
 
 template <typename T> static void free_buffer_1d(T** buffer) { free(*buffer); };
 
-// PMat2D is a 2D pointer matrix with [ROWS] rows and [COLS] columns. Each entry
-// of the matrix is a pointer to an array of [T].
-template <size_t ROWS, size_t COLS, class T> class PMat2D {
+// PtrGrid is a 2D grid of pointers with [ROWS] rows and [COLS] columns. Each
+// entry of the grid is a pointer to an array of [T].
+template <size_t ROWS, size_t COLS, class T> class PtrGrid {
 public:
-    PMat2D() {}
+    PtrGrid() {}
 
-    /// Create a pointer matrix with [n_entries] entries per matrix cell
-    PMat2D(size_t n_entries) { alloc(n_entries); }
+    /// Create a grid of pointers where each grid cell points to an array of
+    /// [n_entries]
+    PtrGrid(size_t n_entries) { alloc(n_entries); }
 
-    ~PMat2D()
+    ~PtrGrid()
     {
-        if (allocated) {
-            for (auto& row : mat) {
-                for (auto& entry : row) {
-                    free(entry);
-                }
-            }
-        }
+        if (is_allocated)
+            free(backing_buf);
     }
 
     /// Allocate [n_entries] entries per pointer cell in the pointer matrix
     void alloc(size_t n_entries)
     {
+        const size_t alloc_sz = ROWS * COLS * n_entries * sizeof(T);
+        backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
+        memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
+        is_allocated = true;
+
+        // Fill-in the grid with pointers into backing_buf
+        size_t offset = 0;
         for (auto& row : mat) {
             for (auto& entry : row) {
-                entry
-                    = reinterpret_cast<T*>(memalign(64, n_entries * sizeof(T)));
-                memset(reinterpret_cast<uint8_t*>(entry), 0,
-                    n_entries * sizeof(T));
+                entry = &backing_buf[offset];
+                offset += n_entries;
             }
+        }
+        if (offset * sizeof(T) != alloc_sz) {
+            fprintf(stderr, "Error Error Error\n");
+            exit(-1);
         }
     }
 
@@ -138,17 +143,24 @@ public:
         }
     }
 
-    /// Free the memory used by the pointer cells
     T** operator[](size_t row_idx)
     {
         return reinterpret_cast<T**>(&mat[row_idx][0]);
     }
 
+    // Delete copy constructor and copy assignment
+    PtrGrid(PtrGrid const&) = delete;
+    PtrGrid& operator=(PtrGrid const&) = delete;
+
 private:
     std::array<std::array<T*, COLS>, ROWS> mat; /// The pointer cells
 
-    /// True iff we've allocated memory for the pointer cells
-    bool allocated = false;
+    /// The backing buffer for the per-cell arrays. Having a common buffer
+    /// reduces the number of memory allocations.
+    T* backing_buf;
+
+    /// True iff we've allocated the backing buffer
+    bool is_allocated = false;
 };
 
 #endif

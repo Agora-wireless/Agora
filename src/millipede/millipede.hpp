@@ -180,7 +180,7 @@ private:
 
     // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
     // [number of OFDM data subcarriers] columns.
-    PMat2D<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
 
     // Data symbols after FFT
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -193,7 +193,7 @@ private:
 
     // Calculated uplink zeroforcing detection matrices. Each matrix has
     // [number of number of antennas] rows and [number of UEs] columns.
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -237,7 +237,7 @@ private:
 
     // Calculated uplink zeroforcing detection matrices. Each matrix has
     // [number of number of UEs] rows and [number of antennas] columns.
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
