@@ -3,35 +3,46 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+.
  * Required packages
-   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
-     * If `nlohmann-json-dev` package can't be found, get code from [here](https://github.com/nlohmann/json) and build from source.
+   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen
+     nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
+     * If `nlohmann-json-dev` package can't be found, get code from
+       [here](https://github.com/nlohmann/json) and build from source.
 
    * Install Armadillo: `./scripts/install_armadillo.sh`.
    * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`.
    * Download and install Intel libraries:
-     * Install Intel MKL - See [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
-     * Download [Intel FlexRAN's FEC SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules) for LDPC decoding to `/opt`.
+     * Install Intel MKL - See
+       [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
+     * Download [Intel FlexRAN's FEC
+       SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
+       for LDPC decoding to `/opt`.
      * Compiling FlexRAN requires an Intel compiler.
-        * For Millipede developers: Please ask internally for precompiled FlexRAN libraries to use from `gcc`.
-        * For Millipede users: Install Intel compiler: Intel compiler version 19.0.4 is required for compiling FlexRAN.
-          Newer versions will not work. Please reach out to the current Millipede developers to learn how to get the correct versions of Intel Parallel
-          Studio XE or Intel System Studio. Set required environment variables by sourcing `compilervars.sh`.
-          For example, if Intel compiler is in `/opt`, run `source $(find 2>/dev/null/opt -name compilervars.sh) intel64`.
-          After running this command, ensure that `icc --version` reports 19.0.4.
-          After instaling `icc 19.04`, compile FlexRAN (see instructions below):
-            ```
-             sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all users read-write access
-             cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
-             sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake
-             ./create-makefiles-linux.sh
-             cd build-avx512-icc % or build-avx2-icc
-             make
-            ```
-     * Optional: DPDK
-        * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
-          Intel 40 GbE and Mellanox 100 GbE NICs in Millipede.
-        * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
-          DESTDIR=/usr -j`
+        * For Millipede developers: Please ask internally for precompiled
+          FlexRAN libraries to use from `gcc`.
+        * For Millipede users:
+          * Intel compiler version 19.0.4 is required for compiling FlexRAN.
+            Newer versions will not work. Please reach out to the current
+            Millipede developers to learn how to get the correct versions of
+            Intel Parallel Studio XE or Intel System Studio.
+          * Set required environment variables by sourcing `compilervars.sh`.
+            For example, if Intel compiler is in `/opt`, run `source $(find
+            2>/dev/null/opt -name compilervars.sh) intel64`. After running this
+            command, ensure that `icc --version` reports 19.0.4.
+          * After instaling `icc 19.04`, compile FlexRAN as follows:
+          ```
+          sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all
+          users read-write access cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ sed -i
+          '/add_compile_options("-Wall")/a \ \
+          add_compile_options("-ffreestanding")'
+          cmake/intel-compile-options.cmake ./create-makefiles-linux.sh cd
+          build-avx512-icc % or build-avx2-icc make
+          ```
+
+   * Optional: DPDK
+      * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
+        Intel 40 GbE and Mellanox 100 GbE NICs in Millipede.
+      * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
+        DESTDIR=/usr -j`
 
 ## Millipede quickstart
 
@@ -71,11 +82,12 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      `./build/sender`.
 
  * Run Millipede with channel simulator and clients
-   * First, return to the base directory (`cd ..`), then run `./build/data_generator data/bs-sim.json` to generate data
-     files.
-   * In one terminal, run `./build/user data/ue-sim.json` to start
-     Clients with uplink configuration.
-   * In another terminal, run  `./build/chsim 8 2 1 1 2 24 data/bs-sim.json data/ue-sim.json`
+   * First, return to the base directory (`cd ..`), then run
+     `./build/data_generator data/bs-sim.json` to generate data files.
+   * In one terminal, run `./build/user data/ue-sim.json` to start clients with
+     uplink configuration.
+   * In another terminal, run  `./build/chsim 8 2 1 1 2 24 data/bs-sim.json
+     data/ue-sim.json`
    * In another terminal, run `./build/millipede data/bs-sim.json` to start
      Millipede with uplink configuration.
 
