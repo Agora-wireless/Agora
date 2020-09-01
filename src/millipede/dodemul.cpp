@@ -14,7 +14,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& data_buffer,
-    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
     PhyStats* in_phy_stats, Stats* stats_manager)

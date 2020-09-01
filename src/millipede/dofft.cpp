@@ -103,7 +103,7 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<char>& socket_buffer, Table<int>& socket_buffer_status,
     Table<complex_float>& data_buffer,
-    PMat2D<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers,
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
