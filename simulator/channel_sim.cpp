@@ -254,10 +254,13 @@ void ChannelSim::start()
     sleep(1);
 
     int ret = 0;
-    Event_data events_list[dequeue_bulk_size];
+
+    static constexpr size_t kDequeueBulkSize = 5;
+    Event_data events_list[kDequeueBulkSize];
     while (true) {
         ret = message_queue_.try_dequeue_bulk(
-            ctok, events_list, dequeue_bulk_size);
+            ctok, events_list, kDequeueBulkSize);
+
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
             Event_data& event = events_list[bulk_count];
 

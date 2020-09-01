@@ -17,20 +17,17 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <ctime>
+#include <iomanip>
 #include <math.h>
 #include <netinet/in.h>
 #include <numeric>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <iomanip>
 
 using namespace arma;
 
 class ChannelSim {
-public:
-    static const int dequeue_bulk_size = 5;
-
 public:
     ChannelSim(Config* bscfg, Config* uecfg, size_t bs_socket_num,
         size_t ue_socket_num, size_t bs_thread_num, size_t user_thread_num,
@@ -39,14 +36,16 @@ public:
 
     void start();
 
-    // loop thread receiving symbols from client antennas
+    // Loop thread receiving symbols from client antennas
     void* ue_rx_loop(int tid);
-    // loop thread receiving symbols from BS antennas
+
+    // Loop thread receiving symbols from BS antennas
     void* bs_rx_loop(int tid);
 
-    // transmits symbols to BS antennas after applying channel
+    // Transmits symbol to BS antennas after applying channel
     void do_tx_bs(int tid, size_t tag);
-    // transmits symbols to client antennas after applying channel
+
+    // Transmit symbols to client antennas after applying channel
     void do_tx_user(int tid, size_t tag);
 
     void schedule_task(Event_data do_task,
@@ -55,29 +54,25 @@ public:
     void* taskThread(int tid);
 
 private:
-    // bs-facing servers addresses
-    std::vector<struct sockaddr_in> servaddr_bs_;
-    // bs-facing sockets
-    std::vector<int> socket_bs_;
-    // ue-facing servers addresses
-    std::vector<struct sockaddr_in> servaddr_ue_;
-    // ue-facing sockets
-    std::vector<int> socket_ue_;
+    std::vector<struct sockaddr_in> servaddr_bs_; // BS-facing server addresses
+    std::vector<int> socket_bs_; // BS-facing sockets
+    std::vector<struct sockaddr_in> servaddr_ue_; // UE-facing server addresses
+    std::vector<int> socket_ue_; // UE-facing sockets
 
     Config* bscfg;
     Config* uecfg;
     cx_fmat channel;
 
-    // data buffer for symbols to be transmitted to BS antennas (uplink)
+    // Data buffer for symbols to be transmitted to BS antennas (uplink)
     char* tx_buffer_bs;
 
-    // data buffer for symbols to be transmitted to client antennas (downlink)
+    // Data buffer for symbols to be transmitted to client antennas (downlink)
     char* tx_buffer_ue;
 
-    // data buffer for received symbols from BS antennas (downlink)
+    // Data buffer for received symbols from BS antennas (downlink)
     char* rx_buffer_bs;
 
-    // data buffer for received symbols from client antennas (uplink)
+    // Data buffer for received symbols from client antennas (uplink)
     char* rx_buffer_ue;
 
     // Task Queue for tasks related to incoming BS packets

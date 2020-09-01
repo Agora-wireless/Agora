@@ -83,11 +83,12 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     return true;
 }
 
-void PacketTXRX::sendBeacon(int tid, size_t frame_id)
+void PacketTXRX::send_beacon(int tid, size_t frame_id)
 {
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    // send a beacon packet in the downlink to trigger user pilot
+
+    // Send a beacon packet in the downlink to trigger user pilot
     std::vector<uint8_t> udp_pkt_buf(cfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
@@ -122,8 +123,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
-    // send Beacons for the first time to kick off sim
-    sendBeacon(tid, 0);
+    send_beacon(tid, 0); // Send Beacons for the first time to kick off sim
 
     int prev_frame_id = -1;
     int radio_id = radio_lo;
@@ -225,12 +225,12 @@ int PacketTXRX::dequeue_send(int tid)
         sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
-    // after sending all symbols, send beacon for next frame
+    // After sending all symbols, send beacon for next frame
     if (frame_id + 1 < c->frames_to_test
         && data_symbol_idx + c->pilot_symbol_num_perframe
             == c->DLSymbols[0].back()
         && ant_id == 0) {
-        sendBeacon(tid, frame_id + 1);
+        send_beacon(tid, frame_id + 1);
     }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
