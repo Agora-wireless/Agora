@@ -191,7 +191,7 @@ static constexpr size_t kMaxDataSCs = 3300;
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 32;
+static constexpr size_t kMaxUEs = 64;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
