@@ -18,15 +18,17 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    PMat2D<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers,
-    Table<complex_float>& recip_buffer, Table<complex_float>& ul_zf_buffer,
-    Table<complex_float>& dl_zf_buffer, Stats* stats_manager)
+    PMat2D<kFrameWnd, kMaxUEs, complex_float> csi_buffers,
+    Table<complex_float>& recip_buffer,
+    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices,
+    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices,
+    Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , csi_buffers_(csi_buffers)
     , recip_buffer_(recip_buffer)
-    , ul_zf_buffer_(ul_zf_buffer)
-    , dl_zf_buffer_(dl_zf_buffer)
+    , ul_zf_matrices_(ul_zf_matrices)
+    , dl_zf_matrices_(dl_zf_matrices)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
@@ -150,8 +152,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         // cout<<mat_input.st()<<endl;
         compute_precoder(mat_csi,
             cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id),
-            cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id),
-            cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, cur_sc_id));
+            ul_zf_matrices_[frame_slot][cur_sc_id],
+            dl_zf_matrices_[frame_slot][cur_sc_id]);
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -233,8 +235,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     // std::cout << mat_csi.st() << std::endl;
     compute_precoder(mat_csi,
         cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
-        cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, base_sc_id),
-        cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, base_sc_id));
+        ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
+        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)]);
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;

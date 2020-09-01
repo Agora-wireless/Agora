@@ -308,26 +308,11 @@ public:
         return data_buffers[symbol_offset];
     }
 
-    /// Return a pointer to the downlink zeroforcing precoding matrix for this
-    /// frame and subcarrier ID
-    inline complex_float* get_dl_zf_mat(Table<complex_float>& dl_zf_buffers,
-        size_t frame_id, size_t sc_id) const
+    /// Return the subcarrier ID to which we should refer to for the zeroforcing
+    /// matrices of subcarrier [sc_id].
+    inline size_t get_zf_sc_id(size_t sc_id) const
     {
-        if (freq_orthogonal_pilot)
-            sc_id -= (sc_id % UE_NUM);
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return dl_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
-    }
-
-    /// Return a pointer to the uplink zeroforcing detection matrix for this
-    /// frame and subcarrier ID
-    inline complex_float* get_ul_zf_mat(Table<complex_float>& ul_zf_buffers,
-        size_t frame_id, size_t sc_id) const
-    {
-        if (freq_orthogonal_pilot)
-            sc_id -= (sc_id % UE_NUM);
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return ul_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+        return freq_orthogonal_pilot ? sc_id - (sc_id % UE_NUM) : sc_id;
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID

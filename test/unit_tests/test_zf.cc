@@ -20,8 +20,13 @@ TEST(TestZF, Perf)
     auto comp_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
     auto ptok = new moodycamel::ProducerToken(comp_queue);
 
-    PMat2D<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers;
+    PMat2D<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+
+    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
+        cfg->BS_ANT_NUM * cfg->UE_NUM);
+    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
+        cfg->UE_NUM * cfg->BS_ANT_NUM);
 
     Table<complex_float> ul_zf_buffer, dl_zf_buffer, recip_buffer;
     ul_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
@@ -34,7 +39,7 @@ TEST(TestZF, Perf)
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
     auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffers, recip_buffer, ul_zf_buffer, dl_zf_buffer, stats);
+        csi_buffers, recip_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();

@@ -46,7 +46,7 @@ union gen_tag_t {
     static_assert(kMaxSymbols < ((1ull << 13) - 1), "");
     static_assert(kMaxUEs < UINT16_MAX, "");
     static_assert(kMaxAntennas < UINT16_MAX, "");
-    static_assert(k5GMaxSubcarriers < UINT16_MAX, "");
+    static_assert(kMaxDataSCs < UINT16_MAX, "");
 
     enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 
