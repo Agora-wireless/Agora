@@ -10,9 +10,5 @@
     "antenna_num": 8,
     "modulation": "16QAM",
     "client_ul_pilot_syms": 0,
-    "frames_to_test": 1,
-    "disable_master": true,
-    "fft_in_rru": true,
-    "subcarrier_block_size": 240,
-    "core_offset": 2
+    "frames_to_test": 1
 }

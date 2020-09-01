@@ -77,9 +77,9 @@ private:
     DemulStatus* demul_status_;
 
     // decoder process one code block at a time
-    size_t cur_frame; // Current frame to decode
-    size_t cur_symbol; // Current symbol to decode
-    size_t cur_cb; // Current code block id to decode
+    size_t cur_frame_ = 0; // Current frame to decode
+    size_t cur_symbol_; // Current symbol to decode
+    size_t cur_cb_ = 0; // Current code block id to decode
 };
 
 #endif

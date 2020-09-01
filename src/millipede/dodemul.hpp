@@ -35,7 +35,7 @@ public:
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
         PhyStats* in_phy_stats, Stats* in_stats_manager,
-        Table<char>* socket_buffer_);
+        Table<char>* socket_buffer_ = nullptr);
     ~DoDemul();
 
     /**

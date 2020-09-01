@@ -89,6 +89,7 @@ private:
     int dequeue_send(int tid);
     int poll_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    struct Packet* recv_relocate(int tid, int radio_id, int rx_offset);
 
     void* loop_tx_rx_argos(int tid);
     int dequeue_send_argos(int tid);

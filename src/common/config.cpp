@@ -209,22 +209,25 @@ Config::Config(std::string jsonfile)
         "Subcarrier block size should be a multiple of lcm(zf_block_size, "
         "demul_block_size)!");
 
-    server_addr_list
-        = tddConf.value("server_addr_list", std::vector<std::string>());
-    rt_assert(server_addr_list.size() > 0, "Address list is 0!");
-    server_addr_idx = tddConf.value("server_addr_idx", 0);
-    rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
-        "OFDM_DATA_NUM % # servers should be 0!");
-    subcarrier_start
-        = OFDM_DATA_START + server_addr_idx * get_ofdm_control_num();
-    subcarrier_end
-        = OFDM_DATA_START + (server_addr_idx + 1) * get_ofdm_control_num();
-    rt_assert(get_ofdm_control_num() % subcarrier_block_size == 0,
-        "Invalid subcarrier range and subcarrier block size!");
-
+    // If without master, use server_addr_list to record all Millipede servers,
+    // and use server_addr_idx to indicate the index of this Millipede server.
+    // Otherwise, use server_addr to indicate the address this server
+    if (disable_master) {
+        server_addr_list
+            = tddConf.value("server_addr_list", std::vector<std::string>());
+        rt_assert(server_addr_list.size() > 0, "Address list is 0!");
+        server_addr_idx = tddConf.value("server_addr_idx", 0);
+        rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
+            "OFDM_DATA_NUM % # servers should be 0!");
+        subcarrier_start
+            = OFDM_DATA_START + server_addr_idx * get_ofdm_control_num();
+        subcarrier_end
+            = OFDM_DATA_START + (server_addr_idx + 1) * get_ofdm_control_num();
+        rt_assert(get_ofdm_control_num() % subcarrier_block_size == 0,
+            "Invalid subcarrier range and subcarrier block size!");
+    }
     demul_events_per_symbol
         = 1 + (get_ofdm_control_num() - 1) / demul_block_size;
-
     zf_events_per_symbol = 1 + (get_ofdm_control_num() - 1) / zf_block_size;
 
     fft_block_size = tddConf.value("fft_block_size", 4);

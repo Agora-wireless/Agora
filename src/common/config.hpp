@@ -308,9 +308,11 @@ public:
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
+    // Get the number of subcarriers this server takes charge of
     inline size_t get_ofdm_control_num() const
     {
-        return OFDM_DATA_NUM / server_addr_list.size();
+        return disable_master ? OFDM_DATA_NUM / server_addr_list.size()
+                              : OFDM_DATA_NUM;
     }
 
     // TODO: Documentation

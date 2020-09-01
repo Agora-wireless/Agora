@@ -28,17 +28,17 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
     , ul_zf_buffer_(ul_zf_buffer)
     , dl_zf_buffer_(dl_zf_buffer)
 {
-    duration_stat_ = stats_manager->get_duration_stat(DoerType::kZF, tid);
-    pred_csi_buffer_ = reinterpret_cast<complex_float*>(
+    duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
+    pred_csi_buffer = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
-    csi_gather_buffer_ = reinterpret_cast<complex_float*>(
+    csi_gather_buffer = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
 {
-    free(pred_csi_buffer_);
-    free(csi_gather_buffer_);
+    free(pred_csi_buffer);
+    free(csi_gather_buffer);
 }
 
 Event_data DoZF::launch(size_t tag)
@@ -97,18 +97,6 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     num_subcarriers = std::min(
         cfg->zf_block_size, cfg->get_ofdm_control_num() - base_sc_id);
 
-    // if (frame_id == 0 && base_sc_id == 0) {
-    //     complex_float* mtx = csi_buffer_[0];
-    //     printf("CSI gather buf is:\n");
-    //     for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-    //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-    //             printf("(%f %f) ", mtx[i * cfg->BS_ANT_NUM + j].re,
-    //                 mtx[i * cfg->BS_ANT_NUM + j].im);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
         size_t start_tsc1 = worker_rdtsc();
@@ -128,7 +116,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                 + sc_inblock_idx;
             const size_t symbol_offset
                 = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->UE_NUM;
-            float* tar_csi_ptr = (float*)csi_gather_buffer_;
+            float* tar_csi_ptr = (float*)csi_gather_buffer;
 
             /* Gather csi matrix of all users and antennas */
             for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
@@ -153,43 +141,17 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                     = csi_buffer_[(frame_slot * cfg->pilot_symbol_num_perframe)
                         + p_i];
                 for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                    csi_gather_buffer_[gather_idx++]
+                    csi_gather_buffer[gather_idx++]
                         = csi_buf[pt_base_offset + (ant_i * kTransposeBlockSize)
                             + (cur_sc_id % kTransposeBlockSize)];
                 }
             }
         }
 
-        // printf("sc %u, frame %u\n", cur_sc_id, frame_id);
-        // printf("(%f %f)\n", csi_buffer_[1][0].re, csi_buffer_[1][0].re);
-
-        // if (cur_sc_id == 0 && frame_id == 0) {
-        //     for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-        //             printf("(%f %f) ",
-        //                 csi_gather_buffer[i * cfg->BS_ANT_NUM + j].re,
-        //                 csi_gather_buffer[i * cfg->BS_ANT_NUM + j].im);
-        //         }
-        //         printf("\n");
-        //     }
-        //     printf("\n");
-        // }
-
-        duration_stat_->task_duration[1] += worker_rdtsc() - start_tsc1;
-        arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_,
+        duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
+        arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
-        // if (frame_id == 0 && cur_sc_id == 0) {
-        //     complex_float* mtx = csi_gather_buffer;
-        //     printf("CSI gather buf is:\n");
-        //     for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-        //             printf("(%f %f) ", mtx[i * cfg->BS_ANT_NUM + j].re,
-        //                 mtx[i * cfg->BS_ANT_NUM + j].im);
-        //         }
-        //         printf("\n");
-        //     }
-        // }
         // cout<<"CSI matrix"<<endl;
         // cout<<mat_input.st()<<endl;
         compute_precoder(mat_csi,
@@ -198,30 +160,17 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, cur_sc_id));
 
         double start_tsc2 = worker_rdtsc();
-        duration_stat_->task_duration[2] += start_tsc2 - start_tsc1;
+        duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
         // cout<<"Precoder:" <<mat_output<<endl;
         double duration3 = worker_rdtsc() - start_tsc2;
-        duration_stat_->task_duration[3] += duration3;
-        duration_stat_->task_count++;
-        duration_stat_->task_duration[0] += worker_rdtsc() - start_tsc1;
+        duration_stat->task_duration[3] += duration3;
+        duration_stat->task_count++;
+        duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
         // if (duration > 500) {
         //     printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
     }
-
-    // if (frame_id == 0 && base_sc_id == 0) {
-    //     complex_float* mtx
-    //         = cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, base_sc_id);
-    //     printf("ZF Matx is:\n");
-    //     for (size_t i = 0; i < cfg->UE_NUM; i++) {
-    //         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-    //             printf("(%f %f) ", mtx[i * cfg->BS_ANT_NUM + j].re,
-    //                 mtx[i * cfg->BS_ANT_NUM + j].im);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
 }
 
 void DoZF::ZF_freq_orthogonal(size_t tag)
@@ -257,7 +206,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
                 + sc_inblock_idx;
             const size_t symbol_offset = frame_id % TASK_BUFFER_FRAME_NUM;
             float* tar_csi_ptr
-                = (float*)csi_gather_buffer_ + cfg->BS_ANT_NUM * i * 2;
+                = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
 
             float* src_csi_ptr
                 = (float*)csi_buffer_[symbol_offset] + offset_in_csi_buffer * 2;
@@ -273,7 +222,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
                 * (kTransposeBlockSize * cfg->BS_ANT_NUM);
 
             for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                csi_gather_buffer_[gather_idx++]
+                csi_gather_buffer[gather_idx++]
                     = csi_buffer_[frame_slot]
                                  [pt_base_offset + (ant_i * kTransposeBlockSize)
                                      + (cur_sc_id % kTransposeBlockSize)];
@@ -281,8 +230,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
         }
     }
 
-    duration_stat_->task_duration[1] += worker_rdtsc() - start_tsc1;
-    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
+    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
+    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
         cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
     // std::cout << "CSI matrix" << std::endl;
@@ -293,12 +242,12 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
         cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id, base_sc_id));
 
     double start_tsc2 = worker_rdtsc();
-    duration_stat_->task_duration[2] += start_tsc2 - start_tsc1;
+    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     // cout<<"Precoder:" <<mat_output<<endl;
-    duration_stat_->task_duration[3] += worker_rdtsc() - start_tsc2;
-    duration_stat_->task_count++;
-    duration_stat_->task_duration[0] += worker_rdtsc() - start_tsc1;
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
+    duration_stat->task_count++;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
 
     // if (duration > 500) {
     //     printf("Thread %d ZF takes %.2f\n", tid, duration);
@@ -317,7 +266,7 @@ void DoZF::Predict(size_t tag)
     offset_in_buffer
         = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->get_ofdm_control_num())
         + base_sc_id;
-    auto* ptr_in = (arma::cx_float*)pred_csi_buffer_;
+    auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
         sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);

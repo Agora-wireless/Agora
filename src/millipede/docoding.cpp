@@ -109,9 +109,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
-    cur_frame = 0;
-    cur_symbol = cfg->pilot_symbol_num_perframe;
-    cur_cb = 0;
+    cur_symbol_ = cfg->pilot_symbol_num_perframe;
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
@@ -220,22 +218,22 @@ Event_data DoDecode::launch(size_t tag)
 void DoDecode::start_work()
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
-        if (cur_cb > 0
-            || demul_status_->ready_to_decode(cur_frame, cur_symbol)) {
-            launch(gen_tag_t::frm_sym_cb(cur_frame,
-                cur_symbol - cfg->pilot_symbol_num_perframe,
-                cur_cb + tid * cfg->LDPC_config.nblocksInSymbol)
+        if (cur_cb_ > 0
+            || demul_status_->ready_to_decode(cur_frame_, cur_symbol_)) {
+            launch(gen_tag_t::frm_sym_cb(cur_frame_,
+                cur_symbol_ - cfg->pilot_symbol_num_perframe,
+                cur_cb_ + tid * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
-            cur_cb++;
-            if (cur_cb == cfg->LDPC_config.nblocksInSymbol) {
-                cur_cb = 0;
-                cur_symbol++;
-                if (cur_symbol
+            cur_cb_++;
+            if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
+                cur_cb_ = 0;
+                cur_symbol_++;
+                if (cur_symbol_
                     == cfg->ul_data_symbol_num_perframe
                         + cfg->pilot_symbol_num_perframe) {
-                    cur_symbol = cfg->pilot_symbol_num_perframe;
-                    rx_status_->decode_done(cur_frame);
-                    cur_frame++;
+                    cur_symbol_ = cfg->pilot_symbol_num_perframe;
+                    rx_status_->decode_done(cur_frame_);
+                    cur_frame_++;
                 }
             }
         }

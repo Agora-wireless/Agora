@@ -155,7 +155,7 @@ public:
             = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
-            if (rx_status_->is_pilot_ready(csi_cur_frame_)) {
+            if (rx_status_->received_all_pilots(csi_cur_frame_)) {
                 run_csi(csi_cur_frame_, sc_range_.start);
                 // exit(0);
                 printf(

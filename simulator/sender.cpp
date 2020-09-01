@@ -286,27 +286,43 @@ void* Sender::worker_thread(int tid)
         pkt->cell_id = 0;
         pkt->ant_id = tag.ant_id;
 
-        memcpy(data_buf->data,
-            iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
-            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
-        if (cfg->fft_in_rru) {
-            run_fft(reinterpret_cast<short*>(data_buf->data), fft_inout,
-                mkl_handle);
+        if (cfg->disable_master) {
+            memcpy(data_buf->data,
+                iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
+                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+            if (cfg->fft_in_rru) {
+                run_fft(data_buf->data, fft_inout, mkl_handle);
+            }
+        } else {
+            memcpy(pkt->data,
+                iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
+                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+            if (cfg->fft_in_rru) {
+                run_fft(pkt->data, fft_inout, mkl_handle);
+            }
         }
 
 #ifdef USE_DPDK
         rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
-        size_t block_size = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
-        for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
-            memcpy(pkt->data,
-                data_buf->data + (i * block_size + cfg->OFDM_DATA_START) * 2,
-                block_size * sizeof(unsigned short) * 2);
-            udp_client.send(cfg->server_addr_list[i], cfg->bs_port + cur_radio,
-                reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                Packet::kOffsetOfData
-                    + 2 * sizeof(unsigned short) * block_size);
+        if (cfg->disable_master) {
+            size_t block_size
+                = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
+            for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+                memcpy(pkt->data,
+                    data_buf->data
+                        + (i * block_size + cfg->OFDM_DATA_START) * 2,
+                    block_size * sizeof(unsigned short) * 2);
+                udp_client.send(cfg->server_addr_list[i],
+                    cfg->bs_port + cur_radio,
+                    reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                    Packet::kOffsetOfData
+                        + 2 * sizeof(unsigned short) * block_size);
+            }
+        } else {
+            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
+                reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
         }
 #endif
 

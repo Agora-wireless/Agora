@@ -17,8 +17,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
-    PhyStats* in_phy_stats, Stats* stats_manager,
-    Table<char>* socket_buffer = nullptr)
+    PhyStats* in_phy_stats, Stats* stats_manager, Table<char>* socket_buffer)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)

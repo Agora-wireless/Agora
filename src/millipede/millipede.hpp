@@ -26,7 +26,6 @@
 #include "shared_counters.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
-#include "subcarrier_manager.hpp"
 #include "txrx.hpp"
 #include "utils.h"
 #include <algorithm>
@@ -82,7 +81,6 @@ public:
 
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id);
-    bool received_all_pilots(size_t frame_id);
     void print_per_frame_done(PrintType print_type, size_t frame_id);
     void print_per_symbol_done(
         PrintType print_type, size_t frame_id, size_t symbol_id);
@@ -91,6 +89,8 @@ public:
 
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_subcarriers(
+        EventType event_type, size_t frame_id, size_t symbol_id);
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
@@ -166,10 +166,6 @@ private:
     // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
 
-    /// The subcarrier manager owns buffers for subcarrier-parallel tasks,
-    /// and coordinates scheduling of these tasks.
-    SubcarrierManager* subcarrier_manager_;
-
     /*****************************************************
      * Buffers
      *****************************************************/
@@ -227,7 +223,6 @@ private:
     Table<complex_float> ue_spec_pilot_buffer_;
 
     RxCounters rx_counters_;
-    CSI_stats csi_stats_;
     FFT_stats fft_stats_;
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
@@ -309,8 +304,6 @@ private:
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
-
-    size_t cur_tid; // TODO (junzhi): Add documentation
 
     // Threads running the subcarrier-parallel processing
     std::vector<std::thread> do_subcarrier_threads_;
