@@ -97,8 +97,8 @@ Millipede::~Millipede()
     delete mac_thread_;
 
     if (config_->disable_master) {
-        for (auto& t : do_subcarrier_threads)
-            t.join()
+        for (auto& t : do_subcarrier_threads_)
+            t.join();
     }
 }
 
@@ -1164,16 +1164,12 @@ void Millipede::initialize_uplink_buffers()
            "socket buffer status size %zu\n",
         socket_buffer_size_, socket_buffer_status_size_);
 
-    if (!cfg->disable_master) {
-        socket_buffer_.malloc(
-            cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
-        socket_buffer_status_.calloc(
-            cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
-    } else {
-        socket_buffer_.malloc(cfg->BS_ANT_NUM, socket_buffer_size_, 64);
-        socket_buffer_status_.malloc(
-            cfg->BS_ANT_NUM, socket_buffer_status_size_, 64);
-    }
+    socket_buffer_.malloc(
+        cfg->disable_master ? cfg->BS_ANT_NUM : cfg->socket_thread_num,
+        socket_buffer_size_, 64);
+    socket_buffer_status_.malloc(
+        cfg->disable_master ? cfg->BS_ANT_NUM : cfg->socket_thread_num,
+        socket_buffer_status_size_, 64);
 
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);

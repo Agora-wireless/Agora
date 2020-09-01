@@ -67,11 +67,9 @@ public:
     void start();
     void stop();
 
-#if BIGSTATION // Note: bigstation mode is currently not working with the DoSubcarrier redesign.
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
-#endif // BIGSTATION
     void* worker(int tid);
     void* subcarrier_worker(int tid);
     void* decode_worker(int tid);
@@ -87,10 +85,10 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
+    void schedule_subcarriers(
+        EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
-    void schedule_subcarriers(
-        EventType event_type, size_t frame_id, size_t symbol_id);
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
