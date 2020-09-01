@@ -1175,7 +1175,6 @@ void Millipede::free_uplink_buffers()
 {
     socket_buffer_.free();
     socket_buffer_status_.free();
-
     data_buffer_.free();
     equal_buffer_.free();
     demod_soft_buffer_.free();
