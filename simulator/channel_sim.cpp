@@ -131,7 +131,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
         TASK_BUFFER_FRAME_NUM * bscfg->symbol_num_perframe
         * (bscfg->BS_ANT_NUM + uecfg->UE_ANT_NUM) * 36);
 
-    assert(bscfg->packet_length == uecfg->packet_legnth);
+    assert(bscfg->packet_length == uecfg->packet_length);
     payload_len = bscfg->packet_length - Packet::kOffsetOfData;
     payload_samps = bscfg->sampsPerSymbol;
 
@@ -270,7 +270,8 @@ void ChannelSim::start()
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 // received a packet from a client antenna
-                if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
+                if (gen_tag_t(event.tags[0]).tag_type
+                    == gen_tag_t::TagType::kUsers) {
                     size_t pilot_symbol_id
                         = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
                     size_t ul_symbol_id
@@ -299,7 +300,7 @@ void ChannelSim::start()
                     }
                     // received a packet from a BS antenna
                 } else if (gen_tag_t(event.tags[0]).tag_type
-                    == TagType::kAntennas) {
+                    == gen_tag_t::TagType::kAntennas) {
                     size_t dl_symbol_id
                         = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
                     size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
@@ -328,7 +329,8 @@ void ChannelSim::start()
             case EventType::kPacketTX: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t offset = frame_id % TASK_BUFFER_FRAME_NUM;
-                if (gen_tag_t(event.tags[0]).tag_type == TagType::kUsers) {
+                if (gen_tag_t(event.tags[0]).tag_type
+                    == gen_tag_t::TagType::kUsers) {
                     user_tx_counter_[offset]++;
                     if (user_tx_counter_[offset] == dl_symbol_num_perframe) {
                         if (kDebugPrintPerFrameDone)
@@ -338,7 +340,7 @@ void ChannelSim::start()
                         user_tx_counter_[offset] = 0;
                     }
                 } else if (gen_tag_t(event.tags[0]).tag_type
-                    == TagType::kAntennas) {
+                    == gen_tag_t::TagType::kAntennas) {
                     bs_tx_counter_[offset]++;
                     if (bs_tx_counter_[offset] == ul_symbol_num_perframe) {
                         if (kDebugPrintPerFrameDone)
