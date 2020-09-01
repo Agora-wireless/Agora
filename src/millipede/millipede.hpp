@@ -192,7 +192,7 @@ private:
     Table<complex_float> data_buffer_;
 
     // Calculated uplink zeroforcing detection matrices. Each matrix has
-    // [number of number of antennas] rows and [number of UEs] columns.
+    // [number of antennas] rows and [number of UEs] columns.
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
 
     // Data after equalization
@@ -236,7 +236,7 @@ private:
     Table<complex_float> dl_ifft_buffer_;
 
     // Calculated uplink zeroforcing detection matrices. Each matrix has
-    // [number of number of UEs] rows and [number of antennas] columns.
+    // [number of UEs] rows and [number of antennas] columns.
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM

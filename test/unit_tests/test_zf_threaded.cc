@@ -120,12 +120,12 @@ TEST(TestZF, VaryingConfig)
     Table<complex_float> recip_buffer;
 
     PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers;
-    csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+    csi_buffers.rand_alloc_cx_float(kMaxAntennas * kMaxDataSCs);
 
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
-        cfg->BS_ANT_NUM * cfg->UE_NUM);
+        kMaxAntennas * kMaxUEs);
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
-        cfg->UE_NUM * cfg->BS_ANT_NUM);
+        kMaxUEs * kMaxAntennas);
 
     recip_buffer.rand_alloc_cx_float(
         TASK_BUFFER_FRAME_NUM, kMaxDataSCs * kMaxAntennas, 64);
