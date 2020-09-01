@@ -80,7 +80,7 @@ public:
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
         char* tx_buffer);
-    void sendBeacon(int tid, size_t frame_id);
+    void send_beacon(int tid, size_t frame_id);
 
 private:
     void* loop_tx_rx(int tid); // The TX/RX event loop
