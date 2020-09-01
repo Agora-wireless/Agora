@@ -18,12 +18,12 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
-    Table<complex_float>& ul_zf_buffer, Table<complex_float>& dl_zf_buffer,
-    Stats* stats_manager)
+    PMat2D<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers,
+    Table<complex_float>& recip_buffer, Table<complex_float>& ul_zf_buffer,
+    Table<complex_float>& dl_zf_buffer, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
-    , csi_buffer_(csi_buffer)
+    , csi_buffers_(csi_buffers)
     , recip_buffer_(recip_buffer)
     , ul_zf_buffer_(ul_zf_buffer)
     , dl_zf_buffer_(dl_zf_buffer)
@@ -108,18 +108,16 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                 kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
                 kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
                 kTransposeBlockSize * 6 + 1);
-            int transpose_block_id = cur_sc_id / kTransposeBlockSize;
-            int sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
-            int offset_in_csi_buffer
+
+            const size_t transpose_block_id = cur_sc_id / kTransposeBlockSize;
+            const size_t sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
+            const size_t offset_in_csi_buffer
                 = transpose_block_id * cfg->BS_ANT_NUM * kTransposeBlockSize
                 + sc_inblock_idx;
-            const size_t symbol_offset
-                = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->UE_NUM;
             float* tar_csi_ptr = (float*)csi_gather_buffer;
 
-            /* Gather csi matrix of all users and antennas */
             for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-                float* src_csi_ptr = (float*)csi_buffer_[symbol_offset + ue_idx]
+                auto* src_csi_ptr = (float*)csi_buffers_[frame_slot][ue_idx]
                     + offset_in_csi_buffer * 2;
                 for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM;
                      ant_idx += 4) {
@@ -135,10 +133,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                 * (kTransposeBlockSize * cfg->BS_ANT_NUM);
 
             size_t gather_idx = 0;
-            for (size_t p_i = 0; p_i < cfg->pilot_symbol_num_perframe; p_i++) {
-                const complex_float* csi_buf
-                    = csi_buffer_[(frame_slot * cfg->pilot_symbol_num_perframe)
-                        + p_i];
+            for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+                const complex_float* csi_buf = csi_buffers_[frame_slot][ue_idx];
                 for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
                     csi_gather_buffer[gather_idx++]
                         = csi_buf[pt_base_offset + (ant_i * kTransposeBlockSize)
@@ -202,12 +198,13 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
             int offset_in_csi_buffer
                 = transpose_block_id * cfg->BS_ANT_NUM * kTransposeBlockSize
                 + sc_inblock_idx;
-            const size_t symbol_offset = frame_id % TASK_BUFFER_FRAME_NUM;
-            float* tar_csi_ptr
-                = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
 
-            float* src_csi_ptr
-                = (float*)csi_buffer_[symbol_offset] + offset_in_csi_buffer * 2;
+            auto* tar_csi_ptr
+                = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
+            const auto* src_csi_ptr
+                = (float*)csi_buffers_[frame_id % TASK_BUFFER_FRAME_NUM][0]
+                + offset_in_csi_buffer * 2;
+
             for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
                 // fetch 4 complex floats for 4 ants
                 __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
@@ -221,9 +218,9 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
 
             for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
                 csi_gather_buffer[gather_idx++]
-                    = csi_buffer_[frame_slot]
-                                 [pt_base_offset + (ant_i * kTransposeBlockSize)
-                                     + (cur_sc_id % kTransposeBlockSize)];
+                    = csi_buffers_[frame_slot][0][pt_base_offset
+                        + (ant_i * kTransposeBlockSize)
+                        + (cur_sc_id % kTransposeBlockSize)];
             }
         }
     }
@@ -253,6 +250,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
 }
 
 // Currently unused
+/*
 void DoZF::Predict(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
@@ -275,3 +273,4 @@ void DoZF::Predict(size_t tag)
         cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
         cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
 }
+*/

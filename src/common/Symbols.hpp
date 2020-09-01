@@ -18,8 +18,10 @@
 #define NUM_BITS 4
 #define MAX_CODED_SC 1152
 
-// Number of frames received that we allocate space for in worker threads
+// Number of frames received that we allocate space for in worker threads. This
+// is the frame window that we track in Millipede.
 #define TASK_BUFFER_FRAME_NUM 40
+static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
@@ -196,16 +198,16 @@ public:
 };
 
 // Maximum number of symbols per frame allowed by Millipede
-static constexpr size_t kMaxSymbolsPerFrame = 1400;
+static constexpr size_t kMaxSymbols = 70;
 
-// Maximum number of OFDM subcarriers in the 5G spec
-static constexpr size_t k5GMaxSubcarriers = 3300;
+// Maximum number of OFDM data subcarriers in the 5G spec
+static constexpr size_t kMaxDataSCs = 3300;
 
 // Maximum number of antennas supported by Millipede
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 1000;
+static constexpr size_t kMaxUEs = 32;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;

@@ -297,17 +297,6 @@ public:
         return symbol_num_perframe * sampsPerSymbol / rate;
     }
 
-    /// Fetch the channel state information matrix for this frame and symbol ID.
-    /// The symbol must be a pilot symbol.
-    inline complex_float* get_csi_mat(Table<complex_float>& csi_buffers,
-        size_t frame_id, size_t symbol_id) const
-    {
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
-            + get_pilot_symbol_idx(frame_id, symbol_id);
-        return csi_buffers[symbol_offset];
-    }
-
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
     /// be an uplink symbol.
     inline complex_float* get_data_buf(Table<complex_float>& data_buffers,
