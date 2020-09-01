@@ -13,14 +13,15 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& data_buffer, Table<complex_float>& ul_zf_buffer,
+    Table<complex_float>& data_buffer,
+    PMat2D<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
     PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , data_buffer_(data_buffer)
-    , ul_zf_buffer_(ul_zf_buffer)
+    , ul_zf_matrices_(ul_zf_matrices)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
     , demod_soft_buffer_(demod_soft_buffer)
@@ -73,6 +74,7 @@ Event_data DoDemul::launch(size_t tag)
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
     const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
+    const size_t frame_slot = frame_id % kFrameWnd;
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
@@ -146,10 +148,10 @@ Event_data DoDemul::launch(size_t tag)
             }
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
 
-            cx_float* data_ptr
+            auto* data_ptr
                 = reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]);
-            cx_float* ul_zf_ptr = reinterpret_cast<cx_float*>(
-                cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, cur_sc_id));
+            auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
+                ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
 
             size_t start_tsc2 = worker_rdtsc();
 #if USE_MKL_JIT

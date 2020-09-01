@@ -720,7 +720,7 @@ void* Millipede::worker_demul(int tid)
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
             demod_soft_buffer_, phy_stats, stats);
 
     /* Initialize Precode operator */
@@ -1177,7 +1177,6 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
 
     data_buffer_.free();
-    ul_zf_buffer_.free();
     equal_buffer_.free();
     demod_soft_buffer_.free();
     decoded_buffer_.free();
@@ -1195,7 +1194,6 @@ void Millipede::free_downlink_buffers()
     dl_ifft_buffer_.free();
     recip_buffer_.free();
     calib_buffer_.free();
-    dl_zf_buffer_.free();
     dl_encoded_buffer_.free();
 
     encode_stats_.fini();
