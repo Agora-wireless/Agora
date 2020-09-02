@@ -86,10 +86,13 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
      `./build/data_generator data/bs-sim.json` to generate data files.
    * In one terminal, run `./build/user data/ue-sim.json` to start clients with
      uplink configuration.
-   * In another terminal, run  `./build/chsim 8 2 1 1 2 24 data/bs-sim.json
-     data/ue-sim.json`
+   * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
+     --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json
+     --ue_conf_file data/ue-sim.json`
    * In another terminal, run `./build/millipede data/bs-sim.json` to start
      Millipede with uplink configuration.
+   * Note: make sure Millipede and sender are using different set of cores,
+     otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    "Hardware mode" section below.
