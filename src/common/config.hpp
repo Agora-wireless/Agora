@@ -327,17 +327,6 @@ public:
         return symbol_num_perframe * sampsPerSymbol / rate;
     }
 
-    /// Fetch the channel state information matrix for this frame and symbol ID.
-    /// The symbol must be a pilot symbol.
-    inline complex_float* get_csi_mat(Table<complex_float>& csi_buffers,
-        size_t frame_id, size_t symbol_id) const
-    {
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
-            + get_pilot_symbol_idx(frame_id, symbol_id);
-        return csi_buffers[symbol_offset];
-    }
-
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
     /// be an uplink symbol.
     inline complex_float* get_data_buf(Table<complex_float>& data_buffers,
@@ -349,26 +338,11 @@ public:
         return data_buffers[symbol_offset];
     }
 
-    /// Return a pointer to the downlink zeroforcing precoding matrix for this
-    /// frame and subcarrier ID
-    inline complex_float* get_dl_zf_mat(Table<complex_float>& dl_zf_buffers,
-        size_t frame_id, size_t sc_id) const
+    /// Return the subcarrier ID to which we should refer to for the zeroforcing
+    /// matrices of subcarrier [sc_id].
+    inline size_t get_zf_sc_id(size_t sc_id) const
     {
-        if (freq_orthogonal_pilot)
-            sc_id -= (sc_id % UE_NUM);
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return dl_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
-    }
-
-    /// Return a pointer to the uplink zeroforcing detection matrix for this
-    /// frame and subcarrier ID
-    inline complex_float* get_ul_zf_mat(Table<complex_float>& ul_zf_buffers,
-        size_t frame_id, size_t sc_id) const
-    {
-        if (freq_orthogonal_pilot)
-            sc_id -= (sc_id % UE_NUM);
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return ul_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+        return freq_orthogonal_pilot ? sc_id - (sc_id % UE_NUM) : sc_id;
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID

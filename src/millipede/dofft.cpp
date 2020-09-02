@@ -102,7 +102,8 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<char>& socket_buffer, Table<int>& socket_buffer_status,
-    Table<complex_float>& data_buffer, Table<complex_float>& csi_buffer,
+    Table<complex_float>& data_buffer,
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
@@ -110,7 +111,7 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     , socket_buffer_(socket_buffer)
     , socket_buffer_status_(socket_buffer_status)
     , data_buffer_(data_buffer)
-    , csi_buffer_(csi_buffer)
+    , csi_buffers_(csi_buffers)
     , calib_buffer_(calib_buffer)
     , phy_stats(in_phy_stats)
 {
@@ -189,11 +190,15 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        if (kPrintPhyStats)
+        if (kPrintPhyStats) {
             phy_stats->update_pilot_snr(frame_id,
                 cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
-        partial_transpose(cfg->get_csi_mat(csi_buffer_, frame_id, symbol_id),
-            ant_id, SymbolType::kPilot);
+        }
+
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
+        partial_transpose(
+            csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
         partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kUL);

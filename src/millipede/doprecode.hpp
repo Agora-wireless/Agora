@@ -28,10 +28,9 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& in_precoder_buffer,
+        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
         Table<complex_float>& in_dl_ifft_buffer,
-        Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
-        Stats* in_stats_manager);
+        Table<int8_t>& dl_encoded_buffer, Stats* in_stats_manager);
     ~DoPrecode();
 
     /**
@@ -63,21 +62,7 @@ public:
     Event_data launch(size_t tag);
 
 private:
-    /**
-     * Modulated data
-     * First dimension: data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM
-     * second dimension: UE_NUM * OFDM_CA_NUM
-     */
-
-    Table<complex_float>& precoder_buffer_;
-
-    /**
-     * Precoded data
-     * First dimension: total symbol number in the buffer:
-     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
-     * BS_ANT_NUM * OFDM_CA_NUM
-     */
-
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
     Table<complex_float>& dl_ifft_buffer_;
     Table<int8_t>& dl_raw_data;
     Table<float> qam_table;
