@@ -3,7 +3,6 @@
 
 #include "Symbols.hpp"
 #include "buffer.hpp"
-//#include "concurrentqueue.h"
 #include "concurrent_queue_wrapper.hpp"
 #include "config.hpp"
 #include "gettime.h"
@@ -27,6 +26,13 @@
 
 using namespace arma;
 
+/**
+ * @brief Simualtor for many-antenna MU-MIMO channel to work with
+ * Millipede BS and UE applications. It generates channel matrice(s)
+ * and applies it to incoming baseband samples from BS and sends them
+ * to the UE application. Similarly, applies the same channel (TDD) to
+ * uplink baseband samples from UE and sends them to BS.
+ */
 class ChannelSim {
 public:
     ChannelSim(Config* bscfg, Config* uecfg, size_t bs_thread_num,
