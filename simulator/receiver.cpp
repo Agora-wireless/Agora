@@ -63,7 +63,7 @@ void* Receiver::loopRecv(int tid)
     int socket_local
         = setup_socket_ipv4(cfg->bs_rru_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv4(
-        &remote_addr, cfg->bs_port + tid, cfg->bs_addr.c_str());
+        &remote_addr, cfg->bs_server_port + tid, cfg->bs_server_addr.c_str());
 
     /* use token to speed up */
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];

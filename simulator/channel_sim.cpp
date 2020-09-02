@@ -330,11 +330,11 @@ void* ChannelSim::bs_rx_loop(int tid)
         socket_bs_[socket_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_bs_[socket_id],
-            bscfg->bs_port + socket_id, bscfg->bs_addr.c_str());
+            bscfg->bs_server_port + socket_id, bscfg->bs_server_addr.c_str());
         printf("BS RX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%zu\n",
-            tid, local_port_id, bscfg->bs_addr.c_str(),
-            bscfg->bs_port + socket_id);
+            tid, local_port_id, bscfg->bs_server_addr.c_str(),
+            bscfg->bs_server_port + socket_id);
         fcntl(socket_bs_[socket_id], F_SETFL, O_NONBLOCK);
     }
 
@@ -394,11 +394,11 @@ void* ChannelSim::ue_rx_loop(int tid)
         socket_ue_[socket_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_ue_[socket_id],
-            uecfg->ue_port + socket_id, uecfg->ue_addr.c_str());
+            uecfg->ue_server_port + socket_id, uecfg->ue_server_addr.c_str());
         printf("UE RX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%zu\n",
-            tid, local_port_id, uecfg->ue_addr.c_str(),
-            uecfg->ue_port + socket_id);
+            tid, local_port_id, uecfg->ue_server_addr.c_str(),
+            uecfg->ue_server_port + socket_id);
         fcntl(socket_ue_[socket_id], F_SETFL, O_NONBLOCK);
     }
 
