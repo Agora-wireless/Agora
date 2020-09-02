@@ -43,10 +43,10 @@ using fft_req_tag_t = rx_tag_t;
 // have only a subset of the fields initialized.
 union gen_tag_t {
     static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
-    static_assert(kMaxSymbolsPerFrame < ((1ull << 13) - 1), "");
+    static_assert(kMaxSymbols < ((1ull << 13) - 1), "");
     static_assert(kMaxUEs < UINT16_MAX, "");
     static_assert(kMaxAntennas < UINT16_MAX, "");
-    static_assert(k5GMaxSubcarriers < UINT16_MAX, "");
+    static_assert(kMaxDataSCs < UINT16_MAX, "");
 
     enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 

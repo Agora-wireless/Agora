@@ -57,7 +57,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     double freq_ghz, moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* ptok, Table<complex_float>& data_buffer,
-    Table<complex_float>& ul_zf_buffer,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
     PhyStats* phy_stats, Stats* stats)
@@ -72,7 +72,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     }
 
     auto computeDemul = new DoDemul(cfg, worker_id, freq_ghz, event_queue,
-        complete_task_queue, ptok, data_buffer, ul_zf_buffer,
+        complete_task_queue, ptok, data_buffer, ul_zf_matrices,
         ue_spec_pilot_buffer, equal_buffer, demod_soft_buffer, phy_stats,
         stats);
 
@@ -122,36 +122,35 @@ TEST(TestDemul, VaryingConfig)
         ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
     }
 
-    Table<complex_float> data_buffer, ul_zf_buffer, ue_spec_pilot_buffer,
-        equal_buffer;
+    Table<complex_float> data_buffer, ue_spec_pilot_buffer, equal_buffer;
     data_buffer.rand_alloc_cx_float(
         cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
-        kMaxAntennas * k5GMaxSubcarriers, 64);
-    ul_zf_buffer.rand_alloc_cx_float(
-        k5GMaxSubcarriers * TASK_BUFFER_FRAME_NUM, kMaxUEs * kMaxAntennas, 64);
+        kMaxAntennas * kMaxDataSCs, 64);
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
+        kMaxAntennas * kMaxUEs);
     equal_buffer.calloc(
         cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
-        k5GMaxSubcarriers * kMaxUEs, 64);
+        kMaxDataSCs * kMaxUEs, 64);
     ue_spec_pilot_buffer.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * kMaxUEs, 64);
     Table<int8_t> demod_soft_buffer;
     demod_soft_buffer.calloc(
         cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
-        kMaxModType * k5GMaxSubcarriers * kMaxUEs, 64);
+        kMaxModType * kMaxDataSCs * kMaxUEs, 64);
     printf(
-        "Size of [data_buffer, ul_zf_buffer, equal_buffer, "
+        "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
         "MB\n",
         cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM * kMaxAntennas
-            * k5GMaxSubcarriers * 4 * 1.0f / 1024 / 1024,
-        k5GMaxSubcarriers * TASK_BUFFER_FRAME_NUM * kMaxUEs * kMaxAntennas * 4
-            * 1.0f / 1024 / 1024,
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM
-            * k5GMaxSubcarriers * kMaxUEs * 4 * 1.0f / 1024 / 1024,
+            * kMaxDataSCs * 4 * 1.0f / 1024 / 1024,
+        kMaxDataSCs * TASK_BUFFER_FRAME_NUM * kMaxUEs * kMaxAntennas * 4 * 1.0f
+            / 1024 / 1024,
+        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM * kMaxDataSCs
+            * kMaxUEs * 4 * 1.0f / 1024 / 1024,
         TASK_BUFFER_FRAME_NUM * cfg->UL_PILOT_SYMS * kMaxUEs * 4 * 1.0f / 1024
             / 1024,
         cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM * kMaxModType
-            * k5GMaxSubcarriers * kMaxUEs * 1.0f / 1024 / 1024);
+            * kMaxDataSCs * kMaxUEs * 1.0f / 1024 / 1024);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
     auto phy_stats = new PhyStats(cfg);
@@ -162,7 +161,7 @@ TEST(TestDemul, VaryingConfig)
     for (size_t i = 0; i < kNumWorkers; i++) {
         workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i, freq_ghz,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
-            std::ref(data_buffer), std::ref(ul_zf_buffer),
+            std::ref(data_buffer), std::ref(ul_zf_matrices),
             std::ref(equal_buffer), std::ref(ue_spec_pilot_buffer),
             std::ref(demod_soft_buffer), phy_stats, stats);
     }
