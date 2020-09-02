@@ -1,65 +1,10 @@
 #include "channel_sim.hpp"
+#include "datatype_conversion.h"
 
 static bool running = true;
 static constexpr bool kPrintChannelOutput = false;
 
-static void convert_short_to_float_simd(
-    short* in_buf, float* out_buf, size_t length)
-{
-#if SIMD
-#ifdef __AVX512F__
-    const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m512i magic_i = _mm512_castps_si512(magic);
-    for (size_t i = 0; i < length; i += 16) {
-        /* get input */
-        __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
-        /* interleave with 0x0000 */
-        __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m512i val_f_int
-            = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
-        __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
-        __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
-        _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
-    }
-#else
-    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m256i magic_i = _mm256_castps_si256(magic);
-    for (size_t i = 0; i < length; i += 16) {
-        /* get input */
-        __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
-
-        __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
-        /* interleave with 0x0000 */
-        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m256i val_f_int
-            = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
-        __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
-        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
-        _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
-
-        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
-        __m256i val_f_int1
-            = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
-        __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
-        __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
-        _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
-    }
-#endif
-    for (size_t i = length / 16; i < length; i++) {
-        out_buf[i] = (float)(in_buf[i] / 32768.f);
-    }
-#else
-    for (size_t i = 0; i < length; i++) {
-        out_buf[i] = (float)(in_buf[i] / 32768.f);
-    }
-#endif
-}
-
-static void convert_float_to_short_simd(
+static void simd_convert_float_to_short(
     float* in_buf, short* out_buf, size_t length)
 {
     /*
@@ -534,7 +479,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     // convert received data to complex float,
     // apply channel, convert back to complex short to TX
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, uecfg->UE_ANT_NUM);
-    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(),
+    simd_convert_short_to_float(src_ptr, (float*)fmat_src.memptr(),
         2 * payload_samps * uecfg->UE_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel;
@@ -542,7 +487,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         print_mat(fmat_dst);
 
     short* dst_ptr = (short*)(tx_buffer_bs + total_offset_bs);
-    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr,
+    simd_convert_float_to_short((float*)fmat_dst.memptr(), dst_ptr,
         2 * payload_samps * bscfg->BS_ANT_NUM);
     std::stringstream ss;
 
@@ -585,7 +530,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     // convert received data to complex float,
     // apply channel, convert back to complex short to TX
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, bscfg->BS_ANT_NUM);
-    convert_short_to_float_simd(src_ptr, (float*)fmat_src.memptr(),
+    simd_convert_short_to_float(src_ptr, (float*)fmat_src.memptr(),
         2 * payload_samps * bscfg->BS_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel.st();
@@ -593,7 +538,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         print_mat(fmat_dst);
 
     short* dst_ptr = (short*)(tx_buffer_ue + total_offset_ue);
-    convert_float_to_short_simd((float*)fmat_dst.memptr(), dst_ptr,
+    simd_convert_float_to_short((float*)fmat_dst.memptr(), dst_ptr,
         2 * payload_samps * uecfg->UE_ANT_NUM);
 
     // send the symbol to all base station antennas
