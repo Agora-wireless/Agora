@@ -353,15 +353,10 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    /// Get the soft demodulation buffer for this frame, symbol,
-    /// user and subcarrier ID
-    inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
-        size_t symbol_id, size_t ue_id, size_t sc_id) const
+    /// Get the offset in any demodulation buffer for this UE and subcarrier
+    inline size_t get_demod_buf_offset(size_t ue_id, size_t sc_id) const
     {
-        size_t total_data_symbol_id
-            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        return &demod_buffer[total_data_symbol_id]
-                            [OFDM_DATA_NUM * 8 * ue_id + sc_id * mod_type];
+        return (ue_id * (kMaxModOrder * OFDM_DATA_NUM)) + (mod_type * sc_id);
     }
 
     /// Get the decode buffer for this frame, symbol,

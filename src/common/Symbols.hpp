@@ -187,6 +187,9 @@ static constexpr size_t kMaxSymbols = 70;
 // Maximum number of OFDM data subcarriers in the 5G spec
 static constexpr size_t kMaxDataSCs = 3300;
 
+// The maximum modulation order (= QAM256) supported
+static constexpr size_t kMaxModOrder = 8;
+
 // Maximum number of antennas supported by Millipede
 static constexpr size_t kMaxAntennas = 64;
 

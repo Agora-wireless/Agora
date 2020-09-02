@@ -86,7 +86,7 @@ public:
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_codeblocks(
-        EventType task_type, size_t frame_id, size_t symbol_id);
+        EventType task_type, size_t frame_id, size_t symbol_idx_ul);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
     void move_events_between_queues(
         EventType event_type1, EventType event_type2);
@@ -200,10 +200,9 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
 
-    // Data after soft demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> demod_soft_buffer_;
+    // Data after demodulation. Each buffer has 8 * number of OFDM data
+    // subcarriers * number of UEs entries.
+    PtrGrid<kFrameWnd, kMaxSymbols, int8_t> demod_buffers_;
 
     // Data after LDPC decoding
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
