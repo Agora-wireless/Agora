@@ -42,17 +42,17 @@ static inline void print_mat(cx_fmat c)
 }
 
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
-    size_t bs_socket_num, size_t user_socket_num, size_t bs_thread_num,
-    size_t user_thread_num, size_t worker_thread_num, size_t in_core_offset)
-    : bs_thread_num(bs_thread_num)
+    size_t bs_thread_num, size_t user_thread_num, size_t worker_thread_num,
+    size_t in_core_offset)
+    : bscfg(config_bs)
+    , uecfg(config_ue)
+    , bs_thread_num(bs_thread_num)
     , user_thread_num(user_thread_num)
-    , bs_socket_num(bs_socket_num)
-    , user_socket_num(user_socket_num)
     , worker_thread_num(worker_thread_num)
     , core_offset(in_core_offset)
+    , bs_socket_num(config_bs->BS_ANT_NUM)
+    , user_socket_num(config_ue->UE_ANT_NUM)
 {
-    this->bscfg = config_bs;
-    this->uecfg = config_ue;
 
     // initialize parameters from config
     srand(time(NULL));

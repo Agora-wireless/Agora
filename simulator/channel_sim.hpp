@@ -29,9 +29,9 @@ using namespace arma;
 
 class ChannelSim {
 public:
-    ChannelSim(Config* bscfg, Config* uecfg, size_t bs_socket_num,
-        size_t ue_socket_num, size_t bs_thread_num, size_t user_thread_num,
-        size_t worker_thread_num, size_t in_core_offset = 30);
+    ChannelSim(Config* bscfg, Config* uecfg, size_t bs_thread_num,
+        size_t user_thread_num, size_t worker_thread_num,
+        size_t in_core_offset = 30);
     ~ChannelSim();
 
     void start();
