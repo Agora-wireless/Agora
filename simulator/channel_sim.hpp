@@ -93,10 +93,9 @@ private:
 
     pthread_t* task_threads;
 
-    size_t ul_symbol_num_perframe;
-    size_t dl_symbol_num_perframe;
-    size_t payload_len;
-    size_t payload_samps;
+    size_t ul_data_plus_pilot_symbols;
+    size_t dl_data_plus_beacon_symbols;
+    size_t payload_length;
 
     size_t bs_thread_num;
     size_t user_thread_num;
