@@ -83,19 +83,19 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     // initialize bs-facing and client-facing data buffers
     size_t tx_buffer_ue_size = TASK_BUFFER_FRAME_NUM * dl_symbol_num_perframe
         * uecfg->UE_ANT_NUM * payload_len;
-    alloc_buffer_1d(&tx_buffer_ue, tx_buffer_ue_size, 64, 1);
+    tx_buffer_ue.resize(tx_buffer_ue_size);
 
     size_t tx_buffer_bs_size = TASK_BUFFER_FRAME_NUM * ul_symbol_num_perframe
         * bscfg->BS_ANT_NUM * payload_len;
-    alloc_buffer_1d(&tx_buffer_bs, tx_buffer_bs_size, 64, 1);
+    tx_buffer_bs.resize(tx_buffer_bs_size);
 
     size_t rx_buffer_ue_size = TASK_BUFFER_FRAME_NUM * ul_symbol_num_perframe
         * uecfg->UE_ANT_NUM * payload_len;
-    alloc_buffer_1d(&rx_buffer_ue, rx_buffer_ue_size, 64, 1);
+    rx_buffer_ue.resize(rx_buffer_ue_size);
 
     size_t rx_buffer_bs_size = TASK_BUFFER_FRAME_NUM * dl_symbol_num_perframe
         * bscfg->BS_ANT_NUM * payload_len;
-    alloc_buffer_1d(&rx_buffer_bs, rx_buffer_bs_size, 64, 1);
+    rx_buffer_bs.resize(rx_buffer_bs_size);
 
     // initilize rx and tx counters
     bs_rx_counter_ = new size_t[dl_symbol_num_perframe * TASK_BUFFER_FRAME_NUM];
@@ -363,8 +363,7 @@ void* ChannelSim::bs_rx_loop(int tid)
             = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_symbol_num_perframe
             + dl_symbol_id;
         size_t offset = symbol_offset * bscfg->BS_ANT_NUM + ant_id;
-        memcpy((void*)(rx_buffer_bs + offset * payload_len), pkt->data,
-            payload_len);
+        memcpy(&rx_buffer_bs[offset * payload_len], pkt->data, payload_len);
 
         rt_assert(
             message_queue_.enqueue(local_ptok,
@@ -434,8 +433,7 @@ void* ChannelSim::ue_rx_loop(int tid)
             = (frame_id % TASK_BUFFER_FRAME_NUM) * ul_symbol_num_perframe
             + total_symbol_id;
         size_t offset = symbol_offset * uecfg->UE_ANT_NUM + ant_id;
-        memcpy((void*)(rx_buffer_ue + offset * payload_len), pkt->data,
-            payload_len);
+        memcpy(&rx_buffer_ue[offset * payload_len], pkt->data, payload_len);
 
         rt_assert(
             message_queue_.enqueue(local_ptok,
@@ -465,30 +463,33 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     size_t total_offset_ue = symbol_offset * payload_len * uecfg->UE_ANT_NUM;
     size_t total_offset_bs = symbol_offset * payload_len * bscfg->BS_ANT_NUM;
 
-    short* src_ptr = (short*)(rx_buffer_ue + total_offset_ue);
+    auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_ue[total_offset_ue]);
 
     // convert received data to complex float,
     // apply channel, convert back to complex short to TX
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, uecfg->UE_ANT_NUM);
-    simd_convert_short_to_float(src_ptr, (float*)fmat_src.memptr(),
+    simd_convert_short_to_float(src_ptr,
+        reinterpret_cast<float*>(fmat_src.memptr()),
         2 * payload_samps * uecfg->UE_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel;
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 
-    short* dst_ptr = (short*)(tx_buffer_bs + total_offset_bs);
-    simd_convert_float_to_short((float*)fmat_dst.memptr(), dst_ptr,
-        2 * payload_samps * bscfg->BS_ANT_NUM);
+    auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs[total_offset_bs]);
+    simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
+        dst_ptr, 2 * payload_samps * bscfg->BS_ANT_NUM);
     std::stringstream ss;
 
     // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < bscfg->BS_ANT_NUM; ant_id++) {
-        new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-        memcpy(pkt->data,
-            (void*)(tx_buffer_bs + total_offset_bs + ant_id * payload_len),
+        pkt->frame_id = frame_id;
+        pkt->symbol_id = symbol_id;
+        pkt->ant_id = ant_id;
+        pkt->cell_id = 0;
+        memcpy(pkt->data, &tx_buffer_bs[total_offset_bs + ant_id * payload_len],
             payload_len);
         ssize_t ret = sendto(socket_bs_[ant_id], (char*)udp_pkt_buf.data(),
             udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_bs_[ant_id],
@@ -514,29 +515,32 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     size_t total_offset_ue = symbol_offset * payload_len * uecfg->UE_ANT_NUM;
     size_t total_offset_bs = symbol_offset * payload_len * bscfg->BS_ANT_NUM;
 
-    short* src_ptr = (short*)(rx_buffer_bs + total_offset_bs);
+    auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_bs[total_offset_bs]);
 
     // convert received data to complex float,
     // apply channel, convert back to complex short to TX
     cx_fmat fmat_src = zeros<cx_fmat>(payload_samps, bscfg->BS_ANT_NUM);
-    simd_convert_short_to_float(src_ptr, (float*)fmat_src.memptr(),
+    simd_convert_short_to_float(src_ptr,
+        reinterpret_cast<float*>(fmat_src.memptr()),
         2 * payload_samps * bscfg->BS_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel.st();
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 
-    short* dst_ptr = (short*)(tx_buffer_ue + total_offset_ue);
-    simd_convert_float_to_short((float*)fmat_dst.memptr(), dst_ptr,
-        2 * payload_samps * uecfg->UE_ANT_NUM);
+    auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue[total_offset_ue]);
+    simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
+        dst_ptr, 2 * payload_samps * uecfg->UE_ANT_NUM);
 
     // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < uecfg->UE_ANT_NUM; ant_id++) {
-        new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-        memcpy(pkt->data,
-            (void*)(tx_buffer_ue + total_offset_ue + ant_id * payload_len),
+        pkt->frame_id = frame_id;
+        pkt->symbol_id = symbol_id;
+        pkt->ant_id = ant_id;
+        pkt->cell_id = 0;
+        memcpy(pkt->data, &tx_buffer_ue[total_offset_ue + ant_id * payload_len],
             payload_len);
         ssize_t ret = sendto(socket_ue_[ant_id], (char*)udp_pkt_buf.data(),
             udp_pkt_buf.size(), 0, (struct sockaddr*)&servaddr_ue_[ant_id],
