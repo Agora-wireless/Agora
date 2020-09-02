@@ -70,16 +70,16 @@ private:
     cx_fmat channel;
 
     // Data buffer for symbols to be transmitted to BS antennas (uplink)
-    char* tx_buffer_bs;
+    std::vector<char> tx_buffer_bs;
 
     // Data buffer for symbols to be transmitted to client antennas (downlink)
-    char* tx_buffer_ue;
+    std::vector<char> tx_buffer_ue;
 
     // Data buffer for received symbols from BS antennas (downlink)
-    char* rx_buffer_bs;
+    std::vector<char> rx_buffer_bs;
 
     // Data buffer for received symbols from client antennas (uplink)
-    char* rx_buffer_ue;
+    std::vector<char> rx_buffer_ue;
 
     // Task Queue for tasks related to incoming BS packets
     moodycamel::ConcurrentQueue<Event_data> task_queue_bs;
