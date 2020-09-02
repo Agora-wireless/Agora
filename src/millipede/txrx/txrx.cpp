@@ -111,7 +111,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-        int local_port_id = cfg->bs_port + radio_id;
+        int local_port_id = cfg->bs_server_port + radio_id;
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],

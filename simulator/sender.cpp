@@ -72,7 +72,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     // Parse IP addresses and MAC addresses
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
@@ -272,8 +272,8 @@ void* Sender::worker_thread(int tid)
         Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
         rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, rru_addr, bs_addr, cfg->bs_rru_port,
-            cfg->bs_port + tag.ant_id, cfg->packet_length);
+            server_mac_addr, sender_addr, server_addr, cfg->bs_rru_port,
+            cfg->bs_server_port + tag.ant_id, cfg->packet_length);
         pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
 #endif
 
@@ -293,7 +293,7 @@ void* Sender::worker_thread(int tid)
         rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
-        udp_client.send(cfg->bs_addr, cfg->bs_port + cur_radio,
+        udp_client.send(cfg->bs_server_addr, cfg->bs_server_port + cur_radio,
             reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
 #endif
 

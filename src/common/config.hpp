@@ -253,19 +253,19 @@ public:
     // The total number of mac packets sent/received in each frame
     size_t mac_packets_perframe;
 
-    std::string ue_addr; // IP address of UE
-    std::string bs_addr; // IP address of the BS
+    std::string ue_server_addr; // IP address of UE
+    std::string bs_server_addr; // IP address of the BS
     std::string rru_addr; // IP address of the RRU/channel simulator
 
     // IP address of the data source/sink server communicating with MAC (BS or UE)
     std::string mac_remote_addr;
 
-    int bs_port; // Base UDP port used by BS to receive data
+    int bs_server_port; // Base UDP port used by BS to receive data
 
     // Base RRU/channel simulator UDP port used by BS to transmit downlink data
     int bs_rru_port;
 
-    int ue_port; // Base UDP port used by UEs to receive data
+    int ue_server_port; // Base UDP port used by UEs to receive data
 
     // Base RRU/channel simulator UDP port used by UEs to transmit uplink data
     int ue_rru_port;

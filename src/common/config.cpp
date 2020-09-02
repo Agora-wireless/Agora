@@ -63,13 +63,13 @@ Config::Config(std::string jsonfile)
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "16QAM");
 
-    bs_addr = tddConf.value("bs_addr", "127.0.0.1");
+    bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
     rru_addr = tddConf.value("rru_addr", "127.0.0.1");
-    ue_addr = tddConf.value("ue_addr", "127.0.0.1");
-    bs_port = tddConf.value("bs_port", 8000);
+    ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
+    bs_server_port = tddConf.value("bs_server_port", 8000);
     bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
-    ue_port = tddConf.value("ue_port", 6000);
+    ue_server_port = tddConf.value("ue_sever_port", 6000);
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
     init_mac_running = tddConf.value("init_mac_running", false);
@@ -108,8 +108,9 @@ Config::Config(std::string jsonfile)
         data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
             symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
-            downlink_mode ? 0
-                          : symbol_num_perframe - pilot_symbol_num_perframe - 1);
+            downlink_mode
+                ? 0
+                : symbol_num_perframe - pilot_symbol_num_perframe - 1);
         dl_data_symbol_num_perframe
             = tddConf.value("dl_symbol_num_perframe", downlink_mode ? 10 : 0);
         dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
@@ -245,8 +246,7 @@ Config::Config(std::string jsonfile)
 
     num_bytes_per_cb = (LDPC_config.cbLen) >> 3;
 
-    data_bytes_num_persymbol
-        = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
+    data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
     mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
@@ -638,7 +638,7 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     if (it != DLSymbols[fid].end())
         return it - DLSymbols[fid].begin() + 1;
     else if (symbol_id == 0)
-	return 0;
+        return 0;
     else
         return SIZE_MAX;
 }
