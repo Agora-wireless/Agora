@@ -48,10 +48,10 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     , uecfg(config_ue)
     , bs_thread_num(bs_thread_num)
     , user_thread_num(user_thread_num)
-    , worker_thread_num(worker_thread_num)
-    , core_offset(in_core_offset)
     , bs_socket_num(config_bs->BS_ANT_NUM)
     , user_socket_num(config_ue->UE_ANT_NUM)
+    , worker_thread_num(worker_thread_num)
+    , core_offset(in_core_offset)
 {
 
     // initialize parameters from config
@@ -171,13 +171,10 @@ void ChannelSim::start()
         bs_context->obj_ptr = this;
         bs_context->id = i;
 
-        if (pthread_create(&recv_thread_bs, NULL,
-                pthread_fun_wrapper<ChannelSim, &ChannelSim::bs_rx_loop>,
-                bs_context)
-            != 0) {
-            perror("socket send thread create failed");
-            exit(0);
-        }
+        int ret = pthread_create(&recv_thread_bs, NULL,
+            pthread_fun_wrapper<ChannelSim, &ChannelSim::bs_rx_loop>,
+            bs_context);
+        rt_assert(ret == 0, "Failed to create BS recv thread!");
     }
 
     for (size_t i = 0; i < user_thread_num; i++) {
@@ -187,13 +184,10 @@ void ChannelSim::start()
         ue_context->obj_ptr = this;
         ue_context->id = i;
 
-        if (pthread_create(&recv_thread_ue, NULL,
-                pthread_fun_wrapper<ChannelSim, &ChannelSim::ue_rx_loop>,
-                ue_context)
-            != 0) {
-            perror("socket recv thread create failed");
-            exit(0);
-        }
+        int ret = pthread_create(&recv_thread_ue, NULL,
+            pthread_fun_wrapper<ChannelSim, &ChannelSim::ue_rx_loop>,
+            ue_context);
+        rt_assert(ret == 0, "Failed to create UE recv thread!");
     }
 
     sleep(1);
@@ -322,36 +316,35 @@ void* ChannelSim::taskThread(int tid)
 
 void* ChannelSim::bs_rx_loop(int tid)
 {
-    int socket_lo = tid * bs_socket_num / bs_thread_num;
-    int socket_hi = (tid + 1) * bs_socket_num / bs_thread_num;
+    size_t socket_lo = tid * bs_socket_num / bs_thread_num;
+    size_t socket_hi = (tid + 1) * bs_socket_num / bs_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset + 1, tid);
 
     // initialize bs-facing sockets
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
+    for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
         int local_port_id = bscfg->bs_rru_port + socket_id;
         socket_bs_[socket_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_bs_[socket_id],
             bscfg->bs_port + socket_id, bscfg->bs_addr.c_str());
         printf("BS RX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%d \n",
+               " with remote address %s:%zu\n",
             tid, local_port_id, bscfg->bs_addr.c_str(),
             bscfg->bs_port + socket_id);
         fcntl(socket_bs_[socket_id], F_SETFL, O_NONBLOCK);
     }
 
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
-    int socket_id = socket_lo;
+    size_t socket_id = socket_lo;
     while (running) {
         if (-1
             == recv(socket_bs_[socket_id], (char*)udp_pkt_buf.data(),
                    udp_pkt_buf.size(), 0)) {
             if (errno != EAGAIN && running) {
-                printf(
-                    "Thread %d socket_id %d recv bs failed\n", tid, socket_id);
+                printf("BS socket %zu receive failed\n", socket_id);
                 exit(0);
             }
             continue;
@@ -362,8 +355,8 @@ void* ChannelSim::bs_rx_loop(int tid)
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
         if (kDebugPrintInTask)
-            printf("Received bs packet frame %zu symbol %zu ant %zu from "
-                   "socket %d\n",
+            printf("Received BS packet for frame %zu, symbol %zu, ant %zu from "
+                   "socket %zu\n",
                 frame_id, symbol_id, ant_id, socket_id);
         size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
         size_t symbol_offset
@@ -373,12 +366,11 @@ void* ChannelSim::bs_rx_loop(int tid)
         memcpy((void*)(rx_buffer_bs + offset * payload_len), pkt->data,
             payload_len);
 
-        Event_data bs_rx_message(EventType::kPacketRX,
-            gen_tag_t::frm_sym_ant(frame_id, symbol_id, ant_id)._tag);
-        if (!message_queue_.enqueue(local_ptok, bs_rx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
+        rt_assert(
+            message_queue_.enqueue(local_ptok,
+                Event_data(EventType::kPacketRX,
+                    gen_tag_t::frm_sym_ant(frame_id, symbol_id, ant_id)._tag)),
+            "BS socket message enqueue failed!");
         if (++socket_id == socket_hi)
             socket_id = socket_lo;
     }
@@ -387,8 +379,8 @@ void* ChannelSim::bs_rx_loop(int tid)
 
 void* ChannelSim::ue_rx_loop(int tid)
 {
-    int socket_lo = tid * user_socket_num / user_thread_num;
-    int socket_hi = (tid + 1) * user_socket_num / user_thread_num;
+    size_t socket_lo = tid * user_socket_num / user_thread_num;
+    size_t socket_hi = (tid + 1) * user_socket_num / user_thread_num;
 
     moodycamel::ProducerToken local_ptok(message_queue_);
     pin_to_core_with_offset(
@@ -396,28 +388,27 @@ void* ChannelSim::ue_rx_loop(int tid)
 
     // initialize client-facing sockets
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
-    for (int socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
+    for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
         int local_port_id = uecfg->ue_rru_port + socket_id;
         socket_ue_[socket_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_ue_[socket_id],
             uecfg->ue_port + socket_id, uecfg->ue_addr.c_str());
         printf("UE RX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%d \n",
+               " with remote address %s:%zu\n",
             tid, local_port_id, uecfg->ue_addr.c_str(),
             uecfg->ue_port + socket_id);
         fcntl(socket_ue_[socket_id], F_SETFL, O_NONBLOCK);
     }
 
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
-    int socket_id = socket_lo;
+    size_t socket_id = socket_lo;
     while (running) {
         if (-1
             == recv(socket_ue_[socket_id], (char*)&udp_pkt_buf[0],
                    udp_pkt_buf.size(), 0)) {
             if (errno != EAGAIN && running) {
-                printf(
-                    "Thread %d socket_id %d recv ue failed\n", tid, socket_id);
+                printf("UE socket %zu receive failed\n", socket_id);
                 exit(0);
             }
             continue;
@@ -436,8 +427,9 @@ void* ChannelSim::ue_rx_loop(int tid)
         if (pilot_symbol_id == SIZE_MAX)
             total_symbol_id = ul_symbol_id + bscfg->pilot_symbol_num_perframe;
         if (kDebugPrintInTask)
-            printf("Received ue packet frame %zu symbol %zu ant %zu\n",
-                frame_id, symbol_id, ant_id);
+            printf("Received UE packet for frame %zu, symbol %zu, ant %zu from "
+                   "socket %zu\n",
+                frame_id, symbol_id, ant_id, socket_id);
         size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * ul_symbol_num_perframe
             + total_symbol_id;
@@ -445,12 +437,11 @@ void* ChannelSim::ue_rx_loop(int tid)
         memcpy((void*)(rx_buffer_ue + offset * payload_len), pkt->data,
             payload_len);
 
-        Event_data user_rx_message(EventType::kPacketRX,
-            gen_tag_t::frm_sym_ue(frame_id, symbol_id, ant_id)._tag);
-        if (!message_queue_.enqueue(local_ptok, user_rx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
+        rt_assert(
+            message_queue_.enqueue(local_ptok,
+                Event_data(EventType::kPacketRX,
+                    gen_tag_t::frm_sym_ue(frame_id, symbol_id, ant_id)._tag)),
+            "UE Socket message enqueue failed!");
         if (++socket_id == socket_hi)
             socket_id = socket_lo;
     }
@@ -505,12 +496,10 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         rt_assert(ret > 0, "sendto() failed");
     }
 
-    Event_data bs_tx_message(EventType::kPacketTX,
-        gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0)._tag);
-    if (!message_queue_.enqueue(*task_ptok[tid], bs_tx_message)) {
-        printf("bs tx message enqueue failed\n");
-        exit(0);
-    }
+    rt_assert(message_queue_.enqueue(*task_ptok[tid],
+                  Event_data(EventType::kPacketTX,
+                      gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0)._tag)),
+        "BS TX message enqueue failed!\n");
 }
 
 void ChannelSim::do_tx_user(int tid, size_t tag)
@@ -555,10 +544,8 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         rt_assert(ret > 0, "sendto() failed");
     }
 
-    Event_data user_tx_message(EventType::kPacketTX,
-        gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0)._tag);
-    if (!message_queue_.enqueue(*task_ptok[tid], user_tx_message)) {
-        printf("user tx message enqueue failed\n");
-        exit(0);
-    }
+    rt_assert(message_queue_.enqueue(*task_ptok[tid],
+                  Event_data(EventType::kPacketTX,
+                      gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0)._tag)),
+        "UE TX message enqueue failed!\n");
 }
