@@ -54,8 +54,9 @@ typedef unsigned short ushort;
  */
 class PacketTXRX {
 public:
-    PacketTXRX(
-        Config* cfg, size_t in_core_offset = 1, RxStatus* rx_status_ = nullptr);
+    PacketTXRX(Config* cfg, size_t in_core_offset = 1,
+        RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr,
+        DecodeStatus* decode_status = nullptr);
     /**
      * queue_message: message queue to communicate with main thread
      */
@@ -82,13 +83,16 @@ public:
      */
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
-        char* tx_buffer);
+        char* tx_buffer, Table<int8_t>* demod_soft_buffer = nullptr,
+        Table<int8_t>* demod_soft_buffer_to_decode = nullptr);
 
 private:
     void* loop_tx_rx(int tid); // The TX/RX event loop
     int dequeue_send(int tid);
     int poll_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    // Receive packets and relocate data to the correct address based on
+    // the subcarrier range
     struct Packet* recv_relocate(int tid, int radio_id, int rx_offset);
 
     void* loop_tx_rx_argos(int tid);
@@ -100,6 +104,8 @@ private:
     const size_t socket_thread_num;
     Table<char>* buffer_;
     Table<int>* buffer_status_;
+    Table<int8_t>* demod_soft_buffer_;
+    Table<int8_t>* demod_soft_buffer_to_decode_;
     size_t packet_num_in_buffer_;
     char* tx_buffer_;
     Table<size_t>* frame_start_;
@@ -111,6 +117,7 @@ private:
 
     std::vector<struct sockaddr_in> servaddr_; /* server address */
     std::vector<int> socket_;
+    std::vector<struct sockaddr_in> millipede_addrs_;
 
 #ifdef USE_DPDK
     uint32_t sender_addr; // IPv4 address of the simulator sender
@@ -121,6 +128,10 @@ private:
     RadioConfig* radioconfig_; // Used only in Argos mode
 
     RxStatus* rx_status_; // Shared states with workers
+    DemulStatus* demul_status_;
+    size_t demod_frame_to_send = 0;
+    size_t demod_symbol_to_send;
+    DecodeStatus* decode_status_;
 };
 
 #endif

@@ -225,6 +225,14 @@ Config::Config(std::string jsonfile)
             = OFDM_DATA_START + (server_addr_idx + 1) * get_ofdm_control_num();
         rt_assert(get_ofdm_control_num() % subcarrier_block_size == 0,
             "Invalid subcarrier range and subcarrier block size!");
+        ue_start = server_addr_idx < UE_NUM % server_addr_list.size()
+            ? server_addr_idx * (UE_NUM / server_addr_list.size() + 1)
+            : UE_NUM
+                - (server_addr_list.size() - server_addr_idx)
+                    * (UE_NUM / server_addr_list.size());
+        ue_end = server_addr_idx < UE_NUM % server_addr_list.size()
+            ? ue_start + UE_NUM / server_addr_list.size() + 1
+            : ue_start + UE_NUM / server_addr_list.size();
     }
     demul_events_per_symbol
         = 1 + (get_ofdm_control_num() - 1) / demul_block_size;

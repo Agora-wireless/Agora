@@ -280,6 +280,9 @@ public:
     // [subcarrier_start, subcarrier_end]
     size_t subcarrier_start;
     size_t subcarrier_end;
+    // This Millipede server takes charge of ue range [ue_start, ue_end]
+    size_t ue_start;
+    size_t ue_end;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
@@ -313,6 +316,25 @@ public:
     {
         return disable_master ? OFDM_DATA_NUM / server_addr_list.size()
                               : OFDM_DATA_NUM;
+    }
+
+    // Get the number of UEs this server takes charge of
+    inline size_t get_num_ues_to_process() const
+    {
+        return disable_master ? UE_NUM : ue_end - ue_start;
+    }
+
+    // Get the Millipede server index given an UE ID
+    inline size_t get_server_idx_by_ue(size_t ue_id) const
+    {
+        size_t ue_num_low = UE_NUM / server_addr_list.size();
+        size_t num_extra_ue = UE_NUM % server_addr_list.size();
+        if (ue_id < num_extra_ue * (ue_num_low + 1)) {
+            return ue_id / (ue_num_low + 1);
+        } else {
+            return num_extra_ue
+                + (ue_id - num_extra_ue * (ue_num_low + 1)) / ue_num_low;
+        }
     }
 
     // TODO: Documentation

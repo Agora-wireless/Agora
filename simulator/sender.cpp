@@ -281,6 +281,7 @@ void* Sender::worker_thread(int tid)
 #endif
 
         // Update the TX buffer
+        pkt->packet_type = Packet::PacketType::kRRU;
         pkt->frame_id = tag.frame_id;
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
         pkt->cell_id = 0;
@@ -314,11 +315,15 @@ void* Sender::worker_thread(int tid)
                     data_buf->data
                         + (i * block_size + cfg->OFDM_DATA_START) * 2,
                     block_size * sizeof(unsigned short) * 2);
+                // udp_client.send(cfg->server_addr_list[i],
+                //     cfg->bs_port + cur_radio,
+                //     reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                //     Packet::kOffsetOfData
+                //         + 2 * sizeof(unsigned short) * block_size);
                 udp_client.send(cfg->server_addr_list[i],
                     cfg->bs_port + cur_radio,
                     reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                    Packet::kOffsetOfData
-                        + 2 * sizeof(unsigned short) * block_size);
+                    cfg->packet_length);
             }
         } else {
             udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,

@@ -147,7 +147,7 @@ public:
     const size_t num_decode_tasks_per_frame_;
 };
 
-// We use DecodeStatus to track # completed demul tasks for each symbol
+// We use DemulStatus to track # completed demul tasks for each symbol
 // This object is shared between all dosubcarriers and dodecoders
 class DemulStatus {
 public:
@@ -213,6 +213,57 @@ public:
 
     size_t max_frame_;
     std::mutex max_frame_mutex_;
+};
+
+class DecodeStatus {
+public:
+    DecodeStatus(Config* cfg)
+        : cfg_(cfg)
+        , num_demod_data_required_(cfg->server_addr_list.size())
+    {
+        cur_frame_ = new size_t[cfg->get_num_ues_to_process()];
+        memset(cur_frame_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
+        cur_symbol_ = new size_t[cfg->get_num_ues_to_process()];
+        memset(cur_symbol_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
+
+        num_demod_data_received_
+            = new std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
+                TASK_BUFFER_FRAME_NUM>[cfg->get_num_ues_to_process()];
+        for (size_t i = 0; i < cfg->get_num_ues_to_process(); i++) {
+            for (size_t j = 0; j < TASK_BUFFER_FRAME_NUM; j++) {
+                num_demod_data_received_[i][j].fill(0);
+            }
+        }
+    }
+
+    void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id)
+    {
+        num_demod_data_received_[ue_id - cfg->ue_start]
+                                [frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]++;
+    }
+
+    bool received_all_demod_data(
+        size_t ue_id, size_t frame_id, size_t symbol_id)
+    {
+        if (num_demod_data_received_[ue_id
+                - cfg->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+            == num_demod_data_required_) {
+            num_demod_data_received_[ue_id
+                - cfg->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+                = 0;
+            return true;
+        }
+        return false;
+    }
+
+private:
+    Config* cfg_;
+    size_t* cur_frame_;
+    size_t* cur_symbol_; // symbol ID for UL data
+    const size_t num_demod_data_required_;
+
+    std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
+        TASK_BUFFER_FRAME_NUM>* num_demod_data_received_;
 };
 
 #endif

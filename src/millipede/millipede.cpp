@@ -11,6 +11,7 @@ Millipede::Millipede(Config* cfg)
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , rx_status_(cfg)
     , demul_status_(cfg)
+    , demod_status_(cfg)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -1195,6 +1196,8 @@ void Millipede::initialize_uplink_buffers()
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
     demod_soft_buffer_.malloc(
+        task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    demod_soft_buffer_to_decode_.malloc(
         task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     decoded_buffer_.calloc(task_buffer_symbol_num_ul,
         roundup<64>(cfg->num_bytes_per_cb) * cfg->LDPC_config.nblocksInSymbol

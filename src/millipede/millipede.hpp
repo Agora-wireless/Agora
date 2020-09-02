@@ -215,6 +215,8 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> demod_soft_buffer_;
 
+    Table<int8_t> demod_soft_buffer_to_decode_;
+
     // Data after LDPC decoding
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: decoded bytes per UE * number of UEs
@@ -315,6 +317,9 @@ private:
 
     // Shared states between dosubcarriers and dodecoders
     DemulStatus demul_status_;
+
+    // Shared states between socket threads and dodecoders
+    DecodeStatus demod_status_;
 };
 
 #endif

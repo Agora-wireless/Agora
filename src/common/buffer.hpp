@@ -222,11 +222,20 @@ struct Packet {
     // The packet's data starts at kOffsetOfData bytes from the start
     static constexpr size_t kOffsetOfData = 64;
 
+    enum class PacketType { kRRU, kDemod };
+
+    PacketType packet_type;
     uint32_t frame_id;
     uint32_t symbol_id;
-    uint32_t cell_id;
-    uint32_t ant_id;
-    uint32_t fill[12]; // Padding for 64-byte alignment needed for SIMD
+    union {
+        uint32_t cell_id;
+        uint32_t ue_id;
+    };
+    union {
+        uint32_t ant_id;
+        uint32_t server_id;
+    };
+    uint32_t fill[11]; // Padding for 64-byte alignment needed for SIMD
     short data[]; // Elements sent by antennae are two bytes (I/Q samples)
     Packet(int f, int s, int c, int a) // TODO: Should be unsigned integers
         : frame_id(f)
