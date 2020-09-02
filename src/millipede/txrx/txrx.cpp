@@ -201,7 +201,6 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         // get the position in rx_buffer
         // move ptr & set status to full
         // rx_buffer_status[rx_offset] = 1;
-
         if (!rx_status_->add_new_packet(frame_id, symbol_id)) {
             cfg->running = false;
         }

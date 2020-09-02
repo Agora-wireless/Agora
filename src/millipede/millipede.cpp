@@ -44,7 +44,8 @@ Millipede::Millipede(Config* cfg)
 
     /* Initialize TXRX threads */
     if (config_->disable_master) {
-        receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &rx_status_));
+        receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &rx_status_,
+            &demul_status_, &demod_status_));
     } else {
         receiver_.reset(
             new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
@@ -106,6 +107,8 @@ Millipede::~Millipede()
 
     if (config_->disable_master) {
         for (auto& t : do_subcarrier_threads_)
+            t.join();
+        for (auto& t : do_decode_threads_)
             t.join();
     }
 }
