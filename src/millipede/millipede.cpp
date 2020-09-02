@@ -9,6 +9,9 @@ using namespace std;
 Millipede::Millipede(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
+    , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
+    , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
+    , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
@@ -628,7 +631,7 @@ void* Millipede::worker(int tid)
     /* Initialize operators */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
-        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
+        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffers_,
         calib_buffer_, phy_stats, stats);
 
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
@@ -636,18 +639,18 @@ void* Millipede::worker(int tid)
         worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats);
 
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
-        complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_zf_buffer_, dl_zf_buffer_, stats);
+        complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
+        recip_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
             demod_soft_buffer_, phy_stats, stats);
 
     auto computePrecode
         = new DoPrecode(config_, tid, freq_ghz, *get_conq(EventType::kPrecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], dl_zf_buffer_,
+            complete_task_queue_, worker_ptoks_ptr[tid], dl_zf_matrices_,
             dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
@@ -687,7 +690,7 @@ void* Millipede::worker_fft(int tid)
     /* Initialize IFFT operator */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
-        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffer_,
+        socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffers_,
         calib_buffer_, phy_stats, stats);
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
@@ -707,8 +710,8 @@ void* Millipede::worker_zf(int tid)
 
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
-        complete_task_queue_, worker_ptoks_ptr[tid], csi_buffer_, recip_buffer_,
-        ul_zf_buffer_, dl_zf_buffer_, stats);
+        complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
+        recip_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
     while (true) {
         computeZF->try_launch();
@@ -722,13 +725,13 @@ void* Millipede::worker_demul(int tid)
     auto computeDemul
         = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
             complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_buffer_, ue_spec_pilot_buffer_, equal_buffer_,
+            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
             demod_soft_buffer_, phy_stats, stats);
 
     /* Initialize Precode operator */
     auto computePrecode
         = new DoPrecode(config_, tid, freq_ghz, *get_conq(EventType::kPrecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], dl_zf_buffer_,
+            complete_task_queue_, worker_ptoks_ptr[tid], dl_zf_matrices_,
             dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     while (true) {
@@ -1091,12 +1094,8 @@ void Millipede::initialize_uplink_buffers()
     socket_buffer_status_.calloc(
         cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
 
-    csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    ul_zf_buffer_.malloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
 
     equal_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
@@ -1158,8 +1157,6 @@ void Millipede::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    dl_zf_buffer_.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
     recip_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.calloc(
@@ -1183,9 +1180,7 @@ void Millipede::free_uplink_buffers()
 {
     socket_buffer_.free();
     socket_buffer_status_.free();
-    csi_buffer_.free();
     data_buffer_.free();
-    ul_zf_buffer_.free();
     equal_buffer_.free();
     demod_soft_buffer_.free();
     decoded_buffer_.free();
@@ -1203,7 +1198,6 @@ void Millipede::free_downlink_buffers()
     dl_ifft_buffer_.free();
     recip_buffer_.free();
     calib_buffer_.free();
-    dl_zf_buffer_.free();
     dl_encoded_buffer_.free();
 
     encode_stats_.fini();

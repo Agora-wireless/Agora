@@ -11,8 +11,10 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-// Number of frames received that we allocate space for in worker threads
+// Number of frames received that we allocate space for in worker threads. This
+// is the frame window that we track in Millipede.
 #define TASK_BUFFER_FRAME_NUM 40
+static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
@@ -172,16 +174,16 @@ static inline std::string thread_type_str(ThreadType thread_type)
 enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
 // Maximum number of symbols per frame allowed by Millipede
-static constexpr size_t kMaxSymbolsPerFrame = 1400;
+static constexpr size_t kMaxSymbols = 70;
 
-// Maximum number of OFDM subcarriers in the 5G spec
-static constexpr size_t k5GMaxSubcarriers = 3300;
+// Maximum number of OFDM data subcarriers in the 5G spec
+static constexpr size_t kMaxDataSCs = 3300;
 
 // Maximum number of antennas supported by Millipede
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 1000;
+static constexpr size_t kMaxUEs = 64;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
