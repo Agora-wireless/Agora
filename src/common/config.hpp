@@ -21,6 +21,7 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
+#include "utils_ldpc.hpp"
 #include <nlohmann/json.hpp>
 //#include <itpp/itbase.h>
 // using namespace itpp;
@@ -28,6 +29,35 @@ using json = nlohmann::json;
 #endif
 typedef unsigned char uchar;
 typedef unsigned short ushort;
+
+class LDPCconfig {
+public:
+    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
+    uint16_t Zc; /// The 5G NR LDPC expansion factor
+    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
+
+    /// Allow the LDPC decoder to terminate without completing all iterations
+    /// if it decodes the codeblock eariler
+    bool earlyTermination;
+
+    size_t nRows; /// Number of rows in the LDPC base graph to use
+    uint32_t cbLen; /// Number of information bits input to LDPC encoding
+    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
+    size_t nblocksInSymbol;
+
+    // Return the number of bytes in the information bit sequence for LDPC
+    // encoding of one code block
+    size_t num_input_bytes() const
+    {
+        return bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
+    }
+
+    // Return the number of bytes in the encoded LDPC code word
+    size_t num_encoded_bytes() const
+    {
+        return bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows));
+    }
+};
 
 class Config {
 public:
@@ -316,17 +346,6 @@ public:
         return symbol_num_perframe * sampsPerSymbol / rate;
     }
 
-    /// Fetch the channel state information matrix for this frame and symbol ID.
-    /// The symbol must be a pilot symbol.
-    inline complex_float* get_csi_mat(Table<complex_float>& csi_buffers,
-        size_t frame_id, size_t symbol_id) const
-    {
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        size_t symbol_offset = (frame_slot * pilot_symbol_num_perframe)
-            + get_pilot_symbol_idx(frame_id, symbol_id);
-        return csi_buffers[symbol_offset];
-    }
-
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
     /// be an uplink symbol.
     inline complex_float* get_data_buf(Table<complex_float>& data_buffers,
@@ -338,26 +357,11 @@ public:
         return data_buffers[symbol_offset];
     }
 
-    /// Return a pointer to the downlink zeroforcing precoding matrix for this
-    /// frame and subcarrier ID
-    inline complex_float* get_dl_zf_mat(Table<complex_float>& dl_zf_buffers,
-        size_t frame_id, size_t sc_id) const
+    /// Return the subcarrier ID to which we should refer to for the zeroforcing
+    /// matrices of subcarrier [sc_id].
+    inline size_t get_zf_sc_id(size_t sc_id) const
     {
-        if (freq_orthogonal_pilot)
-            sc_id -= (sc_id % UE_NUM);
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return dl_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
-    }
-
-    /// Return a pointer to the uplink zeroforcing detection matrix for this
-    /// frame and subcarrier ID
-    inline complex_float* get_ul_zf_mat(Table<complex_float>& ul_zf_buffers,
-        size_t frame_id, size_t sc_id) const
-    {
-        if (freq_orthogonal_pilot)
-            sc_id -= (sc_id % UE_NUM);
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return ul_zf_buffers[(frame_slot * OFDM_DATA_NUM) + sc_id];
+        return freq_orthogonal_pilot ? sc_id - (sc_id % UE_NUM) : sc_id;
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
