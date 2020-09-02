@@ -172,9 +172,8 @@ int RadioTXRX::dequeue_send(int tid)
         new (pkt) Packet(
             frame_id, c->pilotSymbols[0][symbol_idx], 0 /* cell_id */, ant_id);
         // Send pilots
-        ssize_t ret = sendto(socket_[ant_id], (char*)pkt,
-            c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-            sizeof(servaddr_[tid]));
+        ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length, 0,
+            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
         rt_assert(ret > 0, "sendto() failed");
     }
     for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
@@ -197,8 +196,8 @@ int RadioTXRX::dequeue_send(int tid)
             frame_id, c->ULSymbols[0][symbol_id], 0 /* cell_id */, ant_id);
 
         // Send data (one OFDM symbol)
-        ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
-            0, (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
+        ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length, 0,
+            (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
         rt_assert(ret > 0, "sendto() failed");
     }
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
