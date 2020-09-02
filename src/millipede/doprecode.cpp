@@ -12,13 +12,13 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& in_precoder_buffer,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
-    , precoder_buffer_(in_precoder_buffer)
+    , dl_zf_matrices_(dl_zf_matrices)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_raw_data(dl_encoded_or_raw_data)
 {
@@ -61,11 +61,6 @@ Event_data DoPrecode::launch(size_t tag)
         for (int j = 0; j < 4; j++) {
             size_t start_tsc2 = worker_rdtsc();
             int cur_sc_id = base_sc_id + i + j;
-            int precoder_offset
-                = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
-                + cur_sc_id;
-            if (cfg->freq_orthogonal_pilot)
-                precoder_offset = precoder_offset - (cur_sc_id % cfg->UE_NUM);
 
             complex_float* data_ptr = modulated_buffer_temp;
             if (data_symbol_idx_dl
@@ -87,8 +82,10 @@ Event_data DoPrecode::launch(size_t tag)
                 }
             }
 
-            cx_float* precoder_ptr
-                = (cx_float*)precoder_buffer_[precoder_offset];
+            auto* precoder_ptr = reinterpret_cast<cx_float*>(
+                dl_zf_matrices_[frame_id % kFrameWnd]
+                               [cfg->get_zf_sc_id(cur_sc_id)]);
+
             cx_fmat mat_precoder(
                 precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
             cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
