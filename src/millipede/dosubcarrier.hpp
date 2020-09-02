@@ -176,6 +176,7 @@ public:
                     zf_cur_frame_++;
                 }
             }
+
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_)) {
@@ -198,7 +199,6 @@ public:
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);
                         demul_cur_frame_++;
-                        rx_status_->decode_done(demul_cur_frame_ - 1);
                     }
                 }
             }

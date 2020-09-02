@@ -219,8 +219,8 @@ void Millipede::start()
 
     // Start packet I/O
     if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
-            socket_buffer_status_size_, stats->frame_start,
-            dl_socket_buffer_)) {
+            socket_buffer_status_size_, stats->frame_start, dl_socket_buffer_,
+            &demod_soft_buffer_, &demod_soft_buffer_to_decode_)) {
         this->stop();
         return;
     }

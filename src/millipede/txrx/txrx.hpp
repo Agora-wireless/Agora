@@ -119,6 +119,8 @@ private:
     std::vector<int> socket_;
     std::vector<struct sockaddr_in> millipede_addrs_;
 
+    char* send_buffer_;
+
 #ifdef USE_DPDK
     uint32_t sender_addr; // IPv4 address of the simulator sender
     uint32_t server_addr; // IPv4 address of the Millipede server

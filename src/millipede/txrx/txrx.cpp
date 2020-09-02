@@ -27,6 +27,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
         radioconfig_ = new RadioConfig(cfg);
     }
     demod_symbol_to_send = cfg->pilot_symbol_num_perframe;
+    send_buffer_ = reinterpret_cast<char*>(memalign(64, cfg->packet_length));
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
@@ -47,6 +48,7 @@ PacketTXRX::~PacketTXRX()
         radioconfig_->radioStop();
         delete radioconfig_;
     }
+    free(send_buffer_);
 }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
@@ -215,6 +217,9 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         memcpy(
             demod_ptr, pkt->data, cfg->get_ofdm_control_num() * cfg->mod_type);
         decode_status_->receive_demod_data(ue_id, frame_id, symbol_id);
+    } else {
+        printf("Receive unknown packet\n");
+        exit(1);
     }
     return pkt;
 }
@@ -261,18 +266,28 @@ int PacketTXRX::poll_send(int tid)
         && demul_status_->ready_to_decode(
                demod_frame_to_send, demod_symbol_to_send)) {
         for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-            int8_t* demod_ptr
-                = cfg->get_demod_buf(*demod_soft_buffer_, demod_frame_to_send,
-                    demod_symbol_to_send, ue_id, cfg->subcarrier_start);
-            Packet pkt(demod_frame_to_send, demod_symbol_to_send, ue_id,
-                cfg->server_addr_idx);
-            memcpy(pkt.data, demod_ptr,
+            int8_t* demod_ptr = cfg->get_demod_buf(*demod_soft_buffer_,
+                demod_frame_to_send, demod_symbol_to_send, ue_id, 0);
+            Packet* pkt = reinterpret_cast<Packet*>(send_buffer_);
+            pkt->packet_type = Packet::PacketType::kDemod;
+            pkt->frame_id = demod_frame_to_send;
+            pkt->symbol_id = demod_frame_to_send;
+            pkt->ue_id = ue_id;
+            pkt->server_id = cfg->server_addr_idx;
+            memcpy(pkt->data, demod_ptr,
                 cfg->get_ofdm_control_num() * cfg->mod_type);
-            ssize_t ret = sendto(socket_[1], &pkt, cfg->packet_length, 0,
+            ssize_t ret = sendto(socket_[1], pkt, cfg->packet_length, 0,
                 (struct sockaddr*)&millipede_addrs_[cfg->get_server_idx_by_ue(
                     ue_id)],
                 sizeof(millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)]));
             rt_assert(ret > 0, "sendto() failed");
+        }
+        demod_symbol_to_send++;
+        if (demod_symbol_to_send
+            == cfg->pilot_symbol_num_perframe
+                + cfg->ul_data_symbol_num_perframe) {
+            demod_symbol_to_send = cfg->pilot_symbol_num_perframe;
+            demod_frame_to_send++;
         }
         return 1;
     }

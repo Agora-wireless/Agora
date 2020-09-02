@@ -18,8 +18,7 @@ public:
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_data_symbol_per_frame_(cfg->data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
-        , num_decode_tasks_per_frame_(
-              cfg->get_ofdm_control_num() / cfg->subcarrier_block_size)
+        , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
     {
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
             num_pkts_[i] = 0;
@@ -99,6 +98,7 @@ public:
     void decode_done(size_t frame_id)
     {
         rt_assert(frame_id == cur_frame_, "Wrong completed decode task!");
+        printf("Decode one UE data for frame %lu\n", frame_id);
         decode_mutex_.lock();
         num_decode_tasks_completed_++;
         if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
