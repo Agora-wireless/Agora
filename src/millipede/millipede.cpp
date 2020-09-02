@@ -64,15 +64,12 @@ Millipede::Millipede(Config* cfg)
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
-        // Note: bigstation mode currently doesn't work with DoSubcarrier redesign.
-#if BIGSTATION
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_fft>,
             0, cfg->fft_thread_num);
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_zf>,
             cfg->fft_thread_num, cfg->fft_thread_num + cfg->zf_thread_num);
         create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_demul>,
             cfg->fft_thread_num + cfg->zf_thread_num, cfg->worker_thread_num);
-#endif // BIGSTATION
     } else {
         if (cfg->disable_master) {
             do_subcarrier_threads_.resize(
@@ -101,9 +98,8 @@ Millipede::~Millipede()
     delete mac_thread_;
 
     if (config_->disable_master) {
-        for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
-            do_subcarrier_threads_[i].join();
-        }
+        for (auto& t : do_subcarrier_threads_)
+            t.join();
     }
 }
 
@@ -758,8 +754,6 @@ void* Millipede::worker(int tid)
     }
 }
 
-// Note: bigstation mode currently doesn't work with the DoSubcarrier redesign.
-#if BIGSTATION
 void* Millipede::worker_fft(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
@@ -819,7 +813,6 @@ void* Millipede::worker_demul(int tid)
         }
     }
 }
-#endif // BIGSTATION
 
 void Millipede::create_threads(
     void* (*worker)(void*), int tid_start, int tid_end)
@@ -1021,10 +1014,10 @@ void Millipede::print_per_symbol_done(
             frame_id, symbol_id, fft_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kFFTData):
-        printf("Main thread: data FFT done frame %zu, symbol %zu, precoder "
-               "status: %d, fft queue: %zu, zf queue: %zu, demul queue: "
-               "%zu, in "
-               "%.2f\n",
+        printf(
+            "Main thread: data FFT done frame %zu, symbol %zu, precoder "
+            "status: %d, fft queue: %zu, zf queue: %zu, demul queue: %zu, in "
+            "%.2f\n",
             frame_id, symbol_id, zf_stats_.coded_frame == frame_id,
             get_conq(EventType::kFFT)->size_approx(),
             get_conq(EventType::kZF)->size_approx(),
@@ -1162,27 +1155,22 @@ void Millipede::initialize_uplink_buffers()
     if (!cfg->disable_master) {
         socket_buffer_status_size_ = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
             * cfg->symbol_num_perframe;
-        socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
     } else {
         socket_buffer_status_size_
             = SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
-        socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
     }
+    socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
     printf("Millipede: Initializing uplink buffers: socket buffer size %zu, "
            "socket buffer status size %zu\n",
         socket_buffer_size_, socket_buffer_status_size_);
 
-    if (!cfg->disable_master) {
-        socket_buffer_.malloc(
-            cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
-        socket_buffer_status_.calloc(
-            cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
-    } else {
-        socket_buffer_.malloc(cfg->BS_ANT_NUM, socket_buffer_size_, 64);
-        socket_buffer_status_.malloc(
-            cfg->BS_ANT_NUM, socket_buffer_status_size_, 64);
-    }
+    socket_buffer_.malloc(
+        cfg->disable_master ? cfg->BS_ANT_NUM : cfg->socket_thread_num,
+        socket_buffer_size_, 64);
+    socket_buffer_status_.malloc(
+        cfg->disable_master ? cfg->BS_ANT_NUM : cfg->socket_thread_num,
+        socket_buffer_status_size_, 64);
 
     csi_buffer_.malloc(cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
         cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);

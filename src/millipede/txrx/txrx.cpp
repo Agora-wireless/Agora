@@ -160,6 +160,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
 struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
 {
+    // TODO [junzhi]: Can we avoid malloc
     char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
     auto* pkt = reinterpret_cast<Packet*>(buf);
     // if (-1

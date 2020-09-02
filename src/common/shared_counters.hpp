@@ -2,6 +2,7 @@
 #define SHARED_COUNTERS_HPP
 
 #include "Symbols.hpp"
+#include "config.hpp"
 #include "utils.h"
 #include <mutex>
 #include <sstream>
@@ -161,8 +162,7 @@ public:
         max_frame_ = 0;
     }
 
-    // A dosubcarrier launch this function to notify some subcarriers
-    // are completed for demul tasks in a symbol of a frame
+    // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
     void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
     {
         if (frame_id > max_frame_) {
@@ -183,8 +183,8 @@ public:
         mutex_list_[symbol_id].unlock();
     }
 
-    // A dodecode checks whether all subcarriers in a symbol complete their
-    // demul tasks so that it could start to decode
+    // Return true iff we have completed demodulation for all subcarriers in
+    // this symbol have
     bool ready_to_decode(size_t frame_id, size_t symbol_id)
     {
         rt_assert(
@@ -204,7 +204,7 @@ public:
         TASK_BUFFER_FRAME_NUM>
         num_demul_tasks_completed_;
 
-    // # subcarriers required to demul for each symbol
+    // Number of subcarriers required to demodulate for each symbol
     const size_t num_demul_tasks_required_;
 
     // Create a mutex for each symbol
