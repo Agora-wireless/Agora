@@ -11,6 +11,7 @@ Millipede::Millipede(Config* cfg)
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
+    , demod_buffers_(8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM)
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
@@ -146,11 +147,9 @@ void Millipede::schedule_subcarriers(
 }
 
 void Millipede::schedule_codeblocks(
-    EventType event_type, size_t frame_id, size_t symbol_id)
+    EventType event_type, size_t frame_id, size_t symbol_idx_ul)
 {
-    // assert(
-    //     event_type == EventType::kEncode or event_type == EventType::kDecode);
-    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_id, 0);
+    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx_ul, 0);
 
     for (size_t i = 0;
          i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
@@ -637,11 +636,10 @@ void* Millipede::worker(int tid)
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
         recip_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
-    auto computeDemul
-        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
-            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats);
+    auto computeDemul = new DoDemul(config_, tid, freq_ghz,
+        *get_conq(EventType::kDemul), complete_task_queue_,
+        worker_ptoks_ptr[tid], data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
 
     auto computePrecode
         = new DoPrecode(config_, tid, freq_ghz, *get_conq(EventType::kPrecode),
@@ -654,12 +652,12 @@ void* Millipede::worker(int tid)
 
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
+            complete_task_queue_, worker_ptoks_ptr[tid], demod_buffers_,
             decoded_buffer_, phy_stats, stats);
 
     auto computeDecodingLast = new DoDecode(config_, tid, freq_ghz,
         *get_conq(EventType::kDecodeLast), complete_decode_task_queue_,
-        decode_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, phy_stats,
+        decode_ptoks_ptr[tid], demod_buffers_, decoded_buffer_, phy_stats,
         stats);
 
     auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
@@ -717,11 +715,10 @@ void* Millipede::worker_demul(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
-    auto computeDemul
-        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
-            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats);
+    auto computeDemul = new DoDemul(config_, tid, freq_ghz,
+        *get_conq(EventType::kDemul), complete_task_queue_,
+        worker_ptoks_ptr[tid], data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
 
     /* Initialize Precode operator */
     auto computePrecode
@@ -1096,8 +1093,6 @@ void Millipede::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
-    demod_soft_buffer_.malloc(
-        task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     decoded_buffer_.calloc(task_buffer_symbol_num_ul,
         roundup<64>(cfg->num_bytes_per_cb) * cfg->LDPC_config.nblocksInSymbol
             * cfg->UE_NUM,
@@ -1177,7 +1172,6 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
     data_buffer_.free();
     equal_buffer_.free();
-    demod_soft_buffer_.free();
     decoded_buffer_.free();
 
     fft_stats_.fini();

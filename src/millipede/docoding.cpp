@@ -91,15 +91,14 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
+    PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers,
+    Table<uint8_t>& in_decoded_buffer,
     //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
     PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
-    , llr_buffer_(in_demod_buffer)
+    , demod_buffers_(demod_buffers)
     , decoded_buffer_(in_decoded_buffer)
-    //, decoded_bits_count_(in_decoded_bits_count)
-    //, error_bits_count_(in_error_bits_count)
     , phy_stats(in_phy_stats)
 {
     duration_stat
@@ -113,17 +112,16 @@ Event_data DoDecode::launch(size_t tag)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t symbol_id = gen_tag_t(tag).symbol_id;
+    size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     size_t cb_id = gen_tag_t(tag).cb_id;
     size_t symbol_offset
-        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
     size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
     size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
     if (kDebugPrintInTask) {
         printf("In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-               "%zu ue:  "
-               "%zu\n",
-            tid, frame_id, symbol_id, cur_cb_id, ue_id);
+               "%zu, ue: %zu\n",
+            tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 
     size_t start_tsc = worker_rdtsc();
@@ -150,10 +148,12 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    auto* llr_buffer_ptr = cfg->get_demod_buf(llr_buffer_, frame_id, symbol_id,
-        ue_id, LDPC_config.cbCodewLen * cur_cb_id);
+    int8_t* llr_buffer_ptr
+        = &demod_buffers_[frame_id][symbol_idx_ul][cfg->get_demod_buf_offset(
+            ue_id, LDPC_config.cbCodewLen * cur_cb_id)];
+
     auto* decoded_buffer_ptr = cfg->get_decode_buf(
-        decoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
+        decoded_buffer_, frame_id, symbol_idx_ul, ue_id, cur_cb_id);
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
 
@@ -182,7 +182,7 @@ Event_data DoDecode::launch(size_t tag)
         printf("\n");
     }
 
-    if (!kEnableMac && kPrintPhyStats && symbol_id == cfg->UL_PILOT_SYMS) {
+    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->UL_PILOT_SYMS) {
         phy_stats->update_decoded_bits(
             ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
@@ -190,7 +190,7 @@ Event_data DoDecode::launch(size_t tag)
         for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
             uint8_t rx_byte = decoded_buffer_ptr[i];
             uint8_t tx_byte = (uint8_t)cfg->get_info_bits(
-                cfg->ul_bits, symbol_id, ue_id, cur_cb_id)[i];
+                cfg->ul_bits, symbol_idx_ul, ue_id, cur_cb_id)[i];
             phy_stats->update_bit_errors(
                 ue_id, symbol_offset, tx_byte, rx_byte);
             if (rx_byte != tx_byte)
