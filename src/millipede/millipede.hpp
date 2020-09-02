@@ -308,6 +308,9 @@ private:
     // Threads running the subcarrier-parallel processing
     std::vector<std::thread> do_subcarrier_threads_;
 
+    // Threads running the decoders
+    std::vector<std::thread> do_decode_threads_;
+
     moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 
     // Shared states between socket threads and dosubcarriers

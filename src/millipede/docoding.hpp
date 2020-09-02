@@ -58,7 +58,7 @@ public:
         Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
         //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
         PhyStats* in_phy_stats, Stats* in_stats_manager,
-        RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr);
+        RxStatus* rx_status = nullptr, DecodeStatus* decode_status = nullptr);
     ~DoDecode();
 
     Event_data launch(size_t tag);
@@ -74,11 +74,13 @@ private:
     PhyStats* phy_stats;
     DurationStat* duration_stat;
     RxStatus* rx_status_;
-    DemulStatus* demul_status_;
+    DecodeStatus* decode_status_;
+
+    size_t ue_id;
 
     // decoder process one code block at a time
     size_t cur_frame_ = 0; // Current frame to decode
-    size_t cur_symbol_; // Current symbol to decode
+    size_t cur_symbol_ = 0; // Current symbol to decode
     size_t cur_cb_ = 0; // Current code block id to decode
 };
 

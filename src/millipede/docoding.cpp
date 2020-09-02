@@ -95,7 +95,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
     //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
     PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
-    DemulStatus* demul_status)
+    DecodeStatus* decode_status)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , llr_buffer_(in_demod_buffer)
@@ -104,12 +104,12 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     //, error_bits_count_(in_error_bits_count)
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
-    , demul_status_(demul_status)
+    , decode_status_(decode_status)
+    , ue_id(in_tid + in_config->ue_start)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
-    cur_symbol_ = cfg->pilot_symbol_num_perframe;
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
@@ -219,19 +219,17 @@ void DoDecode::start_work()
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
-            || demul_status_->ready_to_decode(cur_frame_, cur_symbol_)) {
-            launch(gen_tag_t::frm_sym_cb(cur_frame_,
-                cur_symbol_ - cfg->pilot_symbol_num_perframe,
-                cur_cb_ + tid * cfg->LDPC_config.nblocksInSymbol)
+            || decode_status_->received_all_demod_data(
+                   ue_id, cur_frame_, cur_symbol_)) {
+            launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
+                cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
                 cur_symbol_++;
-                if (cur_symbol_
-                    == cfg->ul_data_symbol_num_perframe
-                        + cfg->pilot_symbol_num_perframe) {
-                    cur_symbol_ = cfg->pilot_symbol_num_perframe;
+                if (cur_symbol_ == cfg->ul_data_symbol_num_perframe) {
+                    cur_symbol_ = 0;
                     rx_status_->decode_done(cur_frame_);
                     cur_frame_++;
                 }

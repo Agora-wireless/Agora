@@ -238,7 +238,7 @@ public:
 
     void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id)
     {
-        num_demod_data_received_[ue_id - cfg->ue_start]
+        num_demod_data_received_[ue_id - cfg_->ue_start]
                                 [frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]++;
     }
 
@@ -246,10 +246,10 @@ public:
         size_t ue_id, size_t frame_id, size_t symbol_id)
     {
         if (num_demod_data_received_[ue_id
-                - cfg->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+                - cfg_->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
             == num_demod_data_required_) {
             num_demod_data_received_[ue_id
-                - cfg->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+                - cfg_->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
                 = 0;
             return true;
         }

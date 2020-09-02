@@ -79,6 +79,13 @@ Millipede::Millipede(Config* cfg)
                 do_subcarrier_threads_[i]
                     = std::thread(&Millipede::subcarrier_worker, this, i);
             }
+
+            do_decode_threads_.resize(cfg->get_num_ues_to_process());
+
+            for (size_t i = 0; i < do_decode_threads_.size(); i++) {
+                do_decode_threads_[i]
+                    = std::thread(&Millipede::decode_worker, this, i);
+            }
         } else {
             create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>,
                 0, cfg->worker_thread_num);
@@ -688,7 +695,7 @@ void* Millipede::decode_worker(int tid)
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
             complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
-            decoded_buffer_, phy_stats, stats, &rx_status_, &demul_status_);
+            decoded_buffer_, phy_stats, stats, &rx_status_, &demod_status_);
 
     computeDecoding->start_work();
     delete computeDecoding;
