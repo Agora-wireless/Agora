@@ -215,7 +215,7 @@ public:
     size_t sampsPerSymbol;
 
     // The number of bytes in one physical layer time-domain packet received or
-    // sent by Millipede. This includes Millipede's acket header, but not the
+    // sent by Millipede. This includes Millipede's packet header, but not the
     // Ethernet/IP/UDP headers.
     size_t packet_length;
 
@@ -241,22 +241,40 @@ public:
     bool bigstation_mode; // If true, use pipeline-parallel scheduling
     bool correct_phase_shift; // If true, do phase shift correction
 
+    // The total number of uncoded data bytes in each OFDM symbol
     size_t data_bytes_num_persymbol;
-    size_t data_bytes_num_perframe;
-    size_t mac_data_bytes_num_perframe;
-    size_t mac_bytes_num_perframe;
-    size_t mac_packet_length;
-    size_t mac_payload_length;
-    size_t mac_packets_perframe;
-    bool ip_bridge_enable;
 
-    std::string server_addr; // IP address of the Millipede server
-    std::string sender_addr; // IP address of the simulator sender
-    std::string tx_addr_to_mac;
-    // Port ID at Millipede side
-    int bs_port;
-    int ue_rx_port; // UDP port used by UEs to receive data
-    int ue_tx_port; // UDP port used by UEs to transmit data
+    // The total number of MAC payload data bytes in each Frame
+    size_t mac_data_bytes_num_perframe;
+
+    // The total number of MAC packet bytes in each Frame
+    size_t mac_bytes_num_perframe;
+
+    // The length (in bytes) of a MAC packet including the header
+    size_t mac_packet_length;
+
+    // The length (in bytes) of a MAC packet payload
+    size_t mac_payload_length;
+
+    // The total number of mac packets sent/received in each frame
+    size_t mac_packets_perframe;
+
+    std::string ue_server_addr; // IP address of UE
+    std::string bs_server_addr; // IP address of the BS
+    std::string rru_addr; // IP address of the RRU/channel simulator
+
+    // IP address of the data source/sink server communicating with MAC (BS or UE)
+    std::string mac_remote_addr;
+
+    int bs_server_port; // Base UDP port used by BS to receive data
+
+    // Base RRU/channel simulator UDP port used by BS to transmit downlink data
+    int bs_rru_port;
+
+    int ue_server_port; // Base UDP port used by UEs to receive data
+
+    // Base RRU/channel simulator UDP port used by UEs to transmit uplink data
+    int ue_rru_port;
 
     // Port ID at MAC layer side
     int mac_rx_port;
