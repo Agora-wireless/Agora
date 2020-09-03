@@ -61,6 +61,13 @@ void PhyStats::print_evm_stats(size_t frame_id)
     std::cout << ss.str();
 }
 
+float PhyStats::get_evm_snr(size_t frame_id, size_t ue_id)
+{
+    float evm = evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM][ue_id];
+    evm = sqrt(evm) / config_->OFDM_DATA_NUM;
+    return -10 * std::log10(evm);
+}
+
 void PhyStats::print_snr_stats(size_t frame_id)
 {
     std::stringstream ss;

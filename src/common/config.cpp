@@ -66,10 +66,12 @@ Config::Config(std::string jsonfile)
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
     rru_addr = tddConf.value("rru_addr", "127.0.0.1");
     ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
+    mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
     bs_server_port = tddConf.value("bs_server_port", 8000);
     bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
     ue_server_port = tddConf.value("ue_sever_port", 6000);
+
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
     init_mac_running = tddConf.value("init_mac_running", false);

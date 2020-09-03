@@ -39,7 +39,15 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
 
-    udp_server = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+    udp_server
+        = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+
+    const size_t udp_control_len = sizeof(RBIndicator);
+    udp_control_buf_.resize(udp_control_len);
+
+    udp_control_channel = new UDPServer(
+        kBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
+
     udp_client = new UDPClient();
 
     crc_obj = new DoCRC();
@@ -51,11 +59,47 @@ MacThread::~MacThread()
     MLPD_INFO("MAC thread destroyed\n");
 }
 
-void MacThread::process_codeblocks_from_master()
+void MacThread::process_rx_from_master()
 {
     Event_data event;
     if (!rx_queue_->try_dequeue(event))
         return;
+
+    if (event.event_type == EventType::kPacketToMac)
+        process_codeblocks_from_master(event);
+    else if (event.event_type == EventType::kSNRReport)
+        process_snr_report_from_master(event);
+}
+
+void MacThread::process_snr_report_from_master(Event_data event)
+{
+    const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+    if (server_.snr_[ue_id].size() == kSNRWindowSize) {
+        server_.snr_[ue_id].pop();
+    }
+
+    server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
+}
+
+void MacThread::send_ran_config_update(Event_data event)
+{
+    RanConfig rc;
+    rc.mod_order_bits = CommsLib::QAM16;
+    rc.frame_id = scheduler_next_frame_id_;
+
+    Event_data msg(EventType::kRANUpdate);
+    msg.num_tags = 3;
+    msg.tags[0] = rc.n_antennas;
+    msg.tags[1] = rc.mod_order_bits;
+    msg.tags[2] = rc.frame_id;
+    rt_assert(tx_queue_->enqueue(msg),
+        "MAC thread: failed to send RAN update to Millipede");
+
+    scheduler_next_frame_id_++;
+}
+
+void MacThread::process_codeblocks_from_master(Event_data event)
+{
     assert(event.event_type == EventType::kPacketToMac);
 
     const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
@@ -74,18 +118,18 @@ void MacThread::process_codeblocks_from_master()
     if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
         auto* pkt = (struct MacPacket*)ul_data_ptr;
 
-	// we send data to app irrespective of CRC condition
-	// TODO: enable ARQ and ensure reliable data goes to app
-        const size_t frame_data__offset = (symbol_idx_ul - cfg_->UL_PILOT_SYMS)
-            * cfg_->mac_payload_length;
+        // we send data to app irrespective of CRC condition
+        // TODO: enable ARQ and ensure reliable data goes to app
+        const size_t frame_data__offset
+            = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
         memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
             cfg_->mac_payload_length);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
 
         // Check CRC
         uint16_t crc
-            = (uint16_t)(crc_obj->calculate_crc24(
-                             (unsigned char*)pkt->data, cfg_->mac_payload_length)
+            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
+                             cfg_->mac_payload_length)
                 & 0xFFFF);
         if (crc == pkt->crc) {
 
@@ -100,8 +144,8 @@ void MacThread::process_codeblocks_from_master()
                 ss << "Header Info:\n"
                    << "FRAME_ID: " << pkt->frame_id
                    << "\nSYMBOL_ID: " << pkt->symbol_id
-                   << "\nUE_ID: " << pkt->ue_id
-                   << "\nDATLEN: " << pkt->datalen << "\nPAYLOAD:\n";
+                   << "\nUE_ID: " << pkt->ue_id << "\nDATLEN: " << pkt->datalen
+                   << "\nPAYLOAD:\n";
                 for (size_t i = 0; i < cfg_->mac_payload_length; i++) {
                     ss << std::to_string(ul_data_ptr[i]) << " ";
                 }
@@ -114,7 +158,8 @@ void MacThread::process_codeblocks_from_master()
     }
 
     // When the frame is full, send it to the application
-    if (server_.n_filled_in_frame_[ue_id] == cfg_->mac_data_bytes_num_perframe) {
+    if (server_.n_filled_in_frame_[ue_id]
+        == cfg_->mac_data_bytes_num_perframe) {
         server_.n_filled_in_frame_[ue_id] = 0;
 
         udp_client->send(kRemoteHostname, kBaseRemotePort + ue_id,
@@ -134,7 +179,39 @@ void MacThread::process_codeblocks_from_master()
         "Socket message enqueue failed\n");
 }
 
-void MacThread::process_udp_packets_from_apps()
+void MacThread::send_control_information()
+{
+    // send RAN control information UE
+    RBIndicator ri;
+    ri.ue_id = next_radio_id_;
+    ri.mod_order_bits = CommsLib::QAM16;
+    udp_client->send(cfg_->ue_server_addr, kBaseClientPort + ri.ue_id,
+        (uint8_t*)&ri, sizeof(RBIndicator));
+
+    // update RAN config within Millipede
+    send_ran_config_update(Event_data(EventType::kRANUpdate));
+}
+
+void MacThread::process_control_information()
+{
+    memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
+    ssize_t ret = udp_control_channel->recv_nonblocking(
+        &udp_control_buf_[0], udp_control_buf_.size());
+    if (ret == 0) {
+        return; // No data received
+    } else if (ret == -1) {
+        // There was an error in receiving
+        cfg_->running = false;
+        return;
+    }
+
+    rt_assert(static_cast<size_t>(ret) == sizeof(RBIndicator));
+
+    const auto* ri = reinterpret_cast<RBIndicator*>(&udp_control_buf_[0]);
+    process_udp_packets_from_apps(*ri);
+}
+
+void MacThread::process_udp_packets_from_apps(RBIndicator ri)
 {
     memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
     ssize_t ret
@@ -149,11 +226,13 @@ void MacThread::process_udp_packets_from_apps()
     rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe);
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-    mode_ == Mode::kServer ? process_udp_packets_from_apps_server(pkt)
-                           : process_udp_packets_from_apps_client((char *)pkt);
+    mode_ == Mode::kServer
+        ? process_udp_packets_from_apps_server(pkt, ri)
+        : process_udp_packets_from_apps_client((char*)pkt, ri);
 }
 
-void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
+void MacThread::process_udp_packets_from_apps_server(
+    const MacPacket* pkt, RBIndicator ri)
 {
     // We've received bits for the downlink
     const size_t total_symbol_idx
@@ -180,7 +259,8 @@ void MacThread::process_udp_packets_from_apps_server(const MacPacket* pkt)
         "MAC thread: Failed to enqueue downlink packet");
 }
 
-void MacThread::process_udp_packets_from_apps_client(const char* payload)
+void MacThread::process_udp_packets_from_apps_client(
+    const char* payload, RBIndicator ri)
 {
     // We've received bits for the uplink. The received MAC packet does not
     // specify a radio ID, send to radios in round-robin order
@@ -202,15 +282,16 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
             next_frame_id_, next_radio_id_, cfg_->mac_data_bytes_num_perframe);
 
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
-            ss << std::to_string((uint8_t)(payload[i]))
-               << " ";
+            ss << std::to_string((uint8_t)(payload[i])) << " ";
         }
         fprintf(log_file_, "%s\n", ss.str().c_str());
     }
 
     for (size_t pkt_id = 0; pkt_id < cfg_->mac_packets_perframe; pkt_id++) {
-        size_t data_offset = radio_buf_id * cfg_->mac_bytes_num_perframe + pkt_id * cfg_->mac_packet_length;
-        MacPacket* pkt = (MacPacket*)(&(*ul_bits_buffer_)[next_radio_id_][data_offset]);
+        size_t data_offset = radio_buf_id * cfg_->mac_bytes_num_perframe
+            + pkt_id * cfg_->mac_packet_length;
+        MacPacket* pkt
+            = (MacPacket*)(&(*ul_bits_buffer_)[next_radio_id_][data_offset]);
         pkt->frame_id = next_frame_id_;
         pkt->symbol_id = pkt_id;
         pkt->ue_id = next_radio_id_;
@@ -219,14 +300,15 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
         pkt->rsvd[1] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->rsvd[2] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->crc = 0;
+        pkt->rb_indicator = ri;
 
-        memcpy(pkt->data,
-            payload + pkt_id * cfg_->mac_payload_length, cfg_->mac_payload_length);
+        memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
+            cfg_->mac_payload_length);
         // Insert CRC
-        pkt->crc = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
-                                  cfg_->mac_payload_length)
-            & 0xFFFF);
-
+        pkt->crc
+            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
+                             cfg_->mac_payload_length)
+                & 0xFFFF);
     }
 
     (*ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
@@ -234,10 +316,11 @@ void MacThread::process_udp_packets_from_apps_client(const char* payload)
         EventType::kPacketFromMac, rx_tag_t(next_radio_id_, radio_buf_id)._tag);
     rt_assert(
         tx_queue_->enqueue(msg), "MAC thread: Failed to enqueue uplink packet");
-    
+
     radio_buf_id = (radio_buf_id + 1) % TASK_BUFFER_FRAME_NUM;
     next_radio_id_ = (next_radio_id_ + 1) % cfg_->UE_ANT_NUM;
-    if (next_radio_id_ == 0) next_frame_id_++;
+    if (next_radio_id_ == 0)
+        next_frame_id_++;
 }
 
 void MacThread::run_event_loop()
@@ -248,10 +331,15 @@ void MacThread::run_event_loop()
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
     while (cfg_->running) {
-        process_codeblocks_from_master();
-        if (rdtsc() - last_mac_pkt_rx_tsc_ > tsc_delta_) {
-            process_udp_packets_from_apps();
-            last_mac_pkt_rx_tsc_ = rdtsc();
+        process_rx_from_master();
+
+        if (mode_ == Mode::kServer) {
+            if (rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
+                send_control_information();
+                last_frame_tx_tsc_ = rdtsc();
+            }
+        } else {
+            process_control_information();
         }
 
         if (next_frame_id_ == cfg_->frames_to_test) {
