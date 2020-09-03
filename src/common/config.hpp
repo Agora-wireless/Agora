@@ -227,8 +227,17 @@ public:
     size_t ue_ant_offset;
     float scale; // scaling factor for all transmit symbols
 
-    size_t symbol_num_perframe, pilot_symbol_num_perframe,
-        data_symbol_num_perframe;
+    // Total number of symbols in a frame, including all types of symbols (e.g.,
+    // pilot symbols, uplink and downlink data symbols, and calibration symbols)
+    size_t symbol_num_perframe;
+
+    // Total number of pilot symbols in a frame
+    size_t pilot_symbol_num_perframe;
+
+    // Total number of data symbols in a frame, including uplink data symbols
+    // and downlink data symbols
+    size_t data_symbol_num_perframe;
+
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode;
