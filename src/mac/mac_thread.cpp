@@ -187,8 +187,8 @@ void MacThread::send_control_information()
     RBIndicator ri;
     ri.ue_id = next_radio_id_;
     ri.mod_type = CommsLib::QAM16;
-    udp_client->send(kClientHostname, kBaseClientPort + ri.ue_id, (uint8_t*)&ri,
-        sizeof(RBIndicator));
+    udp_client->send(cfg_->client_addr, kBaseClientPort + ri.ue_id,
+        (uint8_t*)&ri, sizeof(RBIndicator));
 
     // update RAN config within Millipede
     send_ran_config_update(Event_data(EventType::kRANUpdate));
