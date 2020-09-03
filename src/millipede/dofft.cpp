@@ -190,35 +190,33 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        if (kCollectPhyStats)
+        if (kCollectPhyStats) {
             phy_stats->update_pilot_snr(frame_id,
                 cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
+        }
+
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
+        partial_transpose(
+            csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
+    } else if (sym_type == SymbolType::kUL) {
+        partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
+            ant_id, SymbolType::kUL);
+    } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
+        or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
+        partial_transpose(
+            &calib_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM], ant_id,
+            SymbolType::kCalUL);
+    } else {
+        rt_assert(false, "Unknown or unsupported symbol type");
     }
 
-    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-    const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
-    partial_transpose(
-        csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
-}
-else if (sym_type == SymbolType::kUL)
-{
-    partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
-        ant_id, SymbolType::kUL);
-}
-else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
-    or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant))
-{
-    partial_transpose(&calib_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM],
-        ant_id, SymbolType::kCalUL);
-}
-else { rt_assert(false, "Unknown or unsupported symbol type"); }
-
-duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
-socket_buffer_status_[socket_thread_id][buf_offset] = 0; // Reset sock buf
-duration_stat->task_count++;
-duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-return Event_data(
-    EventType::kFFT, gen_tag_t::frm_sym(pkt->frame_id, pkt->symbol_id)._tag);
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
+    socket_buffer_status_[socket_thread_id][buf_offset] = 0; // Reset sock buf
+    duration_stat->task_count++;
+    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
+    return Event_data(EventType::kFFT,
+        gen_tag_t::frm_sym(pkt->frame_id, pkt->symbol_id)._tag);
 }
 
 void DoFFT::partial_transpose(
