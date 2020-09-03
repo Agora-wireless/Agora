@@ -42,13 +42,9 @@ public:
     // the server, uplink packets at the client) on kLocalPort
     static constexpr size_t kLocalPort = 8070;
 
-    // Control information messages are sent via an out-of-band control
-    // channel (UDP connection)
+    // Millipede sends control information over an out-of-band control channel
+    // to each UE #i, at port kBaseClientPort + i
     // TODO: need to generalize for hostname, port pairs for each client
-    const char* kClientHostname = "mnr-5g-nuc1";
-
-    // UE #i runs a UDP server, at kBaseClientPort + i, to receive control
-    // information messages from the base station
     static constexpr size_t kBaseClientPort = 7070;
 
     // Maximum number of outstanding UDP packets per UE that we allocate recv()

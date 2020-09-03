@@ -52,9 +52,9 @@ enum class EventType : int {
     kModul,
     kPacketFromMac,
     kPacketToMac,
-    kSNRReport,
-    kRANUpdate, // signal new RAN config to Millipede
-    kRBIndicator // signal RB schedule to UEs
+    kSNRReport, // Signal new SNR measurement from PHY to MAC
+    kRANUpdate, // Signal new RAN config to Millipede
+    kRBIndicator // Signal RB schedule to UEs
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;

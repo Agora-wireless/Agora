@@ -246,6 +246,7 @@ public:
 
     std::string server_addr; // IP address of the Millipede server
     std::string sender_addr; // IP address of the simulator sender
+    std::string client_addr; // IP address of UE host device
     std::string tx_addr_to_mac;
     // Port ID at Millipede side
     int bs_port;
