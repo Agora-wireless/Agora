@@ -191,7 +191,6 @@ private:
     // processed (i.e., including radio transmissing) by the PHY for UE #i
     size_t num_frames_consumed_[kMaxUEs] = {};
 
-
     /*****************************************************
      * Uplink
      *****************************************************/
@@ -324,9 +323,6 @@ private:
     size_t demodul_status_[TASK_BUFFER_FRAME_NUM];
 
     std::queue<std::tuple<int, int>> taskWaitList;
-
-    /* lookup table for QAM, real and imag */
-    Table<float> qam_table;
 
     // for python
     /**

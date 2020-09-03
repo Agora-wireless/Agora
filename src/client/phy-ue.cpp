@@ -140,8 +140,6 @@ Phy_UE::Phy_UE(Config* config)
             dl_data_buffer_[i].resize(config_->OFDM_DATA_NUM);
     }
 
-    init_modulation_table(qam_table, config_->mod_type);
-
     // initilize all kinds of checkers
     memset(csi_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
     memset(data_checker_, 0,
@@ -750,12 +748,14 @@ void Phy_UE::doEncode(int tid, size_t tag)
             ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
                 LDPC_config.nRows, encoded_buffer_temp, parity_buffer,
                 input_ptr);
-            int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
+
+            int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_order_bits;
             int output_offset = total_ul_symbol_id * config_->OFDM_DATA_NUM
                 + cbCodedBytes * cb_id;
+          
             adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
                 &ul_syms_buffer_[ue_id][output_offset], encoded_bytes_per_block,
-                cfg->mod_type);
+                cfg->mod_order_bits);
         }
     }
     //double duration = worker_rdtsc() - start_tsc;
@@ -789,8 +789,8 @@ void Phy_UE::doModul(int tid, size_t tag)
                 = (int8_t*)&ul_syms_buffer_[ant_id][total_ul_symbol_id
                     * config_->OFDM_DATA_NUM];
             for (size_t sc = 0; sc < config_->OFDM_DATA_NUM; sc++) {
-                modul_buf[sc]
-                    = mod_single_uint8((uint8_t)ul_bits[sc], qam_table);
+                modul_buf[sc] = mod_single_uint8(
+                    (uint8_t)ul_bits[sc], config_->mod_table);
             }
         }
     }

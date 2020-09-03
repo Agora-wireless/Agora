@@ -24,7 +24,6 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
-    init_modulation_table(qam_table, cfg->mod_type);
 
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
@@ -78,7 +77,7 @@ Event_data DoPrecode::launch(size_t tag)
                             = cfg->ue_specific_pilot[user_id][cur_sc_id];
                     else
                         data_ptr[user_id] = mod_single_uint8(
-                            (uint8_t) * (raw_data_ptr), qam_table);
+                            (uint8_t) * (raw_data_ptr), cfg->mod_table);
                 }
             }
 
