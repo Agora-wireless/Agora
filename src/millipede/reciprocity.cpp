@@ -48,7 +48,7 @@ Event_data Reciprocity::launch(size_t offset)
 
     for (int i = 0; i < OFDM_DATA_NUM; i += BS_ANT_NUM) {
         // TODO: interpolate instead of steps
-        recip_mat.cols(i, std::min(i + BS_ANT_NUM - 1, OFDM_DATA_NUM))
+        recip_mat.cols(i, std::min(i + BS_ANT_NUM - 1, OFDM_DATA_NUM - 1))
             .each_col()
             = recip_mat.col(i);
     }

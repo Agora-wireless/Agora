@@ -102,9 +102,8 @@ Config::Config(std::string jsonfile)
     hw_framer = tddConf.value("hw_framer", true);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
-        size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
-        pilot_symbol_num_perframe
-            = tddConf.value("pilot_num", pilot_num_default);
+        pilot_symbol_num_perframe = tddConf.value(
+            "pilot_num", freq_orthogonal_pilot ? 1 : UE_ANT_NUM);
         data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
             symbol_num_perframe - pilot_symbol_num_perframe);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
@@ -113,7 +112,6 @@ Config::Config(std::string jsonfile)
         dl_data_symbol_num_perframe
             = tddConf.value("dl_symbol_num_perframe", downlink_mode ? 10 : 0);
         dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
-        dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
         std::string sched("");
         for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
             sched += "P";
