@@ -11,8 +11,8 @@ static constexpr size_t kNumWorkers = 14;
 static constexpr size_t kMaxTestNum = 100;
 static constexpr size_t kMaxItrNum = (1 << 30);
 static constexpr size_t kAntTestNum = 3;
-static constexpr size_t bs_ant_nums[kAntTestNum] = { 32, 16, 32 };
-static constexpr size_t frame_offsets[kAntTestNum] = { 0, 20, 40 };
+static constexpr size_t bs_ant_nums[kAntTestNum] = { 32, 16, 48 };
+static constexpr size_t frame_offsets[kAntTestNum] = { 0, 20, 30 };
 // A spinning barrier to synchronize the start of worker threads
 std::atomic<size_t> num_workers_ready_atomic;
 
@@ -29,10 +29,10 @@ void MasterToWorkerDynamic_master(Config* cfg,
     for (size_t bs_ant_idx = 0; bs_ant_idx < kAntTestNum; bs_ant_idx++) {
         cfg->BS_ANT_NUM = bs_ant_nums[bs_ant_idx];
         for (size_t i = 0; i < kMaxTestNum; i++) {
-            uint32_t frame_id = i / (cfg->OFDM_DATA_NUM / cfg->zf_block_size)
-                + frame_offsets[bs_ant_idx];
-            size_t base_sc_id = (i % (cfg->OFDM_DATA_NUM / cfg->zf_block_size))
-                * cfg->zf_block_size;
+            uint32_t frame_id
+                = i / cfg->zf_events_per_symbol + frame_offsets[bs_ant_idx];
+            size_t base_sc_id
+                = (i % cfg->zf_events_per_symbol) * cfg->zf_block_size;
             event_queue.enqueue(Event_data(
                 EventType::kZF, gen_tag_t::frm_sc(frame_id, base_sc_id)._tag));
         }
@@ -51,9 +51,12 @@ void MasterToWorkerDynamic_master(Config* cfg,
 void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     double freq_ghz, moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* ptok, Table<complex_float>& csi_buffer,
-    Table<complex_float>& recip_buffer, Table<complex_float>& ul_zf_buffer,
-    Table<complex_float>& dl_zf_buffer, Stats* stats)
+    moodycamel::ProducerToken* ptok,
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
+    Table<complex_float>& recip_buffer,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
+    Stats* stats)
 {
     pin_to_core_with_offset(
         ThreadType::kWorker, cfg->core_offset + 1, worker_id);
@@ -63,9 +66,10 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     while (num_workers_ready_atomic != kNumWorkers) {
         // Wait
     }
-    auto computeZF
-        = new DoZF(cfg, worker_id, freq_ghz, event_queue, complete_task_queue,
-            ptok, csi_buffer, recip_buffer, ul_zf_buffer, dl_zf_buffer, stats);
+
+    auto computeZF = new DoZF(cfg, worker_id, freq_ghz, event_queue,
+        complete_task_queue, ptok, csi_buffers, recip_buffer, ul_zf_matrices,
+        dl_zf_matrices, stats);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -113,18 +117,18 @@ TEST(TestZF, VaryingConfig)
         ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
     }
 
-    Table<complex_float> csi_buffer, ul_zf_buffer, dl_zf_buffer, recip_buffer;
-    // Set BS_ANT_NUM to a large enough value for buffer allocation
-    cfg->BS_ANT_NUM = 64;
-    csi_buffer.rand_alloc_cx_float(
-        cfg->pilot_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
-    ul_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-    dl_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
+    Table<complex_float> recip_buffer;
+
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers;
+    csi_buffers.rand_alloc_cx_float(kMaxAntennas * kMaxDataSCs);
+
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
+        kMaxAntennas * kMaxUEs);
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
+        kMaxUEs * kMaxAntennas);
+
     recip_buffer.rand_alloc_cx_float(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        TASK_BUFFER_FRAME_NUM, kMaxDataSCs * kMaxAntennas, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
@@ -134,8 +138,8 @@ TEST(TestZF, VaryingConfig)
     for (size_t i = 0; i < kNumWorkers; i++) {
         workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i, freq_ghz,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
-            std::ref(csi_buffer), std::ref(recip_buffer),
-            std::ref(ul_zf_buffer), std::ref(dl_zf_buffer), stats);
+            std::ref(csi_buffers), std::ref(recip_buffer),
+            std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats);
     }
     master.join();
     for (auto& w : workers)
