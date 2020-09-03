@@ -35,7 +35,7 @@ public:
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer,
-        PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers_,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDemul();
 
@@ -72,7 +72,7 @@ private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
-    PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
     DurationStat* duration_stat;
     PhyStats* phy_stats;
 

@@ -200,9 +200,9 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
 
-    // Data after demodulation. Each buffer has 8 * number of OFDM data
-    // subcarriers * number of UEs entries.
-    PtrGrid<kFrameWnd, kMaxSymbols, int8_t> demod_buffers_;
+    // Data after demodulation. Each buffer has kMaxModType * number of OFDM
+    // data subcarriers
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
 
     // Data after LDPC decoding
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame

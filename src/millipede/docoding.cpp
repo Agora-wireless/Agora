@@ -91,7 +91,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     Table<uint8_t>& in_decoded_buffer,
     //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
     PhyStats* in_phy_stats, Stats* in_stats_manager)
@@ -148,9 +148,8 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    int8_t* llr_buffer_ptr
-        = &demod_buffers_[frame_id][symbol_idx_ul][cfg->get_demod_buf_offset(
-            ue_id, LDPC_config.cbCodewLen * cur_cb_id)];
+    int8_t* llr_buffer_ptr = demod_buffers_[frame_id][symbol_idx_ul][ue_id]
+        + (cfg->mod_type * (LDPC_config.cbCodewLen * cur_cb_id));
 
     auto* decoded_buffer_ptr = cfg->get_decode_buf(
         decoded_buffer_, frame_id, symbol_idx_ul, ue_id, cur_cb_id);

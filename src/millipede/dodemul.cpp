@@ -17,7 +17,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
-    PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
@@ -238,9 +238,8 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        int8_t* demul_ptr
-            = &demod_buffers_[frame_id][symbol_idx_ul]
-                             [cfg->get_demod_buf_offset(i, base_sc_id)];
+        int8_t* demul_ptr = demod_buffers_[frame_id][symbol_idx_ul][i]
+            + (cfg->mod_type * base_sc_id);
 
         switch (cfg->mod_type) {
         case (CommsLib::QAM16):
