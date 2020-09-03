@@ -110,7 +110,7 @@ static constexpr bool kUseArgos = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
-static constexpr bool kCollectPhyStats = true;
+static constexpr bool kCollectPhyStats = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
