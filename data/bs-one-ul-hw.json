@@ -17,13 +17,15 @@
  "cp_len" : 32,
  "ofdm_rx_zero_prefix_bs" : 220,
  "Zc" : 18,
- "beamsweep" : false,
+ "beamsweep" : true,
  "beacon_antenna" : 0,
  "frames" : [
      "BGGGGGPGGUUUUG"
  ],
  "downlink_mode": false,
  "client_ul_pilot_syms" : 2,
- "worker_thread_num" : 25,
- "demul_block_size" : 48
+ "worker_thread_num" : 16,
+ "demul_block_size" : 48,
+ "frames_to_test": 50000,
+ "client_addr": "mnr-5g-nuc1"
 }
