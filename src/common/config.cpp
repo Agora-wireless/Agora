@@ -180,7 +180,7 @@ Config::Config(std::string jsonfile)
     ue_ant_offset = tddConf.value("ue_ant_offset", 0);
     total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
 
-    /* Millipede configurations */
+    /* Agora configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
     core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
@@ -730,7 +730,7 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 
 SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
 {
-    assert(!isUE); // Currently implemented for only the Millipede server
+    assert(!isUE); // Currently implemented for only the Agora server
     char s = frames[frame_id % frames.size()][symbol_id];
     switch (s) {
     case 'B':

@@ -93,7 +93,7 @@ void MacThread::send_ran_config_update(Event_data event)
     msg.tags[1] = rc.mod_order_bits;
     msg.tags[2] = rc.frame_id;
     rt_assert(tx_queue_->enqueue(msg),
-        "MAC thread: failed to send RAN update to Millipede");
+        "MAC thread: failed to send RAN update to Agora");
 
     scheduler_next_frame_id_++;
 }
@@ -188,7 +188,7 @@ void MacThread::send_control_information()
     udp_client->send(cfg_->ue_server_addr, kBaseClientPort + ri.ue_id,
         (uint8_t*)&ri, sizeof(RBIndicator));
 
-    // update RAN config within Millipede
+    // update RAN config within Agora
     send_ran_config_update(Event_data(EventType::kRANUpdate));
 }
 

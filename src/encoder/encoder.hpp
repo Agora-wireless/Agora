@@ -1,6 +1,6 @@
 /**
  * @file encoder.hpp
- * @brief Definitions for Millipede's AVX2-based LDPC encoder.
+ * @brief Definitions for Agora's AVX2-based LDPC encoder.
  *
  * We need an AVX2-based LDPC encoder because FlexRAN's LDPC encoder requires
  * AVX-512.
@@ -27,7 +27,7 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
 };
 
 // PROC_BYTES (maximum bytes processed as an LDPC chunk) is 64 bytes in
-// FlexRAN's LDPC encoder and 32 bytes in Millipede's derived LDPC encoder.
+// FlexRAN's LDPC encoder and 32 bytes in Agora's derived LDPC encoder.
 // Using the larger of the two works for padding buffers.
 static constexpr size_t kMaxProcBytes = 64;
 

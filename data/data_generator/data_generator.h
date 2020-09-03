@@ -6,7 +6,7 @@
 
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for
- * Millipede
+ * Agora
  */
 class DataGenerator {
 public:
@@ -119,6 +119,6 @@ public:
 
 private:
     FastRand fast_rand; // A fast random number generator
-    Config* cfg; // The global Millipede config
+    Config* cfg; // The global Agora config
     const Profile profile; // The pattern of the input byte sequence
 };
