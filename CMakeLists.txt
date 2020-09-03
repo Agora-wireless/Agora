@@ -200,7 +200,7 @@ set(COMMON_SOURCES
   src/encoder/iobuffer.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
-set(MILLIPEDE_SOURCES 
+set(AGORA_SOURCES 
   src/agora/agora.cpp
   src/agora/stats.cpp 
   src/agora/phy_stats.cpp 
@@ -215,15 +215,15 @@ set(MILLIPEDE_SOURCES
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
+  set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
 else()
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
+  set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx.cpp
     src/agora/txrx/txrx_argos.cpp)
 endif()
-add_library(agora_sources_lib OBJECT ${MILLIPEDE_SOURCES})
+add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
   src/client/client_radio.cpp

@@ -10,11 +10,11 @@ set -e
 
 # Obtain the absolute directory where this script exists, which is the `./docker` directory.
 DOCKER_DIR=$(dirname $(readlink -f ${BASH_SOURCE}))
-MILLIPEDE_BASE_DIR=$(readlink -f ${DOCKER_DIR}/.. )
+AGORA_BASE_DIR=$(readlink -f ${DOCKER_DIR}/.. )
 FLEXRAN_DIR_NAME=FlexRAN-FEC-SDK-19-04
 FLEXRAN_DIR=/opt/${FLEXRAN_DIR_NAME}
 # echo "DOCKER_DIR: ${DOCKER_DIR}"
-# echo "MILLIPEDE_BASE_DIR: ${MILLIPEDE_BASE_DIR}"
+# echo "AGORA_BASE_DIR: ${AGORA_BASE_DIR}"
 
 
 # Navigate to the `docker` directory, everything in this script will be executed within there.
@@ -32,17 +32,17 @@ fi
 
 # Perform a regular build, and do so in a new `build` directory
 echo "Performing regular build ..."
-( mkdir -p build;  cd build;  cmake -DFORCE_BUILD_PATH=off ${MILLIPEDE_BASE_DIR};  make -j12 )
+( mkdir -p build;  cd build;  cmake -DFORCE_BUILD_PATH=off ${AGORA_BASE_DIR};  make -j12 )
 
 # The build directory is now present, but we also need `data` and (optionally) `test`
 echo -n "Copying ./data into docker context ... "
 rm -rf ./data/
-cp -rf  ${MILLIPEDE_BASE_DIR}/data/   ./data/
+cp -rf  ${AGORA_BASE_DIR}/data/   ./data/
 echo "done"
 
 echo -n "Copying ./test into docker context ... "
 rm -rf ./test/
-cp -rf  ${MILLIPEDE_BASE_DIR}/test/   ./test/
+cp -rf  ${AGORA_BASE_DIR}/test/   ./test/
 echo "done"
 
 
