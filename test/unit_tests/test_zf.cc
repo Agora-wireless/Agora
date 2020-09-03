@@ -28,18 +28,14 @@ TEST(TestZF, Perf)
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
         cfg->UE_NUM * cfg->BS_ANT_NUM);
 
-    Table<complex_float> ul_zf_buffer, dl_zf_buffer, recip_buffer;
-    ul_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->BS_ANT_NUM * cfg->UE_NUM, 64);
-    dl_zf_buffer.calloc(cfg->OFDM_DATA_NUM * TASK_BUFFER_FRAME_NUM,
-        cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
-    recip_buffer.rand_alloc_cx_float(
+    Table<complex_float> calib_buffer;
+    calib_buffer.rand_alloc_cx_float(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
     auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffers, recip_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+        csi_buffers, calib_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();

@@ -66,11 +66,10 @@ Event_data DoEncode::launch(size_t tag)
         encoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
         reinterpret_cast<uint8_t*>(final_output_ptr),
-        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_type);
+        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
 
     // printf("Encoded data\n");
-    // int mod_type = cfg->mod_type;
-    // int num_mod = LDPC_config.cbCodewLen / mod_type;
+    // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
     // for(int i = 0; i < num_mod; i++) {
     //     printf("%u ", *(final_output_ptr + i));
     // }
@@ -149,7 +148,7 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     int8_t* llr_buffer_ptr = demod_buffers_[frame_id][symbol_idx_ul][ue_id]
-        + (cfg->mod_type * (LDPC_config.cbCodewLen * cur_cb_id));
+        + (cfg->mod_order_bits * (LDPC_config.cbCodewLen * cur_cb_id));
 
     auto* decoded_buffer_ptr = cfg->get_decode_buf(
         decoded_buffer_, frame_id, symbol_idx_ul, ue_id, cur_cb_id);

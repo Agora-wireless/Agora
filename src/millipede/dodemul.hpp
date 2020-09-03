@@ -41,16 +41,16 @@ public:
 
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
-     * @param tid: task thread index, used for selecting spm_buffer and task
-     * ptok
+     * @param tid: task thread index, used for selecting data_gather_buffer 
+     * and task ptok
      * @param offset: offset of the first subcarrier in the block in
-     * data_buffer_ Buffers: data_buffer_, spm_buffer_, precoder_buffer_,
+     * data_buffer_ Buffers: data_buffer_, data_gather_buffer_, precoder_buffer_,
      * equal_buffer_, demod_hard_buffer_ Input buffer: data_buffer_,
      * precoder_buffer_ Output buffer: demod_hard_buffer_ Intermediate buffer:
-     * spm_buffer, equal_buffer_ Offsets: data_buffer_: dim1: frame index * # of
+     * data_gather_buffer, equal_buffer_ Offsets: data_buffer_: dim1: frame index * # of
      * data symbols per frame + data symbol index dim2: transpose block
      * index * block size * # of antennas + antenna index * block size
-     *     spm_buffer:
+     *     data_gather_buffer:
      *         dim1: task thread index
      *         dim2: antenna index
      *     precoder_buffer_:
@@ -59,7 +59,7 @@ public:
      * symbols per frame + data symbol index dim2: subcarrier index * # of
      * users Event offset: offset Description:
      *     1. for each subcarrier in the block, block-wisely copy data from
-     * data_buffer_ to spm_buffer_
+     * data_buffer_ to data_gather_buffer_
      *     2. perform equalization with data and percoder matrixes
      *     3. perform demodulation on equalized data matrix
      *     4. add an event to the message queue to infrom main thread the
@@ -78,7 +78,7 @@ private:
 
     /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
     /// times number of antennas
-    complex_float* spm_buffer;
+    complex_float* data_gather_buffer;
 
     // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;
