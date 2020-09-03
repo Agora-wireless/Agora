@@ -61,13 +61,15 @@ public:
 
 class Config {
 public:
+    // Modulation order in string format (QPSK/16QAM/64QAM)
     std::string modulation;
-    size_t mod_type;
+    // Modulation order (4: QPSK, 16: 16QAM, 64: 64QAM)
     size_t mod_order;
+    // Number of binary bits used for a modulation order
+    size_t mod_order_bits;
+    // Modulation lookup table for mapping binary bits to constellation points
+    Table<float> mod_table;
 
-    std::string conf;
-    std::string serial_file;
-    std::string hub_file;
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
 
@@ -92,6 +94,9 @@ public:
     // frames[i]
     std::vector<std::vector<size_t>> DLCalSymbols;
 
+    // Controls whether the synchronization and frame time keeping is done
+    // in hardware or software
+    // true: use hardware correlator; false: use software corrleator
     bool hw_framer;
 
     std::vector<std::complex<float>> gold_cf32;
@@ -157,6 +162,7 @@ public:
     size_t zf_block_size;
     size_t zf_events_per_symbol; // Derived from zf_block_size
 
+    // Number of antennas handled in one FFT event
     size_t fft_block_size;
 
     bool freq_orthogonal_pilot;
@@ -225,15 +231,15 @@ public:
     // Indicates the (pilot) offset of the UEs in this instance,
     // with respect to all UEs used in the same experiment
     size_t ue_ant_offset;
-    float scale; // scaling factor for all transmit symbols
+    float scale; // Scaling factor for all transmit symbols
 
     size_t symbol_num_perframe, pilot_symbol_num_perframe,
         data_symbol_num_perframe;
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
-    bool downlink_mode;
-    bool bigstation_mode;
-    bool correct_phase_shift;
+    bool downlink_mode; // If true, the frame contains downlink symbols
+    bool bigstation_mode; // If true, use pipeline-parallel scheduling
+    bool correct_phase_shift; // If true, do phase shift correction
 
     // The total number of uncoded data bytes in each OFDM symbol
     size_t data_bytes_num_persymbol;
@@ -314,7 +320,17 @@ public:
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
-    // TODO: Documentation
+    inline void update_mod_cfgs(size_t new_mod_order_bits)
+    {
+        mod_order_bits = new_mod_order_bits;
+        mod_order = (size_t)pow(2, mod_order_bits);
+        init_modulation_table(mod_table, mod_order);
+        LDPC_config.nblocksInSymbol
+            = OFDM_DATA_NUM * mod_order_bits / LDPC_config.cbCodewLen;
+    }
+
+    /// Return total number of data symbols of all frames in a buffer
+    /// that holds data of TASK_BUFFER_FRAME_NUM frames
     inline size_t get_total_data_symbol_idx(
         size_t frame_id, size_t symbol_id) const
     {
@@ -322,7 +338,8 @@ public:
             + symbol_id;
     }
 
-    // TODO: Documentation
+    /// Return total number of uplink data symbols of all frames in a buffer
+    /// that holds data of TASK_BUFFER_FRAME_NUM frames
     inline size_t get_total_data_symbol_idx_ul(
         size_t frame_id, size_t symbol_idx_ul) const
     {
@@ -331,6 +348,8 @@ public:
             + symbol_idx_ul;
     }
 
+    /// Return total number of downlink data symbols of all frames in a buffer
+    /// that holds data of TASK_BUFFER_FRAME_NUM frames
     inline size_t get_total_data_symbol_idx_dl(
         size_t frame_id, size_t symbol_idx_dl) const
     {
@@ -378,8 +397,8 @@ public:
     {
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        return &demod_buffer[total_data_symbol_id]
-                            [OFDM_DATA_NUM * 8 * ue_id + sc_id * mod_type];
+        return &demod_buffer[total_data_symbol_id][OFDM_DATA_NUM * 8 * ue_id
+            + sc_id * mod_order_bits];
     }
 
     /// Get the decode buffer for this frame, symbol,
@@ -408,7 +427,8 @@ public:
     {
         size_t total_data_symbol_id
             = get_total_data_symbol_idx(frame_id, symbol_id);
-        size_t num_encoded_bytes_per_cb = LDPC_config.cbCodewLen / mod_type;
+        size_t num_encoded_bytes_per_cb
+            = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]
                               [roundup<64>(OFDM_DATA_NUM) * ue_id
                                   + num_encoded_bytes_per_cb * cb_id];
