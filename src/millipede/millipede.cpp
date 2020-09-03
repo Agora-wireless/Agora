@@ -104,6 +104,21 @@ void Millipede::schedule_antennas(
     }
 }
 
+void Millipede::send_snr_report(
+    EventType event_type, size_t frame_id, size_t symbol_id)
+{
+    assert(event_type == EventType::kSNRReport);
+    auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
+    for (size_t i = 0; i < config_->UE_NUM; i++) {
+        Event_data snr_report(EventType::kSNRReport, base_tag._tag);
+        snr_report.num_tags = 2;
+        *reinterpret_cast<float*>(&snr_report.tags[1])
+            = phy_stats->get_evm_snr(frame_id, i);
+        try_enqueue_fallback(&mac_request_queue_, snr_report);
+        base_tag.ue_id++;
+    }
+}
+
 void Millipede::schedule_subcarriers(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
@@ -367,6 +382,14 @@ void Millipede::start()
                 }
             } break;
 
+            case EventType::kRANUpdate: {
+                RanConfig rc;
+                rc.n_antennas = event.tags[0];
+                rc.mod_order_bits = event.tags[1];
+                rc.frame_id = event.tags[2];
+                update_ran_config(rc);
+            } break;
+
             case EventType::kPacketToMac: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
@@ -573,6 +596,9 @@ void Millipede::handle_event_fft(size_t tag)
                     }
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
+                    if (kEnableMac)
+                        send_snr_report(
+                            EventType::kSNRReport, frame_id, symbol_id);
                     schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
@@ -732,6 +758,11 @@ void Millipede::create_threads(
             exit(0);
         }
     }
+}
+
+void Millipede::update_ran_config(RanConfig rc)
+{
+    config_->update_mod_cfgs(rc.mod_order_bits);
 }
 
 void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)

@@ -190,7 +190,7 @@ Event_data DoFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        if (kPrintPhyStats) {
+        if (kCollectPhyStats) {
             phy_stats->update_pilot_snr(frame_id,
                 cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
         }

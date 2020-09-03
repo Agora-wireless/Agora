@@ -80,6 +80,9 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
+    // Update Millipede config of RAN parameters
+    void update_ran_config(RanConfig rc);
+
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
@@ -87,6 +90,9 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    // Send current frame's SNR measurements from PHY to MAC
+    void send_snr_report(
+        EventType event_type, size_t frame_id, size_t symbol_id);
     void move_events_between_queues(
         EventType event_type1, EventType event_type2);
 

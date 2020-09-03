@@ -43,7 +43,10 @@ enum class EventType : int {
     kRC,
     kModul,
     kPacketFromMac,
-    kPacketToMac
+    kPacketToMac,
+    kSNRReport, // Signal new SNR measurement from PHY to MAC
+    kRANUpdate, // Signal new RAN config to Millipede
+    kRBIndicator // Signal RB schedule to UEs
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;
@@ -107,6 +110,7 @@ static constexpr bool kUseArgos = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
+static constexpr bool kCollectPhyStats = false;
 
 #define COMBINE_EQUAL_DECODE 1
 

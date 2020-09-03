@@ -343,6 +343,9 @@ void Phy_UE::start()
                     expected_frame_id_from_mac_++;
 
                 if (kDebugPrintPacketsFromMac) {
+                    printf("Main thread: received packet for frame %zu with "
+                           "modulation %zu\n",
+                        pkt->frame_id, pkt->rb_indicator.mod_order_bits);
                     std::stringstream ss;
                     ss << "PhyUE kPacketFromMac, frame ID " << pkt->frame_id
                        << ", bytes: ";
@@ -752,7 +755,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
             int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_order_bits;
             int output_offset = total_ul_symbol_id * config_->OFDM_DATA_NUM
                 + cbCodedBytes * cb_id;
-          
+
             adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
                 &ul_syms_buffer_[ue_id][output_offset], encoded_bytes_per_block,
                 cfg->mod_order_bits);
