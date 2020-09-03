@@ -39,13 +39,15 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
 
+    udp_server
+        = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+
     const size_t udp_control_len = sizeof(RBIndicator);
     udp_control_buf_.resize(udp_control_len);
 
-    udp_server
-        = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
     udp_control_channel = new UDPServer(
         kBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
+
     udp_client = new UDPClient();
 
     crc_obj = new DoCRC();
@@ -71,8 +73,6 @@ void MacThread::process_rx_from_master()
 
 void MacThread::process_snr_report_from_master(Event_data event)
 {
-    assert(event.event_type == EventType::kSNRReport);
-
     const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
     if (server_.snr_[ue_id].size() == kSNRWindowSize) {
         server_.snr_[ue_id].pop();
@@ -83,8 +83,6 @@ void MacThread::process_snr_report_from_master(Event_data event)
 
 void MacThread::send_ran_config_update(Event_data event)
 {
-    assert(event.event_type == EventType::kRANUpdate);
-
     RanConfig rc;
     rc.mod_order_bits = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
