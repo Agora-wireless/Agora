@@ -130,8 +130,8 @@ void MacThread::process_codeblocks_from_master(Event_data event)
 
         // Check CRC
         uint16_t crc
-            = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
-                             cfg_->mac_payload_length)
+            = (uint16_t)(crc_obj->calculate_crc24(
+                             (unsigned char*)pkt->data, cfg_->mac_payload_length)
                 & 0xFFFF);
         if (crc == pkt->crc) {
 
@@ -187,7 +187,7 @@ void MacThread::send_control_information()
     RBIndicator ri;
     ri.ue_id = next_radio_id_;
     ri.mod_type = CommsLib::QAM16;
-    udp_client->send(cfg_->client_addr, kBaseClientPort + ri.ue_id,
+    udp_client->send(cfg_->ue_server_addr, kBaseClientPort + ri.ue_id,
         (uint8_t*)&ri, sizeof(RBIndicator));
 
     // update RAN config within Millipede
@@ -307,7 +307,7 @@ void MacThread::process_udp_packets_from_apps_client(
         memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
             cfg_->mac_payload_length);
         // Insert CRC
-        pkt->crc = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
+        pkt->crc = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
                                   cfg_->mac_payload_length)
             & 0xFFFF);
     }

@@ -29,12 +29,12 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
-    spm_buffer = reinterpret_cast<complex_float*>(memalign(
-        64, kSCsPerCacheline * cfg->BS_ANT_NUM * sizeof(complex_float)));
-    equaled_buffer_temp = reinterpret_cast<complex_float*>(memalign(
-        64, cfg->demul_block_size * cfg->UE_NUM * sizeof(complex_float)));
-    equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(memalign(
-        64, cfg->demul_block_size * cfg->UE_NUM * sizeof(complex_float)));
+    data_gather_buffer = reinterpret_cast<complex_float*>(
+        memalign(64, kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
+    equaled_buffer_temp = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+    equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
@@ -60,7 +60,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
 
 DoDemul::~DoDemul()
 {
-    free(spm_buffer);
+    free(data_gather_buffer);
     free(equaled_buffer_temp);
     free(equaled_buffer_temp_transposed);
 }
@@ -89,7 +89,7 @@ Event_data DoDemul::launch(size_t tag)
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
         size_t start_tsc0 = worker_rdtsc();
 
-        // Step 1: Populate spm_buffer as a row-major matrix with
+        // Step 1: Populate data_gather_buffer as a row-major matrix with
         // kSCsPerCacheline rows and BS_ANT_NUM columns
 
         // Since kSCsPerCacheline divides demul_block_size and
@@ -109,7 +109,7 @@ Event_data DoDemul::launch(size_t tag)
             size_t cur_sc_offset = partial_transpose_block_base
                 + (base_sc_id + i) % kTransposeBlockSize;
             auto* src = (const float*)&data_buf[cur_sc_offset];
-            auto* dst = (float*)spm_buffer;
+            auto* dst = (float*)data_gather_buffer;
             for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i += 4) {
                 for (size_t j = 0; j < kSCsPerCacheline; j++) {
                     __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
@@ -119,7 +119,7 @@ Event_data DoDemul::launch(size_t tag)
                 dst += 8;
             }
         } else {
-            complex_float* dst = spm_buffer;
+            complex_float* dst = data_gather_buffer;
             for (size_t j = 0; j < kSCsPerCacheline; j++) {
                 for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
                     *dst++ = data_buf[partial_transpose_block_base
@@ -148,8 +148,8 @@ Event_data DoDemul::launch(size_t tag)
             }
             cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
 
-            auto* data_ptr
-                = reinterpret_cast<cx_float*>(&spm_buffer[j * cfg->BS_ANT_NUM]);
+            auto* data_ptr = reinterpret_cast<cx_float*>(
+                &data_gather_buffer[j * cfg->BS_ANT_NUM]);
             auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
                 ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
 
@@ -240,7 +240,7 @@ Event_data DoDemul::launch(size_t tag)
         int8_t* demul_ptr = cfg->get_demod_buf(
             demod_soft_buffer_, frame_id, symbol_idx_ul, i, base_sc_id);
 
-        switch (cfg->mod_type) {
+        switch (cfg->mod_order_bits) {
         case (CommsLib::QAM16):
             demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
             break;
@@ -255,7 +255,7 @@ Event_data DoDemul::launch(size_t tag)
         //     tid, frame_id, symbol_idx_ul, base_sc_id);
         // cout << "Demuled data : \n ";
         // cout << " UE " << i << ": ";
-        // for (int k = 0; k < max_sc_ite * cfg->mod_type; k++)
+        // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits; k++)
         //     printf("%i ", demul_ptr[k]);
         // cout << endl;
     }
