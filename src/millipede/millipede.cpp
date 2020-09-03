@@ -11,7 +11,7 @@ Millipede::Millipede(Config* cfg)
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
-    , demod_buffers_(8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM)
+    , demod_buffers_(kMaxModOrder * cfg->OFDM_DATA_NUM)
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);

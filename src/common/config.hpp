@@ -353,12 +353,6 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    /// Get the offset in any demodulation buffer for this UE and subcarrier
-    inline size_t get_demod_buf_offset(size_t ue_id, size_t sc_id) const
-    {
-        return (ue_id * (kMaxModOrder * OFDM_DATA_NUM)) + (mod_type * sc_id);
-    }
-
     /// Get the decode buffer for this frame, symbol,
     /// user and code block ID
     inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,

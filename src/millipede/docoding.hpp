@@ -54,7 +54,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
         Table<uint8_t>& in_decoded_buffer, PhyStats* in_phy_stats,
         Stats* in_stats_manager);
     ~DoDecode();
@@ -63,7 +63,7 @@ public:
 
 private:
     int16_t* resp_var_nodes;
-    PtrGrid<kFrameWnd, kMaxSymbols, int8_t>& demod_buffers_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
     Table<uint8_t>& decoded_buffer_;
     PhyStats* phy_stats;
     DurationStat* duration_stat;
