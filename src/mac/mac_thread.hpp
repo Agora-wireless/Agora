@@ -85,10 +85,12 @@ private:
     void send_ran_config_update(Event_data event);
 
     // Send control information over (out-of-band) control channel
-    // from BS to UE; and process control information received from control
+    // from server to client
+    void send_control_information();
+
+    // At client, process control information received from control
     // channel and forward to PHY UE, so it transmits data in the scheduled
     // time slots.
-    void send_control_information();
     void process_control_information();
 
     // Receive user data bits (downlink bits at the MAC thread running at the
@@ -116,9 +118,8 @@ private:
 
     UDPClient* udp_client; // UDP endpoint used for sending messages
     UDPServer* udp_server; // UDP endpoint used for receiving messages
-    UDPServer*
-        udp_control_channel; // UDP endpoint for receiving control channel messages
-
+    // UDP endpoint for receiving control channel messages
+    UDPServer* udp_control_channel;
     Table<uint8_t>* ul_bits_buffer_;
     Table<uint8_t>* ul_bits_buffer_status_;
 
