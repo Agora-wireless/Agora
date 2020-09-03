@@ -93,9 +93,47 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         }
     }
 
+    if (cfg->disable_master) {
+        pthread_t txrx_thread;
+        auto context = new EventHandlerContext<PacketTXRX>;
+        context->obj_ptr = this;
+        context->id = socket_thread_num;
+        int ret = pthread_create(&txrx_thread, NULL,
+            pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_loop_tx_rx>,
+            context);
+        rt_assert(ret == 0, "Failed to create threads");
+    }
+
     if (kUseArgos)
         radioconfig_->go();
     return true;
+}
+
+void* PacketTXRX::demod_loop_tx_rx(int tid)
+{
+    pin_to_core_with_offset(
+        ThreadType::kWorkerTXRX, core_offset, cfg->socket_thread_num);
+
+    printf("Receiver thread demod\n");
+
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+
+    demod_tx_socket_
+        = setup_socket_ipv4(cfg->demod_tx_port, true, sock_buf_size);
+    demod_rx_socket_
+        = setup_socket_ipv4(cfg->demod_rx_port, true, sock_buf_size);
+    for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+        setup_sockaddr_remote_ipv4(&millipede_addrs_[i], cfg->demod_rx_port,
+            cfg->server_addr_list[i].c_str());
+    }
+
+    int prev_frame_id = -1;
+    while (cfg->running) {
+        if (-1 != poll_send(-1))
+            continue;
+        recv_demod();
+    }
+    return 0;
 }
 
 void* PacketTXRX::loop_tx_rx(int tid)
@@ -121,20 +159,11 @@ void* PacketTXRX::loop_tx_rx(int tid)
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
-    if (cfg->disable_master && tid == 0) {
-        for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
-            setup_sockaddr_remote_ipv4(&millipede_addrs_[i], cfg->bs_port,
-                cfg->server_addr_list[i].c_str());
-        }
-    }
-
     int prev_frame_id = -1;
     int radio_id = radio_lo;
     while (cfg->running) {
         Packet* pkt;
         if (cfg->disable_master) {
-            if (-1 != poll_send(tid))
-                continue;
             pkt = recv_relocate(tid, radio_id, rx_offset);
         } else {
             if (-1 != dequeue_send(tid))
@@ -142,8 +171,9 @@ void* PacketTXRX::loop_tx_rx(int tid)
             pkt = recv_enqueue(tid, radio_id, rx_offset);
         }
         // receive data
-        if (pkt == NULL)
+        if (pkt == NULL) {
             continue;
+        }
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
@@ -154,10 +184,47 @@ void* PacketTXRX::loop_tx_rx(int tid)
             }
         }
 
-        if (++radio_id == radio_hi)
+        if (++radio_id == radio_hi) {
             radio_id = radio_lo;
+        }
     }
     return 0;
+}
+
+void PacketTXRX::recv_demod()
+{
+    char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
+    auto* pkt = reinterpret_cast<Packet*>(buf);
+
+    if (-1
+        == recv(demod_rx_socket_, (char*)pkt, cfg->packet_length,
+               MSG_DONTWAIT)) {
+        if (errno != EAGAIN && cfg->running) {
+            perror("recv failed");
+            exit(0);
+        }
+        free(buf);
+        return;
+    }
+
+    if (pkt->packet_type == Packet::PacketType::kDemod) {
+        size_t frame_id = pkt->frame_id;
+        size_t symbol_id = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
+        size_t ue_id = pkt->ue_id;
+        size_t server_id = pkt->server_id;
+        size_t sc_id = server_id * cfg->get_ofdm_control_num();
+        int8_t* demod_ptr = cfg->get_demod_buf(
+            *demod_soft_buffer_to_decode_, frame_id, symbol_id, ue_id, sc_id);
+        memcpy(
+            demod_ptr, pkt->data, cfg->get_ofdm_control_num() * cfg->mod_type);
+        decode_status_->receive_demod_data(ue_id, frame_id, symbol_id);
+        free(buf);
+        // printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
+        // ue_id, server_id);
+    } else {
+        printf("Receive unknown packet from demod\n");
+        exit(1);
+    }
 }
 
 struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
@@ -170,6 +237,7 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
     //            Packet::kOffsetOfData
     //                + cfg->get_ofdm_control_num() * 2 * sizeof(unsigned short),
     //            0)) {
+
     if (-1 == recv(socket_[radio_id], (char*)pkt, cfg->packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {
             perror("recv failed");
@@ -200,25 +268,17 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
             cfg->get_ofdm_control_num() * 2 * sizeof(unsigned short));
         free(buf);
 
+        // printf("Receive rru packet (%lu %lu %lu)\n", frame_id, symbol_id,
+        // pkt->ant_id);
+
         // get the position in rx_buffer
         // move ptr & set status to full
         // rx_buffer_status[rx_offset] = 1;
         if (!rx_status_->add_new_packet(frame_id, symbol_id)) {
             cfg->running = false;
         }
-    } else if (pkt->packet_type == Packet::PacketType::kDemod) {
-        size_t frame_id = pkt->frame_id;
-        size_t symbol_id = pkt->symbol_id;
-        size_t ue_id = pkt->ue_id;
-        size_t server_id = pkt->server_id;
-        size_t sc_id = server_id * cfg->get_ofdm_control_num();
-        int8_t* demod_ptr = cfg->get_demod_buf(
-            *demod_soft_buffer_to_decode_, frame_id, symbol_id, ue_id, sc_id);
-        memcpy(
-            demod_ptr, pkt->data, cfg->get_ofdm_control_num() * cfg->mod_type);
-        decode_status_->receive_demod_data(ue_id, frame_id, symbol_id);
     } else {
-        printf("Receive unknown packet\n");
+        printf("Receive unknown packet from rru\n");
         exit(1);
     }
     return pkt;
@@ -262,26 +322,32 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
 int PacketTXRX::poll_send(int tid)
 {
-    if (tid == 0
-        && demul_status_->ready_to_decode(
-               demod_frame_to_send, demod_symbol_to_send)) {
+    if (demul_status_->ready_to_decode(
+            demod_frame_to_send, demod_symbol_to_send)) {
+        // printf("Ready to send data for frame %lu symbol %lu\n",
+        // demod_frame_to_send,
+        // demod_symbol_to_send - cfg->pilot_symbol_num_perframe);
         for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
             int8_t* demod_ptr = cfg->get_demod_buf(*demod_soft_buffer_,
                 demod_frame_to_send, demod_symbol_to_send, ue_id, 0);
             Packet* pkt = reinterpret_cast<Packet*>(send_buffer_);
             pkt->packet_type = Packet::PacketType::kDemod;
             pkt->frame_id = demod_frame_to_send;
-            pkt->symbol_id = demod_frame_to_send;
+            pkt->symbol_id = demod_symbol_to_send;
             pkt->ue_id = ue_id;
             pkt->server_id = cfg->server_addr_idx;
             memcpy(pkt->data, demod_ptr,
                 cfg->get_ofdm_control_num() * cfg->mod_type);
-            ssize_t ret = sendto(socket_[1], pkt, cfg->packet_length, 0,
+            ssize_t ret = sendto(demod_tx_socket_, pkt, cfg->packet_length,
+                MSG_DONTWAIT,
                 (struct sockaddr*)&millipede_addrs_[cfg->get_server_idx_by_ue(
                     ue_id)],
                 sizeof(millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)]));
             rt_assert(ret > 0, "sendto() failed");
         }
+        // printf("Send all demod data for frame %lu symbol %lu\n",
+        // demod_frame_to_send,
+        // demod_symbol_to_send - cfg->pilot_symbol_num_perframe);
         demod_symbol_to_send++;
         if (demod_symbol_to_send
             == cfg->pilot_symbol_num_perframe
@@ -290,6 +356,10 @@ int PacketTXRX::poll_send(int tid)
             demod_frame_to_send++;
         }
         return 1;
+    } else {
+        // if (demod_frame_to_send == 1)
+        //     printf("Still waiting for demod data frame %lu symbol %lu\n",
+        //         demod_frame_to_send, demod_symbol_to_send);
     }
     return -1;
 }

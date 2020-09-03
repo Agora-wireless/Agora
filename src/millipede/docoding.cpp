@@ -227,6 +227,8 @@ void DoDecode::start_work()
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
+                // printf("Decode done for ue %lu frame %lu symbol %lu\n", ue_id,
+                // cur_frame_, cur_symbol_);
                 cur_symbol_++;
                 if (cur_symbol_ == cfg->ul_data_symbol_num_perframe) {
                     cur_symbol_ = 0;

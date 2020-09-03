@@ -673,7 +673,8 @@ void Millipede::handle_event_fft(size_t tag)
 
 void* Millipede::subcarrier_worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+    pin_to_core_with_offset(
+        ThreadType::kWorker, base_worker_core_offset + 1, tid);
     moodycamel::ConcurrentQueue<Event_data> dummy_conq;
 
     auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
@@ -692,7 +693,7 @@ void* Millipede::subcarrier_worker(int tid)
 
 void* Millipede::decode_worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset,
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset + 1,
         tid + config_->get_ofdm_control_num() / config_->subcarrier_block_size);
 
     auto computeDecoding

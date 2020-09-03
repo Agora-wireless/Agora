@@ -180,6 +180,8 @@ public:
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_)) {
+                // printf("Demod once for frame %lu symbol %lu\n",
+                // demul_cur_frame_, demul_cur_sym_);
                 do_demul_->independent_launch(demul_cur_frame_,
                     demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
                     sc_range_.start

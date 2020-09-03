@@ -238,6 +238,9 @@ Config::Config(std::string jsonfile)
         = 1 + (get_ofdm_control_num() - 1) / demul_block_size;
     zf_events_per_symbol = 1 + (get_ofdm_control_num() - 1) / zf_block_size;
 
+    demod_tx_port = tddConf.value("demod_tx_port", 3000);
+    demod_rx_port = tddConf.value("demod_rx_port", 3500);
+
     fft_block_size = tddConf.value("fft_block_size", 4);
 
     /* Modulation configurations */

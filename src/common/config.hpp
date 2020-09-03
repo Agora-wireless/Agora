@@ -284,6 +284,9 @@ public:
     size_t ue_start;
     size_t ue_end;
 
+    int demod_tx_port;
+    int demod_rx_port;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;
