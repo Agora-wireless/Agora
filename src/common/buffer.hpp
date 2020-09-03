@@ -9,6 +9,7 @@
 
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include "ran_config.h"
 #include <sstream>
 #include <vector>
 
@@ -43,10 +44,10 @@ using fft_req_tag_t = rx_tag_t;
 // have only a subset of the fields initialized.
 union gen_tag_t {
     static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
-    static_assert(kMaxSymbolsPerFrame < ((1ull << 13) - 1), "");
+    static_assert(kMaxSymbols < ((1ull << 13) - 1), "");
     static_assert(kMaxUEs < UINT16_MAX, "");
     static_assert(kMaxAntennas < UINT16_MAX, "");
-    static_assert(k5GMaxSubcarriers < UINT16_MAX, "");
+    static_assert(kMaxDataSCs < UINT16_MAX, "");
 
     enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 
@@ -218,39 +219,43 @@ struct Packet {
     {
     }
 
-    std::string to_string()
+    std::string to_string() const
     {
         std::ostringstream ret;
         ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
-            << ", cell ID " << cell_id << ", antenna ID " << ant_id << "]";
+            << ", cell ID " << cell_id << ", antenna ID " << ant_id << ", "
+            << sizeof(fill) << " empty bytes]";
         return ret.str();
     }
 };
 
-// TODO: merge Packet and MacPacket into one struct
 struct MacPacket {
     // The packet's data starts at kOffsetOfData bytes from the start
-    static constexpr size_t kOffsetOfData = 64;
+    static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
 
-    uint32_t frame_id;
-    uint32_t symbol_id;
-    uint32_t cell_id;
-    uint32_t ue_id;
-    uint32_t fill[12]; // Padding for 64-byte alignment needed for SIMD
-    short data[]; // Elements sent by antennae are two bytes (I/Q samples)
-    MacPacket(int f, int s, int c, int a) // TODO: Should be unsigned integers
+    uint16_t frame_id;
+    uint16_t symbol_id;
+    uint16_t ue_id;
+    uint16_t datalen; // length of payload in bytes or array data[]
+    uint16_t crc; // 16 bits CRC over calculated for the data[] array
+    uint16_t rsvd[3]; // reserved for future use
+    RBIndicator rb_indicator; // RAN scheduling details for PHY
+    char data[]; // Mac packet payload data
+    MacPacket(int f, int s, int u, int d,
+        int cc) // TODO: Should be unsigned integers
         : frame_id(f)
         , symbol_id(s)
-        , cell_id(c)
-        , ue_id(a)
+        , ue_id(u)
+        , datalen(d)
+        , crc(cc)
     {
     }
 
-    std::string to_string()
+    std::string to_string() const
     {
         std::ostringstream ret;
         ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
-            << ", cell ID " << cell_id << ", user ID " << ue_id << "]";
+            << ", user ID " << ue_id << "]";
         return ret.str();
     }
 };

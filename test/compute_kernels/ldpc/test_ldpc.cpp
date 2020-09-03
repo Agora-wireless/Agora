@@ -7,11 +7,11 @@
  * FlexRAN's decoder, which supports AVX2.
  */
 
-#include "common/Symbols.hpp"
-#include "common/gettime.h"
-#include "common/utils_ldpc.hpp"
+#include "Symbols.hpp"
 #include "encoder.hpp"
+#include "gettime.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 #include <algorithm>
 #include <assert.h>
 #include <bitset>
@@ -50,13 +50,11 @@ int main()
         15, 30, 60, 120, 240 };
     std::sort(zc_vec.begin(), zc_vec.end());
     for (const size_t& zc : zc_vec) {
-        if (zc > avx2enc::ZC_MAX) {
-            fprintf(stderr,
-                "Zc value %zu not supported by avx2enc. Skipping.\n", zc);
+        if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
+            fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
             continue;
         }
         const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
-        const size_t num_parity_bits = zc * kNumRows;
         const size_t num_encoded_bits
             = ldpc_num_encoded_bits(kBaseGraph, zc, kNumRows);
 

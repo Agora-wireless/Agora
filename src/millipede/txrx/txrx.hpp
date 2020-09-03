@@ -80,6 +80,7 @@ public:
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
         char* tx_buffer);
+    void send_beacon(int tid, size_t frame_id);
 
 private:
     void* loop_tx_rx(int tid); // The TX/RX event loop
@@ -104,11 +105,7 @@ private:
     moodycamel::ProducerToken** rx_ptoks_;
     moodycamel::ProducerToken** tx_ptoks_;
 
-#if USE_IPV4
     std::vector<struct sockaddr_in> servaddr_; /* server address */
-#else
-    std::vector<struct sockaddr_in6> servaddr_; /* server address */
-#endif
     std::vector<int> socket_;
 
 #ifdef USE_DPDK

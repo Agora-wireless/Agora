@@ -13,49 +13,26 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
-    // Use one core to allocate launch threads, and use one core to run each
-    // socket thread
-    std::string core_list = std::to_string(core_offset - 1) + "-"
-        + std::to_string(core_offset - 1 + socket_thread_num);
+    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
 
-    // n: channels, m: maximum memory in megabytes
-    const char* rte_argv[] = { "txrx", "-l", core_list.c_str(), NULL };
-    int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
-
-    printf("rte_eal_init argv: ");
-    for (int i = 0; i < rte_argc; i++) {
-        printf("%s, ", rte_argv[i]);
-    }
-    printf("\n");
-    // Initialize DPDK environment
-    int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
-    rt_assert(ret >= 0, "Failed to initialize DPDK");
-
-    unsigned int nb_ports = rte_eth_dev_count_avail();
-    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
-
-    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
-    mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
-        MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
-
-    rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+    mbuf_pool = DpdkTransport::create_mempool();
 
     uint16_t portid = 0;
 
     if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
-    ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     rte_flow_error error;
     rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
-        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port + i);
-        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
+        uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port);
+        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
             server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
         printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
@@ -271,8 +248,8 @@ int PacketTXRX::dequeue_send(int tid)
 
     struct rte_udp_hdr* udp_h
         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_port + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(cfg->ue_rx_port + tid);
+    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port + tid);
+    udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port + tid);
 
     tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
     tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;

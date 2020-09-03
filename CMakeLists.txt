@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.8)
 include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 project(Millipede)
@@ -7,10 +7,14 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
-set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+set(SOURCE_DIR ".")
+
+option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Millipede/build/'" ON)
+if(FORCE_BUILD_PATH)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
+endif()
 
 # New versions of GCC enable position-independent executables by default. We
 # don't want to compile FlexRAN libraries with -fPIC because it reduces
@@ -22,7 +26,7 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64 -fPIC")
   set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
-  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_avx2 -lmkl_def -lpthread -lm -ldl)
+  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
@@ -42,8 +46,8 @@ find_package(GTest REQUIRED)
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 else()
   message(STATUS "Debugging is enabled. Performance will be low")
 endif()
@@ -51,25 +55,41 @@ endif()
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
-add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
+add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
 find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_DPDK_SENDER True CACHE STRING "USE_DPDK_SENDER defaulting to the same value as USE_DPDK")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
-set(USE_LDPC True CACHE STRING "USE_LDPC defaulting to 'True'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
+set(USE_AVX2_ENCODER False CACHE STRING "Use Millipede's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
-message(STATUS "USE_LDPC: ${USE_LDPC}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
-set(TXRX_SOURCES
-  src/millipede/txrx/txrx.cpp
-  src/millipede/txrx/txrx_argos.cpp)
+set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
+
+# Determine if the current machine supports AVX-512
+CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
+if (ISA_AVX512)
+  message(STATUS "Processor supports AVX-512")
+  add_definitions(-DISA_AVX512)
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
+  # Leave USE_AVX2_ENCODER unmodified
+else()
+  message(STATUS "Processor does not support AVX-512")
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
+  set(USE_AVX2_ENCODER True)
+endif()
+
+if(USE_AVX2_ENCODER)
+  message(STATUS "Using Millipede's (i.e., not FlexRAN's) AVX2 encoder")
+  add_definitions(-DUSE_AVX2_ENCODER)
+else()
+  message(STATUS "Using FlexRAN's (i.e., not Millipede's) AVX512 encoder")
+endif()
 
 # DPDK
 if(${USE_DPDK})
@@ -86,10 +106,6 @@ if(${USE_DPDK})
   endif()
   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
 
-  set(TXRX_SOURCES 
-    src/millipede/txrx/txrx_DPDK.cpp
-    src/common/dpdk_transport.cpp)
-
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
   # from the real DPDK include directory (/usr/include/dpdk/).
@@ -102,38 +118,14 @@ if(${USE_DPDK})
   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
   add_definitions(-DUSE_DPDK)
-  if (${USE_DPDK_SENDER})
-    message(STATUS "DPDK is enabled for sender")
-    add_definitions(-DUSE_DPDK_SENDER)
-    set(SENDER_TXRX_SOURCES 
-      simulator/sender_dpdk.cpp
-      src/common/dpdk_transport.cpp)
-  endif()
-else()
-  set(USE_DPDK_SENDER False)
-  message(STATUS "DPDK is disabled")
 endif()
 
-if (NOT ${USE_DPDK_SENDER})
-  message(STATUS "DPDK is disabled for sender")
-  set(USE_DPDK_SENDER False)
-  set(SENDER_TXRX_SOURCES simulator/sender.cpp)
-endif()
+message(STATUS "Use DPDK for millipede: ${USE_DPDK}")
 
-message(STATUS "USE_DPDK: ${USE_DPDK}")
-message(STATUS "USE_DPDK_SENDER: ${USE_DPDK_SENDER}")
-
+# MAC
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
 endif()
-
-set(MAC_CLIENT_SOURCES
-  src/mac/simple_mac_client.cpp
-  src/mac/mac_client_main.cpp)
-set(MAC_BS_SOURCES
-  src/mac/simple_mac_bs.cpp
-  src/mac/mac_bs_main.cpp)
-set(TXRX_MAC_SOURCES src/millipede/txrx/txrx_mac.cpp)
 
 # Argos support
 if(${USE_ARGOS})
@@ -151,14 +143,6 @@ message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-set(ARGOS_SOURCES src/millipede/radio_lib.cpp src/millipede/radio_calibrate.cpp)
-set(CLIENT_SOURCES
-  src/common/modulation.cpp
-  src/client/client_radio.cpp
-  src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/client/txrx_mac.cpp
-)
 set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
 
@@ -195,6 +179,7 @@ endif()
 
 include_directories(
 	src/common/
+	src/mac/
   src/millipede/
   src/millipede/txrx/
   src/client/)
@@ -209,9 +194,11 @@ set(COMMON_SOURCES
   src/common/signalHandler.cpp
   src/common/modulation.cpp
   src/common/net.cpp
+  src/common/crc.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)
+add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(MILLIPEDE_SOURCES 
   src/millipede/millipede.cpp
@@ -221,123 +208,130 @@ set(MILLIPEDE_SOURCES
   src/millipede/dozf.cpp
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
-  src/millipede/reciprocity.cpp)
+  src/millipede/docoding.cpp
+  src/millipede/radio_lib.cpp
+  src/millipede/radio_calibrate.cpp
+  src/mac/mac_thread.cpp)
 
-set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
+if(${USE_DPDK})
+  add_definitions(-DUSE_DPDK)
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
+    src/millipede/txrx/txrx_DPDK.cpp
+    src/common/dpdk_transport.cpp)
+else()
+  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
+    src/millipede/txrx/txrx.cpp
+    src/millipede/txrx/txrx_argos.cpp)
+endif()
+add_library(millipede_sources_lib OBJECT ${MILLIPEDE_SOURCES})
+
+set(CLIENT_SOURCES
+  src/client/client_radio.cpp
+  src/client/phy-ue.cpp
+  src/client/txrx_client.cpp
+  src/mac/mac_thread.cpp)
+add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
+
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
 
-set(LDPC_SOURCES
-  src/encoder/encoder.cpp
-  src/encoder/cyclic_shift.cpp
-  src/encoder/iobuffer.cpp)
+set(FLEXRAN_LDPC_LIBS
+  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
+  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-# LDPC sources that require an Intel compiler
-if(${USE_LDPC})
-  message(STATUS "LDPC is enabled")
-  add_definitions(-DUSE_LDPC)
+set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
-  CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
-  if (ISA_AVX512)
-    message(STATUS "AVX-512 supported.")
-    set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
-  else()
-    message(STATUS "AVX-512 not supported.")
-    set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
-  endif()
+# TODO: The main millipede executable is performance-critical, so we need to
+# test if compiling against precompiled objects instead of compiling directly
+# against sources reduces performance.
+add_executable(millipede
+  src/millipede/main.cpp
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(millipede ${COMMON_LIBS})
 
-  set(FLEXRAN_LDPC_LIBS
-    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
-    ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
-
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} src/millipede/docoding.cpp)
-endif()
-
-get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-foreach(dir ${dirs})
-  message(STATUS "dir='${dir}'")
-endforeach()
-
-set(SOURCES
-  ${MILLIPEDE_SOURCES}
-  ${TXRX_SOURCES}
-  ${TXRX_MAC_SOURCES}
-  ${COMMON_SOURCES}
-  ${ARGOS_SOURCES}
-  ${LDPC_SOURCES})
-			
-add_executable(millipede src/millipede/main.cpp ${SOURCES})
-target_link_libraries(millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
-
-add_library(comp MODULE ${SOURCES})
-target_link_libraries(comp -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS})
-
-add_executable(data_generator 
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp 
-  ${LDPC_SOURCES} 
-  ${COMMON_SOURCES})
-target_link_libraries(data_generator -larmadillo ${FLEXRAN_LDPC_LIBS} ${MKL_LIBS})
+add_executable(data_generator
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
-add_executable(user 
-     src/client/user-main.cpp
-     ${CLIENT_SOURCES}
-     ${COMMON_SOURCES}
-     ${LDPC_SOURCES})
-target_link_libraries(user -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
+add_executable(user
+  src/client/user-main.cpp
+  $<TARGET_OBJECTS:client_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(user ${COMMON_LIBS})
 
-add_library(ue_phy MODULE 
-     ${CLIENT_SOURCES}
-     ${COMMON_SOURCES}
-     ${ARGOS_SOURCES}
-     ${LDPC_SOURCES})
-target_link_libraries(ue_phy -larmadillo ${MKL_LIBS} ${SOAPY_LIB} ${PYTHON_LIB} ${LDPC_LIBS})
-
-add_executable(macuser
-     ${MAC_CLIENT_SOURCES}
-     ${COMMON_SOURCES})
-target_link_libraries(macuser -larmadillo ${MKL_LIBS})
-
-add_executable(macbs
-     ${MAC_BS_SOURCES}
-     ${COMMON_SOURCES})
-target_link_libraries(macbs -larmadillo ${MKL_LIBS})
-
-set(SENDER_SOURCES
+add_executable(sender
   simulator/sender_cli.cpp
-  ${COMMON_SOURCES}
-  ${SENDER_TXRX_SOURCES}
-  ${LDPC_SOURCES})
+  simulator/sender.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(sender ${COMMON_LIBS})
 
-add_executable(sender ${SENDER_SOURCES})
-target_link_libraries(sender ${MKL_LIBS} ${DPDK_LIBRARIES} ${LDPC_LIBS} gflags)
-
-set(SIMULATOR_SOURCES
+add_executable(sim
   simulator/main.cpp
   simulator/simulator.cpp
   simulator/sender.cpp
-  simulator/receiver.cpp 
-  ${COMMON_SOURCES}
-  ${LDPC_SOURCES})
+  simulator/receiver.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(sim ${COMMON_LIBS})
 
-add_executable(sim ${SIMULATOR_SOURCES})
-target_link_libraries(sim ${MKL_LIBS} ${LDPC_LIBS})
+add_executable(chsim
+  simulator/chsim_main.cpp
+  simulator/channel_sim.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(chsim ${COMMON_LIBS})
+
+if(NOT ${USE_DPDK})
+  # Create shared libraries for Python
+  # DPDK is currently not supported
+  #  add_library(comp MODULE
+  #    $<TARGET_OBJECTS:millipede_sources_lib>
+  #    $<TARGET_OBJECTS:common_sources_lib>)
+  #  target_link_libraries(comp ${COMMON_LIBS})
+
+  add_library(ue_phy MODULE
+    $<TARGET_OBJECTS:client_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(ue_phy ${COMMON_LIBS})
+else()
+  message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
+endif()
 
 # End-to-end test
-add_executable(test_millipede test/test_millipede/main.cpp ${SOURCES})
-target_link_libraries(test_millipede -larmadillo
-  ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB} ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lutil)
+add_executable(test_millipede
+  test/test_millipede/main.cpp
+  $<TARGET_OBJECTS:millipede_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_millipede ${COMMON_LIBS})
 
-# The tests to run using ctest
-add_executable(test_zf test/unit_tests/test_zf.cc 
-  ${COMMON_SOURCES} 
-  src/millipede/stats.cpp 
-  src/millipede/dozf.cpp
-  ${LDPC_SOURCES})
-target_link_libraries(test_zf ${GTEST_LIBRARIES} ${MKL_LIBS} -larmadillo ${LDPC_LIBS})
-add_test(NAME test_zf COMMAND test_zf)
+add_executable(test_ldpc
+  test/compute_kernels/ldpc/test_ldpc.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_ldpc ${COMMON_LIBS})
+add_test(NAME test_ldpc COMMAND test_ldpc)
+
+# Unit tests
+set(UNIT_TESTS test_datatype_conversion test_udp_client_server
+  test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
+  test_ptr_grid test_recipcal)
+
+foreach(test_name IN LISTS UNIT_TESTS)
+  add_executable(${test_name}
+    test/unit_tests/${test_name}.cc
+    $<TARGET_OBJECTS:millipede_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+
+  # Unit tests should pass without memory errors
+  set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
+
+  target_link_libraries(${test_name} ${COMMON_LIBS})
+  add_test(NAME ${test_name} COMMAND ${test_name})
+endforeach()
