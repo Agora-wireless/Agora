@@ -209,7 +209,6 @@ set(MILLIPEDE_SOURCES
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
   src/millipede/docoding.cpp
-  src/millipede/reciprocity.cpp
   src/millipede/radio_lib.cpp
   src/millipede/radio_calibrate.cpp
   src/mac/mac_thread.cpp)

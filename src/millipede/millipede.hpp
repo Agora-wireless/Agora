@@ -21,7 +21,6 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
-#include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
@@ -238,10 +237,6 @@ private:
     // Calculated uplink zeroforcing detection matrices. Each matrix has
     // [number of UEs] rows and [number of antennas] columns.
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
-
-    // 1st dimension: TASK_BUFFER_FRAME_NUM
-    // 2nd dimension: number of OFDM data subcarriers * number of antennas
-    Table<complex_float> recip_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas

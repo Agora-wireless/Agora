@@ -1127,8 +1127,6 @@ void Millipede::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    recip_buffer_.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
@@ -1166,7 +1164,6 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
-    recip_buffer_.free();
     calib_buffer_.free();
     dl_encoded_buffer_.free();
 
