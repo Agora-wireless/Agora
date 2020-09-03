@@ -11,13 +11,6 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define CODED_LEN 32
-#define ORIG_CODE_LEN 16
-#define N_ITE 10
-#define NUM_CODE_BLOCK 36
-#define NUM_BITS 4
-#define MAX_CODED_SC 1152
-
 // Number of frames received that we allocate space for in worker threads. This
 // is the frame window that we track in Millipede.
 #define TASK_BUFFER_FRAME_NUM 40
@@ -48,7 +41,6 @@ enum class EventType : int {
     kDecodeLast,
     kEncode,
     kRC,
-    kRXSymbol,
     kModul,
     kPacketFromMac,
     kPacketToMac,
@@ -183,7 +175,7 @@ static inline std::string thread_type_str(ThreadType thread_type)
     return "Invalid thread type";
 }
 
-enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
+enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
 // Maximum number of symbols per frame allowed by Millipede
 static constexpr size_t kMaxSymbols = 70;
@@ -196,6 +188,11 @@ static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
 static constexpr size_t kMaxUEs = 64;
+
+// Maximum modulation (QAM256) supported by Millipede
+// Only up to QAM64 is implemented
+// Here using 8 helps reduce cache false sharing
+static constexpr size_t kMaxModType = 8;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;

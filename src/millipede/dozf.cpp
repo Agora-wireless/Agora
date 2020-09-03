@@ -9,7 +9,6 @@
 #include <malloc.h>
 
 static constexpr bool kUseSIMDGather = true;
-
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = true;
@@ -19,14 +18,14 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& recip_buffer,
+    Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , csi_buffers_(csi_buffers)
-    , recip_buffer_(recip_buffer)
+    , calib_buffer_(calib_buffer)
     , ul_zf_matrices_(ul_zf_matrices)
     , dl_zf_matrices_(dl_zf_matrices)
 {
@@ -35,12 +34,15 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     csi_gather_buffer = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
+    calib_gather_buffer = reinterpret_cast<complex_float*>(
+        memalign(64, kMaxAntennas * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
 {
     free(pred_csi_buffer);
     free(csi_gather_buffer);
+    free(calib_gather_buffer);
 }
 
 Event_data DoZF::launch(size_t tag)
@@ -54,7 +56,7 @@ Event_data DoZF::launch(size_t tag)
 }
 
 void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
-    const complex_float* recip_ptr, complex_float* _mat_ul_zf,
+    complex_float* calib_ptr, complex_float* _mat_ul_zf,
     complex_float* _mat_dl_zf)
 {
     arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
@@ -75,14 +77,55 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
             cfg->UE_NUM, cfg->BS_ANT_NUM, false);
         if (cfg->recipCalEn) {
-            auto* _recip_ptr = const_cast<arma::cx_float*>(
-                reinterpret_cast<const arma::cx_float*>(recip_ptr));
-            arma::cx_fvec vec_calib(_recip_ptr, cfg->BS_ANT_NUM, false);
+            arma::cx_fvec vec_calib(
+                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BS_ANT_NUM,
+                false);
+
+            vec_calib = vec_calib / vec_calib(cfg->ref_ant);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
             mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
             mat_dl_zf = mat_ul_zf;
+    }
+}
+
+// Gather data of one symbol from partially-transposed buffer
+// produced by dofft
+static inline void partial_transpose_gather(
+    size_t cur_sc_id, float* src, float*& dst, size_t bs_ant_num)
+{
+    // The SIMD and non-SIMD methods are equivalent.
+    if (kUseSIMDGather) {
+        __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
+            kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
+            kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
+            kTransposeBlockSize * 6 + 1);
+
+        const size_t transpose_block_id = cur_sc_id / kTransposeBlockSize;
+        const size_t sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
+        const size_t offset_in_src_buffer
+            = transpose_block_id * bs_ant_num * kTransposeBlockSize
+            + sc_inblock_idx;
+
+        src = src + offset_in_src_buffer * 2;
+        for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += 4) {
+            // fetch 4 complex floats for 4 ants
+            __m256 t = _mm256_i32gather_ps(src, index, 4);
+            _mm256_store_ps(dst, t);
+            src += 8 * kTransposeBlockSize;
+            dst += 8;
+        }
+    } else {
+        const size_t pt_base_offset = (cur_sc_id / kTransposeBlockSize)
+            * (kTransposeBlockSize * bs_ant_num);
+        complex_float* cx_src = (complex_float*)src;
+        complex_float* cx_dst = (complex_float*)dst;
+        for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
+            *cx_dst = cx_src[pt_base_offset + (ant_i * kTransposeBlockSize)
+                + (cur_sc_id % kTransposeBlockSize)];
+            cx_dst++;
+        }
     }
 }
 
@@ -104,54 +147,26 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         const size_t cur_sc_id = base_sc_id + i;
 
         // Gather CSI matrices of each pilot from partially-transposed CSIs.
-        // The SIMD and non-SIMD methods are equivalent.
-        if (kUseSIMDGather) {
-            __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
-                kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
-                kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
-                kTransposeBlockSize * 6 + 1);
-
-            const size_t transpose_block_id = cur_sc_id / kTransposeBlockSize;
-            const size_t sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
-            const size_t offset_in_csi_buffer
-                = transpose_block_id * cfg->BS_ANT_NUM * kTransposeBlockSize
-                + sc_inblock_idx;
-            float* tar_csi_ptr = (float*)csi_gather_buffer;
-
-            for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-                auto* src_csi_ptr = (float*)csi_buffers_[frame_slot][ue_idx]
-                    + offset_in_csi_buffer * 2;
-                for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM;
-                     ant_idx += 4) {
-                    /* Fetch 4 complex floats for 4 ants */
-                    __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-                    _mm256_store_ps(tar_csi_ptr, t_csi);
-                    src_csi_ptr += 8 * kTransposeBlockSize;
-                    tar_csi_ptr += 8;
-                }
-            }
-        } else {
-            const size_t pt_base_offset = (cur_sc_id / kTransposeBlockSize)
-                * (kTransposeBlockSize * cfg->BS_ANT_NUM);
-
-            size_t gather_idx = 0;
-            for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
-                const complex_float* csi_buf = csi_buffers_[frame_slot][ue_idx];
-                for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                    csi_gather_buffer[gather_idx++]
-                        = csi_buf[pt_base_offset + (ant_i * kTransposeBlockSize)
-                            + (cur_sc_id % kTransposeBlockSize)];
-                }
-            }
+        for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+            float* dst_csi_ptr
+                = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * ue_idx);
+            partial_transpose_gather(cur_sc_id,
+                (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
+                cfg->BS_ANT_NUM);
+        }
+        if (cfg->recipCalEn) {
+            // Gather reciprocal calibration data from partially-transposed buffer
+            float* dst_calib_ptr = (float*)calib_gather_buffer;
+            partial_transpose_gather(cur_sc_id,
+                (float*)calib_buffer_[frame_slot], dst_calib_ptr,
+                cfg->BS_ANT_NUM);
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-        // cout<<"CSI matrix"<<endl;
-        // cout<<mat_input.st()<<endl;
-        compute_precoder(mat_csi,
-            cfg->get_calib_buffer(recip_buffer_, frame_id, cur_sc_id),
+
+        compute_precoder(mat_csi, calib_gather_buffer,
             ul_zf_matrices_[frame_slot][cur_sc_id],
             dl_zf_matrices_[frame_slot][cur_sc_id]);
 
@@ -184,57 +199,24 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     double start_tsc1 = worker_rdtsc();
 
     // Gather CSIs from partially-transposed CSIs
-    size_t gather_idx = 0;
     for (size_t i = 0; i < cfg->UE_NUM; i++) {
         const size_t cur_sc_id = base_sc_id + i;
-
-        // The SIMD and non-SIMD methods are equivalent.
-        if (kUseSIMDGather) {
-            __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
-                kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
-                kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
-                kTransposeBlockSize * 6 + 1);
-
-            int transpose_block_id = cur_sc_id / kTransposeBlockSize;
-            int sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
-            int offset_in_csi_buffer
-                = transpose_block_id * cfg->BS_ANT_NUM * kTransposeBlockSize
-                + sc_inblock_idx;
-
-            auto* tar_csi_ptr
-                = (float*)csi_gather_buffer + cfg->BS_ANT_NUM * i * 2;
-            const auto* src_csi_ptr
-                = (float*)csi_buffers_[frame_id % TASK_BUFFER_FRAME_NUM][0]
-                + offset_in_csi_buffer * 2;
-
-            for (size_t ant_idx = 0; ant_idx < cfg->BS_ANT_NUM; ant_idx += 4) {
-                // fetch 4 complex floats for 4 ants
-                __m256 t_csi = _mm256_i32gather_ps(src_csi_ptr, index, 4);
-                _mm256_store_ps(tar_csi_ptr, t_csi);
-                src_csi_ptr += 8 * kTransposeBlockSize;
-                tar_csi_ptr += 8;
-            }
-        } else {
-            const size_t pt_base_offset = (cur_sc_id / kTransposeBlockSize)
-                * (kTransposeBlockSize * cfg->BS_ANT_NUM);
-
-            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                csi_gather_buffer[gather_idx++]
-                    = csi_buffers_[frame_slot][0][pt_base_offset
-                        + (ant_i * kTransposeBlockSize)
-                        + (cur_sc_id % kTransposeBlockSize)];
-            }
-        }
+        float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * i);
+        partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
+            dst_csi_ptr, cfg->BS_ANT_NUM);
+    }
+    if (cfg->recipCalEn) {
+        // Gather reciprocal calibration data from partially-transposed buffer
+        float* dst_calib_ptr = (float*)calib_gather_buffer;
+        partial_transpose_gather(base_sc_id, (float*)calib_buffer_[frame_slot],
+            dst_calib_ptr, cfg->BS_ANT_NUM);
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
         cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
-    // std::cout << "CSI matrix" << std::endl;
-    // std::cout << mat_csi.st() << std::endl;
-    compute_precoder(mat_csi,
-        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
+    compute_precoder(mat_csi, calib_gather_buffer,
         ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
         dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)]);
 
@@ -271,7 +253,7 @@ void DoZF::Predict(size_t tag)
     // Input matrix and calibration are for current frame, output precoders are
     // for the next frame
     compute_precoder(mat_input,
-        cfg->get_calib_buffer(recip_buffer_, frame_id, base_sc_id),
+        cfg->get_calib_buffer(calib_buffer_, frame_id, base_sc_id),
         cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
         cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
 }

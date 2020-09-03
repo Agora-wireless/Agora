@@ -86,13 +86,13 @@ void MacThread::send_ran_config_update(Event_data event)
     assert(event.event_type == EventType::kRANUpdate);
 
     RanConfig rc;
-    rc.mod_type = CommsLib::QAM16;
+    rc.mod_order_bits = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
 
     Event_data msg(EventType::kRANUpdate);
     msg.num_tags = 3;
     msg.tags[0] = rc.n_antennas;
-    msg.tags[1] = rc.mod_type;
+    msg.tags[1] = rc.mod_order_bits;
     msg.tags[2] = rc.frame_id;
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: failed to send RAN update to Millipede");
@@ -130,7 +130,7 @@ void MacThread::process_codeblocks_from_master(Event_data event)
 
         // Check CRC
         uint16_t crc
-            = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
+            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
                              cfg_->mac_payload_length)
                 & 0xFFFF);
         if (crc == pkt->crc) {
@@ -186,8 +186,8 @@ void MacThread::send_control_information()
     // send RAN control information UE
     RBIndicator ri;
     ri.ue_id = next_radio_id_;
-    ri.mod_type = CommsLib::QAM16;
-    udp_client->send(cfg_->client_addr, kBaseClientPort + ri.ue_id,
+    ri.mod_order_bits = CommsLib::QAM16;
+    udp_client->send(cfg_->ue_server_addr, kBaseClientPort + ri.ue_id,
         (uint8_t*)&ri, sizeof(RBIndicator));
 
     // update RAN config within Millipede
@@ -307,9 +307,10 @@ void MacThread::process_udp_packets_from_apps_client(
         memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
             cfg_->mac_payload_length);
         // Insert CRC
-        pkt->crc = (uint16_t)(crc_obj->calculateCRC24((unsigned char*)pkt->data,
-                                  cfg_->mac_payload_length)
-            & 0xFFFF);
+        pkt->crc
+            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
+                             cfg_->mac_payload_length)
+                & 0xFFFF);
     }
 
     (*ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;

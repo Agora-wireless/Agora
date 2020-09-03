@@ -10,8 +10,8 @@ Config::Config(std::string jsonfile)
     const auto tddConf = json::parse(conf);
 
     /* antenna configurations */
-    hub_file = tddConf.value("hubs", "");
-    serial_file = tddConf.value("irises", "");
+    std::string hub_file = tddConf.value("hubs", "");
+    std::string serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
     channel = tddConf.value("channel", "A");
@@ -37,7 +37,7 @@ Config::Config(std::string jsonfile)
                 BS_ANT_NUM = nAntennas;
         }
     } else
-        nRadios = tddConf.value("radio_num", BS_ANT_NUM);
+        nRadios = tddConf.value("radio_num", isUE ? UE_ANT_NUM : BS_ANT_NUM);
 
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
@@ -63,19 +63,20 @@ Config::Config(std::string jsonfile)
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
     modulation = tddConf.value("modulation", "16QAM");
 
-    server_addr = tddConf.value("server_addr", "127.0.0.1");
-    sender_addr = tddConf.value("sender_addr", "127.0.0.1");
-    client_addr = tddConf.value("client_addr", "127.0.0.1");
-    tx_addr_to_mac = tddConf.value("tx_addr_to_mac", "127.0.0.1");
-    bs_port = tddConf.value("bs_port", 8000);
-    ue_rx_port = tddConf.value("ue_rx_port", 7000);
-    ue_tx_port = tddConf.value("ue_tx_port", 6000);
+    bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
+    rru_addr = tddConf.value("rru_addr", "127.0.0.1");
+    ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
+    mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
+    bs_server_port = tddConf.value("bs_server_port", 8000);
+    bs_rru_port = tddConf.value("bs_rru_port", 9000);
+    ue_rru_port = tddConf.value("ue_rru_port", 7000);
+    ue_server_port = tddConf.value("ue_sever_port", 6000);
+
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
     init_mac_running = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
-    ip_bridge_enable = tddConf.value("ip_bridge_enable", false);
     CP_LEN = tddConf.value("cp_len", 0);
     OFDM_CA_NUM = tddConf.value("ofdm_ca_num", 2048);
     OFDM_DATA_NUM = tddConf.value("ofdm_data_num", 1200);
@@ -103,19 +104,18 @@ Config::Config(std::string jsonfile)
     hw_framer = tddConf.value("hw_framer", true);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
-        size_t pilot_num_default = freq_orthogonal_pilot ? 1 : UE_ANT_NUM;
-        pilot_symbol_num_perframe
-            = tddConf.value("pilot_num", pilot_num_default);
+        pilot_symbol_num_perframe = tddConf.value(
+            "pilot_num", freq_orthogonal_pilot ? 1 : UE_ANT_NUM);
         data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
-            symbol_num_perframe - pilot_symbol_num_perframe);
+            symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
-            downlink_mode ? 0
-                          : symbol_num_perframe - pilot_symbol_num_perframe);
+            downlink_mode
+                ? 0
+                : symbol_num_perframe - pilot_symbol_num_perframe - 1);
         dl_data_symbol_num_perframe
             = tddConf.value("dl_symbol_num_perframe", downlink_mode ? 10 : 0);
         dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
-        dl_data_symbol_end = dl_data_symbol_start + dl_data_symbol_num_perframe;
-        std::string sched("");
+        std::string sched("B");
         for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
             sched += "P";
         // Below it is assumed either dl or ul to be active at one time
@@ -182,7 +182,7 @@ Config::Config(std::string jsonfile)
 
     /* Millipede configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
-    core_offset = tddConf.value("core_offset", 18);
+    core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     fft_thread_num = tddConf.value("fft_thread_num", 5);
@@ -205,13 +205,6 @@ Config::Config(std::string jsonfile)
 
     fft_block_size = tddConf.value("fft_block_size", 4);
 
-    /* Modulation configurations */
-    mod_type = modulation == "64QAM"
-        ? CommsLib::QAM64
-        : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
-    printf("Modulation: %s\n", modulation.c_str());
-    mod_order = (size_t)pow(2, mod_type);
-
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
@@ -221,10 +214,12 @@ Config::Config(std::string jsonfile)
     LDPC_config.cbLen = ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc);
     LDPC_config.cbCodewLen = ldpc_num_encoded_bits(
         LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows);
-    LDPC_config.nblocksInSymbol
-        = OFDM_DATA_NUM * mod_type / LDPC_config.cbCodewLen;
 
-    num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
+    /* Modulation configurations */
+    mod_order_bits = modulation == "64QAM"
+        ? CommsLib::QAM64
+        : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+    update_mod_cfgs(mod_order_bits);
 
     rt_assert(LDPC_config.nblocksInSymbol > 0,
         "LDPC expansion factor is too large for number of OFDM data "
@@ -246,8 +241,9 @@ Config::Config(std::string jsonfile)
     packet_length
         = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
-    data_bytes_num_persymbol
-        = (LDPC_config.cbLen) >> 3 * LDPC_config.nblocksInSymbol;
+    num_bytes_per_cb = (LDPC_config.cbLen) >> 3;
+
+    data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
     mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
@@ -267,7 +263,7 @@ Config::Config(std::string jsonfile)
               << "\n  mac_data_bytes_num_perframe: "
               << mac_data_bytes_num_perframe
               << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
-              << std::endl;
+              << "\n  Modulation: " << modulation.c_str() << std::endl;
 
     if (packet_length >= 9000) {
         std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
@@ -463,7 +459,7 @@ void Config::genData()
                             + j * LDPC_config.nblocksInSymbol + k]),
                     ul_mod_input[i] + j * OFDM_DATA_NUM
                         + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_type);
+                    encoded_bytes_per_block, mod_order_bits);
             }
         }
     }
@@ -493,13 +489,10 @@ void Config::genData()
                             + j * LDPC_config.nblocksInSymbol + k]),
                     dl_mod_input[i] + j * OFDM_DATA_NUM
                         + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_type);
+                    encoded_bytes_per_block, mod_order_bits);
             }
         }
     }
-
-    Table<float> qam_table;
-    init_modulation_table(qam_table, mod_type);
 
     // Generate freq-domain downlink symbols
     Table<complex_float> dl_iq_ifft;
@@ -515,7 +508,7 @@ void Config::genData()
                 size_t s = p + k;
                 if (k % OFDM_PILOT_SPACING != 0) {
                     dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_mod_input[i][s], qam_table);
+                        = mod_single_uint8(dl_mod_input[i][s], mod_table);
                 } else
                     dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
                 dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
@@ -538,7 +531,7 @@ void Config::genData()
                 size_t k = j - OFDM_DATA_START;
                 size_t s = p + k;
                 ul_iq_f[i][q + j]
-                    = mod_single_uint8(ul_mod_input[i][s], qam_table);
+                    = mod_single_uint8(ul_mod_input[i][s], mod_table);
                 ul_iq_ifft[i][q + j] = ul_iq_f[i][q + j];
             }
 
@@ -637,7 +630,9 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     const auto it
         = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
-        return it - DLSymbols[fid].begin();
+        return it - DLSymbols[fid].begin() + 1;
+    else if (symbol_id == 0)
+        return 0;
     else
         return SIZE_MAX;
 }
@@ -737,6 +732,8 @@ SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
     assert(!isUE); // Currently implemented for only the Millipede server
     char s = frames[frame_id % frames.size()][symbol_id];
     switch (s) {
+    case 'B':
+        return SymbolType::kBeacon;
     case 'D':
         return SymbolType::kDL;
     case 'U':

@@ -205,8 +205,7 @@ Event_data DoFFT::launch(size_t tag)
     } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
         or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
         partial_transpose(
-            &calib_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM], ant_id,
-            SymbolType::kCalUL);
+            calib_buffer_[frame_slot], ant_id, SymbolType::kCalUL);
     } else {
         rt_assert(false, "Unknown or unsupported symbol type");
     }
@@ -224,11 +223,20 @@ void DoFFT::partial_transpose(
 {
     // We have OFDM_DATA_NUM % kTransposeBlockSize == 0
     const size_t num_blocks = cfg->OFDM_DATA_NUM / kTransposeBlockSize;
+    // Do the 1st step of 2-step reciprocal calibration
+    // The 2nd step will be performed in dozf
+    if (symbol_type == SymbolType::kCalDL
+        or symbol_type == SymbolType::kCalUL) {
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i += cfg->BS_ANT_NUM)
+            for (size_t j = 0; j < cfg->BS_ANT_NUM - 1; j++)
+                fft_inout[std::min(i + j, cfg->OFDM_DATA_NUM - 1)
+                    + cfg->OFDM_DATA_START]
+                    = fft_inout[i + cfg->OFDM_DATA_START];
+    }
 
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset
             = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
-
         // We have kTransposeBlockSize % kSCsPerCacheline == 0
         for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
              sc_j += kSCsPerCacheline) {
@@ -236,13 +244,8 @@ void DoFFT::partial_transpose(
             const complex_float* src
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
-            complex_float* dst = nullptr;
-            if (symbol_type == SymbolType::kCalUL) {
-                dst = &out_buf[(block_idx * kTransposeBlockSize) + sc_j];
-            } else {
-                dst = &out_buf[block_base_offset
-                    + (ant_id * kTransposeBlockSize) + sc_j];
-            }
+            complex_float* dst = &out_buf[block_base_offset
+                + (ant_id * kTransposeBlockSize) + sc_j];
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline

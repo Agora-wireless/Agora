@@ -21,7 +21,6 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
-#include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
@@ -91,6 +90,7 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    // Send current frame's SNR measurements from PHY to MAC
     void send_snr_report(
         EventType event_type, size_t frame_id, size_t symbol_id);
     void move_events_between_queues(
@@ -243,10 +243,6 @@ private:
     // Calculated uplink zeroforcing detection matrices. Each matrix has
     // [number of UEs] rows and [number of antennas] columns.
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
-
-    // 1st dimension: TASK_BUFFER_FRAME_NUM
-    // 2nd dimension: number of OFDM data subcarriers * number of antennas
-    Table<complex_float> recip_buffer_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas

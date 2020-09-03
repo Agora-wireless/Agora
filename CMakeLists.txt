@@ -209,7 +209,6 @@ set(MILLIPEDE_SOURCES
   src/millipede/dodemul.cpp
   src/millipede/doprecode.cpp
   src/millipede/docoding.cpp
-  src/millipede/reciprocity.cpp
   src/millipede/radio_lib.cpp
   src/millipede/radio_calibrate.cpp
   src/mac/mac_thread.cpp)
@@ -284,13 +283,19 @@ add_executable(sim
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
+add_executable(chsim
+  simulator/chsim_main.cpp
+  simulator/channel_sim.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(chsim ${COMMON_LIBS})
+
 if(NOT ${USE_DPDK})
   # Create shared libraries for Python
   # DPDK is currently not supported
-  add_library(comp MODULE
-    $<TARGET_OBJECTS:millipede_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>)
-  target_link_libraries(comp ${COMMON_LIBS})
+  #  add_library(comp MODULE
+  #    $<TARGET_OBJECTS:millipede_sources_lib>
+  #    $<TARGET_OBJECTS:common_sources_lib>)
+  #  target_link_libraries(comp ${COMMON_LIBS})
 
   add_library(ue_phy MODULE
     $<TARGET_OBJECTS:client_sources_lib>
@@ -315,7 +320,8 @@ add_test(NAME test_ldpc COMMAND test_ldpc)
 
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
-  test_concurrent_queue test_zf test_zf_threaded test_ptr_grid)
+  test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
+  test_ptr_grid test_recipcal)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
