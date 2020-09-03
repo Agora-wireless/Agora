@@ -23,7 +23,7 @@
      "BGGGGGPGGUUUUG"
  ],
  "downlink_mode": false,
- false"client_ul_pilot_syms" : 2,
+ "client_ul_pilot_syms" : 2,
  "worker_thread_num" : 25,
  "demul_block_size" : 48
 }
