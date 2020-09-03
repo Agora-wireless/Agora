@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef MILLIPEDE_HEAD
-#define MILLIPEDE_HEAD
+#ifndef AGORA_HEAD
+#define AGORA_HEAD
 
 #include "buffer.hpp"
 #include "concurrent_queue_wrapper.hpp"
