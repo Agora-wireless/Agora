@@ -22,7 +22,7 @@ public:
     void update_evm_stats(size_t, size_t, cx_fmat);
     void print_evm_stats(size_t);
     void update_pilot_snr(size_t, size_t, complex_float*);
-    float get_evm_snr(size_t, size_t);
+    float get_evm_snr(size_t frame_id, size_t ue_id);
     void print_snr_stats(size_t);
 
 private:
