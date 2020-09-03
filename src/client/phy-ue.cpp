@@ -748,17 +748,16 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
                                          [cb_offset];
             }
-            int8_t* output_ptr = encoded_buffer_temp;
 
             ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
-                LDPC_config.nRows, output_ptr, parity_buffer, input_ptr);
+                LDPC_config.nRows, encoded_buffer_temp, parity_buffer,
+                input_ptr);
             int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_type;
             int output_offset
                 = total_ul_symbol_id * data_sc_len + cbCodedBytes * cb_id;
-            int8_t* final_output_ptr
-                = (int8_t*)&ul_syms_buffer_[ue_id][output_offset];
-            adapt_bits_for_mod(output_ptr, final_output_ptr,
-                encoded_bytes_per_block, cfg->mod_type);
+            adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+                &ul_syms_buffer_[ue_id][output_offset], encoded_bytes_per_block,
+                cfg->mod_type);
         }
     }
     //double duration = worker_rdtsc() - start_tsc;

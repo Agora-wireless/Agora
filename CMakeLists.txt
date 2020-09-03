@@ -46,8 +46,8 @@ find_package(GTest REQUIRED)
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 else()
   message(STATUS "Debugging is enabled. Performance will be low")
 endif()
@@ -307,42 +307,25 @@ add_executable(test_millipede
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_millipede ${COMMON_LIBS})
 
-# The tests to run using ctest
-add_executable(test_zf
-  test/unit_tests/test_zf.cc
-  $<TARGET_OBJECTS:millipede_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_zf ${COMMON_LIBS})
-add_test(NAME test_zf COMMAND test_zf)
-
 add_executable(test_ldpc
   test/compute_kernels/ldpc/test_ldpc.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
 
-add_executable(test_datatype_conversion
-  test/unit_tests/test_datatype_conversion.cc
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_datatype_conversion ${COMMON_LIBS})
-add_test(NAME test_datatype_conversion COMMAND test_datatype_conversion)
+# Unit tests
+set(UNIT_TESTS test_datatype_conversion test_udp_client_server
+  test_concurrent_queue test_zf test_zf_threaded test_ptr_grid)
 
-add_executable(test_udp_client_server
-  test/unit_tests/test_udp_client_server.cc)
-target_link_libraries(test_udp_client_server ${COMMON_LIBS})
-add_test(NAME test_udp_client_server COMMAND test_udp_client_server)
+foreach(test_name IN LISTS UNIT_TESTS)
+  add_executable(${test_name}
+    test/unit_tests/${test_name}.cc
+    $<TARGET_OBJECTS:millipede_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
 
-add_executable(test_concurrent_queue
-  test/unit_tests/test_concurrent_queue.cc
-   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_concurrent_queue ${COMMON_LIBS})
-add_test(NAME test_concurrent_queue COMMAND test_concurrent_queue)
+  # Unit tests should pass without memory errors
+  set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
 
-add_executable(test_zf_threaded
-  test/unit_tests/test_zf_threaded.cc
-   $<TARGET_OBJECTS:millipede_sources_lib>
-   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_zf_threaded ${COMMON_LIBS})
-add_test(NAME test_zf_threaded COMMAND test_zf_threaded)
-
-
+  target_link_libraries(${test_name} ${COMMON_LIBS})
+  add_test(NAME ${test_name} COMMAND ${test_name})
+endforeach()
