@@ -22,17 +22,17 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
-    int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     rte_flow_error error;
     rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
-        uint16_t src_port = rte_cpu_to_be_16(cfg->ue_tx_port);
-        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_port + i);
+        uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port);
+        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
             server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
         printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
@@ -248,8 +248,8 @@ int PacketTXRX::dequeue_send(int tid)
 
     struct rte_udp_hdr* udp_h
         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_port + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(cfg->ue_rx_port + tid);
+    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port + tid);
+    udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port + tid);
 
     tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
     tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
