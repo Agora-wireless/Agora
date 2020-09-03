@@ -183,10 +183,9 @@ private:
     // 2nd dimension: socket buffer status size
     Table<int> socket_buffer_status_;
 
-    // Estimated CSI data
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * pilots per frame
-    // 2nd dimension: number of antennas * number of OFDM data subcarriers
-    Table<complex_float> csi_buffer_;
+    // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
+    // [number of OFDM data subcarriers] columns.
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
 
     // Data symbols after FFT
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -197,10 +196,9 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated uplink zeroforcing detection matrices
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> ul_zf_buffer_;
+    // Calculated uplink zeroforcing detection matrices. Each matrix has
+    // [number of antennas] rows and [number of UEs] columns.
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -242,10 +240,9 @@ private:
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
 
-    // Calculated zeroforcing precoders for downlink beamforming
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> dl_zf_buffer_;
+    // Calculated uplink zeroforcing detection matrices. Each matrix has
+    // [number of UEs] rows and [number of antennas] columns.
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
