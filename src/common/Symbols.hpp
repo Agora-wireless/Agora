@@ -18,8 +18,10 @@
 #define NUM_BITS 4
 #define MAX_CODED_SC 1152
 
-// Number of frames received that we allocate space for in worker threads
+// Number of frames received that we allocate space for in worker threads. This
+// is the frame window that we track in Millipede.
 #define TASK_BUFFER_FRAME_NUM 40
+static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
@@ -93,7 +95,7 @@ enum class PrintType : int {
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Millipede on machines
 // with insufficient cores, disable this flag.
-static constexpr size_t kEnableThreadPinning = false;
+static constexpr size_t kEnableThreadPinning = true;
 
 #define BIGSTATION 0
 #ifdef USE_DPDK
@@ -183,33 +185,17 @@ static inline std::string thread_type_str(ThreadType thread_type)
 
 enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
-class LDPCconfig {
-public:
-    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
-    uint16_t Zc; /// The 5G NR LDPC expansion factor
-    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
-
-    /// Allow the LDPC decoder to terminate without completing all iterations
-    /// if it decodes the codeblock eariler
-    bool earlyTermination;
-
-    size_t nRows; /// Number of rows in the LDPC base graph to use
-    uint32_t cbLen; /// Number of information bits input to LDPC encoding
-    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
-    size_t nblocksInSymbol;
-};
-
 // Maximum number of symbols per frame allowed by Millipede
-static constexpr size_t kMaxSymbolsPerFrame = 1400;
+static constexpr size_t kMaxSymbols = 70;
 
-// Maximum number of OFDM subcarriers in the 5G spec
-static constexpr size_t k5GMaxSubcarriers = 3300;
+// Maximum number of OFDM data subcarriers in the 5G spec
+static constexpr size_t kMaxDataSCs = 3300;
 
 // Maximum number of antennas supported by Millipede
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 1000;
+static constexpr size_t kMaxUEs = 64;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
