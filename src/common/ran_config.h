@@ -1,10 +1,10 @@
 #pragma once
 
 /**
- * @brief The struct that contains the RAN configuration that Millipede must
+ * @brief The struct that contains the RAN configuration that Agora must
  * apply for a particular frame.
  * 
- * The RanConfig class contains the RAN parameters that Millipede must configure
+ * The RanConfig class contains the RAN parameters that Agora must configure
  * before processing a particular frame.
  * TODO: this is a work in progress.
  */

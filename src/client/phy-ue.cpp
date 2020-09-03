@@ -280,7 +280,7 @@ void Phy_UE::start()
                 ant_id = pkt->ant_id;
                 rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
                     "Error: Received packet for future frame beyond frame "
-                    "window. This can happen if Millipede is running "
+                    "window. This can happen if PHY is running "
                     "slowly, e.g., in debug mode");
 
                 size_t dl_symbol_id = 0;

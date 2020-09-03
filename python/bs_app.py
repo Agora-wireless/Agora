@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-# BS-side application that receives data packets from Millepede MAC
+# BS-side application that receives data packets from Agora MAC
 # packet_size argument should correspond to the number of bits per
-# PHY layer frame in Millipede
+# PHY layer frame in Agora
 # Running example: ./python/bs_app.py --packet-size 66 --stream-num 1
 
 import socket
