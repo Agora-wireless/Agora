@@ -48,6 +48,8 @@ void print128_epi8(__m128i var)
 
 void init_modulation_table(Table<float>& mod_table, size_t mod_order)
 {
+    if (!mod_table.is_allocated())
+        mod_table.malloc(pow(2, kMaxModType), 2, 32);
     switch (mod_order) {
     case 4:
         init_qpsk_table(mod_table);
@@ -74,7 +76,6 @@ void init_modulation_table(Table<float>& mod_table, size_t mod_order)
  */
 void init_qpsk_table(Table<float>& qpsk_table)
 {
-    qpsk_table.malloc(4, 2, 32);
     float scale = 1 / sqrt(2);
     float mod_qpsk[2] = { -scale, scale };
     for (int i = 0; i < 4; i++) {
@@ -114,7 +115,6 @@ void init_qpsk_table(Table<float>& qpsk_table)
  */
 void init_qam16_table(Table<float>& qam16_table)
 {
-    qam16_table.malloc(16, 2, 32);
     float scale = 1 / sqrt(10);
     float mod_16qam[4] = { 1 * scale, 3 * scale, (-1) * scale, (-3) * scale };
     for (int i = 0; i < 16; i++) {
@@ -145,7 +145,6 @@ void init_qam16_table(Table<float>& qam16_table)
 
 void init_qam64_table(Table<float>& qam64_table)
 {
-    qam64_table.malloc(64, 2, 32);
     float scale = 1 / sqrt(42);
     float mod_64qam[8] = { 3 * scale, 1 * scale, 5 * scale, 7 * scale,
         (-3) * scale, (-1) * scale, (-5) * scale, (-7) * scale };

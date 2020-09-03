@@ -607,6 +607,7 @@ Config::~Config()
 {
     free_buffer_1d(&pilots_);
     free_buffer_1d(&pilots_sgn_);
+    mod_table.free();
     dl_bits.free();
     ul_bits.free();
     dl_iq_f.free();
