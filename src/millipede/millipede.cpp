@@ -93,19 +93,6 @@ void Millipede::stop()
     receiver_.reset();
 }
 
-/// Enqueue a batch of task_set_size tasks starting from task index
-/// (task_set_size * task_set_id).
-static void schedule_task_set(EventType task_type, int task_set_size,
-    int task_set_id, moodycamel::ConcurrentQueue<Event_data>* task_queue,
-    moodycamel::ProducerToken* producer_token)
-{
-    Event_data task(task_type, task_set_size * task_set_id);
-    for (int i = 0; i < task_set_size; i++) {
-        try_enqueue_fallback(task_queue, producer_token, task);
-        task.tags[0]++;
-    }
-}
-
 void Millipede::schedule_antennas(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
@@ -276,15 +263,6 @@ void Millipede::start()
                 for (size_t i = 0; i < event.num_tags; i++) {
                     handle_event_fft(event.tags[i]);
                 }
-            } break;
-
-            case EventType::kRC: {
-                size_t frame_id = event.tags[0];
-                stats->master_set_tsc(TsType::kRCDone, frame_id);
-                print_per_frame_done(PrintType::kRC, frame_id);
-                fft_stats_.symbol_rc_count[frame_id % TASK_BUFFER_FRAME_NUM]
-                    = 0;
-                rc_stats_.last_frame = frame_id;
             } break;
 
             case EventType::kZF: {
@@ -588,6 +566,11 @@ void Millipede::handle_event_fft(size_t tag)
                 if (fft_stats_.last_symbol(frame_id)) {
                     stats->master_set_tsc(TsType::kFFTDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
+                    if (!kUseArgos && frame_id + 1 < config_->frames_to_test) {
+                        // For Simulation: send beacon for next frame
+                        for (size_t i = 0; i < config_->socket_thread_num; i++)
+                            receiver_->send_beacon(i, frame_id + 1);
+                    }
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
                     schedule_subcarriers(EventType::kZF, frame_id, 0);
@@ -613,8 +596,9 @@ void Millipede::handle_event_fft(size_t tag)
             == fft_stats_.max_symbol_rc_count) {
             print_per_frame_done(PrintType::kFFTCal, frame_id);
             // TODO: rc_stats_.max_task_count appears uninitalized
-            schedule_task_set(EventType::kRC, rc_stats_.max_task_count,
-                frame_id, get_conq(EventType::kRC), get_ptok(EventType::kRC));
+            stats->master_set_tsc(TsType::kRCDone, frame_id);
+            fft_stats_.symbol_rc_count[frame_id % TASK_BUFFER_FRAME_NUM] = 0;
+            rc_stats_.last_frame = frame_id;
         }
     }
 }
@@ -635,7 +619,7 @@ void* Millipede::worker(int tid)
 
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
-        recip_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
+        calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz,
         *get_conq(EventType::kDemul), complete_task_queue_,
@@ -661,13 +645,9 @@ void* Millipede::worker(int tid)
         decode_ptoks_ptr[tid], demod_buffers_, decoded_buffer_, phy_stats,
         stats);
 
-    auto* computeReciprocity = new Reciprocity(config_, tid, freq_ghz,
-        *get_conq(EventType::kRC), complete_task_queue_, worker_ptoks_ptr[tid],
-        calib_buffer_, recip_buffer_, stats);
-
-    std::vector<Doer*> computers_vec = { computeIFFT, computePrecode,
-        computeDecodingLast, computeZF, computeFFT, computeReciprocity,
-        computeDecoding, computeDemul, computeEncoding };
+    std::vector<Doer*> computers_vec
+        = { computeIFFT, computePrecode, computeDecodingLast, computeZF,
+              computeFFT, computeDecoding, computeDemul, computeEncoding };
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
@@ -705,7 +685,7 @@ void* Millipede::worker_zf(int tid)
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
-        recip_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
+        calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
     while (true) {
         computeZF->try_launch();
@@ -1148,8 +1128,6 @@ void Millipede::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    recip_buffer_.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
@@ -1186,7 +1164,6 @@ void Millipede::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
-    recip_buffer_.free();
     calib_buffer_.free();
     dl_encoded_buffer_.free();
 
