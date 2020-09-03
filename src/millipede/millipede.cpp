@@ -385,7 +385,7 @@ void Millipede::start()
             case EventType::kRANUpdate: {
                 RanConfig rc;
                 rc.n_antennas = event.tags[0];
-                rc.mod_type = event.tags[1];
+                rc.mod_order_bits = event.tags[1];
                 rc.frame_id = event.tags[2];
                 update_ran_config(rc);
             } break;
@@ -762,7 +762,7 @@ void Millipede::create_threads(
 
 void Millipede::update_ran_config(RanConfig rc)
 {
-    config_->mod_type = rc.mod_type;
+    config_->update_mod_cfgs(rc.mod_order_bits);
 }
 
 void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
