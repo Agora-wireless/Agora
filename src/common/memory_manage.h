@@ -6,6 +6,7 @@
 #ifndef MEMORY_MANAGE
 #define MEMORY_MANAGE
 #include <array>
+#include <assert.h>
 #include <cstdlib>
 #include <cstring>
 #include <malloc.h>
@@ -162,9 +163,19 @@ template <size_t DIM1, size_t DIM2, size_t DIM3, class T> class PtrCube {
 public:
     PtrCube() {}
 
-    /// Create a cube of pointers where each cube cell points to an array of
-    /// [n_entries]
-    PtrCube(size_t n_entries) { alloc(n_entries); }
+    /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
+    /// cube cell points to an array of [n_entries]
+    PtrCube(size_t n_entries) { alloc(DIM1, DIM2, DIM3, n_entries); }
+
+    /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
+    /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells
+    /// pointing to an array of [n_entries]. This can use less memory than a
+    /// fully-allocated cube.
+    PtrCube(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
+    {
+        assert(dim_1 <= DIM1 && dim_2 <= DIM2 && dim_3 <= DIM3);
+        alloc(dim_1, dim_2, dim_3, n_entries);
+    }
 
     ~PtrCube()
     {
@@ -173,43 +184,28 @@ public:
     }
 
     /// Allocate [n_entries] entries per pointer cell
-    void alloc(size_t n_entries)
+    void alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
     {
-        const size_t alloc_sz = DIM1 * DIM2 * DIM3 * n_entries * sizeof(T);
+        const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
         backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
         memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
         is_allocated = true;
 
         // Fill-in the grid with pointers into backing_buf
-        size_t offset = 0;
         for (auto& mat : cube) {
             for (auto& row : mat) {
                 for (auto& entry : row) {
-                    entry = &backing_buf[offset];
-                    offset += n_entries;
+                    entry = nullptr;
                 }
             }
         }
-    }
 
-    /// Allocate [n_entries] entries per pointer cell.
-    /// Each entry is a random float between -1.0 and 1.0.
-    void rand_alloc_cx_float(size_t n_entries)
-    {
-        static_assert(
-            sizeof(T) == 2 * sizeof(float), "T must be complex_float");
-        alloc(n_entries);
-
-        std::default_random_engine generator;
-        std::uniform_real_distribution<float> distribution(-1.0, 1.0);
-
-        for (auto& mat : cube) {
-            for (auto& row : mat) {
-                for (auto& entry : row) {
-                    auto* base = reinterpret_cast<float*>(entry);
-                    for (size_t i = 0; i < n_entries * 2; i++) {
-                        base[i] = distribution(generator);
-                    }
+        size_t offset = 0;
+        for (size_t i = 0; i < dim_1; i++) {
+            for (size_t j = 0; j < dim_2; j++) {
+                for (size_t k = 0; k < dim_3; k++) {
+                    cube[i][j][k] = &backing_buf[offset];
+                    offset += n_entries;
                 }
             }
         }
