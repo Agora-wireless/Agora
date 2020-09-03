@@ -1,5 +1,4 @@
-#ifndef RANCONFIG
-#define RANCONFIG
+#pragma once
 
 /**
  * @brief The struct that contains the RAN configuration that Millipede must
@@ -30,5 +29,3 @@ public:
     size_t ue_id; /// UE ID
     size_t mod_order_bits; /// modulation type (number of bits)
 };
-
-#endif
