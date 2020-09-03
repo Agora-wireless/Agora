@@ -1,18 +1,16 @@
 #ifndef COMP_HEAD
 #define COMP_HEAD
-#include "config.hpp"
-#include "txrx_client.hpp"
-//#include "l2.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "mac_thread.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
 #include "net.hpp"
 #include "signalHandler.hpp"
-#include "txrx_mac.hpp"
+#include "txrx_client.hpp"
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
@@ -40,35 +38,6 @@ using namespace arma;
 
 class Phy_UE {
 public:
-/* TASK & SOCKET thread number */
-#ifdef SIM
-    static const int RX_THREAD_NUM = 1;
-    static const int TASK_THREAD_NUM = 8;
-#else
-    static const int RX_THREAD_NUM = 2;
-    static const int TASK_THREAD_NUM = 12;
-#endif
-    static const int TX_THREAD_NUM = 1;
-    static const int L2_THREAD_NUM = 1;
-// defined by protocol usually
-// buffer length of downlink which is synced to uplink
-#ifdef SIM
-    static const int TX_RX_FRAME_OFFSET = 2;
-#else
-    static const int TX_RX_FRAME_OFFSET = 12;
-#endif
-    // static const int TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
-    // buffer length of each socket thread
-    // the actual length will be RX_BUFFER_FRAME_NUM
-    // * symbol_num_perframe * BS_ANT_NUM
-    // static const int RX_BUFFER_FRAME_NUM = 80;
-    // static const int TX_BUFFER_FRAME_NUM = 80;
-    // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
-    // static const int TASK_BUFFER_FRAME_NUM = 60;
-    // optimization parameters for block transpose (see the slides for more
-    // details)
-    // do demul_block_size sub-carriers in each task
-    // static const int demul_block_size = OFDM_CA_NUM*2/transpose_block_size;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
     static const int dequeue_bulk_size = 5;
@@ -87,7 +56,6 @@ public:
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
-    void doMapBits(int, size_t);
     void doEncode(int, size_t);
     void doModul(int, size_t);
     void doIFFT(int, size_t);
@@ -182,16 +150,12 @@ private:
     size_t symbol_perframe;
     size_t ul_pilot_symbol_perframe;
     size_t dl_pilot_symbol_perframe;
-    // static const int empty_symbol_num_perframe;
     size_t ul_data_symbol_perframe;
     size_t dl_data_symbol_perframe;
     size_t ul_symbol_perframe;
     size_t dl_symbol_perframe;
     size_t tx_symbol_perframe;
     size_t symbol_len; // samples in sym without prefix and postfix
-    size_t dl_prefix_len;
-    size_t prefix_len;
-    size_t postfix_len;
     size_t ofdm_syms; // number of OFDM symbols in general symbol (i.e. symbol)
     size_t FFT_LEN;
     size_t CP_LEN;
@@ -215,22 +179,31 @@ private:
     size_t RX_BUFFER_FRAME_NUM;
     size_t TX_BUFFER_FRAME_NUM;
 
+    MacThread* mac_thread_; // The thread running MAC layer functions
+    std::thread mac_std_thread_; // Handle for the MAC thread
+
+    // The frame ID of the next MAC packet we expect to receive from the MAC
+    // thread
+    size_t expected_frame_id_from_mac_ = 0;
+    size_t current_frame_user_num_ = 0;
+
+    // num_frames_consumed_[i] is the number of frames on the uplink completely
+    // processed (i.e., including radio transmissing) by the PHY for UE #i
+    size_t num_frames_consumed_[kMaxUEs] = {};
+
     /*****************************************************
      * Uplink
      *****************************************************/
 
-    // std::unique_ptr<L2> l2_;
-
     /**
-     * transmit data
-     * Frist dimension: TX_THREAD_NUM
-     * Second dimension of buffer (type: uchar): packet_length * UE_NUM *
-     * DL_SYM_PER_FRAME * TX_BUFFER_FRAME_NUM packet_length = sizeof(int) * 4 +
-     * sizeof(uchar) * OFDM_FRAME_LEN; Second dimension of buffer_status:
-     * DL_SYM_PER_FRAME * UE_NUM * TX_BUFFER_FRAME_NUM
+     * Transmit data
+     *
+     * Number of transmit buffers (size = packet_length) and buffer status
+     * entries: TX_THREAD_NUM * TX_BUFFER_FRAME_NUM * UE_NUM * DL_SYM_PER_FRAME
      */
     char* tx_buffer_;
     int* tx_buffer_status_;
+
     int tx_buffer_size;
     int tx_buffer_status_size;
 
@@ -248,8 +221,8 @@ private:
      * First dimension: data_symbol_num_perframe (40-4) *
      * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
      */
-    Table<char> ul_bits_buffer_;
-    Table<int> ul_bits_buffer_status_;
+    Table<uint8_t> ul_bits_buffer_;
+    Table<uint8_t> ul_bits_buffer_status_;
     int ul_bits_buffer_size_;
 
     Table<uint8_t> ul_syms_buffer_;
@@ -266,19 +239,17 @@ private:
      *****************************************************/
 
     std::unique_ptr<RadioTXRX> ru_;
-    std::unique_ptr<PacketTXRX> mac_receiver_;
 
     /**
-     * received data
-     * Frist dimension: RX_THREAD_NUM
-     * Second dimension of buffer (type: char): packet_length *
-     * symbol_num_perframe * BS_ANT_NUM * RX_BUFFER_FRAME_NUM packet_length =
-     * sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2; Second dimension
-     * of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * RX_BUFFER_FRAME_NUM
+     * Received data
+     *
+     * Number of RX buffers (size = packet_length) and buffer status
+     * entries: RX_THREAD_NUM * RX_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * symbol_num_perframe
      */
     Table<char> rx_buffer_;
     Table<int> rx_buffer_status_;
+
     int rx_buffer_size;
     int rx_buffer_status_size;
 
@@ -330,7 +301,6 @@ private:
     moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
     moodycamel::ConcurrentQueue<Event_data> encode_queue_;
     moodycamel::ConcurrentQueue<Event_data> modul_queue_;
-    moodycamel::ConcurrentQueue<Event_data> map_queue_;
 
     pthread_t task_threads[kMaxThreads];
 
@@ -354,9 +324,6 @@ private:
 
     std::queue<std::tuple<int, int>> taskWaitList;
 
-    /* lookup table for QAM, real and imag */
-    Table<float> qam_table;
-
     // for python
     /**
      * dimension: OFDM*UE_NUM
@@ -365,11 +332,5 @@ private:
     // long long* demul_output;
     // float* equal_output;
     size_t record_frame = SIZE_MAX;
-#if USE_IPV4
-    struct sockaddr_in* servaddr_; /* server address */
-#else
-    struct sockaddr_in6* servaddr_; /* server address */
-#endif
-    int* socket_;
 };
 #endif

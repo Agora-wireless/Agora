@@ -13,6 +13,7 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "stats.hpp"
+#include "utils.h"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -24,8 +25,10 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& csi_buffer, Table<complex_float>& recip_buffer,
-        Table<complex_float>& ul_zf_buffer, Table<complex_float>& dl_zf_buffer,
+        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+        Table<complex_float>& calib_buffer,
+        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
+        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
         Stats* stats_manager);
     ~DoZF();
 
@@ -53,7 +56,7 @@ private:
     /// Compute the uplink zeroforcing detector matrix and/or the downlink
     /// zeroforcing precoder using this CSI matrix and calibration buffer
     void compute_precoder(const arma::cx_fmat& mat_csi,
-        const complex_float* recip_buf, complex_float* mat_ul_zf,
+        complex_float* calib_buf, complex_float* mat_ul_zf,
         complex_float* mat_dl_zf);
 
     void ZF_freq_orthogonal(size_t tag);
@@ -82,14 +85,16 @@ private:
      */
     void Predict(size_t offset);
 
-    Table<complex_float> csi_buffer_;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     complex_float* pred_csi_buffer;
-    Table<complex_float> recip_buffer_;
-    Table<complex_float> ul_zf_buffer_;
-    Table<complex_float> dl_zf_buffer_;
+    Table<complex_float> calib_buffer_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
     DurationStat* duration_stat;
 
     complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI
+    // Intermediate buffer to gather reciprical calibration data vector
+    complex_float* calib_gather_buffer;
 };
 
 #endif

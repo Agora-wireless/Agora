@@ -21,6 +21,7 @@
 #include <rte_pause.h>
 #include <rte_prefetch.h>
 #include <rte_udp.h>
+#include <string>
 #include <unistd.h>
 
 #define RX_RING_SIZE 2048
@@ -35,7 +36,8 @@
 /// Maximum number of packets received in rx_burst
 static constexpr size_t kRxBatchSize = 16;
 static constexpr size_t kTxBatchSize = 1;
-/// Offset to the payload
+
+/// Offset to the payload starting from the beginning of the UDP frame
 static constexpr size_t kPayloadOffset = sizeof(struct rte_ether_hdr)
     + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr) + 22;
 static_assert(kPayloadOffset == 64, "");
@@ -55,6 +57,20 @@ public:
     static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
     static void print_pkt(int src_ip, int dst_ip, uint16_t src_port,
         uint16_t dst_port, int len, int tid);
+
+    /// Return a string representation of this packet
+    static std::string pkt_to_string(const rte_mbuf* pkt);
+
+    /// Allocate and return a fresh rte_mbuf with Ethernet, IPv4, and UDP
+    /// header filled
+    static rte_mbuf* alloc_udp(rte_mempool* mbuf_pool,
+        rte_ether_addr src_mac_addr, rte_ether_addr dst_mac_addr,
+        uint32_t src_ip_addr, uint32_t dst_ip_addr, uint16_t src_udp_port,
+        uint16_t dst_udp_port, size_t buffer_length);
+
+    /// Init dpdk on core [core_offset:core_offset+thread_num]
+    static void dpdk_init(uint16_t core_offset, size_t thread_num);
+    static rte_mempool* create_mempool();
 };
 
 #endif

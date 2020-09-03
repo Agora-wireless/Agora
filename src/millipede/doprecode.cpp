@@ -12,19 +12,18 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& in_precoder_buffer,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
-    , precoder_buffer_(in_precoder_buffer)
+    , dl_zf_matrices_(dl_zf_matrices)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_raw_data(dl_encoded_or_raw_data)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
-    init_modulation_table(qam_table, cfg->mod_type);
 
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
@@ -61,11 +60,6 @@ Event_data DoPrecode::launch(size_t tag)
         for (int j = 0; j < 4; j++) {
             size_t start_tsc2 = worker_rdtsc();
             int cur_sc_id = base_sc_id + i + j;
-            int precoder_offset
-                = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
-                + cur_sc_id;
-            if (cfg->freq_orthogonal_pilot)
-                precoder_offset = precoder_offset - (cur_sc_id % cfg->UE_NUM);
 
             complex_float* data_ptr = modulated_buffer_temp;
             if (data_symbol_idx_dl
@@ -74,25 +68,23 @@ Event_data DoPrecode::launch(size_t tag)
                     data_ptr[user_id]
                         = cfg->ue_specific_pilot[user_id][cur_sc_id];
             } else {
-                int symbol_id_in_buffer
-                    = data_symbol_idx_dl - cfg->dl_data_symbol_start;
-
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
                     int8_t* raw_data_ptr
-                        = &dl_raw_data[kUseLDPC ? total_data_symbol_idx
-                                                : symbol_id_in_buffer][cur_sc_id
-                            + cfg->OFDM_DATA_NUM * user_id];
+                        = &dl_raw_data[total_data_symbol_idx][cur_sc_id
+                            + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
                     if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
                         data_ptr[user_id]
                             = cfg->ue_specific_pilot[user_id][cur_sc_id];
                     else
                         data_ptr[user_id] = mod_single_uint8(
-                            (uint8_t) * (raw_data_ptr), qam_table);
+                            (uint8_t) * (raw_data_ptr), cfg->mod_table);
                 }
             }
 
-            cx_float* precoder_ptr
-                = (cx_float*)precoder_buffer_[precoder_offset];
+            auto* precoder_ptr = reinterpret_cast<cx_float*>(
+                dl_zf_matrices_[frame_id % kFrameWnd]
+                               [cfg->get_zf_sc_id(cur_sc_id)]);
+
             cx_fmat mat_precoder(
                 precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
             cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
@@ -128,7 +120,7 @@ Event_data DoPrecode::launch(size_t tag)
                 = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
             __m256d t_data
                 = _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
-            _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);
+            _mm256_store_pd((double*)(ifft_ptr + i * 8), t_data);
         }
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;

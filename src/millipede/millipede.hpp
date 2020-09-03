@@ -17,14 +17,13 @@
 #include "doprecode.hpp"
 #include "dozf.hpp"
 #include "gettime.h"
+#include "mac_thread.hpp"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
-#include "reciprocity.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
-#include "txrx_mac.hpp"
 #include "utils.h"
 #include <algorithm>
 #include <armadillo>
@@ -81,6 +80,9 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
+    // Update Millipede config of RAN parameters
+    void update_ran_config(RanConfig rc);
+
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
@@ -88,6 +90,11 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    // Send current frame's SNR measurements from PHY to MAC
+    void send_snr_report(
+        EventType event_type, size_t frame_id, size_t symbol_id);
+    void move_events_between_queues(
+        EventType event_type1, EventType event_type2);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -95,10 +102,8 @@ public:
     void free_uplink_buffers();
     void free_downlink_buffers();
 
-    void save_demul_data_to_file(int frame_id);
     void save_decode_data_to_file(int frame_id);
     void save_tx_data_to_file(int frame_id);
-    void getDemulData(int** ptr, int* size);
     void getEqualData(float** ptr, int* size);
 
     // Flags that allow developer control over Millipede internals
@@ -147,7 +152,10 @@ private:
     int max_equaled_frame = 0;
     // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
-    std::unique_ptr<MacPacketTXRX> mac_receiver_;
+
+    MacThread* mac_thread_; // The thread running MAC layer functions
+    std::thread mac_std_thread_; // Handle for the MAC thread
+
     Stats* stats;
     PhyStats* phy_stats;
     // std::unique_ptr<Stats> stats_manager_;
@@ -175,10 +183,9 @@ private:
     // 2nd dimension: socket buffer status size
     Table<int> socket_buffer_status_;
 
-    // Estimated CSI data
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * pilots per frame
-    // 2nd dimension: number of antennas * number of OFDM data subcarriers
-    Table<complex_float> csi_buffer_;
+    // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
+    // [number of OFDM data subcarriers] columns.
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
 
     // Data symbols after FFT
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -189,20 +196,14 @@ private:
     // subcarrier 993 -- 1024 of antennas.
     Table<complex_float> data_buffer_;
 
-    // Calculated uplink zeroforcing detection matrices
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> ul_zf_buffer_;
+    // Calculated uplink zeroforcing detection matrices. Each matrix has
+    // [number of antennas] rows and [number of UEs] columns.
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
 
     // Data after equalization
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
-
-    // Data after hard demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<uint8_t> demod_hard_buffer_;
 
     // Data after soft demodulation
     // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
@@ -239,14 +240,9 @@ private:
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
 
-    // Calculated zeroforcing precoders for downlink beamforming
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of OFDM data subcarriers
-    // 2nd dimension: number of antennas * number of UEs
-    Table<complex_float> dl_zf_buffer_;
-
-    // 1st dimension: TASK_BUFFER_FRAME_NUM
-    // 2nd dimension: number of OFDM data subcarriers * number of antennas
-    Table<complex_float> recip_buffer_;
+    // Calculated uplink zeroforcing detection matrices. Each matrix has
+    // [number of UEs] rows and [number of antennas] columns.
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
@@ -258,21 +254,22 @@ private:
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> dl_bits_buffer_;
+    Table<uint8_t> dl_bits_buffer_;
 
     // 1st dimension: number of UEs
     // 2nd dimension: number of OFDM data subcarriers * TASK_BUFFER_FRAME_NUM
     //                * number of DL data symbols per frame
     // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
-    Table<int> dl_bits_buffer_status_;
+    Table<uint8_t> dl_bits_buffer_status_;
 
     /**
      * Data for transmission
-     * First dimension of buffer (type: char): symbol_num_perframe *
-     * SOCKET_BUFFER_FRAME_NUM Second dimension: packet_length * BS_ANT_NUM
-     * packet_length = sizeof(int) * 4 + sizeof(ushort) * OFDM_FRAME_LEN * 2;
-     * First dimension of buffer_status: symbol_num_perframe * BS_ANT_NUM *
-     * SOCKET_BUFFER_FRAME_NUM
+     *
+     * Number of downlink socket buffers and status entries:
+     * SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
+     *
+     * Size of each downlink socket buffer entry: packet_length bytes
+     * Size of each downlink socket buffer status entry: one integer
      */
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
@@ -286,14 +283,22 @@ private:
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
 
+    // Master-to-worker queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
+
+    // Worker-to-master queue for MAC
+    moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
+
     // Master thread's message queue for event completion from Doers;
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
 
+    // Master thread's message queue for event completion from DoDecode;
+    moodycamel::ConcurrentQueue<Event_data> complete_decode_task_queue_;
+
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    // moodycamel::ProducerToken* rx_ptoks_mac_ptr[kMaxThreads];
-    // moodycamel::ProducerToken* tx_ptoks_mac_ptr[kMaxThreads];
     moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 };
 
 #endif

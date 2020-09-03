@@ -11,15 +11,10 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define CODED_LEN 32
-#define ORIG_CODE_LEN 16
-#define N_ITE 10
-#define NUM_CODE_BLOCK 36
-#define NUM_BITS 4
-#define MAX_CODED_SC 1152
-
-// Number of frames received that we allocate space for in worker threads
+// Number of frames received that we allocate space for in worker threads. This
+// is the frame window that we track in Millipede.
 #define TASK_BUFFER_FRAME_NUM 40
+static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 
 // Number of frames received that we allocate space for in TX/RX threads
 #define SOCKET_BUFFER_FRAME_NUM 40
@@ -40,16 +35,18 @@ enum class EventType : int {
     kZF,
     kDemul,
     kIFFT,
-    kMapBits,
     kPrecode,
     kPacketTX,
     kDecode,
+    kDecodeLast,
     kEncode,
     kRC,
-    kRXSymbol,
     kModul,
     kPacketFromMac,
-    kPacketToMac
+    kPacketToMac,
+    kSNRReport, // Signal new SNR measurement from PHY to MAC
+    kRANUpdate, // Signal new RAN config to Millipede
+    kRBIndicator // Signal RB schedule to UEs
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;
@@ -93,13 +90,6 @@ enum class PrintType : int {
 static constexpr size_t kEnableThreadPinning = true;
 
 #define BIGSTATION 0
-#define USE_IPV4 1
-#if USE_IPV4
-static constexpr bool kUseIPv4 = true;
-#else
-static constexpr bool kUseIPv4 = false;
-#endif
-
 #ifdef USE_DPDK
 static constexpr bool kUseDPDK = true;
 #else
@@ -118,9 +108,9 @@ static constexpr bool kUseArgos = true;
 static constexpr bool kUseArgos = false;
 #endif
 
-static constexpr bool kConnectUDP = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
+static constexpr bool kCollectPhyStats = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
@@ -185,33 +175,24 @@ static inline std::string thread_type_str(ThreadType thread_type)
     return "Invalid thread type";
 }
 
-enum class SymbolType { kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
-
-struct LDPCconfig {
-    uint16_t Bg;
-    bool earlyTermination;
-    int16_t decoderIter;
-    uint16_t Zc;
-    size_t nRows;
-    uint32_t cbEncLen;
-    uint32_t cbLen;
-    uint32_t cbCodewLen;
-    size_t nblocksInSymbol;
-};
-
-typedef struct LDPCconfig LDPCconfig;
+enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
 // Maximum number of symbols per frame allowed by Millipede
-static constexpr size_t kMaxSymbolsPerFrame = 1400;
+static constexpr size_t kMaxSymbols = 70;
 
-// Maximum number of OFDM subcarriers in the 5G spec
-static constexpr size_t k5GMaxSubcarriers = 3300;
+// Maximum number of OFDM data subcarriers in the 5G spec
+static constexpr size_t kMaxDataSCs = 3300;
 
 // Maximum number of antennas supported by Millipede
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Millipede
-static constexpr size_t kMaxUEs = 1000;
+static constexpr size_t kMaxUEs = 64;
+
+// Maximum modulation (QAM256) supported by Millipede
+// Only up to QAM64 is implemented
+// Here using 8 helps reduce cache false sharing
+static constexpr size_t kMaxModType = 8;
 
 // Number of cellular frames tracked by Millipede stats
 static constexpr size_t kNumStatsFrames = 10000;
@@ -233,10 +214,10 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
-#ifdef USE_LDPC
-static constexpr bool kUseLDPC = true;
+#ifdef USE_AVX2_ENCODER
+static constexpr bool kUseAVX2Encoder = true;
 #else
-static constexpr bool kUseLDPC = false;
+static constexpr bool kUseAVX2Encoder = false;
 #endif
 
 // Enable debugging for sender and receiver applications

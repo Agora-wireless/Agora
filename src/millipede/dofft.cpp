@@ -5,6 +5,7 @@
  */
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
+#include "datatype_conversion.h"
 #include <malloc.h>
 
 using namespace arma;
@@ -101,7 +102,8 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<char>& socket_buffer, Table<int>& socket_buffer_status,
-    Table<complex_float>& data_buffer, Table<complex_float>& csi_buffer,
+    Table<complex_float>& data_buffer,
+    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
@@ -109,7 +111,7 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     , socket_buffer_(socket_buffer)
     , socket_buffer_status_(socket_buffer_status)
     , data_buffer_(data_buffer)
-    , csi_buffer_(csi_buffer)
+    , csi_buffers_(csi_buffers)
     , calib_buffer_(calib_buffer)
     , phy_stats(in_phy_stats)
 {
@@ -142,18 +144,26 @@ Event_data DoFFT::launch(size_t tag)
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
-    convert_short_to_float_simd(&pkt->data[2 * cfg->OFDM_PREFIX_LEN],
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+    if (cfg->fft_in_rru) {
+        simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
+            reinterpret_cast<float*>(
+                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_]),
+            cfg->OFDM_CA_NUM * 2);
+    } else {
+        convert_short_to_float_simd(
+            &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
+            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    if (kDebugPrintInTask) {
-        printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid,
-            frame_id, symbol_id, ant_id);
-        if (kPrintFFTInput) {
-            printf("FFT input\n");
-            for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-                printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
+        if (kDebugPrintInTask) {
+            printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
+                tid, frame_id, symbol_id, ant_id);
+            if (kPrintFFTInput) {
+                printf("FFT input\n");
+                for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+                    printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     }
 
@@ -171,26 +181,31 @@ Event_data DoFFT::launch(size_t tag)
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    DftiComputeForward(mkl_handle,
-        reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    if (!cfg->fft_in_rru) {
+        DftiComputeForward(mkl_handle,
+            reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
+    }
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (sym_type == SymbolType::kPilot) {
-        if (kPrintPhyStats)
+        if (kCollectPhyStats) {
             phy_stats->update_pilot_snr(frame_id,
                 cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
-        partial_transpose(cfg->get_csi_mat(csi_buffer_, frame_id, symbol_id),
-            ant_id, SymbolType::kPilot);
+        }
+
+        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
+        partial_transpose(
+            csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
         partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kUL);
     } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
         or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
         partial_transpose(
-            &calib_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM], ant_id,
-            SymbolType::kCalUL);
+            calib_buffer_[frame_slot], ant_id, SymbolType::kCalUL);
     } else {
         rt_assert(false, "Unknown or unsupported symbol type");
     }
@@ -208,11 +223,20 @@ void DoFFT::partial_transpose(
 {
     // We have OFDM_DATA_NUM % kTransposeBlockSize == 0
     const size_t num_blocks = cfg->OFDM_DATA_NUM / kTransposeBlockSize;
+    // Do the 1st step of 2-step reciprocal calibration
+    // The 2nd step will be performed in dozf
+    if (symbol_type == SymbolType::kCalDL
+        or symbol_type == SymbolType::kCalUL) {
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i += cfg->BS_ANT_NUM)
+            for (size_t j = 0; j < cfg->BS_ANT_NUM - 1; j++)
+                fft_inout[std::min(i + j, cfg->OFDM_DATA_NUM - 1)
+                    + cfg->OFDM_DATA_START]
+                    = fft_inout[i + cfg->OFDM_DATA_START];
+    }
 
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset
             = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
-
         // We have kTransposeBlockSize % kSCsPerCacheline == 0
         for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
              sc_j += kSCsPerCacheline) {
@@ -220,13 +244,8 @@ void DoFFT::partial_transpose(
             const complex_float* src
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
-            complex_float* dst = nullptr;
-            if (symbol_type == SymbolType::kCalUL) {
-                dst = &out_buf[(block_idx * kTransposeBlockSize) + sc_j];
-            } else {
-                dst = &out_buf[block_base_offset
-                    + (ant_id * kTransposeBlockSize) + sc_j];
-            }
+            complex_float* dst = &out_buf[block_base_offset
+                + (ant_id * kTransposeBlockSize) + sc_j];
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline
@@ -284,8 +303,8 @@ void DoFFT::partial_transpose(
                 fft_result1
                     = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
             }
-            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
-            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
+            _mm256_store_ps(reinterpret_cast<float*>(dst), fft_result0);
+            _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
         }
     }
