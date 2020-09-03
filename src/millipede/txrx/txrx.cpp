@@ -83,6 +83,23 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     return true;
 }
 
+void PacketTXRX::send_beacon(int tid, size_t frame_id)
+{
+    int radio_lo = tid * cfg->nRadios / socket_thread_num;
+    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+
+    // Send a beacon packet in the downlink to trigger user pilot
+    std::vector<uint8_t> udp_pkt_buf(cfg->packet_length, 0);
+    auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+    for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
+        new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
+        ssize_t r = sendto(socket_[ant_id], (char*)udp_pkt_buf.data(),
+            cfg->packet_length, 0, (struct sockaddr*)&servaddr_[ant_id],
+            sizeof(servaddr_[ant_id]));
+        rt_assert(r > 0, "sendto() failed");
+    }
+}
+
 void* PacketTXRX::loop_tx_rx(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
@@ -94,17 +111,19 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-        int local_port_id = cfg->bs_port + radio_id;
+        int local_port_id = cfg->bs_server_port + radio_id;
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            cfg->ue_rx_port + radio_id, cfg->sender_addr.c_str());
+            cfg->bs_rru_port + radio_id, cfg->rru_addr.c_str());
         printf("TXRX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%d \n",
-            tid, local_port_id, cfg->sender_addr.c_str(),
-            cfg->ue_rx_port + radio_id);
+            tid, local_port_id, cfg->rru_addr.c_str(),
+            cfg->bs_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
+
+    send_beacon(tid, 0); // Send Beacons for the first time to kick off sim
 
     int prev_frame_id = -1;
     int radio_id = radio_lo;
@@ -205,6 +224,14 @@ int PacketTXRX::dequeue_send(int tid)
         cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
         sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
+
+    // After sending all symbols, send beacon for next frame
+    if (frame_id + 1 < c->frames_to_test
+        && data_symbol_idx + c->pilot_symbol_num_perframe
+            == c->DLSymbols[0].back()
+        && ant_id == 0) {
+        send_beacon(tid, frame_id + 1);
+    }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketTX, event.tags[0])),

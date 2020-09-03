@@ -38,35 +38,6 @@ using namespace arma;
 
 class Phy_UE {
 public:
-/* TASK & SOCKET thread number */
-#ifdef SIM
-    static const int RX_THREAD_NUM = 1;
-    static const int TASK_THREAD_NUM = 8;
-#else
-    static const int RX_THREAD_NUM = 2;
-    static const int TASK_THREAD_NUM = 12;
-#endif
-    static const int TX_THREAD_NUM = 1;
-    static const int L2_THREAD_NUM = 1;
-// defined by protocol usually
-// buffer length of downlink which is synced to uplink
-#ifdef SIM
-    static const int TX_RX_FRAME_OFFSET = 2;
-#else
-    static const int TX_RX_FRAME_OFFSET = 12;
-#endif
-    // static const int TX_THREAD_NUM = ENABLE_DOWNLINK ? 7 : 0;
-    // buffer length of each socket thread
-    // the actual length will be RX_BUFFER_FRAME_NUM
-    // * symbol_num_perframe * BS_ANT_NUM
-    // static const int RX_BUFFER_FRAME_NUM = 80;
-    // static const int TX_BUFFER_FRAME_NUM = 80;
-    // buffer length of computation part (for FFT/CSI/ZF/DEMUL buffers)
-    // static const int TASK_BUFFER_FRAME_NUM = 60;
-    // optimization parameters for block transpose (see the slides for more
-    // details)
-    // do demul_block_size sub-carriers in each task
-    // static const int demul_block_size = OFDM_CA_NUM*2/transpose_block_size;
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
     static const int dequeue_bulk_size = 5;
@@ -179,7 +150,6 @@ private:
     size_t symbol_perframe;
     size_t ul_pilot_symbol_perframe;
     size_t dl_pilot_symbol_perframe;
-    // static const int empty_symbol_num_perframe;
     size_t ul_data_symbol_perframe;
     size_t dl_data_symbol_perframe;
     size_t ul_symbol_perframe;
@@ -366,7 +336,5 @@ private:
     // long long* demul_output;
     // float* equal_output;
     size_t record_frame = SIZE_MAX;
-    struct sockaddr_in* servaddr_; /* server address */
-    int* socket_;
 };
 #endif
