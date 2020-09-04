@@ -20,14 +20,14 @@
 class RadioConfig;
 
 /**
- * @brief Implementations of this class provide packet I/O for Millipede clients (UEs).
+ * @brief Implementations of this class provide packet I/O for Agora clients (UEs).
  *
  * In the vanilla mode, this class provides socket packet I/O for communicating
  * with channel simulator.
  *
  * In the "Argos" mode, this class uses SoapySDR-based functions (from client_radio.cpp)
- * to communicate with Millipede client wireless hardware. Since clients require over-the-air
- * time synchronization with Millipede BS, this class provides two types of functions
+ * to communicate with Agora client wireless hardware. Since clients require over-the-air
+ * time synchronization with Agora BS, this class provides two types of functions
  * for this purpose:
  * 1) TX/RX with hardware-offloaded synchronization (loop_tx_rx_argos) where sync happens
  *    in the wireless hardware, where only downlink symbols' samples are received (guard

@@ -155,7 +155,7 @@ plot(n,y-T,'LineWidth',2)
 set(gca,'FontSize',18);
 xlabel('Total number of cores');
 ylabel('Latency (ms)');
-legend({'BigStation','MILLIPEDE'});
+legend({'BigStation','AGORA'});
 title('Frame processing latency comparison');
 grid on;
 % xlim([14,34]);

@@ -1,6 +1,6 @@
 /**
  * @file data_generator.cpp
- * @brief Data generator to generate binary files as inputs to Millipede, sender
+ * @brief Data generator to generate binary files as inputs to Agora, sender
  * and correctness tests
  */
 
