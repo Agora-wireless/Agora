@@ -1,5 +1,5 @@
 ### This dockerfile sets up an Ubuntu 18.04 environment from scratch 
-### that is sufficient to *run* Millipede (but not to build it).
+### that is sufficient to *run* Agora (but not to build it).
 
 ### Note: Dockerfile best practices include:
 ###  * Combine apt-get update and install into the same RUN line.
@@ -25,8 +25,8 @@ RUN apt-get install -y vim
 # Required for downloading and building the source packages belowo
 RUN apt-get -y install -y g++ cmake make wget git
 
-# Needed to build and run Millipede. 
-# Currently I'm not sure if *all* of these are needed to *run* Millipede, but some are. 
+# Needed to build and run Agora. 
+# Currently I'm not sure if *all* of these are needed to *run* Agora, but some are. 
 RUN apt-get -y install -y \
     libgflags-dev \
     liblapack-dev \
@@ -83,22 +83,22 @@ ENV DEBIAN_FRONTEND teletype
 
 
 # Copy in our relevant build files. ("test" is optional)
-COPY build/  Millipede/build/
-COPY data/   Millipede/data/
-COPY test/   Millipede/test/
-COPY run_millipede.sh Millipede/
+COPY build/  Agora/build/
+COPY data/   Agora/data/
+COPY test/   Agora/test/
+COPY run_agora.sh Agora/
 
 # Copy the FlexRAN files
 COPY FlexRAN-FEC-SDK-19-04/ /opt/
 
-# Set up the intel MKL compiler variables (shell environment vars) so that Millipede can run.
+# Set up the intel MKL compiler variables (shell environment vars) so that Agora can run.
 # This is only really needed when logging into the container via a remote bash shell and manually running commands.
 # Note that this will NOT take effect if a docker CMD or kubernetes command is used directly.
 RUN echo "source /opt/intel/compilers_and_libraries/linux/bin/compilervars.sh intel64" >> ~/.bashrc
 
 
-# Finally, do something, e.g., run Millipede.
-# TODO, e.g., CMD ./build/millipede data/tddconfig-sim-ul.json
+# Finally, do something, e.g., run Agora.
+# TODO, e.g., CMD ./build/agora data/tddconfig-sim-ul.json
 
 # This command is for debugging/testing; it makes the container run forever so we can remote into it.
 # It's better to do this using a kubernetes command instead.

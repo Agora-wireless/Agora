@@ -63,6 +63,8 @@ public:
         }
     }
 
+    bool is_allocated() { return dimension > 0; }
+
     void free(void)
     {
         std::free(data);

@@ -16,27 +16,27 @@ class Config(object):
 class CoMP(object):
     def __init__(self, configfile):
         conf = Config(configfile)
-        lib.Millipede_new.argtypes = [c_void_p]
-        lib.Millipede_new.restype = c_void_p
-        lib.Millipede_start.argtypes = [c_void_p]
-        lib.Millipede_start.restype = c_void_p
-        lib.Millipede_getEqualData.argtypes = [c_void_p,POINTER(POINTER(c_float)),POINTER(c_int)]
-        lib.Millipede_getEqualData.restype = c_void_p
-        self.obj = lib.Millipede_new(conf.obj)
+        lib.Agora_new.argtypes = [c_void_p]
+        lib.Agora_new.restype = c_void_p
+        lib.Agora_start.argtypes = [c_void_p]
+        lib.Agora_start.restype = c_void_p
+        lib.Agora_getEqualData.argtypes = [c_void_p,POINTER(POINTER(c_float)),POINTER(c_int)]
+        lib.Agora_getEqualData.restype = c_void_p
+        self.obj = lib.Agora_new(conf.obj)
 
     def startCoMP(self):
-    	lib.Millipede_start(self.obj)
+    	lib.Agora_start(self.obj)
 
     def stopCoMP(self):
-        lib.Millipede_stop()
+        lib.Agora_stop()
 
     def destroyCoMP(self):
-        lib.Millipede_destroy(self.obj)
+        lib.Agora_destroy(self.obj)
 
     def getEqualData(self):
         mem = POINTER(c_float)()
         size = c_int(0)
-        lib.Millipede_getEqualData(self.obj, mem, size)
+        lib.Agora_getEqualData(self.obj, mem, size)
         return mem,size
     
 

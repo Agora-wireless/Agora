@@ -1,4 +1,4 @@
-Millipede is a high-performance system for massive-MIMO baseband processing.
+Agora is a high-performance system for massive-MIMO baseband processing.
 
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+.
@@ -17,12 +17,12 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
        SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
        for LDPC decoding to `/opt`.
      * Compiling FlexRAN requires an Intel compiler.
-        * For Millipede developers: Please ask internally for precompiled
+        * For Agora developers: Please ask internally for precompiled
           FlexRAN libraries to use from `gcc`.
-        * For Millipede users:
+        * For Agora users:
           * Intel compiler version 19.0.4 is required for compiling FlexRAN.
             Newer versions will not work. Please reach out to the current
-            Millipede developers to learn how to get the correct versions of
+            Agora developers to learn how to get the correct versions of
             Intel Parallel Studio XE or Intel System Studio.
           * Set required environment variables by sourcing `compilervars.sh`.
             For example, if Intel compiler is in `/opt`, run `source $(find
@@ -40,15 +40,15 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
 
    * Optional: DPDK
       * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
-        Intel 40 GbE and Mellanox 100 GbE NICs in Millipede.
+        Intel 40 GbE and Mellanox 100 GbE NICs in Agora.
       * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
         DESTDIR=/usr -j`
 
-## Millipede quickstart
+## Agora quickstart
 
- * Build Millipede
+ * Build Agora
     ```
-    cd Millipede
+    cd Agora
     mkdir build
     cd build
     cmake ..
@@ -57,31 +57,31 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
 
  * Run end-to-end tests
     ```
-    ./test/test_millipede/test_millipede.sh 100 out % Runs test for 100 iterations
+    ./test/test_agora/test_agora.sh 100 out % Runs test for 100 iterations
     ```
 
- * Run Millipede with simulated client traffic
+ * Run Agora with simulated client traffic
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator data/tddconfig-sim-ul.json` to generate data
      files.
-   * In one terminal, run `./build/millipede data/tddconfig-sim-ul.json` to
-     start Millipede with uplink configuration.
+   * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
+     start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
      --delay=5000 --enable_slow_start=true
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
-   * Note: make sure Millipede and sender are using different set of cores, 
+   * Note: make sure Agora and sender are using different set of cores, 
      otherwise there will be performance slow down.
 
- * Run Millipede with DPDK
+ * Run Agora with DPDK
    * Run `cmake -DUSE_DPDK=1` to enable DPDK in the build.
    * For Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0` to exclude
      Mellanox libraries in the build.
    * When running the sender with DPDK, it is required to set the MAC address
-     of the NIC used by Millipede. To do this, pass `--server_mac_addr=` to
+     of the NIC used by Agora. To do this, pass `--server_mac_addr=` to
      `./build/sender`.
 
- * Run Millipede with channel simulator and clients
+ * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator data/bs-sim.json` to generate data files.
    * In one terminal, run `./build/user data/ue-sim.json` to start clients with
@@ -89,9 +89,9 @@ Millipede is a high-performance system for massive-MIMO baseband processing.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
      --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json
      --ue_conf_file data/ue-sim.json`
-   * In another terminal, run `./build/millipede data/bs-sim.json` to start
-     Millipede with uplink configuration.
-   * Note: make sure Millipede and sender are using different set of cores,
+   * In another terminal, run `./build/agora data/bs-sim.json` to start
+     Agora with uplink configuration.
+   * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
@@ -132,14 +132,14 @@ traffic with hardware UEs (e.g., Iris devices)
 
  * Run the client on a machine connected to the Iris UEs
    * Rebuild the code
-     * Pass `-DENABLE_MAC=on` to cmake
+     * Pass `DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
-   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files
-   * Run `./build/user data/ue-ul-hw.json`
-   * Run `./build/macuser 2 5000 data/ue-ul-hw.json`
+   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files.
+   * Start client app `./python/client_app.py`.
+   * Run `./build/user data/ue-ul-hw.json`.
 
- * Run Millipede on the server
+ * Run Agora on the server
    * Recompile FlexRAN with `-fPIC` to allow using from Python
      ```
      cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
@@ -152,8 +152,9 @@ traffic with hardware UEs (e.g., Iris devices)
      machine to the server's `data` directory.
    * Rebuild the code
      * Set `kExportConstellation = true` in `src/common/Symbols.hpp`
-     * Pass `-DUSE_ARGOS=on` to cmake
+     * Pass `-DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
      serials of your RRU Irises and hub, respectively. Iris serials in your
      Faros RRHs.
-   * Run `python mm_gui.py data/bs-ul-hw.json`
+   * Run BS app `./python/bs_app.py`.
+   * Run `./build/agora data/bs-ul-hw.json`.
