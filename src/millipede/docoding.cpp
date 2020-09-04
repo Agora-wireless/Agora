@@ -91,13 +91,12 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-    Table<uint8_t>& in_decoded_buffer,
-    //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , demod_buffers_(demod_buffers)
-    , decoded_buffer_(in_decoded_buffer)
+    , decoded_buffers_(decoded_buffers)
     , phy_stats(in_phy_stats)
 {
     duration_stat
@@ -150,8 +149,10 @@ Event_data DoDecode::launch(size_t tag)
     int8_t* llr_buffer_ptr = demod_buffers_[frame_id][symbol_idx_ul][ue_id]
         + (cfg->mod_order_bits * (LDPC_config.cbCodewLen * cur_cb_id));
 
-    auto* decoded_buffer_ptr = cfg->get_decode_buf(
-        decoded_buffer_, frame_id, symbol_idx_ul, ue_id, cur_cb_id);
+    uint8_t* decoded_buffer_ptr
+        = decoded_buffers_[frame_id][symbol_idx_ul][ue_id]
+        + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
+
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
 

@@ -65,11 +65,16 @@ Phy_UE::Phy_UE(Config* config)
         &message_queue_, &tx_queue_, rx_ptoks_ptr, tx_ptoks_ptr));
 
     if (kEnableMac) {
+        // TODO [ankalia]: dummy_decoded_buffer is used at the base station
+        // server only, but MacThread for now requires it for the UE client too
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dummy_decoded_buffer;
+
         const size_t mac_cpu_core = config_->core_offset + 1 + rx_thread_num;
         mac_thread_ = new MacThread(MacThread::Mode::kClient, config_,
-            mac_cpu_core, &ul_bits_buffer_, &ul_bits_buffer_status_,
-            nullptr /* dl bits buffer */, nullptr /* dl bits buffer status */,
-            &to_mac_queue_, &message_queue_);
+            mac_cpu_core, dummy_decoded_buffer, &ul_bits_buffer_,
+            &ul_bits_buffer_status_, nullptr /* dl bits buffer */,
+            nullptr /* dl bits buffer status */, &to_mac_queue_,
+            &message_queue_);
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
@@ -596,8 +601,6 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
     // If it is pilot part, do CE
     if (dl_symbol_id < config_->DL_PILOT_SYMS) {
-
-        cx_float avg_csi(0, 0);
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             // divide fft output by pilot data to get CSI estimation
             if (dl_symbol_id == 0) {
@@ -752,7 +755,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
             int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_order_bits;
             int output_offset = total_ul_symbol_id * config_->OFDM_DATA_NUM
                 + cbCodedBytes * cb_id;
-          
+
             adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
                 &ul_syms_buffer_[ue_id][output_offset], encoded_bytes_per_block,
                 cfg->mod_order_bits);

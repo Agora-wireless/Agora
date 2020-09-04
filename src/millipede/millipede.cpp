@@ -13,13 +13,12 @@ Millipede::Millipede(Config* cfg)
     , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
     , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
           kMaxModOrder * cfg->OFDM_DATA_NUM)
+    , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
+          cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Millipede: project directory %s\n", directory.c_str());
-    // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
-    // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
-    // << std::endl; openblas_set_num_threads(1);
 
     this->config_ = cfg;
     if (kDebugPrintPilot) {
@@ -52,9 +51,9 @@ Millipede::Millipede(Config* cfg)
         const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
             + cfg->worker_thread_num + 1;
         mac_thread_ = new MacThread(MacThread::Mode::kServer, cfg, mac_cpu_core,
-            &decoded_buffer_ /* ul bits */, nullptr /* ul bits status */,
-            &dl_bits_buffer_, &dl_bits_buffer_status_, &mac_request_queue_,
-            &mac_response_queue_);
+            decoded_buffer_, nullptr /* ul bits */,
+            nullptr /* ul bits status */, &dl_bits_buffer_,
+            &dl_bits_buffer_status_, &mac_request_queue_, &mac_response_queue_);
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
@@ -1074,10 +1073,6 @@ void Millipede::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
-    decoded_buffer_.calloc(task_buffer_symbol_num_ul,
-        roundup<64>(cfg->num_bytes_per_cb) * cfg->LDPC_config.nblocksInSymbol
-            * cfg->UE_NUM,
-        64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1151,7 +1146,6 @@ void Millipede::free_uplink_buffers()
     socket_buffer_status_.free();
     data_buffer_.free();
     equal_buffer_.free();
-    decoded_buffer_.free();
 
     fft_stats_.fini();
     demul_stats_.fini();
@@ -1173,26 +1167,22 @@ void Millipede::free_downlink_buffers()
     tx_stats_.fini();
 }
 
-void Millipede::save_decode_data_to_file(UNUSED int frame_id)
+void Millipede::save_decode_data_to_file(int frame_id)
 {
     auto& cfg = config_;
-    size_t num_decoded_bytes
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
-    size_t num_decoded_bytes_pad = (((cfg->LDPC_config.cbLen + 7) >> 3) + 63)
-        / 64 * 64 * cfg->LDPC_config.nblocksInSymbol;
+    const size_t num_decoded_bytes
+        = cfg->num_bytes_per_cb * cfg->LDPC_config.nblocksInSymbol;
+
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
     printf("Saving decode data to %s\n", filename.c_str());
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        int total_data_symbol_id = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * cfg->ul_data_symbol_num_perframe
-            + i;
-        uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
-        for (size_t j = 0; j < cfg->UE_NUM; j++)
-            fwrite(ptr + j * num_decoded_bytes_pad, num_decoded_bytes,
-                sizeof(uint8_t), fp);
+        for (size_t j = 0; j < cfg->UE_NUM; j++) {
+            uint8_t* ptr = decoded_buffer_[frame_id % kFrameWnd][i][j];
+            fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
+        }
     }
     fclose(fp);
 }

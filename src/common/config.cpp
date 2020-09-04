@@ -239,7 +239,7 @@ Config::Config(std::string jsonfile)
     packet_length
         = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
-    num_bytes_per_cb = (LDPC_config.cbLen) >> 3;
+    num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
 
     data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     mac_packet_length = data_bytes_num_persymbol;
