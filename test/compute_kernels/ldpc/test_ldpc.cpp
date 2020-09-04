@@ -1,7 +1,7 @@
 /**
  * @file test_ldpc.cpp
  *
- * @brief Accuracy and performance test for LDPC. The encoder is Millipede's
+ * @brief Accuracy and performance test for LDPC. The encoder is Agora's
  * avx2enc - unlike FlexRAN's encoder, avx2enc works with AVX2 (i.e., unlike
  * FlexRAN's encoder, avx2enc does not require AVX-512). The decoder is
  * FlexRAN's decoder, which supports AVX2.

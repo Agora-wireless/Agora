@@ -10,7 +10,7 @@ DEFINE_uint64(num_threads, 4, "Number of sender threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
 DEFINE_uint64(delay, 5000, "Frame duration in microseconds");
 DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
-    "MAC address of the remote Millipede server to send data to");
+    "MAC address of the remote Agora server to send data to");
 DEFINE_string(conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-dl.json",
     "Config filename");

@@ -40,14 +40,14 @@
 typedef unsigned short ushort;
 
 /**
- * @brief Implementations of this class provide packet I/O for Millipede.
+ * @brief Implementations of this class provide packet I/O for Agora.
  *
  * In the vanilla mode, this class provides socket or DPDK-based packet I/O to
- * Millipede (running on the base station server or client) for communicating
+ * Agora (running on the base station server or client) for communicating
  * with simulated peers.
  *
  * In the "Argos" mode, this class provides SoapySDR-based communication for
- * Millipede (running on the base station server or client) for communicating
+ * Agora (running on the base station server or client) for communicating
  * with real wireless hardware peers (antenna hubs for the server, UE devices
  * for the client).
  */
@@ -110,7 +110,7 @@ private:
 
 #ifdef USE_DPDK
     uint32_t sender_addr; // IPv4 address of the simulator sender
-    uint32_t server_addr; // IPv4 address of the Millipede server
+    uint32_t server_addr; // IPv4 address of the Agora server
     struct rte_mempool* mbuf_pool;
 #endif
 

@@ -28,7 +28,7 @@ using namespace arma;
 
 /**
  * @brief Simualtor for many-antenna MU-MIMO channel to work with
- * Millipede BS and UE applications. It generates channel matrice(s)
+ * Agora BS and UE applications. It generates channel matrice(s)
  * and applies it to incoming baseband samples from BS and sends them
  * to the UE application. Similarly, applies the same channel (TDD) to
  * uplink baseband samples from UE and sends them to BS.
