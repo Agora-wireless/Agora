@@ -203,10 +203,8 @@ private:
     // data subcarriers
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
 
-    // Data after LDPC decoding
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: decoded bytes per UE * number of UEs
-    Table<uint8_t> decoded_buffer_;
+    // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
 
     Table<complex_float> ue_spec_pilot_buffer_;
 

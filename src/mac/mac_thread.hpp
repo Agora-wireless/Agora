@@ -4,11 +4,11 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "crc.hpp"
 #include "gettime.h"
 #include "net.hpp"
 #include "udp_client.h"
 #include "udp_server.h"
-#include "crc.hpp"
 
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Millipede
@@ -45,6 +45,7 @@ public:
     static constexpr size_t kMaxPktsPerUE = 64;
 
     MacThread(Mode mode, Config* cfg, size_t core_offset,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
         Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
         moodycamel::ConcurrentQueue<Event_data>* rx_queue,
@@ -87,8 +88,9 @@ private:
     UDPClient* udp_client; // UDP endpoint used for sending messages
     UDPServer* udp_server; // UDP endpoint used for receiving messages
 
-    Table<uint8_t>* ul_bits_buffer_;
-    Table<uint8_t>* ul_bits_buffer_status_;
+    // TODO: decoded_buffer_ is used by only the server, so it should be moved
+    // to server_ for clarity.
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer_;
 
     Table<uint8_t>* dl_bits_buffer_;
     Table<uint8_t>* dl_bits_buffer_status_;
@@ -106,7 +108,7 @@ private:
     size_t next_radio_id_ = 0;
 
     FastRand fast_rand_;
- 
+
     // Server-only members
     struct {
         // Staging buffers to accumulate decoded uplink code blocks for each UE
@@ -123,6 +125,8 @@ private:
         // next use for radio #i
         std::array<size_t, kMaxUEs> ul_bits_buffer_id_;
 
+        Table<uint8_t>* ul_bits_buffer_;
+        Table<uint8_t>* ul_bits_buffer_status_;
     } client_;
 
     // FIFO queue for receiving messages from the master thread
@@ -133,5 +137,4 @@ private:
 
     // CRC
     DoCRC* crc_obj;
-
 };
