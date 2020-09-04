@@ -285,7 +285,7 @@ void Phy_UE::start()
                 ant_id = pkt->ant_id;
                 rt_assert(pkt->frame_id < cur_frame_id + TASK_BUFFER_FRAME_NUM,
                     "Error: Received packet for future frame beyond frame "
-                    "window. This can happen if Millipede is running "
+                    "window. This can happen if PHY is running "
                     "slowly, e.g., in debug mode");
 
                 size_t dl_symbol_id = 0;
@@ -348,6 +348,9 @@ void Phy_UE::start()
                     expected_frame_id_from_mac_++;
 
                 if (kDebugPrintPacketsFromMac) {
+                    printf("Main thread: received packet for frame %zu with "
+                           "modulation %zu\n",
+                        pkt->frame_id, pkt->rb_indicator.mod_order_bits);
                     std::stringstream ss;
                     ss << "PhyUE kPacketFromMac, frame ID " << pkt->frame_id
                        << ", bytes: ";

@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef MILLIPEDE_HEAD
-#define MILLIPEDE_HEAD
+#ifndef AGORA_HEAD
+#define AGORA_HEAD
 
 #include "buffer.hpp"
 #include "concurrent_queue_wrapper.hpp"
@@ -42,7 +42,7 @@
 #include <unistd.h>
 #include <vector>
 
-class Millipede {
+class Agora {
 public:
     /* optimization parameters for block transpose (see the slides for more
      * details) */
@@ -53,13 +53,13 @@ public:
     static const int kDequeueBulkSizeWorker = 4;
 
     /**
-     * @brief Create a Millipede object and start the worker threads
+     * @brief Create a Agora object and start the worker threads
      */
-    Millipede(Config*);
-    ~Millipede();
+    Agora(Config*);
+    ~Agora();
 
     /**
-     * @brief The main Millipede event loop
+     * @brief The main Agora event loop
      */
     void start();
     void stop();
@@ -80,6 +80,9 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
+    // Update Agora config of RAN parameters
+    void update_ran_config(RanConfig rc);
+
     void schedule_subcarriers(
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
@@ -87,6 +90,9 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_idx_ul);
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    // Send current frame's SNR measurements from PHY to MAC
+    void send_snr_report(
+        EventType event_type, size_t frame_id, size_t symbol_id);
     void move_events_between_queues(
         EventType event_type1, EventType event_type2);
 
@@ -100,7 +106,7 @@ public:
     void save_tx_data_to_file(int frame_id);
     void getEqualData(float** ptr, int* size);
 
-    // Flags that allow developer control over Millipede internals
+    // Flags that allow developer control over Agora internals
     struct {
         // Before exiting, save LDPC-decoded or demodulated data to a file
         bool enable_save_decode_data_to_file = false;

@@ -9,6 +9,7 @@
 
 #include "Symbols.hpp"
 #include "memory_manage.h"
+#include "ran_config.h"
 #include <sstream>
 #include <vector>
 
@@ -39,7 +40,7 @@ union rx_tag_t {
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
 
-// A generic tag type for Millipede tasks. The tag for a particular task will
+// A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
 union gen_tag_t {
     static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
@@ -169,7 +170,7 @@ union gen_tag_t {
 static_assert(sizeof(gen_tag_t) == sizeof(size_t), "");
 
 /**
- * Millipede uses these event messages for communication between threads. Each
+ * Agora uses these event messages for communication between threads. Each
  * tag encodes information about a task.
  */
 struct Event_data {
@@ -230,7 +231,7 @@ struct Packet {
 
 struct MacPacket {
     // The packet's data starts at kOffsetOfData bytes from the start
-    static constexpr size_t kOffsetOfData = 16;
+    static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
 
     uint16_t frame_id;
     uint16_t symbol_id;
@@ -238,6 +239,7 @@ struct MacPacket {
     uint16_t datalen; // length of payload in bytes or array data[]
     uint16_t crc; // 16 bits CRC over calculated for the data[] array
     uint16_t rsvd[3]; // reserved for future use
+    RBIndicator rb_indicator; // RAN scheduling details for PHY
     char data[]; // Mac packet payload data
     MacPacket(int f, int s, int u, int d,
         int cc) // TODO: Should be unsigned integers

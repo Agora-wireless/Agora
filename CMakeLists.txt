@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.8)
 include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
-project(Millipede)
+project(Agora)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
@@ -9,7 +9,7 @@ endif()
 
 set(SOURCE_DIR ".")
 
-option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Millipede/build/'" ON)
+option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Agora/build/'" ON)
 if(FORCE_BUILD_PATH)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
@@ -64,7 +64,7 @@ set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
-set(USE_AVX2_ENCODER False CACHE STRING "Use Millipede's AVX2 encoder instead of FlexRAN's AVX512 encoder")
+set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
@@ -85,15 +85,15 @@ else()
 endif()
 
 if(USE_AVX2_ENCODER)
-  message(STATUS "Using Millipede's (i.e., not FlexRAN's) AVX2 encoder")
+  message(STATUS "Using Agora's (i.e., not FlexRAN's) AVX2 encoder")
   add_definitions(-DUSE_AVX2_ENCODER)
 else()
-  message(STATUS "Using FlexRAN's (i.e., not Millipede's) AVX512 encoder")
+  message(STATUS "Using FlexRAN's (i.e., not Agora's) AVX512 encoder")
 endif()
 
 # DPDK
 if(${USE_DPDK})
-  message(STATUS "DPDK is enabled for Millipede")
+  message(STATUS "DPDK is enabled for Agora")
 
   find_library(DPDK_LIB dpdk)
   message(STATUS "DPDK_LIB: ${DPDK_LIB}")
@@ -120,7 +120,7 @@ if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
 endif()
 
-message(STATUS "Use DPDK for millipede: ${USE_DPDK}")
+message(STATUS "Use DPDK for agora: ${USE_DPDK}")
 
 # MAC
 if(${ENABLE_MAC})
@@ -180,8 +180,8 @@ endif()
 include_directories(
 	src/common/
 	src/mac/
-  src/millipede/
-  src/millipede/txrx/
+  src/agora/
+  src/agora/txrx/
   src/client/)
 
 include_directories(SYSTEM src/third_party)
@@ -200,30 +200,30 @@ set(COMMON_SOURCES
   src/encoder/iobuffer.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
-set(MILLIPEDE_SOURCES 
-  src/millipede/millipede.cpp
-  src/millipede/stats.cpp 
-  src/millipede/phy_stats.cpp 
-  src/millipede/dofft.cpp
-  src/millipede/dozf.cpp
-  src/millipede/dodemul.cpp
-  src/millipede/doprecode.cpp
-  src/millipede/docoding.cpp
-  src/millipede/radio_lib.cpp
-  src/millipede/radio_calibrate.cpp
+set(AGORA_SOURCES 
+  src/agora/agora.cpp
+  src/agora/stats.cpp 
+  src/agora/phy_stats.cpp 
+  src/agora/dofft.cpp
+  src/agora/dozf.cpp
+  src/agora/dodemul.cpp
+  src/agora/doprecode.cpp
+  src/agora/docoding.cpp
+  src/agora/radio_lib.cpp
+  src/agora/radio_calibrate.cpp
   src/mac/mac_thread.cpp)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
-    src/millipede/txrx/txrx_DPDK.cpp
+  set(AGORA_SOURCES ${AGORA_SOURCES} 
+    src/agora/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
 else()
-  set(MILLIPEDE_SOURCES ${MILLIPEDE_SOURCES} 
-    src/millipede/txrx/txrx.cpp
-    src/millipede/txrx/txrx_argos.cpp)
+  set(AGORA_SOURCES ${AGORA_SOURCES} 
+    src/agora/txrx/txrx.cpp
+    src/agora/txrx/txrx_argos.cpp)
 endif()
-add_library(millipede_sources_lib OBJECT ${MILLIPEDE_SOURCES})
+add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
   src/client/client_radio.cpp
@@ -246,14 +246,14 @@ set(FLEXRAN_LDPC_LIBS
 set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
-# TODO: The main millipede executable is performance-critical, so we need to
+# TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
 # against sources reduces performance.
-add_executable(millipede
-  src/millipede/main.cpp
-  $<TARGET_OBJECTS:millipede_sources_lib>
+add_executable(agora
+  src/agora/main.cpp
+  $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(millipede ${COMMON_LIBS})
+target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
@@ -293,7 +293,7 @@ if(NOT ${USE_DPDK})
   # Create shared libraries for Python
   # DPDK is currently not supported
   #  add_library(comp MODULE
-  #    $<TARGET_OBJECTS:millipede_sources_lib>
+  #    $<TARGET_OBJECTS:agora_sources_lib>
   #    $<TARGET_OBJECTS:common_sources_lib>)
   #  target_link_libraries(comp ${COMMON_LIBS})
 
@@ -306,11 +306,11 @@ else()
 endif()
 
 # End-to-end test
-add_executable(test_millipede
-  test/test_millipede/main.cpp
-  $<TARGET_OBJECTS:millipede_sources_lib>
+add_executable(test_agora
+  test/test_agora/main.cpp
+  $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_millipede ${COMMON_LIBS})
+target_link_libraries(test_agora ${COMMON_LIBS})
 
 add_executable(test_ldpc
   test/compute_kernels/ldpc/test_ldpc.cpp
@@ -326,7 +326,7 @@ set(UNIT_TESTS test_datatype_conversion test_udp_client_server
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
     test/unit_tests/${test_name}.cc
-    $<TARGET_OBJECTS:millipede_sources_lib>
+    $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
 
   # Unit tests should pass without memory errors

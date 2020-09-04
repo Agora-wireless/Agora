@@ -66,10 +66,12 @@ Config::Config(std::string jsonfile)
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
     rru_addr = tddConf.value("rru_addr", "127.0.0.1");
     ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
+    mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
     bs_server_port = tddConf.value("bs_server_port", 8000);
     bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
     ue_server_port = tddConf.value("ue_sever_port", 6000);
+
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
     init_mac_running = tddConf.value("init_mac_running", false);
@@ -178,7 +180,7 @@ Config::Config(std::string jsonfile)
     ue_ant_offset = tddConf.value("ue_ant_offset", 0);
     total_ue_ant_num = tddConf.value("total_ue_ant_num", UE_ANT_NUM);
 
-    /* Millipede configurations */
+    /* Agora configurations */
     frames_to_test = tddConf.value("frames_to_test", 9600);
     core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
@@ -728,7 +730,7 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 
 SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
 {
-    assert(!isUE); // Currently implemented for only the Millipede server
+    assert(!isUE); // Currently implemented for only the Agora server
     char s = frames[frame_id % frames.size()][symbol_id];
     switch (s) {
     case 'B':

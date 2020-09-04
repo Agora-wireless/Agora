@@ -55,7 +55,7 @@ CTestTestfile.cmake
 ###############
 /sender
 /sim
-/millipede
+/agora
 /data_generator
 
 # IDE config files #

@@ -4,7 +4,7 @@
  *
  */
 
-#include "millipede.hpp"
+#include "agora.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
         confFile = std::string(argv[1]);
     auto* cfg = new Config(confFile.c_str());
     cfg->genData();
-    Millipede* millipede_cli;
+    Agora* agora_cli;
 
     int ret;
     try {
@@ -22,8 +22,8 @@ int main(int argc, char* argv[])
 
         // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
-        millipede_cli = new Millipede(cfg);
-        millipede_cli->start();
+        agora_cli = new Agora(cfg);
+        agora_cli->start();
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
         std::cerr << "SignalException: " << e.what() << std::endl;
