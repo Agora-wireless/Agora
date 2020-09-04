@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Set up a fresh Ubuntu 18.04 box with packages for building Millipede.
+# Set up a fresh Ubuntu 18.04 box with packages for building Agora.
 # This does not include installing Intel compilers and FlexRAN
 
 sudo apt update

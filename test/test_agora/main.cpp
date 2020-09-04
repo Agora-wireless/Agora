@@ -4,7 +4,7 @@
  *
  */
 
-#include "millipede.hpp"
+#include "agora.hpp"
 
 void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     int num_bytes_per_ue, Config* cfg)
@@ -187,10 +187,10 @@ int main(int argc, char* argv[])
     try {
         SignalHandler signalHandler;
         signalHandler.setupSignalHandlers();
-        auto* millipede_cli = new Millipede(cfg);
-        millipede_cli->flags.enable_save_decode_data_to_file = true;
-        millipede_cli->flags.enable_save_tx_data_to_file = true;
-        millipede_cli->start();
+        auto* agora_cli = new Agora(cfg);
+        agora_cli->flags.enable_save_decode_data_to_file = true;
+        agora_cli->flags.enable_save_tx_data_to_file = true;
+        agora_cli->start();
 
         if (cfg->downlink_mode)
             check_correctness_dl(cfg);

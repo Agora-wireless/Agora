@@ -3,10 +3,10 @@
  * Email: jianding17@gmail.com
  *
  */
-#include "millipede.hpp"
+#include "agora.hpp"
 using namespace std;
 
-Millipede::Millipede(Config* cfg)
+Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
@@ -18,11 +18,11 @@ Millipede::Millipede(Config* cfg)
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
-    printf("Millipede: project directory %s\n", directory.c_str());
+    printf("Agora: project directory %s\n", directory.c_str());
 
     this->config_ = cfg;
     if (kDebugPrintPilot) {
-        cout << "Millipede: Pilot data: " << endl;
+        cout << "Agora: Pilot data: " << endl;
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++)
             cout << config_->pilots_[i].re << "+1i*" << config_->pilots_[i].im
                  << ",";
@@ -36,7 +36,7 @@ Millipede::Millipede(Config* cfg)
     initialize_uplink_buffers();
 
     if (config_->dl_data_symbol_num_perframe > 0) {
-        printf("Millipede: Initializing downlink buffers\n");
+        printf("Agora: Initializing downlink buffers\n");
         initialize_downlink_buffers();
     }
 
@@ -60,19 +60,19 @@ Millipede::Millipede(Config* cfg)
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_fft>,
-            0, cfg->fft_thread_num);
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_zf>,
+        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>, 0,
+            cfg->fft_thread_num);
+        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_zf>,
             cfg->fft_thread_num, cfg->fft_thread_num + cfg->zf_thread_num);
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker_demul>,
+        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_demul>,
             cfg->fft_thread_num + cfg->zf_thread_num, cfg->worker_thread_num);
     } else {
-        create_threads(pthread_fun_wrapper<Millipede, &Millipede::worker>, 0,
+        create_threads(pthread_fun_wrapper<Agora, &Agora::worker>, 0,
             cfg->worker_thread_num);
     }
 }
 
-Millipede::~Millipede()
+Agora::~Agora()
 {
     free_uplink_buffers();
     /* Downlink */
@@ -84,15 +84,15 @@ Millipede::~Millipede()
     delete mac_thread_;
 }
 
-void Millipede::stop()
+void Agora::stop()
 {
-    std::cout << "Millipede: stopping threads" << std::endl;
+    std::cout << "Agora: stopping threads" << std::endl;
     config_->running = false;
     usleep(1000);
     receiver_.reset();
 }
 
-void Millipede::schedule_antennas(
+void Agora::schedule_antennas(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
     assert(event_type == EventType::kFFT or event_type == EventType::kIFFT);
@@ -105,7 +105,22 @@ void Millipede::schedule_antennas(
     }
 }
 
-void Millipede::schedule_subcarriers(
+void Agora::send_snr_report(
+    EventType event_type, size_t frame_id, size_t symbol_id)
+{
+    assert(event_type == EventType::kSNRReport);
+    auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
+    for (size_t i = 0; i < config_->UE_NUM; i++) {
+        Event_data snr_report(EventType::kSNRReport, base_tag._tag);
+        snr_report.num_tags = 2;
+        *reinterpret_cast<float*>(&snr_report.tags[1])
+            = phy_stats->get_evm_snr(frame_id, i);
+        try_enqueue_fallback(&mac_request_queue_, snr_report);
+        base_tag.ue_id++;
+    }
+}
+
+void Agora::schedule_subcarriers(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
     auto base_tag = gen_tag_t::frm_sym_sc(frame_id, symbol_id, 0);
@@ -133,7 +148,7 @@ void Millipede::schedule_subcarriers(
     }
 }
 
-void Millipede::schedule_codeblocks(
+void Agora::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_idx_ul)
 {
     auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx_ul, 0);
@@ -146,7 +161,7 @@ void Millipede::schedule_codeblocks(
     }
 }
 
-void Millipede::schedule_users(
+void Agora::schedule_users(
     EventType event_type, size_t frame_id, size_t symbol_id)
 {
     assert(event_type == EventType::kPacketToMac);
@@ -159,7 +174,7 @@ void Millipede::schedule_users(
     }
 }
 
-void Millipede::move_events_between_queues(
+void Agora::move_events_between_queues(
     EventType event_type1, EventType event_type2)
 {
     auto q1 = get_conq(event_type1);
@@ -172,7 +187,7 @@ void Millipede::move_events_between_queues(
     }
 }
 
-void Millipede::start()
+void Agora::start()
 {
     auto& cfg = config_;
 
@@ -184,7 +199,7 @@ void Millipede::start()
         return;
     }
 
-    // Millipede processes a frame after processing for previous frames is
+    // Agora processes a frame after processing for previous frames is
     // complete. cur_frame_id is the frame that is currently being processed.
     size_t cur_frame_id = 0;
 
@@ -238,7 +253,7 @@ void Millipede::start()
                     std::cout
                         << "Error: Received packet for future frame beyond "
                            "frame "
-                        << "window. This can happen if Millipede is running "
+                        << "window. This can happen if Agora is running "
                         << "slowly, e.g., in debug mode\n";
                     cfg->running = false;
                     break;
@@ -364,6 +379,14 @@ void Millipede::start()
                         print_per_frame_done(PrintType::kDecode, frame_id);
                     }
                 }
+            } break;
+
+            case EventType::kRANUpdate: {
+                RanConfig rc;
+                rc.n_antennas = event.tags[0];
+                rc.mod_order_bits = event.tags[1];
+                rc.frame_id = event.tags[2];
+                update_ran_config(rc);
             } break;
 
             case EventType::kPacketToMac: {
@@ -532,7 +555,7 @@ void Millipede::start()
 
 finish:
 
-    printf("Millipede: printing stats and saving to file\n");
+    printf("Agora: printing stats and saving to file\n");
     stats->print_summary();
     stats->save_to_file();
     if (flags.enable_save_decode_data_to_file) {
@@ -548,7 +571,7 @@ finish:
     this->stop();
 }
 
-void Millipede::handle_event_fft(size_t tag)
+void Agora::handle_event_fft(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
@@ -572,6 +595,9 @@ void Millipede::handle_event_fft(size_t tag)
                     }
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
+                    if (kEnableMac)
+                        send_snr_report(
+                            EventType::kSNRReport, frame_id, symbol_id);
                     schedule_subcarriers(EventType::kZF, frame_id, 0);
                 }
             }
@@ -602,7 +628,7 @@ void Millipede::handle_event_fft(size_t tag)
     }
 }
 
-void* Millipede::worker(int tid)
+void* Agora::worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
@@ -656,7 +682,7 @@ void* Millipede::worker(int tid)
     }
 }
 
-void* Millipede::worker_fft(int tid)
+void* Agora::worker_fft(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
@@ -677,7 +703,7 @@ void* Millipede::worker_fft(int tid)
     }
 }
 
-void* Millipede::worker_zf(int tid)
+void* Agora::worker_zf(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
@@ -691,7 +717,7 @@ void* Millipede::worker_zf(int tid)
     }
 }
 
-void* Millipede::worker_demul(int tid)
+void* Agora::worker_demul(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
@@ -715,12 +741,11 @@ void* Millipede::worker_demul(int tid)
     }
 }
 
-void Millipede::create_threads(
-    void* (*worker)(void*), int tid_start, int tid_end)
+void Agora::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 {
     int ret;
     for (int i = tid_start; i < tid_end; i++) {
-        auto context = new EventHandlerContext<Millipede>;
+        auto context = new EventHandlerContext<Agora>;
         context->obj_ptr = this;
         context->id = i;
         ret = pthread_create(&task_threads[i], NULL, worker, context);
@@ -731,7 +756,12 @@ void Millipede::create_threads(
     }
 }
 
-void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
+void Agora::update_ran_config(RanConfig rc)
+{
+    config_->update_mod_cfgs(rc.mod_order_bits);
+}
+
+void Agora::update_rx_counters(size_t frame_id, size_t symbol_id)
 {
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     if (config_->isPilot(frame_id, symbol_id)) {
@@ -773,7 +803,7 @@ void Millipede::update_rx_counters(size_t frame_id, size_t symbol_id)
     }
 }
 
-void Millipede::print_per_frame_done(PrintType print_type, size_t frame_id)
+void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
 {
     if (!kDebugPrintPerFrameDone)
         return;
@@ -903,7 +933,7 @@ void Millipede::print_per_frame_done(PrintType print_type, size_t frame_id)
     }
 }
 
-void Millipede::print_per_symbol_done(
+void Agora::print_per_symbol_done(
     PrintType print_type, size_t frame_id, size_t symbol_id)
 {
     if (!kDebugPrintPerSymbolDone)
@@ -967,7 +997,7 @@ void Millipede::print_per_symbol_done(
     }
 }
 
-void Millipede::print_per_task_done(PrintType print_type, size_t frame_id,
+void Agora::print_per_task_done(PrintType print_type, size_t frame_id,
     size_t symbol_id, size_t ant_or_sc_id)
 {
     if (!kDebugPrintPerTaskDone)
@@ -1016,7 +1046,7 @@ void Millipede::print_per_task_done(PrintType print_type, size_t frame_id,
     }
 }
 
-void Millipede::initialize_queues()
+void Agora::initialize_queues()
 {
     using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
 
@@ -1045,7 +1075,7 @@ void Millipede::initialize_queues()
     }
 }
 
-void Millipede::initialize_uplink_buffers()
+void Agora::initialize_uplink_buffers()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
@@ -1057,7 +1087,7 @@ void Millipede::initialize_uplink_buffers()
         = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
-    printf("Millipede: Initializing uplink buffers: socket buffer size %zu, "
+    printf("Agora: Initializing uplink buffers: socket buffer size %zu, "
            "socket buffer status size %zu\n",
         socket_buffer_size_, socket_buffer_status_size_);
 
@@ -1101,7 +1131,7 @@ void Millipede::initialize_uplink_buffers()
         cfg->data_symbol_num_perframe);
 }
 
-void Millipede::initialize_downlink_buffers()
+void Agora::initialize_downlink_buffers()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num
@@ -1140,7 +1170,7 @@ void Millipede::initialize_downlink_buffers()
         cfg->data_symbol_num_perframe);
 }
 
-void Millipede::free_uplink_buffers()
+void Agora::free_uplink_buffers()
 {
     socket_buffer_.free();
     socket_buffer_status_.free();
@@ -1152,7 +1182,7 @@ void Millipede::free_uplink_buffers()
     decode_stats_.fini();
 }
 
-void Millipede::free_downlink_buffers()
+void Agora::free_downlink_buffers()
 {
     free_buffer_1d(&dl_socket_buffer_);
     free_buffer_1d(&dl_socket_buffer_status_);
@@ -1167,7 +1197,7 @@ void Millipede::free_downlink_buffers()
     tx_stats_.fini();
 }
 
-void Millipede::save_decode_data_to_file(int frame_id)
+void Agora::save_decode_data_to_file(int frame_id)
 {
     auto& cfg = config_;
     const size_t num_decoded_bytes
@@ -1187,7 +1217,7 @@ void Millipede::save_decode_data_to_file(int frame_id)
     fclose(fp);
 }
 
-void Millipede::save_tx_data_to_file(UNUSED int frame_id)
+void Agora::save_tx_data_to_file(UNUSED int frame_id)
 {
     auto& cfg = config_;
 
@@ -1213,7 +1243,7 @@ void Millipede::save_tx_data_to_file(UNUSED int frame_id)
     fclose(fp);
 }
 
-void Millipede::getEqualData(float** ptr, int* size)
+void Agora::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
     auto offset = cfg->get_total_data_symbol_idx_ul(
@@ -1223,21 +1253,21 @@ void Millipede::getEqualData(float** ptr, int* size)
 }
 
 extern "C" {
-EXPORT Millipede* Millipede_new(Config* cfg)
+EXPORT Agora* Agora_new(Config* cfg)
 {
-    // printf("Size of Millipede: %d\n",sizeof(Millipede *));
-    auto* millipede = new Millipede(cfg);
+    // printf("Size of Agora: %d\n",sizeof(Agora *));
+    auto* agora = new Agora(cfg);
 
-    return millipede;
+    return agora;
 }
-EXPORT void Millipede_start(Millipede* millipede) { millipede->start(); }
-EXPORT void Millipede_stop(/*Millipede *millipede*/)
+EXPORT void Agora_start(Agora* agora) { agora->start(); }
+EXPORT void Agora_stop(/*Agora *agora*/)
 {
-    SignalHandler::setExitSignal(true); /*millipede->stop();*/
+    SignalHandler::setExitSignal(true); /*agora->stop();*/
 }
-EXPORT void Millipede_destroy(Millipede* millipede) { delete millipede; }
-EXPORT void Millipede_getEqualData(Millipede* millipede, float** ptr, int* size)
+EXPORT void Agora_destroy(Agora* agora) { delete agora; }
+EXPORT void Agora_getEqualData(Agora* agora, float** ptr, int* size)
 {
-    return millipede->getEqualData(ptr, size);
+    return agora->getEqualData(ptr, size);
 }
 }

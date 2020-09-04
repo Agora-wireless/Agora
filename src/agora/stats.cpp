@@ -87,7 +87,7 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
             &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &demul_frame_summary, &decode_frame_summary);
     else
-        update_stats_in_functions_uplink_millipede(frame_slot,
+        update_stats_in_functions_uplink_agora(frame_slot,
             &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &demul_frame_summary, &decode_frame_summary);
 
@@ -141,7 +141,7 @@ void Stats::update_stats_in_functions_downlink(size_t frame_id)
             &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &precode_frame_summary, &encode_frame_summary);
     else
-        update_stats_in_functions_downlink_millipede(frame_slot,
+        update_stats_in_functions_downlink_agora(frame_slot,
             &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &precode_frame_summary, &encode_frame_summary);
 
@@ -346,7 +346,7 @@ void Stats::update_stats_in_functions_downlink_bigstation(size_t frame_id,
         encode_frame_summary);
 }
 
-void Stats::update_stats_in_functions_uplink_millipede(size_t frame_id,
+void Stats::update_stats_in_functions_uplink_agora(size_t frame_id,
     FrameSummary* fft_frame_summary, FrameSummary* csi_frame_summary,
     FrameSummary* zf_frame_summary, FrameSummary* demul_frame_summary,
     FrameSummary* decode_frame_summary)
@@ -390,7 +390,7 @@ void Stats::update_stats_in_functions_uplink_millipede(size_t frame_id,
         decode_frame_summary, task_thread_num, break_down_num);
 }
 
-void Stats::update_stats_in_functions_downlink_millipede(size_t frame_id,
+void Stats::update_stats_in_functions_downlink_agora(size_t frame_id,
     FrameSummary* ifft_frame_summary, FrameSummary* csi_frame_summary,
     FrameSummary* zf_frame_summary, FrameSummary* precode_frame_summary,
     FrameSummary* encode_frame_summary)

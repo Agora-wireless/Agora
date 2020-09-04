@@ -12,7 +12,7 @@
 #define TOSTRING(x) STRINGIFY(x)
 
 // Number of frames received that we allocate space for in worker threads. This
-// is the frame window that we track in Millipede.
+// is the frame window that we track in Agora.
 #define TASK_BUFFER_FRAME_NUM 40
 static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 
@@ -43,12 +43,15 @@ enum class EventType : int {
     kRC,
     kModul,
     kPacketFromMac,
-    kPacketToMac
+    kPacketToMac,
+    kSNRReport, // Signal new SNR measurement from PHY to MAC
+    kRANUpdate, // Signal new RAN config to Agora
+    kRBIndicator // Signal RB schedule to UEs
 };
 static constexpr size_t kNumEventTypes
     = static_cast<size_t>(EventType::kPacketToMac) + 1;
 
-// Types of Millipede Doers
+// Types of Agora Doers
 enum class DoerType : size_t {
     kFFT,
     kCSI,
@@ -82,7 +85,7 @@ enum class PrintType : int {
 };
 
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
-// crucial for good performance. For testing or developing Millipede on machines
+// crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
 static constexpr size_t kEnableThreadPinning = true;
 
@@ -107,6 +110,7 @@ static constexpr bool kUseArgos = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
+static constexpr bool kCollectPhyStats = false;
 
 #define COMBINE_EQUAL_DECODE 1
 
@@ -173,7 +177,7 @@ static inline std::string thread_type_str(ThreadType thread_type)
 
 enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
-// Maximum number of symbols per frame allowed by Millipede
+// Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 70;
 
 // Maximum number of OFDM data subcarriers in the 5G spec
@@ -182,18 +186,18 @@ static constexpr size_t kMaxDataSCs = 3300;
 // The maximum modulation order (= QAM256) supported
 static constexpr size_t kMaxModOrder = 8;
 
-// Maximum number of antennas supported by Millipede
+// Maximum number of antennas supported by Agora
 static constexpr size_t kMaxAntennas = 64;
 
-// Maximum number of UEs supported by Millipede
+// Maximum number of UEs supported by Agora
 static constexpr size_t kMaxUEs = 64;
 
-// Maximum modulation (QAM256) supported by Millipede
+// Maximum modulation (QAM256) supported by Agora
 // Only up to QAM64 is implemented
 // Here using 8 helps reduce cache false sharing
 static constexpr size_t kMaxModType = 8;
 
-// Number of cellular frames tracked by Millipede stats
+// Number of cellular frames tracked by Agora stats
 static constexpr size_t kNumStatsFrames = 10000;
 
 // If true, enable timing measurements in workers
