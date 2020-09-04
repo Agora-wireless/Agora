@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 # Client-side application that generates random bit data packets
-# and sends through a socket to Millipede client MAC for transmission
+# and sends through a socket to Agora client MAC for transmission
 # through PHY layer. packet_size argument should correspond to the
-# number of bits per PHY layer frame in Millipede. delay argument
+# number of bits per PHY layer frame in Agora. delay argument
 # specifies the delay between transmission of two consecutive packets.
 # Running example: ./python/client_app.py --delay 0.00242 --packet-size 66
 

@@ -190,7 +190,7 @@ private:
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
         FrameSummary* frame_summary_decode);
 
-    void update_stats_in_functions_uplink_millipede(size_t frame_id,
+    void update_stats_in_functions_uplink_agora(size_t frame_id,
         FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
         FrameSummary* frame_summary_decode);
@@ -200,7 +200,7 @@ private:
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
         FrameSummary* frame_summary_encode);
 
-    void update_stats_in_functions_downlink_millipede(size_t frame_id,
+    void update_stats_in_functions_downlink_agora(size_t frame_id,
         FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
         FrameSummary* frame_summary_encode);

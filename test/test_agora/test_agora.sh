@@ -1,14 +1,14 @@
 #!/bin/bash
 #
 # Usage:
-#  * This script must be run from Millipede's top-level directory
-#  * test_millipede.sh: Run the test once
-#  * test_millipede.sh 5: Run the test five times
-#  * test_millipede.sh 5 out_file: Run the test five times and redirect test
+#  * This script must be run from Agora's top-level directory
+#  * test_agora.sh: Run the test once
+#  * test_agora.sh 5: Run the test five times
+#  * test_agora.sh 5 out_file: Run the test five times and redirect test
 #    outputs to out_file. Only print pass/fail summary statistics to screen.
 
 # Check that all required executables are present
-exe_list="build/test_millipede build/data_generator build/sender"
+exe_list="build/test_agora build/data_generator build/sender"
 for exe in ${exe_list}; do
   if [ ! -f ${exe} ]; then
       echo "${exe} not found. Exiting."
@@ -64,8 +64,8 @@ for i in `seq 1 $num_iters`; do
     echo "======================================"
     echo "Running uplink correctness test $i......"
     echo -e "======================================\n"
-    # We sleep before starting the sender to allow the Millipede server to start
-    ./build/test_millipede data/tddconfig-correctness-test-ul.json &
+    # We sleep before starting the sender to allow the Agora server to start
+    ./build/test_agora data/tddconfig-correctness-test-ul.json &
     sleep 1; ./build/sender --num_threads 4 --core_offset 10 --delay 5000 --conf_file "data/tddconfig-correctness-test-ul.json"
     wait
 
@@ -78,7 +78,7 @@ for i in `seq 1 $num_iters`; do
     echo "======================================"
     echo "Running downlink correctness test $i......"
     echo -e "======================================\n"
-    ./build/test_millipede data/tddconfig-correctness-test-dl.json &
+    ./build/test_agora data/tddconfig-correctness-test-dl.json &
     sleep 1; ./build/sender --num_threads 4 --core_offset 10 --delay 5000 --conf_file "data/tddconfig-correctness-test-dl.json"
     echo -e "-------------------------------------------------------\n\n\n"
     wait

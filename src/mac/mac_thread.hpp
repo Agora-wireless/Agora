@@ -13,18 +13,18 @@
 #include <queue>
 
 /**
- * @brief The MAC thread that runs alongside the PHY processing at the Millipede
+ * @brief The MAC thread that runs alongside the PHY processing at the Agora
  * server or client.
  *
  * This thread receives UDP data packets from remote apps and forwards them to
- * Millipede. It receives decoded symbols from Millipede and forwards UDP data
+ * Agora. It receives decoded symbols from Agora and forwards UDP data
  * packets to applications.
  */
 class MacThread {
 public:
     enum class Mode {
-        kServer, // The MAC thread is running the the Millipede server
-        kClient // The MAC thread is running at the Millipede client
+        kServer, // The MAC thread is running the the Agora server
+        kClient // The MAC thread is running at the Agora client
     };
 
     // Default log file for MAC layer outputs
@@ -34,15 +34,15 @@ public:
     // server, downlink at the client), we send UDP packets to kRemoteHostname
     const char* kRemoteHostname = "127.0.0.1";
 
-    // Millipede sends UDP packets for UE #i (uplink packets at the server,
+    // Agora sends UDP packets for UE #i (uplink packets at the server,
     // downlink packets at the client) with destination port kBaseRemotePort + i
     static constexpr size_t kBaseRemotePort = 8080;
 
-    // Millipede listens for UDP packets from applications (downlink packets at
+    // Agora listens for UDP packets from applications (downlink packets at
     // the server, uplink packets at the client) on kLocalPort
     static constexpr size_t kLocalPort = 8070;
 
-    // Millipede sends control information over an out-of-band control channel
+    // Agora sends control information over an out-of-band control channel
     // to each UE #i, at port kBaseClientPort + i
     // TODO: need to generalize for hostname, port pairs for each client
     static constexpr size_t kBaseClientPort = 7070;
@@ -69,7 +69,7 @@ public:
     void run_event_loop();
 
 private:
-    // Receive events from Millipede PHY master thread. Forwards
+    // Receive events from Agora PHY master thread. Forwards
     // to appropriate function in MAC.
     void process_rx_from_master();
 
@@ -101,7 +101,7 @@ private:
         const MacPacket* pkt, RBIndicator ri);
     void process_udp_packets_from_apps_client(const char* pkt, RBIndicator ri);
 
-    // If Mode::kServer, this thread is running at the Millipede server. Else at
+    // If Mode::kServer, this thread is running at the Agora server. Else at
     // the client.
     const Mode mode_;
     Config* cfg_;

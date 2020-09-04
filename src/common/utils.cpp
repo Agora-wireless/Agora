@@ -42,7 +42,7 @@ void pin_to_core_with_offset(
         fprintf(stderr,
             "%s thread %d: failed to pin to core %d. Exiting. "
             "This can happen if the machine has insufficient cores. "
-            "Set kEnableThreadPinning to false to run Millipede to run despite "
+            "Set kEnableThreadPinning to false to run Agora to run despite "
             "this - performance will be low.\n",
             thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
         exit(0);

@@ -40,7 +40,7 @@ union rx_tag_t {
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
 
-// A generic tag type for Millipede tasks. The tag for a particular task will
+// A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
 union gen_tag_t {
     static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
@@ -170,7 +170,7 @@ union gen_tag_t {
 static_assert(sizeof(gen_tag_t) == sizeof(size_t), "");
 
 /**
- * Millipede uses these event messages for communication between threads. Each
+ * Agora uses these event messages for communication between threads. Each
  * tag encodes information about a task.
  */
 struct Event_data {
