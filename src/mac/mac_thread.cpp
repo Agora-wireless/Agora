@@ -36,8 +36,8 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
 
     client_.ul_bits_buffer_id_.fill(0);
 
-    const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
-    udp_pkt_buf_.resize(udp_pkt_len);
+    udp_pkt_buf_.resize(kMaxUDPBytes);
+    app_data_.resize(kMaxUDPBytes);
 
     udp_server
         = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
@@ -204,7 +204,6 @@ void MacThread::process_control_information()
         cfg_->running = false;
         return;
     }
-
     rt_assert(static_cast<size_t>(ret) == sizeof(RBIndicator));
 
     const auto* ri = reinterpret_cast<RBIndicator*>(&udp_control_buf_[0]);
@@ -214,8 +213,8 @@ void MacThread::process_control_information()
 void MacThread::process_udp_packets_from_apps(RBIndicator ri)
 {
     memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
-    ssize_t ret
-        = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+    ssize_t ret = udp_server->recv_nonblocking(
+        &udp_pkt_buf_[0], cfg_->mac_data_bytes_num_perframe);
     if (ret == 0) {
         return; // No data received
     } else if (ret == -1) {
@@ -223,12 +222,27 @@ void MacThread::process_udp_packets_from_apps(RBIndicator ri)
         cfg_->running = false;
         return;
     }
-    rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe);
+
+    printf("MAC thread: received %zu bytes, expected %zu\n", ret,
+        cfg_->mac_data_bytes_num_perframe);
+    size_t new_bytes = static_cast<size_t>(ret);
+    memcpy(&app_data_[n_app_bytes_], &udp_pkt_buf_[0], new_bytes);
+    n_app_bytes_ += new_bytes;
+    printf("MAC thread: byte pointer %zu\n", n_app_bytes_);
+
+    //if (n_app_bytes_ < cfg_->mac_data_bytes_num_perframe) {
+    //    return;
+    //}
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
     mode_ == Mode::kServer
         ? process_udp_packets_from_apps_server(pkt, ri)
         : process_udp_packets_from_apps_client((char*)pkt, ri);
+
+    app_data_.erase(app_data_.begin(),
+        app_data_.begin() + cfg_->mac_data_bytes_num_perframe);
+    n_app_bytes_ -= cfg_->mac_data_bytes_num_perframe;
+    printf("MAC thread: byte pointer %zu\n", n_app_bytes_);
 }
 
 void MacThread::process_udp_packets_from_apps_server(

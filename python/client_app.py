@@ -38,7 +38,7 @@ def main():
     parser.add_option("--delay", type="float", dest="delay",
                       help="", default=0.00242)
     parser.add_option("--packet-size", type="int", dest="packet_size",
-                      help="size of packets in bytes", default=66)
+                      help="size of packets in bytes", default=34)
     parser.add_option("--stream-num", type="int", dest="stream_num",
                       help="number of user spatial streams", default=1)
     parser.add_option("--base-port", type="int", dest="base_port",

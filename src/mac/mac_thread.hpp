@@ -55,6 +55,9 @@ public:
     // TODO: map this to time?
     static constexpr size_t kSNRWindowSize = 100;
 
+    // Max size of UDP staging buffer
+    static constexpr size_t kMaxUDPBytes = 65535;
+
     MacThread(Mode mode, Config* cfg, size_t core_offset,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
         Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
@@ -128,6 +131,12 @@ private:
 
     // A preallocated buffer to store UDP packets received via recv()
     std::vector<uint8_t> udp_pkt_buf_;
+
+    // Staging buffer for app data
+    std::vector<uint8_t> app_data_;
+
+    // Number of unread bytes in app_data_
+    size_t n_app_bytes_ = 0;
 
     // A preallocated buffer to store UDP control information
     // received via recv()
