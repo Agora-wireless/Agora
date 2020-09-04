@@ -132,12 +132,12 @@ traffic with hardware UEs (e.g., Iris devices)
 
  * Run the client on a machine connected to the Iris UEs
    * Rebuild the code
-     * Pass `-DENABLE_MAC=on` to cmake
+     * Pass `DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
-   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files
-   * Run `./build/user data/ue-ul-hw.json`
-   * Run `./build/macuser 2 5000 data/ue-ul-hw.json`
+   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files.
+   * Start client app `./python/client_app.py`.
+   * Run `./build/user data/ue-ul-hw.json`.
 
  * Run Agora on the server
    * Recompile FlexRAN with `-fPIC` to allow using from Python
@@ -152,8 +152,9 @@ traffic with hardware UEs (e.g., Iris devices)
      machine to the server's `data` directory.
    * Rebuild the code
      * Set `kExportConstellation = true` in `src/common/Symbols.hpp`
-     * Pass `-DUSE_ARGOS=on` to cmake
+     * Pass `-DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
      serials of your RRU Irises and hub, respectively. Iris serials in your
      Faros RRHs.
-   * Run `python mm_gui.py data/bs-ul-hw.json`
+   * Run BS app `./python/bs_app.py`.
+   * Run `./build/agora data/bs-ul-hw.json`.
