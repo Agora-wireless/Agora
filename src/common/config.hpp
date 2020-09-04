@@ -199,23 +199,23 @@ public:
     size_t ofdm_tx_zero_postfix_;
 
     // The number of IQ samples to skip from the beginning of symbol received by
-    // Millipede on the uplink at the base station. Due to over-the-air and RF
+    // Agora on the uplink at the base station. Due to over-the-air and RF
     // delays, this can be different from (prefix + CP_LEN), and is currently
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_bs_;
 
     // The number of IQ samples to skip from the beginning of symbol received by
-    // Millipede on the downlink at the client. Due to over-the-air and RF
+    // Agora on the downlink at the client. Due to over-the-air and RF
     // delays, this can be different from (prefix + CP_LEN), and is currently
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_client_;
 
     // The total number of IQ samples in one physical layer time-domain packet
-    // received or sent by Millipede
+    // received or sent by Agora
     size_t sampsPerSymbol;
 
     // The number of bytes in one physical layer time-domain packet received or
-    // sent by Millipede. This includes Millipede's packet header, but not the
+    // sent by Agora. This includes Agora's packet header, but not the
     // Ethernet/IP/UDP headers.
     size_t packet_length;
 
@@ -282,7 +282,7 @@ public:
     bool init_mac_running;
 
     // Number of frames sent by sender during testing = number of frames
-    // processed by Millipede before exiting.
+    // processed by Agora before exiting.
     size_t frames_to_test;
 
     /* LDPC parameters */
@@ -291,7 +291,7 @@ public:
     // Number of bytes per code block
     size_t num_bytes_per_cb;
 
-    bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
+    bool fft_in_rru; // If true, the RRU does FFT instead of Agora
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
