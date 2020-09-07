@@ -87,8 +87,17 @@ public:
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
+
+    /**
+     * @brief Schedule LDPC decoding or encoding over code blocks
+     * @param task_type Either LDPC decoding or LDPC encoding
+     * @param frame_id The monotonically increasing frame ID
+     * @param symbol_idx The index of the symbol among uplink symbols for LDPC
+     * decoding, and among downlink symbols for LDPC encoding
+     */
     void schedule_codeblocks(
-        EventType task_type, size_t frame_id, size_t symbol_id);
+        EventType task_type, size_t frame_id, size_t symbol_idx);
+
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
     // Send current frame's SNR measurements from PHY to MAC
     void send_snr_report(
@@ -205,15 +214,12 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
 
-    // Data after soft demodulation
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> demod_soft_buffer_;
+    // Data after demodulation. Each buffer has kMaxModType * number of OFDM
+    // data subcarriers
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
 
-    // Data after LDPC decoding
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: decoded bytes per UE * number of UEs
-    Table<uint8_t> decoded_buffer_;
+    // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
 
     Table<complex_float> ue_spec_pilot_buffer_;
 

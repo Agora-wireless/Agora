@@ -54,8 +54,8 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<int8_t>& in_demod_buffer, Table<uint8_t>& in_decoded_buffer,
-        //Table<int>& in_decoded_bits_count, Table<int>& in_error_bits_count,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDecode();
 
@@ -63,10 +63,8 @@ public:
 
 private:
     int16_t* resp_var_nodes;
-    Table<int8_t>& llr_buffer_;
-    Table<uint8_t>& decoded_buffer_;
-    //Table<int> decoded_bits_count_;
-    //Table<int> error_bits_count_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
     PhyStats* phy_stats;
     DurationStat* duration_stat;
 };
