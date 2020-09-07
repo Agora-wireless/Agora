@@ -193,6 +193,7 @@ set(COMMON_SOURCES
   src/common/comms-lib-avx.cpp
   src/common/signalHandler.cpp
   src/common/modulation.cpp
+  src/common/modulation_srslte.cpp
   src/common/net.cpp
   src/common/crc.cpp
   src/encoder/cyclic_shift.cpp
@@ -289,21 +290,6 @@ add_executable(chsim
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
-if(NOT ${USE_DPDK})
-  # Create shared libraries for Python
-  # DPDK is currently not supported
-  #  add_library(comp MODULE
-  #    $<TARGET_OBJECTS:agora_sources_lib>
-  #    $<TARGET_OBJECTS:common_sources_lib>)
-  #  target_link_libraries(comp ${COMMON_LIBS})
-
-  add_library(ue_phy MODULE
-    $<TARGET_OBJECTS:client_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>)
-  target_link_libraries(ue_phy ${COMMON_LIBS})
-else()
-  message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
-endif()
 
 # End-to-end test
 add_executable(test_agora
@@ -335,3 +321,19 @@ foreach(test_name IN LISTS UNIT_TESTS)
   target_link_libraries(${test_name} ${COMMON_LIBS})
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# if(NOT ${USE_DPDK})
+#   # Create shared libraries for Python
+#   # DPDK is currently not supported
+#    add_library(comp MODULE
+#      $<TARGET_OBJECTS:agora_sources_lib>
+#      $<TARGET_OBJECTS:common_sources_lib>)
+#    target_link_libraries(comp ${COMMON_LIBS})
+
+#   add_library(ue_phy MODULE
+#     $<TARGET_OBJECTS:client_sources_lib>
+#     $<TARGET_OBJECTS:common_sources_lib>)
+#   target_link_libraries(ue_phy ${COMMON_LIBS})
+# else()
+#   message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
+# endif()

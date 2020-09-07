@@ -3,8 +3,8 @@
  * Email: jianding17@gmail.com
  *
  */
-#ifndef COMPUTE_COMMON
-#define COMPUTE_COMMON
+#ifndef MOD_COMMON
+#define MOD_COMMON
 
 #include "Symbols.hpp"
 #include "buffer.hpp"

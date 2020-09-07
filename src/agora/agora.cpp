@@ -59,8 +59,8 @@ Agora::Agora(Config* cfg)
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>,
-            0, cfg->fft_thread_num);
+        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>, 0,
+            cfg->fft_thread_num);
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker_zf>,
             cfg->fft_thread_num, cfg->fft_thread_num + cfg->zf_thread_num);
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker_demul>,
@@ -112,8 +112,8 @@ void Agora::send_snr_report(
     for (size_t i = 0; i < config_->UE_NUM; i++) {
         Event_data snr_report(EventType::kSNRReport, base_tag._tag);
         snr_report.num_tags = 2;
-        *reinterpret_cast<float*>(&snr_report.tags[1])
-            = phy_stats->get_evm_snr(frame_id, i);
+        float snr = phy_stats->get_evm_snr(frame_id, i);
+        memcpy(&snr_report.tags[1], &snr, sizeof(float));
         try_enqueue_fallback(&mac_request_queue_, snr_report);
         base_tag.ue_id++;
     }
@@ -744,8 +744,7 @@ void* Agora::worker_demul(int tid)
     }
 }
 
-void Agora::create_threads(
-    void* (*worker)(void*), int tid_start, int tid_end)
+void Agora::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 {
     int ret;
     for (int i = tid_start; i < tid_end; i++) {

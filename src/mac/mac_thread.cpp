@@ -78,7 +78,9 @@ void MacThread::process_snr_report_from_master(Event_data event)
         server_.snr_[ue_id].pop();
     }
 
-    server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
+    float snr;
+    memcpy(&snr, &event.tags[1], sizeof(float));
+    server_.snr_[ue_id].push(snr);
 }
 
 void MacThread::send_ran_config_update(Event_data event)
@@ -86,6 +88,9 @@ void MacThread::send_ran_config_update(Event_data event)
     RanConfig rc;
     rc.mod_order_bits = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
+    // TODO: change n_antennas to a desired value
+    // cfg_->BS_ANT_NUM is added to fix compiler warning
+    rc.n_antennas = cfg_->BS_ANT_NUM;
 
     Event_data msg(EventType::kRANUpdate);
     msg.num_tags = 3;
