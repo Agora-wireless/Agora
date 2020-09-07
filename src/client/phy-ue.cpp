@@ -343,7 +343,7 @@ void Phy_UE::start()
                     expected_frame_id_from_mac_++;
 
                 if (kDebugPrintPacketsFromMac) {
-                    printf("Main thread: received packet for frame %zu with "
+                    printf("Main thread: received packet for frame %d with "
                            "modulation %zu\n",
                         pkt->frame_id, pkt->rb_indicator.mod_order_bits);
                     std::stringstream ss;
