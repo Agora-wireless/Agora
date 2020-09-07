@@ -212,15 +212,15 @@ void PacketTXRX::recv_demod()
         size_t symbol_id = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
         size_t ue_id = pkt->ue_id;
         size_t server_id = pkt->server_id;
-        size_t sc_id = server_id * cfg->get_ofdm_control_num();
+        size_t sc_id = server_id * cfg->get_num_sc_per_server();
         int8_t* demod_ptr = cfg->get_demod_buf(
             *demod_soft_buffer_to_decode_, frame_id, symbol_id, ue_id, sc_id);
         memcpy(
-            demod_ptr, pkt->data, cfg->get_ofdm_control_num() * cfg->mod_type);
+            demod_ptr, pkt->data, cfg->get_num_sc_per_server() * cfg->mod_type);
         decode_status_->receive_demod_data(ue_id, frame_id, symbol_id);
         free(buf);
-        // printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
-        // ue_id, server_id);
+        printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
+            ue_id, server_id);
     } else {
         printf("Receive unknown packet from demod\n");
         exit(1);
@@ -235,7 +235,7 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
     // if (-1
     //     == recv(socket_[radio_id], (char*)pkt,
     //            Packet::kOffsetOfData
-    //                + cfg->get_ofdm_control_num() * 2 * sizeof(unsigned short),
+    //                + cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short),
     //            0)) {
 
     if (-1 == recv(socket_[radio_id], (char*)pkt, cfg->packet_length, 0)) {
@@ -260,12 +260,12 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         size_t sc_offset = Packet::kOffsetOfData
             + 2 * sizeof(unsigned short)
                 * (cfg->OFDM_DATA_START
-                      + cfg->server_addr_idx * cfg->get_ofdm_control_num());
+                      + cfg->server_addr_idx * cfg->get_num_sc_per_server());
         memcpy(
             &rx_buffer[rx_offset_ * packet_length], buf, Packet::kOffsetOfData);
         memcpy(&rx_buffer[rx_offset_ * packet_length + sc_offset],
             buf + Packet::kOffsetOfData,
-            cfg->get_ofdm_control_num() * 2 * sizeof(unsigned short));
+            cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
         free(buf);
 
         // printf("Receive rru packet (%lu %lu %lu)\n", frame_id, symbol_id,
@@ -337,7 +337,7 @@ int PacketTXRX::poll_send(int tid)
             pkt->ue_id = ue_id;
             pkt->server_id = cfg->server_addr_idx;
             memcpy(pkt->data, demod_ptr,
-                cfg->get_ofdm_control_num() * cfg->mod_type);
+                cfg->get_num_sc_per_server() * cfg->mod_type);
             ssize_t ret = sendto(demod_tx_socket_, pkt, cfg->packet_length,
                 MSG_DONTWAIT,
                 (struct sockaddr*)&millipede_addrs_[cfg->get_server_idx_by_ue(

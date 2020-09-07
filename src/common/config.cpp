@@ -220,10 +220,10 @@ Config::Config(std::string jsonfile)
         rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
             "OFDM_DATA_NUM % # servers should be 0!");
         subcarrier_start
-            = OFDM_DATA_START + server_addr_idx * get_ofdm_control_num();
+            = OFDM_DATA_START + server_addr_idx * get_num_sc_per_server();
         subcarrier_end
-            = OFDM_DATA_START + (server_addr_idx + 1) * get_ofdm_control_num();
-        rt_assert(get_ofdm_control_num() % subcarrier_block_size == 0,
+            = OFDM_DATA_START + (server_addr_idx + 1) * get_num_sc_per_server();
+        rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
             "Invalid subcarrier range and subcarrier block size!");
         ue_start = server_addr_idx < UE_NUM % server_addr_list.size()
             ? server_addr_idx * (UE_NUM / server_addr_list.size() + 1)
@@ -235,8 +235,8 @@ Config::Config(std::string jsonfile)
             : ue_start + UE_NUM / server_addr_list.size();
     }
     demul_events_per_symbol
-        = 1 + (get_ofdm_control_num() - 1) / demul_block_size;
-    zf_events_per_symbol = 1 + (get_ofdm_control_num() - 1) / zf_block_size;
+        = 1 + (get_num_sc_per_server() - 1) / demul_block_size;
+    zf_events_per_symbol = 1 + (get_num_sc_per_server() - 1) / zf_block_size;
 
     demod_tx_port = tddConf.value("demod_tx_port", 3000);
     demod_rx_port = tddConf.value("demod_rx_port", 3500);

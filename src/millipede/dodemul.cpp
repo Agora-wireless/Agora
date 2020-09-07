@@ -89,7 +89,7 @@ Event_data DoDemul::launch(size_t tag)
 
     size_t max_sc_ite;
     max_sc_ite = std::min(
-        cfg->demul_block_size, cfg->get_ofdm_control_num() - base_sc_id);
+        cfg->demul_block_size, cfg->get_num_sc_per_server() - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
@@ -280,7 +280,7 @@ void DoDemul::independent_launch(
 
     size_t max_sc_ite;
     max_sc_ite = std::min(
-        cfg->demul_block_size, cfg->get_ofdm_control_num() - base_sc_id);
+        cfg->demul_block_size, cfg->get_num_sc_per_server() - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];

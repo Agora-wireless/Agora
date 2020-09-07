@@ -8,11 +8,14 @@
 
 static constexpr bool kDebugDPDK = false;
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status)
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
+    DemulStatus* demul_status = nullptr, DecodeStatus* decode_status = nullptr)
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
     , rx_status_(rx_status)
+    , demul_status_(demul_status)
+    , decode_status_(decode_status)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
 
@@ -20,14 +23,24 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status)
 
     uint16_t portid = 0;
 
-    if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
+    size_t total_thread_num = socket_thread_num;
+    if (cfg->disable_master) {
+        total_thread_num++;
+    }
+
+    if (DpdkTransport::nic_init(portid, mbuf_pool, total_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET,
-        cfg->server_addr_list[cfg->server_addr_idx].c_str(), &server_addr);
-    rt_assert(ret == 1, "Invalid server IP address");
+    if (cfg->disable_master) {
+        ret = inet_pton(AF_INET,
+            cfg->server_addr_list[cfg->server_addr_idx].c_str(), &server_addr);
+        rt_assert(ret == 1, "Invalid server IP address");
+    } else {
+        ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+        rt_assert(ret == 1, "Invalid server IP address");
+    }
 
     rte_flow_error error;
     rte_flow* flow;
@@ -56,6 +69,27 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status)
                 EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
     }
 
+    if (cfg->disable_master) {
+        for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+            uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
+            uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
+            uint32_t src_ip;
+            ret = inet_pton(AF_INET, cfg->server_addr_list[i].c_str(), &src_ip);
+            rt_assert(ret == 1, "Invalid server IP address");
+            flow = DpdkTransport::generate_ipv4_flow(0, socket_thread_num,
+                src_ip, FULL_MASK, server_addr, FULL_MASK, src_port, 0xffff,
+                dst_port, 0xffff, &error);
+            printf("Add rule for demod src ip: %x, src port: %d, dst port: %d, "
+                   "queue: %zu\n",
+                src_ip, src_port, dst_port, socket_thread_num);
+            if (!flow)
+                rte_exit(EXIT_FAILURE, "Error in creating flow: %s\n",
+                    error.message);
+        }
+    }
+
+    demod_symbol_to_send = cfg->pilot_symbol_num_perframe;
+    send_buffer_ = reinterpret_cast<char*>(memalign(64, cfg->packet_length));
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
@@ -71,10 +105,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     tx_ptoks_ = tx_ptoks;
 }
 
-PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
+PacketTXRX::~PacketTXRX()
+{
+    rte_mempool_free(mbuf_pool);
+    free(send_buffer_);
+}
 
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
+    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
+    Table<int8_t>* demod_soft_buffer,
+    Table<int8_t>* demod_soft_buffer_to_decode)
 {
     buffer_ = &buffer;
     buffer_status_ = &buffer_status;
@@ -82,6 +122,9 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
+
+    demod_soft_buffer_ = demod_soft_buffer;
+    demod_soft_buffer_to_decode_ = demod_soft_buffer_to_decode;
 
     printf("create TXRX threads\n");
 
@@ -102,9 +145,27 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
             printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
                 lcore_id);
         }
+        if (cfg->disable_master) {
+            if (worker_id == socket_thread_num) {
+                // Launch demod_loop
+            }
+        }
         worker_id++;
     }
     return true;
+}
+
+void* PacketTXRX::demod_loop_tx_rx(int tid)
+{
+    printf("Receiver thread demod\n");
+
+    int prev_frame_id = -1;
+    while (cfg->running) {
+        if (-1 != poll_send(-1))
+            continue;
+        recv_demod();
+    }
+    return 0;
 }
 
 void* PacketTXRX::loop_tx_rx(int tid)

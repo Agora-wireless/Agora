@@ -23,6 +23,7 @@ int main(int argc, char* argv[])
         // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
         millipede_cli = new Millipede(cfg);
+        millipede_cli->flags.enable_save_decode_data_to_file = true;
         millipede_cli->start();
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {

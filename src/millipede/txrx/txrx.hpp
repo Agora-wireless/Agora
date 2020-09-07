@@ -34,6 +34,8 @@
 #include <sys/types.h>
 #include <vector>
 
+#define USE_DPDK
+
 #ifdef USE_DPDK
 #include "dpdk_transport.hpp"
 #endif

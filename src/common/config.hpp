@@ -315,7 +315,7 @@ public:
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
     // Get the number of subcarriers this server takes charge of
-    inline size_t get_ofdm_control_num() const
+    inline size_t get_num_sc_per_server() const
     {
         return disable_master ? OFDM_DATA_NUM / server_addr_list.size()
                               : OFDM_DATA_NUM;
@@ -324,7 +324,7 @@ public:
     // Get the number of UEs this server takes charge of
     inline size_t get_num_ues_to_process() const
     {
-        return disable_master ? UE_NUM : ue_end - ue_start;
+        return disable_master ? ue_end - ue_start : UE_NUM;
     }
 
     // Get the Millipede server index given an UE ID
@@ -412,7 +412,7 @@ public:
         if (freq_orthogonal_pilot)
             sc_id -= (sc_id % UE_NUM);
         size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        return ul_zf_buffers[(frame_slot * get_ofdm_control_num() + sc_id)];
+        return ul_zf_buffers[(frame_slot * get_num_sc_per_server() + sc_id)];
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
@@ -431,7 +431,7 @@ public:
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
         return &demod_buffer[total_data_symbol_id]
-                            [get_ofdm_control_num() * 8 * ue_id
+                            [get_num_sc_per_server() * 8 * ue_id
                                 + sc_id * mod_type];
     }
 

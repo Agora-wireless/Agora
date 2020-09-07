@@ -160,7 +160,7 @@ class DemulStatus {
 public:
     DemulStatus(Config* cfg)
         : num_demul_tasks_required_(
-              cfg->get_ofdm_control_num() / cfg->demul_block_size)
+              cfg->get_num_sc_per_server() / cfg->demul_block_size)
     {
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
             for (size_t j = 0; j < kMaxNumSymbolsPerFrame; j++) {

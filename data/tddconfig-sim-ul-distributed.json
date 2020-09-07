@@ -18,10 +18,14 @@
     "fft_in_rru": true,
     "disable_master": true,
     "server_addr_list": [
-        "192.168.21.183"
+        "192.168.21.183",
+        "192.168.21.184"
     ],
     "server_addr_idx": 0,
     "bs_port": 11000,
     "ue_rx_port": 10000,
-    "ue_tx_port": 9000
+    "ue_tx_port": 9000,
+    "demod_tx_port": 8100,
+    "demod_rx_port": 8600,
+    "frames_to_test": 1
 }

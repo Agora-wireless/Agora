@@ -95,7 +95,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     }
     size_t num_subcarriers;
     num_subcarriers = std::min(
-        cfg->zf_block_size, cfg->get_ofdm_control_num() - base_sc_id);
+        cfg->zf_block_size, cfg->get_num_sc_per_server() - base_sc_id);
 
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
@@ -264,7 +264,7 @@ void DoZF::Predict(size_t tag)
     // TODO: add prediction algorithm
     size_t offset_in_buffer;
     offset_in_buffer
-        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->get_ofdm_control_num())
+        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->get_num_sc_per_server())
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],

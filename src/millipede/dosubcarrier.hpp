@@ -251,7 +251,7 @@ private:
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
                         // TODO: AVX512 complex multiply support below
                         size_t pilots_sgn_offset = cfg->server_addr_idx
-                            * cfg->get_ofdm_control_num();
+                            * cfg->get_num_sc_per_server();
 
                         __m256 fft_result0 = _mm256_load_ps(
                             reinterpret_cast<const float*>(src));

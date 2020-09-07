@@ -74,7 +74,7 @@ Millipede::Millipede(Config* cfg)
     } else {
         if (cfg->disable_master) {
             do_subcarrier_threads_.resize(
-                cfg->get_ofdm_control_num() / cfg->subcarrier_block_size);
+                cfg->get_num_sc_per_server() / cfg->subcarrier_block_size);
 
             for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
                 do_subcarrier_threads_[i]
@@ -694,7 +694,9 @@ void* Millipede::subcarrier_worker(int tid)
 void* Millipede::decode_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset + 1,
-        tid + config_->get_ofdm_control_num() / config_->subcarrier_block_size);
+        tid
+            + config_->get_num_sc_per_server()
+                / config_->subcarrier_block_size);
 
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
@@ -1315,7 +1317,8 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
         / 64 * 64 * cfg->LDPC_config.nblocksInSymbol;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
-    printf("Saving decode data to %s\n", filename.c_str());
+    printf("Saving decode data to %s, num_decoded_bytes = %lu\n",
+        filename.c_str(), num_decoded_bytes);
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
