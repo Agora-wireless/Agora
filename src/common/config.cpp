@@ -241,8 +241,7 @@ Config::Config(std::string jsonfile)
     packet_length
         = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
 
-    num_bytes_per_cb = bits_to_bytes(LDPC_config.cbLen);
-
+    num_bytes_per_cb = LDPC_config.cbLen / 8; // TODO: Use bits_to_bytes()?
     data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
@@ -426,9 +425,11 @@ void Config::genData()
     fclose(fd);
 #endif
 
-    size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
-    size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
-    size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_ANT_NUM;
+    const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
+    const size_t encoded_bytes_per_block
+        = bits_to_bytes(LDPC_config.cbCodewLen);
+    const size_t num_blocks_per_symbol
+        = LDPC_config.nblocksInSymbol * UE_ANT_NUM;
 
     // Encode uplink bits
     ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,

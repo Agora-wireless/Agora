@@ -135,7 +135,7 @@ TEST(TestDemul, VaryingConfig)
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * kMaxUEs, 64);
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
         cfg->symbol_num_perframe, cfg->UE_NUM,
-        kMaxModOrder * cfg->OFDM_DATA_NUM);
+        kMaxModType * cfg->OFDM_DATA_NUM);
     printf(
         "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "

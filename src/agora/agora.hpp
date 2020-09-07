@@ -87,8 +87,17 @@ public:
         EventType task_type, size_t frame_id, size_t symbol_id);
     void schedule_antennas(
         EventType task_type, size_t frame_id, size_t symbol_id);
+
+    /**
+     * @brief Schedule LDPC decoding or encoding over code blocks
+     * @param task_type Either LDPC decoding or LDPC encoding
+     * @param frame_id The monotonically increasing frame ID
+     * @param symbol_idx The index of the symbol among uplink symbols for LDPC
+     * decoding, and among downlink symbols for LDPC encoding
+     */
     void schedule_codeblocks(
-        EventType task_type, size_t frame_id, size_t symbol_idx_ul);
+        EventType task_type, size_t frame_id, size_t symbol_idx);
+
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
     // Send current frame's SNR measurements from PHY to MAC
     void send_snr_report(

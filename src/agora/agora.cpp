@@ -12,7 +12,7 @@ Agora::Agora(Config* cfg)
     , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
     , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
-          kMaxModOrder * cfg->OFDM_DATA_NUM)
+          kMaxModType * cfg->OFDM_DATA_NUM)
     , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
           cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
@@ -149,9 +149,9 @@ void Agora::schedule_subcarriers(
 }
 
 void Agora::schedule_codeblocks(
-    EventType event_type, size_t frame_id, size_t symbol_idx_ul)
+    EventType event_type, size_t frame_id, size_t symbol_idx)
 {
-    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx_ul, 0);
+    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx, 0);
 
     for (size_t i = 0;
          i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
