@@ -1,6 +1,6 @@
 #include "phy-ue.hpp"
-#include "utils_ldpc.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "utils_ldpc.hpp"
 
 static constexpr bool kDebugPrintPacketsFromMac = false;
 
@@ -34,8 +34,9 @@ Phy_UE::Phy_UE(Config* config)
         TASK_BUFFER_FRAME_NUM * dl_symbol_perframe * config_->UE_ANT_NUM * 36);
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
         * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
-    decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
-        * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
+    decode_queue_
+        = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
+            * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
     message_queue_
         = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
             * config_->symbol_num_perframe * config_->UE_ANT_NUM * 36);
@@ -247,6 +248,15 @@ void Phy_UE::start()
                     "window. This can happen if PHY is running "
                     "slowly, e.g., in debug mode");
 
+                if (symbol_id
+                    == 0) { // To send uplink pilots in simulation mode
+                    Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
+                        gen_tag_t::frm_sym_ue(frame_id, symbol_id, ant_id)
+                            ._tag);
+                    schedule_task(do_tx_pilot_task, &tx_queue_,
+                        *tx_ptoks_ptr[ant_id % rx_thread_num]);
+                }
+
                 size_t dl_symbol_id = 0;
                 if (config_->DLSymbols.size() > 0
                     && config_->DLSymbols[0].size() > 0)
@@ -326,11 +336,12 @@ void Phy_UE::start()
                             = demul_end - demul_begin;
                         int samples_num_per_UE = config_->OFDM_DATA_NUM
                             * dl_data_symbol_perframe * 1000;
-                        printf(
-                            "Frame %zu: RX %d samples (per-client) from %zu clients "
-                            "in %f secs, throughtput %f bps per-client "
-                            "(16QAM), current task queue length %zu\n",
-                            samples_num_per_UE, config_->UE_ANT_NUM, diff.count(),
+                        printf("Frame %zu: RX %d samples (per-client) from %zu "
+                               "clients "
+                               "in %f secs, throughtput %f bps per-client "
+                               "(16QAM), current task queue length %zu\n",
+                            samples_num_per_UE, config_->UE_ANT_NUM,
+                            diff.count(),
                             samples_num_per_UE * log2(16.0f) / diff.count(),
                             demul_queue_.size_approx());
                         demul_begin = std::chrono::system_clock::now();
@@ -342,8 +353,9 @@ void Phy_UE::start()
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-		if (kEnableMac)
-                    schedule_task(Event_data(EventType::kDecode, event.tags[0]), &to_mac_queue_, ptok_mac);
+                if (kEnableMac)
+                    schedule_task(Event_data(EventType::kDecode, event.tags[0]),
+                        &to_mac_queue_, ptok_mac);
                 decode_checker_[frame_id][symbol_id]++;
                 // if this symbol is ready
                 if (decode_checker_[frame_id][symbol_id]
@@ -357,8 +369,7 @@ void Phy_UE::start()
                     decode_status_[frame_id]++;
                     if (decode_status_[frame_id] == dl_data_symbol_perframe) {
                         if (kDebugPrintPerTaskDone)
-                            printf(
-                                "Main thread: Decoding done frame: %zu \n",
+                            printf("Main thread: Decoding done frame: %zu \n",
                                 frame_id);
                         decode_status_[frame_id] = 0;
                     }
@@ -443,6 +454,17 @@ void Phy_UE::start()
                     printf("Main thread: frame: %zu, finished IFFT of "
                            "uplink data for user %zu\n",
                         frame_id, ue_id);
+            } break;
+
+            case EventType::kPacketPilotTX: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+
+                if (kDebugPrintPerSymbolDone) {
+                    printf("Main thread: finished TX Pilot for frame %zu"
+                           "user %zu\n",
+                        frame_id, ue_id);
+                }
             } break;
 
             case EventType::kPacketTX: {
@@ -704,7 +726,8 @@ void Phy_UE::doDemul(int tid, size_t tag)
             config_->modulation.c_str());
     }
 
-    rt_assert(message_queue_.enqueue(*task_ptok[tid], Event_data(EventType::kDemul, tag)),
+    rt_assert(message_queue_.enqueue(
+                  *task_ptok[tid], Event_data(EventType::kDemul, tag)),
         "Demodulation message enqueue failed\n");
 }
 
@@ -742,17 +765,23 @@ void Phy_UE::doDecode(int tid, size_t tag)
 
     for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
          cb_id++) {
-	size_t demod_buffer_offset = 8 * cb_id * LDPC_config.cbCodewLen / config_->mod_order_bits;
-	size_t decode_buffer_offset = cb_id * roundup<64>(config_->num_bytes_per_cb);
-        auto* llr_buffer_ptr = &dl_demod_buffer_[symbol_ant_offset][demod_buffer_offset];
-        auto* decoded_buffer_ptr = &dl_decode_buffer_[symbol_ant_offset][decode_buffer_offset];
+        size_t demod_buffer_offset
+            = 8 * cb_id * LDPC_config.cbCodewLen / config_->mod_order_bits;
+        size_t decode_buffer_offset
+            = cb_id * roundup<64>(config_->num_bytes_per_cb);
+        auto* llr_buffer_ptr
+            = &dl_demod_buffer_[symbol_ant_offset][demod_buffer_offset];
+        auto* decoded_buffer_ptr
+            = &dl_decode_buffer_[symbol_ant_offset][decode_buffer_offset];
         ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
         ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
         bblib_ldpc_decoder_5gnr(
             &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
     }
 
-    rt_assert(message_queue_.enqueue(*task_ptok[tid], Event_data(EventType::kDecode, tag)), "Decoding message enqueue failed\n");
+    rt_assert(message_queue_.enqueue(
+                  *task_ptok[tid], Event_data(EventType::kDecode, tag)),
+        "Decoding message enqueue failed\n");
 }
 
 //////////////////////////////////////////////////////////
@@ -998,7 +1027,8 @@ void Phy_UE::initialize_downlink_buffers()
         dl_decode_buffer_.resize(config_->UE_ANT_NUM * dl_data_symbol_perframe
             * TASK_BUFFER_FRAME_NUM);
         for (size_t i = 0; i < dl_decode_buffer_.size(); i++)
-            dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb) * config_->LDPC_config.nblocksInSymbol);
+            dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb)
+                * config_->LDPC_config.nblocksInSymbol);
         resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
     }
 }
