@@ -70,7 +70,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
