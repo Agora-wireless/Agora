@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
     if (argc == 2)
         confFile = std::string(argv[1]);
     auto* cfg = new Config(confFile.c_str());
-    DataGenerator data_generator(cfg);
+    DataGenerator data_generator(cfg, 0, DataGenerator::Profile::kMNR);
 
     printf("Config file: %s\n", confFile.c_str());
     printf("Using %s-orthogonal pilots\n",

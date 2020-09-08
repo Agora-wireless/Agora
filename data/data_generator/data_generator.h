@@ -4,6 +4,8 @@
 #include "utils_ldpc.hpp"
 #include <string>
 
+static const char data_to_sent[] = { 'M', 'N', 'R' };
+
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for
  * Millipede
@@ -13,7 +15,8 @@ public:
     // The profile of the input information bits
     enum class Profile {
         kRandom, // The input information bytes are chosen at random
-        k123 // The input informatioon bytes are 1, 2, 3, 1, 2, 3, ...
+        k123, // The input informatioon bytes are 1, 2, 3, 1, 2, 3, ...
+        kMNR // The input information bytes are M, N, R
     };
 
     DataGenerator(
@@ -49,6 +52,8 @@ public:
                 information[i] = static_cast<int8_t>(fast_rand.next_u32());
             } else if (profile == Profile::k123) {
                 information[i] = (i % 3) + 1;
+            } else if (profile == Profile::kMNR) {
+                information[i] = data_to_sent[i % 3];
             }
         }
 
