@@ -109,13 +109,14 @@ DoDecode::~DoDecode() { free(resp_var_nodes); }
 Event_data DoDecode::launch(size_t tag)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
-    size_t cb_id = gen_tag_t(tag).cb_id;
-    size_t symbol_offset
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
+    const size_t cb_id = gen_tag_t(tag).cb_id;
+    const size_t symbol_offset
         = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
-    size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
-    size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
+    const size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
+    const size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
+    const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
                "%zu, ue: %zu\n",
@@ -146,11 +147,11 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    int8_t* llr_buffer_ptr = demod_buffers_[frame_id][symbol_idx_ul][ue_id]
+    int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id]
         + (cfg->mod_order_bits * (LDPC_config.cbCodewLen * cur_cb_id));
 
     uint8_t* decoded_buffer_ptr
-        = decoded_buffers_[frame_id][symbol_idx_ul][ue_id]
+        = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
         + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
 
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;

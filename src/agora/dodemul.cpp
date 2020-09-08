@@ -238,7 +238,7 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        int8_t* demul_ptr = demod_buffers_[frame_id][symbol_idx_ul][i]
+        int8_t* demul_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
             + (cfg->mod_order_bits * base_sc_id);
 
         switch (cfg->mod_order_bits) {
