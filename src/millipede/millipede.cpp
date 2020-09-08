@@ -682,7 +682,8 @@ void* Millipede::worker(int tid)
         computeDecoding, computeDemul, computeEncoding };
 
     if (kUseRemote) {
-        RemoteLdpcStub* stub = computeDecoding->initialize_remote_ldpc_stub();
+        RemoteLdpcStub* stub = computeDecoding->initialize_remote_ldpc_stub(
+            base_worker_core_offset + tid);
         computeDecodingLast->set_initialized_remote_ldpc_stub(stub);
     }
 

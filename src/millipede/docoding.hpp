@@ -42,10 +42,13 @@ void decode_response_loop(Config* cfg);
 /// in each worker thread.
 class RemoteLdpcStub {
 public:
-    RemoteLdpcStub(Config* cfg)
+    RemoteLdpcStub(Config* cfg, int core_for_dpdk)
         : num_requests_issued(0)
         , num_responses_received(0)
     {
+        _unused(cfg); // used only for DPDK
+        _unused(core_for_dpdk); // used only for DPDK
+
         // TODO: previously, eRPC req/resp buffers were pre-allocated here.
         // for (size_t i = 0; i < kRpcMaxMsgBufNum; i++) {
         //     auto* req_msgbuf = new erpc::MsgBuffer;
@@ -54,12 +57,12 @@ public:
         // }
 
 #ifdef USE_DPDK
-        /// TODO: what's the proper core offset and worker thread num?
-        DpdkTransport::dpdk_init(cfg->core_offset, cfg->worker_thread_num);
+        // Init DPDK on only this core
+        DpdkTransport::dpdk_init(core_for_dpdk, 1);
         mbuf_pool = DpdkTransport::create_mempool();
 
         uint16_t portid = 0;
-        if (!DpdkTransport::nic_init(portid, mbuf_pool, cfg->worker_thread_num))
+        if (!DpdkTransport::nic_init(portid, mbuf_pool, 1))
         {
             rte_exit(EXIT_FAILURE, "Cannot init NIC with port %u\n", portid);
         }
@@ -146,9 +149,9 @@ public:
     /// with a remote LDPC worker.
     /// The returned `RemoteLdpcStub` can be shared with other doers;
     /// see the `set_initialized_remote_ldpc_stub()` method.
-    RemoteLdpcStub* initialize_remote_ldpc_stub()
+    RemoteLdpcStub* initialize_remote_ldpc_stub(int core_for_dpdk)
     {
-        remote_ldpc_stub_ = new RemoteLdpcStub();
+        remote_ldpc_stub_ = new RemoteLdpcStub(cfg, core_for_dpdk);
         return remote_ldpc_stub_;
     }
 
