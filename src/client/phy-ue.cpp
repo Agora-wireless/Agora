@@ -3,6 +3,7 @@
 #include "utils_ldpc.hpp"
 
 static constexpr bool kDebugPrintPacketsFromMac = false;
+static constexpr bool kDebugPrintPacketsToMac = false;
 
 Phy_UE::Phy_UE(Config* config)
 {
@@ -230,8 +231,6 @@ void Phy_UE::start()
 
             switch (event.event_type) {
 
-                // if EVENT_RX_SYMBOL, do crop
-
             case EventType::kPacketRX: {
                 //int offset = event.tags[0];
                 size_t rx_thread_id = rx_tag_t(event.tags[0]).tid;
@@ -251,7 +250,8 @@ void Phy_UE::start()
                 if (symbol_id
                     == 0) { // To send uplink pilots in simulation mode
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
-                        gen_tag_t::frm_sym_ue(frame_id, symbol_id, ant_id)
+                        gen_tag_t::frm_sym_ue(
+                            frame_id, config_->pilotSymbols[0][ant_id], ant_id)
                             ._tag);
                     schedule_task(do_tx_pilot_task, &tx_queue_,
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
@@ -284,7 +284,6 @@ void Phy_UE::start()
 
             case EventType::kFFT: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 // checker to count # of pilots/users
                 csi_checker_[frame_id]++;
 
@@ -305,7 +304,6 @@ void Phy_UE::start()
             case EventType::kDemul: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
 
                 Event_data do_decode_task(EventType::kDecode, event.tags[0]);
                 schedule_task(do_decode_task, &decode_queue_, ptok_decode);
@@ -340,7 +338,7 @@ void Phy_UE::start()
                                "clients "
                                "in %f secs, throughtput %f bps per-client "
                                "(16QAM), current task queue length %zu\n",
-                            samples_num_per_UE, config_->UE_ANT_NUM,
+                            frame_id, samples_num_per_UE, config_->UE_ANT_NUM,
                             diff.count(),
                             samples_num_per_UE * log2(16.0f) / diff.count(),
                             demul_queue_.size_approx());
@@ -380,7 +378,10 @@ void Phy_UE::start()
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-                if (kDebugPrintPacketsFromMac) {
+                if (kDebugPrintPacketsToMac) {
+                    printf("Main thread: sent decoded packet for frame %zu"
+                           ", symbol %zu to MAC\n",
+                        frame_id, symbol_id);
                 }
 
             } break;
@@ -403,7 +404,7 @@ void Phy_UE::start()
                     expected_frame_id_from_mac_++;
 
                 if (kDebugPrintPacketsFromMac) {
-                    printf("Main thread: received packet for frame %d with "
+                    printf("Main thread: received packet for frame %u with "
                            "modulation %zu\n",
                         pkt->frame_id, pkt->rb_indicator.mod_order_bits);
                     std::stringstream ss;
@@ -458,12 +459,14 @@ void Phy_UE::start()
 
             case EventType::kPacketPilotTX: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
-
-                if (kDebugPrintPerSymbolDone) {
-                    printf("Main thread: finished TX Pilot for frame %zu"
-                           "user %zu\n",
-                        frame_id, ue_id);
+                if (ul_data_symbol_perframe == 0)
+                    cur_frame_id++;
+                if (kDebugPrintPerFrameDone) {
+                    printf("Main thread: finished TXing Pilot for user %zu"
+                           " in frame %zu, symbol %zu\n",
+                        ue_id, frame_id, symbol_id);
                 }
             } break;
 
@@ -490,7 +493,7 @@ void Phy_UE::start()
             } break;
 
             default:
-                printf("Wrong event type in message queue!");
+                std::cout << "Invalid Event Type!" << std::endl;
                 exit(0);
             }
         }
@@ -955,7 +958,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe - 1;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = config_->hw_framer
+    rx_thread_num = (kUseArgos && config_->hw_framer)
         ? std::min(config_->UE_NUM, config_->socket_thread_num)
         : config_->UE_NUM;
 
