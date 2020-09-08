@@ -219,8 +219,8 @@ void PacketTXRX::recv_demod()
             demod_ptr, pkt->data, cfg->get_num_sc_per_server() * cfg->mod_type);
         decode_status_->receive_demod_data(ue_id, frame_id, symbol_id);
         free(buf);
-        printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
-            ue_id, server_id);
+        // printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
+        // ue_id, server_id);
     } else {
         printf("Receive unknown packet from demod\n");
         exit(1);
