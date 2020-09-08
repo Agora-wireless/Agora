@@ -4,7 +4,6 @@
  "ofdm_data_num" : 1200,
  "worker_thread_num" : 25,
  "demul_block_size" : 48,
- "antenna_num": 8,
- "bs_server_addr": "192.168.21.183"
+ "antenna_num": 8
 }
 
