@@ -90,12 +90,12 @@ public:
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
     /**
-     * @brief transmit a tx packet that is ready from PHY through socket to channel simualtor
+     * @brief transmits a tx packet that is ready from PHY through socket to channel simualtor
      */
     int dequeue_send(int tid);
 
     /**
-     * @brief transmit a tx samples packet that is ready from PHY through client wireless hardware
+     * @brief transmits a tx samples packet that is ready from PHY through client wireless hardware
      */
     int dequeue_send_argos(int tid);
 
