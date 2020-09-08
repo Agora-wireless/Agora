@@ -225,14 +225,6 @@ int PacketTXRX::dequeue_send(int tid)
         sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
-    // After sending all symbols, send beacon for next frame
-    if (frame_id + 1 < c->frames_to_test
-        && data_symbol_idx + c->pilot_symbol_num_perframe
-            == c->DLSymbols[0].back()
-        && ant_id == 0) {
-        send_beacon(tid, frame_id + 1);
-    }
-
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketTX, event.tags[0])),
         "Socket message enqueue failed\n");
