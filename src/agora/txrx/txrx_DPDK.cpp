@@ -14,11 +14,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
-
     mbuf_pool = DpdkTransport::create_mempool();
 
-    uint16_t portid = 0;
-
+    const uint16_t portid = 0;
     if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
@@ -36,7 +34,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         flow = DpdkTransport::generate_ipv4_flow(0, i, bs_rru_addr, FULL_MASK,
             bs_server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff,
             &error);
-        printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
+        printf("Adding rule for src port: %d, dst port: %d, queue: %zu\n",
             src_port, dst_port, i);
         if (!flow)
             rte_exit(
@@ -70,8 +68,6 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    printf("create TXRX threads\n");
-
     unsigned int lcore_id;
     size_t worker_id = 0;
     // Launch specific task to cores
@@ -96,16 +92,9 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 
 void PacketTXRX::send_beacon(int tid, size_t frame_id)
 {
-    int radio_lo = tid * cfg->nRadios / socket_thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-
-    // Send a beacon packet in the downlink to trigger user pilot
-    std::vector<uint8_t> udp_pkt_buf(cfg->packet_length, 0);
-    auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
-    for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
-        new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
-        // TODO: implement beacon transmission for DPDK mode
-    }
+    // TODO: implement beacon transmission for DPDK mode
+    _unused(tid);
+    _unused(frame_id);
 }
 
 void* PacketTXRX::loop_tx_rx(int tid)

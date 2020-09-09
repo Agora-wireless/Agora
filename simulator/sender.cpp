@@ -21,7 +21,7 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 }
 
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
-    size_t delay, bool enable_slow_start, std::string server_mac_addr_str,
+    size_t delay, size_t enable_slow_start, std::string server_mac_addr_str,
     bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
@@ -36,6 +36,11 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
+    printf("Initializing sender, sending to base station server at %s, frame "
+           "duration = %.2f ms, slow start = %s\n",
+        cfg->bs_server_addr.c_str(), delay / 1000.0,
+        enable_slow_start == 1 ? "yes" : "no");
+
     _unused(server_mac_addr_str);
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -65,7 +70,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
@@ -152,7 +157,7 @@ void* Sender::master_thread(int)
             packet_count_per_frame[comp_frame_slot]++;
 
             // Add inter-symbol delay
-            if (enable_slow_start) {
+            if (enable_slow_start == 1) {
                 if (ctag.frame_id <= 5) {
                     delay_ticks(tick_start, ticks_5);
                 } else if (ctag.frame_id < 100) {

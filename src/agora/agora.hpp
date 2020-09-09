@@ -41,21 +41,16 @@ public:
     /* optimization parameters for block transpose (see the slides for more
      * details) */
     static const int transpose_block_num = 256;
-    /* dequeue bulk size, used to reduce the overhead of dequeue in main thread
-     */
+
+    // Dequeue batch size, used to reduce the overhead of dequeue in main thread
     static const int kDequeueBulkSizeTXRX = 8;
+
     static const int kDequeueBulkSizeWorker = 4;
 
-    /**
-     * @brief Create a Agora object and start the worker threads
-     */
-    Agora(Config*);
+    Agora(Config*); /// Create an Agora object and start the worker threads
     ~Agora();
 
-    /**
-     * @brief The main Agora event loop
-     */
-    void start();
+    void start(); /// The main Agora event loop
     void stop();
 
     void* worker_fft(int tid);
@@ -74,7 +69,7 @@ public:
     void print_per_task_done(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
-    // Update Agora config of RAN parameters
+    /// Update Agora's RAN config parameters
     void update_ran_config(RanConfig rc);
 
     void schedule_subcarriers(
@@ -93,9 +88,11 @@ public:
         EventType task_type, size_t frame_id, size_t symbol_idx);
 
     void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+
     // Send current frame's SNR measurements from PHY to MAC
     void send_snr_report(
         EventType event_type, size_t frame_id, size_t symbol_id);
+
     void move_events_between_queues(
         EventType event_type1, EventType event_type2);
 
@@ -153,7 +150,6 @@ private:
     Config* config_;
     size_t fft_created_count;
     int max_equaled_frame = 0;
-    // int max_packet_num_per_frame;
     std::unique_ptr<PacketTXRX> receiver_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
@@ -161,9 +157,6 @@ private:
 
     Stats* stats;
     PhyStats* phy_stats;
-    // std::unique_ptr<Stats> stats_manager_;
-    // pthread_t task_threads[TASK_THREAD_NUM];
-    // EventHandlerContext context[TASK_THREAD_NUM];
     pthread_t* task_threads;
 
     /*****************************************************
