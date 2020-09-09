@@ -55,13 +55,13 @@ public:
      *
      * @param delay The TTI slot duration
      *
-     * @param enable_slow_start If true, initially frames are sent in a duration
-     * larger than the TTI
+     * @param enable_slow_start If 1, the sender initially sends frames in a
+     * duration larger than the TTI
      *
      * @param server_mac_addr_str The MAC address of the server's NIC
      */
     Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
-        size_t delay = 0, bool enable_slow_start = true,
+        size_t delay = 0, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
 
@@ -105,7 +105,7 @@ private:
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t num_worker_threads_; // Number of worker threads sending pkts
-    const bool enable_slow_start; // Send frames slowly at first
+    const size_t enable_slow_start; // If 1, send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}

@@ -14,15 +14,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
-
     mbuf_pool = DpdkTransport::create_mempool();
 
-    uint16_t portid = 0;
-
+    const uint16_t portid = 0;
     if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
@@ -35,7 +33,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
             server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
-        printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
+        printf("Adding rule for src port: %d, dst port: %d, queue: %zu\n",
             src_port, dst_port, i);
         if (!flow)
             rte_exit(
@@ -69,8 +67,6 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    printf("create TXRX threads\n");
-
     unsigned int lcore_id;
     size_t worker_id = 0;
     // Launch specific task to cores
@@ -91,6 +87,12 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         worker_id++;
     }
     return true;
+}
+
+void PacketTXRX::send_beacon(int tid, size_t frame_id)
+{
+    _unused(tid);
+    _unused(frame_id);
 }
 
 void* PacketTXRX::loop_tx_rx(int tid)

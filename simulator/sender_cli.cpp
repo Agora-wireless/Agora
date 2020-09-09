@@ -14,7 +14,7 @@ DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
 DEFINE_string(conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
     "Config filename");
-DEFINE_bool(enable_slow_start, true, "Send frames slowly at first.");
+DEFINE_uint64(enable_slow_start, 1, "Send frames slowly at first.");
 
 int main(int argc, char* argv[])
 {
@@ -24,8 +24,6 @@ int main(int argc, char* argv[])
     auto* cfg = new Config(filename.c_str());
     cfg->genData();
 
-    printf("Starting sender, sending to server at %s\n",
-        cfg->bs_server_addr.c_str());
     auto* sender = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset,
         FLAGS_delay, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
     sender->startTX();
