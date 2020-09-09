@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "docoding.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"

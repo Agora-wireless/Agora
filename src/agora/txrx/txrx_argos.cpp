@@ -1,9 +1,7 @@
 /**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- * Implementation of PacketTXRX datapath functions for communicating with
- * real Argos hardware
+ * @file txrx_argos.cpp
+ * @brief Implementation of PacketTXRX datapath functions for communicating 
+ * with real Argos hardware
  */
 
 #include "txrx.hpp"

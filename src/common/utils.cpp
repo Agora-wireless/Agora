@@ -1,12 +1,10 @@
-/*
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
- utility functions for file and text processing.
-
----------------------------------------------------------------------
- Copyright (c) 2018-2019, Rice University
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
----------------------------------------------------------------------
-*/
+/**
+ * @file utils.cpp
+ * @brief Utility functions for file and text processing.
+ */
 
 #include "utils.h"
 

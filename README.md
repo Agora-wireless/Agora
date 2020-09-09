@@ -158,3 +158,6 @@ traffic with hardware UEs (e.g., Iris devices)
      Faros RRHs.
    * Run BS app `./python/bs_app.py`.
    * Run `./build/agora data/bs-ul-hw.json`.
+
+## Contact
+Jian Ding (jian.ding@yale.edu)

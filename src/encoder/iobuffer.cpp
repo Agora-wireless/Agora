@@ -1,6 +1,7 @@
-/*
-    read the input files into z-bit segments
-    regroup the output from z-bit segments to bytes
+/** 
+ * @file iobuffer.cpp
+ * @brief Read the input files into z-bit segments; regroup the output from 
+ * z-bit segments to bytes
  */
 
 #include "iobuffer.hpp"

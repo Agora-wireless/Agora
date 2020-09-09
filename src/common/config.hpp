@@ -1,4 +1,3 @@
-
 #ifndef CONFIG_HEADER
 #define CONFIG_HEADER
 
@@ -266,15 +265,17 @@ public:
     // The total number of mac packets sent/received in each frame
     size_t mac_packets_perframe;
 
-    std::string ue_server_addr; // IP address of the machine running the UE
+    // IP address of the machine running the baseband processing for UE
+    std::string ue_server_addr; 
 
-    // IP address of the machine running the base station
+    // IP address of the machine running the baseband processing for BS
     std::string bs_server_addr;
 
-    // IP address of the RRU, RRU emulator (sender), or channel simulator
-    std::string rru_addr;
+    // IP address of the base station RRU, RRU emulator (sender), 
+    // or channel simulator
+    std::string bs_rru_addr;
 
-    // IP address of the data source/sink server communicating with MAC (BS or UE)
+    // IP address of the data source/sink server communicating with MAC (BS/UE)
     std::string mac_remote_addr;
 
     int bs_server_port; // Base UDP port used by BS to receive data
@@ -296,8 +297,9 @@ public:
     // processed by Agora before exiting.
     size_t frames_to_test;
 
-    /* LDPC parameters */
-    LDPCconfig LDPC_config;
+    // Size of tranport block given by upper layer
+    size_t transport_block_size;
+    LDPCconfig LDPC_config; // LDPC parameters
 
     // Number of bytes per code block
     size_t num_bytes_per_cb;

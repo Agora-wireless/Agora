@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #ifndef PACKETTXRX
 #define PACKETTXRX
 
@@ -105,12 +99,12 @@ private:
     moodycamel::ProducerToken** rx_ptoks_;
     moodycamel::ProducerToken** tx_ptoks_;
 
-    std::vector<struct sockaddr_in> servaddr_; /* server address */
+    std::vector<struct sockaddr_in> bs_rru_sockaddr_;
     std::vector<int> socket_;
 
 #ifdef USE_DPDK
-    uint32_t sender_addr; // IPv4 address of the simulator sender
-    uint32_t server_addr; // IPv4 address of the Agora server
+    uint32_t bs_rru_addr; // IPv4 address of the simulator sender
+    uint32_t bs_server_addr; // IPv4 address of the Agora server
     struct rte_mempool* mbuf_pool;
 #endif
 
