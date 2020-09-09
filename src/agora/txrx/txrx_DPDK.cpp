@@ -22,9 +22,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     rte_flow_error error;
@@ -33,8 +33,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
-        flow = DpdkTransport::generate_ipv4_flow(0, i, sender_addr, FULL_MASK,
-            server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff, &error);
+        flow = DpdkTransport::generate_ipv4_flow(0, i, bs_rru_addr, FULL_MASK,
+            bs_server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff,
+            &error);
         printf("Add rule for src port: %d, dst port: %d, queue: %zu\n",
             src_port, dst_port, i);
         if (!flow)
@@ -91,6 +92,20 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         worker_id++;
     }
     return true;
+}
+
+void PacketTXRX::send_beacon(int tid, size_t frame_id)
+{
+    int radio_lo = tid * cfg->nRadios / socket_thread_num;
+    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+
+    // Send a beacon packet in the downlink to trigger user pilot
+    std::vector<uint8_t> udp_pkt_buf(cfg->packet_length, 0);
+    auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+    for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
+        new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
+        // TODO: implement beacon transmission for DPDK mode
+    }
 }
 
 void* PacketTXRX::loop_tx_rx(int tid)
@@ -154,12 +169,12 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
             continue;
         }
 
-        if (ip_h->src_addr != sender_addr) {
+        if (ip_h->src_addr != bs_rru_addr) {
             printf("Source addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
-        if (ip_h->dst_addr != server_addr) {
+        if (ip_h->dst_addr != bs_server_addr) {
             printf("Destination addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
@@ -242,8 +257,8 @@ int PacketTXRX::dequeue_send(int tid)
 
     struct rte_ipv4_hdr* ip_h
         = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-    ip_h->src_addr = server_addr;
-    ip_h->dst_addr = sender_addr;
+    ip_h->src_addr = bs_server_addr;
+    ip_h->dst_addr = bs_rru_addr;
     ip_h->next_proto_id = IPPROTO_UDP;
 
     struct rte_udp_hdr* udp_h
