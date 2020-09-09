@@ -266,9 +266,13 @@ public:
     // The total number of mac packets sent/received in each frame
     size_t mac_packets_perframe;
 
-    std::string ue_server_addr; // IP address of UE server
-    std::string bs_server_addr; // IP address of the BS server
-    std::string rru_addr; // IP address of the RRU/channel simulator
+    std::string ue_server_addr; // IP address of the machine running the UE
+
+    // IP address of the machine running the base station
+    std::string bs_server_addr;
+
+    // IP address of the RRU, RRU emulator (sender), or channel simulator
+    std::string rru_addr;
 
     // IP address of the data source/sink server communicating with MAC (BS or UE)
     std::string mac_remote_addr;

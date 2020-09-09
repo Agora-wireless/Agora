@@ -269,7 +269,6 @@ Config::Config(std::string jsonfile)
                      "frame size (9000)! "
                   << "Packets will be fragmented.\033[0m" << std::endl;
     }
-    std::cout << "Config done!" << std::endl;
 }
 
 void Config::genData()
