@@ -37,13 +37,12 @@ int DpdkTransport::nic_init(
     rte_eth_dev_set_mtu(port, 9000);
     uint16_t mtu_size = 0;
     rte_eth_dev_get_mtu(port, &mtu_size);
-    printf("MTU: %d\n", mtu_size);
+    rt_assert(mtu_size == 9000, "Invalid MTU (must be 9000 bytes)");
 
     int promiscuous_en = rte_eth_promiscuous_get(port);
-    printf("Promiscuous mode: %d\n", promiscuous_en);
     rte_eth_promiscuous_enable(port);
     promiscuous_en = rte_eth_promiscuous_get(port);
-    printf("Promiscuous mode: %d\n", promiscuous_en);
+    rt_assert(promiscuous_en == 1, "Unable to set promiscuous mode");
 
     rte_eth_dev_info_get(port, &dev_info);
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
@@ -56,16 +55,12 @@ int DpdkTransport::nic_init(
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
     if (retval != 0)
         return retval;
-    printf("Max packet length: %d, dev max: %d\n",
-        port_conf.rxmode.max_rx_pkt_len, dev_info.max_rx_pktlen);
     retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
     if (retval != 0)
         return retval;
 
     rxconf = dev_info.default_rxconf;
     rxconf.offloads = port_conf.rxmode.offloads;
-    uint32_t mbp_buf_size = rte_pktmbuf_data_room_size(mbuf_pool);
-    printf("size of mbuf_pool: %u\n", mbp_buf_size);
 
     for (q = 0; q < rxRings; q++) {
         retval = rte_eth_rx_queue_setup(
