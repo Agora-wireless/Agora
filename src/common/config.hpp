@@ -267,9 +267,9 @@ public:
 
     std::string ue_server_addr; // IP address of UE server
     std::string bs_server_addr; // IP address of the BS server
-    std::string rru_addr; // IP address of the RRU/channel simulator
+    std::string bs_rru_addr; // IP address of the BS RRU/channel simulator
 
-    // IP address of the data source/sink server communicating with MAC (BS or UE)
+    // IP address of the data source/sink server communicating with MAC (BS/UE)
     std::string mac_remote_addr;
 
     int bs_server_port; // Base UDP port used by BS to receive data

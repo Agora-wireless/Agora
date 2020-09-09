@@ -5,7 +5,8 @@
  * @file comms-lib-avx.cpp
  * @brief Select signal processing and communications blocks implemented using
  *  Intel AVX2
-*/
+ * @author Rahman Doost-Mohamamdy: doost@rice.edu
+ */
 
 #include "comms-lib.h"
 #include <queue>
