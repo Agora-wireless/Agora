@@ -123,11 +123,28 @@ void* PacketTXRX::loop_tx_rx(int tid)
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
-    send_beacon(tid, 0); // Send Beacons for the first time to kick off sim
-
+    size_t frame_tsc_delta(
+        (cfg->get_frame_duration_sec() * 1e9) / measure_rdtsc_freq());
     int prev_frame_id = -1;
     int radio_id = radio_lo;
+    size_t tx_frame_start = rdtsc();
+    size_t tx_frame_id = 0;
+    size_t slow_start_factor = 10;
+    send_beacon(
+        tid, tx_frame_id++); // Send Beacons for the first time to kick off sim
     while (cfg->running) {
+        if (rdtsc() - tx_frame_start > frame_tsc_delta * slow_start_factor) {
+            tx_frame_start = rdtsc();
+            send_beacon(tid, tx_frame_id++);
+            if (tx_frame_id > 5)
+                slow_start_factor = 5;
+            else if (tx_frame_id > 100)
+                slow_start_factor = 4;
+            else if (tx_frame_id > 200)
+                slow_start_factor = 2;
+            else if (tx_frame_id > 500)
+                slow_start_factor = 1;
+        }
         if (-1 != dequeue_send(tid))
             continue;
         // receive data

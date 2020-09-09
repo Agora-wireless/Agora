@@ -190,9 +190,9 @@ private:
     size_t expected_frame_id_from_mac_ = 0;
     size_t current_frame_user_num_ = 0;
 
-    // num_frames_consumed_[i] is the number of frames on the uplink completely
-    // processed (i.e., including radio transmissing) by the PHY for UE #i
-    size_t num_frames_consumed_[kMaxUEs] = {};
+    // next_processed_frame_[i] is the next frame index on the uplink
+    // to be processed and transmitted by the PHY for UE #i
+    size_t next_frame_processed_[kMaxUEs] = {};
 
     /*****************************************************
      * Uplink

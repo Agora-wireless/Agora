@@ -464,25 +464,24 @@ void Phy_UE::start()
                 if (ul_data_symbol_perframe == 0)
                     cur_frame_id++;
                 if (kDebugPrintPerFrameDone) {
-                    printf("Main thread: finished TXing Pilot for user %zu"
+                    printf("Main thread: finished Pilot TX for user %zu"
                            " in frame %zu, symbol %zu\n",
                         ue_id, frame_id, symbol_id);
                 }
             } break;
 
             case EventType::kPacketTX: {
-                cur_frame_id++;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
-
-                rt_assert(frame_id == num_frames_consumed_[ue_id]);
+                cur_frame_id = frame_id;
+                rt_assert(frame_id == next_frame_processed_[ue_id]);
 
                 // printf("PhyUE kPacketTX: Freeing buffer %zu for UE %zu\n",
                 //    num_frames_consumed_[ue_id] % TASK_BUFFER_FRAME_NUM, ue_id);
-                ul_bits_buffer_status_[ue_id][num_frames_consumed_[ue_id]
+                ul_bits_buffer_status_[ue_id][next_frame_processed_[ue_id]
                     % TASK_BUFFER_FRAME_NUM]
                     = 0;
-                num_frames_consumed_[ue_id]++;
+                next_frame_processed_[ue_id]++;
 
                 if (kDebugPrintPerSymbolDone) {
                     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
