@@ -1,12 +1,10 @@
-/*
- Select signal processing and communications blocks implemented using Intel AVX
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
-find_beacon_avx: Correlation and Peak detection of a beacon with Gold code (2 repetitions)
----------------------------------------------------------------------
- Copyright (c) 2018-2020, Rice University 
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
- Author(s): Rahman Doost-Mohamamdy: doost@rice.edu
----------------------------------------------------------------------
+/**
+ * @file comms-lib-avx.cpp
+ * @brief Select signal processing and communications blocks implemented using
+ *  Intel AVX2
 */
 
 #include "comms-lib.h"
@@ -21,6 +19,7 @@ find_beacon_avx: Correlation and Peak detection of a beacon with Gold code (2 re
 #define AVX_PACKED_SI 16 // short int
 #define AVX_PACKED_CS 8 // complex short int
 
+/// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
 int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
     const std::vector<std::complex<float>>& seq)
 {

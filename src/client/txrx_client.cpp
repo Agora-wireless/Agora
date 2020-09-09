@@ -1,4 +1,3 @@
-
 #include "txrx_client.hpp"
 #include "config.hpp"
 

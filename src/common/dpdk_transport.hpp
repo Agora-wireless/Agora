@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #ifndef DPDK_TRANSPORT
 #define DPDK_TRANSPORT
 

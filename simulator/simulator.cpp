@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "simulator.hpp"
 
 Simulator::Simulator(Config* cfg, size_t in_task_thread_num,

@@ -1,7 +1,7 @@
 /**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
+ * @file txrx_DPDK.cpp
+ * @brief Implementation of PacketTXRX datapath functions for communicating 
+ * with DPDK
  */
 
 #include "txrx.hpp"

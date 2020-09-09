@@ -1,9 +1,7 @@
 /**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- * Implementation of PacketTXRX initialization functions, and datapath functions
- * for communicating with simulators.
+ * @file txrx.cpp
+ * @brief Implementation of PacketTXRX initialization functions, and datapath
+ * functions for communicating with simulators.
  */
 
 #include "txrx.hpp"

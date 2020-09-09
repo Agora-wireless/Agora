@@ -1,4 +1,3 @@
-
 #include "config.hpp"
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>

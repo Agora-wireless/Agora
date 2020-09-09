@@ -1,4 +1,3 @@
-
 #ifndef CONFIG_HEADER
 #define CONFIG_HEADER
 
@@ -292,8 +291,9 @@ public:
     // processed by Agora before exiting.
     size_t frames_to_test;
 
-    /* LDPC parameters */
-    LDPCconfig LDPC_config;
+    // Size of tranport block given by upper layer
+    size_t transport_block_size;
+    LDPCconfig LDPC_config; // LDPC parameters
 
     // Number of bytes per code block
     size_t num_bytes_per_cb;

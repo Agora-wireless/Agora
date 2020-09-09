@@ -1,9 +1,3 @@
-/**
- * Author: Peiyao Zhao
- * E-Mail: pdszpy19930218@163.com
- *
- */
-
 #ifndef BUFFER_HEAD
 #define BUFFER_HEAD
 
