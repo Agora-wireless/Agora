@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "datatype_conversion.h"

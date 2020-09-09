@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "stats.hpp"
 
 #include <typeinfo>
@@ -87,9 +82,9 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
             &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &demul_frame_summary, &decode_frame_summary);
     else
-        update_stats_in_functions_uplink_agora(frame_slot,
-            &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
-            &demul_frame_summary, &decode_frame_summary);
+        update_stats_in_functions_uplink_agora(frame_slot, &fft_frame_summary,
+            &csi_frame_summary, &zf_frame_summary, &demul_frame_summary,
+            &decode_frame_summary);
 
     fft_us[frame_slot] = fft_frame_summary.us_avg_threads[0];
     csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];

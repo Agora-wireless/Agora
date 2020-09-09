@@ -1,12 +1,11 @@
-/*
- Copyright (c) 2018-2019, Rice University
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
- Author(s): Rahman Doost-Mohamamdy: doost@rice.edu
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
----------------------------------------------------------------------
- Utils functions
----------------------------------------------------------------------
-*/
+/**
+ * @file utils.h
+ * @brief Utility functions for file and text processing.
+ * @author Rahman Doost-Mohamamdy: doost@rice.edu
+ */
 
 #ifndef UTILS_HEADER
 #define UTILS_HEADER

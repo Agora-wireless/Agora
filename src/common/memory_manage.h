@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef MEMORY_MANAGE
 #define MEMORY_MANAGE
 #include <array>

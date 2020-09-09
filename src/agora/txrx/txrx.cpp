@@ -1,9 +1,7 @@
 /**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- * Implementation of PacketTXRX initialization functions, and datapath functions
- * for communicating with simulators.
+ * @file txrx.cpp
+ * @brief Implementation of PacketTXRX initialization functions, and datapath
+ * functions for communicating with simulators.
  */
 
 #include "txrx.hpp"
@@ -15,7 +13,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
 {
     if (!kUseArgos) {
         socket_.resize(cfg->nRadios);
-        servaddr_.resize(cfg->nRadios);
+        bs_rru_sockaddr_.resize(cfg->nRadios);
     } else {
         radioconfig_ = new RadioConfig(cfg);
     }
@@ -94,8 +92,8 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
     for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
         new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
         ssize_t r = sendto(socket_[ant_id], (char*)udp_pkt_buf.data(),
-            cfg->packet_length, 0, (struct sockaddr*)&servaddr_[ant_id],
-            sizeof(servaddr_[ant_id]));
+            cfg->packet_length, 0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+            sizeof(bs_rru_sockaddr_[ant_id]));
         rt_assert(r > 0, "sendto() failed");
     }
 }
@@ -114,11 +112,11 @@ void* PacketTXRX::loop_tx_rx(int tid)
         int local_port_id = cfg->bs_server_port + radio_id;
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
-        setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            cfg->bs_rru_port + radio_id, cfg->rru_addr.c_str());
+        setup_sockaddr_remote_ipv4(&bs_rru_sockaddr_[radio_id],
+            cfg->bs_rru_port + radio_id, cfg->bs_rru_addr.c_str());
         printf("TXRX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%d \n",
-            tid, local_port_id, cfg->rru_addr.c_str(),
+            tid, local_port_id, cfg->bs_rru_addr.c_str(),
             cfg->bs_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
@@ -220,9 +218,10 @@ int PacketTXRX::dequeue_send(int tid)
     new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id % cfg->socket_thread_num],
-        cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-        sizeof(servaddr_[tid]));
+    ssize_t ret
+        = sendto(socket_[ant_id % cfg->socket_thread_num], cur_buffer_ptr,
+            c->packet_length, 0, (struct sockaddr*)&bs_rru_sockaddr_[tid],
+            sizeof(bs_rru_sockaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");
 
     // After sending all symbols, send beacon for next frame

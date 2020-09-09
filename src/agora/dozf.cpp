@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "dozf.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "doer.hpp"
