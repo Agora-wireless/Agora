@@ -1,16 +1,14 @@
-/*
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
- Communications Library:
-   a) Generate pilot/preamble sequences
-   b) OFDM modulation
-
----------------------------------------------------------------------
- Copyright (c) 2018-2019, Rice University
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
- Author(s): Rahman Doost-Mohamamdy: doost@rice.edu
-            Oscar Bejarano: obejarano@rice.edu
----------------------------------------------------------------------
-*/
+/**
+ * @file comms-lib.h
+ * @brief Communications Library:
+ *    a) Generate pilot/preamble sequences
+ *    b) OFDM modulation
+ * @author Rahman Doost-Mohamamdy: doost@rice.edu
+ *         Oscar Bejarano: obejarano@rice.edu 
+ */
 
 #ifndef COMMSLIB_HEADER
 #define COMMSLIB_HEADER

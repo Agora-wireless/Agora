@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "simulator.hpp"
 
 int main(int argc, char const* argv[])
