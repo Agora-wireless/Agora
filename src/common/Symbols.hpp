@@ -46,10 +46,11 @@ enum class EventType : int {
     kPacketToMac,
     kSNRReport, // Signal new SNR measurement from PHY to MAC
     kRANUpdate, // Signal new RAN config to Agora
-    kRBIndicator // Signal RB schedule to UEs
+    kRBIndicator, // Signal RB schedule to UEs
+    kPendingToRemote // We need to wait for a remote server to respond
 };
 static constexpr size_t kNumEventTypes
-    = static_cast<size_t>(EventType::kPacketToMac) + 1;
+    = static_cast<size_t>(EventType::kPendingToRemote) + 1;
 
 // Types of Agora Doers
 enum class DoerType : size_t {
@@ -218,6 +219,12 @@ static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 static constexpr bool kUseAVX2Encoder = true;
 #else
 static constexpr bool kUseAVX2Encoder = false;
+#endif
+
+#ifdef USE_REMOTE
+static constexpr bool kUseRemote = true;
+#else
+static constexpr bool kUseRemote = false;
 #endif
 
 // Enable debugging for sender and receiver applications

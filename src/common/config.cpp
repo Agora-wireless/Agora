@@ -233,6 +233,20 @@ Config::Config(std::string jsonfile)
             / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
         LDPC_config.nRows);
 
+    if (kUseRemote) {
+        remote_ldpc_ip_addr = tddConf.value("remote_ldpc_ip_addr", "127.0.0.1");
+        remote_ldpc_completion_port
+            = tddConf.value("remote_ldpc_completion_port", 31850);
+        remote_ldpc_base_port = tddConf.value("remote_ldpc_base_port", 31851);
+        remote_ldpc_num_threads
+            = tddConf.value("remote_ldpc_num_threads", worker_thread_num);
+        remote_ldpc_core_offset = tddConf.value("remote_ldpc_core_offset", 0);
+#if USE_DPDK
+        remote_ldpc_mac_addr = tddConf.value("remote_ldpc_mac_addr", "");
+        local_mac_addr = tddConf.value("local_mac_addr", "");
+#endif // USE_DPDK
+    }
+
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
     sampsPerSymbol
@@ -655,6 +669,22 @@ size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
         return it - ULSymbols[fid].begin();
     } else
         return SIZE_MAX;
+}
+
+size_t Config::get_ldpc_input_offset(size_t cb_id) const
+{
+    size_t cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
+    size_t ue_id = cb_id / LDPC_config.nblocksInSymbol;
+    return OFDM_DATA_NUM * ue_id + LDPC_config.cbCodewLen * cur_cb_id;
+}
+
+size_t Config::get_ldpc_output_offset(size_t cb_id) const
+{
+    size_t cur_cb_id = cb_id % LDPC_config.nblocksInSymbol;
+    size_t ue_id = cb_id / LDPC_config.nblocksInSymbol;
+    size_t cbLenBytes = bits_to_bytes(LDPC_config.cbLen);
+    return cbLenBytes * LDPC_config.nblocksInSymbol * ue_id
+        + cbLenBytes * cur_cb_id;
 }
 
 bool Config::isPilot(size_t frame_id, size_t symbol_id)

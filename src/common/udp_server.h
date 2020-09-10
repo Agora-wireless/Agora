@@ -104,6 +104,37 @@ public:
         return ret;
     }
 
+    /**
+     * @brief Try once to receive up to len bytes in buf without blocking. 
+     *        
+     * This is the same as `recv_nonblocking`, but it also returns the
+     * source address from whence the message came.
+     *
+     * @return Return the number of bytes received if non-zero bytes are
+     * received. If no bytes are received, return zero. If there was an error
+     * in receiving, return -1.
+     *
+     * return 0.
+     */
+    ssize_t recvfrom_nonblocking(uint8_t* buf, size_t len,
+        sockaddr* src_addr_out, socklen_t* src_addr_out_len)
+    {
+        ssize_t ret = recvfrom(sock_fd_, static_cast<void*>(buf), len, 0,
+            src_addr_out, src_addr_out_len);
+        if (ret == -1) {
+            if (errno == EAGAIN || ret == EWOULDBLOCK) {
+                // These errors mean that there's no data to receive
+                return 0;
+            } else {
+                fprintf(stderr,
+                    "UDPServer: recv() failed with unexpected error %s\n",
+                    strerror(errno));
+                return ret;
+            }
+        }
+        return ret;
+    }
+
 private:
     uint16_t port_; // The UDP port to listen on
     int sock_fd_ = -1;

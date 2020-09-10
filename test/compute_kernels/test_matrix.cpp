@@ -1,7 +1,7 @@
 #include "cpu_attach.hpp"
 // #include "ittnotify.h"
 #include <armadillo>
-#include <complex.h>
+#include <complex>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
