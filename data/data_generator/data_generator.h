@@ -6,8 +6,8 @@
 
 static const char data_to_sent1[] = { 'M', 'N', 'R' };
 static const char data_to_sent2[] = { 'M', 'S', 'R' };
-static const char *data_to_sent3 = "Hello, world!";
-static const char *data_to_sent4 = "Test";
+static const char* data_to_sent3 = "Hello, world!";
+static const char* data_to_sent4 = "Test";
 
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for
@@ -41,8 +41,8 @@ public:
      * @param information The generated input bit sequence
      * @param encoded_codeword The generated encoded codeword bit sequence
      */
-    void gen_codeblock_ul(
-        std::vector<int8_t>& information, std::vector<int8_t>& encoded_codeword, size_t id)
+    void gen_codeblock_ul(std::vector<int8_t>& information,
+        std::vector<int8_t>& encoded_codeword, size_t id)
     {
         const LDPCconfig& lc = cfg->LDPC_config;
         std::vector<int8_t> parity;
@@ -59,13 +59,13 @@ public:
             } else if (profile == Profile::kMNR) {
                 if (id % 4 == 0)
                     information[i] = data_to_sent1[i % 3];
-		else if (id % 4 == 1)
-                    information[i] = data_to_sent2[i % 3];
-		else if (id % 4 == 2)
-                    information[i] = data_to_sent3[i % 13];
-                else
+                else if (id % 4 == 1)
                     information[i] = data_to_sent4[i % 4];
-	    } else if (profile == Profile::kTest) {
+                else if (id % 4 == 2)
+                    information[i] = data_to_sent2[i % 3];
+                else
+                    information[i] = data_to_sent3[i % 13];
+            } else if (profile == Profile::kTest) {
                 information[i] = 32 + i % 94;
             }
         }
