@@ -274,9 +274,9 @@ void ChannelSim::start()
                     if (user_tx_counter_[offset]
                         == dl_data_plus_beacon_symbols) {
                         if (kDebugPrintPerFrameDone)
-                            printf(
-                                "Finished downlink transmission in frame %zu\n",
-                                frame_id);
+                            printf("Finished downlink transmission %zu symbols "
+                                   "in frame %zu\n",
+                                dl_data_plus_beacon_symbols, frame_id);
                         user_tx_counter_[offset] = 0;
                     }
                 } else if (gen_tag_t(event.tags[0]).tag_type
@@ -284,9 +284,9 @@ void ChannelSim::start()
                     bs_tx_counter_[offset]++;
                     if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols) {
                         if (kDebugPrintPerFrameDone)
-                            printf(
-                                "Finished uplink transmission in frame %zu\n",
-                                frame_id);
+                            printf("Finished uplink transmission of %zu "
+                                   "symbols in frame %zu\n",
+                                ul_data_plus_pilot_symbols, frame_id);
                         bs_tx_counter_[offset] = 0;
                     }
                 }

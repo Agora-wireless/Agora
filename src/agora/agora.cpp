@@ -588,11 +588,6 @@ void Agora::handle_event_fft(size_t tag)
                 if (fft_stats_.last_symbol(frame_id)) {
                     stats->master_set_tsc(TsType::kFFTDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
-                    //if (!kUseArgos && frame_id + 1 < config_->frames_to_test) {
-                    //    // For Simulation: send beacon for next frame
-                    //    for (size_t i = 0; i < config_->socket_thread_num; i++)
-                    //        receiver_->send_beacon(i, frame_id + 1);
-                    //}
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
                     if (kEnableMac)
