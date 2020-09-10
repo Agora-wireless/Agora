@@ -52,6 +52,12 @@ int DpdkTransport::nic_init(
         = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
+    // Ensures that Agora gets packets only for the flows we register for
+    struct rte_flow_error error;
+    retval = rte_flow_isolate(port, 1, &error);
+    if (retval != 0)
+        return retval;
+
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
     if (retval != 0)
         return retval;

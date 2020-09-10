@@ -58,6 +58,11 @@ Agora::Agora(Config* cfg)
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
 
+    if (kUseRemote) {
+        // Start the thread that receives decode responses from LDPC workers.
+        remote_ldpc_response_receiver = std::thread(decode_response_loop, cfg);
+    }
+
     /* Create worker threads */
     if (config_->bigstation_mode) {
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>, 0,
@@ -359,7 +364,6 @@ void Agora::start()
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-
                 if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
                     if (kEnableMac) {
                         schedule_users(
@@ -674,6 +678,12 @@ void* Agora::worker(int tid)
     std::vector<Doer*> computers_vec
         = { computeIFFT, computePrecode, computeDecodingLast, computeZF,
               computeFFT, computeDecoding, computeDemul, computeEncoding };
+
+    if (kUseRemote) {
+        RemoteLdpcStub* stub = computeDecoding->initialize_remote_ldpc_stub(
+            base_worker_core_offset + tid);
+        computeDecodingLast->set_initialized_remote_ldpc_stub(stub);
+    }
 
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {

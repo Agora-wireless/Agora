@@ -87,8 +87,22 @@ public:
             addrinfo_map[remote_uri] = rem_addrinfo;
         }
 
-        ssize_t ret = sendto(sock_fd, msg, len, 0, rem_addrinfo->ai_addr,
-            rem_addrinfo->ai_addrlen);
+        send_raw(msg, len, rem_addrinfo->ai_addr, rem_addrinfo->ai_addrlen);
+    }
+
+    /**
+     * @brief Send one UDP packet to a remote server without any kind of 
+     * address resolution.
+     *
+     * @param msg Pointer to the message to send
+     * @param len Length in bytes of the message to send
+     * @param rem_addr address and port of the remote server
+     * @param rem_addr_len Length in bytes of the remote address struct
+     */
+    void send_raw(const uint8_t* msg, size_t len, sockaddr* rem_addr,
+        socklen_t rem_addr_len)
+    {
+        ssize_t ret = sendto(sock_fd, msg, len, 0, rem_addr, rem_addr_len);
         if (ret != static_cast<ssize_t>(len)) {
             throw std::runtime_error(
                 "sendto() failed. errno = " + std::string(strerror(errno)));

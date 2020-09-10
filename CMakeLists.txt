@@ -63,6 +63,7 @@ set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+set(USE_REMOTE False CACHE STRING "Use remote servers for LDPC (true/false)")
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
@@ -102,7 +103,7 @@ if(${USE_DPDK})
   endif()
 
   if(${USE_MLX_NIC})
-    set(MLX_LIBRARIES -libverbs -lmlx5)
+    set(MLX_LIBRARIES -libverbs -lmlx4 -lmlx5)
   endif()
   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
 
@@ -150,6 +151,11 @@ add_definitions(-DTHREADED_INIT)
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 
+if(${USE_REMOTE})
+  message(STATUS "Using remote servers for LDPC")
+  add_definitions(-DUSE_REMOTE)
+endif()
+
 # Console logging level
 if(LOG_LEVEL STREQUAL "none")
   message(STATUS "Logging level = none.")
@@ -182,7 +188,8 @@ include_directories(
 	src/mac/
   src/agora/
   src/agora/txrx/
-  src/client/)
+  src/client/
+  src/remote/)
 
 include_directories(SYSTEM src/third_party)
 
@@ -238,7 +245,7 @@ include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
   ${SOURCE_DIR}/src/encoder)
-
+  
 set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
@@ -283,6 +290,25 @@ add_executable(sim
   src/common/dpdk_transport.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
+
+# Add the remote LDPC executable
+if(${USE_REMOTE})
+  add_executable(remote_ldpc
+    src/remote/remote_ldpc.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(remote_ldpc ${COMMON_LIBS})
+
+  # NOTE: currently the test_remote_ldpc still uses eRPC, so it doesn't work.
+  # add_executable(test_remote_ldpc 
+  #   test/unit_tests/test_remote_ldpc.cc
+  #   src/remote/remote_ldpc.cpp
+  #   src/agora/stats.cpp
+  #   src/agora/docoding.cpp
+  #   src/agora/phy_stats.cpp
+  #   $<TARGET_OBJECTS:common_sources_lib>)
+  #   target_link_libraries(test_remote_ldpc ${COMMON_LIBS})
+  # add_test(NAME test_remote_ldpc COMMAND test_remote_ldpc)
+endif()
 
 add_executable(chsim
   simulator/chsim_main.cpp
