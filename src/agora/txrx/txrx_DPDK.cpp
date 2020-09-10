@@ -82,8 +82,6 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
                 context, lcore_id);
-            printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
-                lcore_id);
         }
         worker_id++;
     }

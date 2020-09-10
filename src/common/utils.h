@@ -41,8 +41,8 @@
 int pin_to_core(int core_id);
 
 /* Pin this thread to core (base_core_offset + thread_id) */
-void pin_to_core_with_offset(
-    ThreadType thread, int base_core_offset, int thread_id);
+void pin_to_core_with_offset(ThreadType thread, int base_core_offset,
+    int thread_id, bool verbose = true);
 
 template <class T> struct EventHandlerContext {
     T* obj_ptr;
