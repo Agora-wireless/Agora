@@ -124,7 +124,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
     }
 
     size_t frame_tsc_delta(
-        (cfg->get_frame_duration_sec() * 1e9) / measure_rdtsc_freq());
+        cfg->get_frame_duration_sec() * 1e9 * measure_rdtsc_freq());
     int prev_frame_id = -1;
     int radio_id = radio_lo;
     size_t tx_frame_start = rdtsc();
@@ -237,9 +237,8 @@ int PacketTXRX::dequeue_send(int tid)
     new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id % cfg->socket_thread_num],
-        cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-        sizeof(servaddr_[tid]));
+    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length, 0,
+        (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
     rt_assert(ret > 0, "sendto() failed");
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
