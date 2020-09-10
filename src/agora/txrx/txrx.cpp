@@ -7,6 +7,7 @@
  */
 
 #include "txrx.hpp"
+#include "logger.h"
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
@@ -58,7 +59,6 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         }
     }
 
-    printf("Creating %zu TX/RX threads\n", socket_thread_num);
     for (size_t i = 0; i < socket_thread_num; i++) {
         pthread_t txrx_thread;
         auto context = new EventHandlerContext<PacketTXRX>;
@@ -102,12 +102,12 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
 
 void* PacketTXRX::loop_tx_rx(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
+    pin_to_core_with_offset(
+        ThreadType::kWorkerTXRX, core_offset, tid, false /* quiet */);
     size_t* rx_frame_start = (*frame_start_)[tid];
     size_t rx_offset = 0;
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    printf("Receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
@@ -116,8 +116,9 @@ void* PacketTXRX::loop_tx_rx(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
             cfg->bs_rru_port + radio_id, cfg->rru_addr.c_str());
-        printf("TXRX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%d \n",
+        MLPD_INFO(
+            "TXRX thread %d: set up UDP socket server listening to port %d"
+            " with remote address %s:%d \n",
             tid, local_port_id, cfg->rru_addr.c_str(),
             cfg->bs_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
