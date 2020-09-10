@@ -13,7 +13,13 @@ Agora::Agora(Config* cfg)
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
-    printf("Agora: project directory %s\n", directory.c_str());
+    printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz, "
+           "master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+           "cores %zu--%zu\n",
+        directory.c_str(), freq_ghz, cfg->core_offset, cfg->core_offset + 1,
+        cfg->core_offset + 1 + cfg->socket_thread_num - 1,
+        base_worker_core_offset,
+        base_worker_core_offset + cfg->worker_thread_num);
 
     this->config_ = cfg;
     if (kDebugPrintPilot) {
@@ -24,9 +30,8 @@ Agora::Agora(Config* cfg)
         cout << endl;
     }
 
-    printf("Measured RDTSC frequency = %.2f\n", freq_ghz);
-
-    pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
+    pin_to_core_with_offset(
+        ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
     initialize_queues();
     initialize_uplink_buffers();
 
@@ -625,7 +630,8 @@ void Agora::handle_event_fft(size_t tag)
 
 void* Agora::worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+    pin_to_core_with_offset(
+        ThreadType::kWorker, base_worker_core_offset, tid, false /* quiet */);
 
     /* Initialize operators */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
@@ -1081,10 +1087,6 @@ void Agora::initialize_uplink_buffers()
     socket_buffer_status_size_
         = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
-
-    printf("Agora: Initializing uplink buffers: socket buffer size %zu, "
-           "socket buffer status size %zu\n",
-        socket_buffer_size_, socket_buffer_status_size_);
 
     socket_buffer_.malloc(
         cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);

@@ -23,7 +23,7 @@ int pin_to_core(int core_id)
 }
 
 void pin_to_core_with_offset(
-    ThreadType thread_type, int core_offset, int thread_id)
+    ThreadType thread_type, int core_offset, int thread_id, bool verbose)
 {
     if (!kEnableThreadPinning)
         return;
@@ -45,8 +45,11 @@ void pin_to_core_with_offset(
             thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
         exit(0);
     } else {
-        printf("%s thread %d: pinned to core %d\n",
-            thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
+        if (verbose) {
+            printf("%s thread %d: pinned to core %d\n",
+                thread_type_str(thread_type).c_str(), thread_id,
+                actual_core_id);
+        }
     }
 }
 
