@@ -304,12 +304,12 @@ void Phy_UE::start()
             case EventType::kDemul: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-
+                size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
                 Event_data do_decode_task(EventType::kDecode, event.tags[0]);
                 schedule_task(do_decode_task, &decode_queue_, ptok_decode);
-                demul_checker_[frame_id][symbol_id]++;
+                demul_checker_[frame_slot][symbol_id]++;
                 // if this symbol is ready
-                if (demul_checker_[frame_id][symbol_id]
+                if (demul_checker_[frame_slot][symbol_id]
                     == config_->UE_ANT_NUM) {
 
                     if (kDebugPrintInTask)
@@ -317,14 +317,14 @@ void Phy_UE::start()
                                "symbol %zu\n",
                             frame_id, symbol_id);
                     max_equaled_frame = frame_id;
-                    demul_checker_[frame_id][symbol_id] = 0;
-                    demul_status_[frame_id]++;
-                    if (demul_status_[frame_id] == dl_data_symbol_perframe) {
+                    demul_checker_[frame_slot][symbol_id] = 0;
+                    demul_status_[frame_slot]++;
+                    if (demul_status_[frame_slot] == dl_data_symbol_perframe) {
                         if (kDebugPrintPerTaskDone)
                             printf(
                                 "Main thread: Demodulation done frame: %zu \n",
                                 frame_id);
-                        demul_status_[frame_id] = 0;
+                        demul_status_[frame_slot] = 0;
                     }
                     demul_count++;
                     if (demul_count == dl_data_symbol_perframe * 9000) {
@@ -350,26 +350,26 @@ void Phy_UE::start()
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-
+                size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
                 if (kEnableMac)
                     schedule_task(Event_data(EventType::kDecode, event.tags[0]),
                         &to_mac_queue_, ptok_mac);
-                decode_checker_[frame_id][symbol_id]++;
+                decode_checker_[frame_slot][symbol_id]++;
                 // if this symbol is ready
-                if (decode_checker_[frame_id][symbol_id]
+                if (decode_checker_[frame_slot][symbol_id]
                     == config_->UE_ANT_NUM) {
 
                     if (kDebugPrintInTask)
                         printf("Main thread: Decoding done frame: %zu, "
                                "symbol %zu\n",
                             frame_id, symbol_id);
-                    decode_checker_[frame_id][symbol_id] = 0;
-                    decode_status_[frame_id]++;
-                    if (decode_status_[frame_id] == dl_data_symbol_perframe) {
+                    decode_checker_[frame_slot][symbol_id] = 0;
+                    decode_status_[frame_slot]++;
+                    if (decode_status_[frame_slot] == dl_data_symbol_perframe) {
                         if (kDebugPrintPerTaskDone)
                             printf("Main thread: Decoding done frame: %zu \n",
                                 frame_id);
-                        decode_status_[frame_id] = 0;
+                        decode_status_[frame_slot] = 0;
                     }
                 }
             } break;
@@ -463,7 +463,7 @@ void Phy_UE::start()
                 size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
                 if (ul_data_symbol_perframe == 0)
                     cur_frame_id++;
-                if (kDebugPrintPerFrameDone) {
+                if (kDebugPrintPerSymbolDone) {
                     printf("Main thread: finished Pilot TX for user %zu"
                            " in frame %zu, symbol %zu\n",
                         ue_id, frame_id, symbol_id);
