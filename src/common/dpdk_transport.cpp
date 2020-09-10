@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #ifdef USE_DPDK
 
 #include "dpdk_transport.hpp"

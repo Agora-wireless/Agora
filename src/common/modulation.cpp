@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "modulation.hpp"
 
 void print256_epi32(__m256i var)

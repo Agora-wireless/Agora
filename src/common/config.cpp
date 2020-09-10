@@ -1,4 +1,3 @@
-
 #include "config.hpp"
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
@@ -64,7 +63,7 @@ Config::Config(std::string jsonfile)
     modulation = tddConf.value("modulation", "16QAM");
 
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
-    rru_addr = tddConf.value("rru_addr", "127.0.0.1");
+    bs_rru_addr = tddConf.value("bs_rru_addr", "127.0.0.1");
     ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
     mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
     bs_server_port = tddConf.value("bs_server_port", 8000);

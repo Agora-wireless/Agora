@@ -1,4 +1,3 @@
-
 #include "txrx_client.hpp"
 #include "config.hpp"
 
@@ -220,10 +219,10 @@ void* RadioTXRX::loop_tx_rx(int tid)
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            config_->ue_rru_port + radio_id, config_->rru_addr.c_str());
+            config_->ue_rru_port + radio_id, config_->bs_rru_addr.c_str());
         printf("TXRX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%d \n",
-            tid, local_port_id, config_->rru_addr.c_str(),
+            tid, local_port_id, config_->bs_rru_addr.c_str(),
             config_->ue_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }

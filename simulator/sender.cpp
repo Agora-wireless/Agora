@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "sender.hpp"
 #include "datatype_conversion.h"
 #include "udp_client.h"
