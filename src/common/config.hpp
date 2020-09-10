@@ -435,6 +435,17 @@ public:
                                 + sc_id * mod_type];
     }
 
+    inline int8_t* get_demod_buf_to_decode(
+        Table<int8_t>& demod_buffer_to_decode, size_t frame_id,
+        size_t symbol_id, size_t ue_id, size_t sc_id) const
+    {
+        size_t total_data_symbol_id
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+        return &demod_buffer_to_decode[total_data_symbol_id]
+                                      [OFDM_DATA_NUM * 8 * ue_id
+                                          + sc_id * mod_type];
+    }
+
     /// Get the decode buffer for this frame, symbol,
     /// user and code block ID
     inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,

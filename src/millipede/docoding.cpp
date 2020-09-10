@@ -155,8 +155,8 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    auto* llr_buffer_ptr = cfg->get_demod_buf(llr_buffer_, frame_id, symbol_id,
-        ue_id, LDPC_config.cbCodewLen * cur_cb_id);
+    auto* llr_buffer_ptr = cfg->get_demod_buf_to_decode(llr_buffer_, frame_id,
+        symbol_id, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
     auto* decoded_buffer_ptr = cfg->get_decode_buf(
         decoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
@@ -167,6 +167,21 @@ Event_data DoDecode::launch(size_t tag)
 
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+
+    // if (ue_id == 2 && symbol_id == 0) {
+    //     printf("Decode src. cur_cb_id = %lu\n", cur_cb_id);
+    //     for (size_t i = 0; i < LDPC_config.cbCodewLen * cfg->mod_type; i++) {
+    //         printf("%x ", (uint8_t)llr_buffer_ptr[i]);
+    //     }
+    //     printf("\n");
+    // }
+
+    // if (ue_id == 2 && symbol_id == 0) {
+    //     for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
+    //         printf("%c ", (char)decoded_buffer_ptr[i]);
+    //     }
+    //     printf("\n");
+    // }
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -221,6 +236,15 @@ void DoDecode::start_work()
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
                    ue_id, cur_frame_, cur_symbol_)) {
+            // if (ue_id == 2 && cur_symbol_ == 0) {
+            //     auto* demod_ptr = cfg->get_demod_buf_to_decode(
+            //         llr_buffer_, cur_frame_, cur_symbol_, ue_id, 0);
+            //     for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->mod_type;
+            //          i++) {
+            //         printf("%x ", (uint8_t)demod_ptr[i]);
+            //     }
+            //     printf("\n");
+            // }
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);

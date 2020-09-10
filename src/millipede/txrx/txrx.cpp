@@ -213,7 +213,7 @@ void PacketTXRX::recv_demod()
         size_t ue_id = pkt->ue_id;
         size_t server_id = pkt->server_id;
         size_t sc_id = server_id * cfg->get_num_sc_per_server();
-        int8_t* demod_ptr = cfg->get_demod_buf(
+        int8_t* demod_ptr = cfg->get_demod_buf_to_decode(
             *demod_soft_buffer_to_decode_, frame_id, symbol_id, ue_id, sc_id);
         memcpy(
             demod_ptr, pkt->data, cfg->get_num_sc_per_server() * cfg->mod_type);
@@ -221,6 +221,15 @@ void PacketTXRX::recv_demod()
         free(buf);
         // printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
         // ue_id, server_id);
+        // if (ue_id == 2 && symbol_id == 0) {
+        //     printf("Packet from server %u:\n", server_id);
+        //     demod_ptr = cfg->get_demod_buf_to_decode(
+        //         *demod_soft_buffer_to_decode_, frame_id, symbol_id, ue_id, 0);
+        //     for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->mod_type; i++) {
+        //         printf("%x ", (uint8_t)demod_ptr[i]);
+        //     }
+        //     printf("\n");
+        // }
     } else {
         printf("Receive unknown packet from demod\n");
         exit(1);
@@ -328,8 +337,10 @@ int PacketTXRX::poll_send(int tid)
         // demod_frame_to_send,
         // demod_symbol_to_send - cfg->pilot_symbol_num_perframe);
         for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-            int8_t* demod_ptr = cfg->get_demod_buf(*demod_soft_buffer_,
-                demod_frame_to_send, demod_symbol_to_send, ue_id, 0);
+            int8_t* demod_ptr
+                = cfg->get_demod_buf(*demod_soft_buffer_, demod_frame_to_send,
+                    demod_symbol_to_send - cfg->pilot_symbol_num_perframe,
+                    ue_id, 0);
             Packet* pkt = reinterpret_cast<Packet*>(send_buffer_);
             pkt->packet_type = Packet::PacketType::kDemod;
             pkt->frame_id = demod_frame_to_send;
@@ -338,6 +349,14 @@ int PacketTXRX::poll_send(int tid)
             pkt->server_id = cfg->server_addr_idx;
             memcpy(pkt->data, demod_ptr,
                 cfg->get_num_sc_per_server() * cfg->mod_type);
+            // if (demod_symbol_to_send == cfg->pilot_symbol_num_perframe
+            //     && ue_id == 2) {
+            //     for (size_t i = 0;
+            //          i < cfg->get_num_sc_per_server() * cfg->mod_type; i++) {
+            //         printf("%x ", (uint8_t)demod_ptr[i]);
+            //     }
+            //     printf("\n");
+            // }
             ssize_t ret = sendto(demod_tx_socket_, pkt, cfg->packet_length,
                 MSG_DONTWAIT,
                 (struct sockaddr*)&millipede_addrs_[cfg->get_server_idx_by_ue(

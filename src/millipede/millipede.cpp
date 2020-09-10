@@ -698,10 +698,10 @@ void* Millipede::decode_worker(int tid)
             + config_->get_num_sc_per_server()
                 / config_->subcarrier_block_size);
 
-    auto computeDecoding
-        = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
-            decoded_buffer_, phy_stats, stats, &rx_status_, &demod_status_);
+    auto computeDecoding = new DoDecode(config_, tid, freq_ghz,
+        *get_conq(EventType::kDecode), complete_task_queue_,
+        worker_ptoks_ptr[tid], demod_soft_buffer_to_decode_, decoded_buffer_,
+        phy_stats, stats, &rx_status_, &demod_status_);
 
     computeDecoding->start_work();
     delete computeDecoding;
