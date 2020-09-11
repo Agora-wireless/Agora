@@ -74,6 +74,9 @@ public:
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames;
 
+    // pilotSymbols[i] contains indices of beacon symbols in frames[i]
+    std::vector<std::vector<size_t>> beaconSymbols;
+
     // pilotSymbols[i] contains indices of pilot symbols in frames[i]
     std::vector<std::vector<size_t>> pilotSymbols;
 
@@ -234,6 +237,9 @@ public:
     // pilot symbols, uplink and downlink data symbols, and calibration symbols)
     size_t symbol_num_perframe;
 
+    // Total number of beacon symbols in a frame
+    size_t beacon_symbol_num_perframe;
+
     // Total number of pilot symbols in a frame
     size_t pilot_symbol_num_perframe;
 
@@ -266,12 +272,12 @@ public:
     size_t mac_packets_perframe;
 
     // IP address of the machine running the baseband processing for UE
-    std::string ue_server_addr; 
+    std::string ue_server_addr;
 
     // IP address of the machine running the baseband processing for BS
     std::string bs_server_addr;
 
-    // IP address of the base station RRU, RRU emulator (sender), 
+    // IP address of the base station RRU, RRU emulator (sender),
     // or channel simulator
     std::string bs_rru_addr;
 
