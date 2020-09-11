@@ -626,7 +626,10 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
     Event_data crop_finish_event;
 
-    // If it is pilot part, do CE
+    // In TDD massive MIMO, a pilot symbol needs to be sent
+    // in the downlink for the user to estimate the channel
+    // due to relative reciprocity calibration,
+    // see Argos paper (Mobicom'12)
     if (dl_symbol_id < config_->DL_PILOT_SYMS) {
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             // divide fft output by pilot data to get CSI estimation
@@ -655,6 +658,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
             - dl_pilot_symbol_perframe][ant_id * config_->OFDM_CA_NUM];
         float evm = 0;
 
+        // use pilot subcarriers for phase tracking and correction
         float theta = 0;
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             if (j % config_->OFDM_PILOT_SPACING == 0) {
@@ -686,7 +690,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
         evm = std::sqrt(
             evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
         if (kPrintPhyStats)
-            std::cout << "Frame: " << frame_id << " EVM: " << 100 * evm
+            std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
+                      << ", User: " << ant_id << ", EVM: " << 100 * evm
                       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
 
         crop_finish_event = Event_data(EventType::kDemul,

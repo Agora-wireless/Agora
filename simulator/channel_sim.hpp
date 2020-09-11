@@ -108,6 +108,14 @@ private:
     size_t* user_rx_counter_;
     size_t bs_tx_counter_[TASK_BUFFER_FRAME_NUM];
     size_t user_tx_counter_[TASK_BUFFER_FRAME_NUM];
+
+    inline size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
+    {
+        if (symbol_id == 0)
+            return 0;
+        else
+            return bscfg->get_dl_symbol_idx(frame_id, symbol_id) + 1;
+    }
 };
 
 #endif
