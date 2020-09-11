@@ -70,9 +70,9 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
@@ -270,8 +270,9 @@ void* Sender::worker_thread(int tid)
         Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
         rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, sender_addr, server_addr, cfg->bs_rru_port,
-            cfg->bs_server_port + tag.ant_id, cfg->packet_length);
+            server_mac_addr, bs_rru_addr, bs_server_addr,
+            cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+            cfg->packet_length);
         pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
 #endif
 
