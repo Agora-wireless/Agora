@@ -133,8 +133,8 @@ private:
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
-    uint32_t sender_addr; // IPv4 address of this data sender
-    uint32_t server_addr; // IPv4 address of the remote target Agora server
+    uint32_t bs_rru_addr; // IPv4 address of this data sender
+    uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
     rte_ether_addr sender_mac_addr; // MAC address of this data sender
 
     // MAC address of the remote target Agora server
