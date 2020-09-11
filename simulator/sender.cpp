@@ -32,9 +32,8 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , delay(delay)
     , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_5(500000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_100(150000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_100(100000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_200(15000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
@@ -199,7 +198,7 @@ void* Sender::master_thread(int)
                 tick_start = rdtsc();
                 // Add delay for beacon at the beginning of a frame
                 delay_ticks(tick_start,
-                    enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
+                    enable_slow_start == 1 ? get_ticks_for_frame(next_frame_id)
                                            : ticks_all);
                 tick_start = rdtsc();
             } else {
@@ -282,7 +281,7 @@ void* Sender::worker_thread(int tid)
         pkt->cell_id = 0;
         pkt->ant_id = tag.ant_id;
         memcpy(pkt->data,
-            iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
+            iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
         if (cfg->fft_in_rru) {
             run_fft(pkt, fft_inout, mkl_handle);
@@ -336,8 +335,6 @@ uint64_t Sender::get_ticks_for_frame(size_t frame_id)
         return ticks_100;
     else if (frame_id < 200)
         return ticks_200;
-    else if (frame_id < 500)
-        return ticks_500;
     else
         return ticks_all;
 }

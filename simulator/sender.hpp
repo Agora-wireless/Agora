@@ -112,7 +112,6 @@ private:
     const uint64_t ticks_5;
     const uint64_t ticks_100;
     const uint64_t ticks_200;
-    const uint64_t ticks_500;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
