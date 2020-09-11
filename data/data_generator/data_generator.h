@@ -13,7 +13,7 @@ public:
     // The profile of the input information bits
     enum class Profile {
         kRandom, // The input information bytes are chosen at random
-        k123, // The input informatioon bytes are 1, 2, 3, 1, 2, 3, ...
+        k123 // The input informatioon bytes are 1, 2, 3, 1, 2, 3, ...
     };
 
     DataGenerator(
