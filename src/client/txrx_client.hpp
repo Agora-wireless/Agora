@@ -1,15 +1,14 @@
-
 #ifndef RadioTXRX_HEADER
 #define RadioTXRX_HEADER
 
 #include "client_radio.hpp"
 #include "concurrentqueue.h"
-#include "utils.h"
 #include "net.hpp"
+#include "utils.h"
 #include <arpa/inet.h>
 #include <complex>
-#include <fstream>
 #include <fcntl.h>
+#include <fstream>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/ioctl.h>

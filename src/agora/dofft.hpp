@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef DOFFT
 #define DOFFT
 
@@ -17,8 +12,8 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
+#include <stdio.h>
+#include <string.h>
 #include <vector>
 
 class DoFFT : public Doer {

@@ -1,4 +1,3 @@
-
 #include "config.hpp"
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
@@ -64,7 +63,7 @@ Config::Config(std::string jsonfile)
     modulation = tddConf.value("modulation", "16QAM");
 
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
-    rru_addr = tddConf.value("rru_addr", "127.0.0.1");
+    bs_rru_addr = tddConf.value("bs_rru_addr", "127.0.0.1");
     ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
     mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
     bs_server_port = tddConf.value("bs_server_port", 8000);
@@ -140,7 +139,7 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-        printf("Frame schedule %s\n", sched.c_str());
+        printf("Config: Frame schedule %s\n", sched.c_str());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
@@ -225,9 +224,9 @@ Config::Config(std::string jsonfile)
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
 
-    printf("LDPC: Zc: %d, code block per symbol: %zu, encoding input len: %d, "
-           "encoded block len: %d, decoder iterations: %d, code rate %.3f "
-           "(nRows = %zu)\n",
+    printf("Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
+           "bits per encoding, %d bits per encoded code word, decoder "
+           "iterations: %d, code rate %.3f (nRows = %zu)\n",
         LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen,
         LDPC_config.cbCodewLen, LDPC_config.decoderIter,
         1.f * ldpc_num_input_cols(LDPC_config.Bg)
@@ -240,6 +239,8 @@ Config::Config(std::string jsonfile)
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length
         = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
+    rt_assert(
+        packet_length < 9000, "Packet size must be smaller than jumbo frame");
 
     num_bytes_per_cb = LDPC_config.cbLen / 8; // TODO: Use bits_to_bytes()?
     data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
@@ -250,26 +251,16 @@ Config::Config(std::string jsonfile)
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
-    std::cout << "Config: "
-              << "\n  BS_ANT_NUM: " << BS_ANT_NUM
-              << "\n  UE_ANT_NUM: " << UE_ANT_NUM
-              << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
-              << "\n  ul_data_symbol_num_perframe: "
-              << ul_data_symbol_num_perframe
-              << "\n  dl_data_symbol_num_perframe: "
-              << dl_data_symbol_num_perframe << "\n  OFDM_CA_NUM "
-              << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: " << OFDM_DATA_NUM
-              << "\n  mac_data_bytes_num_perframe: "
-              << mac_data_bytes_num_perframe
-              << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
-              << "\n  Modulation: " << modulation.c_str() << std::endl;
-
-    if (packet_length >= 9000) {
-        std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
-                     "frame size (9000)! "
-                  << "Packets will be fragmented.\033[0m" << std::endl;
-    }
-    std::cout << "Config done!" << std::endl;
+    printf("Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
+           "frame,\n\t"
+           "%zu uplink data symbols per frame, %zu downlink data "
+           "symbols per frame,\n\t"
+           "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
+           "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
+        BS_ANT_NUM, UE_ANT_NUM, pilot_symbol_num_perframe,
+        ul_data_symbol_num_perframe, dl_data_symbol_num_perframe, OFDM_CA_NUM,
+        OFDM_DATA_NUM, modulation.c_str(), mac_data_bytes_num_perframe,
+        mac_bytes_num_perframe);
 }
 
 void Config::genData()
@@ -389,7 +380,7 @@ void Config::genData()
     std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant"
         + std::to_string(total_ue_ant_num) + ".bin";
-    std::cout << "Reading raw data from " << filename1 << std::endl;
+    std::cout << "Config: Reading raw data from " << filename1 << std::endl;
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == nullptr) {
         printf("Failed to open antenna file %s. Error %s.\n", filename1.c_str(),
@@ -434,9 +425,6 @@ void Config::genData()
     // Encode uplink bits
     ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
         encoded_bytes_per_block, 64);
-    printf("Size of ul_encoded_bits: %zu x %zu\n",
-        ul_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block);
 
     int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
         LDPC_config.Bg, LDPC_config.Zc)];

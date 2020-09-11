@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #include "agora.hpp"
 
 void read_from_file_ul(std::string filename, Table<uint8_t>& data,

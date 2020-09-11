@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #include "agora.hpp"
 
 int main(int argc, char* argv[])

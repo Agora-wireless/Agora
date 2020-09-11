@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef DOPRECODE
 #define DOPRECODE
 
@@ -17,8 +12,8 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <string.h> /* for memcpy */
+#include <stdio.h>
+#include <string.h>
 #include <vector>
 // #include "mkl_dfti.h"
 
