@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #include "receiver.hpp"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)

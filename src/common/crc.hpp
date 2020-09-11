@@ -1,6 +1,6 @@
 /*
- * docrc.hpp
- * Cyclic Redundancy Check (CRC)
+ * @file crc.hpp
+ * @brief Cyclic Redundancy Check (CRC)
  *
  * NOTE:
  *  Only CRC24 supported at the moment

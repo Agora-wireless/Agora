@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #ifndef SIMULATOR_HEAD
 #define SIMULATOR_HEAD
 

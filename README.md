@@ -89,7 +89,7 @@ Agora is a high-performance system for massive-MIMO baseband processing.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
      --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-ul-sim.json
      --ue_conf_file data/ue-ul-sim.json`
-   * In another terminal, run `./build/agora data/bs-sim.json` to start
+   * In another terminal, run `./build/agora data/bs-ul-sim.json` to start
      Agora with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.
@@ -158,3 +158,6 @@ traffic with hardware UEs (e.g., Iris devices)
      Faros RRHs.
    * Run BS app `./python/bs_app.py`.
    * Run `./build/agora data/bs-ul-hw.json`.
+
+## Contact
+Jian Ding (jian.ding@yale.edu)
