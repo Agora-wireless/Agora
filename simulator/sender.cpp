@@ -21,24 +21,21 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 }
 
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
-    size_t delay, size_t enable_slow_start, std::string server_mac_addr_str,
-    bool create_thread_for_master)
+    size_t frame_duration, size_t enable_slow_start,
+    std::string server_mac_addr_str, bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
     , num_worker_threads_(num_worker_threads_)
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
-    , delay(delay)
-    , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_5(500000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_100(150000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , frame_duration_(frame_duration)
+    , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_100(5 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
-        cfg->bs_server_addr.c_str(), delay / 1000.0,
+        cfg->bs_server_addr.c_str(), frame_duration / 1000.0,
         enable_slow_start == 1 ? "yes" : "no");
 
     _unused(server_mac_addr_str);
@@ -158,14 +155,8 @@ void* Sender::master_thread(int)
 
             // Add inter-symbol delay
             if (enable_slow_start == 1) {
-                if (ctag.frame_id <= 5) {
-                    delay_ticks(tick_start, ticks_5);
-                } else if (ctag.frame_id < 100) {
+                if (ctag.frame_id <= 100) {
                     delay_ticks(tick_start, ticks_100);
-                } else if (ctag.frame_id < 200) {
-                    delay_ticks(tick_start, ticks_200);
-                } else if (ctag.frame_id < 500) {
-                    delay_ticks(tick_start, ticks_500);
                 } else {
                     delay_ticks(tick_start, ticks_all);
                 }

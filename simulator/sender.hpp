@@ -48,7 +48,7 @@ public:
      * @param core_offset The master thread runs on core [core_offset]. Worker
      * thread #i runs on core [core_offset + i]
      *
-     * @param delay The TTI slot duration
+     * @param frame_duration The TTI slot duration
      *
      * @param enable_slow_start If 1, the sender initially sends frames in a
      * duration larger than the TTI
@@ -56,7 +56,7 @@ public:
      * @param server_mac_addr_str The MAC address of the server's NIC
      */
     Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
-        size_t delay = 0, size_t enable_slow_start = 1,
+        size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
 
@@ -105,12 +105,9 @@ private:
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}
     const size_t core_offset;
-    const size_t delay;
+    const size_t frame_duration_;
     const uint64_t ticks_all;
-    const uint64_t ticks_5;
     const uint64_t ticks_100;
-    const uint64_t ticks_200;
-    const uint64_t ticks_500;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);

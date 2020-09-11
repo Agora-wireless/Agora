@@ -249,12 +249,11 @@ void Agora::start()
 
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
-                if (pkt->frame_id >= cur_frame_id + TASK_BUFFER_FRAME_NUM) {
-                    std::cout
-                        << "Error: Received packet for future frame beyond "
-                           "frame "
-                        << "window. This can happen if Agora is running "
-                        << "slowly, e.g., in debug mode\n";
+                if (pkt->frame_id >= cur_frame_id + kFrameWnd) {
+                    printf("Error: Received packet for future frame %u beyond "
+                           "frame window (= %zu + %zu). This can happen if "
+                           "Agora is running slowly, e.g., in debug mode\n",
+                        pkt->frame_id, cur_frame_id, kFrameWnd);
                     cfg->running = false;
                     break;
                 }
