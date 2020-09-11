@@ -139,7 +139,8 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-        printf("Config: Frame schedule %s\n", sched.c_str());
+        printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
+            sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
