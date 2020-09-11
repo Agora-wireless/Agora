@@ -120,7 +120,7 @@ Config::Config(std::string jsonfile)
         // Below it is assumed either dl or ul to be active at one time
         if (downlink_mode) {
             size_t dl_symbol_start
-                = pilot_symbol_num_perframe + dl_data_symbol_start;
+                = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
                 = dl_symbol_start + dl_data_symbol_num_perframe;
             for (size_t s = pilot_symbol_num_perframe; s < dl_symbol_start; s++)
@@ -131,15 +131,16 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         } else {
             size_t ul_data_symbol_end
-                = pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
-            for (size_t s = pilot_symbol_num_perframe; s < ul_data_symbol_end;
-                 s++)
+                = 1 + pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
+            for (size_t s = 1 + pilot_symbol_num_perframe;
+                 s < ul_data_symbol_end; s++)
                 sched += "U";
             for (size_t s = ul_data_symbol_end; s < symbol_num_perframe; s++)
                 sched += "G";
         }
         frames.push_back(sched);
-        printf("Config: Frame schedule %s\n", sched.c_str());
+        printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
+            sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
