@@ -277,7 +277,7 @@ void* Sender::worker_thread(int tid)
 
         // Update the TX buffer
         pkt->frame_id = tag.frame_id;
-        pkt->symbol_id = cfg->getSymbolId(tag.symbol_id) + 1;
+        pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
         pkt->cell_id = 0;
         pkt->ant_id = tag.ant_id;
         memcpy(pkt->data,
