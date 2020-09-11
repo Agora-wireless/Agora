@@ -1,8 +1,7 @@
 #!/bin/bash
 
-### This script is for executing only the Agora server.
-### It first generates the simple simulated uplink data and 
-### then it runs a simple Agora server (receiver).
+### This script first generates the simple simulated uplink data 
+### and then runs the sender simulator process endlessly until it is killed.
 
 # Before we do anything, we need to add the proper env vars for Intel MKL, etc.
 # Even though the Dockerfile might do this too, the .bashrc file will not necessarily be `source`d 
@@ -20,8 +19,7 @@ echo -e "\nContents of data file ./data/tddconfig-sim-ul.json:"
 cat ./data/tddconfig-sim-ul.json
 echo -e "\n"
 
-echo -e "\n------------------------------------------------"
-echo "Starting the agora server."
-./build/agora data/tddconfig-sim-ul.json
+echo "Starting the agora sender client."
+./build/sender --num_threads=2 --core_offset=0 --delay=5000000 --enable_slow_start=true --conf_file=data/tddconfig-sim-ul.json 
 
-echo "Agora server exited with exit code $?"
+echo "Sender exited with exit code $?"
