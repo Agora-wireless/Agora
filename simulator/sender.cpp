@@ -31,9 +31,8 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , core_offset(core_offset)
     , delay(delay)
     , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_5(500000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_100(100000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_200(15000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_1(200 * delay * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_2(15 * delay * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
@@ -329,12 +328,10 @@ void* Sender::worker_thread(int tid)
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id)
 {
-    if (frame_id <= 5)
-        return ticks_5;
-    else if (frame_id < 100)
-        return ticks_100;
-    else if (frame_id < 200)
-        return ticks_200;
+    if (frame_id < kFrameWnd)
+        return ticks_wnd_1;
+    else if (frame_id < kFrameWnd * 4)
+        return ticks_wnd_2;
     else
         return ticks_all;
 }
