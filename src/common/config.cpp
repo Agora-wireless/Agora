@@ -120,10 +120,10 @@ Config::Config(std::string jsonfile)
         // Below it is assumed either dl or ul to be active at one time
         if (downlink_mode) {
             size_t dl_symbol_start
-                = pilot_symbol_num_perframe + dl_data_symbol_start;
+                = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
                 = dl_symbol_start + dl_data_symbol_num_perframe;
-            for (size_t s = pilot_symbol_num_perframe; s < dl_symbol_start; s++)
+            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start; s++)
                 sched += "G";
             for (size_t s = dl_symbol_start; s < dl_symbol_end; s++)
                 sched += "D";
@@ -131,8 +131,8 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         } else {
             size_t ul_data_symbol_end
-                = pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
-            for (size_t s = pilot_symbol_num_perframe; s < ul_data_symbol_end;
+                = 1 + pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
+            for (size_t s = 1 + pilot_symbol_num_perframe; s < ul_data_symbol_end;
                  s++)
                 sched += "U";
             for (size_t s = ul_data_symbol_end; s < symbol_num_perframe; s++)
@@ -161,10 +161,10 @@ Config::Config(std::string jsonfile)
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;
     dl_data_symbol_start = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0][0] - pilot_symbol_num_perframe
+        ? DLSymbols[0].front()
         : 0;
     dl_data_symbol_end = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0].back() - pilot_symbol_num_perframe + 1
+        ? DLSymbols[0].back() + 1
         : 0;
 
     if (isUE and !freq_orthogonal_pilot
@@ -620,9 +620,7 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     const auto it
         = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
-        return it - DLSymbols[fid].begin() + 1;
-    else if (symbol_id == 0)
-        return 0;
+        return it - DLSymbols[fid].begin();
     else
         return SIZE_MAX;
 }

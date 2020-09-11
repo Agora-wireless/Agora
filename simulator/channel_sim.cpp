@@ -241,7 +241,7 @@ void ChannelSim::start()
                 } else if (gen_tag_t(event.tags[0]).tag_type
                     == gen_tag_t::TagType::kAntennas) {
                     size_t dl_symbol_id
-                        = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
+                        = get_dl_symbol_idx(frame_id, symbol_id);
                     size_t frame_offset = (frame_id % TASK_BUFFER_FRAME_NUM)
                             * dl_data_plus_beacon_symbols
                         + dl_symbol_id;
@@ -359,7 +359,7 @@ void* ChannelSim::bs_rx_loop(int tid)
             printf("Received BS packet for frame %zu, symbol %zu, ant %zu from "
                    "socket %zu\n",
                 frame_id, symbol_id, ant_id, socket_id);
-        size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
+        size_t dl_symbol_id = get_dl_symbol_idx(frame_id, symbol_id);
         size_t symbol_offset
             = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_data_plus_beacon_symbols
             + dl_symbol_id;
@@ -511,7 +511,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t dl_symbol_id = bscfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t dl_symbol_id = get_dl_symbol_idx(frame_id, symbol_id);
 
     size_t symbol_offset
         = (frame_id % TASK_BUFFER_FRAME_NUM) * dl_data_plus_beacon_symbols
