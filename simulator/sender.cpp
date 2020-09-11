@@ -31,7 +31,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , core_offset(core_offset)
     , delay(delay)
     , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_wnd_1(200 * delay * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_1(200000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_wnd_2(15 * delay * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
