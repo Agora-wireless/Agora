@@ -24,7 +24,6 @@ int main(int argc, char* argv[])
     auto* cfg = new Config(filename.c_str());
     cfg->genData();
 
-    printf("Starting sender\n");
     auto* sender = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset,
         FLAGS_delay, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
     sender->startTX();

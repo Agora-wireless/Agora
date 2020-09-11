@@ -1326,8 +1326,7 @@ void Millipede::save_decode_data_to_file(UNUSED int frame_id)
                 * cfg->ul_data_symbol_num_perframe
             + i;
         uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
-        // for (size_t j = 0; j < cfg->UE_NUM; j++)
-        for (size_t j = cfg->ue_start; j < cfg->ue_end; j++)
+        for (size_t j = 0; j < cfg->UE_NUM; j++)
             fwrite(ptr + j * num_decoded_bytes_pad, num_decoded_bytes,
                 sizeof(uint8_t), fp);
     }

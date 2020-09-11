@@ -219,17 +219,6 @@ void PacketTXRX::recv_demod()
             demod_ptr, pkt->data, cfg->get_num_sc_per_server() * cfg->mod_type);
         decode_status_->receive_demod_data(ue_id, frame_id, symbol_id);
         free(buf);
-        // printf("Receive demod packet (%lu %lu %lu %lu)\n", frame_id, symbol_id,
-        // ue_id, server_id);
-        // if (ue_id == 2 && symbol_id == 0) {
-        //     printf("Packet from server %u:\n", server_id);
-        //     demod_ptr = cfg->get_demod_buf_to_decode(
-        //         *demod_soft_buffer_to_decode_, frame_id, symbol_id, ue_id, 0);
-        //     for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->mod_type; i++) {
-        //         printf("%x ", (uint8_t)demod_ptr[i]);
-        //     }
-        //     printf("\n");
-        // }
     } else {
         printf("Receive unknown packet from demod\n");
         exit(1);
@@ -241,11 +230,6 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
     // TODO [junzhi]: Can we avoid malloc
     char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
     auto* pkt = reinterpret_cast<Packet*>(buf);
-    // if (-1
-    //     == recv(socket_[radio_id], (char*)pkt,
-    //            Packet::kOffsetOfData
-    //                + cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short),
-    //            0)) {
 
     if (-1 == recv(socket_[radio_id], (char*)pkt, cfg->packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {
@@ -276,9 +260,6 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
             buf + Packet::kOffsetOfData,
             cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
         free(buf);
-
-        // printf("Receive rru packet (%lu %lu %lu)\n", frame_id, symbol_id,
-        // pkt->ant_id);
 
         // get the position in rx_buffer
         // move ptr & set status to full
@@ -333,9 +314,6 @@ int PacketTXRX::poll_send(int tid)
 {
     if (demul_status_->ready_to_decode(
             demod_frame_to_send, demod_symbol_to_send)) {
-        // printf("Ready to send data for frame %lu symbol %lu\n",
-        // demod_frame_to_send,
-        // demod_symbol_to_send - cfg->pilot_symbol_num_perframe);
         for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
             int8_t* demod_ptr
                 = cfg->get_demod_buf(*demod_soft_buffer_, demod_frame_to_send,
@@ -349,14 +327,6 @@ int PacketTXRX::poll_send(int tid)
             pkt->server_id = cfg->server_addr_idx;
             memcpy(pkt->data, demod_ptr,
                 cfg->get_num_sc_per_server() * cfg->mod_type);
-            // if (demod_symbol_to_send == cfg->pilot_symbol_num_perframe
-            //     && ue_id == 2) {
-            //     for (size_t i = 0;
-            //          i < cfg->get_num_sc_per_server() * cfg->mod_type; i++) {
-            //         printf("%x ", (uint8_t)demod_ptr[i]);
-            //     }
-            //     printf("\n");
-            // }
             ssize_t ret = sendto(demod_tx_socket_, pkt, cfg->packet_length,
                 MSG_DONTWAIT,
                 (struct sockaddr*)&millipede_addrs_[cfg->get_server_idx_by_ue(
@@ -364,9 +334,6 @@ int PacketTXRX::poll_send(int tid)
                 sizeof(millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)]));
             rt_assert(ret > 0, "sendto() failed");
         }
-        // printf("Send all demod data for frame %lu symbol %lu\n",
-        // demod_frame_to_send,
-        // demod_symbol_to_send - cfg->pilot_symbol_num_perframe);
         demod_symbol_to_send++;
         if (demod_symbol_to_send
             == cfg->pilot_symbol_num_perframe
@@ -375,10 +342,6 @@ int PacketTXRX::poll_send(int tid)
             demod_frame_to_send++;
         }
         return 1;
-    } else {
-        // if (demod_frame_to_send == 1)
-        //     printf("Still waiting for demod data frame %lu symbol %lu\n",
-        //         demod_frame_to_send, demod_symbol_to_send);
     }
     return -1;
 }

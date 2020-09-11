@@ -83,12 +83,6 @@ public:
     // Check whether demodulation can proceed for a symbol in a frame
     bool is_demod_ready(size_t frame_id, size_t symbol_id)
     {
-        // if (frame_id == 0 && symbol_id == 17) {
-        //     printf("Check demod ready 0 17 %lu %lu\n",
-        //         num_data_pkts_[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
-        //             .load(),
-        //         num_pkts_per_symbol_);
-        // }
         if (frame_id < cur_frame_
             || frame_id >= cur_frame_ + TASK_BUFFER_FRAME_NUM) {
             return false;
@@ -104,7 +98,6 @@ public:
     void decode_done(size_t frame_id)
     {
         rt_assert(frame_id == cur_frame_, "Wrong completed decode task!");
-        // printf("Decode one UE data for frame %lu\n", frame_id);
         decode_mutex_.lock();
         num_decode_tasks_completed_++;
         if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
@@ -173,7 +166,6 @@ public:
     // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
     void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
     {
-        // if (frame_id > max_frame_) {
         max_frame_mutex_.lock();
         if (frame_id > max_frame_) {
             max_frame_++;
@@ -184,49 +176,22 @@ public:
             }
         }
         max_frame_mutex_.unlock();
-        // }
         rt_assert(frame_id <= max_frame_
                 && frame_id + TASK_BUFFER_FRAME_NUM > max_frame_,
             "Complete a wrong frame in demul!");
         num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
             += num_tasks;
-        // if (frame_id == 0 && symbol_id == 17) {
-        //     printf("Demul complete for frame 0 symbol 17 %lu %lu %lu\n",
-        //         num_tasks,
-        //         num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM]
-        //                                   [symbol_id],
-        //         num_demul_tasks_required_);
-        // }
-        // if (frame_id == 1 && symbol_id == 4) {
-        // printf("Read_to_decode (1 4 %lu %lu %lu %lu)\n", max_frame_,
-        // num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM]
-        //   [symbol_id]
-        //   .load(),
-        // num_demul_tasks_required_, num_tasks);
-        // }
     }
 
     // Return true iff we have completed demodulation for all subcarriers in
     // this symbol have
     bool ready_to_decode(size_t frame_id, size_t symbol_id)
     {
-        // if (frame_id == 1 && symbol_id == 4) {
-        //     printf("Check read_to_decode (1 4 %lu %lu %lu)\n", max_frame_,
-        //         num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM]
-        //                                   [symbol_id],
-        //         num_demul_tasks_required_);
-        // }
         rt_assert(
             frame_id + TASK_BUFFER_FRAME_NUM > max_frame_, "Decode too slow!");
         if (frame_id > max_frame_) {
             return false;
         }
-        // if (frame_id == 0 && symbol_id == 17) {
-        //     printf("Check ready_to_decode for frame 0 symbol 17 %lu %lu\n",
-        //         num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM]
-        //                                   [symbol_id],
-        //         num_demul_tasks_required_);
-        // }
         return num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM]
                                          [symbol_id]
             == num_demul_tasks_required_;
@@ -271,8 +236,6 @@ public:
     {
         num_demod_data_received_[ue_id - cfg_->ue_start]
                                 [frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]++;
-        // printf("Received demod data for ue %lu frame %lu symbol %lu!\n", ue_id,
-        // frame_id, symbol_id);
     }
 
     bool received_all_demod_data(
@@ -284,8 +247,6 @@ public:
             num_demod_data_received_[ue_id
                 - cfg_->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
                 = 0;
-            // printf("Received all demod data for ue %lu frame %lu symbol %lu!\n",
-            // ue_id, frame_id, symbol_id);
             return true;
         }
         return false;

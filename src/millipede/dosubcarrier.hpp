@@ -133,7 +133,6 @@ public:
 
         // Init internal states
         demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
-        log_ = fopen("log1.txt", "w");
     }
 
     ~DoSubcarrier()
@@ -157,7 +156,6 @@ public:
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             if (rx_status_->received_all_pilots(csi_cur_frame_)) {
                 run_csi(csi_cur_frame_, sc_range_.start);
-                // exit(0);
                 printf(
                     "Main thread: pilot frame: %lu, finished CSI for all pilot "
                     "symbols\n",
@@ -180,8 +178,6 @@ public:
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_)) {
-                // printf("Demod once for frame %lu symbol %lu\n",
-                // demul_cur_frame_, demul_cur_sym_);
                 do_demul_->independent_launch(demul_cur_frame_,
                     demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
                     sc_range_.start
@@ -291,32 +287,6 @@ private:
         }
     }
 
-    void print_demod_data(
-        size_t frame_id, size_t symbol_id, size_t ue_id, size_t sc_id)
-    {
-        int8_t* demul_ptr = cfg->get_demod_buf(demod_soft_buffer_, frame_id,
-            symbol_id - cfg->pilot_symbol_num_perframe, ue_id, sc_id);
-        printf("(%lu %lu %lu %lu): (", frame_id, symbol_id, ue_id, sc_id);
-        for (size_t i = 0; i < cfg->mod_type; i++) {
-            printf("%02x ", (uint8_t)demul_ptr[i]);
-        }
-        printf(")\n");
-        fflush(stdout);
-    }
-
-    void print_ul_zf_buf(size_t frame_id, size_t sc_id)
-    {
-        fprintf(log_, "UL ZF buffer for (%lu %lu):\n", frame_id, sc_id);
-        complex_float* ptr = cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id, sc_id);
-        for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
-            for (size_t j = 0; j < cfg->UE_NUM; j++) {
-                fprintf(log_, "(%lf %lf) ", ptr[i * cfg->UE_NUM + j].re,
-                    ptr[i * cfg->UE_NUM + j].im);
-            }
-            fprintf(log_, "\n");
-        }
-        fprintf(log_, "\n");
-    }
     /// An unused queue used for constructing Doers
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 
@@ -371,8 +341,6 @@ private:
 
     // Shared status with Decode threads
     DemulStatus* demul_status_;
-
-    FILE* log_;
 };
 
 #endif // DOSUBCARRIER_HPP
