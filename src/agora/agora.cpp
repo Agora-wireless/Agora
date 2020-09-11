@@ -13,13 +13,8 @@ Agora::Agora(Config* cfg)
     , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
-    printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz, "
-           "master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-           "cores %zu--%zu\n",
-        directory.c_str(), freq_ghz, cfg->core_offset, cfg->core_offset + 1,
-        cfg->core_offset + 1 + cfg->socket_thread_num - 1,
-        base_worker_core_offset,
-        base_worker_core_offset + cfg->worker_thread_num);
+    printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
+        directory.c_str(), freq_ghz);
 
     this->config_ = cfg;
     if (kDebugPrintPilot) {
@@ -70,6 +65,13 @@ Agora::Agora(Config* cfg)
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker>, 0,
             cfg->worker_thread_num);
     }
+
+    printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+           "cores %zu--%zu\n",
+        cfg->core_offset, cfg->core_offset + 1,
+        cfg->core_offset + 1 + cfg->socket_thread_num - 1,
+        base_worker_core_offset,
+        base_worker_core_offset + cfg->worker_thread_num);
 }
 
 Agora::~Agora()

@@ -129,7 +129,6 @@ Event_data DoDemul::launch(size_t tag)
         // Step 2: For each subcarrier, perform equalization by multiplying the
         // subcarrier's data from each antenna with the subcarrier's precoder
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-            // size_t start_tsc1 = worker_rdtsc();
             const size_t cur_sc_id = base_sc_id + i + j;
 
             cx_float* equal_ptr = nullptr;
@@ -146,6 +145,7 @@ Event_data DoDemul::launch(size_t tag)
 
             auto* data_ptr = reinterpret_cast<cx_float*>(
                 &data_gather_buffer[j * cfg->BS_ANT_NUM]);
+            // size_t start_tsc2 = worker_rdtsc();
             auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
                 ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
 
@@ -233,15 +233,15 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        int8_t* demul_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
+        int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
             + (cfg->mod_order_bits * base_sc_id);
 
         switch (cfg->mod_order_bits) {
         case (CommsLib::QAM16):
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            demod_16qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
         case (CommsLib::QAM64):
-            demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            demod_64qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
         default:
             printf("Demodulation: modulation type %s not supported!\n",

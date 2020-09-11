@@ -81,6 +81,8 @@ private:
      */
     void init_iq_from_file(std::string filename);
 
+    // Get number of CPU ticks for a symbol given a frame index
+    uint64_t get_ticks_for_frame(size_t frame_id);
     size_t get_max_symbol_id() const;
 
     // Launch threads to run worker with thread IDs from tid_start to tid_end
@@ -128,8 +130,8 @@ private:
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
-    uint32_t sender_addr; // IPv4 address of this data sender
-    uint32_t server_addr; // IPv4 address of the remote target Agora server
+    uint32_t bs_rru_addr; // IPv4 address of this data sender
+    uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
     rte_ether_addr sender_mac_addr; // MAC address of this data sender
 
     // MAC address of the remote target Agora server
