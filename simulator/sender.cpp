@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "sender.hpp"
 #include "datatype_conversion.h"
 #include "udp_client.h"
@@ -26,7 +21,7 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 }
 
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
-    size_t delay, bool enable_slow_start, std::string server_mac_addr_str,
+    size_t delay, size_t enable_slow_start, std::string server_mac_addr_str,
     bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
@@ -41,6 +36,11 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
 {
+    printf("Initializing sender, sending to base station server at %s, frame "
+           "duration = %.2f ms, slow start = %s\n",
+        cfg->bs_server_addr.c_str(), delay / 1000.0,
+        enable_slow_start == 1 ? "yes" : "no");
+
     _unused(server_mac_addr_str);
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -70,9 +70,9 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->sender_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
@@ -136,6 +136,10 @@ void* Sender::master_thread(int)
     frame_start[0] = get_time();
     uint64_t tick_start = rdtsc();
     double start_time = get_time();
+    // Add delay for beacon at the beginning of a frame
+    delay_ticks(tick_start,
+        enable_slow_start == 1 ? get_ticks_for_frame(0) : ticks_all);
+    tick_start = rdtsc();
     while (keep_running) {
         gen_tag_t ctag(0); // The completion tag
         int ret = completion_queue_.try_dequeue(ctag._tag);
@@ -157,21 +161,10 @@ void* Sender::master_thread(int)
             packet_count_per_frame[comp_frame_slot]++;
 
             // Add inter-symbol delay
-            if (enable_slow_start) {
-                if (ctag.frame_id <= 5) {
-                    delay_ticks(tick_start, ticks_5);
-                } else if (ctag.frame_id < 100) {
-                    delay_ticks(tick_start, ticks_100);
-                } else if (ctag.frame_id < 200) {
-                    delay_ticks(tick_start, ticks_200);
-                } else if (ctag.frame_id < 500) {
-                    delay_ticks(tick_start, ticks_500);
-                } else {
-                    delay_ticks(tick_start, ticks_all);
-                }
-            } else {
-                delay_ticks(tick_start, ticks_all);
-            }
+
+            delay_ticks(tick_start,
+                enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
+                                       : ticks_all);
 
             tick_start = rdtsc();
 
@@ -179,12 +172,11 @@ void* Sender::master_thread(int)
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
-                    printf("Finished transmit all antennas in frame: %u, "
-                           "next frame scheduled in %.1f us\n",
+                    printf("Finished transmit all antennas for frame: %u in "
+                           "%.1f us\n",
                         ctag.frame_id, get_time() - start_time);
                     start_time = get_time();
                 }
-
                 next_frame_id = ctag.frame_id + 1;
                 if (next_frame_id == cfg->frames_to_test)
                     break;
@@ -202,8 +194,14 @@ void* Sender::master_thread(int)
                     }
                 }
 
-                tick_start = rdtsc();
                 frame_start[next_frame_id % kNumStatsFrames] = get_time();
+
+                tick_start = rdtsc();
+                // Add delay for beacon at the beginning of a frame
+                delay_ticks(tick_start,
+                    enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
+                                           : ticks_all);
+                tick_start = rdtsc();
             } else {
                 next_frame_id = ctag.frame_id;
             }
@@ -275,8 +273,8 @@ void* Sender::worker_thread(int tid)
         Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
         rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, sender_addr, server_addr, cfg->ue_tx_port,
-            cfg->bs_port + tag.ant_id, cfg->packet_length);
+            server_mac_addr, sender_addr, server_addr, cfg->bs_rru_port,
+            cfg->bs_server_port + tag.ant_id, cfg->packet_length);
         pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
 #endif
 
@@ -316,12 +314,13 @@ void* Sender::worker_thread(int tid)
                         + (i * block_size + cfg->OFDM_DATA_START) * 2,
                     block_size * sizeof(unsigned short) * 2);
                 udp_client.send(cfg->server_addr_list[i],
-                    cfg->bs_port + cur_radio,
+                    cfg->bs_server_port + cur_radio,
                     reinterpret_cast<uint8_t*>(socks_pkt_buf),
                     cfg->packet_length);
             }
         } else {
-            udp_client.send(cfg->server_addr, cfg->bs_port + cur_radio,
+            udp_client.send(cfg->bs_server_addr,
+                cfg->bs_server_port + cur_radio,
                 reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
         }
 #endif
@@ -356,6 +355,20 @@ void* Sender::worker_thread(int tid)
         if (++cur_radio == radio_hi)
             cur_radio = radio_lo;
     }
+}
+
+uint64_t Sender::get_ticks_for_frame(size_t frame_id)
+{
+    if (frame_id <= 5)
+        return ticks_5;
+    else if (frame_id < 100)
+        return ticks_100;
+    else if (frame_id < 200)
+        return ticks_200;
+    else if (frame_id < 500)
+        return ticks_500;
+    else
+        return ticks_all;
 }
 
 size_t Sender::get_max_symbol_id() const

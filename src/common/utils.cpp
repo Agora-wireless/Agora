@@ -1,12 +1,10 @@
-/*
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
- utility functions for file and text processing.
-
----------------------------------------------------------------------
- Copyright (c) 2018-2019, Rice University
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
----------------------------------------------------------------------
-*/
+/**
+ * @file utils.cpp
+ * @brief Utility functions for file and text processing.
+ */
 
 #include "utils.h"
 
@@ -25,7 +23,7 @@ int pin_to_core(int core_id)
 }
 
 void pin_to_core_with_offset(
-    ThreadType thread_type, int core_offset, int thread_id)
+    ThreadType thread_type, int core_offset, int thread_id, bool verbose)
 {
     if (!kEnableThreadPinning)
         return;
@@ -42,13 +40,16 @@ void pin_to_core_with_offset(
         fprintf(stderr,
             "%s thread %d: failed to pin to core %d. Exiting. "
             "This can happen if the machine has insufficient cores. "
-            "Set kEnableThreadPinning to false to run Millipede to run despite "
+            "Set kEnableThreadPinning to false to run Agora to run despite "
             "this - performance will be low.\n",
             thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
         exit(0);
     } else {
-        printf("%s thread %d: pinned to core %d\n",
-            thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
+        if (verbose) {
+            printf("%s thread %d: pinned to core %d\n",
+                thread_type_str(thread_type).c_str(), thread_id,
+                actual_core_id);
+        }
     }
 }
 

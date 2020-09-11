@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef SENDER
 #define SENDER
 
@@ -47,7 +42,7 @@ public:
      * @brief Create and optionally start a Sender that sends IQ packets to a
      * server with MAC address [server_mac_addr_str]
      *
-     * @param config The Millipede config @param num_worker_threads Number of
+     * @param config The Agora config @param num_worker_threads Number of
      * worker threads sending packets 
      *
      * @param core_offset The master thread runs on core [core_offset]. Worker
@@ -55,13 +50,13 @@ public:
      *
      * @param delay The TTI slot duration
      *
-     * @param enable_slow_start If true, initially frames are sent in a duration
-     * larger than the TTI
+     * @param enable_slow_start If 1, the sender initially sends frames in a
+     * duration larger than the TTI
      *
      * @param server_mac_addr_str The MAC address of the server's NIC
      */
     Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
-        size_t delay = 0, bool enable_slow_start = true,
+        size_t delay = 0, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
 
@@ -86,6 +81,8 @@ private:
      */
     void init_iq_from_file(std::string filename);
 
+    // Get number of CPU ticks for a symbol given a frame index
+    uint64_t get_ticks_for_frame(size_t frame_id);
     size_t get_max_symbol_id() const;
 
     // Launch threads to run worker with thread IDs from tid_start to tid_end
@@ -105,7 +102,7 @@ private:
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t num_worker_threads_; // Number of worker threads sending pkts
-    const bool enable_slow_start; // Send frames slowly at first
+    const size_t enable_slow_start; // If 1, send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}
@@ -137,10 +134,10 @@ private:
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
     uint32_t sender_addr; // IPv4 address of this data sender
-    uint32_t server_addr; // IPv4 address of the remote target Millipede server
+    uint32_t server_addr; // IPv4 address of the remote target Agora server
     rte_ether_addr sender_mac_addr; // MAC address of this data sender
 
-    // MAC address of the remote target Millipede server
+    // MAC address of the remote target Agora server
     rte_ether_addr server_mac_addr;
 #endif
 };

@@ -6,7 +6,7 @@
 
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for
- * Millipede
+ * Agora
  */
 class DataGenerator {
 public:
@@ -21,7 +21,6 @@ public:
         : cfg(cfg)
         , profile(profile)
     {
-        init_modulation_table(mod_table, cfg->mod_type);
         if (seed != 0) {
             fast_rand.seed = seed;
         }
@@ -73,10 +72,12 @@ public:
 
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], cfg->LDPC_config.num_encoded_bytes(), cfg->mod_type);
+            &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
+            cfg->mod_order_bits);
 
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-            modulated_codeword[i] = mod_single_uint8(mod_input[i], mod_table);
+            modulated_codeword[i]
+                = mod_single_uint8(mod_input[i], cfg->mod_table);
         }
         return modulated_codeword;
     }
@@ -118,9 +119,6 @@ public:
 
 private:
     FastRand fast_rand; // A fast random number generator
-    Config* cfg; // The global Millipede config
+    Config* cfg; // The global Agora config
     const Profile profile; // The pattern of the input byte sequence
-
-    // Pre-computed modulation table for the config's modulation order
-    Table<float> mod_table;
 };

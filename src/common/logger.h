@@ -146,7 +146,7 @@ static inline void output_log_header(FILE* stream, int level)
 }
 
 /// Return true if the logging verbosity is reasonable for non-developer users
-/// of Millipede
+/// of Agora
 static inline bool is_log_level_reasonable()
 {
     return MLPD_LOG_LEVEL <= MLPD_LOG_LEVEL_INFO;

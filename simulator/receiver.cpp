@@ -1,9 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-
 #include "receiver.hpp"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)
@@ -61,9 +55,9 @@ void* Receiver::loopRecv(int tid)
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     struct sockaddr_in remote_addr;
     int socket_local
-        = setup_socket_ipv4(cfg->ue_rx_port + tid, true, sock_buf_size);
+        = setup_socket_ipv4(cfg->bs_rru_port + tid, true, sock_buf_size);
     setup_sockaddr_remote_ipv4(
-        &remote_addr, cfg->bs_port + tid, cfg->server_addr.c_str());
+        &remote_addr, cfg->bs_server_port + tid, cfg->bs_server_addr.c_str());
 
     /* use token to speed up */
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];

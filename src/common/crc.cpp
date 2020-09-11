@@ -1,6 +1,6 @@
 /*
- * crc.cpp
- * Cyclic Redundancy Check (CRC)
+ * @file crc.cpp
+ * @brief Cyclic Redundancy Check (CRC)
  *
  * This is an implementation of the CRC-24Q cyclic redundancy checksum
  * used by Qualcomm, RTCM104V3, and PGP 6.5.1.
@@ -37,7 +37,7 @@
 #include "crc.hpp"
 
 #ifdef REBUILD_TABLE
-static void DoCRC::initCRC24(uint32_t table[256])
+static void DoCRC::init_crc24(uint32_t table[256])
 {
     /*
      * Generate table of all posible remainders given all possible 8-bit
@@ -61,11 +61,11 @@ int main()
 {
     // Default: CRC24
     int i;
-    uint32_t crcTable[256];
-    crcInit(crcTable);
+    uint32_t crc_table[256];
+    init_crc24(crc_table);
 
     for (i = 0; i < 256; i++) {
-        printf("0x%04X, ", crcTable[i]);
+        printf("0x%04X, ", crc_table[i]);
         if ((i % 4) == 3)
             putchar('\n');
     }
@@ -73,7 +73,7 @@ int main()
 }
 #endif
 
-void DoCRC::addCRC24(MacPacket* p)
+void DoCRC::add_crc24(struct MacPacket* p)
 {
     /* Init
      * TODO: Size of CRC should depend on Transport Block length and should 
@@ -81,7 +81,7 @@ void DoCRC::addCRC24(MacPacket* p)
      * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
      */
 
-    uint32_t crc = calculateCRC24((unsigned char*)p->data, p->datalen);
+    uint32_t crc = calculate_crc24((unsigned char*)p->data, p->datalen);
     /*
     p->crc[0] = HI(crc);
     p->crc[1] = MID(crc);
@@ -90,7 +90,7 @@ void DoCRC::addCRC24(MacPacket* p)
     p->crc = crc;
 }
 
-uint32_t DoCRC::calculateCRC24(unsigned char* data, int len)
+uint32_t DoCRC::calculate_crc24(unsigned char* data, int len)
 {
     /*
      *
@@ -107,7 +107,7 @@ uint32_t DoCRC::calculateCRC24(unsigned char* data, int len)
     return crc;
 }
 
-bool DoCRC::checkCRC24(unsigned char* data, int len, uint32_t ref_crc)
+bool DoCRC::check_crc24(unsigned char* data, int len, uint32_t ref_crc)
 {
     /*
      * Compute CRC for incoming packet and verify it matches the CRC entry.
@@ -115,7 +115,7 @@ bool DoCRC::checkCRC24(unsigned char* data, int len, uint32_t ref_crc)
      */
 
     bool rval;
-    uint32_t crc = calculateCRC24(data, len);
+    uint32_t crc = calculate_crc24(data, len);
 
     /*
     rval = (((p->crc[0] == HI(crc)) &&

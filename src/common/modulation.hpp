@@ -1,20 +1,15 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
-#ifndef COMPUTE_COMMON
-#define COMPUTE_COMMON
+#ifndef MOD_COMMON
+#define MOD_COMMON
 
+#include "Symbols.hpp"
 #include "buffer.hpp"
+#include "gettime.h"
+#include "memory_manage.h"
 #include <cmath>
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <iostream>
 #include <stdio.h>
-
-#include "gettime.h"
-#include "memory_manage.h"
 
 #define SCALE_BYTE_CONV_QAM16 100
 #define SCALE_BYTE_CONV_QAM64 100

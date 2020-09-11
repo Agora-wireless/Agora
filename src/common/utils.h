@@ -1,12 +1,11 @@
-/*
- Copyright (c) 2018-2019, Rice University
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
- Author(s): Rahman Doost-Mohamamdy: doost@rice.edu
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
----------------------------------------------------------------------
- Utils functions
----------------------------------------------------------------------
-*/
+/**
+ * @file utils.h
+ * @brief Utility functions for file and text processing.
+ * @author Rahman Doost-Mohamamdy: doost@rice.edu
+ */
 
 #ifndef UTILS_HEADER
 #define UTILS_HEADER
@@ -42,8 +41,8 @@
 int pin_to_core(int core_id);
 
 /* Pin this thread to core (base_core_offset + thread_id) */
-void pin_to_core_with_offset(
-    ThreadType thread, int base_core_offset, int thread_id);
+void pin_to_core_with_offset(ThreadType thread, int base_core_offset,
+    int thread_id, bool verbose = true);
 
 template <class T> struct EventHandlerContext {
     T* obj_ptr;
