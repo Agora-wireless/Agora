@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef DODEMUL
 #define DODEMUL
 
@@ -34,7 +29,8 @@ public:
         Table<complex_float>& data_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         Table<complex_float>& ue_spec_pilot_buffer,
-        Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
+        Table<complex_float>& equal_buffer,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDemul();
 
@@ -71,7 +67,7 @@ private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
-    Table<int8_t>& demod_soft_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
     DurationStat* duration_stat;
     PhyStats* phy_stats;
 

@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef SENDER
 #define SENDER
 
@@ -53,15 +48,15 @@ public:
      * @param core_offset The master thread runs on core [core_offset]. Worker
      * thread #i runs on core [core_offset + i]
      *
-     * @param delay The TTI slot duration
+     * @param frame_duration The TTI slot duration
      *
-     * @param enable_slow_start If true, initially frames are sent in a duration
-     * larger than the TTI
+     * @param enable_slow_start If 1, the sender initially sends frames in a
+     * duration larger than the TTI
      *
      * @param server_mac_addr_str The MAC address of the server's NIC
      */
     Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
-        size_t delay = 0, bool enable_slow_start = true,
+        size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
 
@@ -86,6 +81,8 @@ private:
      */
     void init_iq_from_file(std::string filename);
 
+    // Get number of CPU ticks for a symbol given a frame index
+    uint64_t get_ticks_for_frame(size_t frame_id);
     size_t get_max_symbol_id() const;
 
     // Launch threads to run worker with thread IDs from tid_start to tid_end
@@ -105,17 +102,21 @@ private:
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t num_worker_threads_; // Number of worker threads sending pkts
-    const bool enable_slow_start; // Send frames slowly at first
+    const size_t enable_slow_start; // If 1, send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}
     const size_t core_offset;
-    const size_t delay;
+    const size_t frame_duration_;
+
+    // RDTSC clock ticks between the start of transmission of two symbols in
+    // the steady state
     const uint64_t ticks_all;
-    const uint64_t ticks_5;
-    const uint64_t ticks_100;
-    const uint64_t ticks_200;
-    const uint64_t ticks_500;
+
+    // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
+    // of transmission of two symbols for the first several frames
+    const uint64_t ticks_wnd_1;
+    const uint64_t ticks_wnd_2;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
@@ -136,8 +137,8 @@ private:
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
-    uint32_t sender_addr; // IPv4 address of this data sender
-    uint32_t server_addr; // IPv4 address of the remote target Agora server
+    uint32_t bs_rru_addr; // IPv4 address of this data sender
+    uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
     rte_ether_addr sender_mac_addr; // MAC address of this data sender
 
     // MAC address of the remote target Agora server

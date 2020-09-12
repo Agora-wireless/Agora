@@ -56,6 +56,7 @@ public:
     static constexpr size_t kSNRWindowSize = 100;
 
     MacThread(Mode mode, Config* cfg, size_t core_offset,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
         Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
         moodycamel::ConcurrentQueue<Event_data>* rx_queue,
@@ -118,10 +119,13 @@ private:
 
     UDPClient* udp_client; // UDP endpoint used for sending messages
     UDPServer* udp_server; // UDP endpoint used for receiving messages
+
+    // TODO: decoded_buffer_ is used by only the server, so it should be moved
+    // to server_ for clarity.
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer_;
+
     // UDP endpoint for receiving control channel messages
     UDPServer* udp_control_channel;
-    Table<uint8_t>* ul_bits_buffer_;
-    Table<uint8_t>* ul_bits_buffer_status_;
 
     Table<uint8_t>* dl_bits_buffer_;
     Table<uint8_t>* dl_bits_buffer_status_;
@@ -169,6 +173,8 @@ private:
         // next use for radio #i
         std::array<size_t, kMaxUEs> ul_bits_buffer_id_;
 
+        Table<uint8_t>* ul_bits_buffer_;
+        Table<uint8_t>* ul_bits_buffer_status_;
     } client_;
 
     // FIFO queue for receiving messages from the master thread

@@ -1,8 +1,3 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "dodemul.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include <malloc.h>
@@ -16,7 +11,8 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     Table<complex_float>& data_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
-    Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
+    Table<complex_float>& equal_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
@@ -24,7 +20,7 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     , ul_zf_matrices_(ul_zf_matrices)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
-    , demod_soft_buffer_(demod_soft_buffer)
+    , demod_buffers_(demod_buffers)
     , phy_stats(in_phy_stats)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
@@ -133,7 +129,6 @@ Event_data DoDemul::launch(size_t tag)
         // Step 2: For each subcarrier, perform equalization by multiplying the
         // subcarrier's data from each antenna with the subcarrier's precoder
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-            // size_t start_tsc1 = worker_rdtsc();
             const size_t cur_sc_id = base_sc_id + i + j;
 
             cx_float* equal_ptr = nullptr;
@@ -150,6 +145,7 @@ Event_data DoDemul::launch(size_t tag)
 
             auto* data_ptr = reinterpret_cast<cx_float*>(
                 &data_gather_buffer[j * cfg->BS_ANT_NUM]);
+            // size_t start_tsc2 = worker_rdtsc();
             auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
                 ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
 
@@ -237,15 +233,15 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-        int8_t* demul_ptr = cfg->get_demod_buf(
-            demod_soft_buffer_, frame_id, symbol_idx_ul, i, base_sc_id);
+        int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
+            + (cfg->mod_order_bits * base_sc_id);
 
         switch (cfg->mod_order_bits) {
         case (CommsLib::QAM16):
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            demod_16qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
         case (CommsLib::QAM64):
-            demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            demod_64qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
         default:
             printf("Demodulation: modulation type %s not supported!\n",

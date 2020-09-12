@@ -1,4 +1,3 @@
-
 #ifndef CONFIG_HEADER
 #define CONFIG_HEADER
 
@@ -61,12 +60,10 @@ public:
 
 class Config {
 public:
-    // Modulation order in string format (QPSK/16QAM/64QAM)
-    std::string modulation;
-    // Modulation order (4: QPSK, 16: 16QAM, 64: 64QAM)
-    size_t mod_order;
-    // Number of binary bits used for a modulation order
-    size_t mod_order_bits;
+    std::string modulation; // Modulation order as a string, e.g., "16QAM"
+    size_t mod_order; // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
+    size_t mod_order_bits; // Number of binary bits used for a modulation order
+
     // Modulation lookup table for mapping binary bits to constellation points
     Table<float> mod_table;
 
@@ -76,6 +73,9 @@ public:
     // A string in \p frames contains letters representing the symbol types in
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames;
+
+    // pilotSymbols[i] contains indices of beacon symbols in frames[i]
+    std::vector<std::vector<size_t>> beaconSymbols;
 
     // pilotSymbols[i] contains indices of pilot symbols in frames[i]
     std::vector<std::vector<size_t>> pilotSymbols;
@@ -233,8 +233,20 @@ public:
     size_t ue_ant_offset;
     float scale; // Scaling factor for all transmit symbols
 
-    size_t symbol_num_perframe, pilot_symbol_num_perframe,
-        data_symbol_num_perframe;
+    // Total number of symbols in a frame, including all types of symbols (e.g.,
+    // pilot symbols, uplink and downlink data symbols, and calibration symbols)
+    size_t symbol_num_perframe;
+
+    // Total number of beacon symbols in a frame
+    size_t beacon_symbol_num_perframe;
+
+    // Total number of pilot symbols in a frame
+    size_t pilot_symbol_num_perframe;
+
+    // Total number of data symbols in a frame, including uplink data symbols
+    // and downlink data symbols
+    size_t data_symbol_num_perframe;
+
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode; // If true, the frame contains downlink symbols
@@ -259,11 +271,17 @@ public:
     // The total number of mac packets sent/received in each frame
     size_t mac_packets_perframe;
 
-    std::string ue_server_addr; // IP address of UE server
-    std::string bs_server_addr; // IP address of the BS server
-    std::string rru_addr; // IP address of the RRU/channel simulator
+    // IP address of the machine running the baseband processing for UE
+    std::string ue_server_addr;
 
-    // IP address of the data source/sink server communicating with MAC (BS or UE)
+    // IP address of the machine running the baseband processing for BS
+    std::string bs_server_addr;
+
+    // IP address of the base station RRU, RRU emulator (sender),
+    // or channel simulator
+    std::string bs_rru_addr;
+
+    // IP address of the data source/sink server communicating with MAC (BS/UE)
     std::string mac_remote_addr;
 
     int bs_server_port; // Base UDP port used by BS to receive data
@@ -285,8 +303,9 @@ public:
     // processed by Agora before exiting.
     size_t frames_to_test;
 
-    /* LDPC parameters */
-    LDPCconfig LDPC_config;
+    // Size of tranport block given by upper layer
+    size_t transport_block_size;
+    LDPCconfig LDPC_config; // LDPC parameters
 
     // Number of bytes per code block
     size_t num_bytes_per_cb;
@@ -390,19 +409,7 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    /// Get the soft demodulation buffer for this frame, symbol,
-    /// user and subcarrier ID
-    inline int8_t* get_demod_buf(Table<int8_t>& demod_buffer, size_t frame_id,
-        size_t symbol_id, size_t ue_id, size_t sc_id) const
-    {
-        size_t total_data_symbol_id
-            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        return &demod_buffer[total_data_symbol_id][OFDM_DATA_NUM * 8 * ue_id
-            + sc_id * mod_order_bits];
-    }
-
-    /// Get the decode buffer for this frame, symbol,
-    /// user and code block ID
+    /// Get the decode buffer for this frame, symbol, user and code block ID
     inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,
         size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
     {

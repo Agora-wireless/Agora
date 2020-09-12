@@ -37,6 +37,7 @@ enum class EventType : int {
     kIFFT,
     kPrecode,
     kPacketTX,
+    kPacketPilotTX,
     kDecode,
     kDecodeLast,
     kEncode,
@@ -189,9 +190,9 @@ static constexpr size_t kMaxAntennas = 64;
 // Maximum number of UEs supported by Agora
 static constexpr size_t kMaxUEs = 64;
 
-// Maximum modulation (QAM256) supported by Agora
-// Only up to QAM64 is implemented
-// Here using 8 helps reduce cache false sharing
+// Maximum modulation (QAM256) supported by Agora. The implementation might
+// support only lower modulation orders (e.g., up to QAM64), but using 8 here
+// helps reduce false cache line sharing.
 static constexpr size_t kMaxModType = 8;
 
 // Number of cellular frames tracked by Agora stats

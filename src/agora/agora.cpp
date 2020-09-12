@@ -1,23 +1,22 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #include "agora.hpp"
 using namespace std;
 
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
-    , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
-    , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
+    , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
+    , ul_zf_matrices_(
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
+    , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
+          kMaxModType * cfg->OFDM_DATA_NUM)
+    , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
+          cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
+    , dl_zf_matrices_(
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
-    printf("Agora: project directory %s\n", directory.c_str());
-    // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
-    // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
-    // << std::endl; openblas_set_num_threads(1);
+    printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
+        directory.c_str(), freq_ghz);
 
     this->config_ = cfg;
     if (kDebugPrintPilot) {
@@ -28,9 +27,8 @@ Agora::Agora(Config* cfg)
         cout << endl;
     }
 
-    printf("Measured RDTSC frequency = %.2f\n", freq_ghz);
-
-    pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
+    pin_to_core_with_offset(
+        ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
     initialize_queues();
     initialize_uplink_buffers();
 
@@ -50,17 +48,17 @@ Agora::Agora(Config* cfg)
         const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
             + cfg->worker_thread_num + 1;
         mac_thread_ = new MacThread(MacThread::Mode::kServer, cfg, mac_cpu_core,
-            &decoded_buffer_ /* ul bits */, nullptr /* ul bits status */,
-            &dl_bits_buffer_, &dl_bits_buffer_status_, &mac_request_queue_,
-            &mac_response_queue_);
+            decoded_buffer_, nullptr /* ul bits */,
+            nullptr /* ul bits status */, &dl_bits_buffer_,
+            &dl_bits_buffer_status_, &mac_request_queue_, &mac_response_queue_);
 
         mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     }
 
     /* Create worker threads */
     if (config_->bigstation_mode) {
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>,
-            0, cfg->fft_thread_num);
+        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>, 0,
+            cfg->fft_thread_num);
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker_zf>,
             cfg->fft_thread_num, cfg->fft_thread_num + cfg->zf_thread_num);
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker_demul>,
@@ -69,6 +67,13 @@ Agora::Agora(Config* cfg)
         create_threads(pthread_fun_wrapper<Agora, &Agora::worker>, 0,
             cfg->worker_thread_num);
     }
+
+    printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+           "cores %zu--%zu\n",
+        cfg->core_offset, cfg->core_offset + 1,
+        cfg->core_offset + 1 + cfg->socket_thread_num - 1,
+        base_worker_core_offset,
+        base_worker_core_offset + cfg->worker_thread_num);
 }
 
 Agora::~Agora()
@@ -112,8 +117,8 @@ void Agora::send_snr_report(
     for (size_t i = 0; i < config_->UE_NUM; i++) {
         Event_data snr_report(EventType::kSNRReport, base_tag._tag);
         snr_report.num_tags = 2;
-        *reinterpret_cast<float*>(&snr_report.tags[1])
-            = phy_stats->get_evm_snr(frame_id, i);
+        float snr = phy_stats->get_evm_snr(frame_id, i);
+        memcpy(&snr_report.tags[1], &snr, sizeof(float));
         try_enqueue_fallback(&mac_request_queue_, snr_report);
         base_tag.ue_id++;
     }
@@ -148,11 +153,9 @@ void Agora::schedule_subcarriers(
 }
 
 void Agora::schedule_codeblocks(
-    EventType event_type, size_t frame_id, size_t symbol_id)
+    EventType event_type, size_t frame_id, size_t symbol_idx)
 {
-    // assert(
-    //     event_type == EventType::kEncode or event_type == EventType::kDecode);
-    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_id, 0);
+    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx, 0);
 
     for (size_t i = 0;
          i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
@@ -250,12 +253,11 @@ void Agora::start()
 
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
-                if (pkt->frame_id >= cur_frame_id + TASK_BUFFER_FRAME_NUM) {
-                    std::cout
-                        << "Error: Received packet for future frame beyond "
-                           "frame "
-                        << "window. This can happen if Agora is running "
-                        << "slowly, e.g., in debug mode\n";
+                if (pkt->frame_id >= cur_frame_id + kFrameWnd) {
+                    printf("Error: Received packet for future frame %u beyond "
+                           "frame window (= %zu + %zu). This can happen if "
+                           "Agora is running slowly, e.g., in debug mode\n",
+                        pkt->frame_id, cur_frame_id, kFrameWnd);
                     cfg->running = false;
                     break;
                 }
@@ -589,11 +591,6 @@ void Agora::handle_event_fft(size_t tag)
                 if (fft_stats_.last_symbol(frame_id)) {
                     stats->master_set_tsc(TsType::kFFTDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
-                    if (!kUseArgos && frame_id + 1 < config_->frames_to_test) {
-                        // For Simulation: send beacon for next frame
-                        for (size_t i = 0; i < config_->socket_thread_num; i++)
-                            receiver_->send_beacon(i, frame_id + 1);
-                    }
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
                     if (kEnableMac)
@@ -631,7 +628,8 @@ void Agora::handle_event_fft(size_t tag)
 
 void* Agora::worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+    pin_to_core_with_offset(
+        ThreadType::kWorker, base_worker_core_offset, tid, false /* quiet */);
 
     /* Initialize operators */
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
@@ -647,11 +645,10 @@ void* Agora::worker(int tid)
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
         calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
-    auto computeDemul
-        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
-            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats);
+    auto computeDemul = new DoDemul(config_, tid, freq_ghz,
+        *get_conq(EventType::kDemul), complete_task_queue_,
+        worker_ptoks_ptr[tid], data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
 
     auto computePrecode
         = new DoPrecode(config_, tid, freq_ghz, *get_conq(EventType::kPrecode),
@@ -664,12 +661,12 @@ void* Agora::worker(int tid)
 
     auto computeDecoding
         = new DoDecode(config_, tid, freq_ghz, *get_conq(EventType::kDecode),
-            complete_task_queue_, worker_ptoks_ptr[tid], demod_soft_buffer_,
+            complete_task_queue_, worker_ptoks_ptr[tid], demod_buffers_,
             decoded_buffer_, phy_stats, stats);
 
     auto computeDecodingLast = new DoDecode(config_, tid, freq_ghz,
         *get_conq(EventType::kDecodeLast), complete_decode_task_queue_,
-        decode_ptoks_ptr[tid], demod_soft_buffer_, decoded_buffer_, phy_stats,
+        decode_ptoks_ptr[tid], demod_buffers_, decoded_buffer_, phy_stats,
         stats);
 
     std::vector<Doer*> computers_vec
@@ -723,11 +720,10 @@ void* Agora::worker_demul(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
 
-    auto computeDemul
-        = new DoDemul(config_, tid, freq_ghz, *get_conq(EventType::kDemul),
-            complete_task_queue_, worker_ptoks_ptr[tid], data_buffer_,
-            ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_,
-            demod_soft_buffer_, phy_stats, stats);
+    auto computeDemul = new DoDemul(config_, tid, freq_ghz,
+        *get_conq(EventType::kDemul), complete_task_queue_,
+        worker_ptoks_ptr[tid], data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
 
     /* Initialize Precode operator */
     auto computePrecode
@@ -744,8 +740,7 @@ void* Agora::worker_demul(int tid)
     }
 }
 
-void Agora::create_threads(
-    void* (*worker)(void*), int tid_start, int tid_end)
+void Agora::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
 {
     int ret;
     for (int i = tid_start; i < tid_end; i++) {
@@ -1091,10 +1086,6 @@ void Agora::initialize_uplink_buffers()
         = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
-    printf("Agora: Initializing uplink buffers: socket buffer size %zu, "
-           "socket buffer status size %zu\n",
-        socket_buffer_size_, socket_buffer_status_size_);
-
     socket_buffer_.malloc(
         cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(
@@ -1107,12 +1098,6 @@ void Agora::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
-    demod_soft_buffer_.malloc(
-        task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    decoded_buffer_.calloc(task_buffer_symbol_num_ul,
-        roundup<64>(cfg->num_bytes_per_cb) * cfg->LDPC_config.nblocksInSymbol
-            * cfg->UE_NUM,
-        64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1186,8 +1171,6 @@ void Agora::free_uplink_buffers()
     socket_buffer_status_.free();
     data_buffer_.free();
     equal_buffer_.free();
-    demod_soft_buffer_.free();
-    decoded_buffer_.free();
 
     fft_stats_.fini();
     demul_stats_.fini();
@@ -1209,26 +1192,22 @@ void Agora::free_downlink_buffers()
     tx_stats_.fini();
 }
 
-void Agora::save_decode_data_to_file(UNUSED int frame_id)
+void Agora::save_decode_data_to_file(int frame_id)
 {
     auto& cfg = config_;
-    size_t num_decoded_bytes
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
-    size_t num_decoded_bytes_pad = (((cfg->LDPC_config.cbLen + 7) >> 3) + 63)
-        / 64 * 64 * cfg->LDPC_config.nblocksInSymbol;
+    const size_t num_decoded_bytes
+        = cfg->num_bytes_per_cb * cfg->LDPC_config.nblocksInSymbol;
+
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
     printf("Saving decode data to %s\n", filename.c_str());
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        int total_data_symbol_id = (frame_id % TASK_BUFFER_FRAME_NUM)
-                * cfg->ul_data_symbol_num_perframe
-            + i;
-        uint8_t* ptr = decoded_buffer_[total_data_symbol_id];
-        for (size_t j = 0; j < cfg->UE_NUM; j++)
-            fwrite(ptr + j * num_decoded_bytes_pad, num_decoded_bytes,
-                sizeof(uint8_t), fp);
+        for (size_t j = 0; j < cfg->UE_NUM; j++) {
+            uint8_t* ptr = decoded_buffer_[frame_id % kFrameWnd][i][j];
+            fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
+        }
     }
     fclose(fp);
 }
