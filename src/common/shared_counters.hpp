@@ -27,7 +27,7 @@ public:
             num_pilot_pkts_[i] = 0;
         }
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
-            for (size_t j = 0; j < kMaxNumSymbolsPerFrame; j++) {
+            for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[i][j] = 0;
             }
         }
@@ -106,7 +106,7 @@ public:
             size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
             num_pkts_[frame_slot] = 0;
             num_pilot_pkts_[frame_slot] = 0;
-            for (size_t j = 0; j < kMaxNumSymbolsPerFrame; j++) {
+            for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[frame_slot][j] = 0;
             }
             printf("Main thread: Decode done frame: %lu\n", cur_frame_ - 1);
@@ -124,7 +124,7 @@ public:
 
     // num_data_pkts[i % TASK_BUFFER_FRAME_NUM][j] is the total number of data
     // packets received for frame i and symbol j
-    std::array<std::array<std::atomic<size_t>, kMaxNumSymbolsPerFrame>,
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
         TASK_BUFFER_FRAME_NUM>
         num_data_pkts_;
 
@@ -156,7 +156,7 @@ public:
               cfg->get_num_sc_per_server() / cfg->demul_block_size)
     {
         for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
-            for (size_t j = 0; j < kMaxNumSymbolsPerFrame; j++) {
+            for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_demul_tasks_completed_[i][j] = 0;
             }
         }
@@ -169,7 +169,7 @@ public:
         max_frame_mutex_.lock();
         if (frame_id > max_frame_) {
             max_frame_++;
-            for (size_t i = 0; i < kMaxNumSymbolsPerFrame; i++) {
+            for (size_t i = 0; i < kMaxSymbols; i++) {
                 num_demul_tasks_completed_[max_frame_ % TASK_BUFFER_FRAME_NUM]
                                           [i]
                     = 0;
@@ -200,7 +200,7 @@ public:
     // num_demul_tasks_completed[i % TASK_BUFFER_FRAME_NUM][j] is
     // the number of subcarriers completed for demul tasks in
     // frame i and symbol j
-    std::array<std::array<std::atomic<size_t>, kMaxNumSymbolsPerFrame>,
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
         TASK_BUFFER_FRAME_NUM>
         num_demul_tasks_completed_;
 
@@ -223,7 +223,7 @@ public:
         memset(cur_symbol_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
 
         num_demod_data_received_
-            = new std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
+            = new std::array<std::array<size_t, kMaxSymbols>,
                 TASK_BUFFER_FRAME_NUM>[cfg->get_num_ues_to_process()];
         for (size_t i = 0; i < cfg->get_num_ues_to_process(); i++) {
             for (size_t j = 0; j < TASK_BUFFER_FRAME_NUM; j++) {
@@ -258,8 +258,8 @@ private:
     size_t* cur_symbol_; // symbol ID for UL data
     const size_t num_demod_data_required_;
 
-    std::array<std::array<size_t, kMaxNumSymbolsPerFrame>,
-        TASK_BUFFER_FRAME_NUM>* num_demod_data_received_;
+    std::array<std::array<size_t, kMaxSymbols>, TASK_BUFFER_FRAME_NUM>*
+        num_demod_data_received_;
 };
 
 #endif

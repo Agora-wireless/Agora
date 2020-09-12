@@ -22,8 +22,6 @@ static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 
-static constexpr size_t kMaxNumSymbolsPerFrame = 70;
-
 /// Return true at compile time iff a constant is a power of two
 template <typename T> static constexpr inline bool is_power_of_two(T x)
 {
