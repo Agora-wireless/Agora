@@ -108,8 +108,15 @@ private:
     // {core_offset + 1, ..., core_offset + thread_num - 1}
     const size_t core_offset;
     const size_t frame_duration_;
+
+    // RDTSC clock ticks between the start of transmission of two symbols in
+    // the steady state
     const uint64_t ticks_all;
-    const uint64_t ticks_100;
+
+    // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
+    // of transmission of two symbols for the first several frames
+    const uint64_t ticks_wnd_1;
+    const uint64_t ticks_wnd_2;
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);

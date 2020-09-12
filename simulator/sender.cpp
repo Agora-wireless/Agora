@@ -31,7 +31,10 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , core_offset(core_offset)
     , frame_duration_(frame_duration)
     , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_100(5 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_1(
+          200 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_2(
+          15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
@@ -195,7 +198,7 @@ void* Sender::master_thread(int)
                 tick_start = rdtsc();
                 // Add delay for beacon at the beginning of a frame
                 delay_ticks(tick_start,
-                    enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
+                    enable_slow_start == 1 ? get_ticks_for_frame(next_frame_id)
                                            : ticks_all);
                 tick_start = rdtsc();
             } else {
@@ -278,7 +281,7 @@ void* Sender::worker_thread(int tid)
         pkt->cell_id = 0;
         pkt->ant_id = tag.ant_id;
         memcpy(pkt->data,
-            iq_data_short_[(tag.symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
+            iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
         if (cfg->fft_in_rru) {
             run_fft(pkt, fft_inout, mkl_handle);
@@ -326,9 +329,12 @@ void* Sender::worker_thread(int tid)
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id)
 {
-    if (frame_id < 100)
-        return ticks_100;
-    return ticks_all;
+    if (frame_id < kFrameWnd)
+        return ticks_wnd_1;
+    else if (frame_id < kFrameWnd * 4)
+        return ticks_wnd_2;
+    else
+        return ticks_all;
 }
 
 size_t Sender::get_max_symbol_id() const

@@ -146,18 +146,23 @@ int main(int argc, char* argv[])
                  j += cfg->UE_ANT_NUM) {
                 pilots_t_ue[i + j] = pilot_td[i + j];
             }
-            memcpy(tx_data_all_symbols[0] + i * cfg->OFDM_CA_NUM,
+            // Load pilot to the second symbol
+            // The first symbol is reserved for beacon
+            memcpy(tx_data_all_symbols[cfg->beacon_symbol_num_perframe]
+                    + i * cfg->OFDM_CA_NUM,
                 &pilots_t_ue[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
         }
     } else {
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)
-            memcpy(tx_data_all_symbols[i] + i * cfg->OFDM_CA_NUM, &pilot_td[0],
-                cfg->OFDM_CA_NUM * sizeof(complex_float));
+            memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
+                    + i * cfg->OFDM_CA_NUM,
+                &pilot_td[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
     }
 
-    for (size_t i = cfg->pilot_symbol_num_perframe;
-         i < cfg->symbol_num_perframe; i++) {
-        const size_t data_sym_id = (i - cfg->pilot_symbol_num_perframe);
+    size_t data_sym_start
+        = cfg->pilot_symbol_num_perframe + cfg->beacon_symbol_num_perframe;
+    for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
+        const size_t data_sym_id = (i - data_sym_start);
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
             if (data_sym_id < cfg->UL_PILOT_SYMS) {
                 memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM
