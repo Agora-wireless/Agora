@@ -427,7 +427,7 @@ public:
         size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
     {
         size_t total_data_symbol_id
-            = get_total_data_symbol_idx(frame_id, symbol_id);
+            = get_total_data_symbol_idx_dl(frame_id, symbol_id);
         size_t num_encoded_bytes_per_cb
             = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]
