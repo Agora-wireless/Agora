@@ -51,6 +51,7 @@ public:
     /*****************************************************
      * Downlink
      *****************************************************/
+    void initialize_downlink_buffers();
 
     /**
      * modulate data from nUEs and does spatial multiplexing by applying
@@ -63,6 +64,7 @@ public:
     /*****************************************************
      * Uplink
      *****************************************************/
+    void initialize_uplink_buffers();
 
     /**
      * Do FFT task for one OFDM symbol
@@ -124,6 +126,7 @@ public:
      * completion of this task
      */
     void doDemul(int, size_t);
+    void doDecode(int, size_t);
 
     void getDemulData(long long** ptr, int* size);
     void getEqualPCData(float** ptr, int* size, int);
@@ -187,9 +190,9 @@ private:
     size_t expected_frame_id_from_mac_ = 0;
     size_t current_frame_user_num_ = 0;
 
-    // num_frames_consumed_[i] is the number of frames on the uplink completely
-    // processed (i.e., including radio transmissing) by the PHY for UE #i
-    size_t num_frames_consumed_[kMaxUEs] = {};
+    // next_processed_frame_[i] is the next frame index on the uplink
+    // to be processed and transmitted by the PHY for UE #i
+    size_t next_frame_processed_[kMaxUEs] = {};
 
     /*****************************************************
      * Uplink
@@ -269,6 +272,13 @@ private:
     std::vector<myVec> csi_buffer_;
 
     /**
+     * Data after equalization
+     * First dimension: data_symbol_num_perframe (40-4) *
+     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     */
+    std::vector<myVec> equal_buffer_;
+
+    /**
      * Data symbols after IFFT
      * First dimension: total symbol number in the buffer:
      * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
@@ -276,24 +286,25 @@ private:
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
      */
-    std::vector<myVec> dl_data_buffer_;
+    std::vector<std::vector<int8_t>> dl_demod_buffer_;
 
     /**
-     * Data after equalization
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     *
      */
-    std::vector<myVec> equal_buffer_;
+    std::vector<std::vector<uint8_t>> dl_decode_buffer_;
 
+    int16_t* resp_var_nodes;
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<size_t> non_null_sc_ind_;
     std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
 
     /* Concurrent queues */
-    /* task queue for uplink FFT */
+    /* task queue for downlink FFT */
     moodycamel::ConcurrentQueue<Event_data> fft_queue_;
-    /* task queue for uplink demodulation */
+    /* task queue for downlink demodulation */
     moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+    /* task queue for downlink decoding */
+    moodycamel::ConcurrentQueue<Event_data> decode_queue_;
     /* main thread message queue */
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
     moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
@@ -321,6 +332,9 @@ private:
 
     size_t* demodul_checker_[TASK_BUFFER_FRAME_NUM];
     size_t demodul_status_[TASK_BUFFER_FRAME_NUM];
+
+    size_t* decode_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t decode_status_[TASK_BUFFER_FRAME_NUM];
 
     std::queue<std::tuple<int, int>> taskWaitList;
 

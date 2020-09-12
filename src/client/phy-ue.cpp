@@ -1,7 +1,9 @@
 #include "phy-ue.hpp"
+#include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
 
 static constexpr bool kDebugPrintPacketsFromMac = false;
+static constexpr bool kDebugPrintPacketsToMac = false;
 
 Phy_UE::Phy_UE(Config* config)
 {
@@ -33,6 +35,9 @@ Phy_UE::Phy_UE(Config* config)
         TASK_BUFFER_FRAME_NUM * dl_symbol_perframe * config_->UE_ANT_NUM * 36);
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
         * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
+    decode_queue_
+        = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
+            * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
     message_queue_
         = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
             * config_->symbol_num_perframe * config_->UE_ANT_NUM * 36);
@@ -81,69 +86,14 @@ Phy_UE::Phy_UE(Config* config)
 
     printf("initializing buffers...\n");
 
-    //////////////////////////////////////
-    //////// uplink buffers init (tx) ////
-    //////////////////////////////////////
-
-    // initialize ul data buffer
-    // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
-    // ul_data_symbol_perframe);
-    ul_bits_buffer_size_
-        = TASK_BUFFER_FRAME_NUM * config_->mac_bytes_num_perframe;
-    ul_bits_buffer_.malloc(config_->UE_ANT_NUM, ul_bits_buffer_size_, 64);
-    ul_bits_buffer_status_.calloc(
-        config_->UE_ANT_NUM, TASK_BUFFER_FRAME_NUM, 64);
-    ul_syms_buffer_size_ = TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe
-        * config_->OFDM_DATA_NUM;
-    ul_syms_buffer_.calloc(config_->UE_ANT_NUM, ul_syms_buffer_size_, 64);
-
-    // initialize modulation buffer
-    modul_buffer_.calloc(ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM,
-        config_->OFDM_DATA_NUM * config_->UE_ANT_NUM, 64);
-
-    // initialize IFFT buffer
-    size_t ifft_buffer_block_num
-        = config_->UE_ANT_NUM * ul_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    ifft_buffer_.calloc(ifft_buffer_block_num, config_->OFDM_CA_NUM, 64);
-
-    alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
-    alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
-
-    ////////////////////////////////////////
-    //////// downlink buffers init (rx) ////
-    ////////////////////////////////////////
-
-    // initialize rx buffer
-    rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
-    rx_buffer_status_.calloc(rx_thread_num, rx_buffer_status_size, 64);
-
-    // initialize FFT buffer
-    size_t FFT_buffer_block_num
-        = config_->UE_ANT_NUM * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
-    fft_buffer_.calloc(FFT_buffer_block_num, config_->OFDM_CA_NUM, 64);
+    // uplink buffers init (tx)
+    initialize_uplink_buffers();
+    // downlink buffers init (rx)
+    initialize_downlink_buffers();
 
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, config_->OFDM_CA_NUM);
     (void)DftiCommitDescriptor(mkl_handle);
-
-    // initialize CSI buffer
-    csi_buffer_.resize(config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM);
-    for (size_t i = 0; i < csi_buffer_.size(); i++)
-        csi_buffer_[i].resize(config_->OFDM_DATA_NUM);
-
-    if (dl_data_symbol_perframe > 0) {
-        // initialize equalized data buffer
-        equal_buffer_.resize(config_->UE_ANT_NUM * dl_data_symbol_perframe
-            * TASK_BUFFER_FRAME_NUM);
-        for (size_t i = 0; i < equal_buffer_.size(); i++)
-            equal_buffer_[i].resize(config_->OFDM_DATA_NUM);
-
-        // initialize data buffer
-        dl_data_buffer_.resize(config_->UE_ANT_NUM * dl_data_symbol_perframe
-            * TASK_BUFFER_FRAME_NUM);
-        for (size_t i = 0; i < dl_data_buffer_.size(); i++)
-            dl_data_buffer_[i].resize(config_->OFDM_DATA_NUM);
-    }
 
     // initilize all kinds of checkers
     memset(csi_checker_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
@@ -156,6 +106,15 @@ Phy_UE::Phy_UE(Config* config)
             demul_checker_[i] = new size_t[dl_data_symbol_perframe];
             memset(
                 demul_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
+        }
+    }
+
+    memset(decode_status_, 0, sizeof(int) * TASK_BUFFER_FRAME_NUM);
+    if (dl_data_symbol_perframe > 0) {
+        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+            decode_checker_[i] = new size_t[dl_data_symbol_perframe];
+            memset(
+                decode_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
         }
     }
 
@@ -230,6 +189,8 @@ void Phy_UE::start()
     moodycamel::ProducerToken ptok_fft(fft_queue_);
     moodycamel::ProducerToken ptok_modul(modul_queue_);
     moodycamel::ProducerToken ptok_demul(demul_queue_);
+    moodycamel::ProducerToken ptok_decode(decode_queue_);
+    moodycamel::ProducerToken ptok_mac(to_mac_queue_);
     moodycamel::ProducerToken ptok_ifft(ifft_queue_);
     moodycamel::ProducerToken ptok_encode(encode_queue_);
 
@@ -270,8 +231,6 @@ void Phy_UE::start()
 
             switch (event.event_type) {
 
-                // if EVENT_RX_SYMBOL, do crop
-
             case EventType::kPacketRX: {
                 //int offset = event.tags[0];
                 size_t rx_thread_id = rx_tag_t(event.tags[0]).tid;
@@ -287,6 +246,16 @@ void Phy_UE::start()
                     "Error: Received packet for future frame beyond frame "
                     "window. This can happen if PHY is running "
                     "slowly, e.g., in debug mode");
+
+                if (symbol_id
+                    == 0) { // To send uplink pilots in simulation mode
+                    Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
+                        gen_tag_t::frm_sym_ue(
+                            frame_id, config_->pilotSymbols[0][ant_id], ant_id)
+                            ._tag);
+                    schedule_task(do_tx_pilot_task, &tx_queue_,
+                        *tx_ptoks_ptr[ant_id % rx_thread_num]);
+                }
 
                 size_t dl_symbol_id = 0;
                 if (config_->DLSymbols.size() > 0
@@ -318,6 +287,8 @@ void Phy_UE::start()
                 // checker to count # of pilots/users
                 csi_checker_[frame_id]++;
 
+                Event_data do_demul_task(EventType::kDemul, event.tags[0]);
+                schedule_task(do_demul_task, &demul_queue_, ptok_demul);
                 if (csi_checker_[frame_id]
                     == dl_pilot_symbol_perframe * config_->UE_ANT_NUM) {
                     csi_checker_[frame_id] = 0;
@@ -326,6 +297,91 @@ void Phy_UE::start()
                                "collecting "
                                "pilot frames\n",
                             frame_id);
+                }
+
+            } break;
+
+            case EventType::kDemul: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+                Event_data do_decode_task(EventType::kDecode, event.tags[0]);
+                schedule_task(do_decode_task, &decode_queue_, ptok_decode);
+                demul_checker_[frame_slot][symbol_id]++;
+                // if this symbol is ready
+                if (demul_checker_[frame_slot][symbol_id]
+                    == config_->UE_ANT_NUM) {
+
+                    if (kDebugPrintInTask)
+                        printf("Main thread: Demodulation done frame: %zu, "
+                               "symbol %zu\n",
+                            frame_id, symbol_id);
+                    max_equaled_frame = frame_id;
+                    demul_checker_[frame_slot][symbol_id] = 0;
+                    demul_status_[frame_slot]++;
+                    if (demul_status_[frame_slot] == dl_data_symbol_perframe) {
+                        if (kDebugPrintPerTaskDone)
+                            printf(
+                                "Main thread: Demodulation done frame: %zu \n",
+                                frame_id);
+                        demul_status_[frame_slot] = 0;
+                    }
+                    demul_count++;
+                    if (demul_count == dl_data_symbol_perframe * 9000) {
+                        demul_count = 0;
+                        auto demul_end = std::chrono::system_clock::now();
+                        std::chrono::duration<double> diff
+                            = demul_end - demul_begin;
+                        int samples_num_per_UE = config_->OFDM_DATA_NUM
+                            * dl_data_symbol_perframe * 1000;
+                        printf("Frame %zu: RX %d samples (per-client) from %zu "
+                               "clients "
+                               "in %f secs, throughtput %f bps per-client "
+                               "(16QAM), current task queue length %zu\n",
+                            frame_id, samples_num_per_UE, config_->UE_ANT_NUM,
+                            diff.count(),
+                            samples_num_per_UE * log2(16.0f) / diff.count(),
+                            demul_queue_.size_approx());
+                        demul_begin = std::chrono::system_clock::now();
+                    }
+                }
+            } break;
+
+            case EventType::kDecode: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+                if (kEnableMac)
+                    schedule_task(Event_data(EventType::kDecode, event.tags[0]),
+                        &to_mac_queue_, ptok_mac);
+                decode_checker_[frame_slot][symbol_id]++;
+                // if this symbol is ready
+                if (decode_checker_[frame_slot][symbol_id]
+                    == config_->UE_ANT_NUM) {
+
+                    if (kDebugPrintInTask)
+                        printf("Main thread: Decoding done frame: %zu, "
+                               "symbol %zu\n",
+                            frame_id, symbol_id);
+                    decode_checker_[frame_slot][symbol_id] = 0;
+                    decode_status_[frame_slot]++;
+                    if (decode_status_[frame_slot] == dl_data_symbol_perframe) {
+                        if (kDebugPrintPerTaskDone)
+                            printf("Main thread: Decoding done frame: %zu \n",
+                                frame_id);
+                        decode_status_[frame_slot] = 0;
+                    }
+                }
+            } break;
+
+            case EventType::kPacketToMac: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+
+                if (kDebugPrintPacketsToMac) {
+                    printf("Main thread: sent decoded packet for frame %zu"
+                           ", symbol %zu to MAC\n",
+                        frame_id, symbol_id);
                 }
 
             } break;
@@ -348,7 +404,7 @@ void Phy_UE::start()
                     expected_frame_id_from_mac_++;
 
                 if (kDebugPrintPacketsFromMac) {
-                    printf("Main thread: received packet for frame %d with "
+                    printf("Main thread: received packet for frame %u with "
                            "modulation %zu\n",
                         pkt->frame_id, pkt->rb_indicator.mod_order_bits);
                     std::stringstream ss;
@@ -389,50 +445,6 @@ void Phy_UE::start()
                 //}
             } break;
 
-            case EventType::kDemul: {
-                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-
-                demul_checker_[frame_id][symbol_id]++;
-                // if this symbol is ready
-                if (demul_checker_[frame_id][symbol_id]
-                    == config_->UE_ANT_NUM) {
-
-                    if (kDebugPrintInTask)
-                        printf("Main thread: Demodulation done frame: %zu, "
-                               "symbol %zu\n",
-                            frame_id, symbol_id);
-                    max_equaled_frame = frame_id;
-                    demul_checker_[frame_id][symbol_id] = 0;
-                    demul_status_[frame_id]++;
-                    if (demul_status_[frame_id] == dl_data_symbol_perframe) {
-                        if (kDebugPrintPerTaskDone)
-                            printf(
-                                "Main thread: Demodulation done frame: %zu \n",
-                                frame_id);
-                        demul_status_[frame_id] = 0;
-                    }
-                    demul_count += 1;
-                    // print log per 100 frames
-                    if (demul_count == dl_data_symbol_perframe * 100) {
-                        demul_count = 0;
-                        auto demul_end = std::chrono::system_clock::now();
-                        std::chrono::duration<double> diff
-                            = demul_end - demul_begin;
-                        int samples_num_per_UE = config_->OFDM_CA_NUM
-                            * dl_data_symbol_perframe * 100;
-                        printf(
-                            "Receive %d samples (per-client) from %zu clients "
-                            "in %f secs, throughtput %f bps per-client "
-                            "(16QAM), current task queue length %zu\n",
-                            samples_num_per_UE, config_->UE_NUM, diff.count(),
-                            samples_num_per_UE * log2(16.0f) / diff.count(),
-                            demul_queue_.size_approx());
-                        demul_begin = std::chrono::system_clock::now();
-                    }
-                }
-            } break;
-
             case EventType::kIFFT: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
@@ -445,19 +457,31 @@ void Phy_UE::start()
                         frame_id, ue_id);
             } break;
 
+            case EventType::kPacketPilotTX: {
+                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+                if (ul_data_symbol_perframe == 0)
+                    cur_frame_id++;
+                if (kDebugPrintPerSymbolDone) {
+                    printf("Main thread: finished Pilot TX for user %zu"
+                           " in frame %zu, symbol %zu\n",
+                        ue_id, frame_id, symbol_id);
+                }
+            } break;
+
             case EventType::kPacketTX: {
-                cur_frame_id++;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
-
-                rt_assert(frame_id == num_frames_consumed_[ue_id]);
+                cur_frame_id = frame_id;
+                rt_assert(frame_id == next_frame_processed_[ue_id]);
 
                 // printf("PhyUE kPacketTX: Freeing buffer %zu for UE %zu\n",
                 //    num_frames_consumed_[ue_id] % TASK_BUFFER_FRAME_NUM, ue_id);
-                ul_bits_buffer_status_[ue_id][num_frames_consumed_[ue_id]
+                ul_bits_buffer_status_[ue_id][next_frame_processed_[ue_id]
                     % TASK_BUFFER_FRAME_NUM]
                     = 0;
-                num_frames_consumed_[ue_id]++;
+                next_frame_processed_[ue_id]++;
 
                 if (kDebugPrintPerSymbolDone) {
                     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
@@ -468,7 +492,7 @@ void Phy_UE::start()
             } break;
 
             default:
-                printf("Wrong event type in message queue!");
+                std::cout << "Invalid Event Type!" << std::endl;
                 exit(0);
             }
         }
@@ -602,7 +626,10 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
     Event_data crop_finish_event;
 
-    // If it is pilot part, do CE
+    // In TDD massive MIMO, a pilot symbol needs to be sent
+    // in the downlink for the user to estimate the channel
+    // due to relative reciprocity calibration,
+    // see Argos paper (Mobicom'12)
     if (dl_symbol_id < config_->DL_PILOT_SYMS) {
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             // divide fft output by pilot data to get CSI estimation
@@ -631,6 +658,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
             - dl_pilot_symbol_perframe][ant_id * config_->OFDM_CA_NUM];
         float evm = 0;
 
+        // use pilot subcarriers for phase tracking and correction
         float theta = 0;
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             if (j % config_->OFDM_PILOT_SPACING == 0) {
@@ -662,7 +690,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
         evm = std::sqrt(
             evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
         if (kPrintPhyStats)
-            std::cout << "Frame: " << frame_id << " EVM: " << 100 * evm
+            std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
+                      << ", User: " << ant_id << ", EVM: " << 100 * evm
                       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
 
         crop_finish_event = Event_data(EventType::kDemul,
@@ -686,19 +715,80 @@ void Phy_UE::doDemul(int tid, size_t tag)
     size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
         + dl_symbol_id - dl_pilot_symbol_perframe;
     size_t offset = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
-    cx_float* tar_ptr = (cx_float*)&equal_buffer_[offset][0];
-    uint8_t* demul_ptr = (uint8_t*)(&dl_data_buffer_[offset][0]);
+    float* equal_ptr = (float*)&equal_buffer_[offset][0];
+    int8_t* demul_ptr = &dl_demod_buffer_[offset][0];
 
-    demod_16qam_hard_loop(
-        (float*)tar_ptr, (uint8_t*)demul_ptr, config_->UE_ANT_NUM);
+    //demod_16qam_hard_loop(
+    //    equal_ptr, (uint8_t*)demul_ptr, config_->UE_ANT_NUM);
 
-    // Inform main thread
-    Event_data demul_finish_event(EventType::kDemul, tag);
-
-    if (!message_queue_.enqueue(*task_ptok[tid], demul_finish_event)) {
-        printf("Demuliplexing message enqueue failed\n");
-        exit(0);
+    switch (config_->mod_order_bits) {
+    case (CommsLib::QAM16):
+        demod_16qam_soft_avx2(equal_ptr, demul_ptr, config_->OFDM_DATA_NUM);
+        break;
+    case (CommsLib::QAM64):
+        demod_64qam_soft_avx2(equal_ptr, demul_ptr, config_->OFDM_DATA_NUM);
+        break;
+    default:
+        printf("Demodulation: modulation type %s not supported!\n",
+            config_->modulation.c_str());
     }
+
+    rt_assert(message_queue_.enqueue(
+                  *task_ptok[tid], Event_data(EventType::kDemul, tag)),
+        "Demodulation message enqueue failed\n");
+}
+
+void Phy_UE::doDecode(int tid, size_t tag)
+{
+    LDPCconfig LDPC_config = config_->LDPC_config;
+    size_t frame_id = gen_tag_t(tag).frame_id;
+    size_t symbol_id = gen_tag_t(tag).symbol_id;
+    size_t ant_id = gen_tag_t(tag).ant_id;
+    size_t symbol_offset
+        = config_->get_total_data_symbol_idx_dl(frame_id, symbol_id);
+    size_t symbol_ant_offset = symbol_offset * config_->UE_ANT_NUM + ant_id;
+
+    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
+    };
+    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
+    };
+
+    // Decoder setup
+    int16_t numFillerBits = 0;
+    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+
+    ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
+    ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
+    ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
+    ldpc_decoder_5gnr_request.enableEarlyTermination
+        = LDPC_config.earlyTermination;
+    ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
+    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
+    ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+
+    int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
+    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
+
+    for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
+         cb_id++) {
+        size_t demod_buffer_offset
+            = 8 * cb_id * LDPC_config.cbCodewLen / config_->mod_order_bits;
+        size_t decode_buffer_offset
+            = cb_id * roundup<64>(config_->num_bytes_per_cb);
+        auto* llr_buffer_ptr
+            = &dl_demod_buffer_[symbol_ant_offset][demod_buffer_offset];
+        auto* decoded_buffer_ptr
+            = &dl_decode_buffer_[symbol_ant_offset][decode_buffer_offset];
+        ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
+        ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
+        bblib_ldpc_decoder_5gnr(
+            &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+    }
+
+    rt_assert(message_queue_.enqueue(
+                  *task_ptok[tid], Event_data(EventType::kDecode, tag)),
+        "Decoding message enqueue failed\n");
 }
 
 //////////////////////////////////////////////////////////
@@ -773,7 +863,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
     Event_data encode_event(EventType::kEncode, tag);
 
     if (!message_queue_.enqueue(*task_ptok[tid], encode_event)) {
-        printf("Encodingg message enqueue failed\n");
+        printf("Encoding message enqueue failed\n");
         exit(0);
     }
 }
@@ -872,7 +962,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe - 1;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = config_->hw_framer
+    rx_thread_num = (kUseArgos && config_->hw_framer)
         ? std::min(config_->UE_NUM, config_->socket_thread_num)
         : config_->UE_NUM;
 
@@ -882,6 +972,72 @@ void Phy_UE::initialize_vars_from_cfg(void)
     rx_buffer_status_size
         = (dl_symbol_perframe * config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM);
     rx_buffer_size = config_->packet_length * rx_buffer_status_size;
+}
+
+void Phy_UE::initialize_uplink_buffers()
+{
+    // initialize ul data buffer
+    // l2_buffer_status_.resize(TASK_BUFFER_FRAME_NUM *
+    // ul_data_symbol_perframe);
+    ul_bits_buffer_size_
+        = TASK_BUFFER_FRAME_NUM * config_->mac_bytes_num_perframe;
+    ul_bits_buffer_.malloc(config_->UE_ANT_NUM, ul_bits_buffer_size_, 64);
+    ul_bits_buffer_status_.calloc(
+        config_->UE_ANT_NUM, TASK_BUFFER_FRAME_NUM, 64);
+    ul_syms_buffer_size_ = TASK_BUFFER_FRAME_NUM * ul_data_symbol_perframe
+        * config_->OFDM_DATA_NUM;
+    ul_syms_buffer_.calloc(config_->UE_ANT_NUM, ul_syms_buffer_size_, 64);
+
+    // initialize modulation buffer
+    modul_buffer_.calloc(ul_data_symbol_perframe * TASK_BUFFER_FRAME_NUM,
+        config_->OFDM_DATA_NUM * config_->UE_ANT_NUM, 64);
+
+    // initialize IFFT buffer
+    size_t ifft_buffer_block_num
+        = config_->UE_ANT_NUM * ul_symbol_perframe * TASK_BUFFER_FRAME_NUM;
+    ifft_buffer_.calloc(ifft_buffer_block_num, config_->OFDM_CA_NUM, 64);
+
+    alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
+    alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
+}
+
+void Phy_UE::initialize_downlink_buffers()
+{
+    // initialize rx buffer
+    rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
+    rx_buffer_status_.calloc(rx_thread_num, rx_buffer_status_size, 64);
+
+    // initialize FFT buffer
+    size_t FFT_buffer_block_num
+        = config_->UE_ANT_NUM * dl_symbol_perframe * TASK_BUFFER_FRAME_NUM;
+    fft_buffer_.calloc(FFT_buffer_block_num, config_->OFDM_CA_NUM, 64);
+
+    // initialize CSI buffer
+    csi_buffer_.resize(config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM);
+    for (size_t i = 0; i < csi_buffer_.size(); i++)
+        csi_buffer_[i].resize(config_->OFDM_DATA_NUM);
+
+    if (dl_data_symbol_perframe > 0) {
+        // initialize equalized data buffer
+        equal_buffer_.resize(config_->UE_ANT_NUM * dl_data_symbol_perframe
+            * TASK_BUFFER_FRAME_NUM);
+        for (size_t i = 0; i < equal_buffer_.size(); i++)
+            equal_buffer_[i].resize(config_->OFDM_DATA_NUM);
+
+        // initialize demod buffer
+        dl_demod_buffer_.resize(config_->UE_ANT_NUM * dl_data_symbol_perframe
+            * TASK_BUFFER_FRAME_NUM);
+        for (size_t i = 0; i < dl_demod_buffer_.size(); i++)
+            dl_demod_buffer_[i].resize(config_->OFDM_DATA_NUM * 8);
+
+        // initialize decode buffer
+        dl_decode_buffer_.resize(config_->UE_ANT_NUM * dl_data_symbol_perframe
+            * TASK_BUFFER_FRAME_NUM);
+        for (size_t i = 0; i < dl_decode_buffer_.size(); i++)
+            dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb)
+                * config_->LDPC_config.nblocksInSymbol);
+        resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
+    }
 }
 
 void Phy_UE::getDemulData(long long** ptr, int* size)
