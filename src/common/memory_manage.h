@@ -90,7 +90,17 @@ public:
 
     /// Create a grid of pointers where each grid cell points to an array of
     /// [n_entries]
-    PtrGrid(size_t n_entries) { alloc(n_entries); }
+    PtrGrid(size_t n_entries) { alloc(ROWS, COLS, n_entries); }
+
+    /// Create a grid of pointers with dimensions [ROWS, COLS], where
+    /// only the grid with dimensions [n_rows, n_cols] has cells pointing to an
+    /// array of [n_entries]. This can use less memory than a fully-allocated
+    /// grid.
+    PtrGrid(size_t n_rows, size_t n_cols, size_t n_entries)
+    {
+        assert(n_rows <= ROWS && n_cols <= COLS);
+        alloc(n_rows, n_cols, n_entries);
+    }
 
     ~PtrGrid()
     {
@@ -99,18 +109,18 @@ public:
     }
 
     /// Allocate [n_entries] entries per pointer cell
-    void alloc(size_t n_entries)
+    void alloc(size_t n_rows, size_t n_cols, size_t n_entries)
     {
-        const size_t alloc_sz = ROWS * COLS * n_entries * sizeof(T);
+        const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
         backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
         memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
         is_allocated = true;
 
         // Fill-in the grid with pointers into backing_buf
         size_t offset = 0;
-        for (auto& row : mat) {
-            for (auto& entry : row) {
-                entry = &backing_buf[offset];
+        for (size_t i = 0; i < n_rows; i++) {
+            for (size_t j = 0; j < n_cols; j++) {
+                mat[i][j] = &backing_buf[offset];
                 offset += n_entries;
             }
         }
@@ -122,7 +132,7 @@ public:
     {
         static_assert(
             sizeof(T) == 2 * sizeof(float), "T must be complex_float");
-        alloc(n_entries);
+        alloc(ROWS, COLS, n_entries);
 
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution(-1.0, 1.0);
