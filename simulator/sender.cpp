@@ -32,7 +32,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     , frame_duration_(frame_duration)
     , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_wnd_1(
-          200 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+          200000 /* 200 ms */ * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_wnd_2(
           15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
