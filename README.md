@@ -83,13 +83,13 @@ Agora is a high-performance system for massive-MIMO baseband processing.
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator data/bs-sim.json` to generate data files.
-   * In one terminal, run `./build/user data/ue-sim.json` to start clients with
+     `./build/data_generator data/bs-ul-sim.json` to generate data files.
+   * In one terminal, run `./build/user data/ue-ul-sim.json` to start clients with
      uplink configuration.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
-     --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json
-     --ue_conf_file data/ue-sim.json`
-   * In another terminal, run `./build/agora data/bs-sim.json` to start
+     --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-ul-sim.json
+     --ue_conf_file data/ue-ul-sim.json`
+   * In another terminal, run `./build/agora data/bs-ul-sim.json` to start
      Agora with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.
