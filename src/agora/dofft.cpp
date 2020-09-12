@@ -330,24 +330,22 @@ Event_data DoIFFT::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
     size_t ant_id = gen_tag_t(tag).ant_id;
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t data_symbol_idx = gen_tag_t(tag).symbol_id;
+    size_t symbol_id = gen_tag_t(tag).symbol_id;
+    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
 
     if (kDebugPrintInTask) {
         printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
-            tid, frame_id, data_symbol_idx, ant_id);
+            tid, frame_id, symbol_id, ant_id);
     }
 
-    size_t offset = (cfg->get_total_data_symbol_idx(frame_id, data_symbol_idx)
+    size_t offset = (cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
                         * cfg->BS_ANT_NUM)
         + ant_id;
-
-    size_t num_dl_ifft_buffers = cfg->BS_ANT_NUM * cfg->data_symbol_num_perframe
-        * TASK_BUFFER_FRAME_NUM;
 
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset % num_dl_ifft_buffers];
+    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset];
     memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
     memset(ifft_buf_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
         sizeof(float) * cfg->OFDM_DATA_START * 2);
@@ -367,7 +365,7 @@ Event_data DoIFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-        * cfg->data_symbol_num_perframe;
+        * cfg->dl_data_symbol_num_perframe;
     int socket_symbol_offset = offset % dl_socket_buffer_status_size;
     int packet_length = cfg->packet_length;
     struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
