@@ -1,23 +1,24 @@
-/*
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
- Generate training sequence for pilots and preambles.
-
- Supports:
- STS - 802.11 Short training sequence. Generates one symbol, 16 complex I/Q
-samples. LTS - 802.11 Long training sequence. Generates 2.5 symbols, cp length
-of 32 samples, for a total of 160 complex I/Q samples. LTE Zadoff Chu -
-Generates the 25th root length-63 Zadoff-Chu sequence. Total of 63-long complex
-IQ samples. Gold IFFT - Total of 128-long complex IQ samples including a
-32-sample cyclic prefix Hadamard - Real valued sequence. Possible lenghts: {2,
-4, 8, 16, 32, 64}
-
----------------------------------------------------------------------
- Copyright (c) 2018-2019, Rice University
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
- Author(s): Oscar Bejarano: obejarano@rice.edu
-            Rahman Doost-Mohamamdy: doost@rice.edu
----------------------------------------------------------------------
-*/
+/**
+ * @file comms-lib.cpp
+ * @brief Generate training sequence for pilots and preambles.
+ *
+ * Supports:
+ *    STS - 802.11 Short training sequence. Generates one symbol, 16 complex 
+ *    I/Q samples. 
+ *    LTS - 802.11 Long training sequence. Generates 2.5 symbols, cp length
+ *    of 32 samples, for a total of 160 complex I/Q samples. 
+ *    LTE Zadoff Chu - Generates the 25th root length-63 Zadoff-Chu sequence. 
+ *    Total of 63-long complex IQ samples.
+ *    Gold IFFT - Total of 128-long complex IQ samples including a 32-sample 
+ *    cyclic prefix 
+ *    Hadamard - Real valued sequence. Possible lenghts: 
+ *    {2, 4, 8, 16, 32, 64}
+ * @author Oscar Bejarano: obejarano@rice.edu
+ *         Rahman Doost-Mohamamdy: doost@rice.edu
+ */
 
 #include "comms-lib.h"
 

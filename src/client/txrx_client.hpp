@@ -1,15 +1,14 @@
-
 #ifndef RadioTXRX_HEADER
 #define RadioTXRX_HEADER
 
 #include "client_radio.hpp"
 #include "concurrentqueue.h"
-#include "utils.h"
 #include "net.hpp"
+#include "utils.h"
 #include <arpa/inet.h>
 #include <complex>
-#include <fstream>
 #include <fcntl.h>
+#include <fstream>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/ioctl.h>
@@ -90,12 +89,12 @@ public:
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
     /**
-     * @brief transmit a tx packet that is ready from PHY through socket to channel simualtor
+     * @brief transmits a tx packet that is ready from PHY through socket to channel simualtor
      */
     int dequeue_send(int tid);
 
     /**
-     * @brief transmit a tx samples packet that is ready from PHY through client wireless hardware
+     * @brief transmits a tx samples packet that is ready from PHY through client wireless hardware
      */
     int dequeue_send_argos(int tid);
 

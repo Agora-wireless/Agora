@@ -3,6 +3,7 @@
 #include "utils_ldpc.hpp"
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<Event_data>* rx_queue,
@@ -12,8 +13,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     , freq_ghz_(measure_rdtsc_freq())
     , tsc_delta_((cfg_->get_frame_duration_sec() * 1e9) / freq_ghz_)
     , core_offset_(core_offset)
-    , ul_bits_buffer_(ul_bits_buffer)
-    , ul_bits_buffer_status_(ul_bits_buffer_status)
+    , decoded_buffer_(decoded_buffer)
     , dl_bits_buffer_(dl_bits_buffer)
     , dl_bits_buffer_status_(dl_bits_buffer_status)
     , rx_queue_(rx_queue)
@@ -30,6 +30,9 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
         cfg_->get_frame_duration_sec() * 1000, tsc_delta_);
 
     // Set up buffers
+    client_.ul_bits_buffer_ = ul_bits_buffer;
+    client_.ul_bits_buffer_status_ = ul_bits_buffer_status;
+
     server_.n_filled_in_frame_.fill(0);
     for (auto& v : server_.frame_data_)
         v.resize(cfg_->mac_data_bytes_num_perframe);
@@ -38,18 +41,15 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
 
     const size_t udp_pkt_len = cfg_->mac_data_bytes_num_perframe;
     udp_pkt_buf_.resize(udp_pkt_len);
-
     udp_server
         = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
     const size_t udp_control_len = sizeof(RBIndicator);
     udp_control_buf_.resize(udp_control_len);
-
     udp_control_channel = new UDPServer(
         kBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
 
     udp_client = new UDPClient();
-
     crc_obj = new DoCRC();
 }
 
@@ -78,14 +78,20 @@ void MacThread::process_snr_report_from_master(Event_data event)
         server_.snr_[ue_id].pop();
     }
 
-    server_.snr_[ue_id].push(*reinterpret_cast<float*>(&event.tags[1]));
+    float snr;
+    memcpy(&snr, &event.tags[1], sizeof(float));
+    server_.snr_[ue_id].push(snr);
 }
 
 void MacThread::send_ran_config_update(Event_data event)
 {
     RanConfig rc;
+    rc.n_antennas = 0; // TODO [arjun]: What's the correct value here?
     rc.mod_order_bits = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
+    // TODO: change n_antennas to a desired value
+    // cfg_->BS_ANT_NUM is added to fix compiler warning
+    rc.n_antennas = cfg_->BS_ANT_NUM;
 
     Event_data msg(EventType::kRANUpdate);
     msg.num_tags = 3;
@@ -105,12 +111,8 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     const size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
     const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
-
-    const size_t data_offset = (bits_to_bytes(cfg_->LDPC_config.cbLen)
-        * cfg_->LDPC_config.nblocksInSymbol * ue_id);
     const uint8_t* ul_data_ptr
-        = &(*ul_bits_buffer_)[cfg_->get_total_data_symbol_idx_ul(
-            frame_id, symbol_idx_ul)][data_offset];
+        = decoded_buffer_[frame_id % kFrameWnd][symbol_idx_ul][ue_id];
 
     std::stringstream ss; // Debug-only
 
@@ -118,7 +120,7 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
         auto* pkt = (struct MacPacket*)ul_data_ptr;
 
-        // we send data to app irrespective of CRC condition
+        // We send data to app irrespective of CRC condition
         // TODO: enable ARQ and ensure reliable data goes to app
         const size_t frame_data__offset
             = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
@@ -266,7 +268,7 @@ void MacThread::process_udp_packets_from_apps_client(
     // specify a radio ID, send to radios in round-robin order
     size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
 
-    if ((*ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
+    if ((*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
         fprintf(stderr,
             "MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
             "packet.\n",
@@ -290,8 +292,8 @@ void MacThread::process_udp_packets_from_apps_client(
     for (size_t pkt_id = 0; pkt_id < cfg_->mac_packets_perframe; pkt_id++) {
         size_t data_offset = radio_buf_id * cfg_->mac_bytes_num_perframe
             + pkt_id * cfg_->mac_packet_length;
-        MacPacket* pkt
-            = (MacPacket*)(&(*ul_bits_buffer_)[next_radio_id_][data_offset]);
+        auto* pkt = (MacPacket*)(&(
+            *client_.ul_bits_buffer_)[next_radio_id_][data_offset]);
         pkt->frame_id = next_frame_id_;
         pkt->symbol_id = pkt_id;
         pkt->ue_id = next_radio_id_;
@@ -311,7 +313,7 @@ void MacThread::process_udp_packets_from_apps_client(
                 & 0xFFFF);
     }
 
-    (*ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
+    (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
     Event_data msg(
         EventType::kPacketFromMac, rx_tag_t(next_radio_id_, radio_buf_id)._tag);
     rt_assert(

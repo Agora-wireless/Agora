@@ -1,11 +1,7 @@
-/**
- * Author: Jian Ding
- * Email: jianding17@gmail.com
- *
- */
 #ifndef MEMORY_MANAGE
 #define MEMORY_MANAGE
 #include <array>
+#include <assert.h>
 #include <cstdlib>
 #include <cstring>
 #include <malloc.h>
@@ -94,7 +90,17 @@ public:
 
     /// Create a grid of pointers where each grid cell points to an array of
     /// [n_entries]
-    PtrGrid(size_t n_entries) { alloc(n_entries); }
+    PtrGrid(size_t n_entries) { alloc(ROWS, COLS, n_entries); }
+
+    /// Create a grid of pointers with dimensions [ROWS, COLS], where
+    /// only the grid with dimensions [n_rows, n_cols] has cells pointing to an
+    /// array of [n_entries]. This can use less memory than a fully-allocated
+    /// grid.
+    PtrGrid(size_t n_rows, size_t n_cols, size_t n_entries)
+    {
+        assert(n_rows <= ROWS && n_cols <= COLS);
+        alloc(n_rows, n_cols, n_entries);
+    }
 
     ~PtrGrid()
     {
@@ -102,35 +108,31 @@ public:
             free(backing_buf);
     }
 
-    /// Allocate [n_entries] entries per pointer cell in the pointer matrix
-    void alloc(size_t n_entries)
+    /// Allocate [n_entries] entries per pointer cell
+    void alloc(size_t n_rows, size_t n_cols, size_t n_entries)
     {
-        const size_t alloc_sz = ROWS * COLS * n_entries * sizeof(T);
+        const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
         backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
         memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
         is_allocated = true;
 
         // Fill-in the grid with pointers into backing_buf
         size_t offset = 0;
-        for (auto& row : mat) {
-            for (auto& entry : row) {
-                entry = &backing_buf[offset];
+        for (size_t i = 0; i < n_rows; i++) {
+            for (size_t j = 0; j < n_cols; j++) {
+                mat[i][j] = &backing_buf[offset];
                 offset += n_entries;
             }
         }
-        if (offset * sizeof(T) != alloc_sz) {
-            fprintf(stderr, "Error Error Error\n");
-            exit(-1);
-        }
     }
 
-    /// Allocate [n_entries] entries per pointer cell in the pointer matrix.
+    /// Allocate [n_entries] entries per pointer cell.
     /// Each entry is a random float between -1.0 and 1.0.
     void rand_alloc_cx_float(size_t n_entries)
     {
         static_assert(
             sizeof(T) == 2 * sizeof(float), "T must be complex_float");
-        alloc(n_entries);
+        alloc(ROWS, COLS, n_entries);
 
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution(-1.0, 1.0);
@@ -145,10 +147,7 @@ public:
         }
     }
 
-    T** operator[](size_t row_idx)
-    {
-        return reinterpret_cast<T**>(&mat[row_idx][0]);
-    }
+    std::array<T*, COLS> operator[](size_t row_idx) { return mat[row_idx]; }
 
     // Delete copy constructor and copy assignment
     PtrGrid(PtrGrid const&) = delete;
@@ -156,6 +155,81 @@ public:
 
 private:
     std::array<std::array<T*, COLS>, ROWS> mat; /// The pointer cells
+
+    /// The backing buffer for the per-cell arrays. Having a common buffer
+    /// reduces the number of memory allocations.
+    T* backing_buf;
+
+    /// True iff we've allocated the backing buffer
+    bool is_allocated = false;
+};
+
+// PtrCube is a 3D cube of pointers. Each entry of the cube is a pointer to an
+// array of [T].
+template <size_t DIM1, size_t DIM2, size_t DIM3, class T> class PtrCube {
+public:
+    PtrCube() {}
+
+    /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
+    /// cube cell points to an array of [n_entries]
+    PtrCube(size_t n_entries) { alloc(DIM1, DIM2, DIM3, n_entries); }
+
+    /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
+    /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells
+    /// pointing to an array of [n_entries]. This can use less memory than a
+    /// fully-allocated cube.
+    PtrCube(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
+    {
+        assert(dim_1 <= DIM1 && dim_2 <= DIM2 && dim_3 <= DIM3);
+        alloc(dim_1, dim_2, dim_3, n_entries);
+    }
+
+    ~PtrCube()
+    {
+        if (is_allocated)
+            free(backing_buf);
+    }
+
+    /// Allocate [n_entries] entries per pointer cell
+    void alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
+    {
+        const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
+        backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
+        memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
+        is_allocated = true;
+
+        // Fill-in the grid with pointers into backing_buf
+        for (auto& mat : cube) {
+            for (auto& row : mat) {
+                for (auto& entry : row) {
+                    entry = nullptr;
+                }
+            }
+        }
+
+        size_t offset = 0;
+        for (size_t i = 0; i < dim_1; i++) {
+            for (size_t j = 0; j < dim_2; j++) {
+                for (size_t k = 0; k < dim_3; k++) {
+                    cube[i][j][k] = &backing_buf[offset];
+                    offset += n_entries;
+                }
+            }
+        }
+    }
+
+    std::array<std::array<T*, DIM3>, DIM2> operator[](size_t row_idx)
+    {
+        return cube[row_idx];
+    }
+
+    // Delete copy constructor and copy assignment
+    PtrCube(PtrCube const&) = delete;
+    PtrCube& operator=(PtrCube const&) = delete;
+
+private:
+    /// The pointer cells
+    std::array<std::array<std::array<T*, DIM3>, DIM2>, DIM1> cube;
 
     /// The backing buffer for the per-cell arrays. Having a common buffer
     /// reduces the number of memory allocations.

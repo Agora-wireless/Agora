@@ -1,4 +1,3 @@
-
 #include "txrx_client.hpp"
 #include "config.hpp"
 
@@ -150,59 +149,70 @@ int RadioTXRX::dequeue_send(int tid)
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type == EventType::kPacketTX);
-
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    std::vector<char> zeros(c->packet_length, 0);
-    std::vector<char> pilot(c->packet_length, 0);
-    memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(),
-        c->packet_length - Packet::kOffsetOfData);
-    for (size_t symbol_idx = 0; symbol_idx < c->pilot_symbol_num_perframe;
-         symbol_idx++) {
-        if (kDebugPrintInTask) {
-            printf(
-                "In TX thread %d: Transmitted pilot in frame %zu, symbol %zu, "
-                "ant %zu\n",
-                tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
+    if (event.event_type == EventType::kPacketTX) {
+        for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
+             symbol_id++) {
+
+            size_t offset
+                = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
+                      * c->UE_ANT_NUM)
+                + ant_id;
+
+            if (kDebugPrintInTask) {
+                printf(
+                    "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
+                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+                    tid, frame_id, c->ULSymbols[0][symbol_id], ant_id,
+                    gen_tag_t(event.tags[0])._tag, offset,
+                    message_queue_->size_approx());
+            }
+
+            auto* pkt
+                = (struct Packet*)(tx_buffer_ + offset * c->packet_length);
+            new (pkt) Packet(
+                frame_id, c->ULSymbols[0][symbol_id], 0 /* cell_id */, ant_id);
+
+            // Send data (one OFDM symbol)
+            ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
+                0, (struct sockaddr*)&servaddr_[ant_id],
+                sizeof(servaddr_[ant_id]));
+            rt_assert(ret > 0, "sendto() failed");
         }
+        rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                      Event_data(EventType::kPacketTX, event.tags[0])),
+            "Socket message enqueue failed\n");
+    } else if (event.event_type == EventType::kPacketPilotTX) {
+        std::vector<char> zeros(c->packet_length, 0);
+        std::vector<char> pilot(c->packet_length, 0);
+        memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(),
+            c->packet_length - Packet::kOffsetOfData);
+        for (size_t symbol_idx = 0; symbol_idx < c->pilot_symbol_num_perframe;
+             symbol_idx++) {
+            if (kDebugPrintInTask) {
+                printf("In TX thread %d: Transmitted pilot in frame %zu, "
+                       "symbol %zu, "
+                       "ant %zu\n",
+                    tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
+            }
 
-        auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
-                                           : (struct Packet*)zeros.data();
-        new (pkt) Packet(
-            frame_id, c->pilotSymbols[0][symbol_idx], 0 /* cell_id */, ant_id);
-        // Send pilots
-        ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length, 0,
-            (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
-        rt_assert(ret > 0, "sendto() failed");
-    }
-    for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
-         symbol_id++) {
-
-        size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
-                            * c->UE_ANT_NUM)
-            + ant_id;
-
-        if (kDebugPrintInTask) {
-            printf("In TX thread %d: Transmitted frame %zu, data symbol %zu, "
-                   "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-                tid, frame_id, c->ULSymbols[0][symbol_id], ant_id,
-                gen_tag_t(event.tags[0])._tag, offset,
-                message_queue_->size_approx());
+            auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
+                                               : (struct Packet*)zeros.data();
+            new (pkt) Packet(frame_id, c->pilotSymbols[0][symbol_idx],
+                0 /* cell_id */, ant_id);
+            // Send pilots
+            ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
+                0, (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+            rt_assert(ret > 0, "sendto() failed");
         }
-
-        auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->packet_length);
-        new (pkt) Packet(
-            frame_id, c->ULSymbols[0][symbol_id], 0 /* cell_id */, ant_id);
-
-        // Send data (one OFDM symbol)
-        ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length, 0,
-            (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
-        rt_assert(ret > 0, "sendto() failed");
+        rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+                      Event_data(EventType::kPacketPilotTX, event.tags[0])),
+            "Socket message enqueue failed\n");
+    } else {
+        printf("Wrong event type in tx queue!");
+        exit(0);
     }
-    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  Event_data(EventType::kPacketTX, event.tags[0])),
-        "Socket message enqueue failed\n");
     return event.tags[0];
 }
 
@@ -220,10 +230,10 @@ void* RadioTXRX::loop_tx_rx(int tid)
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
-            config_->ue_rru_port + radio_id, config_->rru_addr.c_str());
+            config_->ue_rru_port + radio_id, config_->bs_rru_addr.c_str());
         printf("TXRX thread %d: set up UDP socket server listening to port %d"
                " with remote address %s:%d \n",
-            tid, local_port_id, config_->rru_addr.c_str(),
+            tid, local_port_id, config_->bs_rru_addr.c_str(),
             config_->ue_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }

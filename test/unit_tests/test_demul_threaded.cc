@@ -59,7 +59,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     moodycamel::ProducerToken* ptok, Table<complex_float>& data_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
-    Table<complex_float>& equal_buffer, Table<int8_t>& demod_soft_buffer,
+    Table<complex_float>& equal_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
     PhyStats* phy_stats, Stats* stats)
 {
     pin_to_core_with_offset(
@@ -73,8 +74,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
 
     auto computeDemul = new DoDemul(cfg, worker_id, freq_ghz, event_queue,
         complete_task_queue, ptok, data_buffer, ul_zf_matrices,
-        ue_spec_pilot_buffer, equal_buffer, demod_soft_buffer, phy_stats,
-        stats);
+        ue_spec_pilot_buffer, equal_buffer, demod_buffers_, phy_stats, stats);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -133,10 +133,9 @@ TEST(TestDemul, VaryingConfig)
         kMaxDataSCs * kMaxUEs, 64);
     ue_spec_pilot_buffer.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * kMaxUEs, 64);
-    Table<int8_t> demod_soft_buffer;
-    demod_soft_buffer.calloc(
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
-        kMaxModType * kMaxDataSCs * kMaxUEs, 64);
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
+        cfg->symbol_num_perframe, cfg->UE_NUM,
+        kMaxModType * cfg->OFDM_DATA_NUM);
     printf(
         "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
@@ -163,7 +162,7 @@ TEST(TestDemul, VaryingConfig)
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
             std::ref(data_buffer), std::ref(ul_zf_matrices),
             std::ref(equal_buffer), std::ref(ue_spec_pilot_buffer),
-            std::ref(demod_soft_buffer), phy_stats, stats);
+            std::ref(demod_buffers), phy_stats, stats);
     }
     master.join();
     for (auto& w : workers)

@@ -1,4 +1,3 @@
-
 #include "config.hpp"
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
@@ -64,7 +63,7 @@ Config::Config(std::string jsonfile)
     modulation = tddConf.value("modulation", "16QAM");
 
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
-    rru_addr = tddConf.value("rru_addr", "127.0.0.1");
+    bs_rru_addr = tddConf.value("bs_rru_addr", "127.0.0.1");
     ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
     mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
     bs_server_port = tddConf.value("bs_server_port", 8000);
@@ -121,10 +120,10 @@ Config::Config(std::string jsonfile)
         // Below it is assumed either dl or ul to be active at one time
         if (downlink_mode) {
             size_t dl_symbol_start
-                = pilot_symbol_num_perframe + dl_data_symbol_start;
+                = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
                 = dl_symbol_start + dl_data_symbol_num_perframe;
-            for (size_t s = pilot_symbol_num_perframe; s < dl_symbol_start; s++)
+            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start; s++)
                 sched += "G";
             for (size_t s = dl_symbol_start; s < dl_symbol_end; s++)
                 sched += "D";
@@ -132,15 +131,16 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         } else {
             size_t ul_data_symbol_end
-                = pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
-            for (size_t s = pilot_symbol_num_perframe; s < ul_data_symbol_end;
-                 s++)
+                = 1 + pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
+            for (size_t s = 1 + pilot_symbol_num_perframe;
+                 s < ul_data_symbol_end; s++)
                 sched += "U";
             for (size_t s = ul_data_symbol_end; s < symbol_num_perframe; s++)
                 sched += "G";
         }
         frames.push_back(sched);
-        printf("Frame schedule %s\n", sched.c_str());
+        printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
+            sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
@@ -148,6 +148,7 @@ Config::Config(std::string jsonfile)
         }
     }
 
+    beaconSymbols = Utils::loadSymbols(frames, 'B');
     pilotSymbols = Utils::loadSymbols(frames, 'P');
     ULSymbols = Utils::loadSymbols(frames, 'U');
     DLSymbols = Utils::loadSymbols(frames, 'D');
@@ -156,16 +157,18 @@ Config::Config(std::string jsonfile)
     recipCalEn = (ULCalSymbols[0].size() == 1 and DLCalSymbols[0].size() == 1);
 
     symbol_num_perframe = frames.at(0).size();
+    beacon_symbol_num_perframe = beaconSymbols[0].size();
     pilot_symbol_num_perframe = pilotSymbols[0].size();
-    data_symbol_num_perframe = symbol_num_perframe - pilot_symbol_num_perframe;
+    data_symbol_num_perframe = symbol_num_perframe - pilot_symbol_num_perframe
+        - beacon_symbol_num_perframe;
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;
     dl_data_symbol_start = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0][0] - pilot_symbol_num_perframe
+        ? DLSymbols[0].front()
         : 0;
     dl_data_symbol_end = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0].back() - pilot_symbol_num_perframe + 1
+        ? DLSymbols[0].back() + 1
         : 0;
 
     if (isUE and !freq_orthogonal_pilot
@@ -225,9 +228,9 @@ Config::Config(std::string jsonfile)
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
 
-    printf("LDPC: Zc: %d, code block per symbol: %zu, encoding input len: %d, "
-           "encoded block len: %d, decoder iterations: %d, code rate %.3f "
-           "(nRows = %zu)\n",
+    printf("Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
+           "bits per encoding, %d bits per encoded code word, decoder "
+           "iterations: %d, code rate %.3f (nRows = %zu)\n",
         LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen,
         LDPC_config.cbCodewLen, LDPC_config.decoderIter,
         1.f * ldpc_num_input_cols(LDPC_config.Bg)
@@ -240,9 +243,10 @@ Config::Config(std::string jsonfile)
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length
         = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
+    rt_assert(
+        packet_length < 9000, "Packet size must be smaller than jumbo frame");
 
-    num_bytes_per_cb = (LDPC_config.cbLen) >> 3;
-
+    num_bytes_per_cb = LDPC_config.cbLen / 8; // TODO: Use bits_to_bytes()?
     data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
@@ -251,26 +255,16 @@ Config::Config(std::string jsonfile)
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
-    std::cout << "Config: "
-              << "\n  BS_ANT_NUM: " << BS_ANT_NUM
-              << "\n  UE_ANT_NUM: " << UE_ANT_NUM
-              << "\n  pilot_symbol_num_perframe: " << pilot_symbol_num_perframe
-              << "\n  ul_data_symbol_num_perframe: "
-              << ul_data_symbol_num_perframe
-              << "\n  dl_data_symbol_num_perframe: "
-              << dl_data_symbol_num_perframe << "\n  OFDM_CA_NUM "
-              << OFDM_CA_NUM << "\n  OFDM_DATA_NUM: " << OFDM_DATA_NUM
-              << "\n  mac_data_bytes_num_perframe: "
-              << mac_data_bytes_num_perframe
-              << "\n  mac_bytes_num_perframe: " << mac_bytes_num_perframe
-              << "\n  Modulation: " << modulation.c_str() << std::endl;
-
-    if (packet_length >= 9000) {
-        std::cout << "\033[1;31mWarning: packet length is larger than jumbo "
-                     "frame size (9000)! "
-                  << "Packets will be fragmented.\033[0m" << std::endl;
-    }
-    std::cout << "Config done!" << std::endl;
+    printf("Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
+           "frame,\n\t"
+           "%zu uplink data symbols per frame, %zu downlink data "
+           "symbols per frame,\n\t"
+           "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
+           "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
+        BS_ANT_NUM, UE_ANT_NUM, pilot_symbol_num_perframe,
+        ul_data_symbol_num_perframe, dl_data_symbol_num_perframe, OFDM_CA_NUM,
+        OFDM_DATA_NUM, modulation.c_str(), mac_data_bytes_num_perframe,
+        mac_bytes_num_perframe);
 }
 
 void Config::genData()
@@ -390,7 +384,7 @@ void Config::genData()
     std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant"
         + std::to_string(total_ue_ant_num) + ".bin";
-    std::cout << "Reading raw data from " << filename1 << std::endl;
+    std::cout << "Config: Reading raw data from " << filename1 << std::endl;
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == nullptr) {
         printf("Failed to open antenna file %s. Error %s.\n", filename1.c_str(),
@@ -426,16 +420,15 @@ void Config::genData()
     fclose(fd);
 #endif
 
-    size_t bytes_per_block = (LDPC_config.cbLen + 7) >> 3;
-    size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
-    size_t num_blocks_per_symbol = LDPC_config.nblocksInSymbol * UE_ANT_NUM;
+    const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
+    const size_t encoded_bytes_per_block
+        = bits_to_bytes(LDPC_config.cbCodewLen);
+    const size_t num_blocks_per_symbol
+        = LDPC_config.nblocksInSymbol * UE_ANT_NUM;
 
     // Encode uplink bits
     ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
         encoded_bytes_per_block, 64);
-    printf("Size of ul_encoded_bits: %zu x %zu\n",
-        ul_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block);
 
     int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
         LDPC_config.Bg, LDPC_config.Zc)];
@@ -631,9 +624,7 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     const auto it
         = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
-        return it - DLSymbols[fid].begin() + 1;
-    else if (symbol_id == 0)
-        return 0;
+        return it - DLSymbols[fid].begin();
     else
         return SIZE_MAX;
 }
