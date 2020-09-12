@@ -138,7 +138,8 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-        printf("Config: Frame schedule %s\n", sched.c_str());
+        printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
+            sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
@@ -146,6 +147,7 @@ Config::Config(std::string jsonfile)
         }
     }
 
+    beaconSymbols = Utils::loadSymbols(frames, 'B');
     pilotSymbols = Utils::loadSymbols(frames, 'P');
     ULSymbols = Utils::loadSymbols(frames, 'U');
     DLSymbols = Utils::loadSymbols(frames, 'D');
@@ -154,9 +156,10 @@ Config::Config(std::string jsonfile)
     recipCalEn = (ULCalSymbols[0].size() == 1 and DLCalSymbols[0].size() == 1);
 
     symbol_num_perframe = frames.at(0).size();
+    beacon_symbol_num_perframe = beaconSymbols[0].size();
     pilot_symbol_num_perframe = pilotSymbols[0].size();
-    data_symbol_num_perframe
-        = symbol_num_perframe - pilot_symbol_num_perframe;
+    data_symbol_num_perframe = symbol_num_perframe - pilot_symbol_num_perframe
+        - beacon_symbol_num_perframe;
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;

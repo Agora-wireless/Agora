@@ -29,13 +29,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     rte_flow* flow;
     /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
-        uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port);
+        uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
         flow = DpdkTransport::generate_ipv4_flow(0, i, bs_rru_addr, FULL_MASK,
             bs_server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff,
             &error);
-        printf("Adding rule for src port: %d, dst port: %d, queue: %zu\n",
-            src_port, dst_port, i);
+        printf("Adding rule for src port: %zu, dst port: %zu, queue: %zu\n",
+            cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
         if (!flow)
             rte_exit(
                 EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
@@ -182,11 +182,10 @@ uint16_t PacketTXRX::dpdk_recv_enqueue(
                 prev_frame_id = frame_id;
             }
         }
-        // printf("thread %d received packet frame %u, symbol %u, ant %u\n",
-        //     tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id);
+        // printf("thread %d received packet frame %u, symbol %u, ant %u\n", tid,
+        //     pkt->frame_id, pkt->symbol_id, pkt->ant_id);
 
-        // get the position in rx_buffer
-        // move ptr & set status to full
+        // get the position in rx_buffer move ptr & set status to full
         // rx_buffer_status[rx_offset] = 1;
 
         // Push kPacketRX event into the queue.
