@@ -34,11 +34,11 @@
 #define MLPD_LOG_DEFAULT_STREAM stdout
 
 // Log messages with "FRAME" or higher verbosity get written to
-// trace_file_or_default_stream. This can be stdout for basic debugging, or
+// mlpd_trace_file_or_default_stream. This can be stdout for basic debugging, or
 // a file named "trace_file" for more involved debugging.
 
-//#define trace_file_or_default_stream trace_file
-#define trace_file_or_default_stream MLPD_LOG_DEFAULT_STREAM
+//#define mlpd_trace_file_or_default_stream trace_file
+#define mlpd_trace_file_or_default_stream MLPD_LOG_DEFAULT_STREAM
 
 // If MLPD_LOG_LEVEL is not defined, default to the highest level so that
 // YouCompleteMe does not report compilation errors
@@ -48,7 +48,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_ERROR
 #define MLPD_ERROR(...)                                                        \
-    output_log_header(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_ERROR);          \
+    mlpd_output_log_header(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_ERROR);     \
     fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                             \
     fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
@@ -57,7 +57,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_WARN
 #define MLPD_WARN(...)                                                         \
-    output_log_header(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_WARN);           \
+    mlpd_output_log_header(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_WARN);      \
     fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                             \
     fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
@@ -66,7 +66,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_INFO
 #define MLPD_INFO(...)                                                         \
-    output_log_header(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_INFO);           \
+    mlpd_output_log_header(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_INFO);      \
     fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                             \
     fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
@@ -75,33 +75,36 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_FRAME
 #define MLPD_FRAME(...)                                                        \
-    output_log_header(trace_file_or_default_stream, MLPD_LOG_LEVEL_FRAME);     \
-    fprintf(trace_file_or_default_stream, __VA_ARGS__);                        \
-    fflush(trace_file_or_default_stream)
+    mlpd_output_log_header(                                                    \
+        mlpd_trace_file_or_default_stream, MLPD_LOG_LEVEL_FRAME);              \
+    fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__);                   \
+    fflush(mlpd_trace_file_or_default_stream)
 #else
 #define MLPD_FRAME(...) ((void)0)
 #endif
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_SYMBOL
 #define MLPD_SYMBOL(...)                                                       \
-    output_log_header(trace_file_or_default_stream, MLPD_LOG_LEVEL_SYMBOL);    \
-    fprintf(trace_file_or_default_stream, __VA_ARGS__);                        \
-    fflush(trace_file_or_default_stream)
+    mlpd_output_log_header(                                                    \
+        mlpd_trace_file_or_default_stream, MLPD_LOG_LEVEL_SYMBOL);             \
+    fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__);                   \
+    fflush(mlpd_trace_file_or_default_stream)
 #else
 #define MLPD_SYMBOL(...) ((void)0)
 #endif
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_TRACE
 #define MLPD_TRACE(...)                                                        \
-    output_log_header(trace_file_or_default_stream, MLPD_LOG_LEVEL_TRACE);     \
-    fprintf(trace_file_or_default_stream, __VA_ARGS__);                        \
-    fflush(trace_file_or_default_stream)
+    mlpd_output_log_header(                                                    \
+        mlpd_trace_file_or_default_stream, MLPD_LOG_LEVEL_TRACE);              \
+    fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__);                   \
+    fflush(mlpd_trace_file_or_default_stream)
 #else
 #define MLPD_TRACE(...) ((void)0)
 #endif
 
 /// Return decent-precision time formatted as seconds:microseconds
-static std::string get_formatted_time()
+static std::string mlpd_get_formatted_time()
 {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
@@ -114,9 +117,9 @@ static std::string get_formatted_time()
 }
 
 // Output log message header
-static inline void output_log_header(FILE* stream, int level)
+static inline void mlpd_output_log_header(FILE* stream, int level)
 {
-    std::string formatted_time = get_formatted_time();
+    std::string formatted_time = mlpd_get_formatted_time();
 
     const char* type;
     switch (level) {

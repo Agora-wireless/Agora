@@ -251,9 +251,12 @@ void Agora::start()
             case EventType::kPacketRX: {
                 size_t socket_thread_id = rx_tag_t(event.tags[0]).tid;
                 size_t sock_buf_offset = rx_tag_t(event.tags[0]).offset;
-
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
+
+                if (rx_start_tsc_ == 0)
+                    rx_start_tsc_ = rdtsc();
+
                 if (pkt->frame_id >= cur_frame_id + kFrameWnd) {
                     printf("Error: Received packet for future frame %u beyond "
                            "frame window (= %zu + %zu). This can happen if "

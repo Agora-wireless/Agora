@@ -13,26 +13,19 @@
 #include "gettime.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
-#include "mkl_dfti.h"
 #include "phy_stats.hpp"
 #include "signalHandler.hpp"
 #include "stats.hpp"
 #include "txrx.hpp"
 #include "utils.h"
 #include <algorithm>
-#include <armadillo>
-#include <emmintrin.h>
-#include <fcntl.h>
-#include <immintrin.h>
 #include <iostream>
-#include <math.h>
 #include <memory>
 #include <pthread.h>
 #include <queue>
 #include <signal.h>
 #include <stdint.h>
 #include <system_error>
-#include <tuple>
 #include <unistd.h>
 #include <vector>
 
@@ -144,6 +137,9 @@ private:
 
     // Worker thread i runs on core base_worker_core_offset + i
     const size_t base_worker_core_offset;
+
+    // Timestamp when the master thread received the first I/Q sample packet
+    size_t rx_start_tsc_ = 0;
 
     Config* config_;
     size_t fft_created_count;
