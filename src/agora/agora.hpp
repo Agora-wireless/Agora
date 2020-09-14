@@ -145,12 +145,10 @@ private:
     // Worker thread i runs on core base_worker_core_offset + i
     const size_t base_worker_core_offset;
 
-    /* lookup table for 16 QAM, real and imag */
-    float** qam16_table_;
     Config* config_;
     size_t fft_created_count;
     int max_equaled_frame = 0;
-    std::unique_ptr<PacketTXRX> receiver_;
+    std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
