@@ -41,8 +41,9 @@ Agora::Agora(Config* cfg)
     phy_stats = new PhyStats(cfg);
 
     /* Initialize TXRX threads */
-    receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
-        get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
+    packet_tx_rx_.reset(
+        new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
+            get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
 
     if (kEnableMac) {
         const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
@@ -93,7 +94,7 @@ void Agora::stop()
     std::cout << "Agora: stopping threads" << std::endl;
     config_->running = false;
     usleep(1000);
-    receiver_.reset();
+    packet_tx_rx_.reset();
 }
 
 void Agora::schedule_antennas(
@@ -196,7 +197,7 @@ void Agora::start()
     auto& cfg = config_;
 
     // Start packet I/O
-    if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
+    if (!packet_tx_rx_->startTXRX(socket_buffer_, socket_buffer_status_,
             socket_buffer_status_size_, stats->frame_start,
             dl_socket_buffer_)) {
         this->stop();
