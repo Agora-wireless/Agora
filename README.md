@@ -159,5 +159,12 @@ traffic with hardware UEs (e.g., Iris devices)
    * Run BS app `./python/bs_app.py`.
    * Run `./build/agora data/bs-ul-hw.json`.
 
+## Acknowledgment
+Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
+
+## Documentation
+Technical details and performance results can be found in
+ * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, November 2020.
+ 
 ## Contact
 Jian Ding (jian.ding@yale.edu)
