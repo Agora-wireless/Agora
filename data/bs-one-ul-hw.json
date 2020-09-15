@@ -9,7 +9,6 @@
  "rxgainB" : 20,
  "txgainB" : 35,
  "rate" : 5e6,
- "symbol_size" : 1,
  "ofdm_tx_zero_prefix" : 160,
  "ofdm_tx_zero_postfix" : 160,
  "ofdm_ca_num" : 512,
