@@ -138,9 +138,6 @@ private:
     // Worker thread i runs on core base_worker_core_offset + i
     const size_t base_worker_core_offset;
 
-    // Timestamp when the master thread received the first I/Q sample packet
-    size_t rx_start_tsc_ = 0;
-
     Config* config_;
     size_t fft_created_count;
     int max_equaled_frame = 0;
@@ -209,8 +206,8 @@ private:
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
     Data_stats demul_stats_;
-    Data_stats decode_stats_; // LDPC-only
-    Data_stats encode_stats_; // LDPC-only
+    Data_stats decode_stats_;
+    Data_stats encode_stats_;
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;
