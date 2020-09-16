@@ -1,5 +1,4 @@
 #include "stats.hpp"
-
 #include <typeinfo>
 
 Stats::Stats(Config* cfg, size_t break_down_num, double freq_ghz)
@@ -107,7 +106,7 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
             = decode_frame_summary.us_avg_threads[i];
     }
 
-    if (kDebugPrintPerFrameDone) {
+    if (kStatsPrintFrameSummary) {
         printf("Frame %zu summary: ", frame_id);
         print_per_frame("FFT", fft_frame_summary);
         print_per_frame("CSI", csi_frame_summary);
@@ -149,7 +148,7 @@ void Stats::update_stats_in_functions_downlink(size_t frame_id)
     const double sum_us_this_frame = csi_us[frame_slot] + ifft_us[frame_slot]
         + zf_us[frame_slot] + precode_us[frame_slot] + encode_us[frame_slot];
 
-    if (kDebugPrintPerFrameDone) {
+    if (kStatsPrintFrameSummary) {
         printf("Frame %zu summary: ", frame_id);
         print_per_frame("CSI", csi_frame_summary);
         print_per_frame("IFFT", ifft_frame_summary);
@@ -442,9 +441,9 @@ void Stats::save_to_file()
     if (config_->downlink_mode) {
         fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
-            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTDone, kZFDone, "
-            "kPrecodeDone, kRXDone, time in CSI, time in FFT, time in ZF, "
-            "time in Demul, time in Decode\n");
+            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
+            "kZFDone, kPrecodeDone, kRXDone, time in CSI, time in FFT, "
+            "time in ZF, time in Demul, time in Decode\n");
 
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
@@ -457,7 +456,7 @@ void Stats::save_to_file()
                 master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
                 master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
                 master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
-                master_get_us_from_ref(TsType::kFFTDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kFFTPilotsDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kZFDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kPrecodeDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kIFFTDone, i, ref_tsc),
@@ -468,9 +467,9 @@ void Stats::save_to_file()
         // Print the header
         fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
-            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTDone, kZFDone, "
-            "kDemulDone, kRXDone, time in CSI, time in FFT, time in ZF, "
-            "time in Demul, time in Decode\n");
+            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
+            "kZFDone, kDemulDone, kRXDone, time in CSI, time in FFT, "
+            "time in ZF, time in Demul, time in Decode\n");
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
             for (size_t j = 0; j < config_->socket_thread_num; j++) {
@@ -484,7 +483,7 @@ void Stats::save_to_file()
                 master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
                 master_get_us_from_ref(TsType::kProcessingStarted, i, ref_tsc),
                 master_get_us_from_ref(TsType::kPilotAllRX, i, ref_tsc),
-                master_get_us_from_ref(TsType::kFFTDone, i, ref_tsc),
+                master_get_us_from_ref(TsType::kFFTPilotsDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kZFDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kDemulDone, i, ref_tsc),
                 master_get_us_from_ref(TsType::kDecodeDone, i, ref_tsc),
