@@ -630,7 +630,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     // in the downlink for the user to estimate the channel
     // due to relative reciprocity calibration,
     // see Argos paper (Mobicom'12)
-    if (dl_symbol_id < config_->DL_PILOT_SYMS) {
+    if (dl_symbol_id < dl_pilot_symbol_perframe) {
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             // divide fft output by pilot data to get CSI estimation
             if (dl_symbol_id == 0) {
@@ -654,8 +654,9 @@ void Phy_UE::doFFT(int tid, size_t tag)
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
         cx_float csi(1, 0);
-        cx_float* dl_iq_f_ptr = (cx_float*)&config_->dl_iq_f[dl_symbol_id
-            - dl_pilot_symbol_perframe][ant_id * config_->OFDM_CA_NUM];
+        cx_float* dl_iq_f_ptr
+            = (cx_float*)&config_
+                  ->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM];
         float evm = 0;
 
         // use pilot subcarriers for phase tracking and correction
@@ -957,9 +958,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_pilot_symbol_perframe = config_->DL_PILOT_SYMS;
     ul_pilot_symbol_perframe = config_->UL_PILOT_SYMS;
     ul_symbol_perframe = config_->ul_data_symbol_num_perframe;
-    dl_symbol_perframe
-        = config_->dl_data_symbol_num_perframe + 1; // plus beacon
-    dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe - 1;
+    dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
+    dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = (kUseArgos && config_->hw_framer)
@@ -970,7 +970,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
         = (ul_symbol_perframe * config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM);
     tx_buffer_size = config_->packet_length * tx_buffer_status_size;
     rx_buffer_status_size
-        = (dl_symbol_perframe * config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM);
+        = (dl_symbol_perframe + config_->beacon_symbol_num_perframe)
+        * config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM;
     rx_buffer_size = config_->packet_length * rx_buffer_status_size;
 }
 
