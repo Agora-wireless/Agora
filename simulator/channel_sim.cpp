@@ -529,6 +529,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         2 * bscfg->sampsPerSymbol * bscfg->BS_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel.st();
+    fmat_dst /= (abs(fmat_dst).max() * 2);
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 
