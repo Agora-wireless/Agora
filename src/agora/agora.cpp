@@ -4,25 +4,22 @@ using namespace std;
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , csi_buffers_(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
-    , ul_zf_matrices_(cfg->BS_ANT_NUM * cfg->UE_NUM)
+    , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
+    , ul_zf_matrices_(
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
     , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
           kMaxModType * cfg->OFDM_DATA_NUM)
     , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
           cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
-    , dl_zf_matrices_(cfg->UE_NUM * cfg->BS_ANT_NUM)
+    , dl_zf_matrices_(
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
     , rx_status_(cfg)
     , demul_status_(cfg)
     , demod_status_(cfg)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
-    printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz, "
-           "master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-           "cores %zu--%zu\n",
-        directory.c_str(), freq_ghz, cfg->core_offset, cfg->core_offset + 1,
-        cfg->core_offset + 1 + cfg->socket_thread_num - 1,
-        base_worker_core_offset,
-        base_worker_core_offset + cfg->worker_thread_num);
+    printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
+        directory.c_str(), freq_ghz);
 
     this->config_ = cfg;
     if (kDebugPrintPilot) {
@@ -96,6 +93,13 @@ Agora::Agora(Config* cfg)
                 cfg->worker_thread_num);
         }
     }
+
+    printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+           "cores %zu--%zu\n",
+        cfg->core_offset, cfg->core_offset + 1,
+        cfg->core_offset + 1 + cfg->socket_thread_num - 1,
+        base_worker_core_offset,
+        base_worker_core_offset + cfg->worker_thread_num);
 }
 
 Agora::~Agora()
@@ -293,12 +297,11 @@ void Agora::start()
 
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
-                if (pkt->frame_id >= cur_frame_id + TASK_BUFFER_FRAME_NUM) {
-                    std::cout
-                        << "Error: Received packet for future frame beyond "
-                           "frame "
-                        << "window. This can happen if Agora is running "
-                        << "slowly, e.g., in debug mode\n";
+                if (pkt->frame_id >= cur_frame_id + kFrameWnd) {
+                    printf("Error: Received packet for future frame %u beyond "
+                           "frame window (= %zu + %zu). This can happen if "
+                           "Agora is running slowly, e.g., in debug mode\n",
+                        pkt->frame_id, cur_frame_id, kFrameWnd);
                     cfg->running = false;
                     break;
                 } else if (pkt->frame_id < cur_frame_id) {
@@ -646,11 +649,6 @@ void Agora::handle_event_fft(size_t tag)
                 if (fft_stats_.last_symbol(frame_id)) {
                     stats->master_set_tsc(TsType::kFFTDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
-                    if (!kUseArgos && frame_id + 1 < config_->frames_to_test) {
-                        // For Simulation: send beacon for next frame
-                        for (size_t i = 0; i < config_->socket_thread_num; i++)
-                            receiver_->send_beacon(i, frame_id + 1);
-                    }
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
                     if (kEnableMac)

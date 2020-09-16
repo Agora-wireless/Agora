@@ -83,13 +83,13 @@ Agora is a high-performance system for massive-MIMO baseband processing.
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator data/bs-sim.json` to generate data files.
-   * In one terminal, run `./build/user data/ue-sim.json` to start clients with
+     `./build/data_generator data/bs-ul-sim.json` to generate data files.
+   * In one terminal, run `./build/user data/ue-ul-sim.json` to start clients with
      uplink configuration.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
-     --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json
-     --ue_conf_file data/ue-sim.json`
-   * In another terminal, run `./build/agora data/bs-sim.json` to start
+     --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-ul-sim.json
+     --ue_conf_file data/ue-ul-sim.json`
+   * In another terminal, run `./build/agora data/bs-ul-sim.json` to start
      Agora with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.
@@ -159,5 +159,12 @@ traffic with hardware UEs (e.g., Iris devices)
    * Run BS app `./python/bs_app.py`.
    * Run `./build/agora data/bs-ul-hw.json`.
 
+## Acknowledgment
+Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
+
+## Documentation
+Technical details and performance results can be found in
+ * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, November 2020.
+ 
 ## Contact
 Jian Ding (jian.ding@yale.edu)

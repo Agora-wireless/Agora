@@ -52,7 +52,7 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    size_t symbol_id_in_buffer = symbol_id - cfg->dl_data_symbol_start;
+    size_t symbol_id_in_buffer = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     int8_t* input_ptr = cfg->get_info_bits(
         raw_data_buffer_, symbol_id_in_buffer, ue_id, cur_cb_id);
 

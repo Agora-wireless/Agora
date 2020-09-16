@@ -174,21 +174,36 @@ void* PacketTXRX::loop_tx_rx(int tid)
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
-    send_beacon(tid, 0); // Send Beacons for the first time to kick off sim
-
+    size_t frame_tsc_delta(
+        cfg->get_frame_duration_sec() * 1e9 * measure_rdtsc_freq());
     int prev_frame_id = -1;
     int radio_id = radio_lo;
+    size_t tx_frame_start = rdtsc();
+    size_t tx_frame_id = 0;
+    size_t slow_start_factor = 10;
+    send_beacon(
+        tid, tx_frame_id++); // Send Beacons for the first time to kick off sim
     while (cfg->running) {
-        Packet* pkt;
-        if (cfg->disable_master) {
-            pkt = recv_relocate(tid, radio_id, rx_offset);
-        } else {
-            if (-1 != dequeue_send(tid))
-                continue;
-            pkt = recv_enqueue(tid, radio_id, rx_offset);
+        if (rdtsc() - tx_frame_start > frame_tsc_delta * slow_start_factor) {
+            tx_frame_start = rdtsc();
+            send_beacon(tid, tx_frame_id++);
+            if (tx_frame_id > 5)
+                slow_start_factor = 5;
+            else if (tx_frame_id > 100)
+                slow_start_factor = 4;
+            else if (tx_frame_id > 200)
+                slow_start_factor = 2;
+            else if (tx_frame_id > 500)
+                slow_start_factor = 1;
         }
-        // receive data
-        if (pkt == NULL) {
+        if (-1 != dequeue_send(tid))
+            continue;
+
+        // Receive data
+        Packet* pkt = cfg->disable_master
+            ? recv_relocate(tid, radio_id, rx_offset)
+            : recv_enqueue(tid, radio_id, rx_offset);
+        if (pkt == nullptr) {
             continue;
         }
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
@@ -399,19 +414,10 @@ int PacketTXRX::dequeue_send(int tid)
     new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret
-        = sendto(socket_[ant_id % cfg->socket_thread_num], cur_buffer_ptr,
-            c->packet_length, 0, (struct sockaddr*)&bs_rru_sockaddr_[tid],
-            sizeof(bs_rru_sockaddr_[tid]));
+    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length, 0,
+        (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+        sizeof(bs_rru_sockaddr_[ant_id]));
     rt_assert(ret > 0, "sendto() failed");
-
-    // After sending all symbols, send beacon for next frame
-    if (frame_id + 1 < c->frames_to_test
-        && data_symbol_idx + c->pilot_symbol_num_perframe
-            == c->DLSymbols[0].back()
-        && ant_id == 0) {
-        send_beacon(tid, frame_id + 1);
-    }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketTX, event.tags[0])),

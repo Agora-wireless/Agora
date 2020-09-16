@@ -21,24 +21,24 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 }
 
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
-    size_t delay, size_t enable_slow_start, std::string server_mac_addr_str,
-    bool create_thread_for_master)
+    size_t frame_duration, size_t enable_slow_start,
+    std::string server_mac_addr_str, bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
     , num_worker_threads_(num_worker_threads_)
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
-    , delay(delay)
-    , ticks_all(delay * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_5(500000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_100(150000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_200(20000 * ticks_per_usec / cfg->symbol_num_perframe)
-    , ticks_500(10000 * ticks_per_usec / cfg->symbol_num_perframe)
+    , frame_duration_(frame_duration)
+    , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_1(
+          200000 /* 200 ms */ * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_wnd_2(
+          15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
-        cfg->bs_server_addr.c_str(), delay / 1000.0,
+        cfg->bs_server_addr.c_str(), frame_duration / 1000.0,
         enable_slow_start == 1 ? "yes" : "no");
 
     _unused(server_mac_addr_str);
@@ -70,9 +70,9 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &sender_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
@@ -161,7 +161,6 @@ void* Sender::master_thread(int)
             packet_count_per_frame[comp_frame_slot]++;
 
             // Add inter-symbol delay
-
             delay_ticks(tick_start,
                 enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
                                        : ticks_all);
@@ -199,7 +198,7 @@ void* Sender::master_thread(int)
                 tick_start = rdtsc();
                 // Add delay for beacon at the beginning of a frame
                 delay_ticks(tick_start,
-                    enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
+                    enable_slow_start == 1 ? get_ticks_for_frame(next_frame_id)
                                            : ticks_all);
                 tick_start = rdtsc();
             } else {
@@ -273,8 +272,9 @@ void* Sender::worker_thread(int tid)
         Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
         rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, sender_addr, server_addr, cfg->bs_rru_port,
-            cfg->bs_server_port + tag.ant_id, cfg->packet_length);
+            server_mac_addr, bs_rru_addr, bs_server_addr,
+            cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+            cfg->packet_length);
         pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
 #endif
 
@@ -359,14 +359,10 @@ void* Sender::worker_thread(int tid)
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id)
 {
-    if (frame_id <= 5)
-        return ticks_5;
-    else if (frame_id < 100)
-        return ticks_100;
-    else if (frame_id < 200)
-        return ticks_200;
-    else if (frame_id < 500)
-        return ticks_500;
+    if (frame_id < kFrameWnd)
+        return ticks_wnd_1;
+    else if (frame_id < kFrameWnd * 4)
+        return ticks_wnd_2;
     else
         return ticks_all;
 }

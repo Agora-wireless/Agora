@@ -74,6 +74,9 @@ public:
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames;
 
+    // pilotSymbols[i] contains indices of beacon symbols in frames[i]
+    std::vector<std::vector<size_t>> beaconSymbols;
+
     // pilotSymbols[i] contains indices of pilot symbols in frames[i]
     std::vector<std::vector<size_t>> pilotSymbols;
 
@@ -233,6 +236,9 @@ public:
     // Total number of symbols in a frame, including all types of symbols (e.g.,
     // pilot symbols, uplink and downlink data symbols, and calibration symbols)
     size_t symbol_num_perframe;
+
+    // Total number of beacon symbols in a frame
+    size_t beacon_symbol_num_perframe;
 
     // Total number of pilot symbols in a frame
     size_t pilot_symbol_num_perframe;
