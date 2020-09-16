@@ -9,7 +9,8 @@ DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
 DEFINE_string(conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
     "Config filename");
-DEFINE_uint64(enable_slow_start, 1, "Send frames slowly at first.");
+DEFINE_uint64(enable_slow_start, 1,
+    "Send frames slower than the specified frame duration during warmup");
 
 int main(int argc, char* argv[])
 {

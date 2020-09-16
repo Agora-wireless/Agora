@@ -34,13 +34,13 @@ enum class TsType : size_t {
     kProcessingStarted, // Signal processing started on a pilot symbol
     kPilotAllRX, // All pilot packets received
     kRCAllRX, // All Reciprocity Calibration Symbols received
-    kFFTDone, // Completed FFT for this frame
+    kFFTPilotsDone, // Completed FFT for all pilots in this frame
     kZFDone, // Completed zeroforcing for this frame
     kDemulDone, // Completed demodulation for this frame
     kRXDone, // All packets of a frame received
     kRCDone, // Recirocity Calibration Computation done
     kEncodeDone,
-    kDecodeDone,
+    kDecodeDone, // Completed all LDPC decoding for this frame
     kPrecodeDone,
     kIFFTDone,
     kTXProcessedFirst,
@@ -50,6 +50,8 @@ static constexpr size_t kNumTimestampTypes
     = static_cast<size_t>(TsType::kTXDone) + 1;
 
 class Stats {
+    static constexpr bool kStatsPrintFrameSummary = false;
+
 public:
     Stats(Config* cfg, size_t break_down_num, double freq_ghz);
     ~Stats();
@@ -103,6 +105,16 @@ public:
     {
         return cycles_to_us(
             master_get_tsc(timestamp_type, frame_id) - reference_tsc, freq_ghz);
+    }
+
+    /// From the master, for a frame ID, get the millisecond difference
+    /// between two timestamp types
+    double master_get_delta_ms(
+        TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id)
+    {
+        return cycles_to_ms(master_get_tsc(timestamp_type_1, frame_id)
+                - master_get_tsc(timestamp_type_2, frame_id),
+            freq_ghz);
     }
 
     /// From the master, for a frame ID, get the microsecond difference
