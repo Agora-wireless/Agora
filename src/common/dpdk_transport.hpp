@@ -43,11 +43,13 @@ public:
 
     static int nic_init(
         uint16_t port, struct rte_mempool* mbuf_pool, int thread_num);
-    static struct rte_flow* generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
-        uint32_t src_ip, uint32_t src_mask, uint32_t dest_ip,
-        uint32_t dest_mask, uint16_t src_port, uint16_t src_port_mask,
-        uint16_t dst_port, uint16_t dst_port_mask,
-        struct rte_flow_error* error);
+
+    // Steer the flow [src_ip, dest_ip, src_port, dst_port] arriving on
+    // [port_id] to RX queue [rx_q]
+    static void install_flow_rule(uint16_t port_id, uint16_t rx_q,
+        uint32_t src_ip, uint32_t dest_ip, uint16_t src_port,
+        uint16_t dst_port);
+
     static void fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
     static void print_pkt(int src_ip, int dst_ip, uint16_t src_port,
         uint16_t dst_port, int len, int tid);
