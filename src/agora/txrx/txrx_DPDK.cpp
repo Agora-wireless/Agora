@@ -16,29 +16,25 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
 
-    const uint16_t portid = 0;
-    if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
-        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+    const uint16_t port_id = 0; // The DPDK port ID
+    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
-    rte_flow_error error;
-    rte_flow* flow;
-    /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
-        flow = DpdkTransport::generate_ipv4_flow(0, i, bs_rru_addr, FULL_MASK,
-            bs_server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff,
-            &error);
-        printf("Adding rule for src port: %zu, dst port: %zu, queue: %zu\n",
+
+        printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+               "dst port: %zu, queue: %zu\n",
+            cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
             cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
-        if (!flow)
-            rte_exit(
-                EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
+        DpdkTransport::install_flow_rule(
+            port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
     }
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
