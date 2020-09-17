@@ -17,7 +17,9 @@
 #include <string.h>
 #include <vector>
 
-#define USE_MKL_JIT 0 // JIT for cgemm is only available after MKL 2019 update 3
+// Just-in-time optimization for MKL cgemm is available only after MKL 2019
+// update 3. Disable this on systems with an older MKL version.
+#define USE_MKL_JIT 1
 
 using namespace arma;
 class DoDemul : public Doer {
