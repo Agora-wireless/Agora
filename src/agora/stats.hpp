@@ -15,7 +15,8 @@ static constexpr size_t kMaxStatBreakdown = 4;
 struct DurationStat {
     size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
     size_t task_count;
-    DurationStat() { memset(this, 0, sizeof(DurationStat)); }
+    DurationStat() { reset(); }
+    void reset() { memset(this, 0, sizeof(DurationStat)); }
 };
 
 // Temporary summary statistics assembled from per-thread runtime stats
