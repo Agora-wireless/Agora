@@ -39,14 +39,18 @@ class Sender {
 
 public:
     /**
-     * @brief Create and optionally start a Sender that sends IQ packets to a
-     * server with MAC address [server_mac_addr_str]
+     * @brief Create and optionally start a Sender that sends I/Q sample packets
+     * to the base station server
      *
-     * @param config The Agora config @param num_worker_threads Number of
-     * worker threads sending packets 
+     * @param config The Agora config
      *
-     * @param core_offset The master thread runs on core [core_offset]. Worker
-     * thread #i runs on core [core_offset + i]
+     * @param num_worker_threads Number of threads in the Sender sending
+     * packets. In DPDK mode, worker thread #i senders packets to
+     * [IP: bs_server_addr, UDP port: bs_server_port + i] from source
+     * [IP: bs_rru_addr, UDP port: bs_rru_port + i].
+     *
+     * @param core_offset The Sender's master thread runs on core [core_offset].
+     * The Sender's worker thread #i runs on core [core_offset + i]
      *
      * @param frame_duration The TTI slot duration
      *
@@ -137,8 +141,8 @@ private:
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
-    uint32_t bs_rru_addr; // IPv4 address of this data sender
-    uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
+    uint32_t bs_rru_addr; // Parsed IPv4 address of this data sender
+    uint32_t bs_server_addr; // Parsed IPv4 address of the remote Agora server
     rte_ether_addr sender_mac_addr; // MAC address of this data sender
 
     // MAC address of the remote target Agora server

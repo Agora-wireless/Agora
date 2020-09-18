@@ -1,7 +1,11 @@
 /**
  * @file txrx_DPDK.cpp
- * @brief Implementation of PacketTXRX datapath functions for communicating 
- * with DPDK
+ *
+ * @brief DPDK-based PacketTXRX datapath functions
+ *
+ * This uses [socket_thread_num] threads to receive packets over the fronthaul.
+ * Thread #i receives packets from [IP: bs_rru_addr, UDP port: bs_rru_port + i],
+ * destined to [IP: bs_server_addr, UDP port: bs_server_port + i].
  */
 
 #include "txrx.hpp"
