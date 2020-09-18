@@ -8,6 +8,9 @@ bool keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
 std::atomic<size_t> num_workers_ready_atomic;
 
+// If true, send all symbols within a frame without inter-symbol delay
+static constexpr bool kDisableInterSymbolPacing = false;
+
 void interrupt_handler(int)
 {
     std::cout << "Will exit..." << std::endl;
@@ -155,14 +158,15 @@ void* Sender::master_thread(int)
             packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
             packet_count_per_frame[comp_frame_slot]++;
 
-            // Add inter-symbol delay
-            delay_ticks(tick_start,
-                enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
-                                       : ticks_all);
+            if (!kDisableInterSymbolPacing) {
+                // Add inter-symbol delay
+                delay_ticks(tick_start,
+                    enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
+                                           : ticks_all);
+                delay_ticks(tick_start, ticks_all);
+                tick_start = rdtsc();
+            }
 
-            tick_start = rdtsc();
-
-            const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
@@ -185,20 +189,21 @@ void* Sender::master_thread(int)
                         delay_ticks(tick_start,
                             cfg->data_symbol_num_perframe * ticks_all);
                     }
+                } else {
+                    if (kDisableInterSymbolPacing) {
+                        // Add delay for the entire frame
+                        delay_ticks(
+                            tick_start, cfg->symbol_num_perframe * ticks_all);
+                        tick_start = rdtsc();
+                    }
                 }
 
                 frame_start[next_frame_id % kNumStatsFrames] = get_time();
-
-                tick_start = rdtsc();
-                // Add delay for beacon at the beginning of a frame
-                delay_ticks(tick_start,
-                    enable_slow_start == 1 ? get_ticks_for_frame(next_frame_id)
-                                           : ticks_all);
-                tick_start = rdtsc();
             } else {
                 next_frame_id = ctag.frame_id;
             }
 
+            const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
