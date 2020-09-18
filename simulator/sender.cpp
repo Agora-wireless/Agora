@@ -45,10 +45,6 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         enable_slow_start == 1 ? "yes" : "no");
 
     _unused(server_mac_addr_str);
-    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
-        packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
-    }
-    memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
@@ -89,13 +85,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     num_workers_ready_atomic = 0;
 }
 
-Sender::~Sender()
-{
-    iq_data_short_.free();
-    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
-        free(packet_count_per_symbol[i]);
-    }
-}
+Sender::~Sender() { iq_data_short_.free(); }
 
 void Sender::startTX()
 {
@@ -151,12 +141,12 @@ void* Sender::master_thread(int)
 
         const size_t comp_frame_slot = ctag.frame_id % SOCKET_BUFFER_FRAME_NUM;
 
-        packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
-        if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
+        n_pkts_per_symbol[comp_frame_slot][ctag.symbol_id]++;
+        if (n_pkts_per_symbol[comp_frame_slot][ctag.symbol_id]
             == cfg->BS_ANT_NUM) {
 
-            packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
-            packet_count_per_frame[comp_frame_slot]++;
+            n_pkts_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
+            n_syms_per_frame[comp_frame_slot]++;
 
             if (!kDisableInterSymbolPacing) {
                 // Add inter-symbol delay
@@ -168,7 +158,7 @@ void* Sender::master_thread(int)
             }
 
             size_t next_frame_id;
-            if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
+            if (n_syms_per_frame[comp_frame_slot] == max_symbol_id) {
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
                     printf("Sender: Transmitted frame %u in %.1f ms\n",
                         ctag.frame_id, (get_time() - start_time) / 1000.0);
@@ -178,7 +168,7 @@ void* Sender::master_thread(int)
                 if (next_frame_id == cfg->frames_to_test)
                     break;
                 frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
-                packet_count_per_frame[comp_frame_slot] = 0;
+                n_syms_per_frame[comp_frame_slot] = 0;
 
                 // Add end-of-frame delay
                 if (cfg->downlink_mode) {
