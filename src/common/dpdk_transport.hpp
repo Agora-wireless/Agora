@@ -1,5 +1,4 @@
-#ifndef DPDK_TRANSPORT
-#define DPDK_TRANSPORT
+#pragma once
 
 #include <inttypes.h>
 #include <rte_byteorder.h>
@@ -25,8 +24,6 @@
 #define MBUF_CACHE_SIZE 128
 
 #define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB
-#define EMPTY_MASK 0x0
-#define FULL_MASK 0xffffffff
 /// Maximum number of packets received in rx_burst
 static constexpr size_t kRxBatchSize = 16;
 static constexpr size_t kTxBatchSize = 1;
@@ -68,5 +65,3 @@ public:
     static void dpdk_init(uint16_t core_offset, size_t thread_num);
     static rte_mempool* create_mempool();
 };
-
-#endif

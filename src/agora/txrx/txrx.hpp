@@ -55,7 +55,9 @@ public:
     ~PacketTXRX();
 
 #ifdef USE_DPDK
-    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, size_t& rx_offset);
+    // At thread [tid], receive packets from the NIC and enqueue them to the
+    // master thread
+    uint16_t dpdk_recv(int tid, size_t& prev_frame_id, size_t& rx_offset);
 #endif
 
     /**
@@ -75,7 +77,7 @@ public:
     void send_beacon(int tid, size_t frame_id);
 
 private:
-    void* loop_tx_rx(int tid); // The TX/RX event loop
+    void* loop_tx_rx(int tid); // The thread function for thread [tid]
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
