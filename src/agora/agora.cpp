@@ -809,22 +809,22 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
         return;
     switch (print_type) {
     case (PrintType::kPacketRXPilots):
-        printf("Main [frame %zu + %.1f ms]: Received all pilots\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Received all pilots\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kPilotAllRX, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketRX): {
-        printf("Main [frame %zu + %.1f ms]: Received all packets\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Received all packets\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kRXDone, TsType::kPilotRX, frame_id));
     } break;
     case (PrintType::kFFTPilots):
-        printf("Main [frame %zu + %.1f ms]: FFT-ed all pilots\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kFFTPilotsDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kFFTCal):
-        printf("Main [frame %zu + %.1f ms]: FFT-ed all calibration symbols\n",
+        printf("Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
             frame_id,
             stats->master_get_us_since(TsType::kRCAllRX, frame_id) / 1000.0);
         break;
@@ -836,17 +836,17 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
                 TsType::kRCDone, TsType::kRCAllRX, frame_id));
         break;
     case (PrintType::kZF):
-        printf("Main [frame %zu + %.1f ms]: Completed zero-forcing\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kZFDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kDemul):
-        printf("Main [frame %zu + %.1f ms]: Completed demodulation\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Completed demodulation\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kDemulDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kDecode):
-        printf("Main [frame %zu + %.1f ms]: Completed LDPC decoding\n",
+        printf("Main [frame %zu + %.2f ms]: Completed LDPC decoding\n",
             frame_id,
             stats->master_get_delta_ms(
                 TsType::kDecodeDone, TsType::kPilotRX, frame_id));
