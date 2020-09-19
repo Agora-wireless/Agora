@@ -201,18 +201,22 @@ private:
 
     Table<complex_float> ue_spec_pilot_buffer_;
 
+    //Counters related to various modules
+    FrameCounters fft_counters_;
+    FrameCounters zf_counters_;
+    FrameCounters demul_counters_;
+    FrameCounters decode_counters_;
+    FrameCounters encode_counters_;
+    FrameCounters precode_counters_;
+    FrameCounters ifft_counters_;
+    FrameCounters tx_counters_;
+    FrameCounters tomac_counters_;
+    FrameCounters frommac_counters_;
+    FrameCounters rc_counters_;
     RxCounters rx_counters_;
-    FFT_stats fft_stats_;
-    ZF_stats zf_stats_;
-    RC_stats rc_stats_;
-    Data_stats demul_stats_;
-    Data_stats decode_stats_;
-    Data_stats encode_stats_;
-    Data_stats precode_stats_;
-    Data_stats ifft_stats_;
-    Data_stats tx_stats_;
-    Data_stats tomac_stats_;
-    Data_stats frommac_stats_;
+    size_t zf_last_frame;
+    size_t rc_last_frame=SIZE_MAX;
+    std::vector<size_t> cur_frame_for_symbol; // is the current frame for the symbol whose index in the frame's uplink symbols is i
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
