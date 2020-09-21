@@ -78,11 +78,11 @@
 
   * Comments
     ([link](https://google.github.io/styleguide/cppguide.html#Comments)):
-    * Use proper grammar.
+    * Use proper grammar and capitalization in comment text.
+    * Comments should fit in 80 characters.
     * Add comments for non-obvious blocks of code.
-    * Avoid commented-out block of code in committed files. For example, if the
-      block of code is needed for debugging, wrap it inside a boolean flag
-      (e.g., `kVerbose`).
+    * Avoid commented-out blocks of code. For example, if a block of code is
+      needed for debugging, wrap it inside a boolean flag (e.g., `kVerbose`).
 
   * Use `size_t` as the integer type unless negative integers are needed.
 
