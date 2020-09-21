@@ -14,7 +14,6 @@
 #include "gettime.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
-#include "mkl_dfti.h"
 #include "phy_stats.hpp"
 #include "shared_counters.hpp"
 #include "signalHandler.hpp"
@@ -22,19 +21,13 @@
 #include "txrx.hpp"
 #include "utils.h"
 #include <algorithm>
-#include <armadillo>
-#include <emmintrin.h>
-#include <fcntl.h>
-#include <immintrin.h>
 #include <iostream>
-#include <math.h>
 #include <memory>
 #include <pthread.h>
 #include <queue>
 #include <signal.h>
 #include <stdint.h>
 #include <system_error>
-#include <tuple>
 #include <unistd.h>
 #include <vector>
 
@@ -149,12 +142,10 @@ private:
     // Worker thread i runs on core base_worker_core_offset + i
     const size_t base_worker_core_offset;
 
-    /* lookup table for 16 QAM, real and imag */
-    float** qam16_table_;
     Config* config_;
     size_t fft_created_count;
     int max_equaled_frame = 0;
-    std::unique_ptr<PacketTXRX> receiver_;
+    std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
@@ -223,8 +214,8 @@ private:
     ZF_stats zf_stats_;
     RC_stats rc_stats_;
     Data_stats demul_stats_;
-    Data_stats decode_stats_; // LDPC-only
-    Data_stats encode_stats_; // LDPC-only
+    Data_stats decode_stats_;
+    Data_stats encode_stats_;
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;

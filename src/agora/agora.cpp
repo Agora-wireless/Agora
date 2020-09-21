@@ -45,10 +45,10 @@ Agora::Agora(Config* cfg)
 
     /* Initialize TXRX threads */
     if (config_->disable_master) {
-        receiver_.reset(new PacketTXRX(cfg, cfg->core_offset + 1, &rx_status_,
-            &demul_status_, &demod_status_));
+        packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + 1,
+            &rx_status_, &demul_status_, &demod_status_));
     } else {
-        receiver_.reset(
+        packet_tx_rx_.reset(
             new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
                 get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
     }
@@ -126,7 +126,7 @@ void Agora::stop()
     std::cout << "Agora: stopping threads" << std::endl;
     config_->running = false;
     usleep(1000);
-    receiver_.reset();
+    packet_tx_rx_.reset();
 }
 
 void Agora::schedule_antennas(
@@ -229,7 +229,7 @@ void Agora::start()
     auto& cfg = config_;
 
     // Start packet I/O
-    if (!receiver_->startTXRX(socket_buffer_, socket_buffer_status_,
+    if (!packet_tx_rx_->startTXRX(socket_buffer_, socket_buffer_status_,
             socket_buffer_status_size_, stats->frame_start, dl_socket_buffer_,
             &demod_buffers_, &demod_soft_buffer_to_decode_)) {
         this->stop();
@@ -294,9 +294,9 @@ void Agora::start()
             case EventType::kPacketRX: {
                 size_t socket_thread_id = rx_tag_t(event.tags[0]).tid;
                 size_t sock_buf_offset = rx_tag_t(event.tags[0]).offset;
-
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
+
                 if (pkt->frame_id >= cur_frame_id + kFrameWnd) {
                     printf("Error: Received packet for future frame %u beyond "
                            "frame window (= %zu + %zu). This can happen if "
@@ -647,7 +647,7 @@ void Agora::handle_event_fft(size_t tag)
                        && rc_stats_.last_frame == frame_id)) {
                 /* If CSI of all UEs is ready, schedule ZF/prediction */
                 if (fft_stats_.last_symbol(frame_id)) {
-                    stats->master_set_tsc(TsType::kFFTDone, frame_id);
+                    stats->master_set_tsc(TsType::kFFTPilotsDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
                     if (kPrintPhyStats)
                         phy_stats->print_snr_stats(frame_id);
@@ -902,41 +902,25 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
     if (!kDebugPrintPerFrameDone)
         return;
     switch (print_type) {
-    case (PrintType::kPacketRX): {
-        size_t prev_frame_slot = (frame_id - 1) % TASK_BUFFER_FRAME_NUM;
-        printf("Main thread: received all packets in frame: %zu in %.2f us."
-               " Demul: %zu done. RX in prev frame: %zu of %zu.\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kRXDone, TsType::kPilotRX, frame_id),
-            demul_stats_.get_symbol_count(frame_id),
-            rx_counters_.num_pkts[prev_frame_slot],
-            rx_counters_.num_pkts_per_frame);
-    } break;
     case (PrintType::kPacketRXPilots):
-        printf("Main thread: received all pilots in frame: %zu  in %.2f us\n",
-            frame_id,
-            stats->master_get_delta_us(
+        printf("Main [frame %zu + %.2f ms]: Received all pilots\n", frame_id,
+            stats->master_get_delta_ms(
                 TsType::kPilotAllRX, TsType::kPilotRX, frame_id));
         break;
+    case (PrintType::kPacketRX): {
+        printf("Main [frame %zu + %.2f ms]: Received all packets\n", frame_id,
+            stats->master_get_delta_ms(
+                TsType::kRXDone, TsType::kPilotRX, frame_id));
+    } break;
     case (PrintType::kFFTPilots):
-        printf("Main thread: pilot frame: %zu, finished FFT for all pilot "
-               "symbols in %.2f us, pilot all received: %.2f\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kFFTDone, TsType::kPilotRX, frame_id),
-            stats->master_get_delta_us(
-                TsType::kPilotAllRX, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kFFTData):
-        printf("Main thread: data frame: %zu, finished FFT for all data "
-               "symbols in %.2f us\n",
-            frame_id, stats->master_get_us_since(TsType::kPilotRX, frame_id));
+        printf("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
+            stats->master_get_delta_ms(
+                TsType::kFFTPilotsDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kFFTCal):
-        printf("Main thread: cal frame: %zu, finished FFT for all cal "
-               "symbols in %.2f us\n",
-            frame_id, stats->master_get_us_since(TsType::kRCAllRX, frame_id));
+        printf("Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
+            frame_id,
+            stats->master_get_us_since(TsType::kRCAllRX, frame_id) / 1000.0);
         break;
     case (PrintType::kRC):
         printf("Main thread: Reciprocity Calculation done frame: %zu in "
@@ -946,31 +930,19 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
                 TsType::kRCDone, TsType::kRCAllRX, frame_id));
         break;
     case (PrintType::kZF):
-        printf("Main thread: ZF done frame: %zu, in %.2f us since pilot FFT "
-               "done, total: %.2f us, FFT queue %zu\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kZFDone, TsType::kFFTDone, frame_id),
-            stats->master_get_delta_us(
-                TsType::kZFDone, TsType::kPilotRX, frame_id),
-            get_conq(EventType::kIFFT)->size_approx());
+        printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n", frame_id,
+            stats->master_get_delta_ms(
+                TsType::kZFDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kDemul):
-        printf("Main thread: Demodulation done frame: %zu (%zu UL symbols) "
-               "in %.2f us since ZF done, total %.2f us\n",
-            frame_id, config_->ul_data_symbol_num_perframe,
-            stats->master_get_delta_us(
-                TsType::kDemulDone, TsType::kZFDone, frame_id),
-            stats->master_get_delta_us(
+        printf("Main [frame %zu + %.2f ms]: Completed demodulation\n", frame_id,
+            stats->master_get_delta_ms(
                 TsType::kDemulDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kDecode):
-        printf("Main thread: Decoding done frame: %zu (%zu UL symbols) in "
-               "%.2f us since ZF done, total %.2f us\n",
-            frame_id, config_->ul_data_symbol_num_perframe,
-            stats->master_get_delta_us(
-                TsType::kDecodeDone, TsType::kZFDone, frame_id),
-            stats->master_get_delta_us(
+        printf("Main [frame %zu + %.2f ms]: Completed LDPC decoding\n",
+            frame_id,
+            stats->master_get_delta_ms(
                 TsType::kDecodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kEncode):

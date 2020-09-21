@@ -74,23 +74,23 @@ public:
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames;
 
-    // pilotSymbols[i] contains indices of beacon symbols in frames[i]
+    // beaconSymbols[i] contains IDs of beacon symbols in frames[i]
     std::vector<std::vector<size_t>> beaconSymbols;
 
-    // pilotSymbols[i] contains indices of pilot symbols in frames[i]
+    // pilotSymbols[i] contains IDs of pilot symbols in frames[i]
     std::vector<std::vector<size_t>> pilotSymbols;
 
-    // ULSymbols[i] contains indices of uplink data symbols in frames[i]
+    // ULSymbols[i] contains IDs of uplink data symbols in frames[i]
     std::vector<std::vector<size_t>> ULSymbols;
 
-    // DLSymbols[i] contains indices of downlink data symbols in frames[i]
+    // DLSymbols[i] contains IDs of downlink data symbols in frames[i]
     std::vector<std::vector<size_t>> DLSymbols;
 
-    // ULCalSymbols[i] contains indices of uplink calibration symbols in
+    // ULCalSymbols[i] contains IDs of uplink calibration symbols in
     // frames[i]
     std::vector<std::vector<size_t>> ULCalSymbols;
 
-    // ULCalSymbols[i] contains indices of downlink calibration symbols in
+    // DLCalSymbols[i] contains IDs of downlink calibration symbols in
     // frames[i]
     std::vector<std::vector<size_t>> DLCalSymbols;
 

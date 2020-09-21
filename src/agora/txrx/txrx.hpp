@@ -32,8 +32,6 @@
 #include "dpdk_transport.hpp"
 #endif
 
-typedef unsigned short ushort;
-
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
  *
@@ -51,9 +49,7 @@ public:
     PacketTXRX(Config* cfg, size_t in_core_offset = 1,
         RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr,
         DecodeStatus* decode_status = nullptr);
-    /**
-     * queue_message: message queue to communicate with main thread
-     */
+
     PacketTXRX(Config* cfg, size_t core_offset,
         moodycamel::ConcurrentQueue<Event_data>* queue_message,
         moodycamel::ConcurrentQueue<Event_data>* queue_task,
@@ -62,18 +58,20 @@ public:
     ~PacketTXRX();
 
 #ifdef USE_DPDK
-    // uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id, size_t& rx_offset);
-    uint16_t dpdk_recv_enqueue(int tid, int& prev_frame_id);
+    // At thread [tid], receive packets from the NIC and enqueue them to the
+    // master thread
+    uint16_t dpdk_recv(int tid, size_t& prev_frame_id, size_t& rx_offset);
 #endif
 
     /**
-     * called in main threads to start the socket threads
-     * buffer: ring buffer to save packets
-     * buffer_status: record the status of each memory block (0: empty, 1:
-     * full) 
-     * packet_num_in_buffer : number of packets the ring buffer could hold
-     * core_offset: attach socket threads to {core_offset, ..., core_offset +
-     * socket_thread_num - 1}
+     * @brief Start the network I/O threads
+     *
+     * @param buffer Ring buffer to save packets
+     * @param buffer_status Status of each packet buffer (0: empty, 1: full)
+     * @packet_num_in_buffer Total number of buffers in an RX ring
+     *
+     * @return True on successfully starting the network I/O threads, false
+     * otherwise
      */
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
@@ -86,8 +84,9 @@ public:
     void send_beacon(int tid, size_t frame_id);
 
 private:
-    void* loop_tx_rx(int tid); // The TX/RX event loop
+    void* loop_tx_rx(int tid); // The thread function for thread [tid]
     void* demod_loop_tx_rx(int tid);
+
     int dequeue_send(int tid);
     int poll_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
@@ -102,7 +101,11 @@ private:
     struct Packet* recv_enqueue_argos(int tid, int radio_id, int rx_offset);
 
     Config* cfg;
+
+    // The network I/O threads run on cores
+    // {core_offset, ..., core_offset + socket_thread_num - 1}
     const size_t core_offset;
+
     const size_t socket_thread_num;
     Table<char>* buffer_;
     Table<int>* buffer_status_;
@@ -111,7 +114,6 @@ private:
     size_t packet_num_in_buffer_;
     char* tx_buffer_;
     Table<size_t>* frame_start_;
-    // pointer of message_queue_
     moodycamel::ConcurrentQueue<Event_data>* message_queue_;
     moodycamel::ConcurrentQueue<Event_data>* task_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
