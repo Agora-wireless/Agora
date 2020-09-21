@@ -284,7 +284,6 @@ public:
     }
 };
 
-
 /**
 //  * This class stores the metrics coresponding to a Frame.
 //  * Specifically, it contains a) the number of symbols per frame and b) the number of tasks per symbol, per frame.
@@ -294,21 +293,22 @@ public:
     size_t max_symbol_count;
     size_t max_task_count;
 
-    void init(int max_symbol_count, int max_task_count=-1, int max_data_symbol=-1)
+    void init(
+        int max_symbol_count, int max_task_count = -1, int max_data_symbol = -1)
     {
         this->max_symbol_count = max_symbol_count;
         this->max_task_count = max_task_count;
         symbol_count.fill(0);
         //define task counters if #tasks is > 0
-        if(max_task_count>0){
-            if(max_data_symbol<=0)
-                throw "the max data symbol should be greater than zero for a positive max task count.";
-            
+        if (max_task_count > 0) {
+            if (max_data_symbol <= 0)
+                throw "the max data symbol should be greater than zero for a "
+                      "positive max task count.";
+
             for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
                 task_count[i] = new size_t[max_data_symbol]();
         }
     }
-
 
     void fini()
     {
@@ -359,11 +359,10 @@ public:
 
 private:
     //array of tasks, per symbol, per frame. This is a moving window over frames.
-    std::array<size_t* , TASK_BUFFER_FRAME_NUM> task_count;
+    std::array<size_t*, TASK_BUFFER_FRAME_NUM> task_count;
 
     //array of symbols per frame. This is a moving window
     std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_count;
 };
-
 
 #endif

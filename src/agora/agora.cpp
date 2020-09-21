@@ -343,7 +343,8 @@ void Agora::start()
                     }
 
                     demul_count++;
-                    if (demul_count == demul_counters_.max_symbol_count * 9000) {
+                    if (demul_count
+                        == demul_counters_.max_symbol_count * 9000) {
                         demul_count = 0;
                         double diff = get_time_us() - demul_begin;
                         int samples_num_per_UE = cfg->OFDM_DATA_NUM
@@ -616,7 +617,7 @@ void Agora::handle_event_fft(size_t tag)
     } else if (sym_type == SymbolType::kCalDL
         or sym_type == SymbolType::kCalUL) {
         print_per_symbol_done(PrintType::kFFTCal, frame_id, symbol_id);
-        if(rc_counters_.last_symbol(frame_id)){
+        if (rc_counters_.last_symbol(frame_id)) {
             print_per_frame_done(PrintType::kFFTCal, frame_id);
             stats->master_set_tsc(TsType::kRCDone, frame_id);
             rc_last_frame = frame_id;
@@ -927,7 +928,9 @@ void Agora::print_per_symbol_done(
     case (PrintType::kRC):
         printf("Main thread: cal symbol FFT done frame: %zu, symbol: %zu, "
                "num symbols done: %zu\n",
-            frame_id, symbol_id, rc_counters_.get_symbol_count(frame_id)); //TODO: check this is correct, the original one does not do %TASK_BUFFER_FRAME_NUM
+            frame_id, symbol_id,
+            rc_counters_.get_symbol_count(
+                frame_id)); //TODO: check this is correct, the original one does not do %TASK_BUFFER_FRAME_NUM
         break;
     case (PrintType::kDemul):
         printf("Main thread: Demodulation done frame %zu, symbol: %zu, num "
@@ -1080,16 +1083,17 @@ void Agora::initialize_uplink_buffers()
         cfg->symbol_num_perframe);
     cur_frame_for_symbol
         = std::vector<size_t>(cfg->ul_data_symbol_num_perframe, SIZE_MAX);
-    
-    rc_counters_.init(cfg->BS_ANT_NUM); 
+
+    rc_counters_.init(cfg->BS_ANT_NUM);
 
     zf_counters_.init(config_->zf_events_per_symbol);
 
     demul_counters_.init(cfg->ul_data_symbol_num_perframe,
         config_->demul_events_per_symbol, cfg->data_symbol_num_perframe);
 
-    decode_counters_.init(cfg->ul_data_symbol_num_perframe, 
-        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM, cfg->data_symbol_num_perframe);
+    decode_counters_.init(cfg->ul_data_symbol_num_perframe,
+        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
+        cfg->data_symbol_num_perframe);
 
     tomac_counters_.init(cfg->ul_data_symbol_num_perframe, cfg->UE_NUM,
         cfg->data_symbol_num_perframe);
@@ -1125,8 +1129,9 @@ void Agora::initialize_downlink_buffers()
     frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->UE_NUM,
         cfg->data_symbol_num_perframe);
     encode_counters_.init(cfg->dl_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM, cfg->data_symbol_num_perframe);
-    precode_counters_.init(cfg->dl_data_symbol_num_perframe, 
+        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
+        cfg->data_symbol_num_perframe);
+    precode_counters_.init(cfg->dl_data_symbol_num_perframe,
         config_->demul_events_per_symbol, cfg->data_symbol_num_perframe);
     ifft_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM,
         cfg->data_symbol_num_perframe);
