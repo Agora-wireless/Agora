@@ -20,13 +20,13 @@ public:
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
     {
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+        for (size_t i = 0; i < kFrameWnd; i++) {
             num_pkts_[i] = 0;
         }
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+        for (size_t i = 0; i < kFrameWnd; i++) {
             num_pilot_pkts_[i] = 0;
         }
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+        for (size_t i = 0; i < kFrameWnd; i++) {
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[i][j] = 0;
             }
@@ -36,14 +36,14 @@ public:
     // When receive a new packet, record it here
     bool add_new_packet(size_t frame_id, size_t symbol_id)
     {
-        if (frame_id >= cur_frame_ + TASK_BUFFER_FRAME_NUM) {
+        if (frame_id >= cur_frame_ + kFrameWnd) {
             std::cout << "Error: Received packet for future frame beyond "
                          "frame "
-                      << "window. This can happen if Millipede is running "
+                      << "window. This can happen if Agora is running "
                       << "slowly, e.g., in debug mode\n";
             return false;
         }
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t frame_slot = frame_id % kFrameWnd;
         num_pkts_[frame_slot]++;
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
@@ -72,22 +72,20 @@ public:
     // used by CSI
     bool received_all_pilots(size_t frame_id)
     {
-        if (frame_id < cur_frame_
-            || frame_id >= cur_frame_ + TASK_BUFFER_FRAME_NUM) {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
             return false;
         }
-        return num_pilot_pkts_[frame_id % TASK_BUFFER_FRAME_NUM]
+        return num_pilot_pkts_[frame_id % kFrameWnd]
             == num_pilot_pkts_per_frame_;
     }
 
     // Check whether demodulation can proceed for a symbol in a frame
     bool is_demod_ready(size_t frame_id, size_t symbol_id)
     {
-        if (frame_id < cur_frame_
-            || frame_id >= cur_frame_ + TASK_BUFFER_FRAME_NUM) {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
             return false;
         }
-        return num_data_pkts_[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+        return num_data_pkts_[frame_id % kFrameWnd][symbol_id]
             == num_pkts_per_symbol_;
     }
 
@@ -103,7 +101,7 @@ public:
         if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
             cur_frame_++;
             num_decode_tasks_completed_ = 0;
-            size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+            size_t frame_slot = frame_id % kFrameWnd;
             num_pkts_[frame_slot] = 0;
             num_pilot_pkts_[frame_slot] = 0;
             for (size_t j = 0; j < kMaxSymbols; j++) {
@@ -114,18 +112,17 @@ public:
         decode_mutex_.unlock();
     }
 
-    // num_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of packets
+    // num_pkts[i % kFrameWnd] is the total number of packets
     // received for frame i (may be removed if not used)
-    std::array<std::atomic<size_t>, TASK_BUFFER_FRAME_NUM> num_pkts_;
+    std::array<std::atomic<size_t>, kFrameWnd> num_pkts_;
 
-    // num_pilot_pkts[i % TASK_BUFFER_FRAME_NUM] is the total number of pilot
+    // num_pilot_pkts[i % kFrameWnd] is the total number of pilot
     // packets received for frame i
-    std::array<std::atomic<size_t>, TASK_BUFFER_FRAME_NUM> num_pilot_pkts_;
+    std::array<std::atomic<size_t>, kFrameWnd> num_pilot_pkts_;
 
-    // num_data_pkts[i % TASK_BUFFER_FRAME_NUM][j] is the total number of data
+    // num_data_pkts[i % kFrameWnd][j] is the total number of data
     // packets received for frame i and symbol j
-    std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
-        TASK_BUFFER_FRAME_NUM>
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_data_pkts_;
 
     // cur_frame is the first frame for which decoding is incomplete
@@ -155,7 +152,7 @@ public:
         : num_demul_tasks_required_(
               cfg->get_num_sc_per_server() / cfg->demul_block_size)
     {
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+        for (size_t i = 0; i < kFrameWnd; i++) {
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_demul_tasks_completed_[i][j] = 0;
             }
@@ -170,16 +167,13 @@ public:
         if (frame_id > max_frame_) {
             max_frame_++;
             for (size_t i = 0; i < kMaxSymbols; i++) {
-                num_demul_tasks_completed_[max_frame_ % TASK_BUFFER_FRAME_NUM]
-                                          [i]
-                    = 0;
+                num_demul_tasks_completed_[max_frame_ % kFrameWnd][i] = 0;
             }
         }
         max_frame_mutex_.unlock();
-        rt_assert(frame_id <= max_frame_
-                && frame_id + TASK_BUFFER_FRAME_NUM > max_frame_,
+        rt_assert(frame_id <= max_frame_ && frame_id + kFrameWnd > max_frame_,
             "Complete a wrong frame in demul!");
-        num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+        num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id]
             += num_tasks;
     }
 
@@ -187,21 +181,18 @@ public:
     // this symbol have
     bool ready_to_decode(size_t frame_id, size_t symbol_id)
     {
-        rt_assert(
-            frame_id + TASK_BUFFER_FRAME_NUM > max_frame_, "Decode too slow!");
+        rt_assert(frame_id + kFrameWnd > max_frame_, "Decode too slow!");
         if (frame_id > max_frame_) {
             return false;
         }
-        return num_demul_tasks_completed_[frame_id % TASK_BUFFER_FRAME_NUM]
-                                         [symbol_id]
+        return num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id]
             == num_demul_tasks_required_;
     }
 
-    // num_demul_tasks_completed[i % TASK_BUFFER_FRAME_NUM][j] is
+    // num_demul_tasks_completed[i % kFrameWnd][j] is
     // the number of subcarriers completed for demul tasks in
     // frame i and symbol j
-    std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
-        TASK_BUFFER_FRAME_NUM>
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demul_tasks_completed_;
 
     // Number of subcarriers required to demodulate for each symbol
@@ -224,9 +215,9 @@ public:
 
         num_demod_data_received_
             = new std::array<std::array<size_t, kMaxSymbols>,
-                TASK_BUFFER_FRAME_NUM>[cfg->get_num_ues_to_process()];
+                kFrameWnd>[cfg->get_num_ues_to_process()];
         for (size_t i = 0; i < cfg->get_num_ues_to_process(); i++) {
-            for (size_t j = 0; j < TASK_BUFFER_FRAME_NUM; j++) {
+            for (size_t j = 0; j < kFrameWnd; j++) {
                 num_demod_data_received_[i][j].fill(0);
             }
         }
@@ -234,18 +225,18 @@ public:
 
     void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id)
     {
-        num_demod_data_received_[ue_id - cfg_->ue_start]
-                                [frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]++;
+        num_demod_data_received_[ue_id - cfg_->ue_start][frame_id % kFrameWnd]
+                                [symbol_id]++;
     }
 
     bool received_all_demod_data(
         size_t ue_id, size_t frame_id, size_t symbol_id)
     {
-        if (num_demod_data_received_[ue_id
-                - cfg_->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+        if (num_demod_data_received_[ue_id - cfg_->ue_start]
+                                    [frame_id % kFrameWnd][symbol_id]
             == num_demod_data_required_) {
-            num_demod_data_received_[ue_id
-                - cfg_->ue_start][frame_id % TASK_BUFFER_FRAME_NUM][symbol_id]
+            num_demod_data_received_[ue_id - cfg_->ue_start]
+                                    [frame_id % kFrameWnd][symbol_id]
                 = 0;
             return true;
         }
@@ -258,7 +249,7 @@ private:
     size_t* cur_symbol_; // symbol ID for UL data
     const size_t num_demod_data_required_;
 
-    std::array<std::array<size_t, kMaxSymbols>, TASK_BUFFER_FRAME_NUM>*
+    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
 };
 

@@ -311,21 +311,21 @@ public:
     size_t num_bytes_per_cb;
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Agora
-    bool disable_master; // If true, Millipede will run without a master thread
+    bool disable_master; // If true, Agora will run without a master thread
     // # subcarriers for each dosubcarrier worker, should be a multiple of
     // lcm(zf_block_size, demul_block_size)
     size_t subcarrier_block_size;
 
-    // The list of IP addresses of all Millipede servers
+    // The list of IP addresses of all Agora servers
     std::vector<std::string> server_addr_list;
-    size_t server_addr_idx; // The index of this Millipede server in the list
-    // This Millipede server takes charge of subcarrier range
+    size_t server_addr_idx; // The index of this Agora server in the list
+
+    // This Agora server takes charge of subcarrier range
     // [subcarrier_start, subcarrier_end]
-    size_t subcarrier_start;
-    size_t subcarrier_end;
-    // This Millipede server takes charge of ue range [ue_start, ue_end]
-    size_t ue_start;
-    size_t ue_end;
+    size_t subcarrier_start, subcarrier_end;
+
+    // This Agora server takes charge of ue range [ue_start, ue_end]
+    size_t ue_start, ue_end;
 
     int demod_tx_port;
     int demod_rx_port;
@@ -370,7 +370,7 @@ public:
         return disable_master ? ue_end - ue_start : UE_NUM;
     }
 
-    // Get the Millipede server index given an UE ID
+    // Get the Agora server index given an UE ID
     inline size_t get_server_idx_by_ue(size_t ue_id) const
     {
         size_t ue_num_low = UE_NUM / server_addr_list.size();

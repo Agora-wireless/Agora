@@ -55,7 +55,7 @@ using namespace arma;
  * @li precoding (`DoPrecode`) for downlink.
  *
  * FIXME: The biggest issue is how buffers are going to be allocated, shared,
- * and accessed. Currently, the rest of Millipede expects single instance of all
+ * and accessed. Currently, the rest of Agora expects single instance of all
  * buffers, but with this redesign, we are allocating per-DoSubcarrier buffers.
  * While this probably is okay for intermediate internal buffers, perhaps we
  * should require (at least initially) that all input and output buffers are
@@ -69,7 +69,7 @@ using namespace arma;
  * allocating/deallocating the intermediate buffers and output buffers but not
  * the input buffers.
  * 
- * FIXME: Currently, the output buffers are still owned by the core `Millipede`
+ * FIXME: Currently, the output buffers are still owned by the core `Agora`
  * instance. We should eventually move them into here.
  */
 class DoSubcarrier : public Doer {
