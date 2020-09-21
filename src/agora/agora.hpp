@@ -215,8 +215,9 @@ private:
     FrameCounters rc_counters_;
     RxCounters rx_counters_;
     size_t zf_last_frame;
-    size_t rc_last_frame=SIZE_MAX;
-    std::vector<size_t> cur_frame_for_symbol; // is the current frame for the symbol whose index in the frame's uplink symbols is i
+    size_t rc_last_frame = SIZE_MAX;
+    std::vector<size_t>
+        cur_frame_for_symbol; // is the current frame for the symbol whose index in the frame's uplink symbols is i
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
