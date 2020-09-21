@@ -1,5 +1,4 @@
 #include "agora.hpp"
-using namespace std;
 
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
@@ -254,6 +253,9 @@ void Agora::start()
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length));
 
+                update_rx_counters(pkt->frame_id, pkt->symbol_id);
+                // Break here to test only packet I/O
+
                 if (pkt->frame_id >= cur_frame_id + kFrameWnd) {
                     printf("Error: Received packet for future frame %u beyond "
                            "frame window (= %zu + %zu). This can happen if "
@@ -263,7 +265,6 @@ void Agora::start()
                     break;
                 }
 
-                update_rx_counters(pkt->frame_id, pkt->symbol_id);
                 if (config_->bigstation_mode) {
                     /* In BigStation, schedule FFT whenever a packet is RX */
                     if (cur_frame_id != pkt->frame_id) {
