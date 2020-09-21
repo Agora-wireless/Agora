@@ -310,7 +310,7 @@ public:
     // Number of bytes per code block
     size_t num_bytes_per_cb;
 
-    bool fft_in_rru; // If true, the RRU does FFT instead of Millipede
+    bool fft_in_rru; // If true, the RRU does FFT instead of Agora
     bool disable_master; // If true, Millipede will run without a master thread
     // # subcarriers for each dosubcarrier worker, should be a multiple of
     // lcm(zf_block_size, demul_block_size)
