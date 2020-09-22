@@ -12,8 +12,7 @@
     "fft_in_rru": true,
     "disable_master": true,
     "server_addr_list": [
-        "192.168.21.183",
-        "192.168.21.184"
+        "192.168.21.181"
     ],
     "server_addr_idx": 0,
     "bs_port": 11000,

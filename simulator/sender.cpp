@@ -1,5 +1,6 @@
 #include "sender.hpp"
 #include "datatype_conversion.h"
+#include "logger.h"
 #include "udp_client.h"
 #include <thread>
 
@@ -300,13 +301,18 @@ void* Sender::worker_thread(int tid)
             "rte_eth_tx_burst() failed");
 #else
         if (cfg->disable_master) {
-            size_t block_size
+            const size_t sc_block_size
                 = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
             for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
                 memcpy(pkt->data,
                     data_buf->data
-                        + (i * block_size + cfg->OFDM_DATA_START) * 2,
-                    block_size * sizeof(unsigned short) * 2);
+                        + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
+                    sc_block_size * sizeof(unsigned short) * 2);
+                MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
+                    pkt->to_string().c_str(), i, cfg->server_addr_list.size(),
+                    cfg->server_addr_list[i].c_str(),
+                    cfg->bs_server_port + cur_radio);
+
                 udp_client.send(cfg->server_addr_list[i],
                     cfg->bs_server_port + cur_radio,
                     reinterpret_cast<uint8_t*>(socks_pkt_buf),
