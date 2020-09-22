@@ -44,13 +44,13 @@ Agora::Agora(Config* cfg)
     phy_stats = new PhyStats(cfg);
 
     /* Initialize TXRX threads */
-    if (config_->disable_master) {
-        packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + 1,
-            &rx_status_, &demul_status_, &demod_status_));
-    } else {
+    if (!config_->disable_master) {
         packet_tx_rx_.reset(
             new PacketTXRX(cfg, cfg->core_offset + 1, &message_queue_,
                 get_conq(EventType::kPacketTX), rx_ptoks_ptr, tx_ptoks_ptr));
+    } else {
+        packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + 1,
+            &rx_status_, &demul_status_, &demod_status_));
     }
 
     if (kEnableMac) {

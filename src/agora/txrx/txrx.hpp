@@ -84,17 +84,17 @@ public:
     void send_beacon(int tid, size_t frame_id);
 
 private:
-    void* loop_tx_rx(int tid); // The thread function for thread [tid]
-    void* demod_loop_tx_rx(int tid);
+    // The simulation-mode thread function running on thread #tid
+    void* loop_tx_rx(int tid);
+
+    // A thread that sends and receives post-demodulation data
+    void* demod_thread(int tid);
 
     int dequeue_send(int tid);
-    int poll_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
     // Receive packets and relocate data to the correct address based on
     // the subcarrier range
     struct Packet* recv_relocate(int tid, int radio_id, int rx_offset);
-
-    void recv_demod();
 
     void* loop_tx_rx_argos(int tid);
     int dequeue_send_argos(int tid);
@@ -123,7 +123,6 @@ private:
     std::vector<int> socket_;
     std::vector<struct sockaddr_in> millipede_addrs_;
     int demod_tx_socket_;
-    int demod_rx_socket_;
 
     char* send_buffer_;
 
