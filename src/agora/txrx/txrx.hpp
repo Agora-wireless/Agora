@@ -92,9 +92,10 @@ private:
 
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+
     // Receive packets and relocate data to the correct address based on
     // the subcarrier range
-    struct Packet* recv_relocate(int tid, int radio_id, int rx_offset);
+    Packet* recv_relocate(int tid, int radio_id, int rx_offset);
 
     void* loop_tx_rx_argos(int tid);
     int dequeue_send_argos(int tid);

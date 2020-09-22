@@ -272,7 +272,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
-struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
+Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
 {
     // TODO [junzhi]: Can we avoid malloc
     char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
@@ -286,6 +286,9 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         free(buf);
         return (NULL);
     }
+
+    MLPD_TRACE("PacketTXRX: Thread %d received packet %s\n", tid,
+        pkt->to_string().c_str());
 
     if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
         char* rx_buffer = (*buffer_)[pkt->ant_id];
