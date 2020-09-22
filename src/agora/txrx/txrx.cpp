@@ -310,7 +310,7 @@ Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         // get the position in rx_buffer
         // move ptr & set status to full
         // rx_buffer_status[rx_offset] = 1;
-        if (!rx_status_->add_new_packet(pkt->frame_id, pkt->symbol_id)) {
+        if (!rx_status_->add_new_packet(pkt)) {
             cfg->running = false;
         }
     } else {

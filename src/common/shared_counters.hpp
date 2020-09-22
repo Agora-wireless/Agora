@@ -1,8 +1,8 @@
-#ifndef SHARED_COUNTERS_HPP
-#define SHARED_COUNTERS_HPP
+#pragma once
 
 #include "Symbols.hpp"
 #include "config.hpp"
+#include "logger.h"
 #include "utils.h"
 #include <mutex>
 #include <sstream>
@@ -34,36 +34,39 @@ public:
     }
 
     // When receive a new packet, record it here
-    bool add_new_packet(size_t frame_id, size_t symbol_id)
+    bool add_new_packet(const Packet* pkt)
     {
-        if (frame_id >= cur_frame_ + kFrameWnd) {
-            std::cout << "Error: Received packet for future frame beyond "
-                         "frame "
-                      << "window. This can happen if Agora is running "
-                      << "slowly, e.g., in debug mode\n";
+        if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
+            MLPD_ERROR(
+                "SharedCounters RxStatus error: Received packet for future "
+                "frame %u beyond frame window (%zu + %zu). This can "
+                "happen if Agora is running slowly, e.g., in debug mode. "
+                "Full packet = %s.\n",
+                pkt->frame_id, cur_frame_, kFrameWnd, pkt->to_string().c_str());
             return false;
         }
-        size_t frame_slot = frame_id % kFrameWnd;
+
+        const size_t frame_slot = pkt->frame_id % kFrameWnd;
         num_pkts_[frame_slot]++;
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_data_symbol_per_frame_)) {
-            printf(
-                "Main thread: received all packets in frame: %lu\n", frame_id);
+            printf("Main thread: received all packets in frame: %u\n",
+                pkt->frame_id);
         }
 
-        if (symbol_id < num_pilot_symbols_per_frame_) {
+        if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
             num_pilot_pkts_[frame_slot]++;
             if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
-                printf("Main thread: received all pilots in frame: %zu\n",
-                    frame_id);
+                printf("Main thread: received all pilots in frame: %u\n",
+                    pkt->frame_id);
             }
         } else {
-            num_data_pkts_[frame_slot][symbol_id]++;
+            num_data_pkts_[frame_slot][pkt->symbol_id]++;
         }
-        if (frame_id > latest_frame_) {
-            // NOTE: race condition could happen here but the impact is small
-            latest_frame_ = frame_id;
+        if (pkt->frame_id > latest_frame_) {
+            // TODO: race condition could happen here but the impact is small
+            latest_frame_ = pkt->frame_id;
         }
         return true;
     }
@@ -252,5 +255,3 @@ private:
     std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
 };
-
-#endif
