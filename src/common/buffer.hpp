@@ -217,12 +217,22 @@ struct Packet {
     // The packet's data starts at kOffsetOfData bytes from the start
     static constexpr size_t kOffsetOfData = 64;
 
-    enum class PacketType {
-        kRRU, // A packet from the RRU
+    enum class PktType {
+        kIQFromRRU, // A packet containing IQ samples from the RRU
         kDemod // A packet generated after the demodulation stage
     };
 
-    PacketType packet_type;
+    static const char* pkt_type_str(PktType pkt_type)
+    {
+        switch (pkt_type) {
+        case PktType::kIQFromRRU:
+            return "[IQ from RRU]";
+        case PktType::kDemod:
+            return "[Demodulated data]";
+        }
+    }
+
+    PktType pkt_type;
     uint32_t frame_id;
     uint32_t symbol_id;
     union {
@@ -246,9 +256,10 @@ struct Packet {
     std::string to_string() const
     {
         std::ostringstream ret;
-        ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
-            << ", cell ID " << cell_id << ", antenna ID " << ant_id << ", "
-            << sizeof(fill) << " empty bytes]";
+        ret << "[Packet type " << pkt_type_str(pkt_type) << ", Frame seq num "
+            << frame_id << ", symbol ID " << symbol_id << ", cell ID "
+            << cell_id << ", antenna ID " << ant_id << ", " << sizeof(fill)
+            << " empty bytes]";
         return ret.str();
     }
 };

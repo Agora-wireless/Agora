@@ -273,7 +273,7 @@ void* Sender::worker_thread(int tid)
 #endif
 
         // Update the TX buffer
-        pkt->packet_type = Packet::PacketType::kRRU;
+        pkt->pkt_type = Packet::PktType::kIQFromRRU;
         pkt->frame_id = tag.frame_id;
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
         pkt->cell_id = 0;

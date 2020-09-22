@@ -131,7 +131,7 @@ void* PacketTXRX::demod_thread(int tid)
                     - cfg->pilot_symbol_num_perframe][ue_id];
 
                 auto* pkt = reinterpret_cast<Packet*>(send_buffer_);
-                pkt->packet_type = Packet::PacketType::kDemod;
+                pkt->pkt_type = Packet::PktType::kDemod;
                 pkt->frame_id = demod_frame_to_send;
                 pkt->symbol_id = demod_symbol_to_send;
                 pkt->ue_id = ue_id;
@@ -162,7 +162,7 @@ void* PacketTXRX::demod_thread(int tid)
             continue;
 
         auto* pkt = reinterpret_cast<Packet*>(&recv_buf[0]);
-        rt_assert(pkt->packet_type == Packet::PacketType::kDemod,
+        rt_assert(pkt->pkt_type == Packet::PktType::kDemod,
             "Received unknown packet type in demod TX/RX thread");
 
         const size_t symbol_idx_ul
@@ -289,23 +289,19 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         return (NULL);
     }
 
-    if (pkt->packet_type == Packet::PacketType::kRRU) {
+    if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
         char* rx_buffer = (*buffer_)[pkt->ant_id];
-        int* rx_buffer_status = (*buffer_status_)[pkt->ant_id];
-        int packet_length = cfg->packet_length;
-        size_t frame_id = pkt->frame_id;
-        size_t symbol_id = pkt->symbol_id;
-        size_t rx_offset_
-            = (frame_id % SOCKET_BUFFER_FRAME_NUM) * cfg->symbol_num_perframe
-            + symbol_id;
+        const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
+                * cfg->symbol_num_perframe
+            + pkt->symbol_id;
 
         size_t sc_offset = Packet::kOffsetOfData
             + 2 * sizeof(unsigned short)
                 * (cfg->OFDM_DATA_START
                       + cfg->server_addr_idx * cfg->get_num_sc_per_server());
-        memcpy(
-            &rx_buffer[rx_offset_ * packet_length], buf, Packet::kOffsetOfData);
-        memcpy(&rx_buffer[rx_offset_ * packet_length + sc_offset],
+        memcpy(&rx_buffer[rx_offset_ * cfg->packet_length], buf,
+            Packet::kOffsetOfData);
+        memcpy(&rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
             buf + Packet::kOffsetOfData,
             cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
         free(buf);
@@ -313,11 +309,11 @@ struct Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         // get the position in rx_buffer
         // move ptr & set status to full
         // rx_buffer_status[rx_offset] = 1;
-        if (!rx_status_->add_new_packet(frame_id, symbol_id)) {
+        if (!rx_status_->add_new_packet(pkt->frame_id, pkt->symbol_id)) {
             cfg->running = false;
         }
     } else {
-        printf("Receive unknown packet from rru\n");
+        printf("Received unknown packet from rru\n");
         exit(1);
     }
     return pkt;
