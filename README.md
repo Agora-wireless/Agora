@@ -3,13 +3,8 @@ Agora is a high-performance system for massive-MIMO baseband processing.
 ## Requirements
  * Toolchain: A C++11 compiler and CMake 2.8+.
  * Required packages
-   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen
-     nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
-     * If `nlohmann-json-dev` package can't be found, get code from
-       [here](https://github.com/nlohmann/json) and build from source.
-
-   * Install Armadillo: `./scripts/install_armadillo.sh`.
-   * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`.
+   * Install required Ubuntu packages, Armadillo, nlohmann json-dev and SoapySDR: 
+   `./scripts/ubuntu.sh`.
    * Download and install Intel libraries:
      * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
@@ -30,12 +25,12 @@ Agora is a high-performance system for massive-MIMO baseband processing.
             command, ensure that `icc --version` reports 19.0.4.
           * After instaling `icc 19.04`, compile FlexRAN as follows:
           ```
-          sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all
-          users read-write access cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ sed -i
-          '/add_compile_options("-Wall")/a \ \
-          add_compile_options("-ffreestanding")'
-          cmake/intel-compile-options.cmake ./create-makefiles-linux.sh cd
-          build-avx512-icc % or build-avx2-icc make
+          sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all users read-write access 
+          cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ sed -i '/add_compile_options("-Wall")/a \ \
+          add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake 
+          ./create-makefiles-linux.sh 
+          cd build-avx512-icc % or build-avx2-icc 
+          make
           ```
 
    * Optional: DPDK
