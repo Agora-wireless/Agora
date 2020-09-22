@@ -327,8 +327,8 @@ public:
     // This Agora server takes charge of ue range [ue_start, ue_end]
     size_t ue_start, ue_end;
 
-    int demod_tx_port;
-    int demod_rx_port;
+    uint16_t demod_tx_port; // UDP port used to receive post-demodulation data
+    uint16_t demod_rx_port; // UDP port used to send post-demodulation data
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
