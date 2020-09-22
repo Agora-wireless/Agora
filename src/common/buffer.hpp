@@ -229,6 +229,8 @@ struct Packet {
             return "[IQ from RRU]";
         case PktType::kDemod:
             return "[Demodulated data]";
+        default:
+            return "[Invalid]";
         }
     }
 
