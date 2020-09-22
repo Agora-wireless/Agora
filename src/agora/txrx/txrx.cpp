@@ -244,8 +244,11 @@ void* PacketTXRX::loop_tx_rx(int tid)
             else if (tx_frame_id > 500)
                 slow_start_factor = 1;
         }
-        if (-1 != dequeue_send(tid))
-            continue;
+
+        if (!cfg->disable_master) {
+            if (-1 != dequeue_send(tid))
+                continue;
+        }
 
         // Receive data
         Packet* pkt = cfg->disable_master

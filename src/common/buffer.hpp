@@ -217,7 +217,10 @@ struct Packet {
     // The packet's data starts at kOffsetOfData bytes from the start
     static constexpr size_t kOffsetOfData = 64;
 
-    enum class PacketType { kRRU, kDemod };
+    enum class PacketType {
+        kRRU, // A packet from the RRU
+        kDemod // A packet generated after the demodulation stage
+    };
 
     PacketType packet_type;
     uint32_t frame_id;
