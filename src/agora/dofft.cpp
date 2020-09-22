@@ -358,7 +358,7 @@ Event_data DoIFFT::launch(size_t tag)
     // printf("\n");
 
     cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    float post_scale = abs(mat_data).max();
+    float post_scale = cfg->BS_ANT_NUM; //abs(mat_data).max();
     mat_data /= post_scale;
 
     size_t start_tsc2 = worker_rdtsc();

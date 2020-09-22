@@ -476,6 +476,10 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         2 * bscfg->sampsPerSymbol * uecfg->UE_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel;
+    // add 30dB SNR noise
+    cx_fmat noise(1e-3*randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM),
+        1e-3*randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM));
+    fmat_dst += noise;
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 
@@ -528,8 +532,11 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         reinterpret_cast<float*>(fmat_src.memptr()),
         2 * bscfg->sampsPerSymbol * bscfg->BS_ANT_NUM);
 
-    cx_fmat fmat_dst = fmat_src * channel.st();
-    fmat_dst /= (abs(fmat_dst).max() * 2);
+    cx_fmat fmat_dst = fmat_src * channel.st() / std::sqrt(bscfg->BS_ANT_NUM);
+    // add 30dB SNR noise
+    cx_fmat noise(1e-3*randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM),
+        1e-3*randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM));
+    fmat_dst += noise;
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 
