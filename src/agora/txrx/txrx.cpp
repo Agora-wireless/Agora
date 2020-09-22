@@ -254,9 +254,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
         Packet* pkt = cfg->disable_master
             ? recv_relocate(tid, radio_id, rx_offset)
             : recv_enqueue(tid, radio_id, rx_offset);
-        if (pkt == nullptr) {
+        if (pkt == NULL)
             continue;
-        }
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
@@ -267,9 +266,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
             }
         }
 
-        if (++radio_id == radio_hi) {
+        if (++radio_id == radio_hi)
             radio_id = radio_lo;
-        }
     }
     return 0;
 }
