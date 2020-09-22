@@ -203,7 +203,8 @@ int RadioTXRX::dequeue_send(int tid)
                 0 /* cell_id */, ant_id);
             // Send pilots
             ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
-                0, (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+                0, (struct sockaddr*)&servaddr_[ant_id],
+                sizeof(servaddr_[ant_id]));
             rt_assert(ret > 0, "sendto() failed");
         }
         rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
