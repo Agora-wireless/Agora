@@ -20,17 +20,6 @@ public:
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
     {
-        for (size_t i = 0; i < kFrameWnd; i++) {
-            num_pkts_[i] = 0;
-        }
-        for (size_t i = 0; i < kFrameWnd; i++) {
-            num_pilot_pkts_[i] = 0;
-        }
-        for (size_t i = 0; i < kFrameWnd; i++) {
-            for (size_t j = 0; j < kMaxSymbols; j++) {
-                num_data_pkts_[i][j] = 0;
-            }
-        }
     }
 
     // When receive a new packet, record it here
@@ -51,14 +40,16 @@ public:
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_data_symbol_per_frame_)) {
-            printf("Main thread: received all packets in frame: %u\n",
-                pkt->frame_id);
+            printf("SharedCounters: received all packets in frame: %u. "
+                   "Pilot pkts = %zu of %zu\n",
+                pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
+                num_pilot_pkts_per_frame_);
         }
 
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
             num_pilot_pkts_[frame_slot]++;
             if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
-                printf("Main thread: received all pilots in frame: %u\n",
+                printf("SharedCounters: received all pilots in frame: %u\n",
                     pkt->frame_id);
             }
         } else {
@@ -115,18 +106,21 @@ public:
         decode_mutex_.unlock();
     }
 
+    // TODO: Instead of having all-atomic counter arrays, can we just make
+    // the entire class atomic?
+
     // num_pkts[i % kFrameWnd] is the total number of packets
     // received for frame i (may be removed if not used)
-    std::array<std::atomic<size_t>, kFrameWnd> num_pkts_;
+    std::array<std::atomic<size_t>, kFrameWnd> num_pkts_ = {};
 
     // num_pilot_pkts[i % kFrameWnd] is the total number of pilot
     // packets received for frame i
-    std::array<std::atomic<size_t>, kFrameWnd> num_pilot_pkts_;
+    std::array<std::atomic<size_t>, kFrameWnd> num_pilot_pkts_ = {};
 
     // num_data_pkts[i % kFrameWnd][j] is the total number of data
     // packets received for frame i and symbol j
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
-        num_data_pkts_;
+        num_data_pkts_ = {};
 
     // cur_frame is the first frame for which decoding is incomplete
     size_t cur_frame_ = 0;

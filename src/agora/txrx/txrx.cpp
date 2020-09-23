@@ -274,7 +274,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
 Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
 {
-    // TODO [junzhi]: Can we avoid malloc
+    // TODO [junzhi]: Can we avoid malloc? Currently we're leaking buf because
+    // we return buf as a Packet to the caller.
     uint8_t* buf = reinterpret_cast<uint8_t*>(malloc(cfg->packet_length));
 
     if (-1 == recv(socket_[radio_id], buf, cfg->packet_length, 0)) {
@@ -305,7 +306,6 @@ Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         memcpy(&rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
             buf + Packet::kOffsetOfData,
             cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
-        free(buf);
 
         // get the position in rx_buffer
         // move ptr & set status to full
