@@ -275,18 +275,18 @@ void* PacketTXRX::loop_tx_rx(int tid)
 Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
 {
     // TODO [junzhi]: Can we avoid malloc
-    char* buf = reinterpret_cast<char*>(malloc(cfg->packet_length));
-    auto* pkt = reinterpret_cast<Packet*>(buf);
+    uint8_t* buf = reinterpret_cast<uint8_t*>(malloc(cfg->packet_length));
 
-    if (-1 == recv(socket_[radio_id], (char*)pkt, cfg->packet_length, 0)) {
+    if (-1 == recv(socket_[radio_id], buf, cfg->packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {
-            perror("recv failed");
-            exit(0);
+            fprintf(stderr, "PacketTXRX: recv_relocate(), socket recv() error");
+            exit(-1);
         }
         free(buf);
-        return (NULL);
+        return nullptr;
     }
 
+    const auto* pkt = reinterpret_cast<Packet*>(buf);
     MLPD_TRACE("PacketTXRX: Thread %d received packet %s\n", tid,
         pkt->to_string().c_str());
 
@@ -317,7 +317,7 @@ Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         printf("Received unknown packet from rru\n");
         exit(1);
     }
-    return pkt;
+    return reinterpret_cast<Packet*>(buf);
 }
 
 struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
