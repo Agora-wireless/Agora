@@ -14,6 +14,9 @@
     "server_addr_list": [
         "192.168.21.181"
     ],
+    "frames" : [
+      "PPPPU"
+    ],
     "server_addr_idx": 0,
     "bs_port": 11000,
     "ue_rx_port": 10000,
