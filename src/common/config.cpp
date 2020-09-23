@@ -212,10 +212,11 @@ Config::Config(std::string jsonfile)
         "Subcarrier block size should be a multiple of lcm(zf_block_size, "
         "demul_block_size)!");
 
-    // If without master, use server_addr_list to record all Agora servers,
-    // and use server_addr_idx to indicate the index of this Agora server.
-    // Otherwise, use server_addr to indicate the address this server
     if (disable_master) {
+        rt_assert(pilot_symbol_num_perframe + ul_data_symbol_num_perframe
+                == symbol_num_perframe,
+            "Masterless mode supports only pilot and uplink data syms for now");
+
         server_addr_list
             = tddConf.value("server_addr_list", std::vector<std::string>());
         rt_assert(server_addr_list.size() > 0, "Address list is 0!");
