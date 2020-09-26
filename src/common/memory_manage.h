@@ -147,7 +147,7 @@ public:
         }
     }
 
-    std::array<T*, COLS> operator[](size_t row_idx) { return mat[row_idx]; }
+    std::array<T*, COLS>& operator[](size_t row_idx) { return mat[row_idx]; }
 
     // Delete copy constructor and copy assignment
     PtrGrid(PtrGrid const&) = delete;
@@ -218,7 +218,7 @@ public:
         }
     }
 
-    std::array<std::array<T*, DIM3>, DIM2> operator[](size_t row_idx)
+    std::array<std::array<T*, DIM3>, DIM2>& operator[](size_t row_idx)
     {
         return cube[row_idx];
     }

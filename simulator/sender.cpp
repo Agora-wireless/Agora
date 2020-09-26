@@ -151,11 +151,6 @@ void* Sender::master_thread(int)
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
             == cfg->BS_ANT_NUM) {
-            if (kDebugSenderReceiver) {
-                printf("Finished transmit all antennas in frame: %u, "
-                       "symbol: %u, in %.1f us\n ",
-                    ctag.frame_id, ctag.symbol_id, get_time() - start_time);
-            }
 
             packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
             packet_count_per_frame[comp_frame_slot]++;
@@ -171,9 +166,8 @@ void* Sender::master_thread(int)
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
-                    printf("Finished transmit all antennas for frame: %u in "
-                           "%.1f us\n",
-                        ctag.frame_id, get_time() - start_time);
+                    printf("Sender: Transmitted frame %u in %.1f ms\n",
+                        ctag.frame_id, (get_time() - start_time) / 1000.0);
                     start_time = get_time();
                 }
                 next_frame_id = ctag.frame_id + 1;
