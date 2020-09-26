@@ -683,14 +683,10 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
-        cx_float csi(1, 0);
-        cx_float* dl_iq_f_ptr
-            = (cx_float*)&config_
-                  ->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM];
-        float evm = 0;
 
         // use pilot subcarriers for phase tracking and correction
         float theta = 0;
+        cx_float csi(1, 0);
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             if (j % config_->OFDM_PILOT_SPACING == 0) {
                 equ_buffer_ptr[j] = 0;
@@ -716,15 +712,24 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 }
                 cx_float y = fft_buffer_ptr[sc_id];
                 equ_buffer_ptr[j] = (y / csi) * phc;
-                evm += std::norm(equ_buffer_ptr[j] - dl_iq_f_ptr[sc_id]);
+                // FIXME: this seems to not work for ant_id > 0,
+                /*
+                complex_float tx
+                    = config_
+                          ->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM
+                              + config_->OFDM_DATA_START + j];
+                evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
+		*/
             }
         }
+        /*
         evm = std::sqrt(
             evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
         if (kPrintPhyStats)
             std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
                       << ", User: " << ant_id << ", EVM: " << 100 * evm
                       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
+        */
     }
 
     rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0; // now empty

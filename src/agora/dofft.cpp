@@ -338,8 +338,9 @@ Event_data DoIFFT::launch(size_t tag)
             tid, frame_id, symbol_id, ant_id);
     }
 
-    size_t offset = (cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-                        * cfg->BS_ANT_NUM)
+    size_t offset
+        = (cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+              * cfg->BS_ANT_NUM)
         + ant_id;
 
     size_t start_tsc1 = worker_rdtsc();
@@ -358,7 +359,7 @@ Event_data DoIFFT::launch(size_t tag)
     // printf("\n");
 
     cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    float post_scale = cfg->BS_ANT_NUM; //abs(mat_data).max();
+    float post_scale = cfg->OFDM_CA_NUM;
     mat_data /= post_scale;
 
     size_t start_tsc2 = worker_rdtsc();
