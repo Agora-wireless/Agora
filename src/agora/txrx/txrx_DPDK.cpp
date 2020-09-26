@@ -16,29 +16,25 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
 
-    const uint16_t portid = 0;
-    if (DpdkTransport::nic_init(portid, mbuf_pool, socket_thread_num) != 0)
-        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+    const uint16_t port_id = 0; // The DPDK port ID
+    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
-    rte_flow_error error;
-    rte_flow* flow;
-    /* create flow for send packet with */
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
-        flow = DpdkTransport::generate_ipv4_flow(0, i, bs_rru_addr, FULL_MASK,
-            bs_server_addr, FULL_MASK, src_port, 0xffff, dst_port, 0xffff,
-            &error);
-        printf("Adding rule for src port: %zu, dst port: %zu, queue: %zu\n",
+
+        printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+               "dst port: %zu, queue: %zu\n",
+            cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
             cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
-        if (!flow)
-            rte_exit(
-                EXIT_FAILURE, "Error in creating flow: %s\n", error.message);
+        DpdkTransport::install_flow_rule(
+            port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
     }
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -98,102 +94,88 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
 void* PacketTXRX::loop_tx_rx(int tid)
 {
     size_t rx_offset = 0;
-    int prev_frame_id = -1;
+    size_t prev_frame_id = SIZE_MAX;
 
     while (cfg->running) {
         if (-1 != dequeue_send(tid))
             continue;
-        uint16_t nb_rx = dpdk_recv_enqueue(tid, prev_frame_id, rx_offset);
-        if (nb_rx == 0)
-            continue;
+
+        dpdk_recv(tid, prev_frame_id, rx_offset);
     }
     return 0;
 }
 
-uint16_t PacketTXRX::dpdk_recv_enqueue(
-    int tid, int& prev_frame_id, size_t& rx_offset)
+uint16_t PacketTXRX::dpdk_recv(
+    int tid, size_t& prev_frame_id, size_t& rx_offset)
 {
-    char* rx_buffer = (*buffer_)[tid];
-    int* rx_buffer_status = (*buffer_status_)[tid];
-    size_t* rx_frame_start = (*frame_start_)[tid];
-    // use token to speed up
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    struct rte_mbuf* rx_bufs[kRxBatchSize] __attribute__((aligned(64)));
+    rte_mbuf* rx_bufs[kRxBatchSize];
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
     if (unlikely(nb_rx == 0))
         return 0;
 
-    for (int i = 0; i < nb_rx; i++) {
-        // if buffer is full, exit
-        if (rx_buffer_status[rx_offset] == 1) {
+    for (size_t i = 0; i < nb_rx; i++) {
+        // If the RX buffer is full, it means that the base station processing
+        // hasn't kept up, so exit.
+        if ((*buffer_status_)[tid][rx_offset] == 1) {
             printf("Receive thread %d rx_buffer full, offset: %zu\n", tid,
                 rx_offset);
             cfg->running = false;
             return 0;
         }
 
-        struct rte_mbuf* dpdk_pkt = rx_bufs[i];
-        /* parse the header */
-        struct rte_ether_hdr* eth_hdr
-            = rte_pktmbuf_mtod(dpdk_pkt, struct rte_ether_hdr*);
+        rte_mbuf* dpdk_pkt = rx_bufs[i];
+        auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+        auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+            reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
         uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
-        struct rte_ipv4_hdr* ip_h = (struct rte_ipv4_hdr*)((char*)eth_hdr
-            + sizeof(struct rte_ether_hdr));
         if (kDebugDPDK) {
-            struct rte_udp_hdr* udp_h = (struct rte_udp_hdr*)((char*)ip_h
-                + sizeof(struct rte_ipv4_hdr));
-            DpdkTransport::print_pkt(ip_h->src_addr, ip_h->dst_addr,
+            auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
+                reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
+            DpdkTransport::print_pkt(ip_hdr->src_addr, ip_hdr->dst_addr,
                 udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
             printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
                 dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
                 RTE_ETHER_TYPE_IPV4);
-            printf("UDP: %d, %d\n", ip_h->next_proto_id, IPPROTO_UDP);
+            printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
         }
 
         if (eth_type != RTE_ETHER_TYPE_IPV4
-            or ip_h->next_proto_id != IPPROTO_UDP) {
+            or ip_hdr->next_proto_id != IPPROTO_UDP) {
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
 
-        if (ip_h->src_addr != bs_rru_addr) {
-            printf("Source addr does not match\n");
+        if (ip_hdr->src_addr != bs_rru_addr) {
+            fprintf(stderr, "DPDK: Source addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
-        if (ip_h->dst_addr != bs_server_addr) {
-            printf("Destination addr does not match\n");
+        if (ip_hdr->dst_addr != bs_server_addr) {
+            fprintf(stderr, "DPDK: Destination addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
 
-        char* payload = (char*)eth_hdr + kPayloadOffset;
+        auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
+        auto* pkt = reinterpret_cast<Packet*>(
+            &(*buffer_)[tid][rx_offset * cfg->packet_length]);
+        DpdkTransport::fastMemcpy(
+            reinterpret_cast<uint8_t*>(pkt), payload, cfg->packet_length);
 
-        struct Packet* pkt
-            = (struct Packet*)&rx_buffer[rx_offset * cfg->packet_length];
-        DpdkTransport::fastMemcpy((char*)pkt, payload, cfg->packet_length);
-        // rte_memcpy((char*)pkt, payload, c->packet_length);
         rte_pktmbuf_free(rx_bufs[i]);
 
         if (kIsWorkerTimingEnabled) {
-            int frame_id = pkt->frame_id;
-            if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
-                prev_frame_id = frame_id;
+            if (prev_frame_id == SIZE_MAX or pkt->frame_id > prev_frame_id) {
+                (*frame_start_)[tid][pkt->frame_id % kNumStatsFrames] = rdtsc();
+                prev_frame_id = pkt->frame_id;
             }
         }
-        // printf("thread %d received packet frame %u, symbol %u, ant %u\n", tid,
-        //     pkt->frame_id, pkt->symbol_id, pkt->ant_id);
 
-        // get the position in rx_buffer move ptr & set status to full
-        // rx_buffer_status[rx_offset] = 1;
-
-        // Push kPacketRX event into the queue.
-        Event_data rx_message(
-            EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
-        if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
+        if (!message_queue_->enqueue(*rx_ptoks_[tid],
+                Event_data(
+                    EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag))) {
+            printf("Failed to enqueue socket message\n");
+            exit(-1);
         }
 
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;

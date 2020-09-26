@@ -233,9 +233,9 @@ void ChannelSim::start()
                                 "user to %zu BS antennas\n",
                                 frame_id, symbol_id, uecfg->UE_ANT_NUM,
                                 bscfg->BS_ANT_NUM);
-                        Event_data do_tx_bs_task(
-                            EventType::kPacketTX, event.tags[0]);
-                        schedule_task(do_tx_bs_task, &task_queue_bs, ptok_bs);
+                        schedule_task(
+                            Event_data(EventType::kPacketTX, event.tags[0]),
+                            &task_queue_bs, ptok_bs);
                     }
                     // received a packet from a BS antenna
                 } else if (gen_tag_t(event.tags[0]).tag_type
@@ -257,10 +257,9 @@ void ChannelSim::start()
                                    "BS to %zu user antennas\n",
                                 frame_id, symbol_id, bscfg->BS_ANT_NUM,
                                 uecfg->UE_ANT_NUM);
-                        Event_data do_tx_user_task(
-                            EventType::kPacketTX, event.tags[0]);
                         schedule_task(
-                            do_tx_user_task, &task_queue_user, ptok_user);
+                            Event_data(EventType::kPacketTX, event.tags[0]),
+                            &task_queue_user, ptok_user);
                     }
                 }
             } break;
