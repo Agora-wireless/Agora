@@ -109,6 +109,12 @@ static constexpr bool kUseArgos = true;
 static constexpr bool kUseArgos = false;
 #endif
 
+#ifdef USE_UHD
+static constexpr bool kUseUHD = true;
+#else
+static constexpr bool kUseUHD = false;
+#endif
+
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 static constexpr bool kCollectPhyStats = false;
