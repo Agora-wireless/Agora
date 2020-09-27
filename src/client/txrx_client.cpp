@@ -6,7 +6,7 @@ RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
     , thread_num_(n_threads)
     , core_id_(in_core_id)
 {
-    if (!kUseArgos) {
+    if (!kUseArgos && !kUseUHD) {
         socket_.resize(config_->nRadios);
         servaddr_.resize(config_->nRadios);
     } else {
@@ -32,7 +32,7 @@ RadioTXRX::RadioTXRX(Config* config, int n_threads, int in_core_id,
 
 RadioTXRX::~RadioTXRX()
 {
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         radioconfig_->radioStop();
         delete radioconfig_;
     }
@@ -56,7 +56,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     tx_buffer_ = in_tx_buffer;
     tx_buffer_status_ = in_tx_buffer_status;
 
-    if (kUseArgos)
+    if (kUseArgos || kUseUHD)
         if (!radioconfig_->radioStart())
             return false;
 
@@ -67,7 +67,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         context->obj_ptr = this;
         context->id = i;
         // start socket thread
-        if (kUseArgos) {
+        if (kUseArgos || kUseUHD) {
             if (config_->hw_framer) {
                 if (pthread_create(&txrx_thread, NULL,
                         pthread_fun_wrapper<RadioTXRX,
