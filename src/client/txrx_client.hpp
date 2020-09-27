@@ -96,7 +96,7 @@ public:
     /**
      * @brief transmits a tx samples packet that is ready from PHY through client wireless hardware
      */
-    int dequeue_send_argos(int tid);
+    int dequeue_send_argos(int tid, long long time0);
 
     /**
      * @brief loop thread function that performs sample Packet I/O in simulation mode.
@@ -148,5 +148,9 @@ private:
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
+
+    // helper buffers
+    std::vector<void*> pilot_buff0;
+    std::vector<void*> pilot_buff1;
 };
 #endif
