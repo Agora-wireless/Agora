@@ -4,9 +4,9 @@
  "channel" : "A",
  "frequency" : 3.6e9,
  "rxgainA" : 20,
- "txgainA" : 10,
+ "txgainA" : 20,
  "rxgainB" : 20,
- "txgainB" : 10
+ "txgainB" : 20,
  "rate" : 5e6,
  "ofdm_ca_num" : 512,
  "ofdm_data_num" : 304,
@@ -16,7 +16,7 @@
  "cp_len" : 32,
  "Zc" : 18,
  "frames" : [
-     "GGDDGGPPGGUUUG"
+     "GGDDGGPGGGUUUG"
  ],
  "hw_framer": false,
  "tx_advance" : 78,
