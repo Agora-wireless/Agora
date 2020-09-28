@@ -286,7 +286,7 @@ private:
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
      */
-    std::vector<std::vector<int8_t>> dl_demod_buffer_;
+    Table<int8_t> dl_demod_buffer_;
 
     /**
      *
@@ -297,6 +297,10 @@ private:
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<size_t> non_null_sc_ind_;
     std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
+    Table<size_t> decoded_bits_count_;
+    Table<size_t> bit_error_count_;
+    Table<size_t> decoded_blocks_count_;
+    Table<size_t> block_error_count_;
 
     /* Concurrent queues */
     /* task queue for downlink FFT */

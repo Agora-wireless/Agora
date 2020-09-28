@@ -35,14 +35,15 @@ Event_data DoPrecode::launch(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t base_sc_id = gen_tag_t(tag).sc_id;
-    size_t data_symbol_idx_dl = gen_tag_t(tag).symbol_id;
+    size_t symbol_id = gen_tag_t(tag).symbol_id;
+    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     size_t total_data_symbol_idx
-        = cfg->get_total_data_symbol_idx(frame_id, data_symbol_idx_dl);
+        = cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl);
 
     size_t start_tsc = worker_rdtsc();
     if (kDebugPrintInTask) {
         printf("In doPrecode TID %d: frame %zu, symbol %zu, subcarrier %zu\n",
-            tid, frame_id, data_symbol_idx_dl, base_sc_id);
+            tid, frame_id, symbol_id, base_sc_id);
     }
 
     __m256i index = _mm256_setr_epi64x(
@@ -58,7 +59,7 @@ Event_data DoPrecode::launch(size_t tag)
 
             complex_float* data_ptr = modulated_buffer_temp;
             if (data_symbol_idx_dl
-                <= cfg->dl_data_symbol_start - 1 + cfg->DL_PILOT_SYMS) {
+                < cfg->DL_PILOT_SYMS) {
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                     data_ptr[user_id]
                         = cfg->ue_specific_pilot[user_id][cur_sc_id];
@@ -125,7 +126,7 @@ Event_data DoPrecode::launch(size_t tag)
     if (kDebugPrintInTask) {
         printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
                "subcarrier: %zu\n",
-            tid, frame_id, data_symbol_idx_dl, base_sc_id);
+            tid, frame_id, symbol_id, base_sc_id);
     }
     return Event_data(EventType::kPrecode, tag);
 }
