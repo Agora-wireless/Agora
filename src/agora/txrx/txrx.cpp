@@ -121,6 +121,11 @@ void* PacketTXRX::demod_thread(int tid)
     demod_tx_socket_
         = setup_socket_ipv4(cfg->demod_tx_port, true, sock_buf_size);
 
+    for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+        setup_sockaddr_remote_ipv4(&millipede_addrs_[i], cfg->demod_rx_port,
+            cfg->server_addr_list[i].c_str());
+    }
+
     while (cfg->running) {
         // 1. Try to send demodulated data to decoders
         if (demul_status_->ready_to_decode(

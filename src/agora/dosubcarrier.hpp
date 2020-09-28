@@ -1,12 +1,5 @@
-/// Author: Kevin Boos
-/// Email: kevinaboos@gmail.com
-///
-/// @see DoSubcarrier
+#pragma once
 
-#ifndef DOSUBCARRIER_HPP
-#define DOSUBCARRIER_HPP
-
-// [Kevin]: unsure if all of these includes are needed.
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
@@ -202,7 +195,7 @@ public:
 private:
     void run_csi(size_t frame_id, size_t base_sc_id)
     {
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t frame_slot = frame_id % kFrameWnd;
         rt_assert(base_sc_id == sc_range_.start, "Invalid SC in run_csi!");
 
         complex_float converted_sc[kSCsPerCacheline];
@@ -218,6 +211,10 @@ private:
                 for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
                      block_idx < sc_range_.end / kTransposeBlockSize;
                      block_idx++) {
+
+                    const size_t block_base_offset
+                        = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+
                     for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
                          sc_j += kSCsPerCacheline) {
                         const size_t sc_idx
@@ -226,11 +223,13 @@ private:
                         simd_convert_float16_to_float32(
                             reinterpret_cast<float*>(converted_sc),
                             reinterpret_cast<float*>(pkt->data
-                                + (sc_idx + cfg->subcarrier_start) * 2),
+                                + (cfg->subcarrier_start + sc_idx) * 2),
                             kSCsPerCacheline * 2);
 
                         const complex_float* src = converted_sc;
-                        complex_float* dst = csi_buffers_[frame_slot][i];
+                        complex_float* dst = csi_buffers_[frame_slot][i]
+                            + block_base_offset + (j * kTransposeBlockSize)
+                            + sc_j;
 
                         // With either of AVX-512 or AVX2, load one cacheline =
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
@@ -282,14 +281,9 @@ private:
     /// The subcarrier range handled by this subcarrier doer.
     struct Range sc_range_;
 
-    // TODO: We should use owned objects here instead of pointers, but these
-    // buffers depend on some Tables beine malloc-ed
     DoZF* do_zf_;
     DoDemul* do_demul_;
     DoPrecode* do_precode_;
-    // Reciprocity*  computeReciprocity_;
-
-    // For the following buffers, see the `SubcarrierManager`'s documentation.
 
     // Input buffers
 
@@ -331,5 +325,3 @@ private:
     // Shared status with Decode threads
     DemulStatus* demul_status_;
 };
-
-#endif // DOSUBCARRIER_HPP

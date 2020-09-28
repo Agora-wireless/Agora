@@ -1172,6 +1172,8 @@ void Agora::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
+    demod_soft_buffer_to_decode_.malloc(
+        task_buffer_symbol_num_ul, 8 * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
