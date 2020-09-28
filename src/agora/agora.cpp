@@ -305,7 +305,7 @@ void Agora::start()
                         // If downlink data transmission is enabled, schedule
                         // downlink encoding for the first data symbol
                         schedule_codeblocks(EventType::kEncode, frame_id,
-                            cfg->dl_data_symbol_start);
+                            cfg->DLSymbols[0].front());
                     }
                 }
             } break;
@@ -432,19 +432,20 @@ void Agora::start()
                 /* Precoding is done, schedule ifft */
                 size_t sc_id = gen_tag_t(event.tags[0]).sc_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 print_per_task_done(
-                    PrintType::kPrecode, frame_id, data_symbol_idx, sc_id);
-                if (precode_stats_.last_task(frame_id, data_symbol_idx)) {
-                    schedule_antennas(
-                        EventType::kIFFT, frame_id, data_symbol_idx);
-                    if (data_symbol_idx < cfg->dl_data_symbol_end - 1) {
-                        schedule_codeblocks(
-                            EventType::kEncode, frame_id, data_symbol_idx + 1);
+                    PrintType::kPrecode, frame_id, symbol_id, sc_id);
+                if (precode_stats_.last_task(frame_id, symbol_id)) {
+                    schedule_antennas(EventType::kIFFT, frame_id, symbol_id);
+                    size_t symbol_idx_dl
+                        = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+                    if (symbol_idx_dl < cfg->dl_data_symbol_num_perframe - 1) {
+                        schedule_codeblocks(EventType::kEncode, frame_id,
+                            cfg->DLSymbols[0][symbol_idx_dl + 1]);
                     }
 
                     print_per_symbol_done(
-                        PrintType::kPrecode, frame_id, data_symbol_idx);
+                        PrintType::kPrecode, frame_id, symbol_id);
                     if (precode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kPrecodeDone, frame_id);
                         print_per_frame_done(PrintType::kPrecode, frame_id);
@@ -486,7 +487,7 @@ void Agora::start()
                     print_per_symbol_done(
                         PrintType::kPacketTX, frame_id, data_symbol_idx);
                     /* If tx of the first symbol is done */
-                    if (data_symbol_idx == cfg->dl_data_symbol_start) {
+                    if (data_symbol_idx == cfg->DLSymbols[0].front()) {
                         stats->master_set_tsc(
                             TsType::kTXProcessedFirst, frame_id);
                         print_per_frame_done(
@@ -1103,10 +1104,10 @@ void Agora::initialize_downlink_buffers()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num
-        = cfg->data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
+        = cfg->dl_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
 
     size_t dl_socket_buffer_status_size = cfg->BS_ANT_NUM
-        * SOCKET_BUFFER_FRAME_NUM * cfg->data_symbol_num_perframe;
+        * SOCKET_BUFFER_FRAME_NUM * cfg->dl_data_symbol_num_perframe;
     size_t dl_socket_buffer_size
         = cfg->packet_length * dl_socket_buffer_status_size;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size, 64, 0);
@@ -1195,13 +1196,11 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        int total_data_symbol_id
-            = (frame_id % TASK_BUFFER_FRAME_NUM) * cfg->data_symbol_num_perframe
-            + i + cfg->dl_data_symbol_start;
+        size_t total_data_symbol_id = cfg->get_total_data_symbol_idx_dl(frame_id, i);
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
-            int offset = total_data_symbol_id * cfg->BS_ANT_NUM + ant_id;
-            int packet_length = config_->packet_length;
+            size_t offset = total_data_symbol_id * cfg->BS_ANT_NUM + ant_id;
+            size_t packet_length = config_->packet_length;
             struct Packet* pkt
                 = (struct Packet*)(&dl_socket_buffer_[offset * packet_length]);
             short* socket_ptr = pkt->data;
