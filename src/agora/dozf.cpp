@@ -82,6 +82,10 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
             mat_dl_zf = mat_ul_zf;
+        // We should be scaling the beamforming matrix, so the IFFT
+        // output can be scaled with OFDM_CA_NUM across all antennas.
+        // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+        mat_dl_zf /= abs(mat_dl_zf).max();
     }
 }
 
