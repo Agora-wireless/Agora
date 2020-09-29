@@ -1,6 +1,13 @@
 Agora is a high-performance system for massive-MIMO baseband processing.
 
+## Overview
+\lin{Provide a link to the Agora Wiki}
+
+\lin{Describe Agora from a user's perspective at a high level: simulated BBU vs. real BBU}
+
 ## Requirements
+\lin{Requirements for what?}
+
  * Toolchain: A C++11 compiler and CMake 2.8+.
  * Required packages
    * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen
@@ -45,6 +52,9 @@ Agora is a high-performance system for massive-MIMO baseband processing.
         DESTDIR=/usr -j`
 
 ## Agora quickstart
+
+\lin{Quickstart to do what? Imagine a user comes here and tries Agora. What will she be trying here? What this quickstart will achieve?}
+\lin{maybe the title should be "Agora with simulated BBU"?}
 
  * Build Agora
     ```
@@ -98,11 +108,17 @@ Agora is a high-performance system for massive-MIMO baseband processing.
    "Hardware mode" section below.
 
  * Before contributing, please go over CONTRIBUTING.md
+ 
+### Server setup 
+\lin{Here provide the information about the server setup used in the paper}
 
-## Running with hardware UEs
+## Agora with real BBU and UEs
+\lin{Do we need to describe the BBU too?}
 
 This section provides instructions for generating and processing real wireless
 traffic with hardware UEs (e.g., Iris devices)
+
+\lin{What are Iris devices?}
 
 ### Prepare the Iris UE devices
 
