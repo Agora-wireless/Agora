@@ -53,8 +53,8 @@ Event_data DoEncode::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-    int8_t* input_ptr = cfg->get_info_bits(
-        raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+    int8_t* input_ptr
+        = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
         encoded_buffer_temp, parity_buffer, input_ptr);
