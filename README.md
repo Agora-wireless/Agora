@@ -7,7 +7,7 @@ Some highlights:
 
 * Agora currently supports baseband processing of up to 64 RRU antennas, 16 UEs, 20 MHz bandwidth, and 64QAM modulation. A 36-core server with AVX512 support is sufficient to run Agora under this maximum configuration.
 * Agora can support vaious configurations: different numbers of RRU antennas and UEs, different bandwidth, different moduation orders, different LDPC code rates.
-* Agora can work without real hardware. A high-performance packet genrator is implemented to emulate RRU traffic.
+* Agora can work without real hardware. A high-performance packet generator is implemented to emulate a massive MIMO RRU.
 * Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
 
