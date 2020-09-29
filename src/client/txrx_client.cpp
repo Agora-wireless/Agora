@@ -368,9 +368,10 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
     if (c->hw_framer) {
         frame_id = (size_t)(rxTime >> 32);
         symbol_id = (size_t)((rxTime >> 16) & 0xFFFF);
+    } else {
+        assert(c->hw_framer || ((rxTime - time0) / frm_num_samps) == frame_id);
     }
-    assert(c->hw_framer || (rxTime - time0) / frm_num_samps == frame_id);
-    if (kDebugBSSender) {
+    if (kDebugPrintInTask) {
         printf("downlink receive: thread %d, frame_id %zu, symbol_id "
                "%zu, radio_id %zu "
                "rxtime %llx\n",
