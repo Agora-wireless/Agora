@@ -3,11 +3,11 @@ Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for
 Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
 to the actual code structure.
 
-Some Highlights:
+Some highlights:
 
-* Agora currently supports baseband processing of up to 64 RRU antennas, 16 UEs, 20 MHz bandwidth, and 64QAM modulation. A 36-core server with AVX512 support is sufficient to run Agora under the maximum configuration.
+* Agora currently supports baseband processing of up to 64 RRU antennas, 16 UEs, 20 MHz bandwidth, and 64QAM modulation. A 36-core server with AVX512 support is sufficient to run Agora under this maximum configuration.
 * Agora can support vaious configurations: different numbers of RRU antennas and UEs, different bandwidth, different moduation orders, different LDPC code rates.
-* Agora can work without real hardware. A high-performance packet genrator is implemented to emulate RRU.
+* Agora can work without real hardware. A high-performance packet genrator is implemented to emulate RRU traffic.
 * Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
 
