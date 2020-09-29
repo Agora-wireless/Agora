@@ -1,7 +1,9 @@
 Agora is a high-performance system for real-time massive MIMO baseband processing. 
 Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
 Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
-to the actual code structure.
+to the actual code structure. More information about its design and evaluation results
+can be found in the paper to appear in CoNEXT 2020.
+\lin{I don't know how to link to Documentation below. Could you do it?}
 
 Some highlights:
 
@@ -13,7 +15,11 @@ Some highlights:
 
 Before contributing, please go over CONTRIBUTING.md
 
+\lin{Please add a link to the md file above}
+
 ## Requirements for building Agora
+Agora can be built with the following setup.
+
  * Toolchain: A C++11 compiler and CMake 2.8+.
  * Operating system: Linux (Ubuntu 16.04 and 18.04 are tested)
  * Required packages
@@ -59,8 +65,8 @@ Before contributing, please go over CONTRIBUTING.md
         DESTDIR=/usr -j`
 
 ## Agora with emulated RRU
-We provide a high performance packet generator to emulate RRU, which allows running Agora without using actual hardware. 
-The following are steps to set up both Agora and the packet generator (sender).
+We provide a high performance packet generator to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator (sender).
+\lin{You probably should provide a link to the code folder for the packet generator. Why did you put (sender) there?}
 
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
@@ -141,6 +147,8 @@ traffic with hardware RRU and UEs. In our experiements, we use a 64-antenna
 Faros base station as RRU, and Iris UE devices as UEs, both are available from 
 [Skylark Wireless](https://skylarkwireless.com).
 
+\lin{You talk about preparing UEs below. How abot RRU?}
+\lin{How to run it with the POWER testbed? Maybe that's more useful for the community?}
 ### Prepare the Iris UE devices
 
  * Flash the client Iris UE device with the proper image
