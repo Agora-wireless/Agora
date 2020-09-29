@@ -227,10 +227,14 @@ if(${USE_DPDK})
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
-else()
+elseif(${USE_ARGOS})
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx.cpp
     src/agora/txrx/txrx_argos.cpp)
+elseif(${USE_UHD})
+  set(AGORA_SOURCES ${AGORA_SOURCES}
+    src/agora/txrx/txrx.cpp
+    src/agora/txrx/txrx_usrp.cpp)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
