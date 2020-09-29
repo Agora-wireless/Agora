@@ -233,9 +233,9 @@ void ChannelSim::start()
                                 "user to %zu BS antennas\n",
                                 frame_id, symbol_id, uecfg->UE_ANT_NUM,
                                 bscfg->BS_ANT_NUM);
-                        Event_data do_tx_bs_task(
-                            EventType::kPacketTX, event.tags[0]);
-                        schedule_task(do_tx_bs_task, &task_queue_bs, ptok_bs);
+                        schedule_task(
+                            Event_data(EventType::kPacketTX, event.tags[0]),
+                            &task_queue_bs, ptok_bs);
                     }
                     // received a packet from a BS antenna
                 } else if (gen_tag_t(event.tags[0]).tag_type
@@ -257,10 +257,9 @@ void ChannelSim::start()
                                    "BS to %zu user antennas\n",
                                 frame_id, symbol_id, bscfg->BS_ANT_NUM,
                                 uecfg->UE_ANT_NUM);
-                        Event_data do_tx_user_task(
-                            EventType::kPacketTX, event.tags[0]);
                         schedule_task(
-                            do_tx_user_task, &task_queue_user, ptok_user);
+                            Event_data(EventType::kPacketTX, event.tags[0]),
+                            &task_queue_user, ptok_user);
                     }
                 }
             } break;
@@ -476,6 +475,10 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         2 * bscfg->sampsPerSymbol * uecfg->UE_ANT_NUM);
 
     cx_fmat fmat_dst = fmat_src * channel;
+    // add 30dB SNR noise
+    cx_fmat noise(1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM),
+        1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM));
+    fmat_dst += noise;
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 
@@ -528,7 +531,11 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         reinterpret_cast<float*>(fmat_src.memptr()),
         2 * bscfg->sampsPerSymbol * bscfg->BS_ANT_NUM);
 
-    cx_fmat fmat_dst = fmat_src * channel.st();
+    cx_fmat fmat_dst = fmat_src * channel.st() / std::sqrt(bscfg->BS_ANT_NUM);
+    // add 30dB SNR noise
+    cx_fmat noise(1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM),
+        1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM));
+    fmat_dst += noise;
     if (kPrintChannelOutput)
         print_mat(fmat_dst);
 

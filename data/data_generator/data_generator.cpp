@@ -325,6 +325,7 @@ int main(int argc, char* argv[])
             auto* ptr_in_precoder = (cx_float*)precoder[j];
             cx_fmat mat_precoder(
                 ptr_in_precoder, cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
+            mat_precoder /= abs(mat_precoder).max();
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
             // printf("symbol %d, sc: %d\n", i, j - cfg->OFDM_DATA_START);
@@ -335,10 +336,6 @@ int main(int argc, char* argv[])
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
             complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->OFDM_CA_NUM;
             CommsLib::IFFT(ptr_ifft, cfg->OFDM_CA_NUM, false);
-
-            cx_fmat mat_data((cx_float*)ptr_ifft, 1, cfg->OFDM_CA_NUM, false);
-            float scale = abs(mat_data).max();
-            mat_data /= scale;
 
             short* txSymbol = dl_tx_data[i] + j * cfg->sampsPerSymbol * 2;
             memset(txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix_);
