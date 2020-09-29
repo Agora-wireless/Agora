@@ -1,49 +1,56 @@
-Agora is a high-performance system for massive-MIMO baseband processing.
+Agora is a high-performance system for real-time massive MIMO baseband processing. 
+Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
+Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
+to the actual code structure.
 
-## Overview
-\lin{Provide a link to the Agora Wiki}
+Some Highlights:
 
-\lin{Describe Agora from a user's perspective at a high level: simulated BBU vs. real BBU}
+* Agora currently supports baseband processing of up to 64 RRU antennas, 16 UEs, 20 MHz bandwidth, and 64QAM modulation. A 36-core server with AVX512 support is sufficient to run Agora under the maximum configuration.
+* Agora can support vaious configurations: different numbers of RRU antennas and UEs, different bandwidth, different moduation orders, different LDPC code rates.
+* Agora can work without real hardware. A high-performance packet genrator is implemented to emulate RRU.
+* Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
+[Skylark Wireless](https://skylarkwireless.com). 
 
-## Requirements
-\lin{Requirements for what?}
+Before contributing, please go over CONTRIBUTING.md
 
+## Requirements for building Agora
  * Toolchain: A C++11 compiler and CMake 2.8+.
+ * Operating system: Linux (Ubuntu 16.04 and 18.04 are tested)
  * Required packages
-   * `sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen
-     nlohmann-json-dev python-numpy python-pyqt5 libgflags-dev`
-     * If `nlohmann-json-dev` package can't be found, get code from
-       [here](https://github.com/nlohmann/json) and build from source.
-
-   * Install Armadillo: `./scripts/install_armadillo.sh`.
-   * Install the latest version of SoapySDR: `./scripts/install_soapysdr.sh`.
+   * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/ubuntu.sh.
    * Download and install Intel libraries:
      * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
-     * Download [Intel FlexRAN's FEC
-       SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
-       for LDPC decoding to `/opt`.
-     * Compiling FlexRAN requires an Intel compiler.
-        * For Agora developers: Please ask internally for precompiled
-          FlexRAN libraries to use from `gcc`.
-        * For Agora users:
-          * Intel compiler version 19.0.4 is required for compiling FlexRAN.
-            Newer versions will not work. Please reach out to the current
-            Agora developers to learn how to get the correct versions of
-            Intel Parallel Studio XE or Intel System Studio.
-          * Set required environment variables by sourcing `compilervars.sh`.
-            For example, if Intel compiler is in `/opt`, run `source $(find
-            2>/dev/null/opt -name compilervars.sh) intel64`. After running this
-            command, ensure that `icc --version` reports 19.0.4.
-          * After instaling `icc 19.04`, compile FlexRAN as follows:
-          ```
-          sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ % Allow all
-          users read-write access cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ sed -i
-          '/add_compile_options("-Wall")/a \ \
-          add_compile_options("-ffreestanding")'
-          cmake/intel-compile-options.cmake ./create-makefiles-linux.sh cd
-          build-avx512-icc % or build-avx2-icc make
-          ```
+       * MKL can also be installed from Intel Parallel Studio XE, please reach out to the current
+         Agora developers to learn how to get the correct version. 
+       * Note: MKL version after 2019 update 3 is required to enable JIT acceleration applied for matrix multiplication in the code.
+     * Install Intel FlexRAN's FEC SDK for LDPC encoding and decoding
+        * Download [Intel FlexRAN's FEC
+           SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
+           for LDPC decoding to `/opt`.
+        * Compiling FlexRAN requires an Intel compiler. Intel compiler version <= 19.0.4 is required for compiling FlexRAN.
+          Newer versions will not work. 
+          * Please reach out to the current
+          Agora developers to learn how to get the correct versions of
+          Intel Parallel Studio XE or Intel System Studio. Version 2019 initial 
+          release of Intel Prallel Studio XE has been tested to work. 
+          * If you are using a newer version of icc, please reach out to the current
+          Agora developers to get the patch for resolving conflicts with FlexRAN.
+        * Set required environment variables by sourcing `compilervars.sh`.
+          For example, if Intel compiler is in `/opt`, run `source $(find
+          2>/dev/null/opt -name compilervars.sh) intel64`. After running this
+          command, ensure that `icc --version` reports 19.0.4.
+        * After instaling `icc 19.04`, compile FlexRAN as follows:
+        ```
+        sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ # Allow all users read-write access 
+        cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ 
+        sed -i '/add_compile_options("-Wall")/a \ \
+        add_compile_options("-ffreestanding")'
+        cmake/intel-compile-options.cmake 
+        ./create-makefiles-linux.sh 
+        cd build-avx512-icc # or build-avx2-icc 
+        make -j
+        ```
 
    * Optional: DPDK
       * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
@@ -51,12 +58,11 @@ Agora is a high-performance system for massive-MIMO baseband processing.
       * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
         DESTDIR=/usr -j`
 
-## Agora quickstart
+## Agora with emulated RRU
+We provide a high performance packet generator to emulate RRU, which allows running Agora without using actual hardware. 
+The following are steps to set up both Agora and the packet generator (sender).
 
-\lin{Quickstart to do what? Imagine a user comes here and tries Agora. What will she be trying here? What this quickstart will achieve?}
-\lin{maybe the title should be "Agora with simulated BBU"?}
-
- * Build Agora
+ * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
     cd Agora
     mkdir build
@@ -65,19 +71,19 @@ Agora is a high-performance system for massive-MIMO baseband processing.
     make -j
     ```
 
- * Run end-to-end tests
+ * Run end-to-end test (uplink and downlik tests should both pass if everything is set up correctly).
     ```
     ./test/test_agora/test_agora.sh 100 out % Runs test for 100 iterations
     ```
 
- * Run Agora with simulated client traffic
+ * Run Agora with simulated RRU traffic
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator data/tddconfig-sim-ul.json` to generate data
      files.
    * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
-     --delay=5000 --enable_slow_start=true
+     --frame_duation=5000 --enable_slow_start=1
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores, 
@@ -105,26 +111,41 @@ Agora is a high-performance system for massive-MIMO baseband processing.
      otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
-   "Hardware mode" section below.
-
- * Before contributing, please go over CONTRIBUTING.md
+   "Agora with real RRU and UEs" section below.
  
-### Server setup 
-\lin{Here provide the information about the server setup used in the paper}
+ 
+### Server setup for performance tests
+To test the performance of Agora, we recommend using two servers 
+(one for Agora and another for the sender) and DPDK for networking. 
+In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
+The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
+We use both ports with DPDK to get enough throughput for the traffic of 64 antennas. 
+We did the following server configurations
+  * Disable Turbo Boost to reduce performance variation by running 
+   `echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost`
+  * Set CPU scaling to performance by running 
+    `sudo cpupower frequency-set -g performance`, 
+    where cpupower can be installed through
+    `sudo apt-get install -y linux-tools-$(uname -r)`
+  * Turn off hyper-threading. We provide an example bash script 
+	 (scripts/tune_hyperthread.sh), where the core indices of on line 4 are machine dependent.
+  * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
+    We direct all the interrupts to core 0 in our experiments.  
+	  We provide an example bash script (scripts/set_smp_affinity.sh), 
+    where the IRQ indices are machine dependent.
 
-## Agora with real BBU and UEs
-\lin{Do we need to describe the BBU too?}
+## Agora with real RRU and UEs
 
 This section provides instructions for generating and processing real wireless
-traffic with hardware UEs (e.g., Iris devices)
-
-\lin{What are Iris devices?}
+traffic with hardware RRU and UEs. In our experiements, we use a 64-antenna 
+Faros base station as RRU, and Iris UE devices as UEs, both are available from 
+[Skylark Wireless](https://skylarkwireless.com).
 
 ### Prepare the Iris UE devices
 
  * Flash the client Iris UE device with the proper image
    * Download the image
-     [bundle]https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz
+     [bundle](https://files.sklk.us/release/universal_2020.04.0.1-3-c9adc42.tar.gz)
    * Unpack the tarball `bootfiles-iris030_ue-2020.04.0.1-3-c9adc42.tar.gz` and
      the one inside.
    * Copy `BOOT.BIN` and `image.ub` files to the SD card of you Iris.
