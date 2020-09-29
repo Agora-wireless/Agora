@@ -52,14 +52,14 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    size_t symbol_id_in_buffer = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     int8_t* input_ptr = cfg->get_info_bits(
-        raw_data_buffer_, symbol_id_in_buffer, ue_id, cur_cb_id);
+        raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
         encoded_buffer_temp, parity_buffer, input_ptr);
     int8_t* final_output_ptr = cfg->get_encoded_buf(
-        encoded_buffer_, frame_id, symbol_id, ue_id, cur_cb_id);
+        encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
         reinterpret_cast<uint8_t*>(final_output_ptr),
         bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);

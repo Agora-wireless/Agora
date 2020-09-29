@@ -105,8 +105,6 @@ Config::Config(std::string jsonfile)
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         pilot_symbol_num_perframe = tddConf.value(
             "pilot_num", freq_orthogonal_pilot ? 1 : UE_ANT_NUM);
-        data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
-            symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
             downlink_mode
                 ? 0
