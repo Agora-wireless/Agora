@@ -113,18 +113,16 @@ static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 static constexpr bool kCollectPhyStats = false;
 
-#define COMBINE_EQUAL_DECODE 1
-
-#define DO_PREDICTION 0
-#define INIT_FRAME_NUM 10
-
 static constexpr bool kDebugPrintPerFrameDone = true;
 static constexpr bool kDebugPrintPerFrameStart = false;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
+
+/// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
+
 static constexpr bool kDebugBSSender = false;
 static constexpr bool kDebugBSReceiver = true;
 

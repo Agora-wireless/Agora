@@ -83,7 +83,7 @@ The following are steps to set up both Agora and the packet generator (sender).
    * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
-     --frame_duation=5000 --enable_slow_start=1
+     --frame_duration=5000 --enable_slow_start=1
      --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
      sender with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores, 
