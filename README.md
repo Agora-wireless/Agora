@@ -2,8 +2,7 @@ Agora is a high-performance system for real-time massive MIMO baseband processin
 Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
 Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
 to the actual code structure. More information about its design and evaluation results
-can be found in the paper to appear in CoNEXT 2020.
-\lin{I don't know how to link to Documentation below. Could you do it?}
+can be found in the [paper](#documentation) to appear in CoNEXT 2020.
 
 Some highlights:
 
@@ -13,9 +12,7 @@ Some highlights:
 * Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
 
-Before contributing, please go over CONTRIBUTING.md
-
-\lin{Please add a link to the md file above}
+Before contributing, please go over [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Requirements for building Agora
 Agora can be built with the following setup.
@@ -65,8 +62,7 @@ Agora can be built with the following setup.
         DESTDIR=/usr -j`
 
 ## Agora with emulated RRU
-We provide a high performance packet generator to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator (sender).
-\lin{You probably should provide a link to the code folder for the packet generator. Why did you put (sender) there?}
+We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
@@ -89,9 +85,9 @@ We provide a high performance packet generator to emulate the RRU. This generato
    * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
-     --frame_duration=5000 --enable_slow_start=1
-     --conf_file=data/tddconfig-sim-ul.json` to start the simulated traffic
-     sender with uplink configuration.
+     --frame_duration=5000 --enable_slow_start=1 
+     --conf_file=data/tddconfig-sim-ul.json` to start the simulated RRU 
+     with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores, 
      otherwise there will be performance slow down.
 
