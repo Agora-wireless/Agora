@@ -105,8 +105,6 @@ Config::Config(std::string jsonfile)
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         pilot_symbol_num_perframe = tddConf.value(
             "pilot_num", freq_orthogonal_pilot ? 1 : UE_ANT_NUM);
-        data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
-            symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
             downlink_mode
                 ? 0
@@ -123,7 +121,8 @@ Config::Config(std::string jsonfile)
                 = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
                 = dl_symbol_start + dl_data_symbol_num_perframe;
-            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start; s++)
+            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start;
+                 s++)
                 sched += "G";
             for (size_t s = dl_symbol_start; s < dl_symbol_end; s++)
                 sched += "D";
@@ -164,12 +163,10 @@ Config::Config(std::string jsonfile)
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;
-    dl_data_symbol_start = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0].front()
-        : 0;
-    dl_data_symbol_end = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0].back() + 1
-        : 0;
+    dl_data_symbol_start
+        = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].front() : 0;
+    dl_data_symbol_end
+        = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].back() + 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot
         and UE_ANT_NUM != pilot_symbol_num_perframe) {
