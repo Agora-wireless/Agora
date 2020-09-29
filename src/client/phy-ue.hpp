@@ -40,7 +40,7 @@ class Phy_UE {
 public:
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
-    static const int dequeue_bulk_size = 5;
+    static const int kDequeueBulkSizeTXRX = 8;
 
     Phy_UE(Config* cfg);
     ~Phy_UE();
@@ -327,19 +327,20 @@ private:
     moodycamel::ProducerToken* task_ptok[kMaxThreads];
 
     // all checkers
-    size_t csi_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t data_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t csi_checker_[kFrameWnd];
+    size_t data_checker_[kFrameWnd];
 
     // can possibly remove this checker
-    size_t* demul_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t demul_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* demul_checker_[kFrameWnd];
+    size_t demul_status_[kFrameWnd];
 
-    size_t* demodul_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t demodul_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* demodul_checker_[kFrameWnd];
+    size_t demodul_status_[kFrameWnd];
 
-    size_t* decode_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t decode_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* decode_checker_[kFrameWnd];
+    size_t decode_status_[kFrameWnd];
 
+    double frame_dl_process_time_[kFrameWnd * kMaxUEs];
     std::queue<std::tuple<int, int>> taskWaitList;
 
     // for python
