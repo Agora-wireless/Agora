@@ -120,6 +120,7 @@ public:
      * uplink symbols for transmission from the hardware.
      */
     void* loop_tx_rx_argos_sync(int tid);
+    void* loop_tx_rx_usrp_sync(int tid);
 
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
