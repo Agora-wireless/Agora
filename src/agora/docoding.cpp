@@ -149,8 +149,9 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cfg->mod_order_bits * (LDPC_config.cbCodewLen * cur_cb_id));
+    auto* llr_buffer_ptr
+        = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
+            symbol_idx_ul, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
 
     uint8_t* decoded_buffer_ptr
         = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
@@ -177,7 +178,7 @@ Event_data DoDecode::launch(size_t tag)
     }
 
     if (kPrintDecodedData) {
-        printf("Decoded data\n");
+        printf("Decoded data: ");
         for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
             printf("%u ", *(decoded_buffer_ptr + i));
         }

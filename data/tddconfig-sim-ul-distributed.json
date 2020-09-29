@@ -12,7 +12,8 @@
     "fft_in_rru": true,
     "disable_master": true,
     "server_addr_list": [
-        "192.168.21.181"
+        "192.168.21.181",
+        "192.168.21.182"
     ],
     "frames" : [
       "PPPPU"

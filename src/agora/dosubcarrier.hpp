@@ -174,6 +174,24 @@ public:
 
                 n_demul_tasks_done_++;
                 if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
+                    /*
+                    // Debug printing: TODO, should use MLPD_TRACE
+                    for (size_t i = 0; i < 4; i++) {
+                        usleep(tid * 3000);
+                        int8_t* demul_ptr = demod_buffers_[demul_cur_frame_
+                            % kFrameWnd][demul_cur_sym_
+                            - cfg->pilot_symbol_num_perframe][i];
+                        printf("UE %zu: ", i);
+                        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+                            if (i % 20 == 0) {
+                                printf(
+                                    "%d ", demul_ptr[i * cfg->mod_order_bits]);
+                            }
+                        }
+                        printf("\n");
+                    }
+                    */
+
                     n_demul_tasks_done_ = 0;
                     demul_status_->demul_complete(
                         demul_cur_frame_, demul_cur_sym_, n_demul_tasks_reqd);
