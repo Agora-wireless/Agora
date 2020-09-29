@@ -1,8 +1,4 @@
 Agora is a high-performance system for real-time massive MIMO baseband processing. 
-Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
-Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
-to the actual code structure. More information about its design and evaluation results
-can be found in the [paper](#documentation) to appear in CoNEXT 2020.
 
 Some highlights:
 
@@ -150,14 +146,20 @@ We did the following server configurations
 
 ## Agora with real RRU and UEs
 
-This section provides instructions for generating and processing real wireless
-traffic with hardware RRU and UEs. In our experiements, we use a 64-antenna 
-Faros base station as RRU, and Iris UE devices as UEs, both are available from 
-[Skylark Wireless](https://skylarkwireless.com). 
+Currently Agora suports a 64-antenna 
+Faros base station as RRU and Iris UE devices. Both are commercially available from 
+[Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
+Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs. 
+\lin{Can you point out the code/interface that are specific to the hardware and need to be changed for a new hardware?}
+
+
+Below we describe how to get it to work with Faros RRU and Iris UEs.
 
 ### Run the uplink demo
 
  * Run the client on a machine connected to the Iris UEs
+ 
+ \lin{What is ``the client''?}
    * Rebuild the code
      * Pass `DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
@@ -190,7 +192,9 @@ Faros base station as RRU, and Iris UE devices as UEs, both are available from
 Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
 
 ## Documentation
-Technical details and performance results can be found in
+Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
+Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
+to the actual code structure. Technical details and performance results can be found in
  * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, November 2020.
  
 ## Contact
