@@ -220,9 +220,9 @@ int main(int argc, char* argv[])
             cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
 
         for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-            auto* ptr_in_csi
-                = reinterpret_cast<arma::cx_float*>(csi_matrices[j]);
-            arma::cx_fmat mat_csi(ptr_in_csi, cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
+            arma::cx_fmat mat_csi(
+                reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
+                cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
             mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
         }
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
