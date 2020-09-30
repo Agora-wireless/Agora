@@ -13,7 +13,10 @@ public:
     // The profile of the input information bits
     enum class Profile {
         kRandom, // The input information bytes are chosen at random
-        k123 // The input informatioon bytes are 1, 2, 3, 1, 2, 3, ...
+
+        // The input informatioon bytes are {1, 2, 3, 1, 2, 3, ...} for UE 0,
+        // {4, 5, 6, 4, 5, 6, ...} for UE 1, and so on
+        k123
     };
 
     DataGenerator(
@@ -32,9 +35,10 @@ public:
      *
      * @param information The generated input bit sequence
      * @param encoded_codeword The generated encoded codeword bit sequence
+     * @param ue_id ID of the UE that this codeblock belongs to
      */
-    void gen_codeblock_ul(
-        std::vector<int8_t>& information, std::vector<int8_t>& encoded_codeword)
+    void gen_codeblock_ul(std::vector<int8_t>& information,
+        std::vector<int8_t>& encoded_codeword, size_t ue_id)
     {
         const LDPCconfig& lc = cfg->LDPC_config;
         std::vector<int8_t> parity;
@@ -47,7 +51,7 @@ public:
             if (profile == Profile::kRandom) {
                 information[i] = static_cast<int8_t>(fast_rand.next_u32());
             } else if (profile == Profile::k123) {
-                information[i] = (i % 3) + 1;
+                information[i] = 1 + (ue_id * 3) + (i % 3);
             }
         }
 

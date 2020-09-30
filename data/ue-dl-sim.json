@@ -3,10 +3,12 @@
  "ofdm_data_num" : 1200,
  "rate" : 30.72e6,
  "worker_thread_num" : 2,
+ "socket_thread_num" : 1,
  "demul_block_size" : 48,
  "ue_num": 2,
  "core_offset" : 16,
  "UE" : true,
+ "client_dl_pilot_syms" : 1,
  "downlink_mode" : true
 }
 

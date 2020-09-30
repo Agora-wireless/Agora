@@ -1,3 +1,4 @@
+#!/bin/bash
 echo 'Current status'
 cat /sys/devices/system/cpu/cpu*/online
 
