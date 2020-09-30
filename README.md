@@ -57,9 +57,7 @@ Agora can be built with the following setup.
         ```
         sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ # Allow all users read-write access 
         cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ 
-        sed -i '/add_compile_options("-Wall")/a \ \
-        add_compile_options("-ffreestanding")'
-        cmake/intel-compile-options.cmake 
+        sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake 
         ./create-makefiles-linux.sh 
         cd build-avx512-icc # or build-avx2-icc 
         make -j
@@ -141,7 +139,7 @@ We did the following server configurations for the server that runs Agora
     where cpupower can be installed through
     `sudo apt-get install -y linux-tools-$(uname -r)`
   * Turn off hyper-threading. We provide an example bash script 
-	 (scripts/tune_hyperthread.sh), where the core indices of on line 4 are machine dependent.
+	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
   * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
     We direct all the interrupts to core 0 in our experiments.  
 	  We provide an example bash script (scripts/set_smp_affinity.sh), 
@@ -158,8 +156,8 @@ In this section, we provide the instruction to collect and analyze timestamp tra
     (Note: using a process priority 99 is dangerous. Before running it, 
     make sure you have direct OS interrupts used by Agora's cores.)
   * Run emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
-  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a MATLAB script to process the timestamp trace. 
-  * We also provide MATLAB scripts that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
+  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
+  * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
 ## Agora with real RRU and UEs
 
@@ -190,8 +188,8 @@ Below we describe how to get it to work with Faros RRU and Iris UEs.
      cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
      sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
      ./create-makefiles-linux.sh
-     cd build-avx512-icc % or build-avx2-icc
-     make
+     cd build-avx512-icc # or build-avx2-icc
+     make -j
      ```
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.

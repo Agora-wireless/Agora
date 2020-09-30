@@ -442,8 +442,7 @@ void Stats::save_to_file()
         fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-            "kZFDone, kPrecodeDone, kRXDone, time in CSI, time in FFT, "
-            "time in ZF, time in Demul, time in Decode\n");
+            "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
 
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
@@ -468,8 +467,8 @@ void Stats::save_to_file()
         fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-            "kZFDone, kDemulDone, kRXDone, time in CSI, time in FFT, "
-            "time in ZF, time in Demul, time in Decode\n");
+            "kZFDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
+            "FFT, time in ZF, time in Demul, time in Decode\n");
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
             for (size_t j = 0; j < config_->socket_thread_num; j++) {
