@@ -74,7 +74,7 @@ Agora::Agora(Config* cfg)
         cfg->core_offset, cfg->core_offset + 1,
         cfg->core_offset + 1 + cfg->socket_thread_num - 1,
         base_worker_core_offset,
-        base_worker_core_offset + cfg->worker_thread_num);
+        base_worker_core_offset + cfg->worker_thread_num - 1);
 }
 
 Agora::~Agora()
@@ -1196,7 +1196,8 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        size_t total_data_symbol_id = cfg->get_total_data_symbol_idx_dl(frame_id, i);
+        size_t total_data_symbol_id
+            = cfg->get_total_data_symbol_idx_dl(frame_id, i);
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             size_t offset = total_data_symbol_id * cfg->BS_ANT_NUM + ant_id;

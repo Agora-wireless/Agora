@@ -65,7 +65,7 @@ public:
             sizeof(serveraddr));
         if (ret != 0) {
             throw std::runtime_error("UDPServer: Failed to bind socket to port "
-                + std::to_string(port));
+                + std::to_string(port) + ". Error: " + strerror(errno));
         }
     }
 
