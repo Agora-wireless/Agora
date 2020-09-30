@@ -72,7 +72,7 @@ public:
         moodycamel::ConcurrentQueue<Event_data>&,
         moodycamel::ConcurrentQueue<Event_data>&, moodycamel::ProducerToken*,
         /// The range of subcarriers handled by this subcarrier doer.
-        struct Range subcarrier_range,
+        Range sc_range,
         // input buffers
         Table<char>& socket_buffer, Table<int>& socket_buffer_status,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -90,7 +90,7 @@ public:
         DemulStatus* demul_status = nullptr)
         : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
               nullptr /* tok */)
-        , sc_range_(subcarrier_range)
+        , sc_range_(sc_range)
         , socket_buffer_(socket_buffer)
         , socket_buffer_status_(socket_buffer_status)
         , csi_buffers_(csi_buffers)
@@ -131,9 +131,6 @@ public:
         delete do_precode_;
         // delete computeReciprocity_;
     }
-
-    // Returns the range of subcarrier IDs handled by this subcarrier doer.
-    Range& subcarrier_range() { return sc_range_; }
 
     void start_work()
     {
