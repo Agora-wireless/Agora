@@ -6,6 +6,7 @@ static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
+static constexpr bool kPrintDownlinkPilotStats = false;
 
 Phy_UE::Phy_UE(Config* config)
 {
@@ -606,46 +607,51 @@ void Phy_UE::doFFT(int tid, size_t tag)
             frame_id, symbol_id, ant_id);
     }
 
-#if DEBUG_DL_PILOT
-    size_t sym_offset = 0;
-    if (config_->isPilot(frame_id, symbol_id)) {
-        std::vector<std::complex<float>> vec;
-        size_t seq_len = ue_pilot_vec[ant_id].size();
-        for (size_t i = 0; i < config_->sampsPerSymbol; i++)
-            vec.push_back(std::complex<float>(
-                pkt->data[2 * i] / 32768.0, pkt->data[2 * i + 1] / 32768.0));
-        sym_offset
-            = CommsLib::find_pilot_seq(vec, ue_pilot_vec[ant_id], seq_len);
-        sym_offset = sym_offset < seq_len ? 0 : sym_offset - seq_len;
-        float noise_power = 0;
-        for (size_t i = 0; i < sym_offset; i++)
-            noise_power += std::pow(std::abs(vec[i]), 2);
-        float signal_power = 0;
-        for (size_t i = sym_offset; i < 2 * sym_offset; i++)
-            signal_power += std::pow(std::abs(vec[i]), 2);
-        float SNR = 10 * std::log10(signal_power / noise_power);
-        printf("frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
-            frame_id, symbol_id, ant_id, sym_offset, SNR);
-        if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250) {
-            record_frame = frame_id;
-        }
-        if (frame_id == record_frame) {
-            std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
-            FILE* f = fopen(fname.c_str(), "wb");
-            fwrite(pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
-            fclose(f);
-        }
+    if (kPrintDownlinkPilotStats) {
+        size_t sym_offset = 0;
+        if (config_->isPilot(frame_id, symbol_id)) {
+            std::vector<std::complex<float>> vec;
+            size_t seq_len = ue_pilot_vec[ant_id].size();
+            for (size_t i = 0; i < config_->sampsPerSymbol; i++)
+                vec.push_back(std::complex<float>(pkt->data[2 * i] / 32768.0,
+                    pkt->data[2 * i + 1] / 32768.0));
+            sym_offset
+                = CommsLib::find_pilot_seq(vec, ue_pilot_vec[ant_id], seq_len);
+            sym_offset = sym_offset < seq_len ? 0 : sym_offset - seq_len;
+            float noise_power = 0;
+            for (size_t i = 0; i < sym_offset; i++)
+                noise_power += std::pow(std::abs(vec[i]), 2);
+            float signal_power = 0;
+            for (size_t i = sym_offset; i < 2 * sym_offset; i++)
+                signal_power += std::pow(std::abs(vec[i]), 2);
+            float SNR = 10 * std::log10(signal_power / noise_power);
+            printf(
+                "frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
+                frame_id, symbol_id, ant_id, sym_offset, SNR);
+            if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250) {
+                record_frame = frame_id;
+            }
+            if (frame_id == record_frame) {
+                std::string fname
+                    = "rxpilot" + std::to_string(symbol_id) + ".bin";
+                FILE* f = fopen(fname.c_str(), "wb");
+                fwrite(
+                    pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
+                fclose(f);
+            }
 
-    } else {
-        if (frame_id == record_frame) {
-            std::string fname = "rxdata" + std::to_string(symbol_id) + ".bin";
-            FILE* f = fopen(fname.c_str(), "wb");
-            fwrite(pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
-            fclose(f);
-            // record_frame = -1;
+        } else {
+            if (frame_id == record_frame) {
+                std::string fname
+                    = "rxdata" + std::to_string(symbol_id) + ".bin";
+                FILE* f = fopen(fname.c_str(), "wb");
+                fwrite(
+                    pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
+                fclose(f);
+                // record_frame = -1;
+            }
         }
     }
-#endif
 
     // remove CP, do FFT
     size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);

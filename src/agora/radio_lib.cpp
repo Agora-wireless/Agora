@@ -434,15 +434,15 @@ int RadioConfig::radioTx(
     // long long frameTime(0);
     int w = baStn[r]->writeStream(this->txStreams[r], buffs,
         _cfg->sampsPerSymbol, txFlags, frameTime, 1000000);
-#if DEBUG_RADIO_TX
-    size_t chanMask;
-    long timeoutUs(0);
-    int statusFlag = 0;
-    int s = baStn[r]->readStreamStatus(
-        this->txStreams[r], chanMask, statusFlag, frameTime, timeoutUs);
-    std::cout << "radio " << r << " tx returned " << w << " and status " << s
-              << " when flags was " << flags << std::endl;
-#endif
+    if (kDebugRadioTX) {
+        size_t chanMask;
+        long timeoutUs(0);
+        int statusFlag = 0;
+        int s = baStn[r]->readStreamStatus(
+            this->txStreams[r], chanMask, statusFlag, frameTime, timeoutUs);
+        std::cout << "radio " << r << " tx returned " << w << " and status "
+                  << s << " when flags was " << flags << std::endl;
+    }
     return w;
 }
 
@@ -466,13 +466,13 @@ int RadioConfig::radioRx(
         int ret = baStn[r]->readStream(this->rxStreams[r], buffs,
             _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
         frameTime = frameTimeNs; // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
-        if (ret != (int)_cfg->sampsPerSymbol)
-            std::cout << "invalid return " << ret << " from radio " << r
-                      << std::endl;
-#if DEBUG_RADIO_RX
-        else
-            std::cout << "radio " << r << "received " << ret << std::endl;
-#endif
+        if (kDebugRadioRX) {
+            if (ret != (int)_cfg->sampsPerSymbol)
+                std::cout << "invalid return " << ret << " from radio " << r
+                          << std::endl;
+            else
+                std::cout << "radio " << r << "received " << ret << std::endl;
+        }
         return ret;
     }
     std::cout << "invalid radio id " << r << std::endl;
