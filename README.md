@@ -57,9 +57,7 @@ Agora can be built with the following setup.
         ```
         sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ # Allow all users read-write access 
         cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ 
-        sed -i '/add_compile_options("-Wall")/a \ \
-        add_compile_options("-ffreestanding")'
-        cmake/intel-compile-options.cmake 
+        sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake 
         ./create-makefiles-linux.sh 
         cd build-avx512-icc # or build-avx2-icc 
         make -j
