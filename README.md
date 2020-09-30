@@ -1,8 +1,4 @@
 Agora is a high-performance system for real-time massive MIMO baseband processing. 
-Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
-Agora's design overview and flow diagram that maps massvie MIMO baseband processing 
-to the actual code structure. More information about its design and evaluation results
-can be found in the [paper](#documentation) to appear in CoNEXT 2020.
 
 Some highlights:
 
@@ -18,9 +14,11 @@ Before contributing, please go over [CONTRIBUTING.md](CONTRIBUTING.md)
 
  * [Requirements for building Agora](#requirements-for-building-agora)
  * [Agora with emulated RRU](#agora-with-emulated-rru)
-   * [Server setup for performance tests](#server-setup-for-performance-tests)
+   * [Building and running Agora](#building-and-running-agora)
+   * [Server setup for performance test](#server-setup-for-performance-tests)
+   * [Running performance test](#running-performance-test)
  * [Agora with real RRU and UEs](#agora-with-real-rru-and-ues)
-   * [Run the uplink demo](#run-the-uplink-demo)
+   * [Running the uplink demo](#running-the-uplink-demo)
  * [Acknowledgment](#acknowledgment)
  * [Dodumentation](#documentation)
  * [Contact](#contact)
@@ -76,6 +74,7 @@ Agora can be built with the following setup.
 ## Agora with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
+### Builing and running Agora
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
     cd Agora
@@ -128,13 +127,13 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    "Agora with real RRU and UEs" section below.
  
  
-### Server setup for performance tests
+### Server setup for performance test
 To test the performance of Agora, we recommend using two servers 
 (one for Agora and another for the sender) and DPDK for networking. 
 In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
 The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
 We use both ports with DPDK to get enough throughput for the traffic of 64 antennas. 
-We did the following server configurations
+We did the following server configurations for the server that runs Agora
   * Disable Turbo Boost to reduce performance variation by running 
    `echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost`
   * Set CPU scaling to performance by running 
@@ -147,19 +146,38 @@ We did the following server configurations
     We direct all the interrupts to core 0 in our experiments.  
 	  We provide an example bash script (scripts/set_smp_affinity.sh), 
     where the IRQ indices are machine dependent.
+  * Compile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`.
+    
+### Running performance test
+In this section, we provide the instruction to collect and analyze timestamp traces for emulated RRU. 
+  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
+    In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
+    to different values to collect different data points in the figures. 
+  * Run Agora as a real-time process (to prevent OS from doing context swithes) using 
+    `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora data/tddconfig-sim-ul.json`. 
+    (Note: using a process priority 99 is dangerous. Before running it, 
+    make sure you have direct OS interrupts used by Agora's cores.)
+  * Run emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
+  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a MATLAB script to process the timestamp trace. 
+  * We also provide MATLAB scripts that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
 ## Agora with real RRU and UEs
 
-This section provides instructions for generating and processing real wireless
-traffic with hardware RRU and UEs. In our experiements, we use a 64-antenna 
-Faros base station as RRU, and Iris UE devices as UEs, both are available from 
-[Skylark Wireless](https://skylarkwireless.com). 
+Currently Agora suports a 64-antenna 
+Faros base station as RRU and Iris UE devices. Both are commercially available from 
+[Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
+Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs. 
+We use command line variables of cmake to switch between emulated RRU and real RRU. 
+We use `-DUSE_AGROS` for Faros RRU and Iris UEs, and `-DUSE_UHD` for USRP-based RRU and UEs. 
 
-### Run the uplink demo
+Below we describe how to get it to work with Faros RRU and Iris UEs.
 
- * Run the client on a machine connected to the Iris UEs
+### Running the uplink demo
+
+ * Run the UE code on a machine connected to the Iris UEs
    * Rebuild the code
-     * Pass `DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
+     * Pass `-DUSE_ARGOS=on -DUSE_UHD=off -DENABLE_MAC=on` to cmake
+     * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on -DENABLE_MAC=on` to cmake 
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
    * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files.
@@ -190,7 +208,9 @@ Faros base station as RRU, and Iris UE devices as UEs, both are available from
 Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
 
 ## Documentation
-Technical details and performance results can be found in
+Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
+Agora's design overview and flow diagram that maps massive MIMO baseband processing 
+to the actual code structure. Technical details and performance results can be found in
  * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, November 2020.
  
 ## Contact
