@@ -89,7 +89,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
 
  * Run Agora with simulated RRU traffic
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator data/tddconfig-sim-ul.json` to generate data
+     `./build/data_generator --conf_file data/tddconfig-sim-ul.json` to generate data
      files.
    * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
@@ -110,7 +110,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator data/bs-ul-sim.json` to generate data files.
+     `./build/data_generator --conf_file data/bs-ul-sim.json` to generate data files.
    * In one terminal, run `./build/user data/ue-ul-sim.json` to start clients with
      uplink configuration.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
@@ -178,7 +178,7 @@ Below we describe how to get it to work with Faros RRU and Iris UEs.
      * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on -DENABLE_MAC=on` to cmake 
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
-   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files.
+   * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
    * Start client app `./python/client_app.py`.
    * Run `./build/user data/ue-ul-hw.json`.
 
