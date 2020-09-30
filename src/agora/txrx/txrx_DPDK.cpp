@@ -213,7 +213,7 @@ int PacketTXRX::dequeue_send(int tid)
 
     char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
+    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
     tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
