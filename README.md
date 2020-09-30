@@ -188,8 +188,8 @@ Below we describe how to get it to work with Faros RRU and Iris UEs.
      cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
      sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
      ./create-makefiles-linux.sh
-     cd build-avx512-icc % or build-avx2-icc
-     make
+     cd build-avx512-icc # or build-avx2-icc
+     make -j
      ```
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
