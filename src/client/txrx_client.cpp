@@ -90,7 +90,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         } else if (kUseUHD) {
             if (pthread_create(&txrx_thread, NULL,
                     pthread_fun_wrapper<RadioTXRX,
-			&RadioTXRX::loop_tx_rx_usrp_sync>,
+                        &RadioTXRX::loop_tx_rx_usrp_sync>,
                     context)
                 != 0) {
                 perror("socket thread create failed");
@@ -691,6 +691,7 @@ void* RadioTXRX::loop_tx_rx_usrp_sync(int tid)
     Table<std::complex<int16_t>> zeros;
     zeros.calloc(2, c->sampsPerSymbol, 64);
     pilot_buff0[0] = c->pilot_ci16.data();
+
     if (c->nChannels == 2) {
         pilot_buff0[1] = zeros[0];
         pilot_buff1[0] = zeros[1];
@@ -742,6 +743,9 @@ void* RadioTXRX::loop_tx_rx_usrp_sync(int tid)
 
     long long time0(0);
     int frame_id = 0;
+
+    // for UHD first pilot should not have an END_BURST flag
+    int txPilotFlags = (kUseUHD && c->nChannels == 2) ? 1 : 2;
 
     int cursor = 0;
     bool resync = false;
@@ -820,7 +824,8 @@ void* RadioTXRX::loop_tx_rx_usrp_sync(int tid)
 
             txTime = time0 + next_tx_frame_id * frm_num_samps
                 + pilot_symbol_id * num_samps - c->cl_tx_advance;
-            r = radio->radioTx(ue_id, pilot_buff0.data(), num_samps, 2, txTime);
+            r = radio->radioTx(
+                ue_id, pilot_buff0.data(), num_samps, txPilotFlags, txTime);
             if (r < num_samps)
                 std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
                           << std::endl;
