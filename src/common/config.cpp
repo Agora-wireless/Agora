@@ -41,8 +41,6 @@ Config::Config(std::string jsonfile)
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
-    rt_assert(
-        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -243,7 +241,7 @@ Config::Config(std::string jsonfile)
     demod_tx_port = tddConf.value("demod_tx_port", 0);
     demod_rx_port = tddConf.value("demod_rx_port", 0);
 
-    fft_block_size = tddConf.value("fft_block_size", 4);
+    fft_block_size = tddConf.value("fft_block_size", 1);
 
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
