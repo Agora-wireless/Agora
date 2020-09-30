@@ -82,6 +82,10 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
             mat_dl_zf = mat_ul_zf;
+        // We should be scaling the beamforming matrix, so the IFFT
+        // output can be scaled with OFDM_CA_NUM across all antennas.
+        // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+        mat_dl_zf /= abs(mat_dl_zf).max();
     }
 }
 
@@ -91,7 +95,8 @@ static inline void partial_transpose_gather(
     size_t cur_sc_id, float* src, float*& dst, size_t bs_ant_num)
 {
     // The SIMD and non-SIMD methods are equivalent.
-    if (kUseSIMDGather) {
+    size_t ant_start = 0;
+    if (kUseSIMDGather and bs_ant_num >= 4) {
         __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
             kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
             kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -107,16 +112,19 @@ static inline void partial_transpose_gather(
         for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += 4) {
             // fetch 4 complex floats for 4 ants
             __m256 t = _mm256_i32gather_ps(src, index, 4);
-            _mm256_store_ps(dst, t);
+            _mm256_storeu_ps(dst, t);
             src += 8 * kTransposeBlockSize;
             dst += 8;
         }
-    } else {
+        // Set the of the remaining antennas to use non-SIMD gather
+        ant_start = bs_ant_num / 4 * 4;
+    }
+    if (ant_start < bs_ant_num) {
         const size_t pt_base_offset = (cur_sc_id / kTransposeBlockSize)
             * (kTransposeBlockSize * bs_ant_num);
         complex_float* cx_src = (complex_float*)src;
-        complex_float* cx_dst = (complex_float*)dst;
-        for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
+        complex_float* cx_dst = (complex_float*)dst + ant_start;
+        for (size_t ant_i = ant_start; ant_i < bs_ant_num; ant_i++) {
             *cx_dst = cx_src[pt_base_offset + (ant_i * kTransposeBlockSize)
                 + (cur_sc_id % kTransposeBlockSize)];
             cx_dst++;

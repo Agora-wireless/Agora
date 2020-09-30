@@ -212,7 +212,8 @@ int RadioTXRX::dequeue_send(int tid)
                 0 /* cell_id */, ant_id);
             // Send pilots
             ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
-                0, (struct sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid]));
+                0, (struct sockaddr*)&servaddr_[ant_id],
+                sizeof(servaddr_[ant_id]));
             rt_assert(ret > 0, "sendto() failed");
         }
         rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
@@ -263,11 +264,13 @@ void* RadioTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
-int RadioTXRX::dequeue_send_argos(int tid)
+int RadioTXRX::dequeue_send_argos(int tid, long long time0)
 {
     auto& c = config_;
     auto& radio = radioconfig_;
     int packet_length = c->packet_length;
+    int num_samps = c->sampsPerSymbol;
+    int frm_num_samps = num_samps * c->symbol_num_perframe;
 
     Event_data event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
@@ -277,12 +280,33 @@ int RadioTXRX::dequeue_send_argos(int tid)
 
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
+    size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
+    size_t ant_id = ue_id * c->nChannels;
+    long long txTime(0);
+    int r;
 
+    if (!c->hw_framer) {
+        size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
+
+        txTime = time0 + tx_frame_id * frm_num_samps
+            + pilot_symbol_id * num_samps - c->cl_tx_advance;
+        r = radio->radioTx(ue_id, pilot_buff0.data(), num_samps, 2, txTime);
+        if (r < num_samps)
+            std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
+                      << std::endl;
+        if (c->nChannels == 2) {
+            pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
+            txTime = time0 + tx_frame_id * frm_num_samps
+                + pilot_symbol_id * num_samps - c->cl_tx_advance;
+            r = radio->radioTx(ue_id, pilot_buff1.data(), num_samps, 2, txTime);
+            if (r < num_samps)
+                std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
+                          << std::endl;
+        }
+    }
     for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
          symbol_id++) {
-        size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
         size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
-        size_t ant_id = ue_id * c->nChannels;
         size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
                             * c->UE_ANT_NUM)
             + ant_id;
@@ -294,12 +318,17 @@ int RadioTXRX::dequeue_send_argos(int tid)
             txbuf[ch] = (void*)pkt->data;
             tx_buffer_status_[offset + ch] = 0;
         }
-        long long frameTime
-            = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+        txTime = c->hw_framer
+            ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
+            : time0 + tx_frame_id * frm_num_samps + tx_symbol_id * num_samps
+                - c->cl_tx_advance;
         int flags = 1; // HAS_TIME
         if (tx_symbol_id == c->ULSymbols[0].back())
             flags = 2; // HAS_TIME & END_BURST, fixme
-        radio->radioTx(ue_id, txbuf, c->sampsPerSymbol, flags, frameTime);
+        r = radio->radioTx(ue_id, txbuf, num_samps, flags, txTime);
+        if (r < num_samps)
+            std::cout << "BAD Write (UL): " << r << "/" << num_samps
+                      << std::endl;
     }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
@@ -367,7 +396,7 @@ void* RadioTXRX::loop_tx_rx_argos(int tid)
             break;
         }
         // transmit data
-        if (-1 != dequeue_send(tid))
+        if (-1 != dequeue_send_argos(tid, 0))
             continue;
         struct Packet* pkt[c->nChannels];
         void* samp[c->nChannels];
@@ -438,8 +467,8 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     std::vector<void*> frm_rx_buff(2);
     frm_rx_buff[0] = frm_buff0.data();
 
-    std::vector<void*> pilot_buff0(2);
-    std::vector<void*> pilot_buff1(2);
+    pilot_buff0.resize(2);
+    pilot_buff1.resize(2);
     Table<std::complex<int16_t>> zeros;
     zeros.calloc(2, c->sampsPerSymbol, 64);
     pilot_buff0[0] = c->pilot_ci16.data();
@@ -451,7 +480,6 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     }
 
     long long rxTime(0);
-    long long txTime(0);
     int radio_id = tid;
     int sync_index(-1);
     int rx_offset = 0;
@@ -548,67 +576,8 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
         }
 
         // schedule transmit symbols
-        Event_data event;
-        while (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
-
-            assert(event.event_type == EventType::kPacketTX);
-
-            size_t tx_frame_id = gen_tag_t(event.tags[0]).frame_id;
-            size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
-
-            // transmit pilot
-            size_t ant_id = ue_id * c->nChannels;
-            assert(ant_id < c->pilotSymbols[0].size());
-            size_t next_tx_frame_id = tx_frame_id + TX_FRAME_DELTA;
-            size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
-
-            txTime = time0 + next_tx_frame_id * frm_num_samps
-                + pilot_symbol_id * num_samps - c->cl_tx_advance;
-            r = radio->radioTx(ue_id, pilot_buff0.data(), num_samps, 2, txTime);
-            if (r < num_samps)
-                std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
-                          << std::endl;
-            if (c->nChannels == 2) {
-                pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
-                txTime = time0 + next_tx_frame_id * frm_num_samps
-                    + pilot_symbol_id * num_samps - c->cl_tx_advance;
-                r = radio->radioTx(
-                    ue_id, pilot_buff1.data(), num_samps, 2, txTime);
-                if (r < num_samps)
-                    std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
-                              << std::endl;
-            }
-            // transmit data
-            for (size_t symbol_id = 0;
-                 symbol_id < c->ul_data_symbol_num_perframe; symbol_id++) {
-                size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
-
-                size_t offset
-                    = (c->get_total_data_symbol_idx_ul(tx_frame_id, symbol_id)
-                          * c->UE_ANT_NUM)
-                    + ant_id;
-
-                void* txbuf[2];
-                for (size_t ch = 0; ch < c->nChannels; ++ch) {
-                    struct Packet* pkt = (struct Packet*)(tx_buffer_
-                        + (offset + ch) * c->packet_length);
-                    txbuf[ch] = (void*)pkt->data;
-                    tx_buffer_status_[offset + ch] = 0;
-                }
-                txTime = time0 + next_tx_frame_id * frm_num_samps
-                    + tx_symbol_id * num_samps - c->cl_tx_advance;
-                int flags = 1; // HAS_TIME
-                if (tx_symbol_id == c->ULSymbols[0].back())
-                    flags = 2; // HAS_TIME & END_BURST, fixme
-                r = radio->radioTx(ue_id, txbuf, num_samps, flags, txTime);
-                if (r < num_samps)
-                    std::cout << "BAD Write (UL): " << r << "/" << num_samps
-                              << std::endl;
-            }
-            rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-                          Event_data(EventType::kPacketTX, event.tags[0])),
-                "Socket message enqueue failed\n");
-        }
+        while (-1 != dequeue_send_argos(tid, time0))
+            ;
 
         // receive the remaining of the frame
         for (size_t symbol_id = 1; symbol_id < c->symbol_num_perframe;
