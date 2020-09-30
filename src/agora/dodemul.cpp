@@ -95,7 +95,8 @@ Event_data DoDemul::launch(size_t tag)
             = ((base_sc_id + i) / kTransposeBlockSize)
             * (kTransposeBlockSize * cfg->BS_ANT_NUM);
 
-        if (kUseSIMDGather) {
+        size_t ant_start = 0;
+        if (kUseSIMDGather and cfg->BS_ANT_NUM % 4 == 0) {
             __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
                 kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
                 kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -114,10 +115,13 @@ Event_data DoDemul::launch(size_t tag)
                 src += (kSCsPerCacheline * kTransposeBlockSize);
                 dst += 8;
             }
+            // Set the remaining number of antennas for non-SIMD gather
+            ant_start = cfg->BS_ANT_NUM % 4;
         } else {
-            complex_float* dst = data_gather_buffer;
+            complex_float* dst = data_gather_buffer + ant_start;
             for (size_t j = 0; j < kSCsPerCacheline; j++) {
-                for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
+                for (size_t ant_i = ant_start; ant_i < cfg->BS_ANT_NUM;
+                     ant_i++) {
                     *dst++ = data_buf[partial_transpose_block_base
                         + (ant_i * kTransposeBlockSize)
                         + ((base_sc_id + i + j) % kTransposeBlockSize)];

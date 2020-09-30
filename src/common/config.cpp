@@ -41,8 +41,6 @@ Config::Config(std::string jsonfile)
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
-    rt_assert(
-        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -203,7 +201,7 @@ Config::Config(std::string jsonfile)
                                           : tddConf.value("zf_block_size", 1);
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
-    fft_block_size = tddConf.value("fft_block_size", 4);
+    fft_block_size = tddConf.value("fft_block_size", 1);
 
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
