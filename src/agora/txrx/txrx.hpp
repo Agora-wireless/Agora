@@ -90,7 +90,6 @@ private:
     void* loop_tx_rx_usrp(int tid);
     int dequeue_send_usrp(int tid);
     int dequeue_send_usrp(int tid, int frame_id, int symbol_id);
-    struct Packet* recv_enqueue_usrp(int tid, int radio_id, int rx_offset);
     struct Packet* recv_enqueue_usrp(
         int tid, int radio_id, int rx_offset, int frame_id, int symbol_id);
 

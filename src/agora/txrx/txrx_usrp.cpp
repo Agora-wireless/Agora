@@ -108,56 +108,6 @@ void* PacketTXRX::loop_tx_rx_usrp(int tid)
 }
 
 struct Packet* PacketTXRX::recv_enqueue_usrp(
-    int tid, int radio_id, int rx_offset)
-{
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    char* rx_buffer = (*buffer_)[tid];
-    int* rx_buffer_status = (*buffer_status_)[tid];
-    int packet_length = cfg->packet_length;
-
-    // if rx_buffer is full, exit
-    int nChannels = cfg->nChannels;
-    struct Packet* pkt[nChannels];
-    void* samp[nChannels];
-    for (int ch = 0; ch < nChannels; ++ch) {
-        // if rx_buffer is full, exit
-        if (rx_buffer_status[rx_offset + ch] == 1) {
-            printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
-                rx_offset);
-            cfg->running = false;
-            break;
-        }
-        pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
-        samp[ch] = pkt[ch]->data;
-    }
-
-    long long frameTime;
-    if (!cfg->running
-        || radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
-        return NULL;
-    }
-
-    int frame_id = (int)(frameTime >> 32);
-    int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
-    int ant_id = radio_id * nChannels;
-    for (int ch = 0; ch < nChannels; ++ch) {
-        new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
-        // move ptr & set status to full
-        // rx_buffer_status[rx_offset + ch] = 1; // has data, after it is read, it is set to 0
-
-        // Push kPacketRX event into the queue.
-        Event_data rx_message(
-            EventType::kPacketRX, rx_tag_t(tid, rx_offset + ch)._tag);
-
-        if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
-        }
-    }
-    return pkt[0];
-}
-
-struct Packet* PacketTXRX::recv_enqueue_usrp(
     int tid, int radio_id, int rx_offset, int frame_id, int symbol_id)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
@@ -212,7 +162,7 @@ struct Packet* PacketTXRX::recv_enqueue_usrp(
         for (int ch = 0; ch < nChannels; ++ch) {
             new (pkt[ch]) Packet(frame_id, symbol_id, 0, ant_id + ch);
             // move ptr & set status to full
-            // rx_buffer_status[rx_offset + ch] = 1; // has data, after it is read, it is set to 0
+            rx_buffer_status[rx_offset + ch] = 1; // has data, after it is read, it is set to 0
 
             // Push kPacketRX event into the queue
             Event_data rx_message(
