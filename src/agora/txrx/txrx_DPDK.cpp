@@ -117,8 +117,8 @@ uint16_t PacketTXRX::dpdk_recv(
         // If the RX buffer is full, it means that the base station processing
         // hasn't kept up, so exit.
         if ((*buffer_status_)[tid][rx_offset] == 1) {
-            printf("Receive thread %d rx_buffer full, offset: %zu\n", tid,
-                rx_offset);
+            printf(
+                "TXRX thread %d rx_buffer full, offset: %zu\n", tid, rx_offset);
             cfg->running = false;
             return 0;
         }
@@ -199,16 +199,16 @@ int PacketTXRX::dequeue_send(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t offset = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-                        * c->BS_ANT_NUM)
+    size_t offset
+        = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+              * c->BS_ANT_NUM)
         + ant_id;
 
     if (kDebugPrintInTask) {
         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, symbol_id, ant_id,
-            gen_tag_t(event.tags[0])._tag, offset,
-            message_queue_->size_approx());
+            tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
+            offset, message_queue_->size_approx());
     }
 
     char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
