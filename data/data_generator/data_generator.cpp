@@ -13,6 +13,7 @@
 #include <armadillo>
 #include <bitset>
 #include <fstream>
+#include <gflags/gflags.h>
 #include <immintrin.h>
 #include <iostream>
 #include <malloc.h>
@@ -23,11 +24,15 @@
 #include <string.h>
 #include <time.h>
 
-using namespace arma;
-
 static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
+
+DEFINE_string(profile, "random",
+    "The profile of the input user bytes (e.g., 'random', '123')");
+DEFINE_string(conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+    "Agora config filename");
 
 float rand_float(float min, float max)
 {
@@ -44,18 +49,24 @@ float rand_float_from_short(float min, float max)
 
 int main(int argc, char* argv[])
 {
-    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string confFile = cur_directory + "/data/tddconfig-sim-ul.json";
-    if (argc == 2)
-        confFile = std::string(argv[1]);
-    auto* cfg = new Config(confFile.c_str());
-    DataGenerator data_generator(cfg);
+    const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    auto* cfg = new Config(FLAGS_conf_file.c_str());
 
-    printf("Config file: %s\n", confFile.c_str());
-    printf("Using %s-orthogonal pilots\n",
+    const DataGenerator::Profile profile = FLAGS_profile == "123"
+        ? DataGenerator::Profile::k123
+        : DataGenerator::Profile::kRandom;
+    DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+
+    printf("DataGenerator: Config file: %s, data profile = %s\n",
+        FLAGS_conf_file.c_str(),
+        profile == DataGenerator::Profile::k123 ? "123" : "random");
+
+    printf("DataGenerator: Using %s-orthogonal pilots\n",
         cfg->freq_orthogonal_pilot ? "frequency" : "time");
-    printf("Generating encoded and modulated data\n");
-    srand(time(NULL));
+
+    printf("DataGenerator: Generating encoded and modulated data\n");
+    srand(time(nullptr));
 
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
@@ -179,8 +190,9 @@ int main(int argc, char* argv[])
     }
 
     // Generate CSI matrix
-    Table<complex_float> CSI_matrix;
-    CSI_matrix.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
+    Table<complex_float> csi_matrices;
+    csi_matrices.calloc(
+        cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
     for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
         complex_float csi
             = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
@@ -189,8 +201,8 @@ int main(int argc, char* argv[])
             complex_float noise = { rand_float_from_short(-1, 1) * kNoiseLevel,
                 rand_float_from_short(-1, 1) * kNoiseLevel };
             // printf("%.4f+%.4fi ", noise.re, noise.im);
-            CSI_matrix[j][i].re = csi.re + noise.re;
-            CSI_matrix[j][i].im = csi.im + noise.im;
+            csi_matrices[j][i].re = csi.re + noise.re;
+            csi_matrices[j][i].im = csi.im + noise.im;
         }
         // printf("\n");
     }
@@ -200,14 +212,17 @@ int main(int argc, char* argv[])
     rx_data_all_symbols.calloc(
         cfg->symbol_num_perframe, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
-        auto* ptr_in_data = (cx_float*)tx_data_all_symbols[i];
-        cx_fmat mat_input_data(
-            ptr_in_data, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-        auto* ptr_out = (cx_float*)rx_data_all_symbols[i];
-        cx_fmat mat_output(ptr_out, cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+        arma::cx_fmat mat_input_data(
+            reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
+            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+        arma::cx_fmat mat_output(
+            reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
+            cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+
         for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-            auto* ptr_in_csi = (cx_float*)CSI_matrix[j];
-            cx_fmat mat_csi(ptr_in_csi, cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
+            arma::cx_fmat mat_csi(
+                reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
+                cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
             mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
         }
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
@@ -248,10 +263,11 @@ int main(int argc, char* argv[])
     Table<complex_float> precoder;
     precoder.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
     for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-        auto* ptr_in = (cx_float*)CSI_matrix[i];
-        cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_ANT_NUM, false);
-        auto* ptr_out = (cx_float*)precoder[i];
-        cx_fmat mat_output(ptr_out, cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
+        arma::cx_fmat mat_input(
+            reinterpret_cast<arma::cx_float*>(csi_matrices[i]), cfg->BS_ANT_NUM,
+            cfg->UE_ANT_NUM, false);
+        arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
+            cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
         pinv(mat_output, mat_input, 1e-2, "dc");
     }
 
@@ -259,8 +275,8 @@ int main(int argc, char* argv[])
     // // for (int i = 0; i < cfg->OFDM_CA_NUM; i++)
     // for (int j = 0; j < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; j++)
     //     printf("%.3f+%.3fi ",
-    //         CSI_matrix[cfg->OFDM_DATA_START][j].re,
-    //         CSI_matrix[cfg->OFDM_DATA_START][j].im);
+    //         csi_matrices[cfg->OFDM_DATA_START][j].re,
+    //         csi_matrices[cfg->OFDM_DATA_START][j].im);
     // printf("\n");
     // printf("precoder \n");
     // // for (int i = 0; i < cfg->OFDM_CA_NUM; i++)
@@ -316,16 +332,19 @@ int main(int argc, char* argv[])
     dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe,
         2 * cfg->sampsPerSymbol * cfg->BS_ANT_NUM, 64);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
-        auto* ptr_in_data = (cx_float*)dl_mod_data[i];
-        cx_fmat mat_input_data(
-            ptr_in_data, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-        auto* ptr_out = (cx_float*)dl_ifft_data[i];
-        cx_fmat mat_output(ptr_out, cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+        arma::cx_fmat mat_input_data(
+            reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->OFDM_CA_NUM,
+            cfg->UE_ANT_NUM, false);
+
+        arma::cx_fmat mat_output(
+            reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
+            cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+
         for (size_t j = cfg->OFDM_DATA_START;
              j < cfg->OFDM_DATA_NUM + cfg->OFDM_DATA_START; j++) {
-            auto* ptr_in_precoder = (cx_float*)precoder[j];
-            cx_fmat mat_precoder(
-                ptr_in_precoder, cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
+            arma::cx_fmat mat_precoder(
+                reinterpret_cast<arma::cx_float*>(precoder[j]), cfg->UE_ANT_NUM,
+                cfg->BS_ANT_NUM, false);
             mat_precoder /= abs(mat_precoder).max();
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
@@ -383,7 +402,7 @@ int main(int argc, char* argv[])
     // }
     // printf("\n");
 
-    CSI_matrix.free();
+    csi_matrices.free();
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
     ue_specific_pilot.free();
