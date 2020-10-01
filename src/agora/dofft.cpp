@@ -60,38 +60,6 @@ static void convert_short_to_float_simd(
 #endif
 }
 
-static inline __m256 __m256_complex_cf32_mult(
-    __m256 data1, __m256 data2, bool conj)
-{
-    __m256 prod0 __attribute__((aligned(32)));
-    __m256 prod1 __attribute__((aligned(32)));
-    __m256 res __attribute__((aligned(32)));
-
-    // https://stackoverflow.com/questions/39509746
-    const __m256 neg0
-        = _mm256_setr_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
-    const __m256 neg1
-        = _mm256_set_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
-    prod0 = _mm256_mul_ps(data1, data2); // q1*q2, i1*i2, ...
-
-    /* Step 2: Negate the imaginary elements of vec2 */
-    data2 = _mm256_mul_ps(data2, conj ? neg0 : neg1);
-
-    /* Step 3: Switch the real and imaginary elements of vec2 */
-    data2 = _mm256_permute_ps(data2, 0xb1);
-
-    /* Step 4: Multiply vec1 and the modified vec2 */
-    prod1 = _mm256_mul_ps(data1, data2); // i2*q1, -i1*q2, ...
-
-    /* Horizontally add the elements in vec3 and vec4 */
-    res = conj
-        ? _mm256_hadd_ps(prod0, prod1)
-        : _mm256_hsub_ps(prod0, prod1); // i2*q1+-i1*q2, i1*i2+-q1*q2, ...
-    res = _mm256_permute_ps(res, 0xd8);
-
-    return res;
-}
-
 DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
@@ -283,8 +251,8 @@ void DoFFT::partial_transpose(
                     cfg->pilots_sgn_[sc_idx + 1].im,
                     cfg->pilots_sgn_[sc_idx + 1].re,
                     cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
-                fft_result0
-                    = __m256_complex_cf32_mult(fft_result0, pilot_tx0, true);
+                fft_result0 = CommsLib::__m256_complex_cf32_mult(
+                    fft_result0, pilot_tx0, true);
 
                 __m256 pilot_tx1
                     = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
@@ -295,8 +263,8 @@ void DoFFT::partial_transpose(
                         cfg->pilots_sgn_[sc_idx + 5].re,
                         cfg->pilots_sgn_[sc_idx + 4].im,
                         cfg->pilots_sgn_[sc_idx + 4].re);
-                fft_result1
-                    = __m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
+                fft_result1 = CommsLib::__m256_complex_cf32_mult(
+                    fft_result1, pilot_tx1, true);
             }
             _mm256_store_ps(reinterpret_cast<float*>(dst), fft_result0);
             _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
