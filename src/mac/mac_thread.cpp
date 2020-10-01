@@ -136,7 +136,7 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         if (crc == pkt->crc) {
 
             // Print information about the received symbol
-            if (kDebugBSReceiver) {
+            if (kLogMacPackets) {
                 fprintf(log_file_,
                     "MAC thread received frame %zu, uplink symbol index %zu, "
                     "size %zu, copied to frame data offset %zu\n",
@@ -276,7 +276,7 @@ void MacThread::process_udp_packets_from_apps_client(
         return;
     }
 
-    if (kDebugBSReceiver) {
+    if (kLogMacPackets) {
         std::stringstream ss;
         fprintf(log_file_,
             "MAC thread: Received data from app for frame %zu, ue %zu, size "
