@@ -587,6 +587,13 @@ void Config::genData()
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
     pilot.resize(sampsPerSymbol);
 
+    if (kDebugPrintPilot) {
+        std::cout << "Pilot data: " << std::endl;
+        for (size_t i = 0; i < OFDM_DATA_NUM; i++)
+            std::cout << pilots_[i].re << "+1i*" << pilots_[i].im << ",";
+        std::cout << std::endl;
+    }
+
     ul_iq_ifft.free();
     dl_iq_ifft.free();
     ue_pilot_ifft.free();
