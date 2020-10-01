@@ -7,7 +7,7 @@ static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
-static constexpr bool kDebugFFTProcessing = false;
+static constexpr size_t kRecordFrameIndex = 1000;
 
 Phy_UE::Phy_UE(Config* config)
 {
@@ -246,9 +246,6 @@ void Phy_UE::start()
                 frame_id = pkt->frame_id;
                 symbol_id = pkt->symbol_id;
                 ant_id = pkt->ant_id;
-                printf("received packet frame_id %d, current processed "
-                       "frame_id is %zu\n",
-                    pkt->frame_id, cur_frame_id);
                 rt_assert(pkt->frame_id < cur_frame_id + kFrameWnd,
                     "Error: Received packet for future frame beyond frame "
                     "window. This can happen if PHY is running "
@@ -300,8 +297,7 @@ void Phy_UE::start()
                 size_t frame_slot = frame_id % kFrameWnd;
                 size_t dl_symbol_idx
                     = config_->get_dl_symbol_idx(frame_id, symbol_id);
-                if (!kDebugFFTProcessing
-                    && dl_symbol_idx >= dl_pilot_symbol_perframe) {
+                if (dl_symbol_idx >= dl_pilot_symbol_perframe) {
                     Event_data do_demul_task(EventType::kDemul, event.tags[0]);
                     schedule_task(do_demul_task, &demul_queue_, ptok_demul);
                 }
@@ -314,16 +310,11 @@ void Phy_UE::start()
                     fft_checker_[frame_slot][ant_id] = 0;
                     fft_status_[frame_slot]++;
                     if (fft_status_[frame_slot] == config_->UE_ANT_NUM) {
-                        double frame_time = get_time_us()
-                            - frame_dl_process_time_[frame_slot * kMaxUEs
-                                  + ant_id];
                         if (kDebugPrintPerFrameDone)
                             printf("Main thread: Equalization done on all "
-                                   "antennas at frame: %zu in %.2f us\n",
-                                frame_id, frame_time);
+                                   "antennas at frame: %zu\n",
+                                frame_id);
                         fft_status_[frame_slot] = 0;
-                        if (kDebugFFTProcessing)
-                            cur_frame_id = frame_id;
                     }
                 }
 
@@ -381,15 +372,20 @@ void Phy_UE::start()
                             frame_id, ant_id);
                     decode_checker_[frame_slot][ant_id] = 0;
                     decode_status_[frame_slot]++;
+                    frame_dl_process_time_[frame_slot * kMaxUEs + ant_id]
+                        = get_time_us()
+                        - frame_dl_process_time_[frame_slot * kMaxUEs + ant_id];
                     if (decode_status_[frame_slot] == config_->UE_ANT_NUM) {
-                        double frame_time = get_time_us()
-                            - frame_dl_process_time_[frame_slot * kMaxUEs
-                                  + ant_id];
+                        double frame_time_total = 0;
+                        for (size_t i = 0; i < config_->UE_ANT_NUM; i++)
+                            frame_time_total
+                                += frame_dl_process_time_[frame_slot * kMaxUEs
+                                    + i];
                         if (kDebugPrintPerFrameDone)
                             printf("Main thread: Decode done on all antennas "
                                    "at frame %zu"
                                    " in %.2f us\n",
-                                frame_id, frame_time);
+                                frame_id, frame_time_total);
                         decode_status_[frame_slot] = 0;
                         if (!kEnableMac)
                             cur_frame_id = frame_id;
@@ -618,16 +614,15 @@ void Phy_UE::doFFT(int tid, size_t tag)
         if (config_->isPilot(frame_id, symbol_id)) {
             std::vector<std::complex<float>> samples_vec(
                 config_->sampsPerSymbol, 0);
-            for (size_t i = 0; i < config_->sampsPerSymbol; i++)
-                samples_vec[i]
-                    = (std::complex<float>(pkt->data[2 * i] / 32768.0,
-                        pkt->data[2 * i + 1] / 32768.0));
-            //simd_convert_short_to_float(pkt->data,
-            //    reinterpret_cast<float*>(samples_vec.data()),
-            //    config_->sampsPerSymbol * 2);
+            simd_convert_short_to_float(pkt->data,
+                reinterpret_cast<float*>(samples_vec.data()),
+                (config_->sampsPerSymbol * 2 / 16) * 16);
             size_t seq_len = ue_pilot_vec[ant_id].size();
-            size_t peak_offset = CommsLib::find_pilot_seq(
-                samples_vec, ue_pilot_vec[ant_id], seq_len);
+            std::vector<std::complex<float>> pilot_corr
+                = CommsLib::correlate_avx(samples_vec, ue_pilot_vec[ant_id]);
+            std::vector<float> pilot_corr_abs = CommsLib::abs2_avx(pilot_corr);
+            size_t peak_offset = *std::max_element(
+                pilot_corr_abs.begin(), pilot_corr_abs.end());
             sym_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
             float noise_power = 0;
             for (size_t i = 0; i < sym_offset; i++)
@@ -639,10 +634,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
             printf(
                 "frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
                 frame_id, symbol_id, ant_id, peak_offset, SNR);
-            if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250) {
-                record_frame = frame_id;
-            }
-            if (frame_id == record_frame) {
+            if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxpilot" + std::to_string(symbol_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
@@ -652,14 +644,13 @@ void Phy_UE::doFFT(int tid, size_t tag)
             }
 
         } else {
-            if (frame_id == record_frame) {
+            if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxdata" + std::to_string(symbol_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
                 fclose(f);
-                // record_frame = -1;
             }
         }
     }

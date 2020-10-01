@@ -23,6 +23,6 @@
  "tx_advance" : 78,
  "client_dl_pilot_syms": 2,
  "modulation" : "16QAM",
- "worker_thread_num" : 1,
+ "worker_thread_num" : 2,
  "demul_block_size" : 48
 }
