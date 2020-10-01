@@ -4,7 +4,7 @@ Some highlights:
 
 * Agora currently supports 64x16 MU-MIMO (64 RRU antennas and 16 UEs) with 20 MHz bandwidth and 64QAM modulation, on a 36-core server with AVX512 support. 
 * Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, moduation orders, LDPC code rates.
-* Agora supports simulated RRU and UEs with a high-performance packet generator.
+* Agora supports emulated RRU and UEs with a high-performance packet generator.
 * Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
 
@@ -13,12 +13,12 @@ Some highlights:
  * [Requirements for building Agora](#requirements-for-building-agora)
  * [Agora with emulated RRU](#agora-with-emulated-rru)
    * [Building and running Agora](#building-and-running-agora)
-   * [Server setup for performance test](#server-setup-for-performance-tests)
+   * [Server setup for performance test](#server-setup-for-performance-test)
    * [Running performance test](#running-performance-test)
  * [Agora with real RRU and UEs](#agora-with-real-rru-and-ues)
    * [Running the uplink demo](#running-the-uplink-demo)
-* [Contributing to Agora](#contributing-to-agora)
-* [Acknowledgment](#acknowledgment)
+ * [Contributing to Agora](#contributing-to-agora)
+ * [Acknowledgment](#acknowledgment)
  * [Dodumentation](#documentation)
  * [Contact](#contact)
  
@@ -71,7 +71,7 @@ Agora can be built with the following setup.
 ## Agora with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
-### Builing and running Agora
+### Building and running Agora
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
     cd Agora
@@ -86,7 +86,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
     ./test/test_agora/test_agora.sh 100 out % Runs test for 100 iterations
     ```
 
- * Run Agora with simulated RRU traffic
+ * Run Agora with emulated RRU traffic
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator --conf_file data/tddconfig-sim-ul.json` to generate data
      files.
@@ -94,7 +94,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
      --frame_duration=5000 --enable_slow_start=1 
-     --conf_file=data/tddconfig-sim-ul.json` to start the simulated RRU 
+     --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
      with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores, 
      otherwise there will be performance slow down.
