@@ -219,6 +219,8 @@ Config::Config(std::string jsonfile)
         server_addr_idx = tddConf.value("server_addr_idx", 0);
         rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
             "OFDM_DATA_NUM % # servers should be 0!");
+
+        // TODO: Should we be using OFDM_DATA_START here?
         subcarrier_start
             = OFDM_DATA_START + server_addr_idx * get_num_sc_per_server();
         subcarrier_end
