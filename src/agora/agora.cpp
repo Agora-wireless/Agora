@@ -19,13 +19,6 @@ Agora::Agora(Config* cfg)
         directory.c_str(), freq_ghz);
 
     this->config_ = cfg;
-    if (kDebugPrintPilot) {
-        cout << "Agora: Pilot data: " << endl;
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++)
-            cout << config_->pilots_[i].re << "+1i*" << config_->pilots_[i].im
-                 << ",";
-        cout << endl;
-    }
 
     pin_to_core_with_offset(
         ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
