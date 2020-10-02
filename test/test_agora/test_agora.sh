@@ -58,7 +58,7 @@ for i in `seq 1 $num_iters`; do
     echo "==========================================="
     echo "Generating data for uplink correctness test $i......"
     echo -e "===========================================\n"
-    ./build/data_generator data/tddconfig-correctness-test-ul.json
+    ./build/data_generator --conf_file data/tddconfig-correctness-test-ul.json
     
     echo -e "-------------------------------------------------------\n\n\n"
     echo "======================================"
@@ -72,7 +72,7 @@ for i in `seq 1 $num_iters`; do
     echo "==========================================="
     echo "Generating data for downlink correctness test $i......"
     echo -e "===========================================\n"
-    ./build/data_generator data/tddconfig-correctness-test-dl.json
+    ./build/data_generator --conf_file data/tddconfig-correctness-test-dl.json
 
     echo -e "-------------------------------------------------------\n\n\n"
     echo "======================================"

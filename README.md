@@ -1,24 +1,23 @@
-Agora is a high-performance system for real-time massive MIMO baseband processing. 
+Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
 Some highlights:
 
-* Agora currently supports baseband processing of up to 64 RRU antennas, 16 UEs, 20 MHz bandwidth, and 64QAM modulation. A 36-core server with AVX512 support is sufficient to run Agora under this maximum configuration.
-* Agora can support vaious configurations: different numbers of RRU antennas and UEs, different bandwidth, different moduation orders, different LDPC code rates.
-* Agora can work without real hardware. A high-performance packet generator is implemented to emulate a massive MIMO RRU.
-* Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
+* Agora currently supports 64x16 MU-MIMO (64 RRU antennas and 16 UEs) with 20 MHz bandwidth and 64QAM modulation, on a 36-core server with AVX512 support. 
+* Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, moduation orders, LDPC code rates.
+* Agora supports an emulated RRU and UEs with a high-performance packet generator.
+* Agora has been tested with real RRUs with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
-
-Before contributing, please go over [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Contents
 
  * [Requirements for building Agora](#requirements-for-building-agora)
  * [Agora with emulated RRU](#agora-with-emulated-rru)
    * [Building and running Agora](#building-and-running-agora)
-   * [Server setup for performance test](#server-setup-for-performance-tests)
+   * [Server setup for performance test](#server-setup-for-performance-test)
    * [Running performance test](#running-performance-test)
  * [Agora with real RRU and UEs](#agora-with-real-rru-and-ues)
    * [Running the uplink demo](#running-the-uplink-demo)
+ * [Contributing to Agora](#contributing-to-agora)
  * [Acknowledgment](#acknowledgment)
  * [Dodumentation](#documentation)
  * [Contact](#contact)
@@ -72,7 +71,7 @@ Agora can be built with the following setup.
 ## Agora with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
-### Builing and running Agora
+### Building and running Agora
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
     cd Agora
@@ -87,15 +86,15 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
     ./test/test_agora/test_agora.sh 100 out % Runs test for 100 iterations
     ```
 
- * Run Agora with simulated RRU traffic
+ * Run Agora with emulated RRU traffic
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator data/tddconfig-sim-ul.json` to generate data
+     `./build/data_generator --conf_file data/tddconfig-sim-ul.json` to generate data
      files.
    * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
      --frame_duration=5000 --enable_slow_start=1 
-     --conf_file=data/tddconfig-sim-ul.json` to start the simulated RRU 
+     --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
      with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores, 
      otherwise there will be performance slow down.
@@ -110,7 +109,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator data/bs-ul-sim.json` to generate data files.
+     `./build/data_generator --conf_file data/bs-ul-sim.json` to generate data files.
    * In one terminal, run `./build/user data/ue-ul-sim.json` to start clients with
      uplink configuration.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
@@ -178,7 +177,7 @@ Below we describe how to get it to work with Faros RRU and Iris UEs.
      * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on -DENABLE_MAC=on` to cmake 
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
-   * Run `./build/data_generator data/ue-ul-hw.json` to generate required data files.
+   * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
    * Start client app `./python/client_app.py`.
    * Run `./build/user data/ue-ul-hw.json`.
 
@@ -202,6 +201,9 @@ Below we describe how to get it to work with Faros RRU and Iris UEs.
    * Run BS app `./python/bs_app.py`.
    * Run `./build/agora data/bs-ul-hw.json`.
 
+## Contributing to Agora
+Agora is open-source and open to your contributions. Before contributing, please read [this](CONTRIBUTING.md).
+
 ## Acknowledgment
 Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
 
@@ -209,7 +211,7 @@ Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
 Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
 Agora's design overview and flow diagram that maps massive MIMO baseband processing 
 to the actual code structure. Technical details and performance results can be found in
- * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, November 2020.
+ * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, December 2020.
  
 ## Contact
 Jian Ding (jian.ding@yale.edu)
