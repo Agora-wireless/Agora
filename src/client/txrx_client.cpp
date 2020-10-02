@@ -336,7 +336,6 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
     char* rx_buffer = (*buffer_)[tid];
     int* rx_buffer_status = (*buffer_status_)[tid];
     int num_samps = c->sampsPerSymbol;
-    int frm_num_samps = num_samps * c->symbol_num_perframe;
     int packet_length = c->packet_length;
     ClientRadioConfig* radio = radioconfig_;
 
@@ -369,7 +368,9 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
         frame_id = (size_t)(rxTime >> 32);
         symbol_id = (size_t)((rxTime >> 16) & 0xFFFF);
     } else {
-        assert(c->hw_framer || ((rxTime - time0) / frm_num_samps) == frame_id);
+        assert(c->hw_framer
+            || (((rxTime - time0) / (num_samps * c->symbol_num_perframe))
+                   == frame_id));
     }
     if (kDebugPrintInTask) {
         printf("downlink receive: thread %d, frame_id %zu, symbol_id "
@@ -504,9 +505,9 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
         }
 
         // convert data to complex float for sync detection
-        std::vector<std::complex<float>> sync_buff;
+        std::vector<std::complex<float>> sync_buff(frm_num_samps, 0);
         for (int i = 0; i < frm_num_samps; i++)
-            sync_buff.push_back(std::complex<float>(
+            sync_buff[i] = (std::complex<float>(
                 frm_buff0[i].real() / 32768.0, frm_buff0[i].imag() / 32768.0));
         sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32);
         if (sync_index < 0)
