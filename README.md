@@ -4,8 +4,8 @@ Some highlights:
 
 * Agora currently supports 64x16 MU-MIMO (64 RRU antennas and 16 UEs) with 20 MHz bandwidth and 64QAM modulation, on a 36-core server with AVX512 support. 
 * Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, moduation orders, LDPC code rates.
-* Agora supports emulated RRU and UEs with a high-performance packet generator.
-* Agora has been tested with real RRU with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
+* Agora supports an emulated RRU and UEs with a high-performance packet generator.
+* Agora has been tested with real RRUs with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
 
 ## Contents
@@ -211,7 +211,7 @@ Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
 Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
 Agora's design overview and flow diagram that maps massive MIMO baseband processing 
 to the actual code structure. Technical details and performance results can be found in
- * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, November 2020.
+ * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, December 2020.
  
 ## Contact
 Jian Ding (jian.ding@yale.edu)
