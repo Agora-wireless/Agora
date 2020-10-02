@@ -603,7 +603,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
                     c->running = false;
                     break;
                 }
-                if (kDebugBSSender) {
+                if (kDebugPrintInTask) {
                     printf(
                         "idle receive: thread %d, frame_id %zu, symbol_id %zu, "
                         "radio_id %d "
