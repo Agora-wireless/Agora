@@ -220,7 +220,6 @@ public:
     size_t packet_length;
 
     size_t OFDM_PILOT_SPACING;
-    size_t TX_PREFIX_LEN;
 
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
