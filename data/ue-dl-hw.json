@@ -12,7 +12,7 @@
  "ofdm_data_num" : 304,
  "ofdm_tx_zero_prefix" : 160,
  "ofdm_tx_zero_postfix" : 160,
- "ofdm_rx_zero_prefix_client" : 240,
+ "ofdm_rx_zero_prefix_client" : 160,
  "cp_len" : 32,
  "Zc" : 18,
  "frames" : [
