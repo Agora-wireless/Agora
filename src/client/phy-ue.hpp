@@ -5,6 +5,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "datatype_conversion.h"
 #include "mac_thread.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
@@ -327,8 +328,8 @@ private:
     moodycamel::ProducerToken* task_ptok[kMaxThreads];
 
     // all checkers
-    size_t csi_checker_[kFrameWnd];
-    size_t data_checker_[kFrameWnd];
+    size_t* fft_checker_[kFrameWnd];
+    size_t fft_status_[kFrameWnd];
 
     // can possibly remove this checker
     size_t* demul_checker_[kFrameWnd];

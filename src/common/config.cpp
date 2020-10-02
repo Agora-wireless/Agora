@@ -568,6 +568,13 @@ void Config::genData()
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
             ofdm_tx_zero_prefix_, CP_LEN, scale);
+        if (kDebugPrintPilot) {
+            printf("ue_specific_pilot%zu=[", i);
+            for (size_t j = 0; j < OFDM_CA_NUM; j++)
+                printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
+                    ue_pilot_ifft[i][j].im);
+            printf("]\n");
+        }
     }
 
     pilot_ci16.resize(sampsPerSymbol, 0);

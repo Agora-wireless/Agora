@@ -339,7 +339,7 @@ Event_data DoIFFT::launch(size_t tag)
     int packet_length = cfg->packet_length;
     struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
         * packet_length];
-    short* socket_ptr = &pkt->data[2 * cfg->TX_PREFIX_LEN];
+    short* socket_ptr = &pkt->data[2 * cfg->ofdm_tx_zero_prefix_];
 
     for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
         /* ifft scaled results by OFDM_CA_NUM */

@@ -7,6 +7,7 @@ static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
+static constexpr size_t kRecordFrameIndex = 1000;
 
 Phy_UE::Phy_UE(Config* config)
 {
@@ -97,24 +98,27 @@ Phy_UE::Phy_UE(Config* config)
     (void)DftiCommitDescriptor(mkl_handle);
 
     // initilize all kinds of checkers
-    memset(csi_checker_, 0, sizeof(int) * kFrameWnd);
-    memset(data_checker_, 0, sizeof(int) * kFrameWnd * config_->UE_ANT_NUM);
+    memset(fft_status_, 0, sizeof(size_t) * kFrameWnd);
+    for (size_t i = 0; i < kFrameWnd; i++) {
+        fft_checker_[i] = new size_t[config_->UE_ANT_NUM];
+        memset(fft_checker_[i], 0, sizeof(size_t) * (config_->UE_ANT_NUM));
+    }
 
-    memset(demul_status_, 0, sizeof(int) * kFrameWnd);
+    memset(demul_status_, 0, sizeof(size_t) * kFrameWnd);
     if (dl_data_symbol_perframe > 0) {
         for (size_t i = 0; i < kFrameWnd; i++) {
-            demul_checker_[i] = new size_t[dl_data_symbol_perframe];
+            demul_checker_[i] = new size_t[config_->UE_ANT_NUM];
             memset(
-                demul_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
+                demul_checker_[i], 0, sizeof(size_t) * (config_->UE_ANT_NUM));
         }
     }
 
-    memset(decode_status_, 0, sizeof(int) * kFrameWnd);
+    memset(decode_status_, 0, sizeof(size_t) * kFrameWnd);
     if (dl_data_symbol_perframe > 0) {
         for (size_t i = 0; i < kFrameWnd; i++) {
-            decode_checker_[i] = new size_t[dl_data_symbol_perframe];
+            decode_checker_[i] = new size_t[config_->UE_ANT_NUM];
             memset(
-                decode_checker_[i], 0, sizeof(int) * (dl_data_symbol_perframe));
+                decode_checker_[i], 0, sizeof(size_t) * (config_->UE_ANT_NUM));
         }
     }
 
@@ -201,8 +205,6 @@ void Phy_UE::start()
     moodycamel::ConsumerToken ctok(message_queue_);
 
     // counter for print log
-    size_t demul_count = 0;
-    auto demul_begin = get_time_us();
     int miss_count = 0;
     int total_count = 0;
 
@@ -291,102 +293,102 @@ void Phy_UE::start()
             case EventType::kFFT: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
-                // checker to count # of pilots/users
-                size_t dl_symbol_id
+                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+                size_t frame_slot = frame_id % kFrameWnd;
+                size_t dl_symbol_idx
                     = config_->get_dl_symbol_idx(frame_id, symbol_id);
-                if (dl_symbol_id >= dl_pilot_symbol_perframe) {
+                if (dl_symbol_idx >= dl_pilot_symbol_perframe) {
                     Event_data do_demul_task(EventType::kDemul, event.tags[0]);
                     schedule_task(do_demul_task, &demul_queue_, ptok_demul);
                 }
-                csi_checker_[frame_id]++;
-                if (csi_checker_[frame_id]
-                    == dl_pilot_symbol_perframe * config_->UE_ANT_NUM) {
-                    csi_checker_[frame_id] = 0;
+                fft_checker_[frame_slot][ant_id]++;
+                if (fft_checker_[frame_slot][ant_id] == dl_symbol_perframe) {
                     if (kDebugPrintPerTaskDone)
-                        printf("Main thread: pilot frame: %zu, finished "
-                               "collecting "
-                               "pilot frames\n",
-                            frame_id);
+                        printf("Main thread: Equalization done frame: %zu, "
+                               "ant_id %zu\n",
+                            frame_id, ant_id);
+                    fft_checker_[frame_slot][ant_id] = 0;
+                    fft_status_[frame_slot]++;
+                    if (fft_status_[frame_slot] == config_->UE_ANT_NUM) {
+                        if (kDebugPrintPerFrameDone)
+                            printf("Main thread: Equalization done on all "
+                                   "antennas at frame: %zu\n",
+                                frame_id);
+                        fft_status_[frame_slot] = 0;
+                    }
                 }
 
             } break;
 
             case EventType::kDemul: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                //size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_slot = frame_id % kFrameWnd;
+                //size_t dl_symbol_idx
+                //    = config_->get_dl_symbol_idx(frame_id, symbol_id)
+                //    - dl_pilot_symbol_perframe;
                 Event_data do_decode_task(EventType::kDecode, event.tags[0]);
                 schedule_task(do_decode_task, &decode_queue_, ptok_decode);
-                demul_checker_[frame_slot][symbol_id]++;
-                // if this symbol is ready
-                if (demul_checker_[frame_slot][symbol_id]
-                    == config_->UE_ANT_NUM) {
-
-                    if (kDebugPrintInTask)
+                demul_checker_[frame_slot][ant_id]++;
+                if (demul_checker_[frame_slot][ant_id]
+                    == dl_data_symbol_perframe) {
+                    if (kDebugPrintPerTaskDone)
                         printf("Main thread: Demodulation done frame: %zu, "
-                               "symbol %zu\n",
-                            frame_id, symbol_id);
+                               "ant %zu\n",
+                            frame_id, ant_id);
                     max_equaled_frame = frame_id;
-                    demul_checker_[frame_slot][symbol_id] = 0;
+                    demul_checker_[frame_slot][ant_id] = 0;
                     demul_status_[frame_slot]++;
-                    if (demul_status_[frame_slot] == dl_data_symbol_perframe) {
+                    if (demul_status_[frame_slot] == config_->UE_ANT_NUM) {
                         if (kDebugPrintPerFrameDone)
-                            printf(
-                                "Main thread: Demodulation done frame: %zu \n",
+                            printf("Main thread: Demodulation done on all "
+                                   "antennas at frame: %zu \n",
                                 frame_id);
                         demul_status_[frame_slot] = 0;
-                    }
-                    demul_count++;
-                    if (demul_count == dl_data_symbol_perframe * 9000) {
-                        demul_count = 0;
-                        double diff = get_time_us() - demul_begin;
-                        int samples_num_per_UE = config_->OFDM_DATA_NUM
-                            * dl_data_symbol_perframe * 1000;
-                        printf("Frame %zu: RX %d samples (per-client) from %zu "
-                               "clients "
-                               "in %f secs, throughtput %f bps per-client"
-                               ", current task queue length %zu\n",
-                            frame_id, samples_num_per_UE, config_->UE_ANT_NUM,
-                            diff,
-                            samples_num_per_UE * config_->mod_order_bits / diff,
-                            demul_queue_.size_approx());
-                        demul_begin = get_time_us();
                     }
                 }
             } break;
 
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_slot = frame_id % kFrameWnd;
+                //size_t dl_symbol_idx
+                //    = config_->get_dl_symbol_idx(frame_id, symbol_id)
+                //    - dl_pilot_symbol_perframe;
                 if (kEnableMac)
-                    schedule_task(Event_data(EventType::kDecode, event.tags[0]),
+                    schedule_task(
+                        Event_data(EventType::kPacketToMac, event.tags[0]),
                         &to_mac_queue_, ptok_mac);
-                else if (dl_data_symbol_perframe > 0)
-                    cur_frame_id = frame_id;
-                decode_checker_[frame_slot][symbol_id]++;
-                // if this symbol is ready
-                if (decode_checker_[frame_slot][symbol_id]
-                    == config_->UE_ANT_NUM) {
+                decode_checker_[frame_slot][ant_id]++;
+                if (decode_checker_[frame_slot][ant_id]
+                    == dl_data_symbol_perframe) {
 
-                    if (kDebugPrintInTask)
+                    if (kDebugPrintPerTaskDone)
                         printf("Main thread: Decoding done frame: %zu, "
-                               "symbol %zu\n",
-                            frame_id, symbol_id);
-                    decode_checker_[frame_slot][symbol_id] = 0;
+                               "ant %zu\n",
+                            frame_id, ant_id);
+                    decode_checker_[frame_slot][ant_id] = 0;
                     decode_status_[frame_slot]++;
-                    if (decode_status_[frame_slot] == dl_data_symbol_perframe) {
-                        double frame_time = get_time_us()
-                            - frame_dl_process_time_[frame_slot * kMaxUEs
-                                  + ant_id];
-                        printf("Main thread: Decode done frame %zu, antenna "
-                               "%zu in %.2f us\n",
-                            frame_id, ant_id, frame_time);
+                    frame_dl_process_time_[frame_slot * kMaxUEs + ant_id]
+                        = get_time_us()
+                        - frame_dl_process_time_[frame_slot * kMaxUEs + ant_id];
+                    if (decode_status_[frame_slot] == config_->UE_ANT_NUM) {
+                        double frame_time_total = 0;
+                        for (size_t i = 0; i < config_->UE_ANT_NUM; i++)
+                            frame_time_total
+                                += frame_dl_process_time_[frame_slot * kMaxUEs
+                                    + i];
                         if (kDebugPrintPerFrameDone)
-                            printf("Main thread: Decoding done frame: %zu \n",
-                                frame_id);
+                            printf("Main thread: Decode done on all antennas "
+                                   "at frame %zu"
+                                   " in %.2f us\n",
+                                frame_id, frame_time_total);
                         decode_status_[frame_slot] = 0;
+                        if (!kEnableMac)
+                            cur_frame_id = frame_id;
                     }
                 }
             } break;
@@ -610,28 +612,29 @@ void Phy_UE::doFFT(int tid, size_t tag)
     if (kPrintDownlinkPilotStats) {
         size_t sym_offset = 0;
         if (config_->isPilot(frame_id, symbol_id)) {
-            std::vector<std::complex<float>> vec;
+            std::vector<std::complex<float>> samples_vec(
+                config_->sampsPerSymbol, 0);
+            simd_convert_short_to_float(pkt->data,
+                reinterpret_cast<float*>(samples_vec.data()),
+                (config_->sampsPerSymbol * 2 / 16) * 16);
             size_t seq_len = ue_pilot_vec[ant_id].size();
-            for (size_t i = 0; i < config_->sampsPerSymbol; i++)
-                vec.push_back(std::complex<float>(pkt->data[2 * i] / 32768.0,
-                    pkt->data[2 * i + 1] / 32768.0));
-            sym_offset
-                = CommsLib::find_pilot_seq(vec, ue_pilot_vec[ant_id], seq_len);
-            sym_offset = sym_offset < seq_len ? 0 : sym_offset - seq_len;
+            std::vector<std::complex<float>> pilot_corr
+                = CommsLib::correlate_avx(samples_vec, ue_pilot_vec[ant_id]);
+            std::vector<float> pilot_corr_abs = CommsLib::abs2_avx(pilot_corr);
+            size_t peak_offset = *std::max_element(
+                pilot_corr_abs.begin(), pilot_corr_abs.end());
+            sym_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
             float noise_power = 0;
             for (size_t i = 0; i < sym_offset; i++)
-                noise_power += std::pow(std::abs(vec[i]), 2);
+                noise_power += std::pow(std::abs(samples_vec[i]), 2);
             float signal_power = 0;
             for (size_t i = sym_offset; i < 2 * sym_offset; i++)
-                signal_power += std::pow(std::abs(vec[i]), 2);
+                signal_power += std::pow(std::abs(samples_vec[i]), 2);
             float SNR = 10 * std::log10(signal_power / noise_power);
             printf(
                 "frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
-                frame_id, symbol_id, ant_id, sym_offset, SNR);
-            if (SNR > 15 && sym_offset >= 230 && sym_offset <= 250) {
-                record_frame = frame_id;
-            }
-            if (frame_id == record_frame) {
+                frame_id, symbol_id, ant_id, peak_offset, SNR);
+            if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxpilot" + std::to_string(symbol_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
@@ -641,14 +644,13 @@ void Phy_UE::doFFT(int tid, size_t tag)
             }
 
         } else {
-            if (frame_id == record_frame) {
+            if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxdata" + std::to_string(symbol_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
                 fclose(f);
-                // record_frame = -1;
             }
         }
     }
@@ -662,10 +664,10 @@ void Phy_UE::doFFT(int tid, size_t tag)
     // transfer ushort to float
     size_t delay_offset
         = (config_->ofdm_rx_zero_prefix_client_ + config_->CP_LEN) * 2;
-    float* cur_fft_buffer_float = (float*)fft_buffer_[FFT_buffer_target_id];
+    float* fft_buff = (float*)fft_buffer_[FFT_buffer_target_id];
 
-    for (size_t i = 0; i < (config_->OFDM_CA_NUM) * 2; i++)
-        cur_fft_buffer_float[i] = pkt->data[delay_offset + i] / 32768.2f;
+    simd_convert_short_to_float(
+        &pkt->data[delay_offset], fft_buff, config_->OFDM_CA_NUM * 2);
 
     // perform fft
     DftiComputeForward(mkl_handle, fft_buffer_[FFT_buffer_target_id]);
