@@ -124,12 +124,10 @@ static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugPrintPilot = false;
 
 static constexpr bool kDebugBSSender = false;
-static constexpr bool kDebugBSReceiver = true;
+static constexpr bool kDebugRadioTX = false;
+static constexpr bool kDebugRadioRX = false;
 
-#define DEBUG_DL_PILOT 0
-#define DEBUG_RECV 0
-#define DEBUG_RADIO_TX 0
-#define DEBUG_RADIO_RX 0
+static constexpr bool kLogMacPackets = true;
 
 enum class ThreadType {
     kMaster,
