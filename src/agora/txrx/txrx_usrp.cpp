@@ -228,7 +228,7 @@ int PacketTXRX::dequeue_send_usrp(int tid)
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
-    if (kDebugBSSender) {
+    if (kDebugPrintInTask) {
         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
@@ -296,7 +296,7 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
-    if (kDebugBSSender) {
+    if (kDebugPrintInTask) {
         printf("In TX thread %d: Transmitted frame %d, symbol %d, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
