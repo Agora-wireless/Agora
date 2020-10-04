@@ -129,7 +129,6 @@ static constexpr bool kDebugPrintInTask = false;
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
 
-static constexpr bool kDebugBSSender = false;
 static constexpr bool kDebugRadioTX = false;
 static constexpr bool kDebugRadioRX = false;
 
