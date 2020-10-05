@@ -41,8 +41,6 @@ Config::Config(std::string jsonfile)
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
-    rt_assert(
-        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -105,8 +103,6 @@ Config::Config(std::string jsonfile)
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         pilot_symbol_num_perframe = tddConf.value(
             "pilot_num", freq_orthogonal_pilot ? 1 : UE_ANT_NUM);
-        data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
-            symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
             downlink_mode
                 ? 0
@@ -205,7 +201,7 @@ Config::Config(std::string jsonfile)
                                           : tddConf.value("zf_block_size", 1);
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
-    fft_block_size = tddConf.value("fft_block_size", 4);
+    fft_block_size = tddConf.value("fft_block_size", 1);
 
     /* LDPC Coding configurations */
     LDPC_config_ul.Bg = tddConf.value("base_graph", 1);
@@ -588,6 +584,13 @@ void Config::genData()
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
             ofdm_tx_zero_prefix_, CP_LEN, scale);
+        if (kDebugPrintPilot) {
+            printf("ue_specific_pilot%zu=[", i);
+            for (size_t j = 0; j < OFDM_CA_NUM; j++)
+                printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
+                    ue_pilot_ifft[i][j].im);
+            printf("]\n");
+        }
     }
 
     pilot_ci16.resize(sampsPerSymbol, 0);
@@ -606,6 +609,13 @@ void Config::genData()
     std::vector<uint32_t> pre_uint32(ofdm_tx_zero_prefix_, 0);
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
     pilot.resize(sampsPerSymbol);
+
+    if (kDebugPrintPilot) {
+        std::cout << "Pilot data: " << std::endl;
+        for (size_t i = 0; i < OFDM_DATA_NUM; i++)
+            std::cout << pilots_[i].re << "+1i*" << pilots_[i].im << ",";
+        std::cout << std::endl;
+    }
 
     ul_iq_ifft.free();
     dl_iq_ifft.free();

@@ -113,25 +113,20 @@ static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 static constexpr bool kCollectPhyStats = false;
 
-#define COMBINE_EQUAL_DECODE 1
-
-#define DO_PREDICTION 0
-#define INIT_FRAME_NUM 10
-
 static constexpr bool kDebugPrintPerFrameDone = true;
 static constexpr bool kDebugPrintPerFrameStart = false;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
-static constexpr bool kDebugPrintPilot = false;
-static constexpr bool kDebugBSSender = false;
-static constexpr bool kDebugBSReceiver = true;
 
-#define DEBUG_DL_PILOT 0
-#define DEBUG_RECV 0
-#define DEBUG_RADIO_TX 0
-#define DEBUG_RADIO_RX 0
+/// Print the I/Q samples in the pilots
+static constexpr bool kDebugPrintPilot = false;
+
+static constexpr bool kDebugRadioTX = false;
+static constexpr bool kDebugRadioRX = false;
+
+static constexpr bool kLogMacPackets = true;
 
 enum class ThreadType {
     kMaster,

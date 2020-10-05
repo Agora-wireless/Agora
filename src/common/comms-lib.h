@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <complex>
 #include <fstream>
+#include <immintrin.h>
 #include <iostream>
 #include <math.h>
 #include <stdio.h>
@@ -121,6 +122,9 @@ public:
     static std::vector<std::complex<int16_t>> correlate_avx(
         std::vector<std::complex<int16_t>> const& f,
         std::vector<std::complex<int16_t>> const& g);
+
+    static __m256 __m256_complex_cf32_mult(
+        __m256 data1, __m256 data2, bool conj);
 };
 
 #endif

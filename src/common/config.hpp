@@ -44,23 +44,23 @@ public:
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames;
 
-    // pilotSymbols[i] contains indices of beacon symbols in frames[i]
+    // beaconSymbols[i] contains IDs of beacon symbols in frames[i]
     std::vector<std::vector<size_t>> beaconSymbols;
 
-    // pilotSymbols[i] contains indices of pilot symbols in frames[i]
+    // pilotSymbols[i] contains IDs of pilot symbols in frames[i]
     std::vector<std::vector<size_t>> pilotSymbols;
 
-    // ULSymbols[i] contains indices of uplink data symbols in frames[i]
+    // ULSymbols[i] contains IDs of uplink data symbols in frames[i]
     std::vector<std::vector<size_t>> ULSymbols;
 
-    // DLSymbols[i] contains indices of downlink data symbols in frames[i]
+    // DLSymbols[i] contains IDs of downlink data symbols in frames[i]
     std::vector<std::vector<size_t>> DLSymbols;
 
-    // ULCalSymbols[i] contains indices of uplink calibration symbols in
+    // ULCalSymbols[i] contains IDs of uplink calibration symbols in
     // frames[i]
     std::vector<std::vector<size_t>> ULCalSymbols;
 
-    // ULCalSymbols[i] contains indices of downlink calibration symbols in
+    // DLCalSymbols[i] contains IDs of downlink calibration symbols in
     // frames[i]
     std::vector<std::vector<size_t>> DLCalSymbols;
 
@@ -187,7 +187,6 @@ public:
     size_t packet_length;
 
     size_t OFDM_PILOT_SPACING;
-    size_t TX_PREFIX_LEN;
 
     size_t DL_PILOT_SYMS;
     size_t UL_PILOT_SYMS;
@@ -440,7 +439,7 @@ public:
         size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
     {
         size_t total_data_symbol_id
-            = get_total_data_symbol_idx(frame_id, symbol_id);
+            = get_total_data_symbol_idx_dl(frame_id, symbol_id);
         size_t num_encoded_bytes_per_cb
             = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]

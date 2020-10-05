@@ -5,6 +5,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "datatype_conversion.h"
 #include "mac_thread.hpp"
 #include "mkl_dfti.h"
 #include "modulation.hpp"
@@ -40,7 +41,7 @@ class Phy_UE {
 public:
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
-    static const int dequeue_bulk_size = 5;
+    static const int kDequeueBulkSizeTXRX = 8;
 
     Phy_UE(Config* cfg);
     ~Phy_UE();
@@ -286,7 +287,7 @@ private:
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)
      */
-    std::vector<std::vector<int8_t>> dl_demod_buffer_;
+    Table<int8_t> dl_demod_buffer_;
 
     /**
      *
@@ -297,6 +298,10 @@ private:
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<size_t> non_null_sc_ind_;
     std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
+    Table<size_t> decoded_bits_count_;
+    Table<size_t> bit_error_count_;
+    Table<size_t> decoded_blocks_count_;
+    Table<size_t> block_error_count_;
 
     /* Concurrent queues */
     /* task queue for downlink FFT */
@@ -323,19 +328,20 @@ private:
     moodycamel::ProducerToken* task_ptok[kMaxThreads];
 
     // all checkers
-    size_t csi_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t data_checker_[TASK_BUFFER_FRAME_NUM];
+    size_t* fft_checker_[kFrameWnd];
+    size_t fft_status_[kFrameWnd];
 
     // can possibly remove this checker
-    size_t* demul_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t demul_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* demul_checker_[kFrameWnd];
+    size_t demul_status_[kFrameWnd];
 
-    size_t* demodul_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t demodul_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* demodul_checker_[kFrameWnd];
+    size_t demodul_status_[kFrameWnd];
 
-    size_t* decode_checker_[TASK_BUFFER_FRAME_NUM];
-    size_t decode_status_[TASK_BUFFER_FRAME_NUM];
+    size_t* decode_checker_[kFrameWnd];
+    size_t decode_status_[kFrameWnd];
 
+    double frame_dl_process_time_[kFrameWnd * kMaxUEs];
     std::queue<std::tuple<int, int>> taskWaitList;
 
     // for python
