@@ -4,12 +4,12 @@
 #include <boost/range/algorithm/count.hpp>
 #include <complex.h>
 #include <emmintrin.h>
-#include <fstream> // std::ifstream
+#include <fstream>
 #include <immintrin.h>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* for memcpy */
+#include <string.h>
 #include <unistd.h>
 #include <vector>
 #define JSON
@@ -22,41 +22,11 @@
 #include "utils.h"
 #include "utils_ldpc.hpp"
 #include <nlohmann/json.hpp>
-//#include <itpp/itbase.h>
-// using namespace itpp;
+
 using json = nlohmann::json;
 #endif
 typedef unsigned char uchar;
 typedef unsigned short ushort;
-
-class LDPCconfig {
-public:
-    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
-    uint16_t Zc; /// The 5G NR LDPC expansion factor
-    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
-
-    /// Allow the LDPC decoder to terminate without completing all iterations
-    /// if it decodes the codeblock eariler
-    bool earlyTermination;
-
-    size_t nRows; /// Number of rows in the LDPC base graph to use
-    uint32_t cbLen; /// Number of information bits input to LDPC encoding
-    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
-    size_t nblocksInSymbol;
-
-    // Return the number of bytes in the information bit sequence for LDPC
-    // encoding of one code block
-    size_t num_input_bytes() const
-    {
-        return bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
-    }
-
-    // Return the number of bytes in the encoded LDPC code word
-    size_t num_encoded_bytes() const
-    {
-        return bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows));
-    }
-};
 
 class Config {
 public:
@@ -109,11 +79,8 @@ public:
     std::vector<uint32_t> beacon;
     complex_float* pilots_;
     complex_float* pilots_sgn_;
-    Table<int8_t> dl_bits;
-    Table<int8_t> ul_bits;
-    Table<int8_t> ul_encoded_bits;
-    Table<uint8_t> ul_mod_input;
-    Table<uint8_t> dl_mod_input;
+    int8_t* dl_bits;
+    int8_t* ul_bits;
     Table<complex_float> dl_iq_f;
     Table<complex_float> ul_iq_f;
     Table<std::complex<int16_t>> dl_iq_t;
@@ -303,9 +270,10 @@ public:
     // processed by Agora before exiting.
     size_t frames_to_test;
 
-    // Size of tranport block given by upper layer
-    size_t transport_block_size;
-    LDPCconfig LDPC_config; // LDPC parameters
+    size_t tb_size_ul; // Uplink transport block size
+    size_t tb_size_dl; // Downlink tranport block size
+    LDPCconfig LDPC_config_ul; // Uplink LDPC parameters
+    LDPCconfig LDPC_config_dl; // Downlink LDPC parameters
 
     // Number of bytes per code block
     size_t num_bytes_per_cb;
@@ -339,13 +307,52 @@ public:
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
+    /// Update configurations depends on modulation order
     inline void update_mod_cfgs(size_t new_mod_order_bits)
     {
         mod_order_bits = new_mod_order_bits;
         mod_order = (size_t)pow(2, mod_order_bits);
         init_modulation_table(mod_table, mod_order);
-        LDPC_config.nblocksInSymbol
-            = OFDM_DATA_NUM * mod_order_bits / LDPC_config.cbCodewLen;
+    }
+
+    inline void update_ldpc_cfgs(LDPCconfig& LDPC_config, size_t& tb_size,
+        size_t n_symbol, size_t target_code_rate)
+    {
+        // Number of information bits available in a frame for each UE
+        size_t n_info_per_ue = compute_n_info(
+            n_symbol, OFDM_DATA_NUM, mod_order_bits, target_code_rate);
+        LDPC_config.Bg = select_base_graph(n_info_per_ue, target_code_rate);
+        LDPC_config.nRows = compute_n_rows(target_code_rate, LDPC_config.Bg);
+        LDPC_config.code_rate
+            = compute_code_rate(LDPC_config.nRows, LDPC_config.Bg);
+
+        // Refine n_info based on the computed code rate.
+        // Note: this implementation is different from standard, we use less
+        // nRow to reduce code rate instead of rate matching.
+        n_info_per_ue = compute_n_info(
+            n_symbol, OFDM_DATA_NUM, mod_order_bits, LDPC_config.code_rate);
+        tb_size = compute_tb_size(n_info_per_ue, target_code_rate);
+        code_block_segmentation(tb_size, LDPC_config.Bg, LDPC_config.nCb,
+            LDPC_config.cbLen, LDPC_config.zc);
+
+        LDPC_config.nRow = compute_n_rows(target_code_rate, LDPC_config.Bg);
+        LDPC_config.map_symbols_to_cbs(
+            symbol_num_perframe, OFDM_DATA_NUM, mod_order_bits);
+    }
+
+    inline void update_cfgs_from_mcs(size_t mcs)
+    {
+        update_mod_cfgs(McsToModOrderBits[mcs]);
+        float target_code_rate = McsToCodeRate[mcs];
+        // Number of UL/DL data symbols
+        size_t n_symbol = downlink_mode ? dl_data_symbol_num_perframe
+                                        : ul_data_symbol_num_perframe;
+        update_ldpc_cfgs(LDPC_config_ul, tb_size_ul,
+            ul_data_symbol_num_perframe, target_code_rate);
+        update_ldpc_cfgs(LDPC_config_dl, tb_size_dl,
+            dl_data_symbol_num_perframe, target_code_rate);
+        num_bytes_per_cb
+            = LDPC_config_ul.cbLen / 8; // TODO: Use bits_to_bytes()?
     }
 
     /// Return total number of data symbols of all frames in a buffer
@@ -441,8 +448,8 @@ public:
                                   + num_encoded_bytes_per_cb * cb_id];
     }
 
-    // Returns the number of pilot subcarriers in downlink symbols used for
-    // phase tracking
+    /// Returns the number of pilot subcarriers in downlink symbols used for
+    /// phase tracking
     inline size_t get_ofdm_pilot_num() const
     {
         return OFDM_DATA_NUM / OFDM_PILOT_SPACING;
