@@ -50,7 +50,7 @@ Agora can be built with the following setup.
           Agora developers to get the patch for resolving conflicts with FlexRAN.
         * Set required environment variables by sourcing `compilervars.sh`.
           For example, if Intel compiler is in `/opt`, run `source $(find
-          2>/dev/null/opt -name compilervars.sh) intel64`. After running this
+          2>/dev/null /opt -name compilervars.sh) intel64`. After running this
           command, ensure that `icc --version` reports 19.0.4.
         * After instaling `icc 19.04`, compile FlexRAN as follows:
         ```
