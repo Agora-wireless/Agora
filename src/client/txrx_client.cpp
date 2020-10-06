@@ -262,8 +262,9 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
     int num_samps = c->sampsPerSymbol;
     int frm_num_samps = num_samps * c->symbol_num_perframe;
 
-    // for UHD devices, first pilot should not be with the END_BURST flag
-    int flagsTxPilot = (kUseUHD && c->nChannels == 2) ? 1 : 2;
+    // For UHD devices, first pilot should not be with the END_BURST flag
+    // 1: HAS_TIME, 2: HAS_TIME | END_BURST
+    int flags_tx_pilot = (kUseUHD && c->nChannels == 2) ? 1 : 2;
 
     Event_data event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
@@ -278,14 +279,14 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
     long long txTime(0);
     int r;
 
-    // transmit pilot
-    if (kUseUHD || !c->hw_framer) {
+    // Transmit pilot
+    if (!c->hw_framer) {
         size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
 
         txTime = time0 + tx_frame_id * frm_num_samps
             + pilot_symbol_id * num_samps - c->cl_tx_advance;
         r = radio->radioTx(
-            ue_id, pilot_buff0.data(), num_samps, flagsTxPilot, txTime);
+            ue_id, pilot_buff0.data(), num_samps, flags_tx_pilot, txTime);
         if (r < num_samps)
             std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
                       << std::endl;
@@ -300,7 +301,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
         }
     }
 
-    // transmit data
+    // Transmit data
     for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
          symbol_id++) {
         size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
@@ -319,10 +320,10 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
             ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
             : time0 + tx_frame_id * frm_num_samps + tx_symbol_id * num_samps
                 - c->cl_tx_advance;
-        int flagsTxSymbol = 1; // HAS_TIME
+        int flags_tx_symbol = 1; // HAS_TIME
         if (tx_symbol_id == c->ULSymbols[0].back())
-            flagsTxSymbol = 2; // HAS_TIME & END_BURST, fixme
-        r = radio->radioTx(ue_id, txbuf, num_samps, flagsTxSymbol, txTime);
+            flags_tx_symbol = 2; // HAS_TIME & END_BURST, fixme
+        r = radio->radioTx(ue_id, txbuf, num_samps, flags_tx_symbol, txTime);
         if (r < num_samps)
             std::cout << "BAD Write (UL): " << r << "/" << num_samps
                       << std::endl;
@@ -502,10 +503,10 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     std::stringstream sout;
 
     // Keep receiving one frame of data until a beacon is found
-    // Perform initial beacon detection every 10 frames
+    // Perform initial beacon detection every kBeaconDetectInterval frames
     while (c->running && sync_index < 0) {
         int r;
-        for (int find_beacon_retry = 0; find_beacon_retry < 10;
+        for (size_t find_beacon_retry = 0; find_beacon_retry < kBeaconDetectInterval;
              find_beacon_retry++) {
             r = radio->radioRx(
                 radio_id, frm_rx_buff.data(), frm_num_samps, rxTime);

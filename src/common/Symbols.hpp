@@ -179,6 +179,9 @@ static inline std::string thread_type_str(ThreadType thread_type)
 
 enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 
+// Intervals for beacon detection at the client (in frames)
+static constexpr size_t kBeaconDetectInterval = 10;
+
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 70;
 
