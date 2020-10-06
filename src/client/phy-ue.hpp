@@ -302,6 +302,8 @@ private:
     Table<size_t> bit_error_count_;
     Table<size_t> decoded_blocks_count_;
     Table<size_t> block_error_count_;
+    size_t* decoded_symbol_count_;
+    size_t* symbol_error_count_;
 
     /* Concurrent queues */
     /* task queue for downlink FFT */

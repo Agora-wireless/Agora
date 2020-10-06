@@ -274,8 +274,7 @@ Event_data DoIFFT::launch(size_t tag)
     // printf("\n");
 
     cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    float post_scale = cfg->OFDM_CA_NUM;
-    mat_data /= post_scale;
+    mat_data /= cfg->OFDM_CA_NUM;
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
