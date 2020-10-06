@@ -536,8 +536,12 @@ void Phy_UE::start()
                       << 1.0 * total_bit_errors / total_decoded_bits
                       << "), block errors (BLER) " << total_block_errors << "/"
                       << total_decoded_blocks << " ("
-                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                      << std::endl;
+                      << 1.0 * total_block_errors / total_decoded_blocks
+                      << "), symbol errors " << symbol_error_count_[ue_id]
+                      << "/" << decoded_symbol_count_[ue_id] << " ("
+                      << 1.0 * symbol_error_count_[ue_id]
+                    / decoded_symbol_count_[ue_id]
+                      << ")" << std::endl;
         }
     }
     this->stop();
@@ -872,7 +876,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
         bblib_ldpc_decoder_5gnr(
             &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
-        if (kPrintPhyStats) {
+        if (kCollectPhyStats) {
             decoded_bits_count_[ant_id][total_dl_symbol_id]
                 += 8 * config_->num_bytes_per_cb;
             decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
@@ -889,6 +893,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
                 }
                 if (rx_byte != tx_byte)
                     block_error++;
+
                 bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
             }
             block_error_count_[ant_id][total_dl_symbol_id] += (block_error > 0);
@@ -904,6 +909,11 @@ void Phy_UE::doDecode(int tid, size_t tag)
             }
             printf("\n");
         }
+    }
+    if (kCollectPhyStats) {
+        decoded_symbol_count_[ant_id]++;
+        symbol_error_count_[ant_id]
+            += block_error_count_[ant_id][total_dl_symbol_id] > 0;
     }
 
     size_t dec_duration_stat = rdtsc() - start_tsc;
@@ -1078,9 +1088,9 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = (kUseArgos && config_->hw_framer)
-        ? std::min(config_->UE_NUM, config_->socket_thread_num)
-        : kUseArgos ? config_->UE_NUM : config_->socket_thread_num;
+    rx_thread_num = (kUseArgos && !config_->hw_framer)
+        ? config_->UE_NUM
+        : std::min(config_->UE_NUM, config_->socket_thread_num);
 
     tx_buffer_status_size
         = (ul_symbol_perframe * config_->UE_ANT_NUM * kFrameWnd);
@@ -1159,6 +1169,10 @@ void Phy_UE::initialize_downlink_buffers()
             config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
         block_error_count_.calloc(
             config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
+        decoded_symbol_count_ = new size_t[config_->UE_ANT_NUM];
+        symbol_error_count_ = new size_t[config_->UE_ANT_NUM];
+        memset(decoded_symbol_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);
+        memset(symbol_error_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);
     }
 }
 
