@@ -310,7 +310,7 @@ void Config::genData()
     auto zc_seq_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_seq = Utils::double_to_cfloat(zc_seq_double);
-    auto common_pilot
+    common_pilot
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
 
     pilots_ = (complex_float*)aligned_alloc(
