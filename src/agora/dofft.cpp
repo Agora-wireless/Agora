@@ -274,8 +274,6 @@ Event_data DoIFFT::launch(size_t tag)
     // printf("\n");
 
     cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    float post_scale = cfg->OFDM_CA_NUM;
-    mat_data /= post_scale;
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -290,7 +288,7 @@ Event_data DoIFFT::launch(size_t tag)
 
     for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
         /* ifft scaled results by OFDM_CA_NUM */
-        __m256 scale_factor = _mm256_set1_ps(32768.0);
+        __m256 scale_factor = _mm256_set1_ps(32768.0 / cfg->OFDM_CA_NUM);
         __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
         __m256 ifft2 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id + 8);
         __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
@@ -308,7 +306,7 @@ Event_data DoIFFT::launch(size_t tag)
                 integer1);
     }
 
-    duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
     // cout << "In ifft: frame: "<< frame_id<<", symbol: "<<
     // current_data_symbol_id<<", ant: " << ant_id << ", data: "; for (int j =
