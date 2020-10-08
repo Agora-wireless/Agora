@@ -131,6 +131,15 @@ if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
 endif()
 
+# UHD support
+# TODO: add SoapyUHD check
+set(USE_UHD False CACHE STRING "USE_UHD defaulting to 'False'")
+message(STATUS "USE_UHD: ${USE_UHD}")
+if(${USE_UHD})
+  message(STATUS "Enabled USE_UHD: ${USE_UHD}")
+  add_definitions(-DUSE_UHD)
+endif()
+
 find_package(SoapySDR "0.7" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
@@ -218,10 +227,14 @@ if(${USE_DPDK})
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
-else()
+elseif(${USE_ARGOS})
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx.cpp
     src/agora/txrx/txrx_argos.cpp)
+elseif(${USE_UHD})
+  set(AGORA_SOURCES ${AGORA_SOURCES}
+    src/agora/txrx/txrx.cpp
+    src/agora/txrx/txrx_usrp.cpp)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 

@@ -12,7 +12,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
-    if (!kUseArgos) {
+    if (!kUseArgos && !kUseUHD) {
         socket_.resize(cfg->nRadios);
         bs_rru_sockaddr_.resize(cfg->nRadios);
     } else {
@@ -34,7 +34,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 
 PacketTXRX::~PacketTXRX()
 {
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         radioconfig_->radioStop();
         delete radioconfig_;
     }
@@ -50,7 +50,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         if (!radioconfig_->radioStart()) {
             fprintf(stderr, "Failed to start radio\n");
             return false;
@@ -68,6 +68,11 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx_argos>,
                 context);
             rt_assert(ret == 0, "Failed to create threads");
+        } else if (kUseUHD) {
+            int ret = pthread_create(&txrx_thread, NULL,
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx_usrp>,
+                context);
+            rt_assert(ret == 0, "Failed to create threads");
         } else {
             int ret = pthread_create(&txrx_thread, NULL,
                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
@@ -76,7 +81,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         }
     }
 
-    if (kUseArgos)
+    if (kUseArgos || kUseUHD)
         radioconfig_->go();
     return true;
 }
