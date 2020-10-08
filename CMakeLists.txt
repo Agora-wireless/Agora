@@ -64,7 +64,10 @@ set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
+# TODO: add SoapyUHD check
+set(USE_UHD False CACHE STRING "USE_UHD defaulting to 'False'")
 
+message(STATUS "USE_UHD: ${USE_UHD}")
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
@@ -131,10 +134,6 @@ if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
 endif()
 
-# UHD support
-# TODO: add SoapyUHD check
-set(USE_UHD False CACHE STRING "USE_UHD defaulting to 'False'")
-message(STATUS "USE_UHD: ${USE_UHD}")
 if(${USE_UHD})
   message(STATUS "Enabled USE_UHD: ${USE_UHD}")
   add_definitions(-DUSE_UHD)
@@ -227,13 +226,10 @@ if(${USE_DPDK})
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
-elseif(${USE_ARGOS})
+else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx.cpp
-    src/agora/txrx/txrx_argos.cpp)
-elseif(${USE_UHD})
-  set(AGORA_SOURCES ${AGORA_SOURCES}
-    src/agora/txrx/txrx.cpp
+    src/agora/txrx/txrx_argos.cpp
     src/agora/txrx/txrx_usrp.cpp)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
