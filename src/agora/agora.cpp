@@ -782,10 +782,10 @@ void Agora::update_rx_counters(size_t frame_id, size_t symbol_id)
             const size_t prev_frame_slot
                 = (frame_slot + TASK_BUFFER_FRAME_NUM - 1)
                 % TASK_BUFFER_FRAME_NUM;
-            printf("Main thread: data received from frame %zu, symbol %zu, in "
-                   "%.2f us. RX in prev frame: %zu\n",
-                frame_id, symbol_id,
-                stats->master_get_delta_us(
+            printf("Main [frame %zu + %.2f ms since last frame]: first packet "
+                   "received. Remaining packets in prev frame: %zu\n",
+                frame_id,
+                stats->master_get_delta_ms(
                     TsType::kPilotRX, frame_id, frame_id - 1),
                 rx_counters_.num_pkts[prev_frame_slot]);
         }
@@ -845,35 +845,35 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
     case (PrintType::kEncode):
         printf("Main [frame %zu + %.2f ms]: completed LDPC encoding\n",
             frame_id,
-            stats->master_get_delta_us(
+            stats->master_get_delta_ms(
                 TsType::kEncodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPrecode):
         printf("Main [frame %zu + %.2f ms]: completed precoding\n", frame_id,
-            stats->master_get_delta_us(
+            stats->master_get_delta_ms(
                 TsType::kPrecodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kIFFT):
         printf("Main [frame %zu + %.2f ms]: completed IFFT\n", frame_id,
-            stats->master_get_delta_us(
+            stats->master_get_delta_ms(
                 TsType::kIFFTDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketTXFirst):
         printf("Main [frame %zu + %.2f ms]: completed TX of first symbol\n",
             frame_id,
-            stats->master_get_delta_us(
+            stats->master_get_delta_ms(
                 TsType::kTXProcessedFirst, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketTX):
         printf("Main [frame %zu + %.2f ms]: completed TX (%zu DL symbols)\n",
             frame_id,
-            stats->master_get_delta_us(
+            stats->master_get_delta_ms(
                 TsType::kTXDone, TsType::kPilotRX, frame_id),
             config_->dl_data_symbol_num_perframe);
         break;
     case (PrintType::kPacketToMac):
         printf("Main [frame %zu + %.2f ms]: completed MAC TX \n", frame_id,
-            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id));
         break;
     default:
         printf("Wrong task type in frame done print!");
