@@ -134,8 +134,8 @@ void* Sender::master_thread(int)
     }
 
     frame_start[0] = get_time();
-    uint64_t tick_start = rdtsc();
     double start_time = get_time();
+    uint64_t tick_start = rdtsc();
     // Add delay for beacon at the beginning of a frame
     if (cfg->beacon_symbol_num_perframe == 1) {
         delay_ticks(tick_start, get_ticks_for_frame(0));
@@ -164,6 +164,12 @@ void* Sender::master_thread(int)
             const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
+                // Add end-of-frame delay
+                if (cfg->downlink_mode) {
+                    delay_ticks(tick_start,
+                        get_ticks_for_frame(ctag.frame_id)
+                            * cfg->data_symbol_num_perframe);
+                }
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
                     printf("Sender: Transmitted frame %u in %.1f ms\n",
                         ctag.frame_id, (get_time() - start_time) / 1000.0);
@@ -174,13 +180,6 @@ void* Sender::master_thread(int)
                     break;
                 frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
-
-                // Add end-of-frame delay
-                if (cfg->downlink_mode) {
-                    delay_ticks(tick_start,
-                        get_ticks_for_frame(ctag.frame_id)
-                            * cfg->data_symbol_num_perframe);
-                }
 
                 frame_start[next_frame_id % kNumStatsFrames] = get_time();
 
