@@ -365,6 +365,8 @@ void Agora::start()
                     print_per_symbol_done(
                         PrintType::kDecode, frame_id, symbol_idx_ul);
                     if (decode_stats_.last_symbol(frame_id)) {
+                        stats->master_set_tsc(TsType::kDecodeDone, frame_id);
+                        print_per_frame_done(PrintType::kDecode, frame_id);
                         if (!kEnableMac) {
                             // assert(cur_frame_id == frame_id);
                             // cur_frame_id++;
@@ -372,8 +374,6 @@ void Agora::start()
                             if (stats->last_frame_id == cfg->frames_to_test - 1)
                                 goto finish;
                         }
-                        stats->master_set_tsc(TsType::kDecodeDone, frame_id);
-                        print_per_frame_done(PrintType::kDecode, frame_id);
                     }
                 }
             } break;
@@ -407,13 +407,14 @@ void Agora::start()
 
             case EventType::kEncode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
-
-                if (encode_stats_.last_task(frame_id, data_symbol_idx)) {
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t symbol_idx_dl
+                    = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+                if (encode_stats_.last_task(frame_id, symbol_idx_dl)) {
                     schedule_subcarriers(
-                        EventType::kPrecode, frame_id, data_symbol_idx);
+                        EventType::kPrecode, frame_id, symbol_id);
                     print_per_symbol_done(
-                        PrintType::kEncode, frame_id, data_symbol_idx);
+                        PrintType::kEncode, frame_id, symbol_idx_dl);
                     if (encode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kEncodeDone, frame_id);
                         print_per_frame_done(PrintType::kEncode, frame_id);
@@ -426,19 +427,18 @@ void Agora::start()
                 size_t sc_id = gen_tag_t(event.tags[0]).sc_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t symbol_idx_dl
+                    = cfg->get_dl_symbol_idx(frame_id, symbol_id);
                 print_per_task_done(
-                    PrintType::kPrecode, frame_id, symbol_id, sc_id);
-                if (precode_stats_.last_task(frame_id, symbol_id)) {
+                    PrintType::kPrecode, frame_id, symbol_idx_dl, sc_id);
+                if (precode_stats_.last_task(frame_id, symbol_idx_dl)) {
                     schedule_antennas(EventType::kIFFT, frame_id, symbol_id);
-                    size_t symbol_idx_dl
-                        = cfg->get_dl_symbol_idx(frame_id, symbol_id);
                     if (symbol_idx_dl < cfg->dl_data_symbol_num_perframe - 1) {
                         schedule_codeblocks(EventType::kEncode, frame_id,
                             cfg->DLSymbols[0][symbol_idx_dl + 1]);
                     }
-
                     print_per_symbol_done(
-                        PrintType::kPrecode, frame_id, symbol_id);
+                        PrintType::kPrecode, frame_id, symbol_idx_dl);
                     if (precode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kPrecodeDone, frame_id);
                         print_per_frame_done(PrintType::kPrecode, frame_id);
@@ -450,15 +450,16 @@ void Agora::start()
                 /* IFFT is done, schedule data transmission */
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t symbol_idx_dl
+                    = cfg->get_dl_symbol_idx(frame_id, symbol_id);
                 try_enqueue_fallback(get_conq(EventType::kPacketTX),
                     tx_ptoks_ptr[ant_id % cfg->socket_thread_num],
                     Event_data(EventType::kPacketTX, event.tags[0]));
-
                 print_per_task_done(
-                    PrintType::kIFFT, frame_id, data_symbol_idx, ant_id);
+                    PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
-                if (ifft_stats_.last_task(frame_id, data_symbol_idx)) {
+                if (ifft_stats_.last_task(frame_id, symbol_idx_dl)) {
                     if (ifft_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kIFFTDone, frame_id);
                         print_per_frame_done(PrintType::kIFFT, frame_id);
@@ -472,15 +473,16 @@ void Agora::start()
                 /* Data is sent */
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
-
+                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t symbol_idx_dl
+                    = cfg->get_dl_symbol_idx(frame_id, symbol_id);
                 print_per_task_done(
-                    PrintType::kPacketTX, frame_id, data_symbol_idx, ant_id);
-                if (tx_stats_.last_task(frame_id, data_symbol_idx)) {
+                    PrintType::kPacketTX, frame_id, symbol_idx_dl, ant_id);
+                if (tx_stats_.last_task(frame_id, symbol_idx_dl)) {
                     print_per_symbol_done(
-                        PrintType::kPacketTX, frame_id, data_symbol_idx);
+                        PrintType::kPacketTX, frame_id, symbol_idx_dl);
                     /* If tx of the first symbol is done */
-                    if (data_symbol_idx == cfg->DLSymbols[0].front()) {
+                    if (symbol_id == cfg->DLSymbols[0].front()) {
                         stats->master_set_tsc(
                             TsType::kTXProcessedFirst, frame_id);
                         print_per_frame_done(
@@ -822,13 +824,6 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
             frame_id,
             stats->master_get_us_since(TsType::kRCAllRX, frame_id) / 1000.0);
         break;
-    case (PrintType::kRC):
-        printf("Main thread: Reciprocity Calculation done frame: %zu in "
-               "%.2f us since reciprocity pilots all received\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kRCDone, TsType::kRCAllRX, frame_id));
-        break;
     case (PrintType::kZF):
         printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n", frame_id,
             stats->master_get_delta_ms(
@@ -840,58 +835,44 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
                 TsType::kDemulDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kDecode):
-        printf("Main [frame %zu + %.2f ms]: Completed LDPC decoding\n",
+        printf("Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
+               "symbols)\n",
             frame_id,
             stats->master_get_delta_ms(
-                TsType::kDecodeDone, TsType::kPilotRX, frame_id));
+                TsType::kDecodeDone, TsType::kPilotRX, frame_id),
+            config_->ul_data_symbol_num_perframe);
         break;
     case (PrintType::kEncode):
-        printf("Main thread: Encoding done frame: %zu in %.2f us since ZF "
-               "done, total %.2f us\n",
+        printf("Main [frame %zu + %.2f ms]: completed LDPC encoding\n",
             frame_id,
-            stats->master_get_delta_us(
-                TsType::kEncodeDone, TsType::kZFDone, frame_id),
             stats->master_get_delta_us(
                 TsType::kEncodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPrecode):
-        printf("Main thread: Precoding done frame: %zu in %.2f us since ZF "
-               "done, total: %.2f us\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kPrecodeDone, TsType::kZFDone, frame_id),
+        printf("Main [frame %zu + %.2f ms]: completed precoding\n", frame_id,
             stats->master_get_delta_us(
                 TsType::kPrecodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kIFFT):
-        printf("Main thread: IFFT done frame: %zu in %.2f us since precode "
-               "done, total: %.2f us\n",
-            frame_id,
-            stats->master_get_delta_us(
-                TsType::kIFFTDone, TsType::kPrecodeDone, frame_id),
+        printf("Main [frame %zu + %.2f ms]: completed IFFT\n", frame_id,
             stats->master_get_delta_us(
                 TsType::kIFFTDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketTXFirst):
-        printf("Main thread: TX of first symbol done frame: %zu in %.2f "
-               "us since ZF done, total: %.2f us\n",
+        printf("Main [frame %zu + %.2f ms]: completed TX of first symbol\n",
             frame_id,
-            stats->master_get_delta_us(
-                TsType::kTXProcessedFirst, TsType::kZFDone, frame_id),
             stats->master_get_delta_us(
                 TsType::kTXProcessedFirst, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketTX):
-        printf("Main thread: TX done frame: %zu (%zu DL symbols) in %.2f us "
-               "since ZF done, total: %.2f us\n",
-            frame_id, config_->dl_data_symbol_num_perframe,
+        printf("Main [frame %zu + %.2f ms]: completed TX (%zu DL symbols)\n",
+            frame_id,
             stats->master_get_delta_us(
-                TsType::kTXDone, TsType::kZFDone, frame_id),
-            stats->master_get_delta_us(
-                TsType::kTXDone, TsType::kPilotRX, frame_id));
+                TsType::kTXDone, TsType::kPilotRX, frame_id),
+            config_->dl_data_symbol_num_perframe);
         break;
     case (PrintType::kPacketToMac):
-        printf("Main thread: MAC TX done frame: %zu, in %.2f us\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: completed MAC TX \n", frame_id,
             stats->master_get_us_since(TsType::kPilotRX, frame_id));
         break;
     default:
@@ -920,11 +901,6 @@ void Agora::print_per_symbol_done(
             get_conq(EventType::kZF)->size_approx(),
             get_conq(EventType::kDemul)->size_approx(),
             stats->master_get_us_since(TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kRC):
-        printf("Main thread: cal symbol FFT done frame: %zu, symbol: %zu, "
-               "num symbols done: %zu\n",
-            frame_id, symbol_id, fft_stats_.symbol_rc_count[frame_id]);
         break;
     case (PrintType::kDemul):
         printf("Main thread: Demodulation done frame %zu, symbol: %zu, num "
