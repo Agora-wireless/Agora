@@ -13,6 +13,8 @@
 // have [n_elems] elements.
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16
+// reference:
+// https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
 static inline void simd_convert_short_to_float(
     const short* in_buf, float* out_buf, size_t n_elems)
 {
