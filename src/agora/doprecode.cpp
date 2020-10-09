@@ -58,8 +58,7 @@ Event_data DoPrecode::launch(size_t tag)
             int cur_sc_id = base_sc_id + i + j;
 
             complex_float* data_ptr = modulated_buffer_temp;
-            if (data_symbol_idx_dl
-                < cfg->DL_PILOT_SYMS) {
+            if (data_symbol_idx_dl < cfg->DL_PILOT_SYMS) {
                 for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                     data_ptr[user_id]
                         = cfg->ue_specific_pilot[user_id][cur_sc_id];
@@ -82,7 +81,10 @@ Event_data DoPrecode::launch(size_t tag)
                                [cfg->get_zf_sc_id(cur_sc_id)]);
 
             cx_fmat mat_precoder(
-                precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+                precoder_ptr, cfg->UE_NUM, cfg->BF_ANT_NUM, false);
+            if (cfg->exclude_ref_from_bf)
+                mat_precoder.insert_cols(cfg->ref_ant,
+                    cx_fmat(cfg->UE_NUM, cfg->nChannels, fill::zeros));
             cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
             cx_float* precoded_ptr
                 = (cx_float*)precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM;
