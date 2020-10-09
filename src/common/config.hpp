@@ -144,6 +144,7 @@ public:
     bool sampleCalEn;
     bool imbalanceCalEn;
     bool recipCalEn;
+    bool exclude_ref_from_bf;
     std::string channel;
 
     size_t core_offset;
@@ -166,7 +167,8 @@ public:
     size_t fft_block_size;
 
     bool freq_orthogonal_pilot;
-    size_t BS_ANT_NUM;
+    size_t BS_ANT_NUM; // Total number of BS antennas
+    size_t BF_ANT_NUM; // Number of antennas used in beamforming
     size_t UE_NUM;
     size_t UE_ANT_NUM;
 

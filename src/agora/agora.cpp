@@ -6,13 +6,13 @@ Agora::Agora(Config* cfg)
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM * cfg->UE_NUM)
     , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
           kMaxModType * cfg->OFDM_DATA_NUM)
     , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
           cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BF_ANT_NUM)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",

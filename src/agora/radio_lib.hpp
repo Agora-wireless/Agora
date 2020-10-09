@@ -58,7 +58,6 @@ private:
     Config* _cfg;
     std::vector<SoapySDR::Device*> hubs;
     std::vector<SoapySDR::Device*> baStn;
-    SoapySDR::Device* ref;
     SoapySDR::Stream* refRxStream;
     std::vector<SoapySDR::Stream*> txStreams;
     std::vector<SoapySDR::Stream*> rxStreams;

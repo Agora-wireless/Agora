@@ -79,6 +79,12 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             vec_calib = vec_calib / vec_calib(cfg->ref_ant);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
+            if (cfg->exclude_ref_from_bf) {
+                mat_calib.shed_rows(
+                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+                mat_calib.shed_cols(
+                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+            }
             mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
             mat_dl_zf = mat_ul_zf;
@@ -169,6 +175,9 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
+        if (cfg->exclude_ref_from_bf) {
+            mat_csi.shed_rows(cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+        }
         compute_precoder(mat_csi, calib_gather_buffer,
             ul_zf_matrices_[frame_slot][cur_sc_id],
             dl_zf_matrices_[frame_slot][cur_sc_id]);
