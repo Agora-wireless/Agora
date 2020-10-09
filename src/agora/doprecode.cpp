@@ -23,6 +23,23 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
         &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
+#if USE_MKL_JIT
+    MKL_Complex8 alpha = { 1, 0 };
+    MKL_Complex8 beta = { 0, 0 };
+    // Input: A: UE_NUM x BS_ANT_NUM (need transpose), B: UE_NUM x 1
+    // Output: C: BS_ANT_NUM x 1
+    // Leading dimensions: A: UE_NUM, B: UE_NUM, C: BS_ANT_NUM
+    mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter, MKL_COL_MAJOR,
+        MKL_NOTRANS, MKL_NOTRANS, cfg->BS_ANT_NUM, 1, cfg->UE_NUM, &alpha,
+        cfg->BS_ANT_NUM, cfg->UE_NUM, &beta, cfg->BS_ANT_NUM);
+
+    if (MKL_JIT_ERROR == status) {
+        fprintf(stderr,
+            "Error: insufficient memory to JIT and store the DGEMM kernel\n");
+        exit(1);
+    }
+    my_cgemm = mkl_jit_get_cgemm_ptr(jitter);
+#endif
 }
 
 DoPrecode::~DoPrecode()
@@ -77,20 +94,23 @@ Event_data DoPrecode::launch(size_t tag)
                 }
             }
 
+            duration_stat->task_duration[1] += worker_rdtsc() - start_tsc2;
             auto* precoder_ptr = reinterpret_cast<cx_float*>(
                 dl_zf_matrices_[frame_id % kFrameWnd]
                                [cfg->get_zf_sc_id(cur_sc_id)]);
+            cx_float* precoded_ptr = reinterpret_cast<cx_float*>(
+                precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM);
 
+#if USE_MKL_JIT
+            my_cgemm(jitter, (MKL_Complex8*)precoder_ptr,
+                (MKL_Complex8*)data_ptr, (MKL_Complex8*)precoded_ptr);
+#else
             cx_fmat mat_precoder(
                 precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
             cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
-            cx_float* precoded_ptr
-                = (cx_float*)precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM;
             cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
-
-            duration_stat->task_duration[1] += worker_rdtsc() - start_tsc2;
             mat_precoded = mat_data * mat_precoder;
-
+#endif
             // printf("In doPrecode thread %d: frame: %d, symbol: %d, "
             //        "subcarrier: % d\n ",
             //     tid, frame_id, current_data_symbol_id, cur_sc_id);
