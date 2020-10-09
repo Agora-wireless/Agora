@@ -8,7 +8,7 @@ using namespace arma;
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
-static constexpr bool kUseInPlaceIFFT = true;
+static constexpr bool kUseInPlaceIFFT = false;
 
 DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
