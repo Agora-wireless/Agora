@@ -460,6 +460,8 @@ void Agora::start()
                     PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
                 if (ifft_stats_.last_task(frame_id, symbol_idx_dl)) {
+                    print_per_symbol_done(
+                        PrintType::kIFFT, frame_id, symbol_idx_dl);
                     if (ifft_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kIFFTDone, frame_id);
                         print_per_frame_done(PrintType::kIFFT, frame_id);
@@ -843,36 +845,36 @@ void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
             config_->ul_data_symbol_num_perframe);
         break;
     case (PrintType::kEncode):
-        printf("Main [frame %zu + %.2f ms]: completed LDPC encoding\n",
+        printf("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
             frame_id,
             stats->master_get_delta_ms(
                 TsType::kEncodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPrecode):
-        printf("Main [frame %zu + %.2f ms]: completed precoding\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Completed precoding\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kPrecodeDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kIFFT):
-        printf("Main [frame %zu + %.2f ms]: completed IFFT\n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
             stats->master_get_delta_ms(
                 TsType::kIFFTDone, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketTXFirst):
-        printf("Main [frame %zu + %.2f ms]: completed TX of first symbol\n",
+        printf("Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
             frame_id,
             stats->master_get_delta_ms(
                 TsType::kTXProcessedFirst, TsType::kPilotRX, frame_id));
         break;
     case (PrintType::kPacketTX):
-        printf("Main [frame %zu + %.2f ms]: completed TX (%zu DL symbols)\n",
+        printf("Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
             frame_id,
             stats->master_get_delta_ms(
                 TsType::kTXDone, TsType::kPilotRX, frame_id),
             config_->dl_data_symbol_num_perframe);
         break;
     case (PrintType::kPacketToMac):
-        printf("Main [frame %zu + %.2f ms]: completed MAC TX \n", frame_id,
+        printf("Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
             stats->master_get_ms_since(TsType::kPilotRX, frame_id));
         break;
     default:
@@ -887,52 +889,67 @@ void Agora::print_per_symbol_done(
         return;
     switch (print_type) {
     case (PrintType::kFFTPilots):
-        printf("Main thread: pilot FFT done frame: %zu, symbol: %zu, num "
-               "symbols done: %zu\n",
-            frame_id, symbol_id, fft_stats_.get_symbol_count(frame_id));
+        printf("Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
+               "%zu symbols done\n",
+            frame_id, symbol_id,
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            fft_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kFFTData):
-        printf(
-            "Main thread: data FFT done frame %zu, symbol %zu, precoder "
-            "status: %d, fft queue: %zu, zf queue: %zu, demul queue: %zu, in "
-            "%.2f\n",
-            frame_id, symbol_id, zf_stats_.coded_frame == frame_id,
-            get_conq(EventType::kFFT)->size_approx(),
-            get_conq(EventType::kZF)->size_approx(),
-            get_conq(EventType::kDemul)->size_approx(),
-            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+        printf("Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
+               "precoder status: %d\n",
+            frame_id, symbol_id,
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            zf_stats_.coded_frame == frame_id);
         break;
     case (PrintType::kDemul):
-        printf("Main thread: Demodulation done frame %zu, symbol: %zu, num "
-               "symbols done: %zu in %.2f\n",
-            frame_id, symbol_id, demul_stats_.get_symbol_count(frame_id),
-            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed demodulation, "
+               "%zu symbols done\n",
+            frame_id, symbol_id,
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            demul_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kDecode):
-        printf("Main thread: Decoding done frame %zu, symbol: %zu, num "
-               "symbols done: %zu\n",
-            frame_id, symbol_id, decode_stats_.get_symbol_count(frame_id));
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
+               "%zu symbols done\n",
+            frame_id, symbol_id,
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            decode_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kEncode):
-        printf("Main thread: Encoding done frame %zu, symbol: %zu, num "
-               "symbols done: %zu\n",
-            frame_id, symbol_id, encode_stats_.get_symbol_count(frame_id));
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
+               "%zu symbols done\n",
+            frame_id, symbol_id,
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            encode_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kPrecode):
-        printf("Main thread: Precoding done frame: %zu, symbol: %zu in %.2f "
-               "us\n",
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
+               "%zu symbols done\n",
             frame_id, symbol_id,
-            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            precode_stats_.get_symbol_count(frame_id));
+        break;
+    case (PrintType::kIFFT):
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
+               "%zu symbols done\n",
+            frame_id, symbol_id,
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            ifft_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kPacketTX):
-        printf("Main thread: TX done frame: %zu, symbol: %zu in %.2f us\n",
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
+               "%zu symbols done\n",
             frame_id, symbol_id,
-            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            tx_stats_.get_symbol_count(frame_id));
         break;
     case (PrintType::kPacketToMac):
-        printf("Main thread: MAC TX done frame: %zu, symbol: %zu in %.2f us\n",
+        printf("Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+               "%zu symbols done\n",
             frame_id, symbol_id,
-            stats->master_get_us_since(TsType::kPilotRX, frame_id));
+            stats->master_get_ms_since(TsType::kPilotRX, frame_id),
+            tomac_stats_.get_symbol_count(frame_id));
         break;
     default:
         printf("Wrong task type in frame done print!");
