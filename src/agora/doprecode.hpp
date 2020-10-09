@@ -12,6 +12,7 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
+#include <mkl.h>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
@@ -64,6 +65,10 @@ private:
     DurationStat* duration_stat;
     complex_float* modulated_buffer_temp;
     complex_float* precoded_buffer_temp;
+#ifdef USE_MKL_JIT
+    void* jitter;
+    cgemm_jit_kernel_t my_cgemm;
+#endif
 };
 
 #endif

@@ -1,6 +1,7 @@
 #ifndef SYMBOLS
 #define SYMBOLS
 
+#include <mkl.h>
 #include <stdint.h>
 #include <string>
 
@@ -21,6 +22,14 @@ static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
 
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
+
+// Just-in-time optimization for MKL cgemm is available only after MKL 2019
+// update 3. Disable this on systems with an older MKL version.
+#if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
+#define USE_MKL_JIT 1
+#else
+#define USE_MKL_JIT 0
+#endif
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T> static constexpr inline bool is_power_of_two(T x)

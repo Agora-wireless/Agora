@@ -70,7 +70,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         if (cfg->recipCalEn) {
             arma::cx_fvec vec_calib(
                 reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BS_ANT_NUM,
@@ -79,9 +79,10 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             vec_calib = vec_calib / vec_calib(cfg->ref_ant);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
-            mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
+            mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
         } else
-            mat_dl_zf = mat_ul_zf;
+            mat_dl_zf = mat_ul_zf.st();
+
         // We should be scaling the beamforming matrix, so the IFFT
         // output can be scaled with OFDM_CA_NUM across all antennas.
         // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
