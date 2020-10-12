@@ -2,6 +2,7 @@
 #include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
+static constexpr bool kUseSpatialLocality = false;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
@@ -20,15 +21,20 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
 
-    alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
+    alloc_buffer_1d(
+        &modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
         &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
+
+    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i += cfg->OFDM_PILOT_SPACING)
+        pilot_scs.push_back(i);
+
 #if USE_MKL_JIT
     MKL_Complex8 alpha = { 1, 0 };
     MKL_Complex8 beta = { 0, 0 };
-    // Input: A: UE_NUM x BS_ANT_NUM (need transpose), B: UE_NUM x 1
+    // Input: A: BS_ANT_NUM x UE_NUM , B: UE_NUM x 1
     // Output: C: BS_ANT_NUM x 1
-    // Leading dimensions: A: UE_NUM, B: UE_NUM, C: BS_ANT_NUM
+    // Leading dimensions: A: BS_ANT_NUM, B: UE_NUM, C: BS_ANT_NUM
     mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter, MKL_COL_MAJOR,
         MKL_NOTRANS, MKL_NOTRANS, cfg->BS_ANT_NUM, 1, cfg->UE_NUM, &alpha,
         cfg->BS_ANT_NUM, cfg->UE_NUM, &beta, cfg->BS_ANT_NUM);
@@ -50,12 +56,13 @@ DoPrecode::~DoPrecode()
 
 Event_data DoPrecode::launch(size_t tag)
 {
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).sc_id;
-    size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t total_data_symbol_idx
-        = cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl);
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const size_t symbol_id = gen_tag_t(tag).symbol_id;
+    const size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    const size_t total_data_symbol_idx
+        = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_idx_dl);
+    const size_t frame_slot = frame_id % kFrameWnd;
 
     size_t start_tsc = worker_rdtsc();
     if (kDebugPrintInTask) {
@@ -64,66 +71,46 @@ Event_data DoPrecode::launch(size_t tag)
             tid, frame_id, symbol_id, base_sc_id);
     }
 
-    __m256i index = _mm256_setr_epi64x(
-        0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
-    int max_sc_ite
+    size_t max_sc_ite
         = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
 
-    for (int i = 0; i < max_sc_ite; i = i + 4) {
-        size_t start_tsc1 = worker_rdtsc();
-        for (int j = 0; j < 4; j++) {
+    if (kUseSpatialLocality) {
+        for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
+
+            size_t start_tsc1 = worker_rdtsc();
+            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
+                for (size_t j = 0; j < kSCsPerCacheline; j++)
+                    load_input_data(symbol_idx_dl, total_data_symbol_idx,
+                        user_id, base_sc_id + i + j, j);
+
             size_t start_tsc2 = worker_rdtsc();
-            int cur_sc_id = base_sc_id + i + j;
-
-            complex_float* data_ptr = modulated_buffer_temp;
-            if (data_symbol_idx_dl < cfg->DL_PILOT_SYMS) {
-                for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
-                    data_ptr[user_id]
-                        = cfg->ue_specific_pilot[user_id][cur_sc_id];
-            } else {
-                for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
-                    int8_t* raw_data_ptr
-                        = &dl_raw_data[total_data_symbol_idx][cur_sc_id
-                            + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
-                    if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
-                        data_ptr[user_id]
-                            = cfg->ue_specific_pilot[user_id][cur_sc_id];
-                    else
-                        data_ptr[user_id] = mod_single_uint8(
-                            (uint8_t) * (raw_data_ptr), cfg->mod_table);
-                }
-            }
-
-            duration_stat->task_duration[1] += worker_rdtsc() - start_tsc2;
-            auto* precoder_ptr = reinterpret_cast<cx_float*>(
-                dl_zf_matrices_[frame_id % kFrameWnd]
-                               [cfg->get_zf_sc_id(cur_sc_id)]);
-            cx_float* precoded_ptr = reinterpret_cast<cx_float*>(
-                precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM);
-
-#if USE_MKL_JIT
-            my_cgemm(jitter, (MKL_Complex8*)precoder_ptr,
-                (MKL_Complex8*)data_ptr, (MKL_Complex8*)precoded_ptr);
-#else
-            cx_fmat mat_precoder(
-                precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-            cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
-            cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
-            mat_precoded = mat_data * mat_precoder;
-#endif
-            // printf("In doPrecode thread %d: frame: %d, symbol: %d, "
-            //        "subcarrier: % d\n ",
-            //     tid, frame_id, current_data_symbol_id, cur_sc_id);
-            // cout << "Precoder: \n" << mat_precoder << endl;
-            // cout << "Data: \n" << mat_data << endl;
-            // cout << "Precoded data: \n" << mat_precoded << endl;
-            duration_stat->task_count++;
+            duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
+            for (size_t j = 0; j < kSCsPerCacheline; j++)
+                precoding_per_sc(frame_slot, base_sc_id + i + j, i + j);
+            duration_stat->task_count
+                = duration_stat->task_count + kSCsPerCacheline;
+            duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
         }
-        duration_stat->task_duration[2] += worker_rdtsc() - start_tsc1;
+    } else {
+        for (size_t i = 0; i < max_sc_ite; i++) {
+            size_t start_tsc1 = worker_rdtsc();
+            int cur_sc_id = base_sc_id + i;
+            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
+                load_input_data(symbol_idx_dl, total_data_symbol_idx, user_id,
+                    cur_sc_id, 0);
+            size_t start_tsc2 = worker_rdtsc();
+            duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
+
+            precoding_per_sc(frame_slot, cur_sc_id, i);
+            duration_stat->task_count++;
+            duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
+        }
     }
 
     size_t start_tsc3 = worker_rdtsc();
 
+    __m256i index = _mm256_setr_epi64x(
+        0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
     float* precoded_ptr = (float*)precoded_buffer_temp;
     for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
         int ifft_buffer_offset
@@ -136,7 +123,7 @@ Event_data DoPrecode::launch(size_t tag)
                 = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
             __m256d t_data
                 = _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
-            _mm256_store_pd((double*)(ifft_ptr + i * 8), t_data);
+            _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);
         }
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
@@ -149,4 +136,50 @@ Event_data DoPrecode::launch(size_t tag)
             tid, frame_id, symbol_id, base_sc_id);
     }
     return Event_data(EventType::kPrecode, tag);
+}
+
+void DoPrecode::load_input_data(size_t symbol_idx_dl,
+    size_t total_data_symbol_idx, size_t user_id, size_t sc_id,
+    size_t sc_id_in_block)
+{
+    complex_float* data_ptr
+        = modulated_buffer_temp + sc_id_in_block * cfg->UE_NUM;
+    if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
+        data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
+    } else {
+        auto it = find(pilot_scs.begin(), pilot_scs.end(), sc_id);
+        if (it != pilot_scs.end()) {
+            data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
+        } else {
+            int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
+                + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
+            data_ptr[user_id]
+                = mod_single_uint8((uint8_t)(*raw_data_ptr), cfg->mod_table);
+        }
+    }
+}
+
+void DoPrecode::precoding_per_sc(
+    size_t frame_slot, size_t sc_id, size_t sc_id_in_block)
+{
+    auto* precoder_ptr = reinterpret_cast<cx_float*>(
+        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(sc_id)]);
+    auto* data_ptr = reinterpret_cast<cx_float*>(modulated_buffer_temp
+        + (kUseSpatialLocality
+                  ? (sc_id_in_block % kSCsPerCacheline * cfg->UE_NUM)
+                  : 0));
+    auto* precoded_ptr = reinterpret_cast<cx_float*>(
+        precoded_buffer_temp + sc_id_in_block * cfg->BS_ANT_NUM);
+#if USE_MKL_JIT
+    my_cgemm(jitter, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
+        (MKL_Complex8*)precoded_ptr);
+#else
+    cx_fmat mat_precoder(precoder_ptr, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    cx_fmat mat_data(data_ptr, cfg->UE_NUM, 1, false);
+    cx_fmat mat_precoded(precoded_ptr, cfg->BS_ANT_NUM, 1, false);
+    mat_precoded = mat_precoder * mat_data;
+    // cout << "Precoder: \n" << mat_precoder << endl;
+    // cout << "Data: \n" << mat_data << endl;
+    // cout << "Precoded data: \n" << mat_precoded << endl;
+#endif
 }
