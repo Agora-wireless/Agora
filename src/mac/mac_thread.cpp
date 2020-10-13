@@ -319,7 +319,7 @@ void MacThread::process_udp_packets_from_apps_client(
     rt_assert(
         tx_queue_->enqueue(msg), "MAC thread: Failed to enqueue uplink packet");
 
-    radio_buf_id = (radio_buf_id + 1) % TASK_BUFFER_FRAME_NUM;
+    radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
     next_radio_id_ = (next_radio_id_ + 1) % cfg_->UE_ANT_NUM;
     if (next_radio_id_ == 0)
         next_frame_id_++;
@@ -384,7 +384,7 @@ int PacketTXRX::dequeue_send(int tid)
     }
 
     size_t socket_symbol_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
+        % (kFrameWnd * c->data_symbol_num_perframe
               * c->BS_ANT_NUM);
     char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;

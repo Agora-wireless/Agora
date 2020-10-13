@@ -14,11 +14,7 @@
 
 // Number of frames received that we allocate space for in worker threads. This
 // is the frame window that we track in Agora.
-#define TASK_BUFFER_FRAME_NUM 40
-static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
-
-// Number of frames received that we allocate space for in TX/RX threads
-#define SOCKET_BUFFER_FRAME_NUM 40
+static constexpr size_t kFrameWnd = 40;
 
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1

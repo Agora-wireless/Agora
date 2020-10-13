@@ -137,7 +137,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
-    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
             frame_id, base_sc_id);
@@ -192,7 +192,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
-    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
                "BS_ANT_NUM: %zu\n",
@@ -247,7 +247,7 @@ void DoZF::Predict(size_t tag)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     const size_t offset_in_buffer
-        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
+        = ((frame_id % kFrameWnd) * cfg->OFDM_DATA_NUM)
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
