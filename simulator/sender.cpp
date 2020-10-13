@@ -245,7 +245,7 @@ void* Sender::worker_thread(int tid)
     rt_assert(cfg->packet_length
         == Packet::kOffsetOfData
             + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
-
+    size_t ant_num_per_cell = cfg->BS_ANT_NUM / cfg->nCells;
     while (true) {
         gen_tag_t tag = 0;
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
@@ -266,8 +266,8 @@ void* Sender::worker_thread(int tid)
         // Update the TX buffer
         pkt->frame_id = tag.frame_id;
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
-        pkt->cell_id = 0;
-        pkt->ant_id = tag.ant_id;
+        pkt->cell_id = tag.ant_id / ant_num_per_cell;
+        pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
         memcpy(pkt->data,
             iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
