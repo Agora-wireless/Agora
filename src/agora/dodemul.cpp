@@ -167,24 +167,23 @@ Event_data DoDemul::launch(size_t tag)
             if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
                     // Reset previous frame
-                    cx_float* phase_shift_ptr
-                        = (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1)
-                            % TASK_BUFFER_FRAME_NUM];
+                    cx_float* phase_shift_ptr = (cx_float*)
+                        ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
                     cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
                         cfg->UL_PILOT_SYMS, false);
                     mat_phase_shift.fill(0);
                 }
                 cx_float* phase_shift_ptr
                     = (cx_float*)&ue_spec_pilot_buffer_[frame_id
-                        % TASK_BUFFER_FRAME_NUM][symbol_idx_ul * cfg->UE_NUM];
+                        % kFrameWnd][symbol_idx_ul * cfg->UE_NUM];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
                 cx_fmat shift_sc
                     = sign(mat_equaled % conj(ue_pilot_data.col(cur_sc_id)));
                 mat_phase_shift += shift_sc;
             } else if (cfg->UL_PILOT_SYMS
                 > 0) { // apply previously calc'ed phase shift to data
-                cx_float* pilot_corr_ptr = (cx_float*)
-                    ue_spec_pilot_buffer_[frame_id % TASK_BUFFER_FRAME_NUM];
+                cx_float* pilot_corr_ptr
+                    = (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
                 cx_fmat pilot_corr_mat(
                     pilot_corr_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
                 fmat theta_mat = arg(pilot_corr_mat);

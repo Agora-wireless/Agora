@@ -129,8 +129,8 @@ private:
     Table<unsigned short> iq_data_short_;
 
     // Number of packets transmitted for each symbol in a frame
-    size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
-    size_t packet_count_per_frame[SOCKET_BUFFER_FRAME_NUM];
+    size_t* packet_count_per_symbol[kFrameWnd];
+    size_t packet_count_per_frame[kFrameWnd];
 
     double* frame_start;
     double* frame_end;

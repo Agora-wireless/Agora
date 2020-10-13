@@ -4,7 +4,7 @@ PhyStats::PhyStats(Config* cfg)
     : config_(cfg)
 {
     const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
+        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
     decoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
     bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
 
@@ -14,20 +14,20 @@ PhyStats::PhyStats(Config* cfg)
     uncoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
     uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
 
-    evm_buffer_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+    evm_buffer_.calloc(kFrameWnd, cfg->UE_ANT_NUM, 64);
     cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
     cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
     ul_gt_mat = ul_iq_f_mat.st();
     ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
 
-    pilot_snr_.calloc(TASK_BUFFER_FRAME_NUM, cfg->UE_ANT_NUM, 64);
+    pilot_snr_.calloc(kFrameWnd, cfg->UE_ANT_NUM, 64);
 }
 
 void PhyStats::print_phy_stats()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
+        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
     for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
         size_t total_decoded_bits(0);
         size_t total_bit_errors(0);
@@ -51,8 +51,7 @@ void PhyStats::print_phy_stats()
 
 void PhyStats::print_evm_stats(size_t frame_id)
 {
-    fmat evm_mat(evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM], config_->UE_NUM,
-        1, false);
+    fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);
     evm_mat = sqrt(evm_mat) / config_->OFDM_DATA_NUM;
     std::stringstream ss;
     ss << "Frame " << frame_id << " Constellation:\n"
@@ -63,7 +62,7 @@ void PhyStats::print_evm_stats(size_t frame_id)
 
 float PhyStats::get_evm_snr(size_t frame_id, size_t ue_id)
 {
-    float evm = evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM][ue_id];
+    float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
     evm = sqrt(evm) / config_->OFDM_DATA_NUM;
     return -10 * std::log10(evm);
 }
@@ -73,7 +72,7 @@ void PhyStats::print_snr_stats(size_t frame_id)
     std::stringstream ss;
     ss << "Frame " << frame_id << " Pilot Signal SNR: ";
     for (size_t i = 0; i < config_->UE_NUM; i++)
-        ss << pilot_snr_[frame_id % TASK_BUFFER_FRAME_NUM][i] << " ";
+        ss << pilot_snr_[frame_id % kFrameWnd][i] << " ";
     ss << std::endl;
     std::cout << ss.str();
 }
@@ -91,15 +90,15 @@ void PhyStats::update_pilot_snr(
         fft_abs_mag.rows(config_->OFDM_DATA_STOP, config_->OFDM_CA_NUM - 1)));
     float noise = config_->OFDM_CA_NUM * (noise_per_sc1 + noise_per_sc2) / 2;
     float snr = (rssi - noise) / noise;
-    pilot_snr_[frame_id % TASK_BUFFER_FRAME_NUM][ue_id] = 10 * std::log10(snr);
+    pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);
 }
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 {
     //assert(eq.size() == ul_gt_mat.col(sc_id).size());
     fmat evm = abs(eq - ul_gt_mat.col(sc_id));
-    fmat cur_evm_mat(evm_buffer_[frame_id % TASK_BUFFER_FRAME_NUM],
-        config_->UE_NUM, 1, false);
+    fmat cur_evm_mat(
+        evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);
     cur_evm_mat += evm % evm;
 }
 

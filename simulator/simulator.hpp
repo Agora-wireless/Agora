@@ -95,10 +95,10 @@ private:
      * 
      * First dimension: SOCKET_THREAD_NUM
      *
-     * Second dimension of socket_buffer: SOCKET_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * Second dimension of socket_buffer: kFrameWnd * BS_ANT_NUM *
      * symbol_num_perframe * packet_length
      *
-     * Second dimension of buffer status: SOCKET_BUFFER_FRAME_NUM * BS_ANT_NUM *
+     * Second dimension of buffer status: kFrameWnd * BS_ANT_NUM *
      * symbol_num_perframe
      */
     Table<char> socket_buffer_;

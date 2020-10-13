@@ -42,10 +42,10 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         enable_slow_start == 1 ? "yes" : "no");
 
     _unused(server_mac_addr_str);
-    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
+    for (size_t i = 0; i < kFrameWnd; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
     }
-    memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
+    memset(packet_count_per_frame, 0, kFrameWnd * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
@@ -89,7 +89,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
 Sender::~Sender()
 {
     iq_data_short_.free();
-    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
+    for (size_t i = 0; i < kFrameWnd; i++) {
         free(packet_count_per_symbol[i]);
     }
 }
@@ -147,7 +147,7 @@ void* Sender::master_thread(int)
         if (!ret)
             continue;
 
-        const size_t comp_frame_slot = ctag.frame_id % SOCKET_BUFFER_FRAME_NUM;
+        const size_t comp_frame_slot = ctag.frame_id % kFrameWnd;
 
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
