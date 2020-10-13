@@ -134,6 +134,7 @@ static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
+static constexpr bool kDebugMulticell = true;
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
