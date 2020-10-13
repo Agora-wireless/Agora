@@ -204,6 +204,7 @@ Config::Config(std::string jsonfile)
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
     fft_block_size = tddConf.value("fft_block_size", 1);
+    encode_block_size = tddConf.value("encode_block_size", 1);
 
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
