@@ -18,13 +18,15 @@
 #define QAM64_THRESHOLD_2 4 / sqrt(42)
 #define QAM64_THRESHOLD_3 6 / sqrt(42)
 
-void init_modulation_table(Table<float>& table, size_t mod_order);
-void init_qpsk_table(Table<float>& table);
-void init_qam16_table(Table<float>& table);
-void init_qam64_table(Table<float>& table);
+void init_modulation_table(Table<complex_float>& table, size_t mod_order);
+void init_qpsk_table(Table<complex_float>& table);
+void init_qam16_table(Table<complex_float>& table);
+void init_qam64_table(Table<complex_float>& table);
 
-complex_float mod_single(int x, Table<float>& mod_table);
-complex_float mod_single_uint8(uint8_t x, Table<float>& mod_table);
+complex_float mod_single(int x, Table<complex_float>& mod_table);
+complex_float mod_single_uint8(uint8_t x, Table<complex_float>& mod_table);
+void mod_simd(uint8_t* in, complex_float*& out, size_t len,
+    Table<complex_float>& mod_table);
 
 void demod_16qam_hard_loop(float* vec_in, uint8_t* vec_out, int num);
 void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num);

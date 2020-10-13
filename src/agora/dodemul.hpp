@@ -12,18 +12,9 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <mkl.h>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
-
-// Just-in-time optimization for MKL cgemm is available only after MKL 2019
-// update 3. Disable this on systems with an older MKL version.
-#if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
-#define USE_MKL_JIT 1
-#else
-#define USE_MKL_JIT 0
-#endif
 
 using namespace arma;
 class DoDemul : public Doer {

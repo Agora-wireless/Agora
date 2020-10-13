@@ -257,15 +257,15 @@ struct MacPacket {
 class RxCounters {
 public:
     // num_pkt[i] is the total number of packets we've received for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pkts;
+    std::array<size_t, kFrameWnd> num_pkts;
 
     // num_pilot_pkts[i] is the total number of pilot packets we've received
     // for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
+    std::array<size_t, kFrameWnd> num_pilot_pkts;
 
     // num_rc_pkts[i] is the total number of reciprocity pilot packets we've received
     // for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_reciprocity_pkts;
+    std::array<size_t, kFrameWnd> num_reciprocity_pkts;
 
     // Number of packets we'll receive per frame on the uplink
     size_t num_pkts_per_frame;
@@ -289,7 +289,7 @@ public:
     size_t max_symbol_count;
     bool last_symbol(int frame_id)
     {
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t frame_slot = frame_id % kFrameWnd;
         if (++symbol_count[frame_slot] == max_symbol_count) {
             symbol_count[frame_slot] = 0;
             return true;
@@ -305,11 +305,11 @@ public:
 
     size_t get_symbol_count(size_t frame_id)
     {
-        return symbol_count[frame_id % TASK_BUFFER_FRAME_NUM];
+        return symbol_count[frame_id % kFrameWnd];
     }
 
 private:
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_count;
+    std::array<size_t, kFrameWnd> symbol_count;
 };
 
 class ZF_stats : public Frame_stats {
@@ -334,18 +334,18 @@ public:
     void init(int _max_task_count, int max_symbols, int max_data_symbol)
     {
         Frame_stats::init(max_symbols);
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+        for (size_t i = 0; i < kFrameWnd; i++)
             task_count[i] = new size_t[max_data_symbol]();
         max_task_count = _max_task_count;
     }
     void fini()
     {
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+        for (size_t i = 0; i < kFrameWnd; i++)
             delete[] task_count[i];
     }
     bool last_task(size_t frame_id, size_t data_symbol_id)
     {
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t frame_slot = frame_id % kFrameWnd;
         if (++task_count[frame_slot][data_symbol_id] == max_task_count) {
             task_count[frame_slot][data_symbol_id] = 0;
             return true;
@@ -355,19 +355,26 @@ public:
 
     size_t get_task_count(size_t frame_id, size_t symbol_id)
     {
-        return task_count[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id];
+        return task_count[frame_id % kFrameWnd][symbol_id];
     }
 
 private:
-    size_t* task_count[TASK_BUFFER_FRAME_NUM];
+    size_t* task_count[kFrameWnd];
 };
 
 class FFT_stats : public Data_stats {
 public:
     size_t max_symbol_data_count;
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_rc_count;
+    std::array<size_t, kFrameWnd> symbol_rc_count;
     size_t max_symbol_rc_count;
 
+    // cur_frame_for_symbol[i] is the current frame for the symbol whose
+    // index in the frame's uplink symbols is i
+    std::vector<size_t> cur_frame_for_symbol;
+};
+
+class Encode_stats : public Data_stats {
+public:
     // cur_frame_for_symbol[i] is the current frame for the symbol whose
     // index in the frame's uplink symbols is i
     std::vector<size_t> cur_frame_for_symbol;

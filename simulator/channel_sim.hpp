@@ -106,8 +106,8 @@ private:
 
     size_t* bs_rx_counter_;
     size_t* user_rx_counter_;
-    size_t bs_tx_counter_[TASK_BUFFER_FRAME_NUM];
-    size_t user_tx_counter_[TASK_BUFFER_FRAME_NUM];
+    size_t bs_tx_counter_[kFrameWnd];
+    size_t user_tx_counter_[kFrameWnd];
 
     inline size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     {
