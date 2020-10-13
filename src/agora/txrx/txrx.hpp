@@ -99,6 +99,8 @@ private:
     // {core_offset, ..., core_offset + socket_thread_num - 1}
     const size_t core_offset;
 
+    const size_t ant_per_cell;
+
     const size_t socket_thread_num;
     Table<char>* buffer_;
     Table<int>* buffer_status_;
