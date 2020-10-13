@@ -12,7 +12,6 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <mkl.h>
 #include <stdio.h>
 #include <string.h>
 #include <vector>

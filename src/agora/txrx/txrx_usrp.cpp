@@ -162,7 +162,8 @@ struct Packet* PacketTXRX::recv_enqueue_usrp(
         for (int ch = 0; ch < nChannels; ++ch) {
             new (pkt[ch]) Packet(frame_id, symbol_id, 0, ant_id + ch);
             // move ptr & set status to full
-            rx_buffer_status[rx_offset + ch] = 1; // has data, after it is read, it is set to 0
+            rx_buffer_status[rx_offset + ch]
+                = 1; // has data, after it is read, it is set to 0
 
             // Push kPacketRX event into the queue
             Event_data rx_message(
@@ -213,11 +214,7 @@ int PacketTXRX::dequeue_send_usrp(int tid)
         else
             txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
     } else {
-        size_t socket_symbol_offset = offset
-            % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-                  * c->BS_ANT_NUM);
-        char* cur_buffer_ptr
-            = tx_buffer_ + socket_symbol_offset * c->packet_length;
+        char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
         txbuf[ch] = (void*)pkt->data;
     }
@@ -281,11 +278,7 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
         else
             txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
     } else {
-        size_t socket_symbol_offset = offset
-            % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-                  * c->BS_ANT_NUM);
-        char* cur_buffer_ptr
-            = tx_buffer_ + socket_symbol_offset * c->packet_length;
+        char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
         txbuf[ch] = (void*)pkt->data;
     }

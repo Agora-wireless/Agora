@@ -373,6 +373,13 @@ public:
     std::vector<size_t> cur_frame_for_symbol;
 };
 
+class Encode_stats : public Data_stats {
+public:
+    // cur_frame_for_symbol[i] is the current frame for the symbol whose
+    // index in the frame's uplink symbols is i
+    std::vector<size_t> cur_frame_for_symbol;
+};
+
 class RC_stats {
 public:
     size_t max_task_count;
