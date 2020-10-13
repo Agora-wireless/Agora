@@ -72,11 +72,12 @@ Event_data DoPrecode::launch(size_t tag)
     } else {
         // Find subcarriers used as pilot in this block
         memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
-        size_t pilot_sc = base_sc_id + cfg->OFDM_PILOT_SPACING
-            - base_sc_id % cfg->OFDM_PILOT_SPACING;
-        for (size_t i = pilot_sc; i < base_sc_id + cfg->demul_block_size;
+        size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
+        size_t first_pilot_sc
+            = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
+        for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
              i += cfg->OFDM_PILOT_SPACING)
-            pilot_sc_flags[i - base_sc_id] = 1;
+            pilot_sc_flags[i] = 1;
     }
 
     if (kDebugPrintInTask) {
