@@ -25,9 +25,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
         &modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
         &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
-
-    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i += cfg->OFDM_PILOT_SPACING)
-        pilot_scs.push_back(i);
+    alloc_buffer_1d(&pilot_sc_flags, cfg->demul_block_size, 64, 1);
 
 #if USE_MKL_JIT
     MKL_Complex8 alpha = { 1, 0 };
@@ -56,6 +54,7 @@ DoPrecode::~DoPrecode()
 
 Event_data DoPrecode::launch(size_t tag)
 {
+    size_t start_tsc = worker_rdtsc();
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t symbol_id = gen_tag_t(tag).symbol_id;
@@ -64,7 +63,22 @@ Event_data DoPrecode::launch(size_t tag)
         = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_idx_dl);
     const size_t frame_slot = frame_id % kFrameWnd;
 
-    size_t start_tsc = worker_rdtsc();
+    // Mark pilot subcarriers in this block
+    // In downlink pilot symbols, all subcarriers are used as pilots
+    // In downlink data symbols, pilot subcarriers are every
+    // OFDM_PILOT_SPACING subcarriers
+    if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
+        memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
+    } else {
+        // Find subcarriers used as pilot in this block
+        memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
+        size_t pilot_sc = base_sc_id + cfg->OFDM_PILOT_SPACING
+            - base_sc_id % cfg->OFDM_PILOT_SPACING;
+        for (size_t i = pilot_sc; i < base_sc_id + cfg->demul_block_size;
+             i += cfg->OFDM_PILOT_SPACING)
+            pilot_sc_flags[i - base_sc_id] = 1;
+    }
+
     if (kDebugPrintInTask) {
         printf(
             "In doPrecode thread %d: frame %zu, symbol %zu, subcarrier %zu\n",
@@ -76,12 +90,13 @@ Event_data DoPrecode::launch(size_t tag)
 
     if (kUseSpatialLocality) {
         for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
-
             size_t start_tsc1 = worker_rdtsc();
-            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
-                for (size_t j = 0; j < kSCsPerCacheline; j++)
+            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
+                for (size_t j = 0; j < kSCsPerCacheline; j++) {
                     load_input_data(symbol_idx_dl, total_data_symbol_idx,
-                        user_id, base_sc_id + i + j, j);
+                        user_id, base_sc_id + i + j, j, pilot_sc_flags[i + j]);
+                }
+            }
 
             size_t start_tsc2 = worker_rdtsc();
             duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
@@ -97,7 +112,7 @@ Event_data DoPrecode::launch(size_t tag)
             int cur_sc_id = base_sc_id + i;
             for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                 load_input_data(symbol_idx_dl, total_data_symbol_idx, user_id,
-                    cur_sc_id, 0);
+                    cur_sc_id, 0, pilot_sc_flags[i]);
             size_t start_tsc2 = worker_rdtsc();
             duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
 
@@ -140,22 +155,17 @@ Event_data DoPrecode::launch(size_t tag)
 
 void DoPrecode::load_input_data(size_t symbol_idx_dl,
     size_t total_data_symbol_idx, size_t user_id, size_t sc_id,
-    size_t sc_id_in_block)
+    size_t sc_id_in_block, size_t is_pilot_sc)
 {
     complex_float* data_ptr
         = modulated_buffer_temp + sc_id_in_block * cfg->UE_NUM;
-    if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
+    if (is_pilot_sc == 1) {
         data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
     } else {
-        auto it = find(pilot_scs.begin(), pilot_scs.end(), sc_id);
-        if (it != pilot_scs.end()) {
-            data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
-        } else {
-            int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
-                + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
-            data_ptr[user_id]
-                = mod_single_uint8((uint8_t)(*raw_data_ptr), cfg->mod_table);
-        }
+        int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
+            + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
+        data_ptr[user_id]
+            = mod_single_uint8((uint8_t)(*raw_data_ptr), cfg->mod_table);
     }
 }
 
