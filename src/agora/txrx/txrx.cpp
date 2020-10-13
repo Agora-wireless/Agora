@@ -10,6 +10,7 @@
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
+    , ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells)
     , socket_thread_num(cfg->socket_thread_num)
 {
     if (!kUseArgos && !kUseUHD) {
@@ -196,6 +197,13 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
         printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n", tid,
             pkt->frame_id, pkt->symbol_id, pkt->ant_id);
     }
+    printf("Before packet combining: receiving data stream from the antenna %d "
+           "in cell %d,\n",
+        pkt->ant_id, pkt->cell_id);
+    pkt->ant_id += pkt->cell_id * ant_per_cell;
+    printf("After packet combining: the combined antenna ID is %d, it comes "
+           "from the cell %d\n",
+        pkt->ant_id, pkt->cell_id);
 
     // get the position in rx_buffer
     // move ptr & set status to full
