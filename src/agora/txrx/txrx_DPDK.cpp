@@ -97,10 +97,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
     size_t prev_frame_id = SIZE_MAX;
 
     while (cfg->running) {
-        if (-1 != dequeue_send(tid))
-            continue;
-
         dpdk_recv(tid, prev_frame_id, rx_offset);
+        dequeue_send(tid);
     }
     return 0;
 }

@@ -52,7 +52,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     double freq_ghz, moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
-    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
@@ -119,7 +119,7 @@ TEST(TestZF, VaryingConfig)
 
     Table<complex_float> calib_buffer;
 
-    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float> csi_buffers;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(kMaxAntennas * kMaxDataSCs);
 
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
@@ -127,8 +127,7 @@ TEST(TestZF, VaryingConfig)
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
         kMaxUEs * kMaxAntennas);
 
-    calib_buffer.rand_alloc_cx_float(
-        TASK_BUFFER_FRAME_NUM, kMaxDataSCs * kMaxAntennas, 64);
+    calib_buffer.rand_alloc_cx_float(kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
