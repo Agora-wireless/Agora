@@ -65,7 +65,7 @@ public:
     size_t mod_order_bits; // Number of binary bits used for a modulation order
 
     // Modulation lookup table for mapping binary bits to constellation points
-    Table<float> mod_table;
+    Table<complex_float> mod_table;
 
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
@@ -164,6 +164,9 @@ public:
 
     // Number of antennas handled in one FFT event
     size_t fft_block_size;
+
+    // Number of code blocks handled in one encode event
+    size_t encode_block_size;
 
     bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
