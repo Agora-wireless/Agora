@@ -207,7 +207,7 @@ private:
     RC_stats rc_stats_;
     Data_stats demul_stats_;
     Data_stats decode_stats_;
-    Data_stats encode_stats_;
+    Encode_stats encode_stats_;
     Data_stats precode_stats_;
     Data_stats ifft_stats_;
     Data_stats tx_stats_;

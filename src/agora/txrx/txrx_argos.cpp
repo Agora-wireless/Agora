@@ -108,9 +108,8 @@ int PacketTXRX::dequeue_send_argos(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t dl_symbol_idx = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t offset
-        = (c->get_total_data_symbol_idx_dl(frame_id, dl_symbol_idx)
-              * c->BS_ANT_NUM)
+    size_t offset = (c->get_total_data_symbol_idx_dl(frame_id, dl_symbol_idx)
+                        * c->BS_ANT_NUM)
         + ant_id;
 
     frame_id += TX_FRAME_DELTA;

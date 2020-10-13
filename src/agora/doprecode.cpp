@@ -144,8 +144,6 @@ Event_data DoPrecode::launch(size_t tag)
     }
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    // duration_stat->task_count++;
-
     if (kDebugPrintInTask) {
         printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
                "subcarrier: %zu\n",
