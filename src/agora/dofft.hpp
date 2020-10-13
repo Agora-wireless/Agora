@@ -149,7 +149,7 @@ private:
     char* dl_socket_buffer_;
     DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    complex_float* ifft_out; // Buffer IFFT output
+    float* ifft_out; // Buffer IFFT output
 };
 
 #endif
