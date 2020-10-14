@@ -35,7 +35,7 @@ public:
     size_t mod_order_bits; // Number of binary bits used for a modulation order
 
     // Modulation lookup table for mapping binary bits to constellation points
-    Table<float> mod_table;
+    Table<complex_float> mod_table;
 
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
@@ -131,6 +131,9 @@ public:
 
     // Number of antennas handled in one FFT event
     size_t fft_block_size;
+
+    // Number of code blocks handled in one encode event
+    size_t encode_block_size;
 
     bool freq_orthogonal_pilot;
     size_t BS_ANT_NUM;
@@ -355,31 +358,28 @@ public:
     }
 
     /// Return total number of data symbols of all frames in a buffer
-    /// that holds data of TASK_BUFFER_FRAME_NUM frames
+    /// that holds data of kFrameWnd frames
     inline size_t get_total_data_symbol_idx(
         size_t frame_id, size_t symbol_id) const
     {
-        return ((frame_id % TASK_BUFFER_FRAME_NUM) * data_symbol_num_perframe)
-            + symbol_id;
+        return ((frame_id % kFrameWnd) * data_symbol_num_perframe) + symbol_id;
     }
 
     /// Return total number of uplink data symbols of all frames in a buffer
-    /// that holds data of TASK_BUFFER_FRAME_NUM frames
+    /// that holds data of kFrameWnd frames
     inline size_t get_total_data_symbol_idx_ul(
         size_t frame_id, size_t symbol_idx_ul) const
     {
-        return ((frame_id % TASK_BUFFER_FRAME_NUM)
-                   * ul_data_symbol_num_perframe)
+        return ((frame_id % kFrameWnd) * ul_data_symbol_num_perframe)
             + symbol_idx_ul;
     }
 
     /// Return total number of downlink data symbols of all frames in a buffer
-    /// that holds data of TASK_BUFFER_FRAME_NUM frames
+    /// that holds data of kFrameWnd frames
     inline size_t get_total_data_symbol_idx_dl(
         size_t frame_id, size_t symbol_idx_dl) const
     {
-        return ((frame_id % TASK_BUFFER_FRAME_NUM)
-                   * dl_data_symbol_num_perframe)
+        return ((frame_id % kFrameWnd) * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }
 
@@ -394,7 +394,7 @@ public:
     inline complex_float* get_data_buf(Table<complex_float>& data_buffers,
         size_t frame_id, size_t symbol_id) const
     {
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t frame_slot = frame_id % kFrameWnd;
         size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
             + get_ul_symbol_idx(frame_id, symbol_id);
         return data_buffers[symbol_offset];
@@ -411,7 +411,7 @@ public:
     inline complex_float* get_calib_buffer(
         Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
     {
-        size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        size_t frame_slot = frame_id % kFrameWnd;
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 

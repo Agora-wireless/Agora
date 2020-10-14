@@ -23,7 +23,7 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
 {
     int* input;
     complex_float* output_mod;
-    Table<float> mod_table;
+    Table<complex_float> mod_table;
     init_modulation_table(mod_table, 16);
     uint8_t* output_demod_loop;
     uint8_t* output_demod_sse;
@@ -132,7 +132,7 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
     int* input;
     complex_float* output_mod;
 
-    Table<float> mod_table;
+    Table<complex_float> mod_table;
     init_modulation_table(mod_table, 64);
     unsigned int num = 100;
     uint8_t* output_demod_loop;

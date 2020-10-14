@@ -6,7 +6,7 @@ RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
     , thread_num_(n_threads)
     , core_id_(in_core_id)
 {
-    if (!kUseArgos) {
+    if (!kUseArgos && !kUseUHD) {
         socket_.resize(config_->nRadios);
         servaddr_.resize(config_->nRadios);
     } else {
@@ -32,7 +32,7 @@ RadioTXRX::RadioTXRX(Config* config, int n_threads, int in_core_id,
 
 RadioTXRX::~RadioTXRX()
 {
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         radioconfig_->radioStop();
         delete radioconfig_;
     }
@@ -56,7 +56,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     tx_buffer_ = in_tx_buffer;
     tx_buffer_status_ = in_tx_buffer_status;
 
-    if (kUseArgos)
+    if (kUseArgos || kUseUHD)
         if (!radioconfig_->radioStart())
             return false;
 
@@ -67,25 +67,23 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
         context->obj_ptr = this;
         context->id = i;
         // start socket thread
-        if (kUseArgos) {
-            if (config_->hw_framer) {
-                if (pthread_create(&txrx_thread, NULL,
-                        pthread_fun_wrapper<RadioTXRX,
-                            &RadioTXRX::loop_tx_rx_argos>,
-                        context)
-                    != 0) {
-                    perror("socket thread create failed");
-                    exit(0);
-                }
-            } else {
-                if (pthread_create(&txrx_thread, NULL,
-                        pthread_fun_wrapper<RadioTXRX,
-                            &RadioTXRX::loop_tx_rx_argos_sync>,
-                        context)
-                    != 0) {
-                    perror("socket thread create failed");
-                    exit(0);
-                }
+        if (kUseArgos && config_->hw_framer) {
+            if (pthread_create(&txrx_thread, NULL,
+                    pthread_fun_wrapper<RadioTXRX,
+                        &RadioTXRX::loop_tx_rx_argos>,
+                    context)
+                != 0) {
+                perror("socket thread create failed");
+                exit(0);
+            }
+        } else if (kUseArgos || kUseUHD) {
+            if (pthread_create(&txrx_thread, NULL,
+                    pthread_fun_wrapper<RadioTXRX,
+                        &RadioTXRX::loop_tx_rx_argos_sync>,
+                    context)
+                != 0) {
+                perror("socket thread create failed");
+                exit(0);
             }
         } else {
             if (pthread_create(&txrx_thread, NULL,
@@ -255,6 +253,7 @@ void* RadioTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
+// dequeue_send_sdr
 int RadioTXRX::dequeue_send_argos(int tid, long long time0)
 {
     auto& c = config_;
@@ -262,6 +261,10 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
     int packet_length = c->packet_length;
     int num_samps = c->sampsPerSymbol;
     int frm_num_samps = num_samps * c->symbol_num_perframe;
+
+    // For UHD devices, first pilot should not be with the END_BURST flag
+    // 1: HAS_TIME, 2: HAS_TIME | END_BURST
+    int flags_tx_pilot = (kUseUHD && c->nChannels == 2) ? 1 : 2;
 
     Event_data event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
@@ -276,12 +279,14 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
     long long txTime(0);
     int r;
 
+    // Transmit pilot
     if (!c->hw_framer) {
         size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
 
         txTime = time0 + tx_frame_id * frm_num_samps
             + pilot_symbol_id * num_samps - c->cl_tx_advance;
-        r = radio->radioTx(ue_id, pilot_buff0.data(), num_samps, 2, txTime);
+        r = radio->radioTx(
+            ue_id, pilot_buff0.data(), num_samps, flags_tx_pilot, txTime);
         if (r < num_samps)
             std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
                       << std::endl;
@@ -295,6 +300,8 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
                           << std::endl;
         }
     }
+
+    // Transmit data
     for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe;
          symbol_id++) {
         size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
@@ -313,10 +320,10 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
             ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
             : time0 + tx_frame_id * frm_num_samps + tx_symbol_id * num_samps
                 - c->cl_tx_advance;
-        int flags = 1; // HAS_TIME
+        int flags_tx_symbol = 1; // HAS_TIME
         if (tx_symbol_id == c->ULSymbols[0].back())
-            flags = 2; // HAS_TIME & END_BURST, fixme
-        r = radio->radioTx(ue_id, txbuf, num_samps, flags, txTime);
+            flags_tx_symbol = 2; // HAS_TIME & END_BURST, fixme
+        r = radio->radioTx(ue_id, txbuf, num_samps, flags_tx_symbol, txTime);
         if (r < num_samps)
             std::cout << "BAD Write (UL): " << r << "/" << num_samps
                       << std::endl;
@@ -494,14 +501,21 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     int rx_offset(0);
     size_t cursor(0);
     std::stringstream sout;
-    while (c->running && sync_index < 0) {
-        int r = radio->radioRx(
-            radio_id, frm_rx_buff.data(), frm_num_samps, rxTime);
 
-        if (r != frm_num_samps) {
-            std::cerr << "BAD SYNC Receive(" << r << "/" << frm_num_samps
-                      << ") at Time " << rxTime << std::endl;
-            continue;
+    // Keep receiving one frame of data until a beacon is found
+    // Perform initial beacon detection every kBeaconDetectInterval frames
+    while (c->running && sync_index < 0) {
+        int r;
+        for (size_t find_beacon_retry = 0; find_beacon_retry < kBeaconDetectInterval;
+             find_beacon_retry++) {
+            r = radio->radioRx(
+                radio_id, frm_rx_buff.data(), frm_num_samps, rxTime);
+
+            if (r != frm_num_samps) {
+                std::cerr << "BAD SYNC Receive(" << r << "/" << frm_num_samps
+                          << ") at Time " << rxTime << std::endl;
+                continue;
+            }
         }
 
         // convert data to complex float for sync detection
@@ -584,7 +598,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
             break;
         }
 
-        // schedule transmit symbols
+        // schedule transmit pilots and symbols
         while (-1 != dequeue_send_argos(tid, time0))
             ;
 
