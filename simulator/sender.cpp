@@ -42,10 +42,10 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         enable_slow_start == 1 ? "yes" : "no");
 
     _unused(server_mac_addr_str);
-    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
+    for (size_t i = 0; i < kFrameWnd; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
     }
-    memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
+    memset(packet_count_per_frame, 0, kFrameWnd * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
@@ -89,7 +89,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
 Sender::~Sender()
 {
     iq_data_short_.free();
-    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
+    for (size_t i = 0; i < kFrameWnd; i++) {
         free(packet_count_per_symbol[i]);
     }
 }
@@ -134,19 +134,20 @@ void* Sender::master_thread(int)
     }
 
     frame_start[0] = get_time();
-    uint64_t tick_start = rdtsc();
     double start_time = get_time();
+    uint64_t tick_start = rdtsc();
     // Add delay for beacon at the beginning of a frame
-    delay_ticks(tick_start,
-        enable_slow_start == 1 ? get_ticks_for_frame(0) : ticks_all);
-    tick_start = rdtsc();
+    if (cfg->beacon_symbol_num_perframe == 1) {
+        delay_ticks(tick_start, get_ticks_for_frame(0));
+        tick_start = rdtsc();
+    }
     while (keep_running) {
         gen_tag_t ctag(0); // The completion tag
         int ret = completion_queue_.try_dequeue(ctag._tag);
         if (!ret)
             continue;
 
-        const size_t comp_frame_slot = ctag.frame_id % SOCKET_BUFFER_FRAME_NUM;
+        const size_t comp_frame_slot = ctag.frame_id % kFrameWnd;
 
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
@@ -156,15 +157,19 @@ void* Sender::master_thread(int)
             packet_count_per_frame[comp_frame_slot]++;
 
             // Add inter-symbol delay
-            delay_ticks(tick_start,
-                enable_slow_start == 1 ? get_ticks_for_frame(ctag.frame_id)
-                                       : ticks_all);
+            delay_ticks(tick_start, get_ticks_for_frame(ctag.frame_id));
 
             tick_start = rdtsc();
 
             const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
+                // Add end-of-frame delay
+                if (cfg->downlink_mode) {
+                    delay_ticks(tick_start,
+                        get_ticks_for_frame(ctag.frame_id)
+                            * cfg->data_symbol_num_perframe);
+                }
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
                     printf("Sender: Transmitted frame %u in %.1f ms\n",
                         ctag.frame_id, (get_time() - start_time) / 1000.0);
@@ -176,25 +181,14 @@ void* Sender::master_thread(int)
                 frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
 
-                // Add end-of-frame delay
-                if (cfg->downlink_mode) {
-                    if (ctag.frame_id < 500) {
-                        delay_ticks(tick_start,
-                            2 * cfg->data_symbol_num_perframe * ticks_all);
-                    } else {
-                        delay_ticks(tick_start,
-                            cfg->data_symbol_num_perframe * ticks_all);
-                    }
-                }
-
                 frame_start[next_frame_id % kNumStatsFrames] = get_time();
 
                 tick_start = rdtsc();
                 // Add delay for beacon at the beginning of a frame
-                delay_ticks(tick_start,
-                    enable_slow_start == 1 ? get_ticks_for_frame(next_frame_id)
-                                           : ticks_all);
-                tick_start = rdtsc();
+                if (cfg->beacon_symbol_num_perframe == 1) {
+                    delay_ticks(tick_start, get_ticks_for_frame(next_frame_id));
+                    tick_start = rdtsc();
+                }
             } else {
                 next_frame_id = ctag.frame_id;
             }
@@ -251,7 +245,7 @@ void* Sender::worker_thread(int tid)
     rt_assert(cfg->packet_length
         == Packet::kOffsetOfData
             + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
-
+    size_t ant_num_per_cell = cfg->BS_ANT_NUM / cfg->nCells;
     while (true) {
         gen_tag_t tag = 0;
         if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
@@ -272,8 +266,8 @@ void* Sender::worker_thread(int tid)
         // Update the TX buffer
         pkt->frame_id = tag.frame_id;
         pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
-        pkt->cell_id = 0;
-        pkt->ant_id = tag.ant_id;
+        pkt->cell_id = tag.ant_id / ant_num_per_cell;
+        pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
         memcpy(pkt->data,
             iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
             (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
@@ -323,7 +317,9 @@ void* Sender::worker_thread(int tid)
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id)
 {
-    if (frame_id < kFrameWnd)
+    if (enable_slow_start == 0)
+        return ticks_all;
+    else if (frame_id < kFrameWnd)
         return ticks_wnd_1;
     else if (frame_id < kFrameWnd * 4)
         return ticks_wnd_2;

@@ -6,6 +6,10 @@
 using namespace arma;
 
 static constexpr bool kPrintFFTInput = false;
+static constexpr bool kPrintIFFTOutput = false;
+static constexpr bool kPrintSocketOutput = false;
+static constexpr bool kUseOutOfPlaceIFFT = false;
+static constexpr bool kMemcpyBeforeIFFT = true;
 
 DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& task_queue,
@@ -13,7 +17,7 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     Table<char>& socket_buffer, Table<int>& socket_buffer_status,
     Table<complex_float>& data_buffer,
-    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
@@ -53,7 +57,7 @@ Event_data DoFFT::launch(size_t tag)
     auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
         + buf_offset * cfg->packet_length);
     size_t frame_id = pkt->frame_id;
-    size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    size_t frame_slot = frame_id % kFrameWnd;
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
 
@@ -107,8 +111,6 @@ Event_data DoFFT::launch(size_t tag)
             phy_stats->update_pilot_snr(frame_id,
                 cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
         }
-
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
         const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
         partial_transpose(
             csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
@@ -251,9 +253,15 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kIFFT, in_tid);
-    (void)DftiCreateDescriptor(
+    DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
-    (void)DftiCommitDescriptor(mkl_handle);
+    if (kUseOutOfPlaceIFFT)
+        DftiSetValue(mkl_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+    DftiCommitDescriptor(mkl_handle);
+
+    // Aligned for SIMD
+    ifft_out = reinterpret_cast<float*>(
+        memalign(64, 2 * cfg->OFDM_CA_NUM * sizeof(float)));
 }
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
@@ -264,78 +272,75 @@ Event_data DoIFFT::launch(size_t tag)
     size_t ant_id = gen_tag_t(tag).ant_id;
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
 
     if (kDebugPrintInTask) {
         printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
             tid, frame_id, symbol_id, ant_id);
     }
 
-    size_t offset
-        = (cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-              * cfg->BS_ANT_NUM)
+    size_t offset = (cfg->get_total_data_symbol_idx_dl(frame_id, symbol_idx_dl)
+                        * cfg->BS_ANT_NUM)
         + ant_id;
 
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset];
-    memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
-    memset(ifft_buf_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
-        sizeof(float) * cfg->OFDM_DATA_START * 2);
+    auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
+    auto* ifft_out_ptr
+        = (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out : ifft_in_ptr;
 
-    DftiComputeBackward(mkl_handle, ifft_buf_ptr);
-    // printf("data after ifft\n");
-    // for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
-    //     printf("%.1f+%.1fj ", dl_ifft_buffer_[buffer_symbol_offset][i].re,
-    //         dl_ifft_buffer_[buffer_symbol_offset][i].im);
-    // printf("\n");
+    if (kMemcpyBeforeIFFT) {
+        memset(ifft_out_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
+        memset(ifft_out_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
+            sizeof(float) * cfg->OFDM_DATA_START * 2);
+        memcpy(ifft_out_ptr + (cfg->OFDM_DATA_START) * 2,
+            ifft_in_ptr + (cfg->OFDM_DATA_START) * 2,
+            sizeof(float) * cfg->OFDM_DATA_NUM * 2);
+        DftiComputeBackward(mkl_handle, ifft_out_ptr);
+    } else {
+        if (kUseOutOfPlaceIFFT) {
+            // Use out-of-place IFFT here is faster than in place IFFT
+            // There is no need to reset non-data subcarriers in ifft input
+            // to 0 since their values are not changed after IFFT
+            DftiComputeBackward(mkl_handle, ifft_in_ptr, ifft_out_ptr);
+        } else {
+            memset(ifft_in_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
+            memset(ifft_in_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
+                sizeof(float) * cfg->OFDM_DATA_START * 2);
+            DftiComputeBackward(mkl_handle, ifft_in_ptr);
+        }
+    }
 
-    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    mat_data /= cfg->OFDM_CA_NUM;
+    if (kPrintIFFTOutput) {
+        printf("data after ifft\n");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
+            printf("%.1f+%.1fj ", dl_ifft_buffer_[offset][i].re,
+                dl_ifft_buffer_[offset][i].im);
+        printf("\n");
+    }
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
-    int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-        * cfg->dl_data_symbol_num_perframe;
-    int socket_symbol_offset = offset % dl_socket_buffer_status_size;
-    int packet_length = cfg->packet_length;
-    struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
-        * packet_length];
+    struct Packet* pkt
+        = (struct Packet*)&dl_socket_buffer_[offset * cfg->packet_length];
     short* socket_ptr = &pkt->data[2 * cfg->ofdm_tx_zero_prefix_];
 
-    for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
-        /* ifft scaled results by OFDM_CA_NUM */
-        __m256 scale_factor = _mm256_set1_ps(32768.0);
-        __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
-        __m256 ifft2 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id + 8);
-        __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
-        __m256 scaled_ifft2 = _mm256_mul_ps(ifft2, scale_factor);
-        __m256i integer1 = _mm256_cvtps_epi32(scaled_ifft1);
-        __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
-        integer1 = _mm256_packs_epi32(integer1, integer2);
-        integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
-        //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
-        _mm256_stream_si256(
-            (__m256i*)&socket_ptr[2 * (sc_id + cfg->CP_LEN)], integer1);
-        if (sc_id >= cfg->OFDM_CA_NUM - cfg->CP_LEN) // add CP
-            _mm256_stream_si256((__m256i*)&socket_ptr[2
-                                    * (sc_id + cfg->CP_LEN - cfg->OFDM_CA_NUM)],
-                integer1);
+    // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results
+    // during data type coversion
+    simd_convert_float_to_short(ifft_out_ptr, socket_ptr, cfg->OFDM_CA_NUM,
+        cfg->CP_LEN, cfg->OFDM_CA_NUM);
+
+    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
+
+    if (kPrintSocketOutput) {
+        printf("IFFT data in socket\n");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+            printf("%hi+%hij ", socket_ptr[i * 2], socket_ptr[i * 2 + 1]);
+        }
+        printf("\n");
     }
-
-    duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
-
-    // cout << "In ifft: frame: "<< frame_id<<", symbol: "<<
-    // current_data_symbol_id<<", ant: " << ant_id << ", data: "; for (int j =
-    // 0; j <OFDM_CA_NUM; j++) {
-    //     int socket_offset = sizeof(int) * 16 + ant_id *
-    //     packetReceiver::packet_length; cout <<*((short *)(socket_ptr +
-    //     socket_offset) + 2 * j)  << "+j"<<*((short *)(socket_ptr +
-    //     socket_offset) + 2 * j + 1 )<<",   ";
-    // }
-    // cout<<"\n\n"<<endl;
 
     duration_stat->task_count++;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;

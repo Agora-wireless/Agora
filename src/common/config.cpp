@@ -9,7 +9,11 @@ Config::Config(std::string jsonfile)
     const auto tddConf = json::parse(conf);
 
     /* antenna configurations */
-    std::string hub_file = tddConf.value("hubs", "");
+    if (!kUseUHD) {
+        std::string hub_file = tddConf.value("hubs", "");
+        if (hub_file.size() > 0)
+            Utils::loadDevices(hub_file, hub_ids);
+    }
     std::string serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
     external_ref_node = tddConf.value("external_ref_node", false);
@@ -20,8 +24,6 @@ Config::Config(std::string jsonfile)
     isUE = tddConf.value("UE", false);
     UE_NUM = tddConf.value("ue_num", 8);
     UE_ANT_NUM = UE_NUM;
-    if (hub_file.size() > 0)
-        Utils::loadDevices(hub_file, hub_ids);
     if (serial_file.size() > 0)
         Utils::loadDevices(serial_file, radio_ids);
     if (radio_ids.size() != 0) {
@@ -41,7 +43,8 @@ Config::Config(std::string jsonfile)
     BF_ANT_NUM = BS_ANT_NUM;
     if (external_ref_node)
         BF_ANT_NUM = BS_ANT_NUM - nChannels;
-    if (kUseArgos) {
+
+    if (kUseArgos || kUseUHD) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
 
@@ -205,6 +208,7 @@ Config::Config(std::string jsonfile)
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
     fft_block_size = tddConf.value("fft_block_size", 1);
+    encode_block_size = tddConf.value("encode_block_size", 1);
 
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
@@ -267,7 +271,7 @@ Config::Config(std::string jsonfile)
 
 void Config::genData()
 {
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         std::vector<std::vector<double>> gold_ifft
             = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
         std::vector<std::complex<int16_t>> gold_ifft_ci16
@@ -307,6 +311,16 @@ void Config::genData()
 
         beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
         coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
+
+        // Add addition padding for beacon sent from host
+        int fracBeacon = sampsPerSymbol % beacon_len;
+        std::vector<std::complex<int16_t>> preBeacon(ofdm_tx_zero_prefix_, 0);
+        std::vector<std::complex<int16_t>> postBeacon(
+            ofdm_tx_zero_postfix_ + fracBeacon, 0);
+        beacon_ci16.insert(
+            beacon_ci16.begin(), preBeacon.begin(), preBeacon.end());
+        beacon_ci16.insert(
+            beacon_ci16.end(), postBeacon.begin(), postBeacon.end());
     }
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
