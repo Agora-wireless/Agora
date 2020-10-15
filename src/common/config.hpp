@@ -144,7 +144,7 @@ public:
     bool sampleCalEn;
     bool imbalanceCalEn;
     bool recipCalEn;
-    bool exclude_ref_from_bf;
+    bool external_ref_node;
     std::string channel;
 
     size_t core_offset;

@@ -34,12 +34,15 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+    chan_est_tmp = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->OFDM_DATA_NUM * sizeof(complex_float)));
 }
 
 DoFFT::~DoFFT()
 {
     DftiFreeDescriptor(&mkl_handle);
     free(fft_inout);
+    free(chan_est_tmp);
 }
 
 Event_data DoFFT::launch(size_t tag)
@@ -114,8 +117,7 @@ Event_data DoFFT::launch(size_t tag)
             ant_id, SymbolType::kUL);
     } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
         or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
-        partial_transpose(
-            calib_buffer_[frame_slot], ant_id, SymbolType::kCalUL);
+        partial_transpose(calib_buffer_[frame_slot], ant_id, sym_type);
     } else {
         rt_assert(false, "Unknown or unsupported symbol type");
     }
@@ -133,16 +135,6 @@ void DoFFT::partial_transpose(
 {
     // We have OFDM_DATA_NUM % kTransposeBlockSize == 0
     const size_t num_blocks = cfg->OFDM_DATA_NUM / kTransposeBlockSize;
-    // Do the 1st step of 2-step reciprocal calibration
-    // The 2nd step will be performed in dozf
-    if (symbol_type == SymbolType::kCalDL
-        or symbol_type == SymbolType::kCalUL) {
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i += cfg->BS_ANT_NUM)
-            for (size_t j = 0; j < cfg->BS_ANT_NUM - 1; j++)
-                fft_inout[std::min(i + j, cfg->OFDM_DATA_NUM - 1)
-                    + cfg->OFDM_DATA_START]
-                    = fft_inout[i + cfg->OFDM_DATA_START];
-    }
 
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset
@@ -154,9 +146,14 @@ void DoFFT::partial_transpose(
             const complex_float* src
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
-            complex_float* dst = &out_buf[block_base_offset
-                + (ant_id * kTransposeBlockSize) + sc_j];
-
+            complex_float* dst = nullptr;
+            if (symbol_type == SymbolType::kCalDL
+                || symbol_type == SymbolType::kCalUL) {
+                dst = &chan_est_tmp[block_idx * kTransposeBlockSize + sc_j];
+            } else {
+                dst = &out_buf[block_base_offset
+                    + (ant_id * kTransposeBlockSize) + sc_j];
+            }
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline
 
@@ -217,6 +214,27 @@ void DoFFT::partial_transpose(
             _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
         }
+    }
+    // Do the 1st step of 2-step reciprocal calibration
+    // The 2nd step will be performed in dozf
+    if (symbol_type == SymbolType::kCalUL) {
+        arma::cx_fvec vec_calib_ul(
+            reinterpret_cast<arma::cx_float*>(chan_est_tmp), cfg->OFDM_DATA_NUM,
+            false);
+        cx_float res = mean(vec_calib_ul);
+        out_buf[cfg->BF_ANT_NUM + ant_id] = { res.real(), res.imag() };
+    } else if (symbol_type == SymbolType::kCalDL) {
+        size_t sc_per_antenna = cfg->OFDM_DATA_NUM / cfg->BF_ANT_NUM;
+        for (size_t j = 0; j < cfg->BF_ANT_NUM; j++) {
+            out_buf[j] = { 0, 0 };
+            for (size_t i = 0; i < sc_per_antenna * cfg->BF_ANT_NUM;
+                 i += cfg->BF_ANT_NUM)
+                out_buf[j] = { chan_est_tmp[i + j].re + out_buf[j].re,
+                    chan_est_tmp[i + j].im + out_buf[j].im };
+        }
+        arma::cx_fvec vec_calib_dl(
+            reinterpret_cast<arma::cx_float*>(out_buf), cfg->BF_ANT_NUM, false);
+        vec_calib_dl /= sc_per_antenna;
     }
 }
 

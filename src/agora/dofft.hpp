@@ -104,6 +104,7 @@ private:
     Table<complex_float>& calib_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
+    complex_float* chan_est_tmp; // Temp buffer for estimated channel
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
     PhyStats* phy_stats;

@@ -82,7 +82,7 @@ Event_data DoPrecode::launch(size_t tag)
 
             cx_fmat mat_precoder(
                 precoder_ptr, cfg->UE_NUM, cfg->BF_ANT_NUM, false);
-            if (cfg->exclude_ref_from_bf)
+            if (cfg->external_ref_node)
                 mat_precoder.insert_cols(cfg->ref_ant,
                     cx_fmat(cfg->UE_NUM, cfg->nChannels, fill::zeros));
             cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
