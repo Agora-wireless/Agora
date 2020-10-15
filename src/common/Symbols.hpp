@@ -1,6 +1,7 @@
 #ifndef SYMBOLS
 #define SYMBOLS
 
+#include <mkl.h>
 #include <stdint.h>
 #include <string>
 
@@ -13,14 +14,18 @@
 
 // Number of frames received that we allocate space for in worker threads. This
 // is the frame window that we track in Agora.
-#define TASK_BUFFER_FRAME_NUM 40
-static constexpr size_t kFrameWnd = TASK_BUFFER_FRAME_NUM;
-
-// Number of frames received that we allocate space for in TX/RX threads
-#define SOCKET_BUFFER_FRAME_NUM 40
+static constexpr size_t kFrameWnd = 40;
 
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
+
+// Just-in-time optimization for MKL cgemm is available only after MKL 2019
+// update 3. Disable this on systems with an older MKL version.
+#if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
+#define USE_MKL_JIT 1
+#else
+#define USE_MKL_JIT 0
+#endif
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T> static constexpr inline bool is_power_of_two(T x)
@@ -109,16 +114,23 @@ static constexpr bool kUseArgos = true;
 static constexpr bool kUseArgos = false;
 #endif
 
+#ifdef USE_UHD
+static constexpr bool kUseUHD = true;
+#else
+static constexpr bool kUseUHD = false;
+#endif
+
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 static constexpr bool kCollectPhyStats = false;
 
 static constexpr bool kDebugPrintPerFrameDone = true;
-static constexpr bool kDebugPrintPerFrameStart = false;
+static constexpr bool kDebugPrintPerFrameStart = true;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
+static constexpr bool kDebugMulticell = false;
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -172,6 +184,9 @@ static inline std::string thread_type_str(ThreadType thread_type)
 }
 
 enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
+
+// Intervals for beacon detection at the client (in frames)
+static constexpr size_t kBeaconDetectInterval = 10;
 
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 70;

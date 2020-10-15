@@ -17,12 +17,10 @@ TEST(TestRecip, Correctness)
     double freq_ghz = measure_rdtsc_freq();
 
     Table<complex_float> calib_buffer, recip_buffer_0, recip_buffer_1;
-    recip_buffer_0.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    recip_buffer_1.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+    recip_buffer_0.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+    recip_buffer_1.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     calib_buffer.rand_alloc_cx_float(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     printf("Reference antenna: %zu\n", cfg->ref_ant);
 
@@ -30,13 +28,13 @@ TEST(TestRecip, Correctness)
 
     // Algorithm in reciprocity.cpp (use as ground truth)
     for (size_t i = 0; i < kMaxFrameNum; i++) {
-        arma::cx_float* ptr_in = reinterpret_cast<arma::cx_float*>(
-            calib_buffer[i % TASK_BUFFER_FRAME_NUM]);
+        arma::cx_float* ptr_in
+            = reinterpret_cast<arma::cx_float*>(calib_buffer[i % kFrameWnd]);
         arma::cx_fmat mat_input(
             ptr_in, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM, false);
         arma::cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant);
-        arma::cx_float* recip_buff = reinterpret_cast<arma::cx_float*>(
-            recip_buffer_0[i % TASK_BUFFER_FRAME_NUM]);
+        arma::cx_float* recip_buff
+            = reinterpret_cast<arma::cx_float*>(recip_buffer_0[i % kFrameWnd]);
         arma::cx_fmat calib_mat = mat_input.each_col() / vec_calib_ref;
 
         arma::cx_fmat recip_mat(
@@ -64,8 +62,8 @@ TEST(TestRecip, Correctness)
     for (size_t i = 0; i < kMaxFrameNum; i++) {
         // In dofft
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
-            auto* ptr_in = calib_buffer[i % TASK_BUFFER_FRAME_NUM]
-                + ant_id * cfg->OFDM_DATA_NUM;
+            auto* ptr_in
+                = calib_buffer[i % kFrameWnd] + ant_id * cfg->OFDM_DATA_NUM;
             for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM;
                  sc_id += cfg->BS_ANT_NUM) {
                 for (size_t j = 0; j < cfg->BS_ANT_NUM; j++)
@@ -74,12 +72,12 @@ TEST(TestRecip, Correctness)
             }
         }
         // Transpose
-        arma::cx_float* ptr_calib = reinterpret_cast<arma::cx_float*>(
-            calib_buffer[i % TASK_BUFFER_FRAME_NUM]);
+        arma::cx_float* ptr_calib
+            = reinterpret_cast<arma::cx_float*>(calib_buffer[i % kFrameWnd]);
         arma::cx_fmat calib_mat(
             ptr_calib, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM, false);
-        arma::cx_float* recip_buff = reinterpret_cast<arma::cx_float*>(
-            recip_buffer_1[i % TASK_BUFFER_FRAME_NUM]);
+        arma::cx_float* recip_buff
+            = reinterpret_cast<arma::cx_float*>(recip_buffer_1[i % kFrameWnd]);
         arma::cx_fmat recip_mat(
             recip_buff, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM, false);
         recip_mat = calib_mat.st();
@@ -87,8 +85,7 @@ TEST(TestRecip, Correctness)
         // In dozf
         for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++) {
             arma::cx_float* ptr_in = reinterpret_cast<arma::cx_float*>(
-                recip_buffer_1[i % TASK_BUFFER_FRAME_NUM]
-                + sc_id * cfg->BS_ANT_NUM);
+                recip_buffer_1[i % kFrameWnd] + sc_id * cfg->BS_ANT_NUM);
             arma::cx_fvec recip_vec(ptr_in, cfg->BS_ANT_NUM, false);
             recip_vec = recip_vec / recip_vec(cfg->ref_ant);
         }
@@ -102,8 +99,8 @@ TEST(TestRecip, Correctness)
     // Check correctness
     constexpr float allowed_error = 1e-3;
     for (size_t i = 0; i < kMaxFrameNum; i++) {
-        float* buf0 = (float*)recip_buffer_0[i % TASK_BUFFER_FRAME_NUM];
-        float* buf1 = (float*)recip_buffer_1[i % TASK_BUFFER_FRAME_NUM];
+        float* buf0 = (float*)recip_buffer_0[i % kFrameWnd];
+        float* buf1 = (float*)recip_buffer_1[i % kFrameWnd];
         for (size_t j = 0; j < cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM; j++) {
             ASSERT_LE(abs(buf0[j] - buf1[j]), allowed_error);
         }

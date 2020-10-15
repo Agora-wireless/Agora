@@ -30,7 +30,6 @@
 #include <tuple>
 #include <unistd.h>
 
-// typedef std::vector<complex_float> myVec;
 typedef std::vector<complex_float,
     boost::alignment::aligned_allocator<complex_float, 64>>
     myVec;
@@ -214,16 +213,16 @@ private:
     /**
      * Data for IFFT, (prefix added)
      * First dimension: IFFT_buffer_block_num = BS_ANT_NUM *
-     * dl_data_symbol_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
-     * OFDM_CA_NUM
+     *   dl_data_symbol_perframe * kFrameWnd 
+     * Second dimension: OFDM_CA_NUM
      */
     Table<complex_float> ifft_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 
     /**
      * Data before modulation
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * First dimension: data_symbol_num_perframe * kFrameWnd 
+     * Second dimension: OFDM_CA_NUM * UE_NUM
      */
     Table<uint8_t> ul_bits_buffer_;
     Table<uint8_t> ul_bits_buffer_status_;
@@ -233,8 +232,8 @@ private:
     int ul_syms_buffer_size_;
     /**
      * Data after modulation
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * First dimension: data_symbol_num_perframe * kFrameWnd
+     * Second dimension: OFDM_CA_NUM * UE_NUM
      */
     Table<complex_float> modul_buffer_;
 
@@ -260,29 +259,29 @@ private:
     /**
      * Data for FFT, after time sync (prefix removed)
      * First dimension: FFT_buffer_block_num = BS_ANT_NUM *
-     * symbol_num_perframe * TASK_BUFFER_FRAME_NUM Second dimension:
+     * symbol_num_perframe * kFrameWnd Second dimension:
      * OFDM_CA_NUM
      */
     Table<complex_float> fft_buffer_;
 
     /**
      * Estimated CSI data
-     * First dimension: OFDM_CA_NUM * TASK_BUFFER_FRAME_NUM
+     * First dimension: OFDM_CA_NUM * kFrameWnd
      * Second dimension: BS_ANT_NUM * UE_NUM
      */
     std::vector<myVec> csi_buffer_;
 
     /**
      * Data after equalization
-     * First dimension: data_symbol_num_perframe (40-4) *
-     * TASK_BUFFER_FRAME_NUM Second dimension: OFDM_CA_NUM * UE_NUM
+     * First dimension: data_symbol_num_perframe * kFrameWnd 
+     * Second dimension: OFDM_CA_NUM * UE_NUM
      */
     std::vector<myVec> equal_buffer_;
 
     /**
      * Data symbols after IFFT
      * First dimension: total symbol number in the buffer:
-     * data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM second dimension:
+     * data_symbol_num_perframe * kFrameWnd second dimension:
      * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
      * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
      * subcarriers)

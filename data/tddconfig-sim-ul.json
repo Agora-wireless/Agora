@@ -6,7 +6,7 @@
  "socket_thread_num": 2,
  "symbol_num_perframe": 14,
  "frames" : [
-     "BPUUUUUUUUUUUU"
+     "PUUUUUUUUUUUUU"
  ],
  "modulation" : "64QAM",
  "Zc" : 104,
