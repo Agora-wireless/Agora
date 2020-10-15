@@ -27,20 +27,6 @@ static void simd_convert_float_to_short(
     }
 }
 
-static inline void print_mat(cx_fmat c)
-{
-    std::stringstream so;
-    for (size_t i = 0; i < c.n_cols; i++) {
-        so << "row" << i << " = [";
-        for (size_t j = 0; j < c.n_rows; j++)
-            so << std::fixed << std::setw(5) << std::setprecision(3)
-               << c.at(j, i).real() << "+" << c.at(j, i).imag() << "i ";
-        so << "];\n";
-    }
-    so << std::endl;
-    std::cout << so.str();
-}
-
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     size_t bs_thread_num, size_t user_thread_num, size_t worker_thread_num,
     size_t in_core_offset)
@@ -480,7 +466,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM));
     fmat_dst += noise;
     if (kPrintChannelOutput)
-        print_mat(fmat_dst);
+        Utils::print_mat(fmat_dst);
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs[total_offset_bs]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
@@ -537,7 +523,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM));
     fmat_dst += noise;
     if (kPrintChannelOutput)
-        print_mat(fmat_dst);
+        Utils::print_mat(fmat_dst);
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue[total_offset_ue]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
