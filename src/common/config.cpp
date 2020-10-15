@@ -12,7 +12,7 @@ Config::Config(std::string jsonfile)
     std::string hub_file = tddConf.value("hubs", "");
     std::string serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
-    exclude_ref_from_bf = tddConf.value("exclude_ref_from_bf", false);
+    external_ref_node = tddConf.value("external_ref_node", false);
     nCells = tddConf.value("cells", 1);
     channel = tddConf.value("channel", "A");
     nChannels = std::min(channel.size(), (size_t)2);
@@ -39,7 +39,7 @@ Config::Config(std::string jsonfile)
     } else
         nRadios = tddConf.value("radio_num", isUE ? UE_ANT_NUM : BS_ANT_NUM);
     BF_ANT_NUM = BS_ANT_NUM;
-    if (exclude_ref_from_bf)
+    if (external_ref_node)
         BF_ANT_NUM = BS_ANT_NUM - nChannels;
     if (kUseArgos) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");

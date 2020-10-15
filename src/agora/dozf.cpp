@@ -55,7 +55,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     complex_float* _mat_dl_zf)
 {
     arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
-        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        cfg->UE_NUM, cfg->BF_ANT_NUM, false);
     if (kUseInverseForZF) {
         try {
             mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
@@ -70,21 +70,14 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cfg->UE_NUM, cfg->BF_ANT_NUM, false);
         if (cfg->recipCalEn) {
             arma::cx_fvec vec_calib(
-                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BS_ANT_NUM,
+                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BF_ANT_NUM,
                 false);
 
-            vec_calib = vec_calib / vec_calib(cfg->ref_ant);
-            arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
+            arma::cx_fmat mat_calib(cfg->BF_ANT_NUM, cfg->BF_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
-            if (cfg->exclude_ref_from_bf) {
-                mat_calib.shed_rows(
-                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
-                mat_calib.shed_cols(
-                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
-            }
             mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
             mat_dl_zf = mat_ul_zf;
@@ -164,18 +157,25 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                 cfg->BS_ANT_NUM);
         }
         if (cfg->recipCalEn) {
-            // Gather reciprocal calibration data from partially-transposed buffer
-            float* dst_calib_ptr = (float*)calib_gather_buffer;
-            partial_transpose_gather(cur_sc_id,
-                (float*)calib_buffer_[frame_slot], dst_calib_ptr,
-                cfg->BS_ANT_NUM);
+            arma::cx_fvec vec_calib_dl(
+                reinterpret_cast<arma::cx_float*>(calib_buffer_[frame_slot]),
+                cfg->BF_ANT_NUM, false);
+            arma::cx_fvec vec_calib_ul(
+                reinterpret_cast<arma::cx_float*>(
+                    &calib_buffer_[frame_slot][cfg->BF_ANT_NUM]),
+                cfg->BF_ANT_NUM, false);
+            arma::cx_fvec vec_calib(
+                reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
+                cfg->BF_ANT_NUM, false);
+
+            vec_calib = vec_calib_dl / vec_calib_ul;
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
-        if (cfg->exclude_ref_from_bf) {
+        if (cfg->external_ref_node) {
             mat_csi.shed_rows(cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
         }
         compute_precoder(mat_csi, calib_gather_buffer,

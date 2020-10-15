@@ -367,7 +367,7 @@ bool RadioConfig::radioStart()
                 std::vector<std::complex<float>> post(
                     _cfg->ofdm_tx_zero_postfix_, 0);
                 recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->common_pilot,
-                    _cfg->nChannels * i, _cfg->BS_ANT_NUM, _cfg->OFDM_CA_NUM,
+                    _cfg->nChannels * i, _cfg->BF_ANT_NUM, _cfg->OFDM_CA_NUM,
                     _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START, _cfg->CP_LEN);
                 recipCalDlPilot.insert(
                     recipCalDlPilot.begin(), pre.begin(), pre.end());
@@ -383,7 +383,7 @@ bool RadioConfig::radioStart()
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
                     recipCalDlPilot = CommsLib::composeRefSymbol(
-                        _cfg->common_pilot, 2 * i + 1, _cfg->BS_ANT_NUM,
+                        _cfg->common_pilot, 2 * i + 1, _cfg->BF_ANT_NUM,
                         _cfg->OFDM_CA_NUM, _cfg->OFDM_DATA_NUM,
                         _cfg->OFDM_DATA_START, _cfg->CP_LEN);
                     baStn[i]->writeRegisters("TX_RAM_B", 0,
