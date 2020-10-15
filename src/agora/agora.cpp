@@ -182,7 +182,7 @@ void Agora::schedule_codeblocks(
     for (size_t ue_id = 0; ue_id < config_->UE_ANT_NUM; ue_id++) {
         for (size_t i = 0; i < LDPC_config.lut_symbol_to_cb[symbol_idx].size();
              i++) {
-            size_t cur_cb_id = LDPC_config.lut_symbol_to_cb[symbol_idx_ul][i];
+            size_t cur_cb_id = LDPC_config.lut_symbol_to_cb[symbol_idx][i];
             if (cur_cb_id < cb_id_in_next_symbol) {
                 event.tags[event.num_tags]
                     = gen_tag_t::frm_sym_cb(frame_id, ue_id, cur_cb_id)._tag;
@@ -1132,8 +1132,8 @@ void Agora::initialize_uplink_buffers()
     demul_stats_.init(config_->demul_events_per_symbol,
         cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 
-    decode_stats_.init(config_->LDPC_config_ul.nCb * cfg->UE_ANT_NUM,
-        cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
+    decode_stats_.init(cfg->UE_ANT_NUM, config_->LDPC_config_ul.nCb,
+        cfg->data_symbol_num_perframe);
 
     tomac_stats_.init(cfg->UE_NUM, cfg->ul_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
@@ -1155,8 +1155,7 @@ void Agora::initialize_downlink_buffers()
 
     dl_bits_buffer_.calloc(
         task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t dl_bits_buffer_status_size
-        = task_buffer_symbol_num * cfg->LDPC_config.nblocksInSymbol;
+    size_t dl_bits_buffer_status_size = kFrameWnd * cfg->LDPC_config_dl.nCb;
     dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
 
     dl_ifft_buffer_.calloc(
@@ -1165,8 +1164,8 @@ void Agora::initialize_downlink_buffers()
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
-    encode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        cfg->dl_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
+    encode_stats_.init(
+        cfg->UE_NUM, cfg->LDPC_config_dl.nCb, cfg->data_symbol_num_perframe);
     encode_stats_.cur_frame_for_symbol
         = std::vector<size_t>(cfg->dl_data_symbol_num_perframe, SIZE_MAX);
     precode_stats_.init(config_->demul_events_per_symbol,
@@ -1206,18 +1205,16 @@ void Agora::free_downlink_buffers()
 void Agora::save_decode_data_to_file(int frame_id)
 {
     auto& cfg = config_;
-    const size_t num_decoded_bytes
-        = cfg->num_bytes_per_cb * cfg->LDPC_config.nblocksInSymbol;
-
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
     printf("Saving decode data to %s\n", filename.c_str());
     FILE* fp = fopen(filename.c_str(), "wb");
 
-    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < cfg->UE_NUM; j++) {
-            uint8_t* ptr = decoded_buffer_[frame_id % kFrameWnd][i][j];
-            fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
+    for (size_t ue_id = 0; ue_id < cfg->UE_ANT_NUM; ue_id++) {
+        for (size_t i = 0; i < cfg->LDPC_config_ul.nCb; i++) {
+            uint8_t* ptr = decoded_buffer_[frame_id % kFrameWnd][ue_id]
+                + i * roundup<64>(cfg->num_bytes_per_cb);
+            fwrite(ptr, cfg->num_bytes_per_cb, sizeof(uint8_t), fp);
         }
     }
     fclose(fp);

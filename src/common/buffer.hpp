@@ -37,29 +37,21 @@ using fft_req_tag_t = rx_tag_t;
 // A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
 union gen_tag_t {
-    static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
-    static_assert(kMaxSymbols < ((1ull << 13) - 1), "");
+    static constexpr size_t kInvalidSymbolId = (1ull << 16) - 1;
+    static_assert(kMaxSymbols < ((1ull << 16) - 1), "");
     static_assert(kMaxUEs < UINT16_MAX, "");
     static_assert(kMaxAntennas < UINT16_MAX, "");
     static_assert(kMaxDataSCs < UINT16_MAX, "");
 
-    enum TagType {
-        kSymbols,
-        kCodeblocks,
-        kUsers,
-        kAntennas,
-        kSubcarriers,
-        kNone
-    };
+    enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 
     struct {
-        uint32_t frame_id;
-        TagType tag_type1 : 13;
+        uint32_t frame_id : 29;
+        TagType tag_type : 3;
         union {
             uint16_t symbol_id;
             uint16_t cb_ue_id;
-        } uint16_t symbol_id : 13;
-        TagType tag_type2 : 3;
+        };
         union {
             uint16_t cb_id; // code block
             uint16_t ue_id;
@@ -80,7 +72,7 @@ union gen_tag_t {
         std::ostringstream ret;
         ret << "[Frame ID " << std::to_string(frame_id) << ", symbol ID "
             << std::to_string(symbol_id);
-        switch (tag_type2) {
+        switch (tag_type) {
         case kCodeblocks:
             ret << ", code block ID " << std::to_string(cb_id) << "]";
             break;
@@ -107,7 +99,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.cb_ue_id = cb_ue_id;
-        ret.tag_type2 = TagType::kCodeblocks;
+        ret.tag_type = TagType::kCodeblocks;
         ret.cb_id = cb_id;
         return ret;
     }
@@ -119,7 +111,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type2 = TagType::kUsers;
+        ret.tag_type = TagType::kUsers;
         ret.ue_id = ue_id;
         return ret;
     }
@@ -131,7 +123,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type2 = TagType::kSubcarriers;
+        ret.tag_type = TagType::kSubcarriers;
         ret.sc_id = sc_id;
         return ret;
     }
@@ -144,7 +136,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type2 = TagType::kAntennas;
+        ret.tag_type = TagType::kAntennas;
         ret.ant_id = ant_id;
         return ret;
     }
@@ -156,7 +148,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = kInvalidSymbolId;
-        ret.tag_type2 = TagType::kSubcarriers;
+        ret.tag_type = TagType::kSubcarriers;
         ret.sc_id = sc_id;
         return ret;
     }
@@ -168,7 +160,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type2 = TagType::kNone;
+        ret.tag_type = TagType::kNone;
         return ret;
     }
 };

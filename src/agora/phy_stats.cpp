@@ -6,7 +6,7 @@ PhyStats::PhyStats(Config* cfg)
     , bit_error_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb)
     , decoded_blocks_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb)
     , block_error_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb)
-    , uncoded_blocks_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb)
+    , uncoded_bits_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb)
     , uncoded_bit_error_count_(
           kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb)
 {
@@ -22,14 +22,13 @@ PhyStats::PhyStats(Config* cfg)
 void PhyStats::print_phy_stats()
 {
     auto& cfg = config_;
-    const size_t task_buffer_cb_num_ul = cfg->LDPC_config_ul.nCb * kFrameWnd;
     for (size_t ue_id = 0; ue_id < cfg->UE_ANT_NUM; ue_id++) {
         size_t total_decoded_bits(0);
         size_t total_bit_errors(0);
         size_t total_decoded_blocks(0);
         size_t total_block_errors(0);
         for (size_t i = 0; i < kFrameWnd; i++) {
-            for (size_t j = 0; j < cfg->LDPC_config_ul.cb; j++) {
+            for (size_t j = 0; j < cfg->LDPC_config_ul.nCb; j++) {
                 total_decoded_bits += decoded_bits_count_[i][ue_id][j];
                 total_bit_errors += bit_error_count_[i][ue_id][j];
                 total_decoded_blocks += decoded_blocks_count_[i][ue_id][j];

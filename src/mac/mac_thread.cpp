@@ -237,10 +237,8 @@ void MacThread::process_udp_packets_from_apps_server(
     const MacPacket* pkt, RBIndicator ri)
 {
     // We've received bits for the downlink
-    const size_t total_symbol_idx
-        = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
     const size_t rx_offset
-        = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
+        = pkt->frame_id * cfg_->LDPC_config_dl.nCb + pkt->cb_id;
 
     if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
         MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",

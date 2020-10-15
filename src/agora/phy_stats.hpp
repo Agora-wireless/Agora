@@ -31,8 +31,8 @@ private:
     PtrGrid<kFrameWnd, kMaxUEs, size_t> bit_error_count_;
     PtrGrid<kFrameWnd, kMaxUEs, size_t> decoded_blocks_count_;
     PtrGrid<kFrameWnd, kMaxUEs, size_t> block_error_count_;
-    trGrid<kFrameWnd, kMaxUEs, size_t> uncoded_bits_count_;
-    trGrid<kFrameWnd, kMaxUEs, size_t> uncoded_bit_error_count_;
+    PtrGrid<kFrameWnd, kMaxUEs, size_t> uncoded_bits_count_;
+    PtrGrid<kFrameWnd, kMaxUEs, size_t> uncoded_bit_error_count_;
 
     Table<float> evm_buffer_;
     Table<float> pilot_snr_;

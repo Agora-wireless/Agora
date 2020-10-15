@@ -235,7 +235,7 @@ private:
 
     // Data after LDPC encoding and bit adaption for modulation input.
     // Each buffer has number of subcarriers btyes (rounded up to 64 btyes)
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dl_encoded_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> dl_encoded_buffer_;
 
     // 1st dimension: kFrameWnd * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs

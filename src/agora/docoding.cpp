@@ -24,10 +24,10 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
     parity_buffer = (int8_t*)memalign(64,
         ldpc_encoding_parity_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+            cfg->LDPC_config_dl.Bg, cfg->LDPC_config_dl.Zc));
     encoded_buffer_temp = (int8_t*)memalign(64,
         ldpc_encoding_encoded_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+            cfg->LDPC_config_dl.Bg, cfg->LDPC_config_dl.Zc));
 }
 
 DoEncode::~DoEncode()
@@ -49,7 +49,8 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    int8_t* input_ptr = raw_data_buffer_[ue_id][cb_id];
+    int8_t* input_ptr
+        = raw_data_buffer_[ue_id] + cb_id * roundup<64>(cfg->num_bytes_per_cb);
 
     ldpc_encode_helper(cfg->LDPC_config_dl.Bg, cfg->LDPC_config_dl.Zc,
         cfg->LDPC_config_dl.nRows, encoded_buffer_temp, parity_buffer,
@@ -57,7 +58,7 @@ Event_data DoEncode::launch(size_t tag)
     auto* encoded_temp_ptr = reinterpret_cast<uint8_t*>(encoded_buffer_temp);
     if (kPrintEncodedData) {
         printf("Encoded data\n");
-        for (int i = 0; i < cfg->LDPC_config_dl.num_encoded_bytes(); i++) {
+        for (size_t i = 0; i < cfg->LDPC_config_dl.num_encoded_bytes(); i++) {
             printf("%u ", *(encoded_temp_ptr + i));
         }
         printf("\n");
@@ -67,12 +68,12 @@ Event_data DoEncode::launch(size_t tag)
         size_t symbol_idx_dl = cfg->LDPC_config_dl.lut_cb_to_symbol[cb_id][i];
         int8_t* final_output_ptr
             = encoded_buffer_[frame_id][symbol_idx_dl][ue_id]
-            + LDPC_config_dl.get_chunk_start_sc(cb_id, i);
+            + cfg->LDPC_config_dl.get_chunk_start_sc(cb_id, i);
         adapt_bits_for_mod(encoded_temp_ptr,
             reinterpret_cast<uint8_t*>(final_output_ptr),
             cfg->LDPC_config_dl.lut_cb_chunks_bytes[cb_id][i],
             cfg->mod_order_bits);
-        ul_encoded_ptr += cfg->LDPC_config_dl.lut_cb_chunks_bytes[cb_id][i];
+        encoded_temp_ptr += cfg->LDPC_config_dl.lut_cb_chunks_bytes[cb_id][i];
     }
 
     size_t duration = worker_rdtsc() - start_tsc;
@@ -132,14 +133,12 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_request.Zc = cfg->LDPC_config_ul.Zc;
     ldpc_decoder_5gnr_request.baseGraph = cfg->LDPC_config_ul.Bg;
     ldpc_decoder_5gnr_request.nRows = cfg->LDPC_config_ul.nRows;
-
-    int numMsgBits = LDPC_config.cbLen - numFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits
         = cfg->LDPC_config_ul.cbLen - ldpc_decoder_5gnr_request.numFillerBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     size_t start_symbol = cfg->LDPC_config_ul.lut_cb_to_symbol[cb_id][0];
-    size_t start_sc = cfg->LDPC_config_ul.get_chunk_start_sc[cb_id][0];
+    size_t start_sc = cfg->LDPC_config_ul.get_chunk_start_sc(cb_id, 0);
     int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][ue_id]
         + (cfg->mod_order_bits
               * (start_symbol * cfg->OFDM_DATA_NUM + start_sc));

@@ -335,9 +335,9 @@ public:
             n_symbol, OFDM_DATA_NUM, mod_order_bits, LDPC_config.code_rate);
         tb_size = compute_tb_size(n_info_per_ue, target_code_rate);
         code_block_segmentation(tb_size, LDPC_config.Bg, LDPC_config.nCb,
-            LDPC_config.cbLen, LDPC_config.zc);
+            LDPC_config.cbLen, LDPC_config.Zc);
 
-        LDPC_config.nRow = compute_n_rows(target_code_rate, LDPC_config.Bg);
+        LDPC_config.nRows = compute_n_rows(target_code_rate, LDPC_config.Bg);
         LDPC_config.map_symbols_to_cbs(
             symbol_num_perframe, OFDM_DATA_NUM, mod_order_bits);
     }
@@ -346,9 +346,6 @@ public:
     {
         update_mod_cfgs(McsToModOrderBits[mcs]);
         float target_code_rate = McsToCodeRate[mcs];
-        // Number of UL/DL data symbols
-        size_t n_symbol = downlink_mode ? dl_data_symbol_num_perframe
-                                        : ul_data_symbol_num_perframe;
         update_ldpc_cfgs(LDPC_config_ul, tb_size_ul,
             ul_data_symbol_num_perframe, target_code_rate);
         update_ldpc_cfgs(LDPC_config_dl, tb_size_dl,
@@ -413,27 +410,6 @@ public:
     {
         size_t frame_slot = frame_id % kFrameWnd;
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
-    }
-
-    /// Get dl_bits for this symbol, user and code block ID
-    inline int8_t* get_info_bits(Table<int8_t>& dl_info_bits, size_t symbol_id,
-        size_t ue_id, size_t cb_id) const
-    {
-        return &dl_info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
-            * (LDPC_config_dl.nCb * ue_id + cb_id)];
-    }
-
-    /// Get encoded_buffer for this frame, symbol, user and code block ID
-    inline int8_t* get_encoded_buf(Table<int8_t>& encoded_buffer,
-        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
-    {
-        size_t total_data_symbol_id
-            = get_total_data_symbol_idx_dl(frame_id, symbol_id);
-        size_t num_encoded_bytes_per_cb
-            = LDPC_config.cbCodewLen / mod_order_bits;
-        return &encoded_buffer[total_data_symbol_id]
-                              [roundup<64>(OFDM_DATA_NUM) * ue_id
-                                  + num_encoded_bytes_per_cb * cb_id];
     }
 
     /// Returns the number of pilot subcarriers in downlink symbols used for

@@ -10,7 +10,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ProducerToken* worker_producer_token,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Table<complex_float>& dl_ifft_buffer,
-    PtrGrid<kFrameWnd, kMaxUEs, int8_t>& dl_encoded_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& dl_encoded_buffer,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)

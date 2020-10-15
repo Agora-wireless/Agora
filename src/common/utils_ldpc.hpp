@@ -9,136 +9,6 @@
 #include <assert.h>
 #include <malloc.h>
 
-class LDPCconfig {
-public:
-    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
-    uint16_t Zc; /// The 5G NR LDPC expansion factor
-    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
-
-    /// Allow the LDPC decoder to terminate without completing all iterations
-    /// if it decodes the codeblock eariler
-    bool earlyTermination;
-
-    size_t nRows; /// Number of rows in the LDPC base graph to use
-    uint32_t cbLen; /// Number of information bits input to LDPC encoding
-    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
-    size_t nCb; /// Number of code blocks in a frame
-    float code_rate;
-    /// Lookup table that maps code blocks to symbols
-    std::vector<std::vector<size_t>> lut_cb_to_symbol;
-    /// Lookup table that maps symbols to code blocks
-    std::vector<std::vector<size_t>> lut_symbol_to_cb;
-    /// Lookup table for number of bytes within chunks of code blocks
-    std::vector<std::vector<size_t>> lut_cb_chunks_bytes;
-    /// Lookup table for number of subcarriers occupied by chunks of code blocks
-    std::vector<std::vector<size_t>> lut_cb_chunks_scs;
-
-    // Return the number of bytes in the information bit sequence for LDPC
-    // encoding of one code block
-    size_t num_input_bytes() const
-    {
-        return bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
-    }
-
-    // Return the number of bytes in the encoded LDPC code word
-    size_t num_encoded_bytes() const
-    {
-        return bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows));
-    }
-
-    // Return the number of bytes in the encoded LDPC code word
-    // rounded up to 64 btyes
-    size_t num_encoded_bytes_pad() const
-    {
-        return roundup<64>(num_encoded_bytes());
-    }
-
-    // Generate lookup tables for the mappling between symbols and code blocks
-    void map_symbols_to_cbs(
-        size_t symbol_num_perframe, size_t ofdm_data_num, size_t mod_order_bits)
-    {
-        // rt_assert(LDPC_config.nCb <= symbol_num_perframe,
-        //     "LDPC lifting factor (Zc) is too small (requires number of "
-        //     "symbols per frame > number of code blocks per frame).");
-        lut_symbol_to_cb.resize(symbol_num_perframe);
-        lut_cb_to_symbol.resize(nCb);
-        lut_cb_chunks_bytes.resize(symbol_num_perframe);
-        lut_cb_chunks_scs.resize(symbol_num_perframe);
-        size_t num_encoded_bytes_per_symbol
-            = bits_to_bytes(ofdm_data_num * mod_order_bits);
-        if (symbol_num_perframe % nCb == 0) {
-            size_t symbol_per_cb = symbol_num_perframe / nCb;
-            for (size_t i = 0; i < nCb; i++) {
-                for (size_t j = 0; j < symbol_per_cb; j++) {
-                    lut_cb_to_symbol[i].push_back(i * symbol_per_cb + j);
-                    // Use all subcarriers in symbols except the last symbol
-                    if (j == symbol_per_cb - 1) {
-                        lut_cb_chunks_bytes[i].push_back(num_encoded_bytes()
-                            - j * num_encoded_bytes_per_symbol);
-                        lut_cb_chunks_scs[i].push_back(
-                            cbCodewLen / mod_order_bits - j * ofdm_data_num);
-                    } else {
-                        lut_cb_chunks_bytes[i].push_back(
-                            num_encoded_bytes_per_symbol);
-                        lut_cb_chunks_scs[i].push_back(ofdm_data_num);
-                    }
-                }
-            }
-            for (size_t i = 0; i < symbol_num_perframe; i++) {
-                lut_symbol_to_cb[i].push_back(
-                    symbol_num_perframe / symbol_per_cb);
-            }
-        } else {
-            // Number of subcarriers required for a code block
-            // Pad to 64 bytes to avoid cache false sharing
-            size_t num_encoded_scs_pad
-                = roundup<64>(cbCodewLen / mod_order_bits);
-            size_t unmapped_scs_in_symbol = ofdm_data_num;
-            size_t symbol_id = 0;
-            for (size_t i = 0; i < nCb; i++) {
-                size_t unmapped_scs_in_cb = num_encoded_scs_pad;
-                while (unmapped_scs_in_cb > 0) {
-                    lut_cb_to_symbol[i].push_back(symbol_id);
-                    lut_symbol_to_cb[symbol_id].push_back(i);
-                    if (unmapped_scs_in_cb >= unmapped_scs_in_symbol) {
-                        lut_cb_chunks_bytes[i].push_back(bits_to_bytes(
-                            unmapped_scs_in_symbol * mod_order_bits));
-                        lut_cb_chunks_scs[i].push_back(unmapped_scs_in_symbol);
-                        unmapped_scs_in_cb -= unmapped_scs_in_symbol;
-                        symbol_id++;
-                        unmapped_scs_in_symbol = ofdm_data_num;
-                    } else {
-                        lut_cb_chunks_bytes[i].push_back(
-                            bits_to_bytes(unmapped_scs_in_cb * mod_order_bits));
-                        lut_cb_chunks_scs[i].push_back(unmapped_scs_in_cb);
-                        unmapped_scs_in_cb = 0;
-                        unmapped_scs_in_symbol -= unmapped_scs_in_cb;
-                    }
-                }
-            }
-        }
-    }
-
-    // Return the offset of subcarrier for the start of a code block's
-    // current chunk within a symbol
-    size_t get_chunk_start_sc(size_t cb_id, size_t chunk_id) const
-    {
-        size_t symbol_id = lut_cb_to_symbol[cb_id][chunk_id];
-        const auto it = find(lut_symbol_to_cb[symbol_id].begin(),
-            lut_symbol_to_cb[symbol_id].end(), cb_id);
-        rt_assert(it != lut_symbol_to_cb[symbol_id].end(),
-            "Code block does not exist in the symbol");
-        size_t cb_id_in_symbol = it - lut_symbol_to_cb[symbol_id].begin();
-        size_t chunk_start_sc = 0;
-
-        for (size_t i = 0; i < cb_id_in_symbol; i++)
-            cb_offset_in_symbol
-                += lut_cb_chunks_scs[lut_symbol_to_cb[symbol_id][i]].back();
-
-        return chunk_start_sc;
-    }
-};
-
 #ifndef __has_builtin
 #define __has_builtin(x) 0
 #endif
@@ -415,20 +285,20 @@ static constexpr float McsToCodeRate[28] = { 0.1172, 0.1885, 0.3008, 0.4385,
     0.7363, 0.7783, 0.8213, 0.8643, 0.8950, 0.9258 };
 
 // Lookup table for transport block size from 3GPP TS38.214-Table 5.1.3.2-2
-static constexpr std::vector<size_t> LutNInfo = { 24, 32, 40, 48, 56, 64, 72,
-    80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 208,
-    224, 240, 256, 272, 288, 304, 320, 336, 352, 368, 384, 408, 432, 456, 480,
-    504, 528, 552, 576, 608, 640, 672, 704, 736, 768, 808, 848, 928, 984, 1032,
-    1064, 1128, 1160, 1192, 1224, 1256, 1288, 1320, 1352, 1416, 1480, 1544,
-    1608, 1672, 1736, 1800, 1864, 1928, 2024, 2088, 2152, 2216, 2280, 2408,
-    2472, 2536, 2600, 2664, 2728, 2792, 2856, 2976, 3104, 3240, 3368, 3496,
-    3624, 3752, 3824 };
+static std::vector<size_t> LutNInfo = { 24, 32, 40, 48, 56, 64, 72, 80, 88, 96,
+    104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 208, 224, 240,
+    256, 272, 288, 304, 320, 336, 352, 368, 384, 408, 432, 456, 480, 504, 528,
+    552, 576, 608, 640, 672, 704, 736, 768, 808, 848, 928, 984, 1032, 1064,
+    1128, 1160, 1192, 1224, 1256, 1288, 1320, 1352, 1416, 1480, 1544, 1608,
+    1672, 1736, 1800, 1864, 1928, 2024, 2088, 2152, 2216, 2280, 2408, 2472,
+    2536, 2600, 2664, 2728, 2792, 2856, 2976, 3104, 3240, 3368, 3496, 3624,
+    3752, 3824 };
 
 // Set of LDPC lifting size Zc from 3GPP TS38.212-Table 5.3.2-1
-static constexpr std::vector<size_t> LutZc = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56,
-    60, 64, 72, 80, 88, 96, 104, 112, 120, 128, 144, 160, 176, 192, 208, 224,
-    240, 256, 288, 320, 352, 384 };
+static std::vector<size_t> LutZc = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+    15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72,
+    80, 88, 96, 104, 112, 120, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288,
+    320, 352, 384 };
 
 // Select base graph based on transport block size and code rate.
 // 3GPP TS38.212-7.2.2
@@ -467,19 +337,18 @@ static inline size_t select_zc(
             kb = 6;
     }
 
-    zc = closest(LutZc, std::ceil(1.f * n_info_per_cb / kb));
-    return zc
+    size_t zc = closest(LutZc, std::ceil(1.f * n_info_per_cb / kb));
+    return zc;
 }
 
 // Code block segmentation based on 3GPP TS38.212-5.2.2
 static inline void code_block_segmentation(size_t tb_size, uint16_t base_graph,
-    size_t& n_cb, size_t& n_info_per_cb, size_t& zc)
+    size_t& n_cb, uint32_t& n_info_per_cb, uint16_t& zc)
 {
     size_t max_k_cb = base_graph == 1 ? 8448 : 3840;
     size_t tb_size_prime = tb_size;
     // Determine number of code blocks
     if (tb_size < max_k_cb) {
-        size_t n_crc_bits = 0;
         n_cb = 1;
         n_info_per_cb = tb_size;
     } else {
@@ -511,9 +380,9 @@ static inline size_t compute_tb_size(size_t n_info, float code_rate)
 {
     size_t transport_block_size;
     if (n_info <= 3824) {
-        size_t n = std::max(3, std::floor(std::log2(n_info)) - 6);
+        size_t n = std::max(3, (int)std::floor(std::log2(n_info)) - 6);
         size_t n_info_prime = std::max(
-            24, std::pow(2, n) * std::floor(n_info / std::pow(2, n)));
+            24, (int)(std::pow(2, n) * std::floor(n_info / std::pow(2, n))));
         transport_block_size = closest(LutNInfo, n_info_prime);
     } else {
         size_t n = std::floor(std::log2(n_info - 24)) - 5;
@@ -533,9 +402,10 @@ static inline size_t compute_tb_size(size_t n_info, float code_rate)
 static inline size_t compute_n_rows(float target_code_rate, uint16_t base_graph)
 {
     size_t n_info_cols = ldpc_num_input_cols(base_graph);
-    size_t n_rows = std::max(4,
+    size_t n_rows = std::max((size_t)4,
         std::min(ldpc_max_num_rows(base_graph),
-            std::round(1.f * n_info_cols / target_code_rate) - n_info_cols));
+            (int)std::round(1.f * n_info_cols / target_code_rate)
+                - n_info_cols));
     return n_rows;
 }
 
@@ -545,5 +415,133 @@ static inline float compute_code_rate(size_t n_rows, uint16_t base_graph)
     return (1.f * ldpc_num_input_cols(base_graph)
         / (ldpc_num_input_cols(base_graph) + n_rows - num_punctured_cols));
 }
+
+class LDPCconfig {
+public:
+    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
+    uint16_t Zc; /// The 5G NR LDPC expansion factor
+    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
+
+    /// Allow the LDPC decoder to terminate without completing all iterations
+    /// if it decodes the codeblock eariler
+    bool earlyTermination;
+
+    size_t nRows; /// Number of rows in the LDPC base graph to use
+    uint32_t cbLen; /// Number of information bits input to LDPC encoding
+    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
+    size_t nCb; /// Number of code blocks in a frame
+    float code_rate;
+    /// Lookup table that maps code blocks to symbols
+    std::vector<std::vector<size_t>> lut_cb_to_symbol;
+    /// Lookup table that maps symbols to code blocks
+    std::vector<std::vector<size_t>> lut_symbol_to_cb;
+    /// Lookup table for number of bytes within chunks of code blocks
+    std::vector<std::vector<size_t>> lut_cb_chunks_bytes;
+    /// Lookup table for number of subcarriers occupied by chunks of code blocks
+    std::vector<std::vector<size_t>> lut_cb_chunks_scs;
+
+    // Return the number of bytes in the information bit sequence for LDPC
+    // encoding of one code block
+    size_t num_input_bytes() const
+    {
+        return bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
+    }
+
+    // Return the number of bytes in the encoded LDPC code word
+    size_t num_encoded_bytes() const
+    {
+        return bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows));
+    }
+
+    // Return the number of bytes in the encoded LDPC code word
+    // rounded up to 64 btyes
+    size_t num_encoded_bytes_pad() const
+    {
+        return roundup<64>(num_encoded_bytes());
+    }
+
+    // Generate lookup tables for the mappling between symbols and code blocks
+    void map_symbols_to_cbs(
+        size_t symbol_num_perframe, size_t ofdm_data_num, size_t mod_order_bits)
+    {
+        // rt_assert(LDPC_config.nCb <= symbol_num_perframe,
+        //     "LDPC lifting factor (Zc) is too small (requires number of "
+        //     "symbols per frame > number of code blocks per frame).");
+        lut_symbol_to_cb.resize(symbol_num_perframe);
+        lut_cb_to_symbol.resize(nCb);
+        lut_cb_chunks_bytes.resize(symbol_num_perframe);
+        lut_cb_chunks_scs.resize(symbol_num_perframe);
+        size_t num_encoded_bytes_per_symbol
+            = bits_to_bytes(ofdm_data_num * mod_order_bits);
+        if (symbol_num_perframe % nCb == 0) {
+            size_t symbol_per_cb = symbol_num_perframe / nCb;
+            for (size_t i = 0; i < nCb; i++) {
+                for (size_t j = 0; j < symbol_per_cb; j++) {
+                    lut_cb_to_symbol[i].push_back(i * symbol_per_cb + j);
+                    // Use all subcarriers in symbols except the last symbol
+                    if (j == symbol_per_cb - 1) {
+                        lut_cb_chunks_bytes[i].push_back(num_encoded_bytes()
+                            - j * num_encoded_bytes_per_symbol);
+                        lut_cb_chunks_scs[i].push_back(
+                            cbCodewLen / mod_order_bits - j * ofdm_data_num);
+                    } else {
+                        lut_cb_chunks_bytes[i].push_back(
+                            num_encoded_bytes_per_symbol);
+                        lut_cb_chunks_scs[i].push_back(ofdm_data_num);
+                    }
+                }
+            }
+            for (size_t i = 0; i < symbol_num_perframe; i++) {
+                lut_symbol_to_cb[i].push_back(
+                    symbol_num_perframe / symbol_per_cb);
+            }
+        } else {
+            // Number of subcarriers required for a code block
+            // Pad to 64 bytes to avoid cache false sharing
+            size_t num_encoded_scs_pad
+                = roundup<64>(cbCodewLen / mod_order_bits);
+            size_t unmapped_scs_in_symbol = ofdm_data_num;
+            size_t symbol_id = 0;
+            for (size_t i = 0; i < nCb; i++) {
+                size_t unmapped_scs_in_cb = num_encoded_scs_pad;
+                while (unmapped_scs_in_cb > 0) {
+                    lut_cb_to_symbol[i].push_back(symbol_id);
+                    lut_symbol_to_cb[symbol_id].push_back(i);
+                    if (unmapped_scs_in_cb >= unmapped_scs_in_symbol) {
+                        lut_cb_chunks_bytes[i].push_back(bits_to_bytes(
+                            unmapped_scs_in_symbol * mod_order_bits));
+                        lut_cb_chunks_scs[i].push_back(unmapped_scs_in_symbol);
+                        unmapped_scs_in_cb -= unmapped_scs_in_symbol;
+                        symbol_id++;
+                        unmapped_scs_in_symbol = ofdm_data_num;
+                    } else {
+                        lut_cb_chunks_bytes[i].push_back(
+                            bits_to_bytes(unmapped_scs_in_cb * mod_order_bits));
+                        lut_cb_chunks_scs[i].push_back(unmapped_scs_in_cb);
+                        unmapped_scs_in_cb = 0;
+                        unmapped_scs_in_symbol -= unmapped_scs_in_cb;
+                    }
+                }
+            }
+        }
+    }
+
+    // Return the offset of subcarrier for the start of a code block's
+    // current chunk within a symbol
+    size_t get_chunk_start_sc(size_t cb_id, size_t chunk_id) const
+    {
+        size_t symbol_id = lut_cb_to_symbol[cb_id][chunk_id];
+        const auto it = find(lut_symbol_to_cb[symbol_id].begin(),
+            lut_symbol_to_cb[symbol_id].end(), cb_id);
+        rt_assert(it != lut_symbol_to_cb[symbol_id].end(),
+            "Code block does not exist in the symbol");
+        size_t cb_id_in_symbol = it - lut_symbol_to_cb[symbol_id].begin();
+        size_t chunk_start_sc = 0;
+        for (size_t i = 0; i < cb_id_in_symbol; i++)
+            chunk_start_sc
+                += lut_cb_chunks_scs[lut_symbol_to_cb[symbol_id][i]].back();
+        return chunk_start_sc;
+    }
+};
 
 #endif

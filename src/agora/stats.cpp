@@ -563,9 +563,8 @@ void Stats::print_summary()
             / c->dl_data_symbol_num_perframe;
         double ifft_frames = (double)num_ifft_tasks / c->BS_ANT_NUM
             / c->dl_data_symbol_num_perframe;
-        double encode_frames = (double)num_encode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
-            / c->dl_data_symbol_num_perframe;
+        double encode_frames
+            = (double)num_encode_tasks / c->LDPC_config_dl.nCb / c->UE_NUM;
         printf("Downlink totals (tasks, frames): ");
         printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
         printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
@@ -601,9 +600,8 @@ void Stats::print_summary()
             / c->ul_data_symbol_num_perframe;
         double demul_frames = (double)num_demul_tasks / c->OFDM_DATA_NUM
             / c->ul_data_symbol_num_perframe;
-        double decode_frames = (double)num_decode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
-            / c->ul_data_symbol_num_perframe;
+        double decode_frames
+            = (double)num_decode_tasks / c->LDPC_config_dl.nCb * c->UE_NUM;
         printf("Uplink totals (tasks, frames): ");
         printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
         printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
