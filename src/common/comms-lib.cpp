@@ -440,6 +440,8 @@ std::vector<std::complex<float>> CommsLib::composeRefSymbol(
     }
     if (timeDomain) {
         auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
+        for (size_t i = 0; i < pilot_cf32.size(); i++)
+            pilot_cf32[i] /= std::sqrt(period);
         pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
             pilot_cf32.end()); // add CP
         return pilot_cf32;
