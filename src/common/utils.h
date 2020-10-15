@@ -16,6 +16,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #include "Symbols.hpp"
+#include <armadillo>
 #include <atomic>
 #include <chrono>
 #include <complex>
@@ -25,6 +26,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream> // std::ifstream
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <pthread.h>
@@ -88,6 +90,8 @@ public:
     static void printVector(std::vector<std::complex<int16_t>>& data);
     static void writeBinaryFile(
         std::string name, size_t elem_size, size_t buffer_size, void* buff);
+    static void print_vec(arma::cx_fvec, std::string);
+    static void print_mat(arma::cx_fmat);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
