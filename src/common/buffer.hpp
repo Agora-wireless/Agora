@@ -43,12 +43,23 @@ union gen_tag_t {
     static_assert(kMaxAntennas < UINT16_MAX, "");
     static_assert(kMaxDataSCs < UINT16_MAX, "");
 
-    enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
+    enum TagType {
+        kSymbols,
+        kCodeblocks,
+        kUsers,
+        kAntennas,
+        kSubcarriers,
+        kNone
+    };
 
     struct {
         uint32_t frame_id;
-        uint16_t symbol_id : 13;
-        TagType tag_type : 3;
+        TagType tag_type1 : 13;
+        union {
+            uint16_t symbol_id;
+            uint16_t cb_ue_id;
+        } uint16_t symbol_id : 13;
+        TagType tag_type2 : 3;
         union {
             uint16_t cb_id; // code block
             uint16_t ue_id;
@@ -69,7 +80,7 @@ union gen_tag_t {
         std::ostringstream ret;
         ret << "[Frame ID " << std::to_string(frame_id) << ", symbol ID "
             << std::to_string(symbol_id);
-        switch (tag_type) {
+        switch (tag_type2) {
         case kCodeblocks:
             ret << ", code block ID " << std::to_string(cb_id) << "]";
             break;
@@ -91,12 +102,12 @@ union gen_tag_t {
 
     // Generate a tag with code block ID, frame ID, and symbol ID bits set and
     // other fields blank
-    static gen_tag_t frm_sym_cb(size_t frame_id, size_t symbol_id, size_t cb_id)
+    static gen_tag_t frm_sym_cb(size_t frame_id, size_t cb_ue_id, size_t cb_id)
     {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
-        ret.symbol_id = symbol_id;
-        ret.tag_type = TagType::kCodeblocks;
+        ret.cb_ue_id = cb_ue_id;
+        ret.tag_type2 = TagType::kCodeblocks;
         ret.cb_id = cb_id;
         return ret;
     }
@@ -108,7 +119,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type = TagType::kUsers;
+        ret.tag_type2 = TagType::kUsers;
         ret.ue_id = ue_id;
         return ret;
     }
@@ -120,7 +131,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type = TagType::kSubcarriers;
+        ret.tag_type2 = TagType::kSubcarriers;
         ret.sc_id = sc_id;
         return ret;
     }
@@ -133,7 +144,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type = TagType::kAntennas;
+        ret.tag_type2 = TagType::kAntennas;
         ret.ant_id = ant_id;
         return ret;
     }
@@ -145,7 +156,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = kInvalidSymbolId;
-        ret.tag_type = TagType::kSubcarriers;
+        ret.tag_type2 = TagType::kSubcarriers;
         ret.sc_id = sc_id;
         return ret;
     }
@@ -157,7 +168,7 @@ union gen_tag_t {
         gen_tag_t ret(0);
         ret.frame_id = frame_id;
         ret.symbol_id = symbol_id;
-        ret.tag_type = TagType::kNone;
+        ret.tag_type2 = TagType::kNone;
         return ret;
     }
 };

@@ -79,8 +79,8 @@ public:
     std::vector<uint32_t> beacon;
     complex_float* pilots_;
     complex_float* pilots_sgn_;
-    int8_t* dl_bits;
-    int8_t* ul_bits;
+    Table<int8_t> dl_bits;
+    Table<int8_t> ul_bits;
     Table<complex_float> dl_iq_f;
     Table<complex_float> ul_iq_f;
     Table<std::complex<int16_t>> dl_iq_t;

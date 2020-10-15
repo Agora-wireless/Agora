@@ -380,23 +380,23 @@ void Config::genData()
     // Get uplink and downlink raw bits either from file or random numbers
     size_t num_bytes_per_cb_pad = roundup<64>(num_bytes_per_cb);
     size_t num_bytes_per_cb_all_ue = num_bytes_per_cb_pad * UE_ANT_NUM;
-    dl_bits = reinterpret_cast<int8_t*>(memalign(
-        64, LDPC_config_dl.nCb * num_bytes_per_cb_all_ue * sizeof(int8_t)));
+    dl_bits.malloc(UE_ANT_NUM, LDPC_config_ul.nCb * num_bytes_per_cb_pad, 64);
     dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     dl_iq_t.calloc(
         dl_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
-    ul_bits = reinterpret_cast<int8_t*>(memalign(
-        64, LDPC_config_ul.nCb * num_bytes_per_cb_all_ue * sizeof(int8_t)));
+    ul_bits.malloc(UE_ANT_NUM, LDPC_config_ul.nCb * num_bytes_per_cb_pad, 64);
     ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
     ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
 #ifdef GENERATE_DATA
-    for (size_t i = 0; i < LDPC_config_ul.nCb * num_bytes_per_cb_all_ue; i++)
-        ul_bits[i] = static_cast<int8_t>(rand());
-    for (size_t i = 0; i < LDPC_config_dl.nCb * num_bytes_per_cb_all_ue; i++)
-        dl_bits[i] = static_cast<int8_t>(rand());
+    for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++)
+        for (size_t i = 0; i < LDPC_config_ul.nCb * num_bytes_per_cb_pad; i++)
+            ul_bits[ue_id][i] = static_cast<int8_t>(rand());
+    for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++)
+        for (size_t i = 0; i < LDPC_config_dl.nCb * num_bytes_per_cb_pad; i++)
+            dl_bits[ue_id][i] = static_cast<int8_t>(rand());
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
     std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
@@ -409,14 +409,14 @@ void Config::genData()
             strerror(errno));
         exit(-1);
     }
-    for (size_t i = 0; i < LDPC_config_ul.nCb; i++) {
-        if (fseek(fd, num_bytes_per_cb * ue_ant_offset, SEEK_SET) != 0)
-            return;
-        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+    for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
+        for (size_t i = 0; i < LDPC_config_ul.nCb; i++) {
+            if (fseek(fd, num_bytes_per_cb * ue_ant_offset, SEEK_SET) != 0)
+                return;
+
             // Read one code block to padded locations
-            size_t r
-                = fread(ul_bits + (i * UE_ANT_NUM + j) * num_bytes_per_cb_pad,
-                    sizeof(int8_t), num_bytes_per_cb, fd);
+            size_t r = fread(ul_bits[ue_id] + i * num_bytes_per_cb_pad,
+                sizeof(int8_t), num_bytes_per_cb, fd);
             if (r < num_bytes_per_cb)
                 printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);
@@ -428,11 +428,10 @@ void Config::genData()
             != 0)
             return;
     }
-    for (size_t i = 0; i < LDPC_config_dl.nCb; i++) {
-        for (size_t j = 0; j < UE_ANT_NUM; j++) {
-            size_t r
-                = fread(dl_bits + (i * UE_ANT_NUM + j) * num_bytes_per_cb_pad,
-                    sizeof(int8_t), num_bytes_per_cb, fd);
+    for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
+        for (size_t i = 0; i < LDPC_config_dl.nCb; i++) {
+            size_t r = fread(dl_bits[ue_id] + i * num_bytes_per_cb_pad,
+                sizeof(int8_t), num_bytes_per_cb, fd);
             if (r < num_bytes_per_cb)
                 printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);

@@ -4,17 +4,18 @@ using namespace std;
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
+    , csi_buffers_(
+          kFrameWnd, cfg->UE_ANT_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
-    , demod_buffers_(kFrameWnd, cfg->UE_NUM,
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_ANT_NUM)
+    , demod_buffers_(kFrameWnd, cfg->UE_ANT_NUM,
           cfg->ul_data_symbol_num_perframe * kMaxModType * cfg->OFDM_DATA_NUM)
-    , decoded_buffer_(kFrameWnd, cfg->UE_NUM,
+    , decoded_buffer_(kFrameWnd, cfg->UE_ANT_NUM,
           cfg->LDPC_config_ul.nCb * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
+          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM)
     , dl_encoded_buffer_(kFrameWnd, cfg->dl_data_symbol_num_perframe,
-          cfg->UE_NUM, roundup<64>(cfg->OFDM_DATA_NUM))
+          cfg->UE_ANT_NUM, roundup<64>(cfg->OFDM_DATA_NUM))
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
@@ -97,7 +98,7 @@ void Agora::send_snr_report(
 {
     assert(event_type == EventType::kSNRReport);
     auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
-    for (size_t i = 0; i < config_->UE_NUM; i++) {
+    for (size_t i = 0; i < config_->UE_ANT_NUM; i++) {
         Event_data snr_report(EventType::kSNRReport, base_tag._tag);
         snr_report.num_tags = 2;
         float snr = phy_stats->get_evm_snr(frame_id, i);
@@ -167,31 +168,35 @@ void Agora::schedule_subcarriers(
 void Agora::schedule_codeblocks(
     EventType event_type, size_t frame_id, size_t symbol_idx)
 {
-    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx, 0);
+    LDPCconfig LDPC_config = (event_type == EventType::kEncode)
+        ? config_->LDPC_config_dl
+        : config_->LDPC_config_ul;
 
-    // for (size_t i = 0;
-    //      i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
-    //     try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
-    //         Event_data(event_type, base_tag._tag));
-    //     base_tag.cb_id++;
-    // }
-    size_t num_tasks = config_->UE_NUM * config_->LDPC_config.nblocksInSymbol;
-    size_t num_blocks = num_tasks / config_->encode_block_size;
-    size_t num_remainder = num_tasks % config_->encode_block_size;
-    if (num_remainder > 0)
-        num_blocks++;
     Event_data event;
-    event.num_tags = config_->encode_block_size;
     event.event_type = event_type;
-    for (size_t i = 0; i < num_blocks; i++) {
-        if ((i == num_blocks - 1) && num_remainder > 0)
-            event.num_tags = num_remainder;
-        for (size_t j = 0; j < event.num_tags; j++) {
-            event.tags[j] = base_tag._tag;
-            base_tag.cb_id++;
+    event.num_tags = 0;
+    size_t cb_id_in_next_symbol
+        = LDPC_config.lut_symbol_to_cb[symbol_idx + 1][0];
+    // For each user, schedule all the codeblocks whose data
+    // dependency is satisfied by this symbol
+    for (size_t ue_id = 0; ue_id < config_->UE_ANT_NUM; ue_id++) {
+        for (size_t i = 0; i < LDPC_config.lut_symbol_to_cb[symbol_idx].size();
+             i++) {
+            size_t cur_cb_id = LDPC_config.lut_symbol_to_cb[symbol_idx_ul][i];
+            if (cur_cb_id < cb_id_in_next_symbol) {
+                event.tags[event.num_tags]
+                    = gen_tag_t::frm_sym_cb(frame_id, ue_id, cur_cb_id)._tag;
+                event.num_tags++;
+                if (event.num_tags == config_->encode_block_size) {
+                    try_enqueue_fallback(
+                        get_conq(event_type), get_ptok(event_type), event);
+                    event.num_tags = 0;
+                }
+            }
         }
-        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type), event);
     }
+    if (event.num_tags > 0)
+        try_enqueue_fallback(get_conq(event_type), get_ptok(event_type), event);
 }
 
 void Agora::schedule_users(
@@ -345,12 +350,13 @@ void Agora::start()
 
                 print_per_task_done(
                     PrintType::kDemul, frame_id, symbol_idx_ul, base_sc_id);
-                /* If this symbol is ready */
+                // If this symbol is ready
                 if (demul_stats_.last_task(frame_id, symbol_idx_ul)) {
                     if (demul_stats_.get_symbol_count(frame_id)
-                        < demul_stats_.max_symbol_count - 1)
+                        < demul_stats_.max_symbol_count - 1) {
                         schedule_codeblocks(
                             EventType::kDecode, frame_id, symbol_idx_ul);
+                    }
                     print_per_symbol_done(
                         PrintType::kDemul, frame_id, symbol_idx_ul);
                     if (demul_stats_.last_symbol(frame_id)) {
@@ -549,7 +555,7 @@ void Agora::start()
                         printf("TX %d samples (per-client) to %zu clients "
                                "in %f secs, throughtput %f bps per-client "
                                "(16QAM), current tx queue length %zu\n",
-                            samples_num_per_UE, cfg->UE_NUM, diff,
+                            samples_num_per_UE, cfg->UE_ANT_NUM, diff,
                             samples_num_per_UE * log2(16.0f) / diff,
                             get_conq(EventType::kPacketTX)->size_approx());
                         tx_begin = get_time_us();
@@ -827,8 +833,7 @@ void Agora::update_rx_counters(size_t frame_id, size_t symbol_id)
     if (rx_counters_.num_pkts[frame_slot] == 0) {
         // schedule this frame's encoding
         for (size_t i = 0; i < config_->dl_data_symbol_num_perframe; i++)
-            schedule_codeblocks(
-                EventType::kEncode, frame_id, config_->DLSymbols[0][i]);
+            schedule_codeblocks(EventType::kEncode, frame_id, i);
         stats->master_set_tsc(TsType::kPilotRX, frame_id);
         if (kDebugPrintPerFrameStart) {
             const size_t prev_frame_slot
@@ -1103,9 +1108,9 @@ void Agora::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     equal_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_ANT_NUM, 64);
     ue_spec_pilot_buffer_.calloc(
-        kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
+        kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_ANT_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
@@ -1127,7 +1132,7 @@ void Agora::initialize_uplink_buffers()
     demul_stats_.init(config_->demul_events_per_symbol,
         cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 
-    decode_stats_.init(config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
+    decode_stats_.init(config_->LDPC_config_ul.nCb * cfg->UE_ANT_NUM,
         cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 
     tomac_stats_.init(cfg->UE_NUM, cfg->ul_data_symbol_num_perframe,
