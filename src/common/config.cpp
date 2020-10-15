@@ -471,7 +471,7 @@ void Config::genData()
                 auto* ul_mod_ptr
                     = ul_mod_input[LDPC_config_ul.lut_cb_to_symbol[i][k]]
                     + j * OFDM_DATA_NUM
-                    + LDPC_config_ul.get_chunk_start_in_symbol(i, k);
+                    + LDPC_config_ul.get_chunk_start_sc(i, k);
                 adapt_bits_for_mod(ul_encoded_ptr, ul_mod_ptr,
                     LDPC_config_ul.lut_cb_chunks_bytes[i][k], mod_order_bits);
                 ul_encoded_ptr += LDPC_config_ul.lut_cb_chunks_bytes[i];
@@ -503,10 +503,10 @@ void Config::genData()
                 auto* dl_mod_ptr
                     = dl_mod_input[LDPC_config_dl.lut_cb_to_symbol[i][k]]
                     + j * OFDM_DATA_NUM
-                    + LDPC_config_dl.get_chunk_start_in_symbol(i, k);
+                    + LDPC_config_dl.get_chunk_start_sc(i, k);
                 adapt_bits_for_mod(dl_encoded_ptr, dl_mod_ptr,
                     LDPC_config_dl.lut_cb_chunks_bytes[i][k], mod_order_bits);
-                dl_encoded_ptr += LDPC_config_dl.lut_cb_chunks_bytes[i];
+                dl_encoded_ptr += LDPC_config_dl.lut_cb_chunks_bytes[i][k];
             }
         }
     }

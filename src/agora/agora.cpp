@@ -7,12 +7,14 @@ Agora::Agora(Config* cfg)
     , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(
           kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
-    , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
-          kMaxModType * cfg->OFDM_DATA_NUM)
-    , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
-          cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
+    , demod_buffers_(kFrameWnd, cfg->UE_NUM,
+          cfg->ul_data_symbol_num_perframe * kMaxModType * cfg->OFDM_DATA_NUM)
+    , decoded_buffer_(kFrameWnd, cfg->UE_NUM,
+          cfg->LDPC_config_ul.nCb * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(
           kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
+    , dl_encoded_buffer_(kFrameWnd, cfg->dl_data_symbol_num_perframe,
+          cfg->UE_NUM, roundup<64>(cfg->OFDM_DATA_NUM))
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
@@ -1093,10 +1095,9 @@ void Agora::initialize_uplink_buffers()
         = cfg->BS_ANT_NUM * kFrameWnd * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
-    socket_buffer_.malloc(
-        cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
+    socket_buffer_.malloc(cfg->socket_thread_num, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(
-        cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
+        cfg->socket_thread_num, socket_buffer_status_size_, 64);
 
     data_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
@@ -1156,8 +1157,6 @@ void Agora::initialize_downlink_buffers()
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
     calib_buffer_.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    dl_encoded_buffer_.calloc(task_buffer_symbol_num,
-        roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
@@ -1192,7 +1191,6 @@ void Agora::free_downlink_buffers()
 
     dl_ifft_buffer_.free();
     calib_buffer_.free();
-    dl_encoded_buffer_.free();
 
     encode_stats_.fini();
     precode_stats_.fini();

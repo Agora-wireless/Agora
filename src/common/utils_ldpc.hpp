@@ -30,6 +30,8 @@ public:
     std::vector<std::vector<size_t>> lut_symbol_to_cb;
     /// Lookup table for number of bytes within chunks of code blocks
     std::vector<std::vector<size_t>> lut_cb_chunks_bytes;
+    /// Lookup table for number of subcarriers occupied by chunks of code blocks
+    std::vector<std::vector<size_t>> lut_cb_chunks_scs;
 
     // Return the number of bytes in the information bit sequence for LDPC
     // encoding of one code block
@@ -61,6 +63,7 @@ public:
         lut_symbol_to_cb.resize(symbol_num_perframe);
         lut_cb_to_symbol.resize(nCb);
         lut_cb_chunks_bytes.resize(symbol_num_perframe);
+        lut_cb_chunks_scs.resize(symbol_num_perframe);
         size_t num_encoded_bytes_per_symbol
             = bits_to_bytes(ofdm_data_num * mod_order_bits);
         if (symbol_num_perframe % nCb == 0) {
@@ -69,12 +72,16 @@ public:
                 for (size_t j = 0; j < symbol_per_cb; j++) {
                     lut_cb_to_symbol[i].push_back(i * symbol_per_cb + j);
                     // Use all subcarriers in symbols except the last symbol
-                    if (j == symbol_per_cb - 1)
-                        lut_cb_chunks_bytes[i].push_back(num_encoded_bytes
+                    if (j == symbol_per_cb - 1) {
+                        lut_cb_chunks_bytes[i].push_back(num_encoded_bytes()
                             - j * num_encoded_bytes_per_symbol);
-                    else
+                        lut_cb_chunks_scs[i].push_back(
+                            cbCodewLen / mod_order_bits - j * ofdm_data_num);
+                    } else {
                         lut_cb_chunks_bytes[i].push_back(
                             num_encoded_bytes_per_symbol);
+                        lut_cb_chunks_scs[i].push_back(ofdm_data_num);
+                    }
                 }
             }
             for (size_t i = 0; i < symbol_num_perframe; i++) {
@@ -96,12 +103,14 @@ public:
                     if (unmapped_scs_in_cb >= unmapped_scs_in_symbol) {
                         lut_cb_chunks_bytes[i].push_back(bits_to_bytes(
                             unmapped_scs_in_symbol * mod_order_bits));
+                        lut_cb_chunks_scs[i].push_back(unmapped_scs_in_symbol);
                         unmapped_scs_in_cb -= unmapped_scs_in_symbol;
                         symbol_id++;
                         unmapped_scs_in_symbol = ofdm_data_num;
                     } else {
                         lut_cb_chunks_bytes[i].push_back(
                             bits_to_bytes(unmapped_scs_in_cb * mod_order_bits));
+                        lut_cb_chunks_scs[i].push_back(unmapped_scs_in_cb);
                         unmapped_scs_in_cb = 0;
                         unmapped_scs_in_symbol -= unmapped_scs_in_cb;
                     }
@@ -110,23 +119,23 @@ public:
         }
     }
 
-    // Return the offset for the start of a code block's current chunk
-    // within a symbol
-    size_t get_chunk_offset_in_symbol(size_t cb_id, size_t chunk_id) const
+    // Return the offset of subcarrier for the start of a code block's
+    // current chunk within a symbol
+    size_t get_chunk_start_sc(size_t cb_id, size_t chunk_id) const
     {
         size_t symbol_id = lut_cb_to_symbol[cb_id][chunk_id];
-        const auto it = find(
-            lut_symbol_to_cb[fid].begin(), lut_symbol_to_cb[fid].end(), cb_id);
-        rt_assert(it != lut_symbol_to_cb[fid].end(),
+        const auto it = find(lut_symbol_to_cb[symbol_id].begin(),
+            lut_symbol_to_cb[symbol_id].end(), cb_id);
+        rt_assert(it != lut_symbol_to_cb[symbol_id].end(),
             "Code block does not exist in the symbol");
         size_t cb_id_in_symbol = it - lut_symbol_to_cb[symbol_id].begin();
-        size_t chunk_offset_in_symbol = 0;
+        size_t chunk_start_sc = 0;
 
         for (size_t i = 0; i < cb_id_in_symbol; i++)
             cb_offset_in_symbol
-                += lut_cb_chunks_bytes[lut_symbol_to_cb[symbol_id][i]].back();
+                += lut_cb_chunks_scs[lut_symbol_to_cb[symbol_id][i]].back();
 
-        return chunk_offset_in_symbol;
+        return chunk_start_sc;
     }
 };
 

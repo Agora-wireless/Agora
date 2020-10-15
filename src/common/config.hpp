@@ -415,23 +415,12 @@ public:
         return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
     }
 
-    /// Get the decode buffer for this frame, symbol, user and code block ID
-    inline uint8_t* get_decode_buf(Table<uint8_t>& decoded_buffer,
-        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
-    {
-        size_t total_data_symbol_id
-            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
-        return &decoded_buffer[total_data_symbol_id][roundup<64>(
-                                                         num_bytes_per_cb)
-            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
-    }
-
-    /// Get ul_bits for this symbol, user and code block ID
-    inline int8_t* get_info_bits(Table<int8_t>& info_bits, size_t symbol_id,
+    /// Get dl_bits for this symbol, user and code block ID
+    inline int8_t* get_info_bits(Table<int8_t>& dl_info_bits, size_t symbol_id,
         size_t ue_id, size_t cb_id) const
     {
-        return &info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
-            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+        return &dl_info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
+            * (LDPC_config_dl.nCb * ue_id + cb_id)];
     }
 
     /// Get encoded_buffer for this frame, symbol, user and code block ID

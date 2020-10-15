@@ -9,14 +9,14 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
-    Table<complex_float>& in_dl_ifft_buffer,
-    Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
+    Table<complex_float>& dl_ifft_buffer,
+    PtrGrid<kFrameWnd, kMaxUEs, int8_t>& dl_encoded_buffer,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
           worker_producer_token)
     , dl_zf_matrices_(dl_zf_matrices)
-    , dl_ifft_buffer_(in_dl_ifft_buffer)
-    , dl_raw_data(dl_encoded_or_raw_data)
+    , dl_ifft_buffer_(dl_ifft_buffer)
+    , dl_encoded_buffer_(dl_encoded_buffer)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
@@ -152,17 +152,16 @@ Event_data DoPrecode::launch(size_t tag)
     return Event_data(EventType::kPrecode, tag);
 }
 
-void DoPrecode::load_input_data(size_t symbol_idx_dl,
-    size_t total_data_symbol_idx, size_t user_id, size_t sc_id,
-    size_t sc_id_in_block, size_t is_pilot_sc)
+void DoPrecode::load_input_data(size_t symbol_idx_dl, size_t frame_id,
+    size_t user_id, size_t sc_id, size_t sc_id_in_block, size_t is_pilot_sc)
 {
     complex_float* data_ptr
         = modulated_buffer_temp + sc_id_in_block * cfg->UE_NUM;
     if (is_pilot_sc == 1) {
         data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
     } else {
-        int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
-            + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
+        int8_t* raw_data_ptr
+            = dl_encoded_buffer_[frame_id][symbol_idx_dl][user_id] + sc_id;
         data_ptr[user_id]
             = mod_single_uint8((uint8_t)(*raw_data_ptr), cfg->mod_table);
     }

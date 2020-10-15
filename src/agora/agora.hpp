@@ -194,10 +194,11 @@ private:
 
     // Data after demodulation. Each buffer has kMaxModType * number of OFDM
     // data subcarriers
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
+    PtrGrid<kFrameWnd, kMaxUEs, int8_t> demod_buffers_;
 
-    // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
+    // Data after LDPC decoding. Each buffer has number of code blocks per UE
+    // * number of btyes of info bits per block.
+    PtrGrid<kFrameWnd, kMaxUEs, uint8_t> decoded_buffer_;
 
     Table<complex_float> ue_spec_pilot_buffer_;
 
@@ -232,9 +233,9 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
     Table<complex_float> calib_buffer_;
 
-    // 1st dimension: kFrameWnd * number of data symbols per frame
-    // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<int8_t> dl_encoded_buffer_;
+    // Data after LDPC encoding and bit adaption for modulation input.
+    // Each buffer has number of subcarriers btyes (rounded up to 64 btyes)
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dl_encoded_buffer_;
 
     // 1st dimension: kFrameWnd * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
