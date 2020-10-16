@@ -11,6 +11,7 @@ static constexpr bool kDebugDPDK = false;
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
+    , ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells)
     , socket_thread_num(cfg->socket_thread_num)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
