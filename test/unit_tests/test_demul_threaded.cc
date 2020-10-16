@@ -60,8 +60,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
-    PhyStats* phy_stats, Stats* stats)
+    PtrGrid<kFrameWnd, kMaxUEs, int8_t>& demod_buffers_, PhyStats* phy_stats,
+    Stats* stats)
 {
     pin_to_core_with_offset(
         ThreadType::kWorker, cfg->core_offset + 1, worker_id);
@@ -131,9 +131,8 @@ TEST(TestDemul, VaryingConfig)
     equal_buffer.calloc(cfg->ul_data_symbol_num_perframe * kFrameWnd,
         kMaxDataSCs * kMaxUEs, 64);
     ue_spec_pilot_buffer.calloc(kFrameWnd, cfg->UL_PILOT_SYMS * kMaxUEs, 64);
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
-        cfg->symbol_num_perframe, cfg->UE_NUM,
-        kMaxModType * cfg->OFDM_DATA_NUM);
+    PtrGrid<kFrameWnd, kMaxUEs, int8_t> demod_buffers(kFrameWnd, cfg->UE_NUM,
+        cfg->ul_data_symbol_num_perframe * kMaxModType * cfg->OFDM_DATA_NUM);
     printf(
         "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "

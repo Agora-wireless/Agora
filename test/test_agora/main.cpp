@@ -1,10 +1,7 @@
 #include "agora.hpp"
 
-void read_from_file_ul(std::string filename, Table<uint8_t>& data,
-    int num_bytes_per_ue, Config* cfg)
+void read_from_file_ul(std::string filename, Table<uint8_t>& data, Config* cfg)
 {
-    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
-    size_t UE_NUM = cfg->UE_NUM;
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         printf("open file failed: %s\n", filename.c_str());
@@ -12,19 +9,13 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     } else {
         printf("opening file %s\n", filename.c_str());
     }
-    int expect_num_bytes = num_bytes_per_ue * UE_NUM;
+    size_t expect_num_bytes = cfg->num_bytes_per_cb * cfg->LDPC_config_ul.nCb;
     // printf("read data of %d byptes\n", expect_num_bytes);
-    for (int i = 0; i < data_symbol_num_perframe; i++) {
-        int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
-        // if (i == 0) {
-        // printf("i: %d\n", i);
-        // for (int j = 0; j < num_bytes; j++) {
-        //     printf("%u ", data[i][j]);
-        // }
-        // printf("\n");
-        // }
+    for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
+        size_t num_bytes
+            = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
         if (expect_num_bytes != num_bytes) {
-            printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
+            printf("read file failed: %s, ue %zu, expect: %zu, actual: %zu "
                    "bytes\n",
                 filename.c_str(), i, expect_num_bytes, num_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -53,47 +44,36 @@ void read_from_file_dl(
 
 void check_correctness_ul(Config* cfg)
 {
-    int UE_NUM = cfg->UE_NUM;
-    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
-    int OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
-    int UL_PILOT_SYMS = cfg->UL_PILOT_SYMS;
-
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_"
         + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
-        + std::to_string(cfg->UE_NUM) + ".bin";
+        + std::to_string(cfg->UE_ANT_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
-    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
-    output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
+    size_t num_bytes_per_ue = cfg->num_bytes_per_cb * cfg->LDPC_config_ul.nCb;
+    raw_data.calloc(cfg->UE_ANT_NUM, num_bytes_per_ue, 64);
+    output_data.calloc(cfg->UE_ANT_NUM, num_bytes_per_ue, 64);
 
-    int num_bytes_per_ue
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
-    read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
-    read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
+    read_from_file_ul(raw_data_filename, raw_data, cfg);
+    read_from_file_ul(output_data_filename, output_data, cfg);
 
     int error_cnt = 0;
     int total_count = 0;
-    for (int i = 0; i < data_symbol_num_perframe; i++) {
-        if (i < UL_PILOT_SYMS)
-            continue;
-        for (int ue = 0; ue < UE_NUM; ue++) {
-            for (int j = 0; j < num_bytes_per_ue; j++) {
-                total_count++;
-                int offset_in_raw = num_bytes_per_ue * ue + j;
-                int offset_in_output = num_bytes_per_ue * ue + j;
-                if (raw_data[i][offset_in_raw]
-                    != output_data[i][offset_in_output]) {
-                    error_cnt++;
-                    // printf("(%d, %d, %u, %u)\n", i, j,
-                    //     raw_data[i][offset_in_raw],
-                    //     output_data[i][offset_in_output]);
-                }
+
+    for (size_t ue_id = 0; ue_id < cfg->UE_ANT_NUM; ue_id++) {
+        for (size_t i = 0; i < num_bytes_per_ue; i++) {
+            total_count++;
+            if (raw_data[ue_id][i] != output_data[ue_id][i]) {
+                error_cnt++;
+                // printf("(%d, %d, %u, %u)\n", i, j,
+                //     raw_data[i][offset_in_raw],
+                //     output_data[i][offset_in_output]);
             }
         }
     }
+
     printf("======================\n");
     printf("Uplink test: \n\n");
     if (error_cnt == 0)
