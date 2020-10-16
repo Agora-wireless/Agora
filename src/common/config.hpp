@@ -347,7 +347,7 @@ public:
         update_mod_cfgs(McsToModOrderBits[mcs]);
         float target_code_rate = McsToCodeRate[mcs];
         update_ldpc_cfgs(LDPC_config_ul, tb_size_ul,
-            ul_data_symbol_num_perframe, target_code_rate);
+            ul_data_symbol_num_perframe - UL_PILOT_SYMS, target_code_rate);
         update_ldpc_cfgs(LDPC_config_dl, tb_size_dl,
             dl_data_symbol_num_perframe, target_code_rate);
         num_bytes_per_cb

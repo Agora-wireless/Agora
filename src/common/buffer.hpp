@@ -231,18 +231,18 @@ struct MacPacket {
     static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
 
     uint16_t frame_id;
-    uint16_t symbol_id;
     uint16_t ue_id;
+    uint16_t cb_id;
     uint16_t datalen; // length of payload in bytes or array data[]
     uint16_t crc; // 16 bits CRC over calculated for the data[] array
     uint16_t rsvd[3]; // reserved for future use
     RBIndicator rb_indicator; // RAN scheduling details for PHY
     char data[]; // Mac packet payload data
-    MacPacket(int f, int s, int u, int d,
+    MacPacket(int f, int u, int c, int d,
         int cc) // TODO: Should be unsigned integers
         : frame_id(f)
-        , symbol_id(s)
         , ue_id(u)
+        , cb_id(c)
         , datalen(d)
         , crc(cc)
     {
@@ -251,8 +251,8 @@ struct MacPacket {
     std::string to_string() const
     {
         std::ostringstream ret;
-        ret << "[Frame seq num " << frame_id << ", symbol ID " << symbol_id
-            << ", user ID " << ue_id << "]";
+        ret << "[Frame seq num " << frame_id << ", user ID " << ue_id
+            << ", code block ID " << cb_id << "]";
         return ret.str();
     }
 };

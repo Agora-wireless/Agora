@@ -199,16 +199,15 @@ void Agora::schedule_codeblocks(
         try_enqueue_fallback(get_conq(event_type), get_ptok(event_type), event);
 }
 
-void Agora::schedule_users(
-    EventType event_type, size_t frame_id, size_t symbol_id)
+void Agora::schedule_users(EventType event_type, size_t frame_id, size_t cb_id)
 {
     assert(event_type == EventType::kPacketToMac);
-    auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
+    auto base_tag = gen_tag_t::frm_sym_cb(frame_id, 0, cb_id);
 
     for (size_t i = 0; i < config_->UE_NUM; i++) {
         try_enqueue_fallback(&mac_request_queue_,
             Event_data(EventType::kPacketToMac, base_tag._tag));
-        base_tag.ue_id++;
+        base_tag.cb_ue_id++;
     }
 }
 
@@ -396,21 +395,18 @@ void Agora::start()
 
             case EventType::kDecode: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
+                size_t cb_id = gen_tag_t(event.tags[0]).cb_id;
 
-                if (decode_stats_.last_task(frame_id, symbol_idx_ul)) {
+                if (decode_stats_.last_task(frame_id, cb_id)) {
                     if (kEnableMac) {
                         schedule_users(
-                            EventType::kPacketToMac, frame_id, symbol_idx_ul);
+                            EventType::kPacketToMac, frame_id, cb_id);
                     }
-                    print_per_symbol_done(
-                        PrintType::kDecode, frame_id, symbol_idx_ul);
+                    print_per_symbol_done(PrintType::kDecode, frame_id, cb_id);
                     if (decode_stats_.last_symbol(frame_id)) {
                         stats->master_set_tsc(TsType::kDecodeDone, frame_id);
                         print_per_frame_done(PrintType::kDecode, frame_id);
                         if (!kEnableMac) {
-                            // assert(cur_frame_id == frame_id);
-                            // cur_frame_id++;
                             stats->update_stats_in_functions_uplink(frame_id);
                             if (stats->last_frame_id == cfg->frames_to_test - 1)
                                 goto finish;
@@ -429,10 +425,10 @@ void Agora::start()
 
             case EventType::kPacketToMac: {
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-                if (tomac_stats_.last_task(frame_id, symbol_idx_ul)) {
+                size_t cb_id = gen_tag_t(event.tags[0]).cb_id;
+                if (tomac_stats_.last_task(frame_id, cb_id)) {
                     print_per_symbol_done(
-                        PrintType::kPacketToMac, frame_id, symbol_idx_ul);
+                        PrintType::kPacketToMac, frame_id, cb_id);
                     if (tomac_stats_.last_symbol(frame_id)) {
                         assert(cur_frame_id == frame_id);
                         cur_frame_id++;
@@ -449,19 +445,32 @@ void Agora::start()
             case EventType::kEncode: {
                 for (size_t i = 0; i < event.num_tags; i++) {
                     size_t frame_id = gen_tag_t(event.tags[i]).frame_id;
-                    size_t symbol_id = gen_tag_t(event.tags[i]).symbol_id;
-                    size_t symbol_idx_dl
-                        = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-                    if (encode_stats_.last_task(frame_id, symbol_idx_dl)) {
-                        encode_stats_.cur_frame_for_symbol[symbol_idx_dl]
-                            = frame_id;
-                        /* If precoder exist, schedule precoding */
-                        if (zf_stats_.coded_frame == frame_id) {
-                            schedule_subcarriers(
-                                EventType::kPrecode, frame_id, symbol_id);
+                    size_t cb_id = gen_tag_t(event.tags[i]).cb_id;
+                    if (encode_stats_.last_task(frame_id, cb_id)) {
+                        for (size_t j = 0;
+                             j < cfg->LDPC_config_dl.lut_cb_to_symbol[cb_id]
+                                     .size();
+                             j++) {
+                            size_t cur_symbol_id
+                                = cfg->LDPC_config_dl
+                                      .lut_cb_to_symbol[cb_id][j];
+                            if (cb_id == (cfg->LDPC_config_dl.nCb - 1)
+                                or cur_symbol_id
+                                    != cfg->LDPC_config_dl
+                                           .lut_cb_to_symbol[cb_id + 1][0]) {
+                                encode_stats_
+                                    .cur_frame_for_symbol[cur_symbol_id]
+                                    = frame_id;
+                                /* If precoder exist, schedule precoding */
+                                if (zf_stats_.coded_frame == frame_id)
+                                    schedule_subcarriers(EventType::kPrecode,
+                                        frame_id,
+                                        cfg->DLSymbols[0][cur_symbol_id]);
+                            }
                         }
+
                         print_per_symbol_done(
-                            PrintType::kEncode, frame_id, symbol_idx_dl);
+                            PrintType::kEncode, frame_id, cb_id);
                         if (encode_stats_.last_symbol(frame_id)) {
                             stats->master_set_tsc(
                                 TsType::kEncodeDone, frame_id);
@@ -1132,11 +1141,11 @@ void Agora::initialize_uplink_buffers()
     demul_stats_.init(config_->demul_events_per_symbol,
         cfg->ul_data_symbol_num_perframe, cfg->data_symbol_num_perframe);
 
-    decode_stats_.init(cfg->UE_ANT_NUM, config_->LDPC_config_ul.nCb,
-        cfg->data_symbol_num_perframe);
+    decode_stats_.init(
+        cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb, cfg->LDPC_config_ul.nCb);
 
-    tomac_stats_.init(cfg->UE_NUM, cfg->ul_data_symbol_num_perframe,
-        cfg->data_symbol_num_perframe);
+    tomac_stats_.init(
+        cfg->UE_ANT_NUM, cfg->LDPC_config_ul.nCb, cfg->LDPC_config_ul.nCb);
 }
 
 void Agora::initialize_downlink_buffers()
@@ -1153,10 +1162,10 @@ void Agora::initialize_downlink_buffers()
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size, 64, 1);
 
-    dl_bits_buffer_.calloc(
-        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
-    size_t dl_bits_buffer_status_size = kFrameWnd * cfg->LDPC_config_dl.nCb;
-    dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
+    dl_bits_buffer_.calloc(kFrameWnd * cfg->UE_ANT_NUM,
+        cfg->LDPC_config_dl.nCb * roundup<64>(cfg->num_bytes_per_cb), 64);
+    dl_bits_buffer_status_.calloc(
+        kFrameWnd * cfg->UE_ANT_NUM, cfg->LDPC_config_dl.nCb, 64);
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
@@ -1165,7 +1174,7 @@ void Agora::initialize_downlink_buffers()
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,
         cfg->data_symbol_num_perframe);
     encode_stats_.init(
-        cfg->UE_NUM, cfg->LDPC_config_dl.nCb, cfg->data_symbol_num_perframe);
+        cfg->UE_ANT_NUM, cfg->LDPC_config_dl.nCb, cfg->LDPC_config_dl.nCb);
     encode_stats_.cur_frame_for_symbol
         = std::vector<size_t>(cfg->dl_data_symbol_num_perframe, SIZE_MAX);
     precode_stats_.init(config_->demul_events_per_symbol,

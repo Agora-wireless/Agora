@@ -9,11 +9,15 @@ static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 
-Phy_UE::Phy_UE(Config* config)
+Phy_UE::Phy_UE(Config* cfg)
+    : decoded_bits_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_dl.nCb)
+    , bit_error_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_dl.nCb)
+    , decoded_blocks_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_dl.nCb)
+    , block_error_count_(kFrameWnd, cfg->UE_ANT_NUM, cfg->LDPC_config_dl.nCb)
 {
     srand(time(NULL));
 
-    this->config_ = config;
+    this->config_ = cfg;
     initialize_vars_from_cfg();
 
     std::vector<size_t> data_sc_ind_;
@@ -27,8 +31,9 @@ Phy_UE::Phy_UE(Config* config)
 
     ue_pilot_vec.resize(config_->UE_ANT_NUM);
     for (size_t i = 0; i < config_->UE_ANT_NUM; i++) {
-        for (size_t j = config->ofdm_tx_zero_prefix_;
-             j < config_->sampsPerSymbol - config->ofdm_tx_zero_postfix_; j++) {
+        for (size_t j = config_->ofdm_tx_zero_prefix_;
+             j < config_->sampsPerSymbol - config_->ofdm_tx_zero_postfix_;
+             j++) {
             ue_pilot_vec[i].push_back(std::complex<float>(
                 config_->ue_specific_pilot_t[i][j].real() / 32768.0,
                 config_->ue_specific_pilot_t[i][j].imag() / 32768.0));
@@ -74,7 +79,7 @@ Phy_UE::Phy_UE(Config* config)
     if (kEnableMac) {
         // TODO [ankalia]: dummy_decoded_buffer is used at the base station
         // server only, but MacThread for now requires it for the UE client too
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dummy_decoded_buffer;
+        PtrGrid<kFrameWnd, kMaxUEs, uint8_t> dummy_decoded_buffer;
 
         const size_t mac_cpu_core = config_->core_offset + 1 + rx_thread_num;
         mac_thread_ = new MacThread(MacThread::Mode::kClient, config_,
@@ -518,18 +523,18 @@ void Phy_UE::start()
         }
     }
     if (kPrintPhyStats) {
-        const size_t task_buffer_symbol_num_dl
-            = dl_data_symbol_perframe * kFrameWnd;
         for (size_t ue_id = 0; ue_id < config_->UE_ANT_NUM; ue_id++) {
             size_t total_decoded_bits(0);
             size_t total_bit_errors(0);
             size_t total_decoded_blocks(0);
             size_t total_block_errors(0);
-            for (size_t i = 0; i < task_buffer_symbol_num_dl; i++) {
-                total_decoded_bits += decoded_bits_count_[ue_id][i];
-                total_bit_errors += bit_error_count_[ue_id][i];
-                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-                total_block_errors += block_error_count_[ue_id][i];
+            for (size_t i = 0; i < kFrameWnd; i++) {
+                for (size_t j = 0; j < config_->LDPC_config_dl.nCb; j++) {
+                    total_decoded_bits += decoded_bits_count_[i][ue_id][j];
+                    total_bit_errors += bit_error_count_[i][ue_id][j];
+                    total_decoded_blocks += decoded_blocks_count_[i][ue_id][j];
+                    total_block_errors += block_error_count_[i][ue_id][j];
+                }
             }
             std::cout << "UE " << ue_id << ": bit errors (BER) "
                       << total_bit_errors << "/" << total_decoded_bits << "("
@@ -818,22 +823,19 @@ void Phy_UE::doDemul(int tid, size_t tag)
 
 void Phy_UE::doDecode(int tid, size_t tag)
 {
-    LDPCconfig LDPC_config = config_->LDPC_config;
+    LDPCconfig LDPC_config = config_->LDPC_config_dl;
     size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t symbol_id = gen_tag_t(tag).symbol_id;
+    size_t cb_id = gen_tag_t(tag).cb_id;
     size_t ant_id = gen_tag_t(tag).ant_id;
     if (kDebugPrintInTask) {
-        printf("In doDecode TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
-            frame_id, symbol_id, ant_id);
+        printf("In doDecode TID %d: frame %zu, code block %zu, ant_id %zu\n",
+            tid, frame_id, cb_id, ant_id);
     }
     size_t start_tsc = rdtsc();
 
     const size_t frame_slot = frame_id % kFrameWnd;
-    size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
-        + dl_symbol_id - dl_pilot_symbol_perframe;
     size_t symbol_ant_offset
-        = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
+        = (frame_slot * LDPC_config.nCb + cb_id) * config_->UE_ANT_NUM + ant_id;
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
@@ -857,60 +859,58 @@ void Phy_UE::doDecode(int tid, size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
-         cb_id++) {
-        size_t demod_buffer_offset
-            = cb_id * LDPC_config.cbCodewLen * config_->mod_order_bits;
-        size_t decode_buffer_offset
-            = cb_id * roundup<64>(config_->num_bytes_per_cb);
-        auto* llr_buffer_ptr
-            = &dl_demod_buffer_[symbol_ant_offset][demod_buffer_offset];
-        auto* decoded_buffer_ptr
-            = &dl_decode_buffer_[symbol_ant_offset][decode_buffer_offset];
-        ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
-        ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
-        bblib_ldpc_decoder_5gnr(
-            &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+    size_t demod_buffer_offset
+        = cb_id * LDPC_config.cbCodewLen * config_->mod_order_bits;
+    size_t decode_buffer_offset
+        = cb_id * roundup<64>(config_->num_bytes_per_cb);
+    auto* llr_buffer_ptr
+        = &dl_demod_buffer_[symbol_ant_offset][demod_buffer_offset];
+    auto* decoded_buffer_ptr
+        = &dl_decode_buffer_[symbol_ant_offset][decode_buffer_offset];
+    ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
+    bblib_ldpc_decoder_5gnr(
+        &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
-        if (kPrintPhyStats) {
-            decoded_bits_count_[ant_id][total_dl_symbol_id]
-                += 8 * config_->num_bytes_per_cb;
-            decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
-            size_t block_error(0);
-            for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
-                uint8_t rx_byte = decoded_buffer_ptr[i];
-                uint8_t tx_byte = (uint8_t)config_->get_info_bits(
-                    config_->dl_bits, dl_symbol_id, ant_id, cb_id)[i];
-                uint8_t xor_byte(tx_byte ^ rx_byte);
-                size_t bit_errors = 0;
-                for (size_t j = 0; j < 8; j++) {
-                    bit_errors += xor_byte & 1;
-                    xor_byte >>= 1;
-                }
-                if (rx_byte != tx_byte)
-                    block_error++;
-                bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
+    if (kPrintPhyStats) {
+        decoded_bits_count_[frame_id][ant_id][cb_id]
+            += 8 * config_->num_bytes_per_cb;
+        decoded_blocks_count_[frame_id][ant_id][cb_id]++;
+        size_t block_error(0);
+        for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
+            uint8_t rx_byte = decoded_buffer_ptr[i];
+            uint8_t tx_byte = (uint8_t)config_->dl_bits[ant_id][cb_id
+                    * roundup<64>(config_->num_bytes_per_cb)
+                + i];
+            uint8_t xor_byte(tx_byte ^ rx_byte);
+            size_t bit_errors = 0;
+            for (size_t j = 0; j < 8; j++) {
+                bit_errors += xor_byte & 1;
+                xor_byte >>= 1;
             }
-            block_error_count_[ant_id][total_dl_symbol_id] += (block_error > 0);
+            if (rx_byte != tx_byte)
+                block_error++;
+            bit_error_count_[frame_id][ant_id][cb_id] += bit_errors;
         }
+        block_error_count_[frame_id][ant_id][cb_id] += (block_error > 0);
+    }
 
-        if (kPrintDecodedData) {
-            printf("Decoded data (original byte)\n");
-            for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
-                uint8_t rx_byte = decoded_buffer_ptr[i];
-                uint8_t tx_byte = (uint8_t)config_->get_info_bits(
-                    config_->dl_bits, dl_symbol_id, ant_id, cb_id)[i];
-                printf("%x(%x) ", rx_byte, tx_byte);
-            }
-            printf("\n");
+    if (kPrintDecodedData) {
+        printf("Decoded data (original byte)\n");
+        for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
+            uint8_t rx_byte = decoded_buffer_ptr[i];
+            uint8_t tx_byte = (uint8_t)config_->dl_bits[ant_id][cb_id
+                    * roundup<64>(config_->num_bytes_per_cb)
+                + i];
+            printf("%x(%x) ", rx_byte, tx_byte);
         }
+        printf("\n");
     }
 
     size_t dec_duration_stat = rdtsc() - start_tsc;
     if (kDebugPrintPerTaskDone)
-        printf("Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-            symbol_id, ant_id,
-            cycles_to_us(dec_duration_stat, measure_rdtsc_freq()));
+        printf("Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, cb_id,
+            ant_id, cycles_to_us(dec_duration_stat, measure_rdtsc_freq()));
 
     rt_assert(message_queue_.enqueue(
                   *task_ptok[tid], Event_data(EventType::kDecode, tag)),
@@ -923,7 +923,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
 
 void Phy_UE::doEncode(int tid, size_t tag)
 {
-    LDPCconfig LDPC_config = config_->LDPC_config;
+    LDPCconfig LDPC_config = config_->LDPC_config_dl;
     // size_t ue_id = rx_tag_t(tag).tid;
     // size_t offset = rx_tag_t(tag).offset;
     const size_t frame_id = gen_tag_t(tag).frame_id;
@@ -932,12 +932,10 @@ void Phy_UE::doEncode(int tid, size_t tag)
     auto& cfg = config_;
     // size_t start_tsc = worker_rdtsc();
 
-    int8_t* encoded_buffer_temp = (int8_t*)memalign(64,
-        ldpc_encoding_encoded_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-    int8_t* parity_buffer = (int8_t*)memalign(64,
-        ldpc_encoding_parity_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+    int8_t* encoded_buffer_temp = (int8_t*)memalign(
+        64, ldpc_encoding_encoded_buf_size(LDPC_config.Bg, LDPC_config.Zc));
+    int8_t* parity_buffer = (int8_t*)memalign(
+        64, ldpc_encoding_parity_buf_size(LDPC_config.Bg, LDPC_config.Zc));
 
     size_t bytes_per_block = kEnableMac
         ? (LDPC_config.cbLen) >> 3
@@ -948,23 +946,17 @@ void Phy_UE::doEncode(int tid, size_t tag)
          ul_symbol_id++) {
         size_t total_ul_symbol_id
             = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
-        for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
-             cb_id++) {
+        for (size_t cb_id = 0; cb_id < LDPC_config.nCb; cb_id++) {
             int8_t* input_ptr;
             if (kEnableMac) {
                 uint8_t* ul_bits = ul_bits_buffer_[ue_id]
                     + frame_slot * config_->mac_bytes_num_perframe;
 
-                int input_offset = bytes_per_block
-                        * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
-                    + bytes_per_block * cb_id;
+                int input_offset = bytes_per_block * cb_id;
                 input_ptr = (int8_t*)ul_bits + input_offset;
             } else {
-                size_t cb_offset
-                    = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
-                    * bytes_per_block;
-                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
-                                         [cb_offset];
+                size_t cb_offset = cb_id * bytes_per_block;
+                input_ptr = &cfg->ul_bits[ue_id][cb_offset];
             }
 
             ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
@@ -1144,21 +1136,10 @@ void Phy_UE::initialize_downlink_buffers()
             buffer_size, config_->OFDM_DATA_NUM * kMaxModType, 64);
 
         // initialize decode buffer
-        dl_decode_buffer_.resize(buffer_size);
+        dl_decode_buffer_.resize(config_->UE_ANT_NUM * kFrameWnd);
         for (size_t i = 0; i < dl_decode_buffer_.size(); i++)
-            dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb)
-                * config_->LDPC_config.nblocksInSymbol);
+            dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb));
         resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
-
-        decoded_bits_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
-        bit_error_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
-
-        decoded_blocks_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
-        block_error_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
     }
 }
 

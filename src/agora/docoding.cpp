@@ -160,7 +160,7 @@ Event_data DoDecode::launch(size_t tag)
 
     if (kPrintLLRData) {
         printf("LLR data\n");
-        for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
+        for (size_t i = 0; i < cfg->LDPC_config_ul.cbCodewLen; i++) {
             printf("%d ", *(llr_buffer_ptr + i));
         }
         printf("\n");
@@ -168,7 +168,7 @@ Event_data DoDecode::launch(size_t tag)
 
     if (kPrintDecodedData) {
         printf("Decoded data\n");
-        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
+        for (size_t i = 0; i < (cfg->LDPC_config_ul.cbLen >> 3); i++) {
             printf("%u ", *(decoded_buffer_ptr + i));
         }
         printf("\n");

@@ -3,7 +3,7 @@
 #include "utils_ldpc.hpp"
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
+    PtrGrid<kFrameWnd, kMaxUEs, uint8_t>& decoded_buffer,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<Event_data>* rx_queue,
@@ -109,54 +109,49 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     assert(event.event_type == EventType::kPacketToMac);
 
     const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    const size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-    const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
-    const uint8_t* ul_data_ptr
-        = decoded_buffer_[frame_id % kFrameWnd][symbol_idx_ul][ue_id];
+    const size_t cb_id = gen_tag_t(event.tags[0]).cb_id;
+    const size_t ue_id = gen_tag_t(event.tags[0]).cb_ue_id;
+    const uint8_t* ul_data_ptr = decoded_buffer_[frame_id % kFrameWnd][ue_id]
+        + cb_id * roundup<64>(cfg_->num_bytes_per_cb);
 
     std::stringstream ss; // Debug-only
 
-    // Only non-pilot uplink symbols have application data.
-    if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
-        auto* pkt = (struct MacPacket*)ul_data_ptr;
+    auto* pkt = (struct MacPacket*)ul_data_ptr;
 
-        // We send data to app irrespective of CRC condition
-        // TODO: enable ARQ and ensure reliable data goes to app
-        const size_t frame_data__offset
-            = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
-        memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
-            cfg_->mac_payload_length);
-        server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
+    // We send data to app irrespective of CRC condition
+    // TODO: enable ARQ and ensure reliable data goes to app
+    const size_t frame_data_offset = cb_id * cfg_->mac_payload_length;
+    memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data,
+        cfg_->mac_payload_length);
+    server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
 
-        // Check CRC
-        uint16_t crc
-            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
-                             cfg_->mac_payload_length)
-                & 0xFFFF);
-        if (crc == pkt->crc) {
+    // Check CRC
+    uint16_t crc
+        = (uint16_t)(crc_obj->calculate_crc24(
+                         (unsigned char*)pkt->data, cfg_->mac_payload_length)
+            & 0xFFFF);
+    if (crc == pkt->crc) {
 
-            // Print information about the received symbol
-            if (kLogMacPackets) {
-                fprintf(log_file_,
-                    "MAC thread received frame %zu, uplink symbol index %zu, "
-                    "size %zu, copied to frame data offset %zu\n",
-                    frame_id, symbol_idx_ul, cfg_->mac_payload_length,
-                    frame_data__offset);
+        // Print information about the received symbol
+        if (kLogMacPackets) {
+            fprintf(log_file_,
+                "MAC thread received frame %zu, ue %zu, cb %zu, "
+                "size %zu, copied to frame data offset %zu\n",
+                frame_id, ue_id, cb_id, cfg_->mac_payload_length,
+                frame_data_offset);
 
-                ss << "Header Info:\n"
-                   << "FRAME_ID: " << pkt->frame_id
-                   << "\nSYMBOL_ID: " << pkt->symbol_id
-                   << "\nUE_ID: " << pkt->ue_id << "\nDATLEN: " << pkt->datalen
-                   << "\nPAYLOAD:\n";
-                for (size_t i = 0; i < cfg_->mac_payload_length; i++) {
-                    ss << std::to_string(ul_data_ptr[i]) << " ";
-                }
-                fprintf(log_file_, "%s\n", ss.str().c_str());
-                ss.str("");
+            ss << "Header Info:\n"
+               << "FRAME_ID: " << pkt->frame_id << "\nUE_ID: " << pkt->ue_id
+               << "\nCB_ID: " << pkt->cb_id << "\nDATLEN: " << pkt->datalen
+               << "\nPAYLOAD:\n";
+            for (size_t i = 0; i < cfg_->mac_payload_length; i++) {
+                ss << std::to_string(ul_data_ptr[i]) << " ";
             }
-        } else {
-            printf("Bad Packet: CRC Check Failed! \n");
+            fprintf(log_file_, "%s\n", ss.str().c_str());
+            ss.str("");
         }
+    } else {
+        printf("Bad Packet: CRC Check Failed! \n");
     }
 
     // When the frame is full, send it to the application
@@ -237,24 +232,22 @@ void MacThread::process_udp_packets_from_apps_server(
     const MacPacket* pkt, RBIndicator ri)
 {
     // We've received bits for the downlink
-    const size_t rx_offset
-        = pkt->frame_id * cfg_->LDPC_config_dl.nCb + pkt->cb_id;
+    const size_t rx_offset = pkt->frame_id * cfg_->UE_ANT_NUM + pkt->ue_id;
 
-    if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
+    if ((*dl_bits_buffer_status_)[rx_offset][pkt->cb_id] == 1) {
         MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
             rx_offset);
         cfg_->running = false;
         return;
     }
 
-    for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
-        (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
-    memcpy(
-        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->OFDM_DATA_NUM],
+    (*dl_bits_buffer_status_)[rx_offset][pkt->cb_id] = 1;
+    memcpy(&(*dl_bits_buffer_)[rx_offset][pkt->cb_id
+               * roundup<64>(cfg_->num_bytes_per_cb)],
         pkt->data, udp_pkt_buf_.size());
 
     Event_data msg(EventType::kPacketFromMac,
-        gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)._tag);
+        gen_tag_t::frm_sym_cb(pkt->frame_id, pkt->ue_id, pkt->cb_id)._tag);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: Failed to enqueue downlink packet");
 }
@@ -293,8 +286,8 @@ void MacThread::process_udp_packets_from_apps_client(
         auto* pkt = (MacPacket*)(&(
             *client_.ul_bits_buffer_)[next_radio_id_][data_offset]);
         pkt->frame_id = next_frame_id_;
-        pkt->symbol_id = pkt_id;
         pkt->ue_id = next_radio_id_;
+        pkt->cb_id = pkt_id; // One code block per packet
         pkt->datalen = cfg_->mac_payload_length;
         pkt->rsvd[0] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
         pkt->rsvd[1] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);

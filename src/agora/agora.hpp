@@ -80,7 +80,7 @@ public:
     void schedule_codeblocks(
         EventType task_type, size_t frame_id, size_t symbol_idx);
 
-    void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    void schedule_users(EventType task_type, size_t frame_id, size_t cb_id);
 
     // Send current frame's SNR measurements from PHY to MAC
     void send_snr_report(

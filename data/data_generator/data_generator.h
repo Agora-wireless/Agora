@@ -40,7 +40,7 @@ public:
     void gen_codeblock_ul(std::vector<int8_t>& information,
         std::vector<int8_t>& encoded_codeword, size_t ue_id)
     {
-        const LDPCconfig& lc = cfg->LDPC_config;
+        const LDPCconfig& lc = cfg->LDPC_config_ul;
         std::vector<int8_t> parity;
         parity.resize(ldpc_encoding_parity_buf_size(lc.Bg, lc.Zc));
 
@@ -55,9 +55,8 @@ public:
             }
         }
 
-        ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-            cfg->LDPC_config.nRows, &encoded_codeword[0], &parity[0],
-            &information[0]);
+        ldpc_encode_helper(lc.Bg, lc.Zc, lc.nRows, &encoded_codeword[0],
+            &parity[0], &information[0]);
 
         information.resize(lc.num_input_bytes());
         encoded_codeword.resize(lc.num_encoded_bytes());
@@ -76,7 +75,7 @@ public:
 
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
+            &mod_input[0], cfg->LDPC_config_ul.num_encoded_bytes(),
             cfg->mod_order_bits);
 
         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {

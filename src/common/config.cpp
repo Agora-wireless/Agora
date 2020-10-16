@@ -220,7 +220,7 @@ Config::Config(std::string jsonfile)
     LDPC_config_ul.cbCodewLen = ldpc_num_encoded_bits(
         LDPC_config_ul.Bg, LDPC_config_ul.Zc, LDPC_config_ul.nRows);
     // Use one code block per symbol
-    LDPC_config_ul.nCb = ul_data_symbol_num_perframe;
+    LDPC_config_ul.nCb = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
     LDPC_config_ul.map_symbols_to_cbs(
         ul_data_symbol_num_perframe, OFDM_DATA_NUM, mod_order_bits);
 
@@ -261,10 +261,9 @@ Config::Config(std::string jsonfile)
         packet_length < 9000, "Packet size must be smaller than jumbo frame");
 
     num_bytes_per_cb = LDPC_config_ul.cbLen / 8; // TODO: Use bits_to_bytes()?
-    data_bytes_num_persymbol = num_bytes_per_cb; // One code block per symbol
-    mac_packet_length = data_bytes_num_persymbol;
-    mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
-    mac_packets_perframe = ul_data_symbol_num_perframe - UL_PILOT_SYMS;
+    mac_packet_length = num_bytes_per_cb + MacPacket::kOffsetOfData;
+    mac_payload_length = num_bytes_per_cb;
+    mac_packets_perframe = LDPC_config_ul.nCb;
     mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 

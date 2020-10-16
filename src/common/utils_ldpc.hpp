@@ -531,8 +531,8 @@ public:
     size_t get_chunk_start_sc(size_t cb_id, size_t chunk_id) const
     {
         size_t symbol_id = lut_cb_to_symbol[cb_id][chunk_id];
-        const auto it = find(lut_symbol_to_cb[symbol_id].begin(),
-            lut_symbol_to_cb[symbol_id].end(), cb_id);
+        const auto it = std::find((lut_symbol_to_cb[symbol_id]).begin(),
+            (lut_symbol_to_cb[symbol_id]).end(), cb_id);
         rt_assert(it != lut_symbol_to_cb[symbol_id].end(),
             "Code block does not exist in the symbol");
         size_t cb_id_in_symbol = it - lut_symbol_to_cb[symbol_id].begin();

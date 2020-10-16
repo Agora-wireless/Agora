@@ -297,10 +297,10 @@ private:
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<size_t> non_null_sc_ind_;
     std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
-    Table<size_t> decoded_bits_count_;
-    Table<size_t> bit_error_count_;
-    Table<size_t> decoded_blocks_count_;
-    Table<size_t> block_error_count_;
+    PtrGrid<kFrameWnd, kMaxUEs, size_t> decoded_bits_count_;
+    PtrGrid<kFrameWnd, kMaxUEs, size_t> bit_error_count_;
+    PtrGrid<kFrameWnd, kMaxUEs, size_t> decoded_blocks_count_;
+    PtrGrid<kFrameWnd, kMaxUEs, size_t> block_error_count_;
 
     /* Concurrent queues */
     /* task queue for downlink FFT */
