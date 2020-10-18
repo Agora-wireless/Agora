@@ -27,6 +27,7 @@
 #include <fstream> // std::ifstream
 #include <iostream>
 #include <mutex>
+#include <numa.h>
 #include <pthread.h>
 #include <random>
 #include <sstream>
@@ -36,6 +37,10 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
+
+#define MAX_CORE_NUM 200
+
+void set_cpu_layout_on_numa_nodes(bool verbose = false);
 
 /* Pin this thread to core with global index = core_id */
 int pin_to_core(int core_id);

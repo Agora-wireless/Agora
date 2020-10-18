@@ -4,6 +4,7 @@
 
 Config::Config(std::string jsonfile)
 {
+    set_cpu_layout_on_numa_nodes();
     std::string conf;
     Utils::loadTDDConfig(jsonfile, conf);
     const auto tddConf = json::parse(conf);

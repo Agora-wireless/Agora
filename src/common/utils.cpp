@@ -8,6 +8,45 @@
 
 #include "utils.h"
 
+size_t cpu_layout[MAX_CORE_NUM];
+bool cpu_layout_initlized = false;
+
+void print_bitmask(const struct bitmask* bm)
+{
+    for (size_t i = 0; i < bm->size; ++i)
+        printf("%d", numa_bitmask_isbitset(bm, i));
+}
+
+void set_cpu_layout_on_numa_nodes(bool verbose)
+{
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    // numa_set_localalloc();
+
+    bitmask* bm = numa_bitmask_alloc(num_cores);
+    int cpu_id = 0;
+    for (int i = 0; i <= numa_max_node(); ++i) {
+        numa_node_to_cpus(i, bm);
+        if (verbose) {
+            printf("NUMA node %d ", i);
+            print_bitmask(bm);
+            printf(" CPUs: ");
+        }
+        for (size_t j = 0; j < bm->size; j++) {
+            if (numa_bitmask_isbitset(bm, j)) {
+                if (verbose)
+                    printf("%zu ", j);
+                cpu_layout[cpu_id] = j;
+                cpu_id++;
+            }
+        }
+        if (verbose)
+            printf("\n");
+    }
+
+    numa_bitmask_free(bm);
+    cpu_layout_initlized = true;
+}
+
 int pin_to_core(int core_id)
 {
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
@@ -36,19 +75,22 @@ void pin_to_core_with_offset(
         actual_core_id = (actual_core_id % num_cores) + 1;
     }
 
-    if (pin_to_core(actual_core_id) != 0) {
+    size_t physical_core_id
+        = cpu_layout_initlized ? cpu_layout[actual_core_id] : actual_core_id;
+
+    if (pin_to_core(physical_core_id) != 0) {
         fprintf(stderr,
-            "%s thread %d: failed to pin to core %d. Exiting. "
+            "%s thread %d: failed to pin to core %zu. Exiting. "
             "This can happen if the machine has insufficient cores. "
             "Set kEnableThreadPinning to false to run Agora to run despite "
             "this - performance will be low.\n",
-            thread_type_str(thread_type).c_str(), thread_id, actual_core_id);
+            thread_type_str(thread_type).c_str(), thread_id, physical_core_id);
         exit(0);
     } else {
         if (verbose) {
-            printf("%s thread %d: pinned to core %d\n",
+            printf("%s thread %d: pinned to core %zu\n",
                 thread_type_str(thread_type).c_str(), thread_id,
-                actual_core_id);
+                physical_core_id);
         }
     }
 }
