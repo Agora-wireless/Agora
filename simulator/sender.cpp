@@ -83,7 +83,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     server_mac_addr.resize(cfg->dpdk_num_ports);
 
     for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++) {
-        if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+        if (DpdkTransport::nic_init(
+                port_id, mbuf_pool, socket_thread_num, cfg->packet_length)
+            != 0)
             rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
         // Parse MAC addresses
         ether_addr* parsed_mac = ether_aton(
