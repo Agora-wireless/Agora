@@ -257,9 +257,8 @@ void* Sender::worker_thread(int tid)
     size_t total_tx_packets_rolling = 0;
     size_t cur_radio = radio_lo;
 
-    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, dpdk NIC port: %zu, "
-           "queue: %zu\n",
-        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, port_id, queue_id);
+    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu\n", (size_t)tid,
+        ant_num_this_thread, cfg->BS_ANT_NUM);
 
     // We currently don't support zero-padding OFDM prefix and postfix
     rt_assert(cfg->packet_length
@@ -290,7 +289,7 @@ void* Sender::worker_thread(int tid)
         pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
         memcpy(pkt->data,
             iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
-            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * (kUse12BitIQ ? 3 : 4));
         if (cfg->fft_in_rru) {
             run_fft(pkt, fft_inout, mkl_handle);
         }
@@ -380,9 +379,15 @@ void Sender::init_iq_from_file(std::string filename)
                 strerror(errno));
             exit(-1);
         }
-        for (size_t j = 0; j < expected_count; j++) {
-            iq_data_short_[i][j]
-                = static_cast<unsigned short>(iq_data_float[i][j] * 32768);
+        if (kUse12BitIQ) {
+            // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
+            convert_float_to_12bit_iq(iq_data_float[i],
+                reinterpret_cast<uint8_t*>(iq_data_short_[i]), expected_count);
+        } else {
+            for (size_t j = 0; j < expected_count; j++) {
+                iq_data_short_[i][j]
+                    = static_cast<unsigned short>(iq_data_float[i][j] * 32768);
+            }
         }
     }
     fclose(fp);

@@ -4,6 +4,7 @@
 #include "Symbols.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
