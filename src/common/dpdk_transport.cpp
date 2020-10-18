@@ -15,8 +15,8 @@ inline const struct rte_eth_conf port_conf_default()
     return port_conf;
 }
 
-int DpdkTransport::nic_init(
-    uint16_t port, struct rte_mempool* mbuf_pool, int thread_num)
+int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
+    int thread_num, size_t pkt_len)
 {
     struct rte_eth_conf port_conf = port_conf_default();
     const uint16_t rxRings = thread_num, txRings = 2 * thread_num;
@@ -49,8 +49,9 @@ int DpdkTransport::nic_init(
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
         port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
 
-    port_conf.rxmode.max_rx_pkt_len
-        = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
+    port_conf.rxmode.max_rx_pkt_len = RTE_MIN(
+        RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len),
+        pkt_len);
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);

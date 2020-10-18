@@ -15,7 +15,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
-    mbuf_pool = DpdkTransport::create_mempool(cfg->dl_packet_length);
+    mbuf_pool = DpdkTransport::create_mempool();
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
