@@ -42,8 +42,9 @@ public:
      * @brief Create and optionally start a Sender that sends IQ packets to a
      * server with MAC address [server_mac_addr_str]
      *
-     * @param config The Agora config @param num_worker_threads Number of
-     * worker threads sending packets 
+     * @param config The Agora config 
+     *
+     * @param socket_thread_num Number of worker threads sending packets 
      *
      * @param core_offset The master thread runs on core [core_offset]. Worker
      * thread #i runs on core [core_offset + i]
@@ -55,7 +56,7 @@ public:
      *
      * @param server_mac_addr_str The MAC address of the server's NIC
      */
-    Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
+    Sender(Config* config, size_t socket_thread_num, size_t core_offset = 30,
         size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false);
@@ -101,7 +102,7 @@ private:
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
     const double ticks_per_usec; // RDTSC frequency in GHz
-    const size_t num_worker_threads_; // Number of worker threads sending pkts
+    const size_t socket_thread_num; // Number of worker threads sending pkts
     const size_t enable_slow_start; // If 1, send frames slowly at first
 
     // The master thread runs on core core_offset. Worker threads use cores
@@ -139,10 +140,10 @@ private:
     struct rte_mempool* mbuf_pool;
     uint32_t bs_rru_addr; // IPv4 address of this data sender
     uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
-    rte_ether_addr sender_mac_addr; // MAC address of this data sender
-
-    // MAC address of the remote target Agora server
-    rte_ether_addr server_mac_addr;
+    // MAC addresses of this data sender
+    std::vector<rte_ether_addr> sender_mac_addr;
+    // MAC addresses of the remote target Agora server
+    std::vector<rte_ether_addr> server_mac_addr;
 #endif
 };
 

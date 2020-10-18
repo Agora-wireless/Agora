@@ -5,6 +5,8 @@
 
 bool keep_running = true;
 
+static constexpr size_t kMacAddrBtyes = 17;
+
 // A spinning barrier to synchronize the start of worker threads
 std::atomic<size_t> num_workers_ready_atomic;
 
@@ -20,13 +22,13 @@ void delay_ticks(uint64_t start, uint64_t ticks)
         _mm_pause();
 }
 
-Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
+Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     size_t frame_duration, size_t enable_slow_start,
     std::string server_mac_addr_str, bool create_thread_for_master)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
-    , num_worker_threads_(num_worker_threads_)
+    , socket_thread_num(socket_thread_num)
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
     , frame_duration_(frame_duration)
@@ -52,36 +54,50 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         + ".bin");
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
-        64, num_worker_threads_ * sizeof(moodycamel::ProducerToken*));
-    for (size_t i = 0; i < num_worker_threads_; i++)
+        64, socket_thread_num * sizeof(moodycamel::ProducerToken*));
+    for (size_t i = 0; i < socket_thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
     // Create a master thread when started from simulator
     if (create_thread_for_master)
         create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
-            num_worker_threads_, num_worker_threads_ + 1);
+            socket_thread_num, socket_thread_num + 1);
 
 #ifdef USE_DPDK
-    DpdkTransport::dpdk_init(core_offset, num_worker_threads_);
+    DpdkTransport::dpdk_init(core_offset, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
 
-    uint16_t portid = 0; // For now, hard-code to port zero
-    if (DpdkTransport::nic_init(portid, mbuf_pool, num_worker_threads_) != 0)
-        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
-
-    // Parse IP addresses and MAC addresses
+    // Parse IP addresses
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
-    ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
-    rt_assert(parsed_mac != NULL, "Invalid server mac address");
-    memcpy(&server_mac_addr, parsed_mac, sizeof(ether_addr));
+    rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
+        "Invalid number of DPDK ports");
 
-    ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
-    rt_assert(ret == 0, "Cannot get MAC address of the port");
-    printf("Number of DPDK cores: %d\n", rte_lcore_count());
+    rt_assert(server_mac_addr_str.length()
+            == (cfg->dpdk_num_ports * (kMacAddrBtyes + 1) - 1),
+        "Invalid length of server MAC address");
+    sender_mac_addr.resize(cfg->dpdk_num_ports);
+    server_mac_addr.resize(cfg->dpdk_num_ports);
+
+    for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++) {
+        if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+            rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
+        // Parse MAC addresses
+        ether_addr* parsed_mac = ether_aton(
+            server_mac_addr_str
+                .substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
+                .c_str());
+        rt_assert(parsed_mac != NULL, "Invalid server mac address");
+        memcpy(&server_mac_addr[port_id], parsed_mac, sizeof(ether_addr));
+
+        ret = rte_eth_macaddr_get(port_id, &sender_mac_addr[port_id]);
+        rt_assert(ret == 0, "Cannot get MAC address of the port");
+        printf("Number of DPDK cores: %d\n", rte_lcore_count());
+    }
+
 #endif
     num_workers_ready_atomic = 0;
 }
@@ -100,7 +116,7 @@ void Sender::startTX()
     frame_end = new double[kNumStatsFrames]();
 
     create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
-        num_worker_threads_);
+        socket_thread_num);
     master_thread(0); // Start the master thread
 }
 
@@ -110,7 +126,7 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_end = in_frame_end;
 
     create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
-        num_worker_threads_);
+        socket_thread_num);
 }
 
 void* Sender::master_thread(int)
@@ -119,7 +135,7 @@ void* Sender::master_thread(int)
     pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
 
     // Wait for all worker threads to be ready
-    while (num_workers_ready_atomic != num_worker_threads_) {
+    while (num_workers_ready_atomic != socket_thread_num) {
         // Wait
     }
 
@@ -129,7 +145,7 @@ void* Sender::master_thread(int)
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
         rt_assert(send_queue_.enqueue(
-                      *task_ptok[i % num_worker_threads_], req_tag._tag),
+                      *task_ptok[i % socket_thread_num], req_tag._tag),
             "Send task enqueue failed");
     }
 
@@ -196,9 +212,8 @@ void* Sender::master_thread(int)
             for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
-                rt_assert(
-                    send_queue_.enqueue(
-                        *task_ptok[i % num_worker_threads_], req_tag._tag),
+                rt_assert(send_queue_.enqueue(
+                              *task_ptok[i % socket_thread_num], req_tag._tag),
                     "Send task enqueue failed");
             }
         }
@@ -213,7 +228,7 @@ void* Sender::worker_thread(int tid)
 
     // Wait for all Sender threads (including master) to start runnung
     num_workers_ready_atomic++;
-    while (num_workers_ready_atomic != num_worker_threads_) {
+    while (num_workers_ready_atomic != socket_thread_num) {
         // Wait
     }
 
@@ -223,10 +238,14 @@ void* Sender::worker_thread(int tid)
     DftiCommitDescriptor(mkl_handle);
 
     const size_t max_symbol_id = get_max_symbol_id();
-    const size_t radio_lo = tid * cfg->nRadios / num_worker_threads_;
-    const size_t radio_hi = (tid + 1) * cfg->nRadios / num_worker_threads_;
-    const size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
-        + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
+    const size_t radio_lo = tid * cfg->nRadios / socket_thread_num;
+    const size_t radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+    const size_t ant_num_this_thread = cfg->BS_ANT_NUM / socket_thread_num
+        + ((size_t)tid < cfg->BS_ANT_NUM % socket_thread_num ? 1 : 0);
+#ifdef USE_DPDK
+    const size_t port_id = tid % cfg->dpdk_num_ports;
+    const size_t queue_id = tid / cfg->dpdk_num_ports;
+#endif
 
     UDPClient udp_client;
     auto fft_inout = reinterpret_cast<complex_float*>(
@@ -238,8 +257,9 @@ void* Sender::worker_thread(int tid)
     size_t total_tx_packets_rolling = 0;
     size_t cur_radio = radio_lo;
 
-    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
-        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
+    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, dpdk NIC port: %zu, "
+           "queue: %zu\n",
+        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, port_id, queue_id);
 
     // We currently don't support zero-padding OFDM prefix and postfix
     rt_assert(cfg->packet_length
@@ -256,9 +276,9 @@ void* Sender::worker_thread(int tid)
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
-        rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, bs_rru_addr, bs_server_addr,
-            cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+        rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool,
+            sender_mac_addr[port_id], server_mac_addr[port_id], bs_rru_addr,
+            bs_server_addr, cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
             cfg->packet_length);
         pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
 #endif
@@ -276,7 +296,7 @@ void* Sender::worker_thread(int tid)
         }
 
 #ifdef USE_DPDK
-        rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
+        rt_assert(rte_eth_tx_burst(port_id, queue_id, &tx_mbuf, 1) == 1,
             "rte_eth_tx_burst() failed");
 #else
         udp_client.send(cfg->bs_server_addr, cfg->bs_server_port + cur_radio,

@@ -296,6 +296,9 @@ public:
     // Base RRU/channel simulator UDP port used by UEs to transmit uplink data
     int ue_rru_port;
 
+    // Number of NIC ports used for DPDK
+    uint16_t dpdk_num_ports;
+
     // Port ID at MAC layer side
     int mac_rx_port;
     int mac_tx_port;

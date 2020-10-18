@@ -17,25 +17,30 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
 
-    const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
-        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
-
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
+
+    rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
+        "Invalid number of DPDK ports");
+
+    for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++)
+        if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+            rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
         printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
-               "dst port: %zu, queue: %zu\n",
+               "dst port: %zu, DPDK port %zu, queue: %zu\n",
             cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
-            cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
-        DpdkTransport::install_flow_rule(
-            port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
+            cfg->bs_rru_port + i, cfg->bs_server_port + i,
+            i % cfg->dpdk_num_ports, i / cfg->dpdk_num_ports);
+        DpdkTransport::install_flow_rule(i % cfg->dpdk_num_ports,
+            i / cfg->dpdk_num_ports, bs_rru_addr, bs_server_addr, src_port,
+            dst_port);
     }
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
