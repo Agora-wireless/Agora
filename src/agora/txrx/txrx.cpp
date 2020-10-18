@@ -249,13 +249,13 @@ int PacketTXRX::dequeue_send(int tid)
             offset, message_queue_->size_approx());
     }
 
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length, 0,
-        (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->dl_packet_length,
+        0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
         sizeof(bs_rru_sockaddr_[ant_id]));
     rt_assert(ret > 0, "sendto() failed");
 

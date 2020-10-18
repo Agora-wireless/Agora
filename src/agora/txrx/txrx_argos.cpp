@@ -127,7 +127,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         else
             txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx];
     } else {
-        char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
+        char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
         txbuf[ch] = (void*)pkt->data;
     }

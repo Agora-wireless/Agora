@@ -37,6 +37,8 @@
 #endif
 
 class Sender {
+public:
+    static constexpr size_t kDequeueBulkSize = 4;
 
 public:
     /**

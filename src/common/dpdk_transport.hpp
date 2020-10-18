@@ -63,5 +63,5 @@ public:
 
     /// Init dpdk on core [core_offset:core_offset+thread_num]
     static void dpdk_init(uint16_t core_offset, size_t thread_num);
-    static rte_mempool* create_mempool();
+    static rte_mempool* create_mempool(size_t packet_length);
 };
