@@ -101,19 +101,21 @@ void* PacketTXRX::loop_tx_rx(int tid)
 {
     size_t rx_offset = 0;
     size_t prev_frame_id = SIZE_MAX;
+    const uint16_t port_id = tid % cfg->dpdk_num_ports;
+    const uint16_t queue_id = tid / cfg->dpdk_num_ports;
 
     while (cfg->running) {
-        dpdk_recv(tid, prev_frame_id, rx_offset);
+        dpdk_recv(tid, port_id, queue_id, prev_frame_id, rx_offset);
         dequeue_send(tid);
     }
     return 0;
 }
 
-uint16_t PacketTXRX::dpdk_recv(
-    int tid, size_t& prev_frame_id, size_t& rx_offset)
+uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
+    size_t& prev_frame_id, size_t& rx_offset)
 {
     rte_mbuf* rx_bufs[kRxBatchSize];
-    uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+    uint16_t nb_rx = rte_eth_rx_burst(port_id, queue_id, rx_bufs, kRxBatchSize);
     if (unlikely(nb_rx == 0))
         return 0;
 
