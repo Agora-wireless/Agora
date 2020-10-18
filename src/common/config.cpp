@@ -242,7 +242,8 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length
-        = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
+        = Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * sampsPerSymbol);
+    dl_packet_length = Packet::kOffsetOfData + sampsPerSymbol * 4;
     rt_assert(
         packet_length < 9000, "Packet size must be smaller than jumbo frame");
 

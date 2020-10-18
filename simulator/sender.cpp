@@ -65,7 +65,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
 #ifdef USE_DPDK
     DpdkTransport::dpdk_init(core_offset, socket_thread_num);
-    mbuf_pool = DpdkTransport::create_mempool();
+    mbuf_pool = DpdkTransport::create_mempool(cfg->packet_length);
 
     // Parse IP addresses
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
@@ -245,6 +245,7 @@ void* Sender::worker_thread(int tid)
 #ifdef USE_DPDK
     const size_t port_id = tid % cfg->dpdk_num_ports;
     const size_t queue_id = tid / cfg->dpdk_num_ports;
+    rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #endif
 
     UDPClient udp_client;
@@ -263,75 +264,93 @@ void* Sender::worker_thread(int tid)
     // We currently don't support zero-padding OFDM prefix and postfix
     rt_assert(cfg->packet_length
         == Packet::kOffsetOfData
-            + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
+            + (kUse12BitIQ ? 3 : 4) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
     size_t ant_num_per_cell = cfg->BS_ANT_NUM / cfg->nCells;
+
+    size_t tags[kDequeueBulkSize];
     while (true) {
-        gen_tag_t tag = 0;
-        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
+        size_t num_tags = send_queue_.try_dequeue_bulk_from_producer(
+            *(task_ptok[tid]), tags, kDequeueBulkSize);
+        if (num_tags == 0)
             continue;
 
-        size_t start_tsc_send = rdtsc();
+        for (size_t tag_id = 0; tag_id < num_tags; tag_id++) {
+            size_t start_tsc_send = rdtsc();
 
-        // Send a message to the server. We assume that the server is running.
-        Packet* pkt = socks_pkt_buf;
+            // Send a message to the server. We assume that the server is running.
+            Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
-        rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool,
-            sender_mac_addr[port_id], server_mac_addr[port_id], bs_rru_addr,
-            bs_server_addr, cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
-            cfg->packet_length);
-        pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
+            tx_mbufs[tag_id] = DpdkTransport::alloc_udp(mbuf_pool,
+                sender_mac_addr[port_id], server_mac_addr[port_id], bs_rru_addr,
+                bs_server_addr, cfg->bs_rru_port + tid,
+                cfg->bs_server_port + tid, cfg->packet_length);
+            pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*)
+                + kPayloadOffset);
 #endif
 
-        // Update the TX buffer
-        pkt->frame_id = tag.frame_id;
-        pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
-        pkt->cell_id = tag.ant_id / ant_num_per_cell;
-        pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
-        memcpy(pkt->data,
-            iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
-            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * (kUse12BitIQ ? 3 : 4));
-        if (cfg->fft_in_rru) {
-            run_fft(pkt, fft_inout, mkl_handle);
+            // Update the TX buffer
+            auto tag = gen_tag_t(tags[tag_id]);
+            pkt->frame_id = tag.frame_id;
+            pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
+            pkt->cell_id = tag.ant_id / ant_num_per_cell;
+            pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
+            memcpy(pkt->data,
+                iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
+                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * (kUse12BitIQ ? 3 : 4));
+            if (cfg->fft_in_rru) {
+                run_fft(pkt, fft_inout, mkl_handle);
+            }
+
+#ifndef USE_DPDK
+            udp_client.send(cfg->bs_server_addr,
+                cfg->bs_server_port + cur_radio,
+                reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
+#endif
+
+            if (kDebugSenderReceiver) {
+                printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
+                       "%d, "
+                       "TX time: %.3f us\n",
+                    tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
+                    pkt->symbol_id, pkt->ant_id,
+                    cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
+            }
+
+            total_tx_packets_rolling++;
+            total_tx_packets++;
+            if (total_tx_packets_rolling
+                == ant_num_this_thread * max_symbol_id * 1000) {
+                double end = get_time();
+                double byte_len = cfg->packet_length * ant_num_this_thread
+                    * max_symbol_id * 1000.f;
+                double diff = end - begin;
+                printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
+                    (size_t)tid,
+                    total_tx_packets / (ant_num_this_thread * max_symbol_id),
+                    diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
+                begin = get_time();
+                total_tx_packets_rolling = 0;
+            }
+
+            if (++cur_radio == radio_hi)
+                cur_radio = radio_lo;
         }
 
 #ifdef USE_DPDK
-        rt_assert(rte_eth_tx_burst(port_id, queue_id, &tx_mbuf, 1) == 1,
-            "rte_eth_tx_burst() failed");
-#else
-        udp_client.send(cfg->bs_server_addr, cfg->bs_server_port + cur_radio,
-            reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
+        size_t nb_tx_new
+            = rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
+        if (unlikely(nb_tx_new != num_tags)) {
+            printf("Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
+                   "num_tags: %zu\n",
+                tid, nb_tx_new, num_tags);
+            keep_running = 0;
+            break;
+        }
 #endif
-
-        if (kDebugSenderReceiver) {
-            printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, "
-                   "TX time: %.3f us\n",
-                tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
-                pkt->symbol_id, pkt->ant_id,
-                cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
-        }
-
-        rt_assert(
-            completion_queue_.enqueue(tag._tag), "Completion enqueue failed");
-
-        total_tx_packets_rolling++;
-        total_tx_packets++;
-        if (total_tx_packets_rolling
-            == ant_num_this_thread * max_symbol_id * 1000) {
-            double end = get_time();
-            double byte_len = cfg->packet_length * ant_num_this_thread
-                * max_symbol_id * 1000.f;
-            double diff = end - begin;
-            printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
-                (size_t)tid,
-                total_tx_packets / (ant_num_this_thread * max_symbol_id),
-                diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
-            begin = get_time();
-            total_tx_packets_rolling = 0;
-        }
-
-        if (++cur_radio == radio_hi)
-            cur_radio = radio_lo;
+        rt_assert(completion_queue_.enqueue_bulk(tags, num_tags),
+            "Completion enqueue failed");
     }
+    return nullptr;
 }
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id)

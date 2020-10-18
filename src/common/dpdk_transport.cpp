@@ -86,10 +86,11 @@ int DpdkTransport::nic_init(
 
     struct rte_ether_addr addr;
     rte_eth_macaddr_get(port, &addr);
-    printf("NIC %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-           " %02" PRIx8 " %02" PRIx8 " \n",
-        port, addr.addr_bytes[0], addr.addr_bytes[1], addr.addr_bytes[2],
-        addr.addr_bytes[3], addr.addr_bytes[4], addr.addr_bytes[5]);
+    printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+           " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
+        port, rte_eth_dev_socket_id(port), addr.addr_bytes[0],
+        addr.addr_bytes[1], addr.addr_bytes[2], addr.addr_bytes[3],
+        addr.addr_bytes[4], addr.addr_bytes[5]);
 
     struct rte_eth_link link;
     rte_eth_link_get_nowait(port, &link);
@@ -283,12 +284,12 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
     rt_assert(ret >= 0, "Failed to initialize DPDK");
 }
 
-rte_mempool* DpdkTransport::create_mempool()
+rte_mempool* DpdkTransport::create_mempool(size_t packet_length)
 {
     unsigned int nb_ports = rte_eth_dev_count_avail();
     printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
-    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    size_t mbuf_size = packet_length + MBUF_CACHE_SIZE;
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
         NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 

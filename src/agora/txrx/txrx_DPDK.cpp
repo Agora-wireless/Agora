@@ -15,7 +15,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     , socket_thread_num(cfg->socket_thread_num)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
-    mbuf_pool = DpdkTransport::create_mempool();
+    mbuf_pool = DpdkTransport::create_mempool(cfg->dl_packet_length);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
@@ -217,7 +217,7 @@ int PacketTXRX::dequeue_send(int tid)
             offset, message_queue_->size_approx());
     }
 
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
@@ -238,10 +238,10 @@ int PacketTXRX::dequeue_send(int tid)
     udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port + tid);
     udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port + tid);
 
-    tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
-    tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
+    tx_bufs[0]->pkt_len = cfg->dl_packet_length + kPayloadOffset;
+    tx_bufs[0]->data_len = cfg->dl_packet_length + kPayloadOffset;
     char* payload = (char*)eth_hdr + kPayloadOffset;
-    DpdkTransport::fastMemcpy(payload, (char*)pkt, cfg->packet_length);
+    DpdkTransport::fastMemcpy(payload, (char*)pkt, cfg->dl_packet_length);
 
     // Send data (one OFDM symbol)
     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);

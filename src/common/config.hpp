@@ -221,6 +221,7 @@ public:
     // sent by Agora. This includes Agora's packet header, but not the
     // Ethernet/IP/UDP headers.
     size_t packet_length;
+    size_t dl_packet_length;
 
     size_t OFDM_PILOT_SPACING;
 

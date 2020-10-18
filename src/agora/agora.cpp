@@ -1142,7 +1142,7 @@ void Agora::initialize_downlink_buffers()
     size_t dl_socket_buffer_status_size
         = cfg->BS_ANT_NUM * kFrameWnd * cfg->dl_data_symbol_num_perframe;
     size_t dl_socket_buffer_size
-        = cfg->packet_length * dl_socket_buffer_status_size;
+        = cfg->dl_packet_length * dl_socket_buffer_status_size;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size, 64, 0);
     alloc_buffer_1d(
         &dl_socket_buffer_status_, dl_socket_buffer_status_size, 64, 1);
@@ -1235,9 +1235,8 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             size_t offset = total_data_symbol_id * cfg->BS_ANT_NUM + ant_id;
-            size_t packet_length = config_->packet_length;
-            struct Packet* pkt
-                = (struct Packet*)(&dl_socket_buffer_[offset * packet_length]);
+            struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[offset
+                * cfg->dl_packet_length]);
             short* socket_ptr = pkt->data;
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
