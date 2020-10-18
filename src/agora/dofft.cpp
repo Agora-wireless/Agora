@@ -38,6 +38,9 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+
+    temp_16bits_iq
+        = reinterpret_cast<uint16_t*>(memalign(64, 32 * sizeof(uint16_t)));
 }
 
 DoFFT::~DoFFT()
@@ -64,9 +67,17 @@ Event_data DoFFT::launch(size_t tag)
                 &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_]),
             cfg->OFDM_CA_NUM * 2);
     } else {
-        simd_convert_short_to_float(
-            &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
-            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+        if (kUse12BitIQ) {
+            simd_convert_12bit_iq_to_float(
+                (uint8_t*)pkt->data + 3 * cfg->ofdm_rx_zero_prefix_bs_,
+                reinterpret_cast<float*>(fft_inout), temp_16bits_iq,
+                cfg->OFDM_CA_NUM * 3);
+        } else {
+            simd_convert_short_to_float(
+                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
+                reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        }
 
         if (kDebugPrintInTask) {
             printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
