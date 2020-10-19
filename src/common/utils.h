@@ -42,6 +42,8 @@
 
 void set_cpu_layout_on_numa_nodes(bool verbose = false);
 
+size_t get_physical_core_id(size_t core_id);
+
 /* Pin this thread to core with global index = core_id */
 int pin_to_core(int core_id);
 
