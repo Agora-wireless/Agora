@@ -70,14 +70,24 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    for (size_t i = 0; i < socket_thread_num; i++) {
-        pthread_t txrx_thread;
-        auto context = new EventHandlerContext<PacketTXRX>;
-        context->obj_ptr = this;
-        context->id = i;
-        int ret = pthread_create(&txrx_thread, NULL,
-            pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>, context);
-        rt_assert(ret == 0, "Failed to create threads");
+    unsigned int lcore_id;
+    size_t worker_id = 0;
+    // Launch specific task to cores
+    RTE_LCORE_FOREACH_SLAVE(lcore_id)
+    {
+        // launch communication and task thread onto specific core
+        if (worker_id < socket_thread_num) {
+            auto context = new EventHandlerContext<PacketTXRX>;
+            context->obj_ptr = this;
+            context->id = worker_id;
+            rte_eal_remote_launch(
+                (lcore_function_t*)
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
+                context, lcore_id);
+            printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
+                lcore_id);
+        }
+        worker_id++;
     }
     return true;
 }
@@ -91,16 +101,15 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
 
 void* PacketTXRX::loop_tx_rx(int tid)
 {
-    pin_to_core_with_offset(
-        ThreadType::kWorkerTXRX, core_offset, tid, false /* quiet */);
     size_t rx_offset = 0;
     size_t prev_frame_id = SIZE_MAX;
     const uint16_t port_id = tid % cfg->dpdk_num_ports;
     const uint16_t queue_id = tid / cfg->dpdk_num_ports;
 
     while (cfg->running) {
+        if (-1 != dequeue_send(tid))
+            continue;
         dpdk_recv(tid, port_id, queue_id, prev_frame_id, rx_offset);
-        dequeue_send(tid);
     }
     return 0;
 }

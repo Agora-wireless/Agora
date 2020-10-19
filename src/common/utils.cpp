@@ -47,6 +47,14 @@ void set_cpu_layout_on_numa_nodes(bool verbose)
     cpu_layout_initlized = true;
 }
 
+size_t get_physical_core_id(size_t core_id)
+{
+    if (cpu_layout_initlized)
+        return cpu_layout[core_id];
+    else
+        return core_id;
+}
+
 int pin_to_core(int core_id)
 {
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);

@@ -16,6 +16,7 @@
 #include <rte_udp.h>
 #include <string>
 #include <unistd.h>
+#include <utils.h>
 
 #define RX_RING_SIZE 2048
 #define TX_RING_SIZE 2048

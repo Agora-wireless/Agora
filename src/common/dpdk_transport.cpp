@@ -273,8 +273,10 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
 void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
 {
     // DPDK setup
-    std::string core_list = std::to_string(core_offset) + "-"
-        + std::to_string(core_offset + thread_num);
+    std::string core_list = std::to_string(get_physical_core_id(core_offset));
+    for (size_t i = 1; i < thread_num + 1; i++)
+        core_list = core_list + ","
+            + std::to_string(get_physical_core_id(core_offset + i));
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
         = { "txrx", "-l", core_list.c_str(), "--log-level", "0", nullptr };
