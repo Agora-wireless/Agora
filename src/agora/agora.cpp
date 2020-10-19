@@ -230,6 +230,9 @@ void Agora::start()
         return;
     }
 
+    pin_to_core_with_offset(
+        ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
+
     // Agora processes a frame after processing for previous frames is
     // complete. cur_frame_id is the frame that is currently being processed.
     size_t cur_frame_id = 0;
@@ -709,8 +712,8 @@ void* Agora::worker(int tid)
 
     std::vector<Doer*> computers_vec;
     if (config_->dl_data_symbol_num_perframe > 0)
-        computers_vec = { computeZF, computeFFT, computeEncoding, computeIFFT,
-            computePrecode };
+        computers_vec = { computeZF, computeFFT, computeIFFT, computePrecode,
+            computeEncoding };
     else
         computers_vec = { computeDecodingLast, computeZF, computeFFT,
             computeDecoding, computeDemul };
