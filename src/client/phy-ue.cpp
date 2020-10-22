@@ -861,6 +861,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
+    size_t block_error(0);
     for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
          cb_id++) {
         size_t demod_buffer_offset
@@ -880,7 +881,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
             decoded_bits_count_[ant_id][total_dl_symbol_id]
                 += 8 * config_->num_bytes_per_cb;
             decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
-            size_t block_error(0);
+            size_t byte_error(0);
             for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
                 uint8_t rx_byte = decoded_buffer_ptr[i];
                 uint8_t tx_byte = (uint8_t)config_->get_info_bits(
@@ -892,11 +893,12 @@ void Phy_UE::doDecode(int tid, size_t tag)
                     xor_byte >>= 1;
                 }
                 if (rx_byte != tx_byte)
-                    block_error++;
+                    byte_error++;
 
                 bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
             }
-            block_error_count_[ant_id][total_dl_symbol_id] += (block_error > 0);
+            block_error_count_[ant_id][total_dl_symbol_id] += (byte_error > 0);
+            block_error += (byte_error > 0);
         }
 
         if (kPrintDecodedData) {
@@ -912,8 +914,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
     }
     if (kCollectPhyStats) {
         decoded_symbol_count_[ant_id]++;
-        symbol_error_count_[ant_id]
-            += block_error_count_[ant_id][total_dl_symbol_id] > 0;
+        symbol_error_count_[ant_id] += (block_error > 0);
     }
 
     size_t dec_duration_stat = rdtsc() - start_tsc;
