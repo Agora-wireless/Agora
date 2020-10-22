@@ -57,8 +57,7 @@ public:
 
     // Load input data for a single UE and a single subcarrier
     void load_input_data(size_t symbol_idx_dl, size_t total_data_symbol_idx,
-        size_t user_id, size_t sc_id, size_t sc_id_in_block,
-        size_t is_pilot_sc);
+        size_t user_id, size_t sc_id, size_t sc_id_in_block);
     void precoding_per_sc(
         size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
 
@@ -70,7 +69,6 @@ private:
     DurationStat* duration_stat;
     complex_float* modulated_buffer_temp;
     complex_float* precoded_buffer_temp;
-    size_t* pilot_sc_flags;
 #if USE_MKL_JIT
     void* jitter;
     cgemm_jit_kernel_t my_cgemm;
