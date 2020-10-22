@@ -545,6 +545,11 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     rx_offset = 0;
     while (c->running) {
 
+        if (c->frames_to_test > 0 && frame_id > c->frames_to_test) {
+            c->running = false;
+            break;
+        }
+
         // recv corresponding to symbol_id = 0 (Beacon)
         int r = radio->radioRx(
             radio_id, frm_rx_buff.data(), num_samps + rx_offset, rxTime);
