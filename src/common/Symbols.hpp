@@ -124,10 +124,13 @@ static constexpr bool kUseUHD = false;
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
 
+static constexpr bool kUsePartialTrans = true;
+
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = false;
 static constexpr bool kCollectPhyStats = false;
 
+static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
 static constexpr bool kDebugPrintPerFrameStart = true;
 static constexpr bool kDebugPrintPerSymbolDone = false;
@@ -150,6 +153,7 @@ enum class ThreadType {
     kWorkerFFT,
     kWorkerZF,
     kWorkerDemul,
+    kWorkerDecode,
     kWorkerRX,
     kWorkerTX,
     kWorkerTXRX,
@@ -171,6 +175,8 @@ static inline std::string thread_type_str(ThreadType thread_type)
         return "Worker (ZF)";
     case ThreadType::kWorkerDemul:
         return "Worker (Demul)";
+    case ThreadType::kWorkerDecode:
+        return "Worker (Decode)";
     case ThreadType::kWorkerRX:
         return "RX";
     case ThreadType::kWorkerTX:

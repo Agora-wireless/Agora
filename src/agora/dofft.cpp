@@ -167,8 +167,11 @@ void DoFFT::partial_transpose(
             const complex_float* src
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
-            complex_float* dst = &out_buf[block_base_offset
-                + (ant_id * kTransposeBlockSize) + sc_j];
+            complex_float* dst = kUsePartialTrans
+                ? &out_buf[block_base_offset + (ant_id * kTransposeBlockSize)
+                      + sc_j]
+                : &out_buf[(cfg->OFDM_DATA_NUM * ant_id) + sc_j
+                      + block_idx * kTransposeBlockSize];
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline

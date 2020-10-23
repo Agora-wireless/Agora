@@ -510,12 +510,14 @@ void Stats::save_to_file()
         for (size_t i = 0; i < last_frame_id; i++) {
             fprintf(fp_debug_detailed,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
-                fft_breakdown_us[0][i], fft_breakdown_us[1][i],
-                fft_breakdown_us[2][i], zf_breakdown_us[0][i],
-                zf_breakdown_us[1][i], zf_breakdown_us[2][i],
-                demul_breakdown_us[0][i], demul_breakdown_us[1][i],
-                demul_breakdown_us[2][i], decode_breakdown_us[0][i],
-                decode_breakdown_us[1][i], decode_breakdown_us[2][i]);
+                fft_breakdown_us[0][i] + csi_breakdown_us[0][i],
+                fft_breakdown_us[1][i] + csi_breakdown_us[1][i],
+                fft_breakdown_us[2][i] + csi_breakdown_us[2][i],
+                zf_breakdown_us[0][i], zf_breakdown_us[1][i],
+                zf_breakdown_us[2][i], demul_breakdown_us[0][i],
+                demul_breakdown_us[1][i], demul_breakdown_us[2][i],
+                decode_breakdown_us[0][i], decode_breakdown_us[1][i],
+                decode_breakdown_us[2][i]);
         }
         fclose(fp_debug_detailed);
     }
