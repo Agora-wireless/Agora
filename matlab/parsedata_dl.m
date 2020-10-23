@@ -175,3 +175,9 @@ legend({sprintf('RX duration (avg: %.2f us)',avg_rx_duration),...
     sprintf('IFFT done (avg: %.2f us)', avg_proc_duration)},'Location','southeast');
 title('CDF of frame duration and processing duration')
 
+[f_proc_delay,x_proc_delay] = ecdf(frame_duration_ifft(subset));
+x_set = x_proc_delay(f_proc_delay>0.99);
+tail_proc_duration = x_set(1);
+fprintf('99th: %.2f, max: %.2f\n',  tail_proc_duration, max(frame_duration_ifft(subset)));
+
+
