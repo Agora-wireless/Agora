@@ -51,8 +51,6 @@ static constexpr size_t kNumTimestampTypes
     = static_cast<size_t>(TsType::kTXDone) + 1;
 
 class Stats {
-    static constexpr bool kStatsPrintFrameSummary = true;
-
 public:
     Stats(Config* cfg, size_t break_down_num, double freq_ghz);
     ~Stats();
