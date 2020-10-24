@@ -158,8 +158,11 @@ public:
     size_t demul_block_size;
     size_t demul_events_per_symbol; // Derived from demul_block_size
 
-    // Number of OFDM data subcarriers handled in one zeroforcing event
+    // Number of OFDM data subcarriers handled in one doZF function call
     size_t zf_block_size;
+
+    // Number of doZF function call handled in on event
+    size_t zf_batch_size;
     size_t zf_events_per_symbol; // Derived from zf_block_size
 
     // Number of antennas handled in one FFT event
