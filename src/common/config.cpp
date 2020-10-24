@@ -202,6 +202,7 @@ Config::Config(std::string jsonfile)
         "Demodulation block size must be a multiple of transpose block size");
     demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
 
+    zf_batch_size = tddConf.value("zf_batch_size", 1);
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;

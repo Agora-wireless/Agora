@@ -157,7 +157,7 @@ void Agora::schedule_subcarriers(
     if (event_type == EventType::kZF) {
         Event_data event;
         event.event_type = event_type;
-        event.num_tags = 3;
+        event.num_tags = config_->zf_batch_size;
         size_t num_blocks = num_events / event.num_tags;
         size_t num_remainder = num_events % event.num_tags;
         if (num_remainder > 0)
