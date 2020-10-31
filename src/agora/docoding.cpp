@@ -195,7 +195,7 @@ Event_data DoDecode::launch(size_t tag)
         phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
     }
 
-    double duration = worker_rdtsc() - start_tsc;
+    size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
     if (cycles_to_us(duration, freq_ghz) > 500) {

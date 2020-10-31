@@ -132,6 +132,19 @@ static inline void partial_transpose_gather(
     }
 }
 
+// Gather data of one symbol from partially-transposed buffer
+// produced by dofft
+static inline void transpose_gather(size_t cur_sc_id, float* src, float*& dst,
+    size_t bs_ant_num, size_t ofdm_data_num)
+{
+    complex_float* cx_src = (complex_float*)src;
+    complex_float* cx_dst = (complex_float*)dst;
+    for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
+        *cx_dst = cx_src[ant_i * ofdm_data_num + cur_sc_id];
+        cx_dst++;
+    }
+}
+
 void DoZF::ZF_time_orthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
@@ -153,9 +166,14 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
             float* dst_csi_ptr
                 = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * ue_idx);
-            partial_transpose_gather(cur_sc_id,
-                (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
-                cfg->BS_ANT_NUM);
+            if (kUsePartialTrans)
+                partial_transpose_gather(cur_sc_id,
+                    (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
+                    cfg->BS_ANT_NUM);
+            else
+                transpose_gather(cur_sc_id,
+                    (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
+                    cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
         }
         if (cfg->recipCalEn) {
             arma::cx_fvec vec_calib_dl(

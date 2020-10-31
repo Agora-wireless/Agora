@@ -49,6 +49,7 @@ public:
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
+    void* worker_decode(int tid);
     void* worker(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
