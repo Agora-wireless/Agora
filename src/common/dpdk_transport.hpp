@@ -16,6 +16,7 @@
 #include <rte_udp.h>
 #include <string>
 #include <unistd.h>
+#include <utils.h>
 
 #define RX_RING_SIZE 2048
 #define TX_RING_SIZE 2048
@@ -38,8 +39,8 @@ public:
     DpdkTransport();
     ~DpdkTransport();
 
-    static int nic_init(
-        uint16_t port, struct rte_mempool* mbuf_pool, int thread_num);
+    static int nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
+        int thread_num, size_t pkt_len = JUMBO_FRAME_MAX_SIZE);
 
     // Steer the flow [src_ip, dest_ip, src_port, dst_port] arriving on
     // [port_id] to RX queue [rx_q]
@@ -63,5 +64,6 @@ public:
 
     /// Init dpdk on core [core_offset:core_offset+thread_num]
     static void dpdk_init(uint16_t core_offset, size_t thread_num);
-    static rte_mempool* create_mempool();
+    static rte_mempool* create_mempool(
+        size_t packet_length = JUMBO_FRAME_MAX_SIZE);
 };

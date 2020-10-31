@@ -104,7 +104,12 @@ private:
     Table<complex_float>& calib_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
+  
     complex_float* chan_est_tmp; // Temp buffer for estimated channel
+
+    // Buffer for store 16-bit IQ converted from 12-bit IQ
+    uint16_t* temp_16bits_iq;
+  
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
     PhyStats* phy_stats;
@@ -150,7 +155,7 @@ private:
     char* dl_socket_buffer_;
     DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    float* ifft_out; // Buffer IFFT output
+    float* ifft_out; // Buffer for IFFT output
 };
 
 #endif
