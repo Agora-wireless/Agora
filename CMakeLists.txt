@@ -189,7 +189,8 @@ include_directories(
 	src/mac/
   src/agora/
   src/agora/txrx/
-  src/client/)
+  src/client/
+  data/data_generator)
 
 include_directories(SYSTEM src/third_party)
 
@@ -306,11 +307,19 @@ add_executable(test_agora
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
 
-add_executable(test_ldpc
-  test/compute_kernels/ldpc/test_ldpc.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_ldpc ${COMMON_LIBS})
-add_test(NAME test_ldpc COMMAND test_ldpc)
+
+set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
+foreach(test_name IN LISTS LDPC_TESTS)
+  add_executable(${test_name}
+    test/compute_kernels/ldpc/${test_name}.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
+  # Unit tests should pass without memory errors
+  set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
+
+  target_link_libraries(${test_name} ${COMMON_LIBS})
+  add_test(NAME ${test_name} COMMAND ${test_name})
+endforeach()
+
 
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
