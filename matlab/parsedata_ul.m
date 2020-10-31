@@ -1,5 +1,4 @@
 fid = fopen('../data/timeresult.txt');
-%  fid = fopen('uplink_change_core/timeresult_agora_64x16_1ms.txt');
 % 1. Pilot RX by socket threads (= reference time), 
 % 2. kPilotRX, 3. kProcessingStarted, 4. kPilotAllRX, 5. kFFTDone, 6. kZFDone, 
 % 7. kDemulDone, 8. kDecodeDone, 9. kRXDone, 10. time in CSI, 11. time in FFT, "
@@ -42,7 +41,7 @@ demul_time_in_function = temp{13};
 decode_time_in_function = temp{14};
 
 index = [1:frame_count];
-subset = index(1200:frame_count-2);
+subset = index(500:frame_count-2);
 
 
 fprintf("Average delay between rx thread and main thread: %.2f\n", ...
@@ -187,7 +186,7 @@ xlabel('Duration (us)');
 
 
 [f_proc_delay,x_proc_delay] = ecdf(frame_duration_decode(subset));
-x_set = x_proc_delay(f_proc_delay>0.99);
+x_set = x_proc_delay(f_proc_delay>0.999);
 tail_proc_duration = x_set(1);
 x_set = x_proc_delay(f_proc_delay>0.5);
 median_proc_duration = x_set(1);
@@ -197,7 +196,7 @@ legend({sprintf('RX duration (avg: %.2f us)',avg_rx_duration),...
     avg_proc_duration)},'Location','southeast');
 title('CDF of frame duration and processing duration')
 
-fprintf('Median: %.2f, 99th: %.2f, max: %.2f\n',  median_proc_duration, tail_proc_duration, max(frame_duration_decode(subset)));
+fprintf('Median: %.2f, 99.9th: %.2f, max: %.2f\n',  median_proc_duration, tail_proc_duration, max(frame_duration_decode(subset)));
 
 figure(4);clf;
 myccdf = 1-f_proc_delay;

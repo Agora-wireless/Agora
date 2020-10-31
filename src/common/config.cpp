@@ -210,6 +210,8 @@ Config::Config(std::string jsonfile)
     fft_block_size = tddConf.value("fft_block_size", 1);
     encode_block_size = tddConf.value("encode_block_size", 1);
 
+    noise_level = tddConf.value("noise_level", 0.03); //default: 30 dB
+    printf("Noise level: %.2f\n", noise_level);
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);

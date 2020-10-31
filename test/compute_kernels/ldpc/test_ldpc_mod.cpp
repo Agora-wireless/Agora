@@ -59,7 +59,6 @@ int main(int argc, char* argv[])
 {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator(seed);
-
     std::normal_distribution<double> distribution(0.0, 1.0);
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -118,15 +117,14 @@ int main(int argc, char* argv[])
             }
         }
 
-        // Modulate the encoded codewords
         Table<complex_float> modulated_codewords;
         modulated_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 64);
-
         Table<int8_t> demod_data_all_symbols;
         demod_data_all_symbols.calloc(
             num_codeblocks, cfg->OFDM_DATA_NUM * 8, 64);
-
         std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+
+        // Modulate, add noise, and demodulate the encoded codewords
         for (size_t i = 0; i < num_codeblocks; i++) {
 
             adapt_bits_for_mod(
@@ -145,7 +143,6 @@ int main(int argc, char* argv[])
                               * noise_levels[noise_id],
                           static_cast<float>(distribution(generator))
                               * noise_levels[noise_id] };
-                // printf("%.4f+%.4fi ", noise.re, noise.im);
                 modulated_codewords[i][j].re
                     = modulated_codewords[i][j].re + noise.re;
                 modulated_codewords[i][j].im

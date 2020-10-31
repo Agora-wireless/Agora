@@ -314,6 +314,8 @@ public:
 
     // Size of tranport block given by upper layer
     size_t transport_block_size;
+
+    float noise_level;
     LDPCconfig LDPC_config; // LDPC parameters
 
     // Number of bytes per code block
