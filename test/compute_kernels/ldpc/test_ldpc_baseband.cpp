@@ -45,7 +45,6 @@ int main(int argc, char* argv[])
 {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator(seed);
-
     std::normal_distribution<double> distribution(0.0, 1.0);
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -186,22 +185,20 @@ int main(int argc, char* argv[])
             }
         }
 
-        // Generate CSI matrix
+        // Generate CSI matrix without noise
         Table<complex_float> csi_matrices_no_noise;
         csi_matrices_no_noise.calloc(
             cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
         for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
             complex_float csi = { static_cast<float>(distribution(generator)),
                 static_cast<float>(distribution(generator)) };
-            // printf("noise of ant %d, ue %d\n", i % cfg->BS_ANT_NUM, i / cfg->BS_ANT_NUM );
             for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-                // printf("%.4f+%.4fi ", noise.re, noise.im);
                 csi_matrices_no_noise[j][i].re = csi.re;
                 csi_matrices_no_noise[j][i].im = csi.im;
             }
-            // printf("\n");
         }
 
+        // Generate CSI matrix with noise for pilot symbols
         Table<complex_float> csi_matrices_pilot;
         csi_matrices_pilot.calloc(
             cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
@@ -212,15 +209,14 @@ int main(int argc, char* argv[])
                               * noise_levels[noise_id],
                           static_cast<float>(distribution(generator))
                               * noise_levels[noise_id] };
-                // printf("%.4f+%.4fi ", noise.re, noise.im);
                 csi_matrices_pilot[j][i].re
                     = csi_matrices_no_noise[j][i].re + noise.re;
                 csi_matrices_pilot[j][i].im
                     = csi_matrices_no_noise[j][i].im + noise.im;
             }
-            // printf("\n");
         }
 
+        // Generate CSI matrix with noise for data symbols
         Table<complex_float> csi_matrices_data;
         csi_matrices_data.calloc(
             cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
@@ -231,13 +227,11 @@ int main(int argc, char* argv[])
                               * noise_levels[noise_id],
                           static_cast<float>(distribution(generator))
                               * noise_levels[noise_id] };
-                // printf("%.4f+%.4fi ", noise.re, noise.im);
                 csi_matrices_data[j][i].re
                     = csi_matrices_no_noise[j][i].re + noise.re;
                 csi_matrices_data[j][i].im
                     = csi_matrices_no_noise[j][i].im + noise.im;
             }
-            // printf("\n");
         }
 
         // Generate RX data received by base station after going through channels
