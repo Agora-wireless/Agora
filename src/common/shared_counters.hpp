@@ -4,6 +4,7 @@
 #include "config.hpp"
 #include "logger.h"
 #include "utils.h"
+#include "gettime.h"
 #include <mutex>
 #include <sstream>
 #include <vector>
@@ -19,6 +20,8 @@ public:
         , num_data_symbol_per_frame_(cfg->data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
+        , last_frame_cycles_(worker_rdtsc())
+        , freq_ghz_(measure_rdtsc_freq())
     {
     }
 
@@ -94,6 +97,7 @@ public:
         num_decode_tasks_completed_++;
         if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
             cur_frame_++;
+	    size_t cur_cycle = worker_rdtsc();
             num_decode_tasks_completed_ = 0;
             size_t frame_slot = frame_id % kFrameWnd;
             num_pkts_[frame_slot] = 0;
@@ -101,7 +105,8 @@ public:
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[frame_slot][j] = 0;
             }
-            printf("Main thread: Decode done frame: %lu\n", cur_frame_ - 1);
+            printf("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+            last_frame_cycles_ = cur_cycle;
         }
         decode_mutex_.unlock();
     }
@@ -132,6 +137,12 @@ public:
     // cur_frame will be incremented in all tasks are completed
     size_t num_decode_tasks_completed_;
     std::mutex decode_mutex_;
+
+    // The timestamp when last frame was processed (in cycles)
+    size_t last_frame_cycles_;
+    
+    // The CPU frequency (in GHz), used to convert cycles to time
+    size_t freq_ghz_;
 
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame_;
@@ -224,6 +235,7 @@ public:
     {
         num_demod_data_received_[ue_id - cfg_->ue_start][frame_id % kFrameWnd]
                                 [symbol_id]++;
+        printf("Receive demod data for ue %lu symbol %lu\n", ue_id, symbol_id);
     }
 
     bool received_all_demod_data(
@@ -235,6 +247,7 @@ public:
             num_demod_data_received_[ue_id - cfg_->ue_start]
                                     [frame_id % kFrameWnd][symbol_id]
                 = 0;
+            printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id);
             return true;
         }
         return false;

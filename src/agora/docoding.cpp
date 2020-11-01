@@ -219,6 +219,7 @@ void DoDecode::start_work()
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
                    ue_id, cur_frame_, cur_symbol_)) {
+            printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id, cur_frame_, cur_symbol_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
