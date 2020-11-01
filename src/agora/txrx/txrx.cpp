@@ -148,7 +148,7 @@ void* PacketTXRX::demod_thread(int tid)
                     (struct sockaddr*)&millipede_addrs_
                         [cfg->get_server_idx_by_ue(ue_id)],
                     sizeof(millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)]));
-                printf("Send demod data ue %lu symbol %lu\n", ue_id, demod_symbol_to_send);
+                printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send, cfg->get_server_idx_by_ue(ue_id));
                 rt_assert(ret > 0, "sendto() failed");
             }
             demod_symbol_to_send++;
