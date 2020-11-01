@@ -235,7 +235,7 @@ public:
     {
         num_demod_data_received_[ue_id - cfg_->ue_start][frame_id % kFrameWnd]
                                 [symbol_id]++;
-        printf("Receive demod data for ue %lu symbol %lu\n", ue_id, symbol_id);
+        //printf("Receive demod data for ue %lu symbol %lu\n", ue_id, symbol_id);
     }
 
     bool received_all_demod_data(

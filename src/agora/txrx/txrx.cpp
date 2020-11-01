@@ -170,6 +170,7 @@ void* PacketTXRX::demod_thread(int tid)
         auto* pkt = reinterpret_cast<Packet*>(&recv_buf[0]);
         rt_assert(pkt->pkt_type == Packet::PktType::kDemod,
             "Received unknown packet type in demod TX/RX thread");
+        printf("Receive demod data ue %lu symbol %lu server %lu\n", pkt->ue_id, pkt->symbol_id, pkt->server_id);
 
         const size_t symbol_idx_ul
             = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
