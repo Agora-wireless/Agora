@@ -91,11 +91,11 @@ private:
     void* demod_thread(int tid);
 
     int dequeue_send(int tid);
-    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    int recv_enqueue(int tid, int radio_id, int rx_offset);
 
     // Receive packets and relocate data to the correct address based on
     // the subcarrier range
-    Packet* recv_relocate(int tid, int radio_id, int rx_offset);
+    int recv_relocate(int tid, int radio_id, int rx_offset);
 
     void* loop_tx_rx_argos(int tid);
     int dequeue_send_argos(int tid);
@@ -122,7 +122,7 @@ private:
 
     std::vector<struct sockaddr_in> bs_rru_sockaddr_;
     std::vector<int> socket_;
-    std::vector<struct sockaddr_in> millipede_addrs_;
+    std::vector<struct sockaddr_in> millipede_sockaddrs_;
     int demod_tx_socket_;
 
     char* send_buffer_;
@@ -131,6 +131,7 @@ private:
     uint32_t bs_rru_addr; // IPv4 address of the simulator sender
     uint32_t bs_server_addr; // IPv4 address of the Agora server
     struct rte_mempool* mbuf_pool;
+    std::vector<uint32_t> millipede_addrs_;
 #endif
 
     RadioConfig* radioconfig_; // Used only in Argos mode

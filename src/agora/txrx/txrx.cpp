@@ -21,7 +21,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
         socket_.resize(cfg->nRadios);
         bs_rru_sockaddr_.resize(cfg->nRadios);
         if (cfg->disable_master) {
-            millipede_addrs_.resize(cfg->server_addr_list.size());
+            millipede_sockaddrs_.resize(cfg->server_addr_list.size());
         }
     } else {
         radioconfig_ = new RadioConfig(cfg);
@@ -111,7 +111,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 void* PacketTXRX::demod_thread(int tid)
 {
     std::vector<uint8_t> recv_buf(cfg->packet_length);
-    UDPServer udp_server(cfg->demod_rx_port);
+    UDPServer udp_server(cfg->demod_rx_port, 128 * 1024 * 1024);
 
     pin_to_core_with_offset(
         ThreadType::kWorkerTXRX, core_offset, cfg->socket_thread_num);
@@ -122,7 +122,7 @@ void* PacketTXRX::demod_thread(int tid)
         = setup_socket_ipv4(cfg->demod_tx_port, true, sock_buf_size);
 
     for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
-        setup_sockaddr_remote_ipv4(&millipede_addrs_[i], cfg->demod_rx_port,
+        setup_sockaddr_remote_ipv4(&millipede_sockaddrs_[i], cfg->demod_rx_port,
             cfg->server_addr_list[i].c_str());
     }
 
@@ -145,9 +145,9 @@ void* PacketTXRX::demod_thread(int tid)
                     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 ssize_t ret = sendto(demod_tx_socket_, pkt, cfg->packet_length,
                     MSG_DONTWAIT,
-                    (struct sockaddr*)&millipede_addrs_
+                    (struct sockaddr*)&millipede_sockaddrs_
                         [cfg->get_server_idx_by_ue(ue_id)],
-                    sizeof(millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)]));
+                    sizeof(millipede_sockaddrs_[cfg->get_server_idx_by_ue(ue_id)]));
                 printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send, cfg->get_server_idx_by_ue(ue_id));
                 rt_assert(ret > 0, "sendto() failed");
             }
@@ -258,20 +258,20 @@ void* PacketTXRX::loop_tx_rx(int tid)
         }
 
         // Receive data
-        Packet* pkt = cfg->disable_master
+        int res = cfg->disable_master
             ? recv_relocate(tid, radio_id, rx_offset)
             : recv_enqueue(tid, radio_id, rx_offset);
-        if (pkt == NULL)
+        if (res == 0)
             continue;
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
-        if (kIsWorkerTimingEnabled) {
-            int frame_id = pkt->frame_id;
-            if (frame_id > prev_frame_id) {
-                rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
-                prev_frame_id = frame_id;
-            }
-        }
+        // if (kIsWorkerTimingEnabled) {
+        //     int frame_id = pkt->frame_id;
+        //     if (frame_id > prev_frame_id) {
+        //         rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
+        //         prev_frame_id = frame_id;
+        //     }
+        // }
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
@@ -279,7 +279,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
-Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
+int PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
 {
     // TODO [junzhi]: Can we avoid malloc? Currently we're leaking buf because
     // we return buf as a Packet to the caller.
@@ -291,7 +291,7 @@ Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
             exit(-1);
         }
         free(buf);
-        return nullptr;
+        return 0;
     }
 
     const auto* pkt = reinterpret_cast<Packet*>(buf);
@@ -324,10 +324,10 @@ Packet* PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
         printf("Received unknown packet from rru\n");
         exit(1);
     }
-    return reinterpret_cast<Packet*>(buf);
+    return 1;
 }
 
-struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
+int PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
@@ -363,7 +363,7 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
         printf("socket message enqueue failed\n");
         exit(0);
     }
-    return pkt;
+    return 1;
 }
 
 int PacketTXRX::dequeue_send(int tid)

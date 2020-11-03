@@ -37,6 +37,21 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
             port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
     }
 
+    int ret = inet_pton(AF_INET, cfg->server_addr_list[cfg->server_addr_idx].c_str(), &millipede_addrs_[cfg->server_addr_idx]);
+    rt_assert(ret == 1, "Invalid sender IP address");
+    for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
+        int ret = inet_pton(AF_INET, cfg->server_addr_list[i].c_str(), &millipede_addrs_[i]);
+        rt_assert(ret == 1, "Invalid sender IP address");
+        uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
+        uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
+        printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+               "dst port: %zu, queue: %zu\n",
+            cfg->server_addr_list[i].c_str(), cfg->server_addr_list[cfg->server_addr_idx].c_str(),
+            cfg->demod_tx_port, cfg->demod_rx_port, socket_thread_num);
+        DpdkTransport::install_flow_rule(
+            port_id, socket_thread_num, millipede_addrs_[i], millipede_addrs_[cfg->server_addr_idx], src_port, dst_port);
+    }
+
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
@@ -55,7 +70,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
+    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
+    Table<int8_t>* demod_soft_buffer_to_decode)
 {
     buffer_ = &buffer;
     buffer_status_ = &buffer_status;
@@ -63,6 +80,16 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
+
+    demod_buffers_ = demod_buffers;
+    demod_soft_buffer_to_decode_ = demod_soft_buffer_to_decode;
+
+    if (kUseArgos) {
+        if (!radioconfig_->radioStart()) {
+            fprintf(stderr, "Failed to start radio\n");
+            return false;
+        }
+    }
 
     unsigned int lcore_id;
     size_t worker_id = 0;
@@ -78,10 +105,148 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
                 context, lcore_id);
+        } else if (worker_id == socket_thread_num && cfg->disable_master) {
+            auto context = new EventHandlerContext<PacketTXRX>;
+            context->obj_ptr = this;
+            context->id = worker_id;
+            rte_eal_remote_launch((lcore_function_t*)
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+                context, lcore_id);
         }
         worker_id++;
     }
+
+    if (kUseArgos)
+        radioconfig_->go();
+
     return true;
+}
+
+void PacketTXRX::demod_thread(int tid) 
+{
+    std::vector<uint8_t> recv_buf(cfg->packet_length);
+
+    printf("Demodulation TX/RX thread\n");
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+
+    while (cfg->running) {
+        // 1. Try to send demodulated data to decoders
+        if (demul_status_->ready_to_decode(
+                demod_frame_to_send, demod_symbol_to_send)) {
+            for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+                int8_t* demod_ptr = (*demod_buffers_)[demod_frame_to_send
+                    % kFrameWnd][demod_symbol_to_send
+                    - cfg->pilot_symbol_num_perframe][ue_id];
+
+                struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+                struct rte_ether_hdr* eth_hdr
+                    = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+                eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+
+                struct rte_ipv4_hdr* ip_h
+                    = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
+                ip_h->src_addr = millipede_addrs_[cfg->server_addr_idx];
+                ip_h->dst_addr = millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)];
+                ip_h->next_proto_id = IPPROTO_UDP;
+
+                struct rte_udp_hdr* udp_h
+                    = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
+                udp_h->src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
+                udp_h->dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
+
+                tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
+                tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
+
+                char* payload = (char*)eth_hdr + kPayloadOffset;
+                auto* pkt = reinterpret_cast<Packet*>(payload);
+                pkt->pkt_type = Packet::PktType::kDemod;
+                pkt->frame_id = demod_frame_to_send;
+                pkt->symbol_id = demod_symbol_to_send;
+                pkt->ue_id = ue_id;
+                pkt->server_id = cfg->server_addr_idx;
+                DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
+                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+
+                // Send data (one OFDM symbol)
+                size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+                if (unlikely(nb_tx_new != 1)) {
+                    printf("rte_eth_tx_burst() failed\n");
+                    exit(0);
+                }
+                printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send, cfg->get_server_idx_by_ue(ue_id));
+                rt_assert(ret > 0, "sendto() failed");
+            }
+            demod_symbol_to_send++;
+            if (demod_symbol_to_send
+                == cfg->pilot_symbol_num_perframe
+                    + cfg->ul_data_symbol_num_perframe) {
+                demod_symbol_to_send = cfg->pilot_symbol_num_perframe;
+                demod_frame_to_send++;
+            }
+        }
+
+        // 2. Try to receive demodulated data for decoding
+        rte_mbuf* rx_bufs[kRxBatchSize];
+        uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+        if (unlikely(nb_rx == 0))
+            continue;
+
+        for (size_t i = 0; i < nb_rx; i++) {
+            rte_mbuf* dpdk_pkt = rx_bufs[i];
+            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+
+            if (eth_type != RTE_ETHER_TYPE_IPV4
+                or ip_hdr->next_proto_id != IPPROTO_UDP) {
+                rte_pktmbuf_free(rx_bufs[i]);
+                continue;
+            }
+
+            bool found = false;
+            for (size_t j = 0; j < millipede_addrs_.size(); j ++) {
+                if (ip_hdr->src_addr == millipede_addrs_[j]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                fprintf(stderr, "DPDK: Source addr does not match\n");
+                rte_pktmbuf_free(rx_bufs[i]);
+                continue;
+            }
+            if (ip_hdr->dst_addr != millipede_addrs_[cfg->server_addr_idx]) {
+                fprintf(stderr, "DPDK: Destination addr does not match\n");
+                rte_pktmbuf_free(rx_bufs[i]);
+                continue;
+            }
+
+            auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+            if (pkt->pkt_type == Packet::PktType::kDemod) {
+                printf("Receive demod data ue %lu symbol %lu server %lu\n", pkt->ue_id, pkt->symbol_id, pkt->server_id);
+                const size_t symbol_idx_ul
+                    = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
+                const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+
+                int8_t* demod_ptr
+                    = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                        pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+                DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                decode_status_->receive_demod_data(
+                    pkt->ue_id, pkt->frame_id, symbol_idx_ul);
+            } else {
+                printf("Received unknown packet type in demod TX/RX thread\n");
+                exit(1);
+            }
+
+            rte_pktmbuf_free(rx_bufs[i]);
+        }
+    }
+
+    return 0;
 }
 
 void PacketTXRX::send_beacon(int tid, size_t frame_id)
@@ -96,17 +261,33 @@ void* PacketTXRX::loop_tx_rx(int tid)
     size_t rx_offset = 0;
     size_t prev_frame_id = SIZE_MAX;
 
-    while (cfg->running) {
-        if (-1 != dequeue_send(tid))
-            continue;
+    int radio_lo = tid * cfg->nRadios / socket_thread_num;
+    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+    int radio_id = radio_lo;
 
-        dpdk_recv(tid, prev_frame_id, rx_offset);
+    while (cfg->running) {
+        if (!cfg->disable_master) {
+            if (-1 != dequeue_send(tid))
+                continue;
+        }
+        
+        // Receive data
+        int res = cfg->disable_master
+            ? recv_relocate(tid, radio_id, rx_offset)
+            : recv_enqueue(tid, radio_id, rx_offset);
+        if (res == 0)
+            continue;
+        rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
+
+        if (++radio_id == radio_hi)
+            radio_id = radio_lo;
+        
     }
     return 0;
 }
 
-uint16_t PacketTXRX::dpdk_recv(
-    int tid, size_t& prev_frame_id, size_t& rx_offset)
+int PacketTXRX::recv_relocate(
+    int tid, int& radio_id, size_t& rx_offset)
 {
     rte_mbuf* rx_bufs[kRxBatchSize];
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
@@ -156,11 +337,34 @@ uint16_t PacketTXRX::dpdk_recv(
             continue;
         }
 
-        auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
-        auto* pkt = reinterpret_cast<Packet*>(
-            &(*buffer_)[tid][rx_offset * cfg->packet_length]);
-        DpdkTransport::fastMemcpy(
-            reinterpret_cast<uint8_t*>(pkt), payload, cfg->packet_length);
+        auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+        if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
+            char* rx_buffer = (*buffer_)[pkt->ant_id];
+            const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
+                    * cfg->symbol_num_perframe
+                + pkt->symbol_id;
+
+            size_t sc_offset = Packet::kOffsetOfData
+                + 2 * sizeof(unsigned short)
+                    * (cfg->OFDM_DATA_START
+                        + cfg->server_addr_idx * cfg->get_num_sc_per_server());
+            DpdkTransport::fastMemcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+            DpdkTransport::fastMemcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+                (uint8_t*)pkt + Packet::kOffsetOfData,
+                cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
+
+            // get the position in rx_buffer
+            // move ptr & set status to full
+            // rx_buffer_status[rx_offset] = 1;
+            if (!rx_status_->add_new_packet(pkt)) {
+                cfg->running = false;
+            }
+        } else {
+            printf("Received unknown packet from rru\n");
+            exit(1);
+        }
 
         rte_pktmbuf_free(rx_bufs[i]);
 
@@ -169,13 +373,6 @@ uint16_t PacketTXRX::dpdk_recv(
                 (*frame_start_)[tid][pkt->frame_id % kNumStatsFrames] = rdtsc();
                 prev_frame_id = pkt->frame_id;
             }
-        }
-
-        if (!message_queue_->enqueue(*rx_ptoks_[tid],
-                Event_data(
-                    EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag))) {
-            printf("Failed to enqueue socket message\n");
-            exit(-1);
         }
 
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
