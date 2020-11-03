@@ -285,7 +285,7 @@ public:
 };
 
 /**
-  * @brief This class stores the metrics coresponding to a Frame.
+  * @brief This class stores the counters corresponding to a frame.
   * Specifically, it contains a) the number of symbols per frame 
   * and b) the number of tasks per symbol, per frame.
   */
