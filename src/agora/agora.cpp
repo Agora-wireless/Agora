@@ -327,8 +327,8 @@ void Agora::start()
                 for (size_t tag_id = 0; tag_id < event.num_tags; tag_id++) {
                     size_t frame_id = gen_tag_t(event.tags[tag_id]).frame_id;
                     print_per_task_done(PrintType::kZF, frame_id, 0,
-                        zf_counters_.get_symbol_count(frame_id));
-                    if (zf_counters_.last_symbol(frame_id)) {
+                        zf_counters_.get_task_count(frame_id));
+                    if (zf_counters_.last_task(frame_id)) {
                         stats->master_set_tsc(TsType::kZFDone, frame_id);
                         zf_last_frame = frame_id;
                         print_per_frame_done(PrintType::kZF, frame_id);
@@ -462,7 +462,7 @@ void Agora::start()
                     size_t symbol_id = gen_tag_t(event.tags[i]).symbol_id;
                     size_t symbol_idx_dl
                         = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-                    if (encode_counters_.last_task(frame_id, data_symbol_idx)) {
+                    if (encode_counters_.last_task(frame_id, symbol_idx_dl)) {
                         encode_cur_frame_for_symbol[symbol_idx_dl] = frame_id;
                         // If precoder of the current frame exists
                         if (zf_last_frame == frame_id) {
@@ -633,7 +633,6 @@ void Agora::handle_event_fft(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t frame_slot = frame_id % kFrameWnd;
     SymbolType sym_type = config_->get_symbol_type(frame_id, symbol_id);
 
     if (sym_type == SymbolType::kPilot) {
@@ -671,7 +670,7 @@ void Agora::handle_event_fft(size_t tag)
     } else if (sym_type == SymbolType::kCalDL
         or sym_type == SymbolType::kCalUL) {
         print_per_symbol_done(PrintType::kFFTCal, frame_id, symbol_id);
-        if (rc_counters_.last_symbol(frame_id)) {
+        if (rc_counters_.last_task(frame_id)) {
             print_per_frame_done(PrintType::kFFTCal, frame_id);
             stats->master_set_tsc(TsType::kRCDone, frame_id);
             rc_last_frame = frame_id;
@@ -1154,8 +1153,7 @@ void Agora::initialize_uplink_buffers()
     rx_counters_.num_reciprocity_pkts_per_frame = cfg->BS_ANT_NUM;
 
     fft_created_count = 0;
-    fft_counters_.init(cfg->pilot_symbol_num_perframe, cfg->BS_ANT_NUM,
-        cfg->symbol_num_perframe);
+    fft_counters_.init(cfg->pilot_symbol_num_perframe, cfg->BS_ANT_NUM);
     fft_cur_frame_for_symbol
         = std::vector<size_t>(cfg->ul_data_symbol_num_perframe, SIZE_MAX);
 
@@ -1163,15 +1161,13 @@ void Agora::initialize_uplink_buffers()
 
     zf_counters_.init(config_->zf_events_per_symbol);
 
-    demul_counters_.init(cfg->ul_data_symbol_num_perframe,
-        config_->demul_events_per_symbol, cfg->data_symbol_num_perframe);
+    demul_counters_.init(
+        cfg->ul_data_symbol_num_perframe, config_->demul_events_per_symbol);
 
     decode_counters_.init(cfg->ul_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        cfg->data_symbol_num_perframe);
+        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM);
 
-    tomac_counters_.init(cfg->ul_data_symbol_num_perframe, cfg->UE_NUM,
-        cfg->data_symbol_num_perframe);
+    tomac_counters_.init(cfg->ul_data_symbol_num_perframe, cfg->UE_NUM);
 }
 
 void Agora::initialize_downlink_buffers()
@@ -1200,19 +1196,15 @@ void Agora::initialize_downlink_buffers()
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
-    frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->UE_NUM,
-        cfg->data_symbol_num_perframe);
+    frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->UE_NUM);
     encode_counters_.init(cfg->dl_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM,
-        cfg->data_symbol_num_perframe);
+        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM);
     encode_cur_frame_for_symbol
         = std::vector<size_t>(cfg->dl_data_symbol_num_perframe, SIZE_MAX);
-    precode_counters_.init(cfg->dl_data_symbol_num_perframe,
-        config_->demul_events_per_symbol, cfg->data_symbol_num_perframe);
-    ifft_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM,
-        cfg->data_symbol_num_perframe);
-    tx_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM,
-        cfg->data_symbol_num_perframe);
+    precode_counters_.init(
+        cfg->dl_data_symbol_num_perframe, config_->demul_events_per_symbol);
+    ifft_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM);
+    tx_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM);
 }
 
 void Agora::free_uplink_buffers()
