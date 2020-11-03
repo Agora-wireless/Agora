@@ -296,34 +296,20 @@ public:
     // Maximum number of tasks in a symbol
     size_t max_task_count;
 
-    void init(
-        int max_symbol_count, int max_task_count = -1, int max_data_symbol = -1)
+    void init(size_t max_symbol_count, size_t max_task_count = 0,
+        size_t max_data_symbol = 0)
     {
         this->max_symbol_count = max_symbol_count;
         this->max_task_count = max_task_count;
         symbol_count.fill(0);
-        // Define task counters if number of tasks > 0
-        if (max_task_count > 0) {
-            rt_assert(max_data_symbol > 0,
-                "max_data_symbol should be larger than 0.");
-            for (size_t i = 0; i < kFrameWnd; i++)
-                task_count[i] = new size_t[max_data_symbol]();
-        }
-    }
-
-    void fini()
-    {
-        for (size_t i = 0; i < kFrameWnd; i++)
-            delete[] task_count[i];
     }
 
     /**
      * @brief Check whether the symbol is the last symbol for a given frame 
      * while simultaneously incrementing the symbol count.
-     * If the symbol is the last symbol, the count is reset to 0.
      * @param frame id The frame id to check
      */
-    bool last_symbol(int frame_id)
+    bool last_symbol(size_t frame_id)
     {
         const size_t frame_slot = frame_id % kFrameWnd;
         if (++symbol_count[frame_slot] == max_symbol_count) {
@@ -364,7 +350,7 @@ public:
 private:
     // task_count[i][j] is the number of tasks completed for
     // frame (i % kFrameWnd) and symbol j
-    std::array<size_t*, kFrameWnd> task_count;
+    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd> task_count;
     // symbol_count[i] is the number of symbols completed for
     // frame (i % kFrameWnd)
     std::array<size_t, kFrameWnd> symbol_count;
