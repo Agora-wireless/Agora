@@ -296,8 +296,7 @@ public:
     // Maximum number of tasks in a symbol
     size_t max_task_count;
 
-    void init(size_t max_symbol_count, size_t max_task_count = 0,
-        size_t max_data_symbol = 0)
+    void init(size_t max_symbol_count, size_t max_task_count = 0)
     {
         this->max_symbol_count = max_symbol_count;
         this->max_task_count = max_task_count;
@@ -337,6 +336,24 @@ public:
         return false;
     }
 
+    /**
+     * @brief Check whether the task is the last task for a given frame 
+     * while simultaneously incrementing the task count.
+     * This is used for tasks performed once per frame (e.g., ZF)
+     * @param frame_id The frame id to check
+     */
+    bool last_task(size_t frame_id)
+    {
+        const size_t frame_slot = frame_id % kFrameWnd;
+        // Number of tasks is stored as number of symbols
+        if (++symbol_count[frame_slot] == max_symbol_count) {
+            // If the task is the last task, reset count to 0
+            symbol_count[frame_slot] = 0;
+            return true;
+        }
+        return false;
+    }
+
     size_t get_symbol_count(size_t frame_id)
     {
         return symbol_count[frame_id % kFrameWnd];
@@ -345,6 +362,11 @@ public:
     size_t get_task_count(size_t frame_id, size_t symbol_id)
     {
         return task_count[frame_id % kFrameWnd][symbol_id];
+    }
+
+    size_t get_task_count(size_t frame_id)
+    {
+        return symbol_count[frame_id % kFrameWnd];
     }
 
 private:
