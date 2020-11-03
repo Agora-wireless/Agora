@@ -57,8 +57,7 @@ void Simulator::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    buffer_frame_num
-        = symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+    buffer_frame_num = symbol_num_perframe * BS_ANT_NUM * kFrameWnd;
     max_packet_num_per_frame = BS_ANT_NUM * dl_data_symbol_num_perframe;
 
     /* counters for printing summary */
@@ -92,7 +91,7 @@ void Simulator::start()
                 int frame_id = pkt->frame_id % 10000;
                 int symbol_id = pkt->symbol_id;
                 int ant_id = pkt->ant_id;
-                int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
+                int frame_id_in_buffer = (frame_id % kFrameWnd);
                 socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
                 // printf(
@@ -218,15 +217,14 @@ void Simulator::initialize_uplink_buffers()
     alloc_buffer_1d(&context, TASK_THREAD_NUM, 64, 0);
 
     socket_buffer_size_ = (long long)packet_length * symbol_num_perframe
-        * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
-    socket_buffer_status_size_
-        = symbol_num_perframe * BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM;
+        * BS_ANT_NUM * kFrameWnd;
+    socket_buffer_status_size_ = symbol_num_perframe * BS_ANT_NUM * kFrameWnd;
     socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, 64);
     socket_buffer_status_.calloc(
         SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, 64);
 
     /* initilize all uplink status checkers */
-    alloc_buffer_1d(&rx_counter_packets_, TASK_BUFFER_FRAME_NUM, 64, 1);
+    alloc_buffer_1d(&rx_counter_packets_, kFrameWnd, 64, 1);
 
     frame_start.calloc(SOCKET_RX_THREAD_NUM, kNumStatsFrames, 4096);
     alloc_buffer_1d(&frame_start_receive, kNumStatsFrames, 4096, 1);

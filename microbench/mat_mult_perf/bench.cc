@@ -6,6 +6,9 @@
 
 double freq_ghz = -1.0;  // RDTSC frequency
 
+#define clflushopt(addr) \
+  asm volatile(".byte 0x66; clflush %0" : "+m"(*(volatile char*)(addr)));
+
 DEFINE_uint64(n_iters, 10000, "Number of iterations of inversion");
 DEFINE_uint64(n_rows, 8, "Number of matrix rows");
 DEFINE_uint64(n_cols, 8, "Number of matrix columns");
@@ -70,6 +73,27 @@ float mat_mult_perf_jit(std::vector<arma::cx_fmat>& test_matrices,
   return ret;
 }
 
+void flush_cache_lines(std::vector<arma::cx_fmat>& test_matrices,
+                       std::vector<arma::cx_fmat>& test_col_vectors) {
+  for (auto& m : test_matrices) {
+    auto* base = reinterpret_cast<uint8_t*>(m.memptr());
+    size_t n_bytes = m.n_rows * m.n_cols * sizeof(arma::cx_float);
+
+    for (size_t i = 0; i < n_bytes; i += 64) {
+      clflushopt(base + i);
+    }
+  }
+
+  for (auto& v : test_col_vectors) {
+    auto* base = reinterpret_cast<uint8_t*>(v.memptr());
+    size_t n_bytes = v.n_rows * v.n_cols * sizeof(arma::cx_float);
+
+    for (size_t i = 0; i < n_bytes; i += 64) {
+      clflushopt(base + i);
+    }
+  }
+}
+
 int main(int argc, char** argv) {
   mkl_set_num_threads(1);
   arma::arma_rng::set_seed_random();
@@ -88,15 +112,29 @@ int main(int argc, char** argv) {
     test_col_vectors.push_back(arma::randn<arma::cx_fmat>(FLAGS_n_cols, 1));
   }
 
-  float ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
-  ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
-  ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
-  ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
-  fprintf(stderr, "Computation proof = %.2f\n", ret);
+  printf("No cache line flushing, JIT\n");
+  for (size_t i = 0; i < 4; i++) {
+    float ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
+    fprintf(stderr, "Computation proof = %.2f\n", ret);
+  }
 
-  ret = mat_mult_perf(test_matrices, test_col_vectors);
-  ret = mat_mult_perf(test_matrices, test_col_vectors);
-  ret = mat_mult_perf(test_matrices, test_col_vectors);
-  ret = mat_mult_perf(test_matrices, test_col_vectors);
-  fprintf(stderr, "Computation proof = %.2f\n", ret);
+  printf("\nNo cache line flushing, no JIT\n");
+  for (size_t i = 0; i < 4; i++) {
+    float ret = mat_mult_perf(test_matrices, test_col_vectors);
+    fprintf(stderr, "Computation proof = %.2f\n", ret);
+  }
+
+  printf("\nCache line flushing, JIT\n");
+  for (size_t i = 0; i < 4; i++) {
+    flush_cache_lines(test_matrices, test_col_vectors);
+    float ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
+    fprintf(stderr, "Computation proof = %.2f\n", ret);
+  }
+
+  printf("\nCache line flushing, no JIT\n");
+  for (size_t i = 0; i < 4; i++) {
+    flush_cache_lines(test_matrices, test_col_vectors);
+    float ret = mat_mult_perf(test_matrices, test_col_vectors);
+    fprintf(stderr, "Computation proof = %.2f\n", ret);
+  }
 }

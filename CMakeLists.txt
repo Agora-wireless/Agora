@@ -64,7 +64,10 @@ set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
+# TODO: add SoapyUHD check
+set(USE_UHD False CACHE STRING "USE_UHD defaulting to 'False'")
 
+message(STATUS "USE_UHD: ${USE_UHD}")
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
@@ -103,7 +106,7 @@ if(${USE_DPDK})
   if(${USE_MLX_NIC})
     set(MLX_LIBRARIES -libverbs -lmlx5)
   endif()
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
+  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -Wl,--no-whole-archive dl)
 
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
@@ -129,6 +132,11 @@ endif()
 # Argos support
 if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
+endif()
+
+if(${USE_UHD})
+  message(STATUS "Enabled USE_UHD: ${USE_UHD}")
+  add_definitions(-DUSE_UHD)
 endif()
 
 find_package(SoapySDR "0.7" CONFIG)
@@ -181,7 +189,8 @@ include_directories(
 	src/mac/
   src/agora/
   src/agora/txrx/
-  src/client/)
+  src/client/
+  data/data_generator)
 
 include_directories(SYSTEM src/third_party)
 
@@ -221,7 +230,8 @@ if(${USE_DPDK})
 else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx.cpp
-    src/agora/txrx/txrx_argos.cpp)
+    src/agora/txrx/txrx_argos.cpp
+    src/agora/txrx/txrx_usrp.cpp)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
@@ -243,7 +253,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -297,11 +307,19 @@ add_executable(test_agora
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
 
-add_executable(test_ldpc
-  test/compute_kernels/ldpc/test_ldpc.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(test_ldpc ${COMMON_LIBS})
-add_test(NAME test_ldpc COMMAND test_ldpc)
+
+set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
+foreach(test_name IN LISTS LDPC_TESTS)
+  add_executable(${test_name}
+    test/compute_kernels/ldpc/${test_name}.cpp
+    $<TARGET_OBJECTS:common_sources_lib>)
+  # Unit tests should pass without memory errors
+  set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
+
+  target_link_libraries(${test_name} ${COMMON_LIBS})
+  add_test(NAME ${test_name} COMMAND ${test_name})
+endforeach()
+
 
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server

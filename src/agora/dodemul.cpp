@@ -95,7 +95,8 @@ Event_data DoDemul::launch(size_t tag)
             = ((base_sc_id + i) / kTransposeBlockSize)
             * (kTransposeBlockSize * cfg->BS_ANT_NUM);
 
-        if (kUseSIMDGather) {
+        size_t ant_start = 0;
+        if (kUseSIMDGather and cfg->BS_ANT_NUM % 4 == 0 and kUsePartialTrans) {
             __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
                 kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
                 kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -114,13 +115,19 @@ Event_data DoDemul::launch(size_t tag)
                 src += (kSCsPerCacheline * kTransposeBlockSize);
                 dst += 8;
             }
+            // Set the remaining number of antennas for non-SIMD gather
+            ant_start = cfg->BS_ANT_NUM % 4;
         } else {
-            complex_float* dst = data_gather_buffer;
+            complex_float* dst = data_gather_buffer + ant_start;
             for (size_t j = 0; j < kSCsPerCacheline; j++) {
-                for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i++) {
-                    *dst++ = data_buf[partial_transpose_block_base
-                        + (ant_i * kTransposeBlockSize)
-                        + ((base_sc_id + i + j) % kTransposeBlockSize)];
+                for (size_t ant_i = ant_start; ant_i < cfg->BS_ANT_NUM;
+                     ant_i++) {
+                    *dst++ = kUsePartialTrans
+                        ? data_buf[partial_transpose_block_base
+                              + (ant_i * kTransposeBlockSize)
+                              + ((base_sc_id + i + j) % kTransposeBlockSize)]
+                        : data_buf[ant_i * cfg->OFDM_DATA_NUM + base_sc_id + i
+                              + j];
                 }
             }
         }
@@ -163,24 +170,23 @@ Event_data DoDemul::launch(size_t tag)
             if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
                     // Reset previous frame
-                    cx_float* phase_shift_ptr
-                        = (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1)
-                            % TASK_BUFFER_FRAME_NUM];
+                    cx_float* phase_shift_ptr = (cx_float*)
+                        ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
                     cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
                         cfg->UL_PILOT_SYMS, false);
                     mat_phase_shift.fill(0);
                 }
                 cx_float* phase_shift_ptr
                     = (cx_float*)&ue_spec_pilot_buffer_[frame_id
-                        % TASK_BUFFER_FRAME_NUM][symbol_idx_ul * cfg->UE_NUM];
+                        % kFrameWnd][symbol_idx_ul * cfg->UE_NUM];
                 cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
                 cx_fmat shift_sc
                     = sign(mat_equaled % conj(ue_pilot_data.col(cur_sc_id)));
                 mat_phase_shift += shift_sc;
             } else if (cfg->UL_PILOT_SYMS
                 > 0) { // apply previously calc'ed phase shift to data
-                cx_float* pilot_corr_ptr = (cx_float*)
-                    ue_spec_pilot_buffer_[frame_id % TASK_BUFFER_FRAME_NUM];
+                cx_float* pilot_corr_ptr
+                    = (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
                 cx_fmat pilot_corr_mat(
                     pilot_corr_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
                 fmat theta_mat = arg(pilot_corr_mat);

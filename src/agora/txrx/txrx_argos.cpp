@@ -15,7 +15,7 @@ void* PacketTXRX::loop_tx_rx_argos(int tid)
     int rx_offset = 0;
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    printf("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int prev_frame_id = -1;
     int radio_id = radio_lo;
@@ -57,8 +57,8 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
     for (int ch = 0; ch < nChannels; ++ch) {
         // if rx_buffer is full, exit
         if (rx_buffer_status[rx_offset + ch] == 1) {
-            printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
-                rx_offset);
+            printf(
+                "TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
             cfg->running = false;
             break;
         }
@@ -107,11 +107,11 @@ int PacketTXRX::dequeue_send_argos(int tid)
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-    size_t offset
-        = (c->get_total_data_symbol_idx(frame_id, symbol_id) * c->BS_ANT_NUM)
+    size_t dl_symbol_idx = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t offset = (c->get_total_data_symbol_idx_dl(frame_id, dl_symbol_idx)
+                        * c->BS_ANT_NUM)
         + ant_id;
 
-    symbol_id += c->UE_ANT_NUM;
     frame_id += TX_FRAME_DELTA;
 
     void* txbuf[2];
@@ -120,19 +120,14 @@ int PacketTXRX::dequeue_send_argos(int tid)
 
     if (kDebugDownlink) {
         std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
-        size_t dl_symbol_idx = c->get_dl_symbol_idx(frame_id, symbol_id);
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->DL_PILOT_SYMS)
             txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
         else
-            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
+            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx];
     } else {
-        size_t socket_symbol_offset = offset
-            % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-                  * c->BS_ANT_NUM);
-        char* cur_buffer_ptr
-            = tx_buffer_ + socket_symbol_offset * c->packet_length;
+        char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
         txbuf[ch] = (void*)pkt->data;
     }
@@ -143,7 +138,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
-    if (kDebugBSSender) {
+    if (kDebugPrintInTask) {
         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,

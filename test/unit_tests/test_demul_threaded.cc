@@ -124,15 +124,13 @@ TEST(TestDemul, VaryingConfig)
 
     Table<complex_float> data_buffer, ue_spec_pilot_buffer, equal_buffer;
     data_buffer.rand_alloc_cx_float(
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
+        cfg->ul_data_symbol_num_perframe * kFrameWnd,
         kMaxAntennas * kMaxDataSCs, 64);
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
         kMaxAntennas * kMaxUEs);
-    equal_buffer.calloc(
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM,
+    equal_buffer.calloc(cfg->ul_data_symbol_num_perframe * kFrameWnd,
         kMaxDataSCs * kMaxUEs, 64);
-    ue_spec_pilot_buffer.calloc(
-        TASK_BUFFER_FRAME_NUM, cfg->UL_PILOT_SYMS * kMaxUEs, 64);
+    ue_spec_pilot_buffer.calloc(kFrameWnd, cfg->UL_PILOT_SYMS * kMaxUEs, 64);
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
         cfg->symbol_num_perframe, cfg->UE_NUM,
         kMaxModType * cfg->OFDM_DATA_NUM);
@@ -140,16 +138,15 @@ TEST(TestDemul, VaryingConfig)
         "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
         "MB\n",
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM * kMaxAntennas
+        cfg->ul_data_symbol_num_perframe * kFrameWnd * kMaxAntennas
             * kMaxDataSCs * 4 * 1.0f / 1024 / 1024,
-        kMaxDataSCs * TASK_BUFFER_FRAME_NUM * kMaxUEs * kMaxAntennas * 4 * 1.0f
-            / 1024 / 1024,
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM * kMaxDataSCs
-            * kMaxUEs * 4 * 1.0f / 1024 / 1024,
-        TASK_BUFFER_FRAME_NUM * cfg->UL_PILOT_SYMS * kMaxUEs * 4 * 1.0f / 1024
+        kMaxDataSCs * kFrameWnd * kMaxUEs * kMaxAntennas * 4 * 1.0f / 1024
             / 1024,
-        cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM * kMaxModType
-            * kMaxDataSCs * kMaxUEs * 1.0f / 1024 / 1024);
+        cfg->ul_data_symbol_num_perframe * kFrameWnd * kMaxDataSCs * kMaxUEs * 4
+            * 1.0f / 1024 / 1024,
+        kFrameWnd * cfg->UL_PILOT_SYMS * kMaxUEs * 4 * 1.0f / 1024 / 1024,
+        cfg->ul_data_symbol_num_perframe * kFrameWnd * kMaxModType * kMaxDataSCs
+            * kMaxUEs * 1.0f / 1024 / 1024);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
     auto phy_stats = new PhyStats(cfg);

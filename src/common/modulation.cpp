@@ -41,10 +41,11 @@ void print128_epi8(__m128i var)
  ***********************************************************************************
  */
 
-void init_modulation_table(Table<float>& mod_table, size_t mod_order)
+void init_modulation_table(Table<complex_float>& mod_table, size_t mod_order)
 {
     if (!mod_table.is_allocated())
-        mod_table.malloc(pow(2, kMaxModType), 2, 32);
+        mod_table.malloc(1, pow(2, kMaxModType), 32);
+    // mod_table.malloc(pow(2, kMaxModType), 2, 32);
     switch (mod_order) {
     case 4:
         init_qpsk_table(mod_table);
@@ -69,13 +70,12 @@ void init_modulation_table(Table<float>& mod_table, size_t mod_order)
  *---------------> I
  *  00  |  10
  */
-void init_qpsk_table(Table<float>& qpsk_table)
+void init_qpsk_table(Table<complex_float>& qpsk_table)
 {
     float scale = 1 / sqrt(2);
     float mod_qpsk[2] = { -scale, scale };
     for (int i = 0; i < 4; i++) {
-        qpsk_table[i][1] = mod_qpsk[i / 2];
-        qpsk_table[i][0] = mod_qpsk[i % 2];
+        qpsk_table[0][i] = { mod_qpsk[i / 2], mod_qpsk[i % 2] };
     }
 }
 
@@ -108,7 +108,7 @@ void init_qpsk_table(Table<float>& qpsk_table)
  *  1110  1100  |  0100  0110
  *  1111  1101  |  0101  0111
  */
-void init_qam16_table(Table<float>& qam16_table)
+void init_qam16_table(Table<complex_float>& qam16_table)
 {
     float scale = 1 / sqrt(10);
     float mod_16qam[4] = { 1 * scale, 3 * scale, (-1) * scale, (-3) * scale };
@@ -117,10 +117,9 @@ void init_qam16_table(Table<float>& qam16_table)
         int imag_i = (((i >> 2) & 0x1) << 1) + (i & 0x1);
         /* get bit 3 and 1 */
         int real_i = (((i >> 3) & 0x1) << 1) + ((i >> 1) & 0x1);
-        qam16_table[i][0] = mod_16qam[real_i];
-        qam16_table[i][1] = mod_16qam[imag_i];
-        // printf("%d: (%.3f, %.3f)\n", i, qam16_table[i][0],
-        // qam16_table[i][1]);
+        qam16_table[0][i] = { mod_16qam[real_i], mod_16qam[imag_i] };
+        // printf("%d: (%.3f, %.3f)\n", i, qam16_table[i][0].re,
+        // qam16_table[i][0].im);
     }
 }
 
@@ -138,7 +137,7 @@ void init_qam16_table(Table<float>& qam16_table)
  *  111111  111101  110101  110111  |  010111  010101  011101  011111
  */
 
-void init_qam64_table(Table<float>& qam64_table)
+void init_qam64_table(Table<complex_float>& qam64_table)
 {
     float scale = 1 / sqrt(42);
     float mod_64qam[8] = { 3 * scale, 1 * scale, 5 * scale, 7 * scale,
@@ -150,8 +149,7 @@ void init_qam64_table(Table<float>& qam64_table)
         /* get bit 5, 3, 1 */
         int real_i = (((i >> 5) & 0x1) << 2) + (((i >> 3) & 0x1) << 1)
             + ((i >> 1) & 0x1);
-        qam64_table[i][0] = mod_64qam[real_i];
-        qam64_table[i][1] = mod_64qam[imag_i];
+        qam64_table[0][i] = { mod_64qam[real_i], mod_64qam[imag_i] };
     }
 }
 
@@ -161,20 +159,49 @@ void init_qam64_table(Table<float>& qam64_table)
  ***********************************************************************************
  */
 
-complex_float mod_single(int x, Table<float>& mod_table)
+complex_float mod_single(int x, Table<complex_float>& mod_table)
 {
-    complex_float re;
-    re.re = mod_table[x][0];
-    re.im = mod_table[x][1];
-    return re;
+    return mod_table[0][x];
 }
 
-complex_float mod_single_uint8(uint8_t x, Table<float>& mod_table)
+complex_float mod_single_uint8(uint8_t x, Table<complex_float>& mod_table)
 {
-    complex_float re;
-    re.re = mod_table[x][0];
-    re.im = mod_table[x][1];
-    return re;
+    return mod_table[0][x];
+}
+
+// TODO: test correctness
+void mod_simd(uint8_t* in, complex_float*& out, size_t len,
+    Table<complex_float>& mod_table)
+{
+#ifdef __AVX512F__
+    for (size_t i = 0; i < len / kSCsPerCacheline; i++) {
+        __m512i index = _mm512_setr_epi64(
+            in[0], in[1], in[2], in[3], in[4], in[5], in[6], in[7]);
+        __m512d t = _mm512_i64gather_pd(index, (double*)(mod_table[0]), 8);
+        _mm512_store_pd((double*)(out), t);
+        in += kSCsPerCacheline;
+        out += kSCsPerCacheline;
+    }
+#else
+    size_t half_size = kSCsPerCacheline / 2;
+    for (size_t i = 0; i < len / kSCsPerCacheline; i++) {
+        __m256i index = _mm256_setr_epi64x(in[0], in[1], in[2], in[3]);
+        __m256d t = _mm256_i64gather_pd((double*)(mod_table[0]), index, 8);
+        _mm256_store_pd((double*)(out), t);
+        in += half_size;
+        out += half_size;
+        index = _mm256_setr_epi64x(in[4], in[5], in[6], in[7]);
+        t = _mm256_i64gather_pd((double*)(mod_table[0]), index, 8);
+        _mm256_store_pd((double*)(out), t);
+        in += half_size;
+        out += half_size;
+    }
+#endif
+
+    size_t remainder = len % kSCsPerCacheline;
+    for (size_t i = 0; i < remainder; i++) {
+        out[i] = mod_single_uint8(in[i], mod_table);
+    }
 }
 
 /**

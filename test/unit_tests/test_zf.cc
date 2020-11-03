@@ -30,7 +30,7 @@ TEST(TestZF, Perf)
 
     Table<complex_float> calib_buffer;
     calib_buffer.rand_alloc_cx_float(
-        TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
