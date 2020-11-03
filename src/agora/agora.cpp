@@ -1221,11 +1221,6 @@ void Agora::free_uplink_buffers()
     socket_buffer_status_.free();
     data_buffer_.free();
     equal_buffer_.free();
-
-    fft_counters_.fini();
-    rc_counters_.fini();
-    demul_counters_.fini();
-    decode_counters_.fini();
 }
 
 void Agora::free_downlink_buffers()
@@ -1236,11 +1231,6 @@ void Agora::free_downlink_buffers()
     dl_ifft_buffer_.free();
     calib_buffer_.free();
     dl_encoded_buffer_.free();
-
-    encode_counters_.fini();
-    precode_counters_.fini();
-    ifft_counters_.fini();
-    tx_counters_.fini();
 }
 
 void Agora::save_decode_data_to_file(int frame_id)
