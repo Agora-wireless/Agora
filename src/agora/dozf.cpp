@@ -70,7 +70,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
         if (cfg->recipCalEn) {
             arma::cx_fvec vec_calib(
                 reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BS_ANT_NUM,
@@ -79,9 +79,14 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             vec_calib = vec_calib / vec_calib(cfg->ref_ant);
             arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
-            mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
+            mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
         } else
-            mat_dl_zf = mat_ul_zf;
+            mat_dl_zf = mat_ul_zf.st();
+
+        // We should be scaling the beamforming matrix, so the IFFT
+        // output can be scaled with OFDM_CA_NUM across all antennas.
+        // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+        mat_dl_zf /= abs(mat_dl_zf).max();
     }
 }
 
@@ -91,7 +96,8 @@ static inline void partial_transpose_gather(
     size_t cur_sc_id, float* src, float*& dst, size_t bs_ant_num)
 {
     // The SIMD and non-SIMD methods are equivalent.
-    if (kUseSIMDGather) {
+    size_t ant_start = 0;
+    if (kUseSIMDGather and bs_ant_num >= 4) {
         __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
             kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
             kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -107,16 +113,19 @@ static inline void partial_transpose_gather(
         for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += 4) {
             // fetch 4 complex floats for 4 ants
             __m256 t = _mm256_i32gather_ps(src, index, 4);
-            _mm256_store_ps(dst, t);
+            _mm256_storeu_ps(dst, t);
             src += 8 * kTransposeBlockSize;
             dst += 8;
         }
-    } else {
+        // Set the of the remaining antennas to use non-SIMD gather
+        ant_start = bs_ant_num / 4 * 4;
+    }
+    if (ant_start < bs_ant_num) {
         const size_t pt_base_offset = (cur_sc_id / kTransposeBlockSize)
             * (kTransposeBlockSize * bs_ant_num);
         complex_float* cx_src = (complex_float*)src;
-        complex_float* cx_dst = (complex_float*)dst;
-        for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
+        complex_float* cx_dst = (complex_float*)dst + ant_start;
+        for (size_t ant_i = ant_start; ant_i < bs_ant_num; ant_i++) {
             *cx_dst = cx_src[pt_base_offset + (ant_i * kTransposeBlockSize)
                 + (cur_sc_id % kTransposeBlockSize)];
             cx_dst++;
@@ -124,11 +133,24 @@ static inline void partial_transpose_gather(
     }
 }
 
+// Gather data of one symbol from partially-transposed buffer
+// produced by dofft
+static inline void transpose_gather(size_t cur_sc_id, float* src, float*& dst,
+    size_t bs_ant_num, size_t ofdm_data_num)
+{
+    complex_float* cx_src = (complex_float*)src;
+    complex_float* cx_dst = (complex_float*)dst;
+    for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
+        *cx_dst = cx_src[ant_i * ofdm_data_num + cur_sc_id];
+        cx_dst++;
+    }
+}
+
 void DoZF::ZF_time_orthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
-    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
             frame_id, base_sc_id);
@@ -145,9 +167,14 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
             float* dst_csi_ptr
                 = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * ue_idx);
-            partial_transpose_gather(cur_sc_id,
-                (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
-                cfg->BS_ANT_NUM);
+            if (kUsePartialTrans)
+                partial_transpose_gather(cur_sc_id,
+                    (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
+                    cfg->BS_ANT_NUM);
+            else
+                transpose_gather(cur_sc_id,
+                    (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
+                    cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
         }
         if (cfg->recipCalEn) {
             // Gather reciprocal calibration data from partially-transposed buffer
@@ -183,7 +210,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
-    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
                "BS_ANT_NUM: %zu\n",
@@ -238,7 +265,7 @@ void DoZF::Predict(size_t tag)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     const size_t offset_in_buffer
-        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
+        = ((frame_id % kFrameWnd) * cfg->OFDM_DATA_NUM)
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],

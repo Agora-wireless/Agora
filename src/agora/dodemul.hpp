@@ -12,12 +12,9 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <mkl.h>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
-
-#define USE_MKL_JIT 0 // JIT for cgemm is only available after MKL 2019 update 3
 
 using namespace arma;
 class DoDemul : public Doer {

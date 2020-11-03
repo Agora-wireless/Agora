@@ -4,12 +4,17 @@
 
 Config::Config(std::string jsonfile)
 {
+    set_cpu_layout_on_numa_nodes();
     std::string conf;
     Utils::loadTDDConfig(jsonfile, conf);
     const auto tddConf = json::parse(conf);
 
     /* antenna configurations */
-    std::string hub_file = tddConf.value("hubs", "");
+    if (!kUseUHD) {
+        std::string hub_file = tddConf.value("hubs", "");
+        if (hub_file.size() > 0)
+            Utils::loadDevices(hub_file, hub_ids);
+    }
     std::string serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
     nCells = tddConf.value("cells", 1);
@@ -19,8 +24,6 @@ Config::Config(std::string jsonfile)
     isUE = tddConf.value("UE", false);
     UE_NUM = tddConf.value("ue_num", 8);
     UE_ANT_NUM = UE_NUM;
-    if (hub_file.size() > 0)
-        Utils::loadDevices(hub_file, hub_ids);
     if (serial_file.size() > 0)
         Utils::loadDevices(serial_file, radio_ids);
     if (radio_ids.size() != 0) {
@@ -38,11 +41,9 @@ Config::Config(std::string jsonfile)
     } else
         nRadios = tddConf.value("radio_num", isUE ? UE_ANT_NUM : BS_ANT_NUM);
 
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
     }
-    rt_assert(
-        BS_ANT_NUM % 4 == 0, "Number of BS Antennas must be multiple of 4");
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
@@ -70,6 +71,8 @@ Config::Config(std::string jsonfile)
     bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
     ue_server_port = tddConf.value("ue_sever_port", 6000);
+
+    dpdk_num_ports = tddConf.value("dpdk_num_ports", 1);
 
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
@@ -105,8 +108,6 @@ Config::Config(std::string jsonfile)
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         pilot_symbol_num_perframe = tddConf.value(
             "pilot_num", freq_orthogonal_pilot ? 1 : UE_ANT_NUM);
-        data_symbol_num_perframe = tddConf.value("data_symbol_num_perframe",
-            symbol_num_perframe - pilot_symbol_num_perframe - 1);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
             downlink_mode
                 ? 0
@@ -123,7 +124,8 @@ Config::Config(std::string jsonfile)
                 = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
                 = dl_symbol_start + dl_data_symbol_num_perframe;
-            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start; s++)
+            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start;
+                 s++)
                 sched += "G";
             for (size_t s = dl_symbol_start; s < dl_symbol_end; s++)
                 sched += "D";
@@ -164,12 +166,10 @@ Config::Config(std::string jsonfile)
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
     downlink_mode = dl_data_symbol_num_perframe > 0;
-    dl_data_symbol_start = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0].front()
-        : 0;
-    dl_data_symbol_end = dl_data_symbol_num_perframe > 0
-        ? DLSymbols[0].back() + 1
-        : 0;
+    dl_data_symbol_start
+        = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].front() : 0;
+    dl_data_symbol_end
+        = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].back() + 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot
         and UE_ANT_NUM != pilot_symbol_num_perframe) {
@@ -202,12 +202,16 @@ Config::Config(std::string jsonfile)
         "Demodulation block size must be a multiple of transpose block size");
     demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
 
+    zf_batch_size = tddConf.value("zf_batch_size", 1);
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
 
-    fft_block_size = tddConf.value("fft_block_size", 4);
+    fft_block_size = tddConf.value("fft_block_size", 1);
+    encode_block_size = tddConf.value("encode_block_size", 1);
 
+    noise_level = tddConf.value("noise_level", 0.03); //default: 30 dB
+    printf("Noise level: %.2f\n", noise_level);
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
@@ -242,7 +246,8 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length
-        = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
+        = Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * sampsPerSymbol);
+    dl_packet_length = Packet::kOffsetOfData + sampsPerSymbol * 4;
     rt_assert(
         packet_length < 9000, "Packet size must be smaller than jumbo frame");
 
@@ -269,7 +274,7 @@ Config::Config(std::string jsonfile)
 
 void Config::genData()
 {
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         std::vector<std::vector<double>> gold_ifft
             = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
         std::vector<std::complex<int16_t>> gold_ifft_ci16
@@ -309,6 +314,16 @@ void Config::genData()
 
         beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
         coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
+
+        // Add addition padding for beacon sent from host
+        int fracBeacon = sampsPerSymbol % beacon_len;
+        std::vector<std::complex<int16_t>> preBeacon(ofdm_tx_zero_prefix_, 0);
+        std::vector<std::complex<int16_t>> postBeacon(
+            ofdm_tx_zero_postfix_ + fracBeacon, 0);
+        beacon_ci16.insert(
+            beacon_ci16.begin(), preBeacon.begin(), preBeacon.end());
+        beacon_ci16.insert(
+            beacon_ci16.end(), postBeacon.begin(), postBeacon.end());
     }
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
@@ -573,6 +588,13 @@ void Config::genData()
     for (size_t i = 0; i < UE_ANT_NUM; i++) {
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
             ofdm_tx_zero_prefix_, CP_LEN, scale);
+        if (kDebugPrintPilot) {
+            printf("ue_specific_pilot%zu=[", i);
+            for (size_t j = 0; j < OFDM_CA_NUM; j++)
+                printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
+                    ue_pilot_ifft[i][j].im);
+            printf("]\n");
+        }
     }
 
     pilot_ci16.resize(sampsPerSymbol, 0);
@@ -591,6 +613,13 @@ void Config::genData()
     std::vector<uint32_t> pre_uint32(ofdm_tx_zero_prefix_, 0);
     pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
     pilot.resize(sampsPerSymbol);
+
+    if (kDebugPrintPilot) {
+        std::cout << "Pilot data: " << std::endl;
+        for (size_t i = 0; i < OFDM_DATA_NUM; i++)
+            std::cout << pilots_[i].re << "+1i*" << pilots_[i].im << ",";
+        std::cout << std::endl;
+    }
 
     ul_iq_ifft.free();
     dl_iq_ifft.free();

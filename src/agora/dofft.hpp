@@ -24,7 +24,7 @@ public:
         moodycamel::ProducerToken* worker_producer_token,
         Table<char>& socket_buffer, Table<int>& socket_buffer_status,
         Table<complex_float>& data_buffer,
-        PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
+        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
         Stats* stats_manager);
     ~DoFFT();
@@ -100,10 +100,12 @@ private:
     Table<char>& socket_buffer_;
     Table<int>& socket_buffer_status_;
     Table<complex_float>& data_buffer_;
-    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers_;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     Table<complex_float>& calib_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
+    // Buffer for store 16-bit IQ converted from 12-bit IQ
+    uint16_t* temp_16bits_iq;
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
     PhyStats* phy_stats;
@@ -149,6 +151,7 @@ private:
     char* dl_socket_buffer_;
     DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    float* ifft_out; // Buffer for IFFT output
 };
 
 #endif

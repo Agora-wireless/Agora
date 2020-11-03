@@ -49,6 +49,7 @@ public:
     void* worker_fft(int tid);
     void* worker_zf(int tid);
     void* worker_demul(int tid);
+    void* worker_decode(int tid);
     void* worker(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
@@ -126,7 +127,7 @@ private:
     {
         std::ostringstream ret;
         ret << "[";
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
+        for (size_t i = 0; i < kFrameWnd; i++) {
             ret << std::to_string(fft_queue_arr[i].size()) << " ";
         }
         ret << "]";
@@ -175,7 +176,7 @@ private:
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
 
     // Data symbols after FFT
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 1st dimension: kFrameWnd * uplink data symbols per frame
     // 2nd dimension: number of antennas * number of OFDM data subcarriers
     //
     // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
@@ -188,7 +189,7 @@ private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
 
     // Data after equalization
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
+    // 1st dimension: kFrameWnd * uplink data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<complex_float> equal_buffer_;
 
@@ -214,17 +215,19 @@ private:
     FrameCounters frommac_counters_;
     FrameCounters rc_counters_;
     RxCounters rx_counters_;
-    size_t zf_last_frame;
+    size_t zf_last_frame = SIZE_MAX;
     size_t rc_last_frame = SIZE_MAX;
-    std::vector<size_t>
-        cur_frame_for_symbol; // is the current frame for the symbol whose index in the frame's uplink symbols is i
+    // The frame index for a symbol whose FFT is done
+    std::vector<size_t> fft_cur_frame_for_symbol;
+    // The frame index for a symbol whose encode is done
+    std::vector<size_t> encode_cur_frame_for_symbol;
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
-    std::array<std::queue<fft_req_tag_t>, TASK_BUFFER_FRAME_NUM> fft_queue_arr;
+    std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr;
 
     // Data for IFFT
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of antennas * number of
+    // 1st dimension: kFrameWnd * number of antennas * number of
     // data symbols per frame
     // 2nd dimension: number of OFDM carriers (including non-data carriers)
     Table<complex_float> dl_ifft_buffer_;
@@ -233,20 +236,20 @@ private:
     // [number of UEs] rows and [number of antennas] columns.
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
 
-    // 1st dimension: TASK_BUFFER_FRAME_NUM
+    // 1st dimension: kFrameWnd
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
     Table<complex_float> calib_buffer_;
 
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
+    // 1st dimension: kFrameWnd * number of data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> dl_encoded_buffer_;
 
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
+    // 1st dimension: kFrameWnd * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<uint8_t> dl_bits_buffer_;
 
     // 1st dimension: number of UEs
-    // 2nd dimension: number of OFDM data subcarriers * TASK_BUFFER_FRAME_NUM
+    // 2nd dimension: number of OFDM data subcarriers * kFrameWnd
     //                * number of DL data symbols per frame
     // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
     Table<uint8_t> dl_bits_buffer_status_;
@@ -255,7 +258,7 @@ private:
      * Data for transmission
      *
      * Number of downlink socket buffers and status entries:
-     * SOCKET_BUFFER_FRAME_NUM * symbol_num_perframe * BS_ANT_NUM
+     * kFrameWnd * symbol_num_perframe * BS_ANT_NUM
      *
      * Size of each downlink socket buffer entry: packet_length bytes
      * Size of each downlink socket buffer status entry: one integer

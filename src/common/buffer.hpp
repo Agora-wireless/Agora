@@ -257,15 +257,15 @@ struct MacPacket {
 class RxCounters {
 public:
     // num_pkt[i] is the total number of packets we've received for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pkts;
+    std::array<size_t, kFrameWnd> num_pkts;
 
     // num_pilot_pkts[i] is the total number of pilot packets we've received
     // for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_pilot_pkts;
+    std::array<size_t, kFrameWnd> num_pilot_pkts;
 
     // num_rc_pkts[i] is the total number of reciprocity pilot packets we've received
     // for frame i
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> num_reciprocity_pkts;
+    std::array<size_t, kFrameWnd> num_reciprocity_pkts;
 
     // Number of packets we'll receive per frame on the uplink
     size_t num_pkts_per_frame;
@@ -285,12 +285,15 @@ public:
 };
 
 /**
-//  * This class stores the metrics coresponding to a Frame.
-//  * Specifically, it contains a) the number of symbols per frame and b) the number of tasks per symbol, per frame.
-//  */
+  * @brief This class stores the metrics coresponding to a Frame.
+  * Specifically, it contains a) the number of symbols per frame 
+  * and b) the number of tasks per symbol, per frame.
+  */
 class FrameCounters {
 public:
+    // Maximum number of symbols in a frame
     size_t max_symbol_count;
+    // Maximum number of tasks in a symbol
     size_t max_task_count;
 
     void init(
@@ -299,32 +302,32 @@ public:
         this->max_symbol_count = max_symbol_count;
         this->max_task_count = max_task_count;
         symbol_count.fill(0);
-        //define task counters if #tasks is > 0
+        // Define task counters if number of tasks > 0
         if (max_task_count > 0) {
-            if (max_data_symbol <= 0)
-                throw "the max data symbol should be greater than zero for a "
-                      "positive max task count.";
-
-            for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+            rt_assert(max_data_symbol > 0,
+                "max_data_symbol should be larger than 0.");
+            for (size_t i = 0; i < kFrameWnd; i++)
                 task_count[i] = new size_t[max_data_symbol]();
         }
     }
 
     void fini()
     {
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++)
+        for (size_t i = 0; i < kFrameWnd; i++)
             delete[] task_count[i];
     }
 
     /**
-     * Checks whether or not the symbol is the last symbol for a given frame while simultaneously incrementing the symbol count.
+     * @brief Check whether the symbol is the last symbol for a given frame 
+     * while simultaneously incrementing the symbol count.
      * If the symbol is the last symbol, the count is reset to 0.
-     * @arg frame id: the frame id to check
-     **/
+     * @param frame id The frame id to check
+     */
     bool last_symbol(int frame_id)
     {
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t frame_slot = frame_id % kFrameWnd;
         if (++symbol_count[frame_slot] == max_symbol_count) {
+            // If the symbol is the last symbol, reset count to 0
             symbol_count[frame_slot] = 0;
             return true;
         }
@@ -332,15 +335,16 @@ public:
     }
 
     /**
-     * Checks whether or not the task is the last task for a given frame and symbol while simultaneously incrementing the task count.
-     * If the task is the last symbol, the count is reset to 0.
-     * @arg frame_id: the frame id to check
-     * @arg symbol_id: the symbol id to check
-     **/
+     * @brief Check whether the task is the last task for a given frame and 
+     * symbol while simultaneously incrementing the task count.
+     * @param frame_id The frame id to check
+     * @param symbol_id The symbol id to check
+     */
     bool last_task(size_t frame_id, size_t symbol_id)
     {
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+        const size_t frame_slot = frame_id % kFrameWnd;
         if (++task_count[frame_slot][symbol_id] == max_task_count) {
+            // If the task is the last task, reset count is to 0
             task_count[frame_slot][symbol_id] = 0;
             return true;
         }
@@ -349,20 +353,21 @@ public:
 
     size_t get_symbol_count(size_t frame_id)
     {
-        return symbol_count[frame_id % TASK_BUFFER_FRAME_NUM];
+        return symbol_count[frame_id % kFrameWnd];
     }
 
     size_t get_task_count(size_t frame_id, size_t symbol_id)
     {
-        return task_count[frame_id % TASK_BUFFER_FRAME_NUM][symbol_id];
+        return task_count[frame_id % kFrameWnd][symbol_id];
     }
 
 private:
-    //array of tasks, per symbol, per frame. This is a moving window over frames.
-    std::array<size_t*, TASK_BUFFER_FRAME_NUM> task_count;
-
-    //array of symbols per frame. This is a moving window
-    std::array<size_t, TASK_BUFFER_FRAME_NUM> symbol_count;
+    // task_count[i][j] is the number of tasks completed for
+    // frame (i % kFrameWnd) and symbol j
+    std::array<size_t*, kFrameWnd> task_count;
+    // symbol_count[i] is the number of symbols completed for
+    // frame (i % kFrameWnd)
+    std::array<size_t, kFrameWnd> symbol_count;
 };
 
 #endif

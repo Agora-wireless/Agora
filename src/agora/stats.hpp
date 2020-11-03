@@ -15,7 +15,8 @@ static constexpr size_t kMaxStatBreakdown = 4;
 struct DurationStat {
     size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
     size_t task_count;
-    DurationStat() { memset(this, 0, sizeof(DurationStat)); }
+    DurationStat() { reset(); }
+    void reset() { memset(this, 0, sizeof(DurationStat)); }
 };
 
 // Temporary summary statistics assembled from per-thread runtime stats
@@ -50,8 +51,6 @@ static constexpr size_t kNumTimestampTypes
     = static_cast<size_t>(TsType::kTXDone) + 1;
 
 class Stats {
-    static constexpr bool kStatsPrintFrameSummary = false;
-
 public:
     Stats(Config* cfg, size_t break_down_num, double freq_ghz);
     ~Stats();
@@ -90,6 +89,14 @@ public:
                                 [frame_id % kNumStatsFrames];
     }
 
+    /// From the master, get the millisecond elapsed since the timestamp of
+    /// timestamp_type was taken for frame_id
+    double master_get_ms_since(TsType timestamp_type, size_t frame_id)
+    {
+        return cycles_to_ms(
+            rdtsc() - master_get_tsc(timestamp_type, frame_id), freq_ghz);
+    }
+
     /// From the master, get the microseconds elapsed since the timestamp of
     /// timestamp_type was taken for frame_id
     double master_get_us_since(TsType timestamp_type, size_t frame_id)
@@ -124,6 +131,16 @@ public:
     {
         return cycles_to_us(master_get_tsc(timestamp_type_1, frame_id)
                 - master_get_tsc(timestamp_type_2, frame_id),
+            freq_ghz);
+    }
+
+    /// From the master, get the microsecond difference between the times that
+    /// a timestamp type was taken for two frames
+    double master_get_delta_ms(
+        TsType timestamp_type, size_t frame_id_1, size_t frame_id_2)
+    {
+        return cycles_to_ms(master_get_tsc(timestamp_type, frame_id_1)
+                - master_get_tsc(timestamp_type, frame_id_2),
             freq_ghz);
     }
 

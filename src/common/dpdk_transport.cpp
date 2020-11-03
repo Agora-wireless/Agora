@@ -4,6 +4,7 @@
 #include "buffer.hpp"
 #include "eth_common.h"
 #include "utils.h"
+#include <immintrin.h>
 #include <string>
 
 inline const struct rte_eth_conf port_conf_default()
@@ -14,8 +15,8 @@ inline const struct rte_eth_conf port_conf_default()
     return port_conf;
 }
 
-int DpdkTransport::nic_init(
-    uint16_t port, struct rte_mempool* mbuf_pool, int thread_num)
+int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
+    int thread_num, size_t pkt_len)
 {
     struct rte_eth_conf port_conf = port_conf_default();
     const uint16_t rxRings = thread_num, txRings = 2 * thread_num;
@@ -48,8 +49,9 @@ int DpdkTransport::nic_init(
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
         port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
 
-    port_conf.rxmode.max_rx_pkt_len
-        = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
+    port_conf.rxmode.max_rx_pkt_len = RTE_MIN(
+        RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len),
+        pkt_len);
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
@@ -85,10 +87,11 @@ int DpdkTransport::nic_init(
 
     struct rte_ether_addr addr;
     rte_eth_macaddr_get(port, &addr);
-    printf("NIC %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-           " %02" PRIx8 " %02" PRIx8 " \n",
-        port, addr.addr_bytes[0], addr.addr_bytes[1], addr.addr_bytes[2],
-        addr.addr_bytes[3], addr.addr_bytes[4], addr.addr_bytes[5]);
+    printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+           " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
+        port, rte_eth_dev_socket_id(port), addr.addr_bytes[0],
+        addr.addr_bytes[1], addr.addr_bytes[2], addr.addr_bytes[3],
+        addr.addr_bytes[4], addr.addr_bytes[5]);
 
     struct rte_eth_link link;
     rte_eth_link_get_nowait(port, &link);
@@ -160,73 +163,55 @@ void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,
         tid, b[0], b[1], b[2], b[3], sp, b[6], b[7], b[8], b[9], dp, len);
 }
 
-struct rte_flow* DpdkTransport::generate_ipv4_flow(uint16_t port_id,
-    uint16_t rx_q, uint32_t src_ip, uint32_t src_mask, uint32_t dest_ip,
-    uint32_t dest_mask, uint16_t src_port, uint16_t src_port_mask,
-    uint16_t dst_port, uint16_t dst_port_mask, struct rte_flow_error* error)
+void DpdkTransport::install_flow_rule(uint16_t port_id, uint16_t rx_q,
+    uint32_t src_ip, uint32_t dest_ip, uint16_t src_port, uint16_t dst_port)
 {
     struct rte_flow_attr attr;
     struct rte_flow_item pattern[4];
     struct rte_flow_action action[2];
-    struct rte_flow* flow = NULL;
     struct rte_flow_action_queue queue = { .index = rx_q };
-    struct rte_flow_item_ipv4 ip_spec;
-    struct rte_flow_item_ipv4 ip_mask;
-    struct rte_flow_item_udp udp_spec;
-    struct rte_flow_item_udp udp_mask;
-    struct rte_flow_item udp_item;
-    int res;
     memset(pattern, 0, sizeof(pattern));
     memset(action, 0, sizeof(action));
-    /*
-     * set the rule attribute.
-     * in this case only ingress packets will be checked.
-     */
+
+    // Set the rule attribute. Only ingress packets will be checked.
     memset(&attr, 0, sizeof(struct rte_flow_attr));
     attr.ingress = 1;
     attr.priority = 0;
-    /*
-     * create the action sequence.
-     * one action only,  move packet to queue
-     */
+
+    // Create the action sequence. One action only: move packet to queue
     action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
     action[0].conf = &queue;
     action[1].type = RTE_FLOW_ACTION_TYPE_END;
-    /*
-     * set the first level of the pattern (ETH).
-     * since in this example we just want to get the
-     * ipv4 we set this level to allow all.
-     */
-    pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 
-    /* the final level must be always type end */
+    // Set the first level of the pattern (ETH), allow all
+    pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
     pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
-    /*
-     * setting the second level of the pattern (IP).
-     * in this example this is the level we care about
-     * so we set it according to the parameters.
-     */
+
+    // Set the second level of the pattern (IP)
+    struct rte_flow_item_ipv4 ip_spec;
+    struct rte_flow_item_ipv4 ip_mask;
     memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
     memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
-    // ip_spec.hdr.next_proto_id = IPPROTO_UDP;
-    // ip_mask.hdr.next_proto_id = 0xf; // protocol mask
-
-    ip_spec.hdr.dst_addr = dest_ip; // htonl(dest_ip);
-    ip_mask.hdr.dst_addr = dest_mask;
-    ip_spec.hdr.src_addr = src_ip; // htonl(src_ip);
-    ip_mask.hdr.src_addr = src_mask;
+    ip_spec.hdr.dst_addr = dest_ip;
+    ip_mask.hdr.dst_addr = 0xffffffff;
+    ip_spec.hdr.src_addr = src_ip;
+    ip_mask.hdr.src_addr = 0xffffffff;
 
     pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
     pattern[1].spec = &ip_spec;
     pattern[1].mask = &ip_mask;
 
+    // Set the third level of the pattern (UDP)
+    struct rte_flow_item_udp udp_spec;
+    struct rte_flow_item_udp udp_mask;
+    struct rte_flow_item udp_item;
     udp_spec.hdr.src_port = src_port;
     udp_spec.hdr.dst_port = dst_port;
     udp_spec.hdr.dgram_len = 0;
     udp_spec.hdr.dgram_cksum = 0;
 
-    udp_mask.hdr.src_port = src_port_mask;
-    udp_mask.hdr.dst_port = dst_port_mask;
+    udp_mask.hdr.src_port = 0xffff;
+    udp_mask.hdr.dst_port = 0xffff;
     udp_mask.hdr.dgram_len = 0;
     udp_mask.hdr.dgram_cksum = 0;
 
@@ -234,13 +219,14 @@ struct rte_flow* DpdkTransport::generate_ipv4_flow(uint16_t port_id,
     udp_item.spec = &udp_spec;
     udp_item.mask = &udp_mask;
     udp_item.last = NULL;
-
     pattern[2] = udp_item;
 
-    res = rte_flow_validate(port_id, &attr, pattern, action, error);
-    if (!res)
-        flow = rte_flow_create(port_id, &attr, pattern, action, error);
-    return flow;
+    rte_flow_error error;
+    int res = rte_flow_validate(port_id, &attr, pattern, action, &error);
+    rt_assert(res == 0, "DPDK: Failed to validate flow rule");
+
+    rte_flow* flow = rte_flow_create(port_id, &attr, pattern, action, &error);
+    rt_assert(flow != nullptr, "DPDK: Failed to install flow rule");
 }
 
 rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
@@ -287,8 +273,10 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
 void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
 {
     // DPDK setup
-    std::string core_list = std::to_string(core_offset) + "-"
-        + std::to_string(core_offset + thread_num);
+    std::string core_list = std::to_string(get_physical_core_id(core_offset));
+    for (size_t i = 1; i < thread_num + 1; i++)
+        core_list = core_list + ","
+            + std::to_string(get_physical_core_id(core_offset + i));
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
         = { "txrx", "-l", core_list.c_str(), "--log-level", "0", nullptr };
@@ -299,12 +287,12 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
     rt_assert(ret >= 0, "Failed to initialize DPDK");
 }
 
-rte_mempool* DpdkTransport::create_mempool()
+rte_mempool* DpdkTransport::create_mempool(size_t packet_length)
 {
     unsigned int nb_ports = rte_eth_dev_count_avail();
     printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
-    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    size_t mbuf_size = packet_length + MBUF_CACHE_SIZE;
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
         NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 

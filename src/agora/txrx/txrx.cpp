@@ -10,9 +10,10 @@
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
+    , ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells)
     , socket_thread_num(cfg->socket_thread_num)
 {
-    if (!kUseArgos) {
+    if (!kUseArgos && !kUseUHD) {
         socket_.resize(cfg->nRadios);
         bs_rru_sockaddr_.resize(cfg->nRadios);
     } else {
@@ -34,7 +35,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 
 PacketTXRX::~PacketTXRX()
 {
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         radioconfig_->radioStop();
         delete radioconfig_;
     }
@@ -50,7 +51,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    if (kUseArgos) {
+    if (kUseArgos || kUseUHD) {
         if (!radioconfig_->radioStart()) {
             fprintf(stderr, "Failed to start radio\n");
             return false;
@@ -68,6 +69,11 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx_argos>,
                 context);
             rt_assert(ret == 0, "Failed to create threads");
+        } else if (kUseUHD) {
+            int ret = pthread_create(&txrx_thread, NULL,
+                pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx_usrp>,
+                context);
+            rt_assert(ret == 0, "Failed to create threads");
         } else {
             int ret = pthread_create(&txrx_thread, NULL,
                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
@@ -76,7 +82,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         }
     }
 
-    if (kUseArgos)
+    if (kUseArgos || kUseUHD)
         radioconfig_->go();
     return true;
 }
@@ -175,8 +181,7 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
-        printf(
-            "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
         cfg->running = false;
         return (NULL);
     }
@@ -187,6 +192,21 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
             exit(0);
         }
         return (NULL);
+    }
+    if (kDebugPrintInTask) {
+        printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n", tid,
+            pkt->frame_id, pkt->symbol_id, pkt->ant_id);
+    }
+    if (kDebugMulticell) {
+        printf("Before packet combining: receiving data stream from the "
+               "antenna %d in cell %d,\n",
+            pkt->ant_id, pkt->cell_id);
+    }
+    pkt->ant_id += pkt->cell_id * ant_per_cell;
+    if (kDebugMulticell) {
+        printf("After packet combining: the combined antenna ID is %d, it "
+               "comes from the cell %d\n",
+            pkt->ant_id, pkt->cell_id);
     }
 
     // get the position in rx_buffer
@@ -214,30 +234,28 @@ int PacketTXRX::dequeue_send(int tid)
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+    size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-    size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
-                        * c->BS_ANT_NUM)
+    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t offset
+        = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+              * c->BS_ANT_NUM)
         + ant_id;
 
     if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+        printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, data_symbol_idx, ant_id,
-            gen_tag_t(event.tags[0])._tag, offset,
-            message_queue_->size_approx());
+            tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
+            offset, message_queue_->size_approx());
     }
 
-    size_t socket_symbol_offset = offset
-        % (SOCKET_BUFFER_FRAME_NUM * c->data_symbol_num_perframe
-              * c->BS_ANT_NUM);
-    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, data_symbol_idx, 0 /* cell_id */, ant_id);
+    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length, 0,
-        (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->dl_packet_length,
+        0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
         sizeof(bs_rru_sockaddr_[ant_id]));
     rt_assert(ret > 0, "sendto() failed");
 

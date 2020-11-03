@@ -1,15 +1,17 @@
-#include "memory_manage.h"
 #include <gtest/gtest.h>
+#define private public
+#include "memory_manage.h"
 
-static constexpr size_t kRows = 40;
-static constexpr size_t kCols = 1200;
+static constexpr size_t kRows = 4;
+static constexpr size_t kCols = 12;
 static constexpr size_t kCol2s = 64;
-const size_t n_entries = 64 * 32;
+const size_t n_entries = 64;
 
 TEST(TestPtrGrid, Basic)
 {
     PtrGrid<kRows, kCols, float> ptr_grid(n_entries);
 
+    // Test basic accesses and zero-initialization
     float sum = 0;
     for (size_t i = 0; i < kRows; i++) {
         for (size_t j = 0; j < kCols; j++) {
@@ -18,12 +20,17 @@ TEST(TestPtrGrid, Basic)
     }
 
     ASSERT_EQ(sum, 0.0);
+
+    // Test that [] operator returns a reference, not a copy
+    ptr_grid[0][0] = nullptr;
+    ASSERT_EQ(ptr_grid.mat[0][0], nullptr);
 }
 
 TEST(TestPtrCube, Basic)
 {
     PtrCube<kRows, kCols, kCol2s, float> ptr_cube(n_entries);
 
+    // Test basic accesses and zero-initialization
     float sum = 0;
     for (size_t i = 0; i < kRows; i++) {
         for (size_t j = 0; j < kCols; j++) {
@@ -34,6 +41,10 @@ TEST(TestPtrCube, Basic)
     }
 
     ASSERT_EQ(sum, 0.0);
+
+    // Test that [] operator returns a reference, not a copy
+    ptr_cube[0][0][0] = nullptr;
+    ASSERT_EQ(ptr_cube.cube[0][0][0], nullptr);
 }
 
 int main(int argc, char** argv)

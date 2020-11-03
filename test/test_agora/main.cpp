@@ -71,8 +71,6 @@ void check_correctness_ul(Config* cfg)
 
     int num_bytes_per_ue
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
-    printf("num_bytes_per_ue: %d\n", num_bytes_per_ue);
-
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
@@ -186,6 +184,7 @@ int main(int argc, char* argv[])
         agora_cli->flags.enable_save_tx_data_to_file = true;
         agora_cli->start();
 
+        printf("Start correctness check\n");
         if (cfg->downlink_mode)
             check_correctness_dl(cfg);
         else
