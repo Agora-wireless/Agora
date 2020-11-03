@@ -173,32 +173,22 @@ Below we describe how to get it to work with Faros RRU and Iris UEs.
 
  * Run the UE code on a machine connected to the Iris UEs
    * Rebuild the code
-     * Pass `-DUSE_ARGOS=on -DUSE_UHD=off -DENABLE_MAC=on` to cmake
-     * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on -DENABLE_MAC=on` to cmake 
+     * Pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
+     * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake 
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
    * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
-   * Start client app `./python/client_app.py`.
    * Run `./build/user data/ue-ul-hw.json`.
 
  * Run Agora on the server
-   * Recompile FlexRAN with `-fPIC` to allow using from Python
-     ```
-     cd /opt/FlexRAN-FEC-SDK-19-04/sdk/
-     sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-fPIC")' cmake/intel-compile-options.cmake
-     ./create-makefiles-linux.sh
-     cd build-avx512-icc # or build-avx2-icc
-     make -j
-     ```
+
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
-     * Set `kExportConstellation = true` in `src/common/Symbols.hpp`
-     * Pass `-DUSE_ARGOS=on` and `-DENABLE_MAC=on` to cmake
+     * Set `kPrintPhyStats = true` in `src/common/Symbols.hpp`, if you wish to see uplink BER results.
+     * Pass `-DUSE_ARGOS=on` to cmake
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
-     serials of your RRU Irises and hub, respectively. Iris serials in your
-     Faros RRHs.
-   * Run BS app `./python/bs_app.py`.
+     serials of your RRU Irises and hub, respectively.
    * Run `./build/agora data/bs-ul-hw.json`.
 
 ## Contributing to Agora
