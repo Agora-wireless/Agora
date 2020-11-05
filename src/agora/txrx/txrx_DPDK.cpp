@@ -150,7 +150,7 @@ void* PacketTXRX::demod_thread(int tid)
                 if (target_server_idx == cfg->server_addr_idx) {
                     int8_t* target_demod_ptr
                         = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
-                            pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+                            demod_frame_to_send, demod_symbol_to_send, ue_id, cfg->server_addr_idx * cfg->get_num_sc_per_server());
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
