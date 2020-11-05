@@ -26,8 +26,11 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
-    rt_assert(ret == 1, "Invalid server IP address");
+    millipede_addrs_.reserve(cfg->server_addr_list.size());
+    ret = inet_pton(AF_INET, cfg->server_addr_list[cfg->server_addr_idx].c_str(), &millipede_addrs_[cfg->server_addr_idx]);
+    rt_assert(ret == 1, "Invalid sender IP address");
+    // ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
+    // rt_assert(ret == 1, "Invalid server IP address");
 
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
@@ -41,9 +44,6 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
             port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
     }
 
-    millipede_addrs_.reserve(cfg->server_addr_list.size());
-    ret = inet_pton(AF_INET, cfg->server_addr_list[cfg->server_addr_idx].c_str(), &millipede_addrs_[cfg->server_addr_idx]);
-    rt_assert(ret == 1, "Invalid sender IP address");
     for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
         if (i == cfg->server_addr_idx) {
             continue;
