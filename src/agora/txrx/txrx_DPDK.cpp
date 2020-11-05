@@ -146,41 +146,49 @@ void* PacketTXRX::demod_thread(int tid)
                     % kFrameWnd][demod_symbol_to_send
                     - cfg->pilot_symbol_num_perframe][ue_id];
 
-                struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
-                struct rte_ether_hdr* eth_hdr
-                    = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
-                eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+                size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
+                if (target_server_idx == cfg->server_addr_idx) {
+                    int8_t* target_demod_ptr
+                        = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                            pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+                    memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                } else {
+                    struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+                    struct rte_ether_hdr* eth_hdr
+                        = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+                    eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
 
-                struct rte_ipv4_hdr* ip_h
-                    = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-                ip_h->src_addr = millipede_addrs_[cfg->server_addr_idx];
-                ip_h->dst_addr = millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)];
-                ip_h->next_proto_id = IPPROTO_UDP;
+                    struct rte_ipv4_hdr* ip_h
+                        = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
+                    ip_h->src_addr = millipede_addrs_[cfg->server_addr_idx];
+                    ip_h->dst_addr = millipede_addrs_[cfg->get_server_idx_by_ue(ue_id)];
+                    ip_h->next_proto_id = IPPROTO_UDP;
 
-                struct rte_udp_hdr* udp_h
-                    = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-                udp_h->src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
-                udp_h->dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
+                    struct rte_udp_hdr* udp_h
+                        = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
+                    udp_h->src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
+                    udp_h->dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
 
-                tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
-                tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
+                    tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
+                    tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
 
-                char* payload = (char*)eth_hdr + kPayloadOffset;
-                auto* pkt = reinterpret_cast<Packet*>(payload);
-                pkt->pkt_type = Packet::PktType::kDemod;
-                pkt->frame_id = demod_frame_to_send;
-                pkt->symbol_id = demod_symbol_to_send;
-                pkt->ue_id = ue_id;
-                pkt->server_id = cfg->server_addr_idx;
-                DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
-                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    char* payload = (char*)eth_hdr + kPayloadOffset;
+                    auto* pkt = reinterpret_cast<Packet*>(payload);
+                    pkt->pkt_type = Packet::PktType::kDemod;
+                    pkt->frame_id = demod_frame_to_send;
+                    pkt->symbol_id = demod_symbol_to_send;
+                    pkt->ue_id = ue_id;
+                    pkt->server_id = cfg->server_addr_idx;
+                    DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
+                        cfg->get_num_sc_per_server() * cfg->mod_order_bits);
 
-                // Send data (one OFDM symbol)
-                size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-                if (unlikely(nb_tx_new != 1)) {
-                    printf("rte_eth_tx_burst() failed\n");
-                    exit(0);
+                    // Send data (one OFDM symbol)
+                    size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+                    if (unlikely(nb_tx_new != 1)) {
+                        printf("rte_eth_tx_burst() failed\n");
+                        exit(0);
+                    }
                 }
                 printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send, cfg->get_server_idx_by_ue(ue_id));
             }
