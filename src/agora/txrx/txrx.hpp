@@ -91,11 +91,11 @@ private:
     void* demod_thread(int tid);
 
     int dequeue_send(int tid);
-    int recv_enqueue(int tid, int radio_id, int rx_offset);
+    int recv_enqueue(int tid, int radio_id, size_t rx_offset);
 
     // Receive packets and relocate data to the correct address based on
     // the subcarrier range
-    int recv_relocate(int tid, int radio_id, int rx_offset);
+    int recv_relocate(int tid, int radio_id, size_t rx_offset);
 
     void* loop_tx_rx_argos(int tid);
     int dequeue_send_argos(int tid);

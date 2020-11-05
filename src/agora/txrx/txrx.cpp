@@ -279,7 +279,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
-int PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
+int PacketTXRX::recv_relocate(int tid, int radio_id, size_t rx_offset)
 {
     // TODO [junzhi]: Can we avoid malloc? Currently we're leaking buf because
     // we return buf as a Packet to the caller.
@@ -327,7 +327,7 @@ int PacketTXRX::recv_relocate(int tid, int radio_id, int rx_offset)
     return 1;
 }
 
-int PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
+int PacketTXRX::recv_enqueue(int tid, int radio_id, size_t rx_offset)
 {
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];

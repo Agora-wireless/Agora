@@ -8,16 +8,20 @@
 
 static constexpr bool kDebugDPDK = false;
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
+    DemulStatus* demul_status, DecodeStatus* decode_status)
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
+    , rx_status_(rx_status)
+    , demul_status_(demul_status)
+    , decode_status_(decode_status)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num + 1) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
@@ -37,9 +41,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
             port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
     }
 
-    int ret = inet_pton(AF_INET, cfg->server_addr_list[cfg->server_addr_idx].c_str(), &millipede_addrs_[cfg->server_addr_idx]);
+    millipede_addrs_.reserve(cfg->server_addr_list.size());
+    ret = inet_pton(AF_INET, cfg->server_addr_list[cfg->server_addr_idx].c_str(), &millipede_addrs_[cfg->server_addr_idx]);
     rt_assert(ret == 1, "Invalid sender IP address");
     for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
+        if (i == cfg->server_addr_idx) {
+            continue;
+        }
         int ret = inet_pton(AF_INET, cfg->server_addr_list[i].c_str(), &millipede_addrs_[i]);
         rt_assert(ret == 1, "Invalid sender IP address");
         uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
@@ -122,7 +130,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     return true;
 }
 
-void PacketTXRX::demod_thread(int tid) 
+void* PacketTXRX::demod_thread(int tid) 
 {
     std::vector<uint8_t> recv_buf(cfg->packet_length);
 
@@ -175,7 +183,6 @@ void PacketTXRX::demod_thread(int tid)
                     exit(0);
                 }
                 printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send, cfg->get_server_idx_by_ue(ue_id));
-                rt_assert(ret > 0, "sendto() failed");
             }
             demod_symbol_to_send++;
             if (demod_symbol_to_send
@@ -274,7 +281,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
         // Receive data
         int res = cfg->disable_master
             ? recv_relocate(tid, radio_id, rx_offset)
-            : recv_enqueue(tid, radio_id, rx_offset);
+            : 0;
         if (res == 0)
             continue;
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
@@ -287,7 +294,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
 }
 
 int PacketTXRX::recv_relocate(
-    int tid, int& radio_id, size_t& rx_offset)
+    int tid, int radio_id, size_t rx_offset)
 {
     rte_mbuf* rx_bufs[kRxBatchSize];
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
@@ -368,12 +375,12 @@ int PacketTXRX::recv_relocate(
 
         rte_pktmbuf_free(rx_bufs[i]);
 
-        if (kIsWorkerTimingEnabled) {
-            if (prev_frame_id == SIZE_MAX or pkt->frame_id > prev_frame_id) {
-                (*frame_start_)[tid][pkt->frame_id % kNumStatsFrames] = rdtsc();
-                prev_frame_id = pkt->frame_id;
-            }
-        }
+        // if (kIsWorkerTimingEnabled) {
+        //     if (prev_frame_id == SIZE_MAX or pkt->frame_id > prev_frame_id) {
+        //         (*frame_start_)[tid][pkt->frame_id % kNumStatsFrames] = rdtsc();
+        //         prev_frame_id = pkt->frame_id;
+        //     }
+        // }
 
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
     }
