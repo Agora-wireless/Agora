@@ -219,6 +219,12 @@ Config::Config(std::string jsonfile)
         server_addr_idx = tddConf.value("server_addr_idx", 0);
         rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
             "OFDM_DATA_NUM % # servers should be 0!");
+        if (kUseDPDK) {
+            server_mac_list
+                = tddConf.value("server_mac_list", std::vector<std::string>());
+            rt_assert(server_addr_list.size() > 0, "MAC list is 0!");
+            rt_assert(server_addr_list.size() == server_addr_list.size(), "Two list not equal!");
+        }
 
         // TODO: Should we be using OFDM_DATA_START here?
         subcarrier_start

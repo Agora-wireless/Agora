@@ -75,10 +75,25 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
+    if (cfg->disable_master) {
+        bs_server_addr_list.reserve(cfg->server_addr_list.size());
+        for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
+            ret = inet_pton(AF_INET, cfg->server_addr_list[i].c_str(), &bs_server_addr_list[i]);
+        }
+    }
 
-    ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
-    rt_assert(parsed_mac != NULL, "Invalid server mac address");
-    memcpy(&server_mac_addr, parsed_mac, sizeof(ether_addr));
+    if (cfg->disable_master) {
+        server_mac_addr_list.reserve(cfg->server_addr_list.size());
+        for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
+            ether_addr* parsed_mac = ether_aton(cfg->server_mac_list[i].c_str());
+            rt_assert(parsed_mac != NULL, "Invalid server mac address");
+            memcpy(&server_mac_addr_list[i], parsed_mac, sizeof(ether_addr));
+        }
+    } else {
+        ether_addr* parsed_mac = ether_aton(server_mac_addr_str.c_str());
+        rt_assert(parsed_mac != NULL, "Invalid server mac address");
+        memcpy(&server_mac_addr, parsed_mac, sizeof(ether_addr));
+    }
 
     ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
@@ -271,6 +286,14 @@ void* Sender::worker_thread(int tid)
             cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
             cfg->packet_length);
         pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
+        
+        rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->server_addr_list.size()];
+        for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
+            tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
+                server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
+                cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+                cfg->packet_length);
+        }
 #endif
 
         // Update the TX buffer
@@ -297,8 +320,31 @@ void* Sender::worker_thread(int tid)
         }
 
 #ifdef USE_DPDK
-        rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
-            "rte_eth_tx_burst() failed");
+        if (cfg->disable_master) {
+            const size_t sc_block_size
+                = cfg->OFDM_DATA_NUM / cfg->server_addr_list.size();
+            for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
+                pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
+                pkt->pkt_type = Packet::PktType::kIQFromRRU;
+                pkt->frame_id = tag.frame_id;
+                pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
+                pkt->cell_id = 0;
+                pkt->ant_id = tag.ant_id;
+                memcpy(pkt->data,
+                    data_buf->data
+                        + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
+                    sc_block_size * sizeof(unsigned short) * 2);
+                MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
+                    pkt->to_string().c_str(), i, cfg->server_addr_list.size(),
+                    cfg->server_addr_list[i].c_str(),
+                    cfg->bs_server_port + cur_radio);
+            }
+            rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->server_addr_list.size()) == 1,
+                "rte_eth_tx_burst() failed");
+        } else {
+            rt_assert(rte_eth_tx_burst(0, tid, &tx_mbuf, 1) == 1,
+                "rte_eth_tx_burst() failed");
+        }
 #else
         if (cfg->disable_master) {
             const size_t sc_block_size

@@ -330,6 +330,10 @@ public:
     uint16_t demod_tx_port; // UDP port used to receive post-demodulation data
     uint16_t demod_rx_port; // UDP port used to send post-demodulation data
 
+    // The list of MAC addresses of all Agora servers 
+    // Only used in distributed&DPDK version
+    std::vector<std::string> server_mac_list;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

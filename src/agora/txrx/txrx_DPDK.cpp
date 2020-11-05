@@ -38,10 +38,10 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
 
         printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
                "dst port: %zu, queue: %zu\n",
-            cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
+            cfg->bs_rru_addr.c_str(), cfg->server_addr_list[cfg->server_addr_idx].c_str(),
             cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
         DpdkTransport::install_flow_rule(
-            port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
+            port_id, i, bs_rru_addr, millipede_addrs_[cfg->server_addr_idx], src_port, dst_port);
     }
 
     for (size_t i = 0; i < cfg->server_addr_list.size(); i ++) {
