@@ -9,28 +9,25 @@ Some highlights:
 [Skylark Wireless](https://skylarkwireless.com). 
 
 ## Contents
-
- * [Requirements for building Agora](#requirements-for-building-agora)
- * [Agora with emulated RRU](#agora-with-emulated-rru)
-   * [Building and running Agora](#building-and-running-agora)
-   * [Server setup for performance test](#server-setup-for-performance-test)
-   * [Running performance test](#running-performance-test)
- * [Agora with real RRU and UEs](#agora-with-real-rru-and-ues)
-   * [Running the uplink demo](#running-the-uplink-demo)
+ * [Building Agora](#building-agora)
+   * [Setting up the build environment](#setting-up-the-build-environment)
+   * [Agora with emulated RRU](#agora-with-emulated-rru)
+     * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
+     * [Running performance test](#running-performance-test)
+   * [Agora with real RRU](#agora-with-real-rru)
+     * [Building and running with real RRU](#building-and-running-with-real-rru)
  * [Contributing to Agora](#contributing-to-agora)
  * [Acknowledgment](#acknowledgment)
  * [Dodumentation](#documentation)
  * [Contact](#contact)
  
  
-## Requirements for building Agora
-Agora can be built with the following setup.
-
- * Toolchain: A C++11 compiler and CMake 2.8+.
- * Operating system: Linux (Ubuntu 16.04 and 18.04 are tested)
- * Required packages
-   * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/ubuntu.sh.
-   * Download and install Intel libraries:
+# Building Agora
+  Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04 and 18.04. 
+  Agora requires CMake 2.8+ and works with both GNU and Intel compiler with C++11 support. 
+## Setting up the build environment
+  * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/ubuntu.sh.
+  * Download and install Intel libraries:
      * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
        * MKL can also be installed from Intel Parallel Studio XE, please reach out to the current
@@ -71,7 +68,7 @@ Agora can be built with the following setup.
 ## Agora with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
-### Building and running Agora
+### Building and running with emulated RRU
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
     cd Agora
@@ -121,16 +118,24 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
-   "Agora with real RRU and UEs" section below.
+   [Agora with real RRU](#agora-with-real-rru) section below.
  
  
-### Server setup for performance test
+### Running performance test
 To test the performance of Agora, we recommend using two servers 
 (one for Agora and another for the sender) and DPDK for networking. 
 In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
 The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
-We use both ports with DPDK to get enough throughput for the traffic of 64 antennas. 
-We did the following server configurations for the server that runs Agora
+* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores
+for testing real-time performance of 8x8 MU-MIMO. 
+If you do not have a powerful server or high throughput NICs, 
+we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
+which will increase frame duration and reduce throughput.
+
+To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK
+to get enough throughput for the traffic of 64 antennas. 
+(**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
+We did the following configurations for the server that runs Agora:
   * Disable Turbo Boost to reduce performance variation by running 
    `echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost`
   * Set CPU scaling to performance by running 
@@ -145,8 +150,7 @@ We did the following server configurations for the server that runs Agora
     where the IRQ indices are machine dependent.
   * Compile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`.
     
-### Running performance test
-In this section, we provide the instruction to collect and analyze timestamp traces for emulated RRU. 
+The steps to collect and analyze timestamp traces are as follows:
   * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
@@ -158,35 +162,36 @@ In this section, we provide the instruction to collect and analyze timestamp tra
   * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
-## Agora with real RRU and UEs
+## Agora with real RRU
 
 Currently Agora suports a 64-antenna 
 Faros base station as RRU and Iris UE devices. Both are commercially available from 
 [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
-Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs. 
+Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs.
+
+### Building and running with real RRU
 We use command line variables of cmake to switch between emulated RRU and real RRU. 
 We use `-DUSE_AGROS` for Faros RRU and Iris UEs, and `-DUSE_UHD` for USRP-based RRU and UEs. 
 
-Below we describe how to get it to work with Faros RRU and Iris UEs.
-
-### Running the uplink demo
-
- * Run the UE code on a machine connected to the Iris UEs
-   * Rebuild the code
-     * Pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
-     * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake 
+Currently, Agora only supports uplink with real RRU and UEs. 
+We recommend using one server for controlling the RRU and running Agora, 
+and another server for controlling the UEs and running the UE code.
+Below we describe how to get the uplink demo work.
+ * Rebuild the code on both servers for RRU side the UE side.
+    * For Faros RRU and Iris UEs, pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
+    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake 
+    * Run `make -j` to recompile the code.
+ * Run the UE code on the server connected to the Iris UEs
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
    * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
    * Run `./build/user data/ue-ul-hw.json`.
-
- * Run Agora on the server
-
+ * Run Agora on the server connected to the Faros RRU
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
      * Set `kPrintPhyStats = true` in `src/common/Symbols.hpp`, if you wish to see uplink BER results.
-     * Pass `-DUSE_ARGOS=on` to cmake
+     * Run `make -j` to recompile the code.
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
      serials of your RRU Irises and hub, respectively.
    * Run `./build/agora data/bs-ul-hw.json`.
