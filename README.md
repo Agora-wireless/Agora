@@ -156,8 +156,10 @@ we recommend using two servers
 (one for Agora and another for the emulated RRU) and DPDK for networking. 
 In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
 The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
-* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores
+
+* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores 
 for testing real-time performance of 8x8 MU-MIMO. 
+For 8x8 MU-MIMO, our test on a machine with AVX-512 and CPU frequency of 2.3 GHz support shows that at least 7 worker cores are required to achieve real-time performance. Additionally, Agora requires one core for the manager thread and at least 1 core for network threads. We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., data/tddconfig-sim-ul.json. 
 If you do not have a powerful server or high throughput NICs, 
 we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
 which will increase frame duration and reduce throughput.
