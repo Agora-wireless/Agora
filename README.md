@@ -75,12 +75,15 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
     make -j
     ```
 
- * Run end-to-end test (uplink and downlik tests should both pass if everything is set up correctly).
+ * Run end-to-end test to check correctness (uplink and downlik tests should both pass if everything is set up correctly).
     ```
-    ./test/test_agora/test_agora.sh 100 out % Runs test for 100 iterations
+    ./test/test_agora/test_agora.sh 10 out % Runs test for 10 iterations
     ```
 
  * Run Agora with emulated RRU traffic
+   * **NOTE**: We recommend running Agora and the emulated RRU on two different machines. 
+   If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores, 
+     otherwise there will be performance slow down.
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator --conf_file data/tddconfig-sim-ul.json` to generate data
      files.
@@ -90,16 +93,14 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      --frame_duration=5000 --enable_slow_start=1 
      --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
      with uplink configuration.
-   * Note: make sure Agora and sender are using different set of cores, 
-     otherwise there will be performance slow down.
-
- * Run Agora with DPDK
-   * Run `cmake -DUSE_DPDK=1` to enable DPDK in the build.
-   * For Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0` to exclude
-     Mellanox libraries in the build.
-   * When running the sender with DPDK, it is required to set the MAC address
+   * The above steps use Linux networking stack for packet I/O. Agora also supports using DPDK
+   to bypass the kernel for packet I/O. To enable DPDK, run `cmake -DUSE_DPDK=1 ..; make -j` to 
+   rebuild code for Mellanox NICs; for Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j` 
+   to exclude Mellanox libraries in the build.
+   When running the emulated RRU with DPDK, it is required to set the MAC address
      of the NIC used by Agora. To do this, pass `--server_mac_addr=` to
      `./build/sender`.
+   * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
@@ -186,10 +187,13 @@ The steps to collect and analyze timestamp traces are as follows:
   * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
+  * Gerenrate source data files by running
+     `./build/data_generator --conf_file data/tddconfig-sim-ul.json`.
   * Run Agora as a real-time process (to prevent OS from doing context swithes) using 
     `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora data/tddconfig-sim-ul.json`. 
-    (**Note**: Using a process priority 99 is dangerous. Before running it, 
-    make sure you have directed OS interrupts away from cores used by Agora.)
+    (**NOTE**: Using a process priority 99 is dangerous. Before running it, 
+    make sure you have directed OS interrupts away from cores used by Agora. If you have not done so,
+    run `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora data/tddconfig-sim-ul.json` instead to run Agora as a normal process.)
   * Run the emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
   * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
