@@ -24,25 +24,18 @@ Some highlights:
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04 and 18.04. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++11 support. 
 ## Setting up the build environment
-  * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/ubuntu.sh.
+  * See `scripts/ubuntu.sh` for required packages, including Linux packages, gtest, Armadillo, nlohmann json-dev and SoapySDR, and the corresponding versions. Run `./scripts/ubuntu.sh` to install these packages.
   * Download and install Intel libraries:
-     * Install Intel MKL - See
-       [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
-       * MKL can also be installed from Intel Parallel Studio XE, please reach out to the current
-         Agora developers to learn how to get the correct version. 
-       * Note: MKL version after 2019 update 3 is required to enable JIT acceleration applied for matrix multiplication in the code.
      * Install Intel FlexRAN's FEC SDK for LDPC encoding and decoding
         * Download [Intel FlexRAN's FEC
            SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
            for LDPC decoding to `/opt`.
         * Compiling FlexRAN requires an Intel compiler. Intel compiler version <= 19.0.4 is required for compiling FlexRAN.
           Newer versions will not work. 
-          * Please reach out to the current
-          Agora developers to learn how to get the correct versions of
-          Intel Parallel Studio XE or Intel System Studio. Version 2019 initial 
-          release of Intel Prallel Studio XE has been tested to work. 
-          * If you are using a newer version of icc, please reach out to the current
-          Agora developers to get the patch for resolving conflicts with FlexRAN.
+          * Intel compiler can be installed from Intel Parallel Studio XE or Intel System Studio. 
+	  We have tested version 2019 initial release of Intel Prallel Studio XE. 
+          * Newer versions of Intel compiler can also work, but require a patch for resolving conflicts with FlexRAN. 
+	  Please [contact](#contact) the current Agora developers to get the patch.
         * Set required environment variables by sourcing `compilervars.sh`.
           For example, if Intel compiler is in `/opt`, run `source $(find
           2>/dev/null /opt -name compilervars.sh) intel64`. After running this
@@ -56,6 +49,10 @@ Some highlights:
         cd build-avx512-icc # or build-avx2-icc 
         make -j
         ```
+   * Install Intel MKL - See
+       [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
+       * MKL can also be installed from Intel Parallel Studio XE. Agora has been tested with 2019 and 2020 versions. 
+       * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
    * Optional: DPDK
       * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
