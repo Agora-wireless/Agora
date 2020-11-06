@@ -11,11 +11,9 @@ Some highlights:
 ## Contents
  * [Building Agora](#building-agora)
    * [Setting up the build environment](#setting-up-the-build-environment)
-   * [Agora with emulated RRU](#agora-with-emulated-rru)
-     * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
-     * [Running performance test](#running-performance-test)
-   * [Agora with real RRU](#agora-with-real-rru)
-     * [Building and running with real RRU](#building-and-running-with-real-rru)
+   * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
+   * [Building and running with real RRU](#building-and-running-with-real-rru)
+   * [Running performance test](#running-performance-test)
  * [Contributing to Agora](#contributing-to-agora)
  * [Acknowledgment](#acknowledgment)
  * [Dodumentation](#documentation)
@@ -24,7 +22,7 @@ Some highlights:
  
 # Building Agora
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04 and 18.04. 
-  Agora requires CMake 2.8+ and works with both GNU and Intel compiler with C++11 support. 
+  Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++11 support. 
 ## Setting up the build environment
   * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/ubuntu.sh.
   * Download and install Intel libraries:
@@ -65,10 +63,9 @@ Some highlights:
       * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
         DESTDIR=/usr -j`
 
-## Agora with emulated RRU
+## Building and running with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
-### Building and running with emulated RRU
  * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
     ```
     cd Agora
@@ -119,57 +116,13 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    [Agora with real RRU](#agora-with-real-rru) section below.
- 
- 
-### Running performance test
-To test the performance of Agora, we recommend using two servers 
-(one for Agora and another for the sender) and DPDK for networking. 
-In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
-The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
-* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores
-for testing real-time performance of 8x8 MU-MIMO. 
-If you do not have a powerful server or high throughput NICs, 
-we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
-which will increase frame duration and reduce throughput.
 
-To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK
-to get enough throughput for the traffic of 64 antennas. 
-(**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
-We did the following configurations for the server that runs Agora:
-  * Disable Turbo Boost to reduce performance variation by running 
-   `echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost`
-  * Set CPU scaling to performance by running 
-    `sudo cpupower frequency-set -g performance`, 
-    where cpupower can be installed through
-    `sudo apt-get install -y linux-tools-$(uname -r)`
-  * Turn off hyper-threading. We provide an example bash script 
-	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
-  * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
-    We direct all the interrupts to core 0 in our experiments.  
-	  We provide an example bash script (scripts/set_smp_affinity.sh), 
-    where the IRQ indices are machine dependent.
-  * Compile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`.
-    
-The steps to collect and analyze timestamp traces are as follows:
-  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
-    In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
-    to different values to collect different data points in the figures. 
-  * Run Agora as a real-time process (to prevent OS from doing context swithes) using 
-    `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora data/tddconfig-sim-ul.json`. 
-    (Note: using a process priority 99 is dangerous. Before running it, 
-    make sure you have direct OS interrupts used by Agora's cores.)
-  * Run emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
-  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
-  * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
-
-## Agora with real RRU
-
-Currently Agora suports a 64-antenna 
+## Building and running with real RRU
+Agora suports a 64-antenna 
 Faros base station as RRU and Iris UE devices. Both are commercially available from 
 [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
 Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs.
 
-### Building and running with real RRU
 We use command line variables of cmake to switch between emulated RRU and real RRU. 
 We use `-DUSE_AGROS` for Faros RRU and Iris UEs, and `-DUSE_UHD` for USRP-based RRU and UEs. 
 
@@ -195,6 +148,51 @@ Below we describe how to get the uplink demo work.
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
      serials of your RRU Irises and hub, respectively.
    * Run `./build/agora data/bs-ul-hw.json`.
+
+## Running performance test
+To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation,
+we recommend using two servers 
+(one for Agora and another for the emulated RRU) and DPDK for networking. 
+In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
+The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
+* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores
+for testing real-time performance of 8x8 MU-MIMO. 
+If you do not have a powerful server or high throughput NICs, 
+we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
+which will increase frame duration and reduce throughput.
+
+To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK
+to get enough throughput for the traffic of 64 antennas. 
+(**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
+
+To reduce performance variations, we did the following configurations for the server that runs Agora:
+  * **NOTE**: These steps are not strictly required if you just wanted to try out Agora and do not care about performance variations.
+  * Disable Turbo Boost to reduce performance variation by running 
+   `echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost`
+  * Set CPU scaling to performance by running 
+    `sudo cpupower frequency-set -g performance`, 
+    where cpupower can be installed through
+    `sudo apt-get install -y linux-tools-$(uname -r)`
+  * Turn off hyper-threading. We provide an example bash script 
+	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
+  * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
+    We direct all the interrupts to core 0 in our experiments.  
+	  We provide an example bash script (scripts/set_smp_affinity.sh), 
+    where the IRQ indices are machine dependent.
+    
+The steps to collect and analyze timestamp traces are as follows:
+  * For Intel NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`; 
+  For Mallenox NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=1 ..; make -j`.
+  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
+    In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
+    to different values to collect different data points in the figures. 
+  * Run Agora as a real-time process (to prevent OS from doing context swithes) using 
+    `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora data/tddconfig-sim-ul.json`. 
+    (**Note**: Using a process priority 99 is dangerous. Before running it, 
+    make sure you have directed OS interrupts away from cores used by Agora.)
+  * Run the emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
+  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
+  * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
 ## Contributing to Agora
 Agora is open-source and open to your contributions. Before contributing, please read [this](CONTRIBUTING.md).
