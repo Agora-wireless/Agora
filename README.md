@@ -49,15 +49,15 @@ Some highlights:
         cd build-avx512-icc # or build-avx2-icc 
         make -j
         ```
-   * Install Intel MKL - See
+    * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
        * MKL can also be installed from Intel Parallel Studio XE. Agora has been tested with 2019 and 2020 versions. 
        * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
-   * Optional: DPDK
-      * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
+    * Optional: DPDK
+       * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
         Intel 40 GbE and Mellanox 100 GbE NICs in Agora.
-      * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
+       * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
         DESTDIR=/usr -j`
 
 ## Building and running with emulated RRU
