@@ -31,14 +31,11 @@
 
 class Agora {
 public:
-    /* optimization parameters for block transpose (see the slides for more
-     * details) */
-    static const int transpose_block_num = 256;
-
     // Dequeue batch size, used to reduce the overhead of dequeue in main thread
     static const int kDequeueBulkSizeTXRX = 8;
-
     static const int kDequeueBulkSizeWorker = 4;
+
+    static const int kMaxWorkerNum = 50; // Max number of worker threads allowed
 
     Agora(Config*); /// Create an Agora object and start the worker threads
     ~Agora();
@@ -46,14 +43,13 @@ public:
     void start(); /// The main Agora event loop
     void stop();
 
-    void* worker_fft(int tid);
-    void* worker_zf(int tid);
-    void* worker_demul(int tid);
-    void* worker_decode(int tid);
-    void* worker(int tid);
+    void worker_fft(int tid);
+    void worker_zf(int tid);
+    void worker_demul(int tid);
+    void worker_decode(int tid);
+    void worker(int tid);
 
-    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
-    void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+    void create_threads(); /// Launch worker threads
 
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id);
@@ -141,11 +137,12 @@ private:
 
     Config* config_;
     size_t fft_created_count;
-    int max_equaled_frame = 0;
+    size_t max_equaled_frame = SIZE_MAX;
     std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
+    std::thread worker_std_threads_[kMaxWorkerNum]; // Handle for worker threads
 
     Stats* stats;
     PhyStats* phy_stats;
