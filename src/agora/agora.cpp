@@ -50,21 +50,7 @@ Agora::Agora(Config* cfg)
     }
 
     /* Create worker threads */
-    if (config_->bigstation_mode) {
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_fft>, 0,
-            cfg->fft_thread_num);
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_zf>,
-            cfg->fft_thread_num, cfg->fft_thread_num + cfg->zf_thread_num);
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_demul>,
-            cfg->fft_thread_num + cfg->zf_thread_num,
-            cfg->fft_thread_num + cfg->zf_thread_num + cfg->demul_thread_num);
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker_decode>,
-            cfg->fft_thread_num + cfg->zf_thread_num + cfg->demul_thread_num,
-            cfg->worker_thread_num);
-    } else {
-        create_threads(pthread_fun_wrapper<Agora, &Agora::worker>, 0,
-            cfg->worker_thread_num);
-    }
+    create_threads();
 
     printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
            "cores %zu--%zu\n",
@@ -83,6 +69,8 @@ Agora::~Agora()
 
     if (kEnableMac)
         mac_std_thread_.join();
+    for (size_t i = 0; i < config_->worker_thread_num; i++)
+        worker_std_threads_[i].join();
     delete mac_thread_;
 }
 
@@ -678,7 +666,7 @@ void Agora::handle_event_fft(size_t tag)
     }
 }
 
-void* Agora::worker(int tid)
+void Agora::worker(int tid)
 {
     pin_to_core_with_offset(
         ThreadType::kWorker, base_worker_core_offset, tid, false /* quiet */);
@@ -737,7 +725,7 @@ void* Agora::worker(int tid)
     }
 }
 
-void* Agora::worker_fft(int tid)
+void Agora::worker_fft(int tid)
 {
     pin_to_core_with_offset(
         ThreadType::kWorkerFFT, base_worker_core_offset, tid);
@@ -759,7 +747,7 @@ void* Agora::worker_fft(int tid)
     }
 }
 
-void* Agora::worker_zf(int tid)
+void Agora::worker_zf(int tid)
 {
     pin_to_core_with_offset(
         ThreadType::kWorkerZF, base_worker_core_offset, tid);
@@ -774,7 +762,7 @@ void* Agora::worker_zf(int tid)
     }
 }
 
-void* Agora::worker_demul(int tid)
+void Agora::worker_demul(int tid)
 {
     pin_to_core_with_offset(
         ThreadType::kWorkerDemul, base_worker_core_offset, tid);
@@ -799,7 +787,7 @@ void* Agora::worker_demul(int tid)
     }
 }
 
-void* Agora::worker_decode(int tid)
+void Agora::worker_decode(int tid)
 {
     pin_to_core_with_offset(
         ThreadType::kWorkerDecode, base_worker_core_offset, tid);
@@ -822,18 +810,27 @@ void* Agora::worker_decode(int tid)
     }
 }
 
-void Agora::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
+void Agora::create_threads()
 {
-    int ret;
-    for (int i = tid_start; i < tid_end; i++) {
-        auto context = new EventHandlerContext<Agora>;
-        context->obj_ptr = this;
-        context->id = i;
-        ret = pthread_create(&task_threads[i], NULL, worker, context);
-        if (ret != 0) {
-            perror("task thread create failed");
-            exit(0);
-        }
+    auto& cfg = config_;
+    if (cfg->bigstation_mode) {
+        for (size_t i = 0; i < cfg->fft_thread_num; i++)
+            worker_std_threads_[i] = std::thread(&Agora::worker_fft, this, i);
+        for (size_t i = cfg->fft_thread_num;
+             i < cfg->fft_thread_num + cfg->zf_thread_num; i++)
+            worker_std_threads_[i] = std::thread(&Agora::worker_zf, this, i);
+        for (size_t i = cfg->fft_thread_num + cfg->zf_thread_num; i
+             < cfg->fft_thread_num + cfg->zf_thread_num + cfg->demul_thread_num;
+             i++)
+            worker_std_threads_[i] = std::thread(&Agora::worker_demul, this, i);
+        for (size_t i
+             = cfg->fft_thread_num + cfg->zf_thread_num + cfg->demul_thread_num;
+             i < cfg->worker_thread_num; i++)
+            worker_std_threads_[i]
+                = std::thread(&Agora::worker_decode, this, i);
+    } else {
+        for (size_t i = 0; i < cfg->worker_thread_num; i++)
+            worker_std_threads_[i] = std::thread(&Agora::worker, this, i);
     }
 }
 
