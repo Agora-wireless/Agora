@@ -49,7 +49,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
-        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
+        + "/data/LDPC_rx_data_256_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
@@ -394,6 +394,7 @@ size_t Sender::get_max_symbol_id() const
 
 void Sender::init_iq_from_file(std::string filename)
 {
+    printf("Filename: %s\n", filename.c_str());
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
     iq_data_short_.calloc(
         packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);

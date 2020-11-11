@@ -218,7 +218,7 @@ void* PacketTXRX::demod_thread(int tid)
                 continue;
             }
             if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
-                fprintf(stderr, "DPDK: Destination addr does not match\n");
+                fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
                 rte_pktmbuf_free(rx_bufs[i]);
                 continue;
             }
@@ -310,7 +310,7 @@ int PacketTXRX::recv_relocate(int tid)
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
-        if (ip_hdr->dst_addr != bs_server_addr) {
+        if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
             fprintf(stderr, "DPDK: Destination addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
