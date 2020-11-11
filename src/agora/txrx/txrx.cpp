@@ -194,7 +194,6 @@ void* PacketTXRX::loop_tx_rx(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerTXRX, core_offset, tid, false /* quiet */);
     size_t* rx_frame_start = (*frame_start_)[tid];
-    size_t rx_offset = 0;
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
 
@@ -237,10 +236,9 @@ void* PacketTXRX::loop_tx_rx(int tid)
         }
 
         // Receive data
-        int res = recv_relocate(tid, radio_id, rx_offset);
+        int res = recv_relocate(tid);
         if (res == 0)
             continue;
-        rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         // if (kIsWorkerTimingEnabled) {
         //     int frame_id = pkt->frame_id;
@@ -256,7 +254,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
-int PacketTXRX::recv_relocate(int tid, int radio_id, size_t rx_offset)
+int PacketTXRX::recv_relocate(int tid)
 {
     if (-1 == recv(socket_[radio_id], recv_buf, cfg->packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {

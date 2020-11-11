@@ -258,19 +258,15 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
 
 void* PacketTXRX::loop_tx_rx(int tid)
 {
-    size_t rx_offset = 0;
-    size_t prev_frame_id = SIZE_MAX;
-
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
     int radio_id = radio_lo;
 
     while (cfg->running) {
         // Receive data
-        int res = recv_relocate(tid, radio_id, rx_offset);
+        int res = recv_relocate(tid);
         if (res == 0)
             continue;
-        rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
@@ -279,8 +275,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
     return 0;
 }
 
-int PacketTXRX::recv_relocate(
-    int tid, int radio_id, size_t rx_offset)
+int PacketTXRX::recv_relocate(int tid)
 {
     rte_mbuf* rx_bufs[kRxBatchSize];
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
@@ -356,8 +351,6 @@ int PacketTXRX::recv_relocate(
         //         prev_frame_id = pkt->frame_id;
         //     }
         // }
-
-        rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
     }
     return nb_rx;
 }
