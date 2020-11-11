@@ -27,13 +27,8 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
-    if (cfg->disable_master) {
-        data_gather_buffer = reinterpret_cast<complex_float*>(memalign(
-            64, cfg->OFDM_DATA_NUM * kMaxAntennas * sizeof(complex_float)));
-    } else {
-        data_gather_buffer = reinterpret_cast<complex_float*>(memalign(
-            64, kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
-    }
+    data_gather_buffer = reinterpret_cast<complex_float*>(memalign(
+        64, cfg->OFDM_DATA_NUM * kMaxAntennas * sizeof(complex_float)));
     equaled_buffer_temp = reinterpret_cast<complex_float*>(
         memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
     equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(

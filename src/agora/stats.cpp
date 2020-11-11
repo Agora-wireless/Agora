@@ -76,14 +76,9 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
     FrameSummary demul_frame_summary;
     FrameSummary decode_frame_summary;
 
-    if (config_->bigstation_mode)
-        update_stats_in_functions_uplink_bigstation(frame_slot,
-            &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
-            &demul_frame_summary, &decode_frame_summary);
-    else
-        update_stats_in_functions_uplink_agora(frame_slot, &fft_frame_summary,
-            &csi_frame_summary, &zf_frame_summary, &demul_frame_summary,
-            &decode_frame_summary);
+    update_stats_in_functions_uplink_agora(frame_slot, &fft_frame_summary,
+        &csi_frame_summary, &zf_frame_summary, &demul_frame_summary,
+        &decode_frame_summary);
 
     fft_us[frame_slot] = fft_frame_summary.us_avg_threads[0];
     csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];
@@ -130,14 +125,9 @@ void Stats::update_stats_in_functions_downlink(size_t frame_id)
     FrameSummary precode_frame_summary;
     FrameSummary encode_frame_summary;
 
-    if (config_->bigstation_mode)
-        update_stats_in_functions_downlink_bigstation(frame_slot,
-            &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
-            &precode_frame_summary, &encode_frame_summary);
-    else
-        update_stats_in_functions_downlink_agora(frame_slot,
-            &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
-            &precode_frame_summary, &encode_frame_summary);
+    update_stats_in_functions_downlink_agora(frame_slot,
+        &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
+        &precode_frame_summary, &encode_frame_summary);
 
     csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];
     ifft_us[frame_slot] = ifft_frame_summary.us_avg_threads[0];

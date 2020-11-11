@@ -169,11 +169,6 @@ private:
     // 2nd dimension: socket buffer size
     Table<char> socket_buffer_;
 
-    // Status of received data buffers
-    // 1st dimension: number of socket RX threads
-    // 2nd dimension: socket buffer status size
-    Table<int> socket_buffer_status_;
-
     // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
     // [number of OFDM data subcarriers] columns.
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
@@ -268,32 +263,11 @@ private:
 
     sched_info_t sched_info_arr[kMaxThreads];
 
-    // Master thread's message queue for receiving packets
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
-
-    // Master-to-worker queue for MAC
-    moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
-
-    // Worker-to-master queue for MAC
-    moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
-
-    // Master thread's message queue for event completion from Doers;
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
-
-    // Master thread's message queue for event completion from DoDecode;
-    moodycamel::ConcurrentQueue<Event_data> complete_decode_task_queue_;
-
-    moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
-
     // Threads running the subcarrier-parallel processing
     std::vector<std::thread> do_subcarrier_threads_;
 
     // Threads running the decoders
     std::vector<std::thread> do_decode_threads_;
-
-    moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 
     // Shared states between socket threads and dosubcarriers
     RxStatus rx_status_;

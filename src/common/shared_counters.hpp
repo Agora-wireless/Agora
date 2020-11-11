@@ -214,7 +214,7 @@ class DecodeStatus {
 public:
     DecodeStatus(Config* cfg)
         : cfg_(cfg)
-        , num_demod_data_required_(cfg->server_addr_list.size())
+        , num_demod_data_required_(cfg->bs_server_addr_list.size())
     {
         cur_frame_ = new size_t[cfg->get_num_ues_to_process()];
         memset(cur_frame_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());

@@ -92,7 +92,6 @@ Config::Config(std::string jsonfile)
         = tddConf.value("ofdm_data_start", (OFDM_CA_NUM - OFDM_DATA_NUM) / 2);
     OFDM_DATA_STOP = OFDM_DATA_START + OFDM_DATA_NUM;
     downlink_mode = tddConf.value("downlink_mode", false);
-    bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
@@ -200,48 +199,45 @@ Config::Config(std::string jsonfile)
                                           : tddConf.value("zf_block_size", 1);
 
     /* Distributed & normal mode options */
-    fft_in_rru = tddConf.value("fft_in_rru", false);
-    disable_master = tddConf.value("disable_master", false);
     subcarrier_block_size = tddConf.value(
         "subcarrier_block_size", lcm(zf_block_size, demul_block_size));
     rt_assert(subcarrier_block_size % lcm(zf_block_size, demul_block_size) == 0,
         "Subcarrier block size should be a multiple of lcm(zf_block_size, "
         "demul_block_size)!");
 
-    if (disable_master) {
-        rt_assert(pilot_symbol_num_perframe + ul_data_symbol_num_perframe
-                == symbol_num_perframe,
-            "Masterless mode supports only pilot and uplink data syms for now");
+    rt_assert(pilot_symbol_num_perframe + ul_data_symbol_num_perframe
+            == symbol_num_perframe,
+        "Masterless mode supports only pilot and uplink data syms for now");
 
-        server_addr_list
-            = tddConf.value("server_addr_list", std::vector<std::string>());
-        rt_assert(server_addr_list.size() > 0, "Address list is 0!");
-        server_addr_idx = tddConf.value("server_addr_idx", 0);
-        rt_assert(OFDM_DATA_NUM % server_addr_list.size() == 0,
-            "OFDM_DATA_NUM % # servers should be 0!");
-        if (kUseDPDK) {
-            server_mac_list
-                = tddConf.value("server_mac_list", std::vector<std::string>());
-            rt_assert(server_addr_list.size() > 0, "MAC list is 0!");
-            rt_assert(server_addr_list.size() == server_addr_list.size(), "Two list not equal!");
-        }
-
-        // TODO: Should we be using OFDM_DATA_START here?
-        subcarrier_start
-            = OFDM_DATA_START + server_addr_idx * get_num_sc_per_server();
-        subcarrier_end
-            = OFDM_DATA_START + (server_addr_idx + 1) * get_num_sc_per_server();
-        rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
-            "Invalid subcarrier range and subcarrier block size!");
-        ue_start = server_addr_idx < UE_NUM % server_addr_list.size()
-            ? server_addr_idx * (UE_NUM / server_addr_list.size() + 1)
-            : UE_NUM
-                - (server_addr_list.size() - server_addr_idx)
-                    * (UE_NUM / server_addr_list.size());
-        ue_end = server_addr_idx < UE_NUM % server_addr_list.size()
-            ? ue_start + UE_NUM / server_addr_list.size() + 1
-            : ue_start + UE_NUM / server_addr_list.size();
+    bs_server_addr_list
+        = tddConf.value("bs_server_addr_list", std::vector<std::string>());
+    rt_assert(bs_server_addr_list.size() > 0, "Address list is 0!");
+    bs_server_addr_idx = tddConf.value("bs_server_addr_idx", 0);
+    rt_assert(OFDM_DATA_NUM % bs_server_addr_list.size() == 0,
+        "OFDM_DATA_NUM % # servers should be 0!");
+    if (kUseDPDK) {
+        bs_server_mac_list
+            = tddConf.value("bs_server_mac_list", std::vector<std::string>());
+        rt_assert(bs_server_mac_list.size() > 0, "MAC list is 0!");
+        rt_assert(bs_server_mac_list.size() == bs_server_addr_list.size(), "Two list not equal!");
     }
+
+    // TODO: Should we be using OFDM_DATA_START here?
+    subcarrier_start
+        = OFDM_DATA_START + bs_server_addr_idx * get_num_sc_per_server();
+    subcarrier_end
+        = OFDM_DATA_START + (bs_server_addr_idx + 1) * get_num_sc_per_server();
+    rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
+        "Invalid subcarrier range and subcarrier block size!");
+    ue_start = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
+        ? bs_server_addr_idx * (UE_NUM / bs_server_addr_list.size() + 1)
+        : UE_NUM
+            - (bs_server_addr_list.size() - bs_server_addr_idx)
+                * (UE_NUM / bs_server_addr_list.size());
+    ue_end = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
+        ? ue_start + UE_NUM / bs_server_addr_list.size() + 1
+        : ue_start + UE_NUM / bs_server_addr_list.size();
+
     demul_events_per_symbol
         = 1 + (get_num_sc_per_server() - 1) / demul_block_size;
     zf_events_per_symbol = 1 + (get_num_sc_per_server() - 1) / zf_block_size;

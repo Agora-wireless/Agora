@@ -50,11 +50,6 @@ public:
         RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr,
         DecodeStatus* decode_status = nullptr);
 
-    PacketTXRX(Config* cfg, size_t core_offset,
-        moodycamel::ConcurrentQueue<Event_data>* queue_message,
-        moodycamel::ConcurrentQueue<Event_data>* queue_task,
-        moodycamel::ProducerToken** rx_ptoks,
-        moodycamel::ProducerToken** tx_ptoks);
     ~PacketTXRX();
 
 #ifdef USE_DPDK
@@ -73,7 +68,7 @@ public:
      * @return True on successfully starting the network I/O threads, false
      * otherwise
      */
-    bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
+    bool startTXRX(Table<char>& buffer,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
         char* tx_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
@@ -109,37 +104,33 @@ private:
 
     const size_t socket_thread_num;
     Table<char>* buffer_;
-    Table<int>* buffer_status_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_;
     Table<int8_t>* demod_soft_buffer_to_decode_;
     size_t packet_num_in_buffer_;
     char* tx_buffer_;
     Table<size_t>* frame_start_;
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
-    moodycamel::ProducerToken** rx_ptoks_;
-    moodycamel::ProducerToken** tx_ptoks_;
 
     std::vector<struct sockaddr_in> bs_rru_sockaddr_;
     std::vector<int> socket_;
-    std::vector<struct sockaddr_in> millipede_sockaddrs_;
+    std::vector<struct sockaddr_in> bs_server_sockaddrs_;
     int demod_tx_socket_;
 
     char* send_buffer_;
+    uint8_t* recv_buffer_;
 
 #ifdef USE_DPDK
     uint32_t bs_rru_addr; // IPv4 address of the simulator sender
     uint32_t bs_server_addr; // IPv4 address of the Agora server
     struct rte_mempool* mbuf_pool;
-    std::vector<uint32_t> millipede_addrs_;
+    std::vector<uint32_t> bs_server_addrs_;
 #endif
 
     RadioConfig* radioconfig_; // Used only in Argos mode
 
     RxStatus* rx_status_; // Shared states with workers
     DemulStatus* demul_status_;
-    size_t demod_frame_to_send = 0;
-    size_t demod_symbol_to_send;
+    size_t demod_frame_to_send_ = 0;
+    size_t demod_symbol_to_send_;
     DecodeStatus* decode_status_;
 };
 

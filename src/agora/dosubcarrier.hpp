@@ -69,12 +69,10 @@ class DoSubcarrier : public Doer {
 public:
     /// Construct a new Do Subcarrier object
     DoSubcarrier(Config* config, int tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>&,
-        moodycamel::ConcurrentQueue<Event_data>&, moodycamel::ProducerToken*,
         /// The range of subcarriers handled by this subcarrier doer.
         Range sc_range,
         // input buffers
-        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
+        Table<char>& socket_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
         Table<complex_float>& data_buffer,
@@ -92,7 +90,6 @@ public:
               nullptr /* tok */)
         , sc_range_(sc_range)
         , socket_buffer_(socket_buffer)
-        , socket_buffer_status_(socket_buffer_status)
         , csi_buffers_(csi_buffers)
         , calib_buffer_(calib_buffer)
         , dl_encoded_buffer_(dl_encoded_buffer)
@@ -249,7 +246,7 @@ private:
                         // With either of AVX-512 or AVX2, load one cacheline =
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
                         // TODO: AVX512 complex multiply support below
-                        size_t pilots_sgn_offset = cfg->server_addr_idx
+                        size_t pilots_sgn_offset = cfg->bs_server_addr_idx
                             * cfg->get_num_sc_per_server();
 
                         __m256 fft_result0 = _mm256_load_ps(
@@ -290,9 +287,6 @@ private:
         }
     }
 
-    /// An unused queue used for constructing Doers
-    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
-
     /// The subcarrier range handled by this subcarrier doer.
     struct Range sc_range_;
 
@@ -303,7 +297,6 @@ private:
     // Input buffers
 
     Table<char>& socket_buffer_;
-    Table<int>& socket_buffer_status_;
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     Table<complex_float>& calib_buffer_;
@@ -339,4 +332,6 @@ private:
 
     // Shared status with Decode threads
     DemulStatus* demul_status_;
+
+    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 };

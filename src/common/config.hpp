@@ -250,7 +250,6 @@ public:
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode; // If true, the frame contains downlink symbols
-    bool bigstation_mode; // If true, use pipeline-parallel scheduling
     bool correct_phase_shift; // If true, do phase shift correction
 
     // The total number of uncoded data bytes in each OFDM symbol
@@ -310,15 +309,13 @@ public:
     // Number of bytes per code block
     size_t num_bytes_per_cb;
 
-    bool fft_in_rru; // If true, the RRU does FFT instead of Agora
-    bool disable_master; // If true, Agora will run without a master thread
     // # subcarriers for each dosubcarrier worker, should be a multiple of
     // lcm(zf_block_size, demul_block_size)
     size_t subcarrier_block_size;
 
     // The list of IP addresses of all Agora servers
-    std::vector<std::string> server_addr_list;
-    size_t server_addr_idx; // The index of this Agora server in the list
+    std::vector<std::string> bs_server_addr_list;
+    size_t bs_server_addr_idx; // The index of this Agora server in the list
 
     // This Agora server takes charge of subcarrier range
     // [subcarrier_start, subcarrier_end]
@@ -332,7 +329,7 @@ public:
 
     // The list of MAC addresses of all Agora servers 
     // Only used in distributed&DPDK version
-    std::vector<std::string> server_mac_list;
+    std::vector<std::string> bs_server_mac_list;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
@@ -364,21 +361,20 @@ public:
     // Get the number of subcarriers this server takes charge of
     inline size_t get_num_sc_per_server() const
     {
-        return disable_master ? OFDM_DATA_NUM / server_addr_list.size()
-                              : OFDM_DATA_NUM;
+        return OFDM_DATA_NUM / bs_server_addr_list.size();
     }
 
     // Get the number of UEs this server takes charge of
     inline size_t get_num_ues_to_process() const
     {
-        return disable_master ? ue_end - ue_start : UE_NUM;
+        return ue_end - ue_start;
     }
 
     // Get the Agora server index given an UE ID
     inline size_t get_server_idx_by_ue(size_t ue_id) const
     {
-        size_t ue_num_low = UE_NUM / server_addr_list.size();
-        size_t num_extra_ue = UE_NUM % server_addr_list.size();
+        size_t ue_num_low = UE_NUM / bs_server_addr_list.size();
+        size_t num_extra_ue = UE_NUM % bs_server_addr_list.size();
         if (ue_id < num_extra_ue * (ue_num_low + 1)) {
             return ue_id / (ue_num_low + 1);
         } else {

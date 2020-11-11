@@ -20,26 +20,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     if (!kUseArgos) {
         socket_.resize(cfg->nRadios);
         bs_rru_sockaddr_.resize(cfg->nRadios);
-        if (cfg->disable_master) {
-            millipede_sockaddrs_.resize(cfg->server_addr_list.size());
-        }
+        bs_server_sockaddrs_.resize(cfg->bs_server_addr_list.size());
     } else {
         radioconfig_ = new RadioConfig(cfg);
     }
-    demod_symbol_to_send = cfg->pilot_symbol_num_perframe;
+    demod_symbol_to_send_ = cfg->pilot_symbol_num_perframe;
     send_buffer_ = reinterpret_cast<char*>(memalign(64, cfg->packet_length));
-}
-
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* queue_message,
-    moodycamel::ConcurrentQueue<Event_data>* queue_task,
-    moodycamel::ProducerToken** rx_ptoks, moodycamel::ProducerToken** tx_ptoks)
-    : PacketTXRX(cfg, core_offset)
-{
-    message_queue_ = queue_message;
-    task_queue_ = queue_task;
-    rx_ptoks_ = rx_ptoks;
-    tx_ptoks_ = tx_ptoks;
+    recv_buffer_ = reinterpret_cast<char*>(memalign(64, cfg->packet_length));
 }
 
 PacketTXRX::~PacketTXRX()
@@ -51,13 +38,12 @@ PacketTXRX::~PacketTXRX()
     free(send_buffer_);
 }
 
-bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
+bool PacketTXRX::startTXRX(Table<char>& buffer,
     size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
     Table<int8_t>* demod_soft_buffer_to_decode)
 {
     buffer_ = &buffer;
-    buffer_status_ = &buffer_status;
     frame_start_ = &frame_start;
 
     packet_num_in_buffer_ = packet_num_in_buffer;
@@ -92,16 +78,14 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         }
     }
 
-    if (cfg->disable_master) {
-        pthread_t txrx_thread;
-        auto context = new EventHandlerContext<PacketTXRX>;
-        context->obj_ptr = this;
-        context->id = socket_thread_num;
-        int ret = pthread_create(&txrx_thread, NULL,
-            pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
-            context);
-        rt_assert(ret == 0, "Failed to create threads");
-    }
+    pthread_t txrx_thread;
+    auto context = new EventHandlerContext<PacketTXRX>;
+    context->obj_ptr = this;
+    context->id = socket_thread_num;
+    int ret = pthread_create(&txrx_thread, NULL,
+        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+        context);
+    rt_assert(ret == 0, "Failed to create threads");
 
     if (kUseArgos)
         radioconfig_->go();
@@ -121,42 +105,42 @@ void* PacketTXRX::demod_thread(int tid)
     demod_tx_socket_
         = setup_socket_ipv4(cfg->demod_tx_port, true, sock_buf_size);
 
-    for (size_t i = 0; i < cfg->server_addr_list.size(); i++) {
-        setup_sockaddr_remote_ipv4(&millipede_sockaddrs_[i], cfg->demod_rx_port,
-            cfg->server_addr_list[i].c_str());
+    for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
+        setup_sockaddr_remote_ipv4(&bs_server_sockaddrs_[i], cfg->demod_rx_port,
+            cfg->bs_server_addr_list[i].c_str());
     }
 
     while (cfg->running) {
         // 1. Try to send demodulated data to decoders
         if (demul_status_->ready_to_decode(
-                demod_frame_to_send, demod_symbol_to_send)) {
+                demod_frame_to_send_, demod_symbol_to_send_)) {
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-                int8_t* demod_ptr = (*demod_buffers_)[demod_frame_to_send
-                    % kFrameWnd][demod_symbol_to_send
+                int8_t* demod_ptr = (*demod_buffers_)[demod_frame_to_send_
+                    % kFrameWnd][demod_symbol_to_send_
                     - cfg->pilot_symbol_num_perframe][ue_id];
 
                 auto* pkt = reinterpret_cast<Packet*>(send_buffer_);
                 pkt->pkt_type = Packet::PktType::kDemod;
-                pkt->frame_id = demod_frame_to_send;
-                pkt->symbol_id = demod_symbol_to_send;
+                pkt->frame_id = demod_frame_to_send_;
+                pkt->symbol_id = demod_symbol_to_send_;
                 pkt->ue_id = ue_id;
-                pkt->server_id = cfg->server_addr_idx;
+                pkt->server_id = cfg->bs_server_addr_idx;
                 memcpy(pkt->data, demod_ptr,
                     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 ssize_t ret = sendto(demod_tx_socket_, pkt, cfg->packet_length,
                     MSG_DONTWAIT,
-                    (struct sockaddr*)&millipede_sockaddrs_
+                    (struct sockaddr*)&bs_server_sockaddrs_
                         [cfg->get_server_idx_by_ue(ue_id)],
-                    sizeof(millipede_sockaddrs_[cfg->get_server_idx_by_ue(ue_id)]));
-                printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send, cfg->get_server_idx_by_ue(ue_id));
+                    sizeof(bs_server_sockaddrs_[cfg->get_server_idx_by_ue(ue_id)]));
+                printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send_, cfg->get_server_idx_by_ue(ue_id));
                 rt_assert(ret > 0, "sendto() failed");
             }
-            demod_symbol_to_send++;
-            if (demod_symbol_to_send
+            demod_symbol_to_send_++;
+            if (demod_symbol_to_send_
                 == cfg->pilot_symbol_num_perframe
                     + cfg->ul_data_symbol_num_perframe) {
-                demod_symbol_to_send = cfg->pilot_symbol_num_perframe;
-                demod_frame_to_send++;
+                demod_symbol_to_send_ = cfg->pilot_symbol_num_perframe;
+                demod_frame_to_send_++;
             }
         }
 
@@ -252,15 +236,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
                 slow_start_factor = 1;
         }
 
-        if (!cfg->disable_master) {
-            if (-1 != dequeue_send(tid))
-                continue;
-        }
-
         // Receive data
-        int res = cfg->disable_master
-            ? recv_relocate(tid, radio_id, rx_offset)
-            : recv_enqueue(tid, radio_id, rx_offset);
+        int res = recv_relocate(tid, radio_id, rx_offset);
         if (res == 0)
             continue;
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
@@ -281,20 +258,15 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
 int PacketTXRX::recv_relocate(int tid, int radio_id, size_t rx_offset)
 {
-    // TODO [junzhi]: Can we avoid malloc? Currently we're leaking buf because
-    // we return buf as a Packet to the caller.
-    uint8_t* buf = reinterpret_cast<uint8_t*>(malloc(cfg->packet_length));
-
-    if (-1 == recv(socket_[radio_id], buf, cfg->packet_length, 0)) {
+    if (-1 == recv(socket_[radio_id], recv_buf, cfg->packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {
             fprintf(stderr, "PacketTXRX: recv_relocate(), socket recv() error");
             exit(-1);
         }
-        free(buf);
         return 0;
     }
 
-    const auto* pkt = reinterpret_cast<Packet*>(buf);
+    const auto* pkt = reinterpret_cast<Packet*>(recv_buf);
     MLPD_TRACE("PacketTXRX: Thread %d received packet %s\n", tid,
         pkt->to_string().c_str());
 
@@ -307,16 +279,14 @@ int PacketTXRX::recv_relocate(int tid, int radio_id, size_t rx_offset)
         size_t sc_offset = Packet::kOffsetOfData
             + 2 * sizeof(unsigned short)
                 * (cfg->OFDM_DATA_START
-                      + cfg->server_addr_idx * cfg->get_num_sc_per_server());
-        memcpy(&rx_buffer[rx_offset_ * cfg->packet_length], buf,
+                      + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
+        memcpy(&rx_buffer[rx_offset_ * cfg->packet_length], recv_buf,
             Packet::kOffsetOfData);
         memcpy(&rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
-            buf + Packet::kOffsetOfData,
+            recv_buf + Packet::kOffsetOfData,
             cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
 
         // get the position in rx_buffer
-        // move ptr & set status to full
-        // rx_buffer_status[rx_offset] = 1;
         if (!rx_status_->add_new_packet(pkt)) {
             cfg->running = false;
         }
@@ -327,84 +297,46 @@ int PacketTXRX::recv_relocate(int tid, int radio_id, size_t rx_offset)
     return 1;
 }
 
-int PacketTXRX::recv_enqueue(int tid, int radio_id, size_t rx_offset)
-{
-    moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-    char* rx_buffer = (*buffer_)[tid];
-    int* rx_buffer_status = (*buffer_status_)[tid];
-    int packet_length = cfg->packet_length;
 
-    // if rx_buffer is full, exit
-    if (rx_buffer_status[rx_offset] == 1) {
-        printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-        cfg->running = false;
-        return (NULL);
-    }
-    struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
-    if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
-        if (errno != EAGAIN && cfg->running) {
-            perror("recv failed");
-            exit(0);
-        }
-        return (NULL);
-    }
-    if (kDebugPrintInTask) {
-        printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n", tid,
-            pkt->frame_id, pkt->symbol_id, pkt->ant_id);
-    }
+// int PacketTXRX::dequeue_send(int tid)
+// {
+//     auto& c = cfg;
+//     Event_data event;
+//     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+//         return -1;
 
-    // get the position in rx_buffer
-    // move ptr & set status to full
-    rx_buffer_status[rx_offset] = 1;
+//     // printf("tx queue length: %d\n", task_queue_->size_approx());
+//     assert(event.event_type == EventType::kPacketTX);
 
-    // Push kPacketRX event into the queue.
-    Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
-    if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
-    }
-    return 1;
-}
+//     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
+//     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+//     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-int PacketTXRX::dequeue_send(int tid)
-{
-    auto& c = cfg;
-    Event_data event;
-    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
-        return -1;
+//     size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+//     size_t offset
+//         = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+//               * c->BS_ANT_NUM)
+//         + ant_id;
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type == EventType::kPacketTX);
+//     if (kDebugPrintInTask) {
+//         printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
+//                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+//             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
+//             offset, message_queue_->size_approx());
+//     }
 
-    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+//     char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
+//     auto* pkt = (Packet*)cur_buffer_ptr;
+//     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
-    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-    size_t offset
-        = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-              * c->BS_ANT_NUM)
-        + ant_id;
+//     // Send data (one OFDM symbol)
+//     ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length, 0,
+//         (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+//         sizeof(bs_rru_sockaddr_[ant_id]));
+//     rt_assert(ret > 0, "sendto() failed");
 
-    if (kDebugPrintInTask) {
-        printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
-            offset, message_queue_->size_approx());
-    }
-
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
-    auto* pkt = (Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-    // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->packet_length, 0,
-        (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
-        sizeof(bs_rru_sockaddr_[ant_id]));
-    rt_assert(ret > 0, "sendto() failed");
-
-    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  Event_data(EventType::kPacketTX, event.tags[0])),
-        "Socket message enqueue failed\n");
-    return event.tags[0];
-}
+//     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
+//                   Event_data(EventType::kPacketTX, event.tags[0])),
+//         "Socket message enqueue failed\n");
+//     return event.tags[0];
+// }
