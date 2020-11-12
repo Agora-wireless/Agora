@@ -5,6 +5,7 @@
  */
 
 #include "txrx.hpp"
+#include <netinet/ether.h>
 
 static constexpr bool kDebugDPDK = false;
 
@@ -27,8 +28,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
+
     bs_server_addrs_.reserve(cfg->bs_server_addr_list.size());
+    bs_server_mac_addrs_.reserve(cfg->bs_server_addr_list.size());
+
     ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), &bs_server_addrs_[cfg->bs_server_addr_idx]);
+    
+    ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[cfg->bs_server_addr_idx].c_str());
+    rt_assert(parsed_mac != NULL, "Invalid server mac address");
+    memcpy(&bs_server_mac_addrs_[cfg->bs_server_addr_idx], parsed_mac, sizeof(ether_addr));
+
     rt_assert(ret == 1, "Invalid sender IP address");
 
     for (size_t i = 0; i < socket_thread_num; i++) {
@@ -49,6 +58,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
         }
         int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addrs_[i]);
         rt_assert(ret == 1, "Invalid sender IP address");
+        ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
+        rt_assert(parsed_mac != NULL, "Invalid server mac address");
+        memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
         uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
         printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
@@ -146,6 +158,10 @@ void* PacketTXRX::demod_thread(int tid)
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
                     eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+                    memcpy(eth_hdr->s_addr.addr_bytes, bs_server_mac_addrs_[cfg->bs_server_addr_idx].addr_bytes,
+                        RTE_ETHER_ADDR_LEN);
+                    memcpy(eth_hdr->d_addr.addr_bytes, bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)].addr_bytes,
+                        RTE_ETHER_ADDR_LEN);
 
                     struct rte_ipv4_hdr* ip_h
                         = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));

@@ -123,6 +123,7 @@ private:
     uint32_t bs_server_addr; // IPv4 address of the Agora server
     struct rte_mempool* mbuf_pool;
     std::vector<uint32_t> bs_server_addrs_;
+    std::vector<rte_ether_addr> bs_server_mac_addrs_;
 #endif
 
     RadioConfig* radioconfig_; // Used only in Argos mode
