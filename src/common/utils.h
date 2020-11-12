@@ -27,6 +27,7 @@
 #include <fstream> // std::ifstream
 #include <iostream>
 #include <mutex>
+#include <numa.h>
 #include <pthread.h>
 #include <random>
 #include <sstream>
@@ -36,6 +37,12 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
+
+#define MAX_CORE_NUM 200
+
+void set_cpu_layout_on_numa_nodes(bool verbose = false);
+
+size_t get_physical_core_id(size_t core_id);
 
 /* Pin this thread to core with global index = core_id */
 int pin_to_core(int core_id);
@@ -51,6 +58,16 @@ template <class T> struct EventHandlerContext {
 
 template <class C, void* (C::*run_thread)(int)>
 void* pthread_fun_wrapper(void* context)
+{
+    EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+    C* obj = reinterpret_cast<C*>(eh_context->obj_ptr);
+    int id = eh_context->id;
+    delete eh_context;
+    return (obj->*run_thread)(id);
+}
+
+template <class C, void (C::*run_thread)(int)>
+void pthread_fun_wrapper(void* context)
 {
     EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
     C* obj = reinterpret_cast<C*>(eh_context->obj_ptr);

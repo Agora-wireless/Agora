@@ -24,7 +24,6 @@
 #include <string.h>
 #include <time.h>
 
-static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 
@@ -198,8 +197,9 @@ int main(int argc, char* argv[])
             = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
         // printf("noise of ant %d, ue %d\n", i % cfg->BS_ANT_NUM, i / cfg->BS_ANT_NUM );
         for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-            complex_float noise = { rand_float_from_short(-1, 1) * kNoiseLevel,
-                rand_float_from_short(-1, 1) * kNoiseLevel };
+            complex_float noise
+                = { rand_float_from_short(-1, 1) * cfg->noise_level,
+                      rand_float_from_short(-1, 1) * cfg->noise_level };
             // printf("%.4f+%.4fi ", noise.re, noise.im);
             csi_matrices[j][i].re = csi.re + noise.re;
             csi_matrices[j][i].im = csi.im + noise.im;

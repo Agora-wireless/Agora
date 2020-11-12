@@ -158,8 +158,11 @@ public:
     size_t demul_block_size;
     size_t demul_events_per_symbol; // Derived from demul_block_size
 
-    // Number of OFDM data subcarriers handled in one zeroforcing event
+    // Number of OFDM data subcarriers handled in one doZF function call
     size_t zf_block_size;
+
+    // Number of doZF function call handled in on event
+    size_t zf_batch_size;
     size_t zf_events_per_symbol; // Derived from zf_block_size
 
     // Number of antennas handled in one FFT event
@@ -221,6 +224,7 @@ public:
     // sent by Agora. This includes Agora's packet header, but not the
     // Ethernet/IP/UDP headers.
     size_t packet_length;
+    size_t dl_packet_length;
 
     size_t OFDM_PILOT_SPACING;
 
@@ -296,6 +300,9 @@ public:
     // Base RRU/channel simulator UDP port used by UEs to transmit uplink data
     int ue_rru_port;
 
+    // Number of NIC ports used for DPDK
+    uint16_t dpdk_num_ports;
+
     // Port ID at MAC layer side
     int mac_rx_port;
     int mac_tx_port;
@@ -307,6 +314,8 @@ public:
 
     // Size of tranport block given by upper layer
     size_t transport_block_size;
+
+    float noise_level;
     LDPCconfig LDPC_config; // LDPC parameters
 
     // Number of bytes per code block

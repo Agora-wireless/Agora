@@ -86,6 +86,23 @@ public:
         return modulated_codeword;
     }
 
+    std::vector<complex_float> get_modulation(
+        const int8_t* encoded_codeword, size_t num_bits)
+    {
+        std::vector<complex_float> modulated_codeword(cfg->OFDM_DATA_NUM);
+        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+
+        adapt_bits_for_mod(
+            reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+            &mod_input[0], bits_to_bytes(num_bits), cfg->mod_order_bits);
+
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+            modulated_codeword[i]
+                = mod_single_uint8(mod_input[i], cfg->mod_table);
+        }
+        return modulated_codeword;
+    }
+
     /**
      * @param modulated_codeword The modulated codeword with OFDM_DATA_NUM
      * elements

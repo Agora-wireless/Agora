@@ -2,7 +2,7 @@
 #include "concurrent_queue_wrapper.hpp"
 
 using namespace arma;
-static constexpr bool kUseSpatialLocality = false;
+static constexpr bool kUseSpatialLocality = true;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
