@@ -38,6 +38,9 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+
+    temp_16bits_iq
+        = reinterpret_cast<uint16_t*>(memalign(64, 32 * sizeof(uint16_t)));
 }
 
 DoFFT::~DoFFT()
@@ -64,9 +67,17 @@ Event_data DoFFT::launch(size_t tag)
                 &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_]),
             cfg->OFDM_CA_NUM * 2);
     } else {
-        simd_convert_short_to_float(
-            &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
-            reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+        if (kUse12BitIQ) {
+            simd_convert_12bit_iq_to_float(
+                (uint8_t*)pkt->data + 3 * cfg->ofdm_rx_zero_prefix_bs_,
+                reinterpret_cast<float*>(fft_inout), temp_16bits_iq,
+                cfg->OFDM_CA_NUM * 3);
+        } else {
+            simd_convert_short_to_float(
+                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
+                reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        }
 
         if (kDebugPrintInTask) {
             printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
@@ -156,8 +167,11 @@ void DoFFT::partial_transpose(
             const complex_float* src
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
-            complex_float* dst = &out_buf[block_base_offset
-                + (ant_id * kTransposeBlockSize) + sc_j];
+            complex_float* dst = kUsePartialTrans
+                ? &out_buf[block_base_offset + (ant_id * kTransposeBlockSize)
+                      + sc_j]
+                : &out_buf[(cfg->OFDM_DATA_NUM * ant_id) + sc_j
+                      + block_idx * kTransposeBlockSize];
 
             // With either of AVX-512 or AVX2, load one cacheline =
             // 16 float values = 8 subcarriers = kSCsPerCacheline
@@ -215,8 +229,8 @@ void DoFFT::partial_transpose(
                 fft_result1 = CommsLib::__m256_complex_cf32_mult(
                     fft_result1, pilot_tx1, true);
             }
-            _mm256_store_ps(reinterpret_cast<float*>(dst), fft_result0);
-            _mm256_store_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
+            _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
+            _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
 #endif
         }
     }
@@ -306,7 +320,7 @@ Event_data DoIFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     struct Packet* pkt
-        = (struct Packet*)&dl_socket_buffer_[offset * cfg->packet_length];
+        = (struct Packet*)&dl_socket_buffer_[offset * cfg->dl_packet_length];
     short* socket_ptr = &pkt->data[2 * cfg->ofdm_tx_zero_prefix_];
 
     // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results

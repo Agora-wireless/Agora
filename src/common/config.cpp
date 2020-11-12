@@ -4,6 +4,7 @@
 
 Config::Config(std::string jsonfile)
 {
+    set_cpu_layout_on_numa_nodes();
     std::string conf;
     Utils::loadTDDConfig(jsonfile, conf);
     const auto tddConf = json::parse(conf);
@@ -70,6 +71,8 @@ Config::Config(std::string jsonfile)
     bs_rru_port = tddConf.value("bs_rru_port", 9000);
     ue_rru_port = tddConf.value("ue_rru_port", 7000);
     ue_server_port = tddConf.value("ue_sever_port", 6000);
+
+    dpdk_num_ports = tddConf.value("dpdk_num_ports", 1);
 
     mac_rx_port = tddConf.value("mac_rx_port", 5000);
     mac_tx_port = tddConf.value("mac_tx_port", 4000);
@@ -199,6 +202,7 @@ Config::Config(std::string jsonfile)
         "Demodulation block size must be a multiple of transpose block size");
     demul_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / demul_block_size;
 
+    zf_batch_size = tddConf.value("zf_batch_size", 1);
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
     zf_events_per_symbol = 1 + (OFDM_DATA_NUM - 1) / zf_block_size;
@@ -206,6 +210,8 @@ Config::Config(std::string jsonfile)
     fft_block_size = tddConf.value("fft_block_size", 1);
     encode_block_size = tddConf.value("encode_block_size", 1);
 
+    noise_level = tddConf.value("noise_level", 0.03); //default: 30 dB
+    printf("Noise level: %.2f\n", noise_level);
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
@@ -240,7 +246,8 @@ Config::Config(std::string jsonfile)
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length
-        = Packet::kOffsetOfData + (2 * sizeof(short) * sampsPerSymbol);
+        = Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * sampsPerSymbol);
+    dl_packet_length = Packet::kOffsetOfData + sampsPerSymbol * 4;
     rt_assert(
         packet_length < 9000, "Packet size must be smaller than jumbo frame");
 

@@ -15,8 +15,8 @@ inline const struct rte_eth_conf port_conf_default()
     return port_conf;
 }
 
-int DpdkTransport::nic_init(
-    uint16_t port, struct rte_mempool* mbuf_pool, int thread_num)
+int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
+    int thread_num, size_t pkt_len)
 {
     struct rte_eth_conf port_conf = port_conf_default();
     const uint16_t rxRings = thread_num, txRings = 2 * thread_num;
@@ -49,8 +49,9 @@ int DpdkTransport::nic_init(
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
         port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
 
-    port_conf.rxmode.max_rx_pkt_len
-        = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
+    port_conf.rxmode.max_rx_pkt_len = RTE_MIN(
+        RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len),
+        pkt_len);
     // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
     retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
@@ -86,10 +87,11 @@ int DpdkTransport::nic_init(
 
     struct rte_ether_addr addr;
     rte_eth_macaddr_get(port, &addr);
-    printf("NIC %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-           " %02" PRIx8 " %02" PRIx8 " \n",
-        port, addr.addr_bytes[0], addr.addr_bytes[1], addr.addr_bytes[2],
-        addr.addr_bytes[3], addr.addr_bytes[4], addr.addr_bytes[5]);
+    printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+           " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
+        port, rte_eth_dev_socket_id(port), addr.addr_bytes[0],
+        addr.addr_bytes[1], addr.addr_bytes[2], addr.addr_bytes[3],
+        addr.addr_bytes[4], addr.addr_bytes[5]);
 
     struct rte_eth_link link;
     rte_eth_link_get_nowait(port, &link);
@@ -106,6 +108,7 @@ int DpdkTransport::nic_init(
     return 0;
 }
 
+// Reference: https://stackoverflow.com/a/44948720
 void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
 {
     // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,
@@ -271,8 +274,10 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
 void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
 {
     // DPDK setup
-    std::string core_list = std::to_string(core_offset) + "-"
-        + std::to_string(core_offset + thread_num);
+    std::string core_list = std::to_string(get_physical_core_id(core_offset));
+    for (size_t i = 1; i < thread_num + 1; i++)
+        core_list = core_list + ","
+            + std::to_string(get_physical_core_id(core_offset + i));
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
         = { "txrx", "-l", core_list.c_str(), "--log-level", "0", nullptr };
@@ -283,12 +288,12 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
     rt_assert(ret >= 0, "Failed to initialize DPDK");
 }
 
-rte_mempool* DpdkTransport::create_mempool()
+rte_mempool* DpdkTransport::create_mempool(size_t packet_length)
 {
     unsigned int nb_ports = rte_eth_dev_count_avail();
     printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
-    size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
+    size_t mbuf_size = packet_length + MBUF_CACHE_SIZE;
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
         NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 

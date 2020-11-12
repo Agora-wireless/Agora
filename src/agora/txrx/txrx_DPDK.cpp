@@ -11,30 +11,36 @@ static constexpr bool kDebugDPDK = false;
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
+    , ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells)
     , socket_thread_num(cfg->socket_thread_num)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
-
-    const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
-        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
+    rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
+        "Invalid number of DPDK ports");
+
+    for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++)
+        if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num) != 0)
+            rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
+
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
         printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
-               "dst port: %zu, queue: %zu\n",
+               "dst port: %zu, DPDK port %zu, queue: %zu\n",
             cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
-            cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
-        DpdkTransport::install_flow_rule(
-            port_id, i, bs_rru_addr, bs_server_addr, src_port, dst_port);
+            cfg->bs_rru_port + i, cfg->bs_server_port + i,
+            i % cfg->dpdk_num_ports, i / cfg->dpdk_num_ports);
+        DpdkTransport::install_flow_rule(i % cfg->dpdk_num_ports,
+            i / cfg->dpdk_num_ports, bs_rru_addr, bs_server_addr, src_port,
+            dst_port);
     }
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -78,6 +84,8 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
                 context, lcore_id);
+            printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
+                lcore_id);
         }
         worker_id++;
     }
@@ -91,23 +99,25 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
     _unused(frame_id);
 }
 
-void* PacketTXRX::loop_tx_rx(int tid)
+void PacketTXRX::loop_tx_rx(int tid)
 {
     size_t rx_offset = 0;
     size_t prev_frame_id = SIZE_MAX;
+    const uint16_t port_id = tid % cfg->dpdk_num_ports;
+    const uint16_t queue_id = tid / cfg->dpdk_num_ports;
 
     while (cfg->running) {
-        dpdk_recv(tid, prev_frame_id, rx_offset);
-        dequeue_send(tid);
+        if (-1 != dequeue_send(tid))
+            continue;
+        dpdk_recv(tid, port_id, queue_id, prev_frame_id, rx_offset);
     }
-    return 0;
 }
 
-uint16_t PacketTXRX::dpdk_recv(
-    int tid, size_t& prev_frame_id, size_t& rx_offset)
+uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
+    size_t& prev_frame_id, size_t& rx_offset)
 {
     rte_mbuf* rx_bufs[kRxBatchSize];
-    uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+    uint16_t nb_rx = rte_eth_rx_burst(port_id, queue_id, rx_bufs, kRxBatchSize);
     if (unlikely(nb_rx == 0))
         return 0;
 
@@ -209,7 +219,7 @@ int PacketTXRX::dequeue_send(int tid)
             offset, message_queue_->size_approx());
     }
 
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
@@ -230,10 +240,10 @@ int PacketTXRX::dequeue_send(int tid)
     udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port + tid);
     udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port + tid);
 
-    tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
-    tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
+    tx_bufs[0]->pkt_len = cfg->dl_packet_length + kPayloadOffset;
+    tx_bufs[0]->data_len = cfg->dl_packet_length + kPayloadOffset;
     char* payload = (char*)eth_hdr + kPayloadOffset;
-    DpdkTransport::fastMemcpy(payload, (char*)pkt, cfg->packet_length);
+    DpdkTransport::fastMemcpy(payload, (char*)pkt, cfg->dl_packet_length);
 
     // Send data (one OFDM symbol)
     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);

@@ -8,7 +8,7 @@
 
 static constexpr bool kDebugDownlink = false;
 
-void* PacketTXRX::loop_tx_rx_usrp(int tid)
+void PacketTXRX::loop_tx_rx_usrp(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
     size_t* rx_frame_start = (*frame_start_)[tid];
@@ -104,7 +104,6 @@ void* PacketTXRX::loop_tx_rx_usrp(int tid)
             }
         }
     }
-    return 0;
 }
 
 struct Packet* PacketTXRX::recv_enqueue_usrp(
