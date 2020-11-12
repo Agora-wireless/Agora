@@ -218,6 +218,7 @@ struct Packet {
     static constexpr size_t kOffsetOfData = 64;
 
     enum class PktType {
+        kInvalid,
         kIQFromRRU, // A packet containing IQ samples from the RRU
         kDemod // A packet generated after the demodulation stage
     };
@@ -263,6 +264,14 @@ struct Packet {
             << cell_id << ", antenna ID " << ant_id << ", " << sizeof(fill)
             << " empty bytes]";
         return ret.str();
+    }
+
+    void print_content(size_t length) const
+    {
+        for (size_t i = 0; i < length; i ++) {
+            printf("%02x ", ((uint8_t*)data)[i]);
+        }
+        printf("\n");
     }
 };
 

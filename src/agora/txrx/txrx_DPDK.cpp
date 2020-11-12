@@ -17,8 +17,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     , demul_status_(demul_status)
     , decode_status_(decode_status)
 {
-    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
+    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 1);
     mbuf_pool = DpdkTransport::create_mempool();
+    demod_symbol_to_send_ = cfg->pilot_symbol_num_perframe;
 
     const uint16_t port_id = 0; // The DPDK port ID
     if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num + 1) != 0)
@@ -137,6 +138,8 @@ void* PacketTXRX::demod_thread(int tid)
                         = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
                             demod_frame_to_send_, demod_symbol_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    decode_status_->receive_demod_data(
+                        ue_id, demod_frame_to_send_, demod_symbol_to_send_ - cfg->pilot_symbol_num_perframe);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                     tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
@@ -175,7 +178,6 @@ void* PacketTXRX::demod_thread(int tid)
                         exit(0);
                     }
                 }
-                printf("Send demod data ue %lu symbol %lu to server %lu\n", ue_id, demod_symbol_to_send_, cfg->get_server_idx_by_ue(ue_id));
             }
             demod_symbol_to_send_++;
             if (demod_symbol_to_send_
@@ -225,7 +227,6 @@ void* PacketTXRX::demod_thread(int tid)
 
             auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
             if (pkt->pkt_type == Packet::PktType::kDemod) {
-                printf("Receive demod data ue %lu symbol %lu server %lu\n", pkt->ue_id, pkt->symbol_id, pkt->server_id);
                 const size_t symbol_idx_ul
                     = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
                 const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
@@ -316,7 +317,7 @@ int PacketTXRX::recv_relocate(int tid)
             continue;
         }
 
-        auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+        auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
         if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
             char* rx_buffer = (*buffer_)[pkt->ant_id];
             const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)

@@ -320,7 +320,7 @@ void* Sender::worker_thread(int tid)
                 cfg->bs_server_addr_list[i].c_str(),
                 cfg->bs_server_port + cur_radio);
         }
-        rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == 1,
+        rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
             "rte_eth_tx_burst() failed");
 #else
         const size_t sc_block_size
