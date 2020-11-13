@@ -18,7 +18,8 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     Table<char>& socket_buffer, Table<int>& socket_buffer_status,
     Table<complex_float>& data_buffer,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
@@ -26,7 +27,8 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     , socket_buffer_status_(socket_buffer_status)
     , data_buffer_(data_buffer)
     , csi_buffers_(csi_buffers)
-    , calib_buffer_(calib_buffer)
+    , calib_dl_buffer_(calib_dl_buffer)
+    , calib_ul_buffer_(calib_ul_buffer)
     , phy_stats(in_phy_stats)
 {
     duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid);
@@ -38,8 +40,10 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    chan_est_tmp = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->OFDM_DATA_NUM * sizeof(complex_float)));
+    //calib_dl_rx_fft = reinterpret_cast<complex_float*>(memalign(
+    //    64, cfg->BF_ANT_NUM * kSCsPerCacheline * sizeof(complex_float)));
+    calib_dl_partial_.calloc(
+        kFrameWnd, cfg->BF_ANT_NUM * kCalibScGroupSize, 64);
     temp_16bits_iq
         = reinterpret_cast<uint16_t*>(memalign(64, 32 * sizeof(uint16_t)));
 }
@@ -48,7 +52,41 @@ DoFFT::~DoFFT()
 {
     DftiFreeDescriptor(&mkl_handle);
     free(fft_inout);
-    free(chan_est_tmp);
+    calib_ul_buffer_.free();
+    calib_dl_buffer_.free();
+}
+
+// @brief
+// @in_vec: input complex data to estimate regression params
+// @x0: value of the first x data (assumed consecutive integers)
+// @out_vec: output complex data with linearly regressed phase
+static inline void calib_regression_estimate(
+    arma::cx_fvec in_vec, arma::cx_fvec& out_vec, size_t x0)
+{
+    size_t in_len = in_vec.size();
+    size_t out_len = out_vec.size();
+    std::vector<float> scs(out_len, 0);
+    for (size_t i = 0; i < out_len; i++)
+        scs[i] = i;
+    arma::fvec x_vec((float*)scs.data() + x0, in_len, false);
+    arma::fvec in_phase = arg(in_vec);
+    arma::fvec in_mag = abs(in_vec);
+
+    // finding regression parameters from the input vector
+    // https://www.cse.wustl.edu/~jain/iucee/ftp/k_14slr.pdf
+    arma::fvec xy = in_phase % x_vec;
+    float xbar = arma::mean(x_vec);
+    float ybar = arma::mean(in_phase);
+    float coeff = (arma::sum(xy) - in_len * xbar * ybar)
+        / (arma::sum(arma::square(x_vec)) - in_len * xbar * xbar);
+    float intercept = ybar - coeff * xbar;
+
+    // extrapolating phase for the target subcarrier using regression
+    arma::fvec x_vec_all((float*)scs.data(), out_len, false);
+    arma::fvec tar_angle = coeff * x_vec_all + intercept;
+    out_vec.set_real(arma::cos(tar_angle));
+    out_vec.set_imag(arma::sin(tar_angle));
+    out_vec *= arma::mean(in_mag);
 }
 
 Event_data DoFFT::launch(size_t tag)
@@ -127,9 +165,60 @@ Event_data DoFFT::launch(size_t tag)
     } else if (sym_type == SymbolType::kUL) {
         partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kUL);
-    } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
-        or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
-        partial_transpose(calib_buffer_[frame_slot], ant_id, sym_type);
+    } else if (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant) {
+        // Only process uplink for antennas that also do downlink in this frame
+        // for consistency with calib downlink processing.
+        if (ant_id / cfg->ant_per_group == frame_id % cfg->ant_per_group) {
+            partial_transpose(
+                &calib_ul_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM],
+                ant_id, sym_type);
+            size_t window_size
+                = std::min(frame_id, kMovingMeanBatchSize * cfg->ant_group_num);
+            size_t frame_grp_id = frame_id / cfg->ant_group_num;
+            size_t frame_grp_slot = frame_grp_id % kFrameWnd;
+            arma::cx_fvec sc_vec(reinterpret_cast<arma::cx_float*>(
+                                     &calib_ul_buffer_[frame_grp_slot][ant_id
+                                         * cfg->OFDM_DATA_NUM]),
+                cfg->OFDM_DATA_NUM, false);
+            for (size_t w = 0; w < window_size - 1; w++) {
+                size_t prev_frame_grp = (frame_grp_id - w) % kFrameWnd;
+                arma::cx_fvec sc_vec_prev(
+                    reinterpret_cast<arma::cx_float*>(
+                        &calib_ul_buffer_[prev_frame_grp]
+                                         [ant_id * cfg->OFDM_DATA_NUM]),
+                    cfg->OFDM_DATA_NUM, false);
+                sc_vec += sc_vec_prev;
+            }
+            sc_vec *= kMovingMeanScaling;
+        }
+    } else if (sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant) {
+        partial_transpose(calib_dl_partial_[frame_slot], ant_id, sym_type);
+        // average calib pilot subcarriers across frames
+        // TODO: be careful of averaging since not every antenna is updated in every frame
+        arma::cx_fmat sc_mat(
+            reinterpret_cast<arma::cx_float*>(calib_dl_partial_[frame_slot]),
+            kCalibScGroupSize, cfg->BF_ANT_NUM, false);
+        size_t window_size
+            = std::min(frame_id, kMovingMeanBatchSize * cfg->ant_group_num);
+        size_t frame_grp_id = frame_id / cfg->ant_group_num;
+        size_t frame_grp_slot = frame_grp_id % kFrameWnd;
+        for (size_t w = 0; w < window_size - 1; w++) {
+            size_t prev_frame_slot = (frame_grp_id - w) % kFrameWnd;
+            arma::cx_fmat sc_mat_prev(reinterpret_cast<arma::cx_float*>(
+                                          calib_dl_partial_[prev_frame_slot]),
+                kCalibScGroupSize, cfg->BF_ANT_NUM, false);
+            sc_mat += sc_mat_prev;
+        }
+        sc_mat *= kMovingMeanScaling;
+        for (size_t i = 0; i < cfg->BF_ANT_NUM; i++) {
+            arma::cx_fvec tar_sc_vec(
+                reinterpret_cast<arma::cx_float*>(
+                    &calib_dl_buffer_[frame_grp_slot]
+                                     [ant_id * cfg->OFDM_DATA_NUM]),
+                cfg->OFDM_DATA_NUM, false);
+            size_t sc0 = kCalibScGroupSize * (i % cfg->ant_per_group);
+            calib_regression_estimate(sc_mat.col(i), tar_sc_vec, sc0);
+        }
     } else {
         rt_assert(false, "Unknown or unsupported symbol type");
     }
@@ -159,15 +248,21 @@ void DoFFT::partial_transpose(
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
             complex_float* dst = nullptr;
-            if (symbol_type == SymbolType::kCalDL
-                || symbol_type == SymbolType::kCalUL) {
-                dst = &chan_est_tmp[block_idx * kTransposeBlockSize + sc_j];
+            if (symbol_type == SymbolType::kCalDL) {
+                if (sc_j / kCalibScGroupSize < cfg->ant_per_group)
+                    // copy this chunk to the corresponding anntea offset
+                    dst = &out_buf[(sc_j / kCalibScGroupSize)
+                        * kCalibScGroupSize];
+            } else if (symbol_type == SymbolType::kCalUL) {
+                //if (kSCsPerCacheLine * (ant_id % cfg->ant_per_group) == sc_j)
+                //    dst = out_buf[ant_id * kSCsPerCacheline];
+                dst = &out_buf[sc_j];
             } else {
                 dst = kUsePartialTrans
-                ? &out_buf[block_base_offset + (ant_id * kTransposeBlockSize)
-                      + sc_j]
-                : &out_buf[(cfg->OFDM_DATA_NUM * ant_id) + sc_j
-                      + block_idx * kTransposeBlockSize];
+                    ? &out_buf[block_base_offset
+                          + (ant_id * kTransposeBlockSize) + sc_j]
+                    : &out_buf[(cfg->OFDM_DATA_NUM * ant_id) + sc_j
+                          + block_idx * kTransposeBlockSize];
             }
 
             // With either of AVX-512 or AVX2, load one cacheline =
@@ -233,25 +328,25 @@ void DoFFT::partial_transpose(
     }
     // Do the 1st step of 2-step reciprocal calibration
     // The 2nd step will be performed in dozf
-    if (symbol_type == SymbolType::kCalUL) {
-        arma::cx_fvec vec_calib_ul(
-            reinterpret_cast<arma::cx_float*>(chan_est_tmp), cfg->OFDM_DATA_NUM,
-            false);
-        cx_float res = mean(vec_calib_ul);
-        out_buf[cfg->BF_ANT_NUM + ant_id] = { res.real(), res.imag() };
-    } else if (symbol_type == SymbolType::kCalDL) {
-        size_t sc_per_antenna = cfg->OFDM_DATA_NUM / cfg->BF_ANT_NUM;
-        for (size_t j = 0; j < cfg->BF_ANT_NUM; j++) {
-            out_buf[j] = { 0, 0 };
-            for (size_t i = 0; i < sc_per_antenna * cfg->BF_ANT_NUM;
-                 i += cfg->BF_ANT_NUM)
-                out_buf[j] = { chan_est_tmp[i + j].re + out_buf[j].re,
-                    chan_est_tmp[i + j].im + out_buf[j].im };
-        }
-        arma::cx_fvec vec_calib_dl(
-            reinterpret_cast<arma::cx_float*>(out_buf), cfg->BF_ANT_NUM, false);
-        vec_calib_dl /= sc_per_antenna;
-    }
+    //if (symbol_type == SymbolType::kCalUL) {
+    //    arma::cx_fvec vec_calib_ul(
+    //        reinterpret_cast<arma::cx_float*>(chan_est_tmp), cfg->OFDM_DATA_NUM,
+    //        false);
+    //    cx_float res = mean(vec_calib_ul);
+    //    out_buf[ant_id] = { res.real(), res.imag() };
+    //} else if (symbol_type == SymbolType::kCalDL) {
+    //    size_t sc_per_antenna = cfg->OFDM_DATA_NUM / cfg->BF_ANT_NUM;
+    //    for (size_t j = 0; j < cfg->BF_ANT_NUM; j++) {
+    //        out_buf[j] = { 0, 0 };
+    //        for (size_t i = 0; i < sc_per_antenna * cfg->BF_ANT_NUM;
+    //             i += cfg->BF_ANT_NUM)
+    //            out_buf[j] = { chan_est_tmp[i + j].re + out_buf[j].re,
+    //                chan_est_tmp[i + j].im + out_buf[j].im };
+    //    }
+    //    arma::cx_fvec vec_calib_dl(
+    //        reinterpret_cast<arma::cx_float*>(out_buf), cfg->BF_ANT_NUM, false);
+    //    vec_calib_dl /= sc_per_antenna;
+    //}
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,

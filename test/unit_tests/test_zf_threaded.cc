@@ -53,7 +53,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_buffer,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats)
@@ -68,8 +69,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     }
 
     auto computeZF = new DoZF(cfg, worker_id, freq_ghz, event_queue,
-        complete_task_queue, ptok, csi_buffers, calib_buffer, ul_zf_matrices,
-        dl_zf_matrices, stats);
+        complete_task_queue, ptok, csi_buffers, calib_dl_buffer,
+        calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -117,7 +118,8 @@ TEST(TestZF, VaryingConfig)
         ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
     }
 
-    Table<complex_float> calib_buffer;
+    Table<complex_float> calib_dl_buffer;
+    Table<complex_float> calib_ul_buffer;
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(kMaxAntennas * kMaxDataSCs);
@@ -127,7 +129,10 @@ TEST(TestZF, VaryingConfig)
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
         kMaxUEs * kMaxAntennas);
 
-    calib_buffer.rand_alloc_cx_float(kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
+    calib_dl_buffer.rand_alloc_cx_float(
+        kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
+    calib_ul_buffer.rand_alloc_cx_float(
+        kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
@@ -137,8 +142,9 @@ TEST(TestZF, VaryingConfig)
     for (size_t i = 0; i < kNumWorkers; i++) {
         workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i, freq_ghz,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
-            std::ref(csi_buffers), std::ref(calib_buffer),
-            std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats);
+            std::ref(csi_buffers), std::ref(calib_dl_buffer),
+            std::ref(calib_ul_buffer), std::ref(ul_zf_matrices),
+            std::ref(dl_zf_matrices), stats);
     }
     master.join();
     for (auto& w : workers)

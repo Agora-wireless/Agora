@@ -341,25 +341,32 @@ bool RadioConfig::radioStart()
         baStn[i]->writeSetting("TDD_MODE", "true");
         std::vector<std::string> tddSched;
         for (size_t f = 0; f < _cfg->frames.size(); f++) {
-            std::string sched = _cfg->frames[f];
-            size_t schedSize = sched.size();
-            for (size_t s = 0; s < schedSize; s++) {
-                char c = _cfg->frames[f].at(s);
-                if (c == 'C')
-                    sched.replace(s, 1, isRefAnt ? "R" : "P");
-                else if (c == 'L')
-                    sched.replace(s, 1, isRefAnt ? "P" : "R");
-                else if (c == 'P')
-                    sched.replace(s, 1, "R");
-                else if (c == 'U')
-                    sched.replace(s, 1, "R");
-                else if (c == 'D')
-                    sched.replace(s, 1, "T");
-                else if (c != 'B')
-                    sched.replace(s, 1, "G");
+            for (size_t g = 0; g < _cfg->ant_group_num; g++) {
+                std::string sched = _cfg->frames[f];
+                size_t schedSize = sched.size();
+                for (size_t s = 0; s < schedSize; s++) {
+                    char c = _cfg->frames[f].at(s);
+                    if (c == 'C') {
+                        std::string cal
+                            = (g == i / _cfg->ant_per_group) ? "P" : "G";
+                        sched.replace(s, 1, isRefAnt ? "R" : cal);
+                    } else if (c == 'L') {
+                        //std::string cal
+                        //    = (g == i / _cfg->ant_per_group) ? "R" : "G";
+                        sched.replace(s, 1, isRefAnt ? "P" : "R");
+                    } else if (c == 'P')
+                        sched.replace(s, 1, "R");
+                    else if (c == 'U')
+                        sched.replace(s, 1, "R");
+                    else if (c == 'D')
+                        sched.replace(s, 1, "T");
+                    else if (c != 'B')
+                        sched.replace(s, 1, "G");
+                }
+                std::cout << "Radio " << i << " Frame " << f << ": " << sched
+                          << std::endl;
+                tddSched.push_back(sched);
             }
-            std::cout << sched << std::endl;
-            tddSched.push_back(sched);
         }
         conf["frames"] = tddSched;
         std::string confString = conf.dump();
@@ -393,9 +400,10 @@ bool RadioConfig::radioStart()
                     _cfg->ofdm_tx_zero_prefix_, 0);
                 std::vector<std::complex<float>> post(
                     _cfg->ofdm_tx_zero_postfix_, 0);
-                recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->common_pilot,
-                    _cfg->nChannels * i, _cfg->BF_ANT_NUM, _cfg->OFDM_CA_NUM,
-                    _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START, _cfg->CP_LEN);
+                recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
+                    _cfg->common_pilot, _cfg->nChannels * i * kCalibScGroupSize,
+                    kCalibScGroupSize, _cfg->OFDM_CA_NUM, _cfg->OFDM_DATA_NUM,
+                    _cfg->OFDM_DATA_START, _cfg->CP_LEN, false /*block type*/);
                 recipCalDlPilot.insert(
                     recipCalDlPilot.begin(), pre.begin(), pre.end());
                 recipCalDlPilot.insert(
@@ -409,10 +417,11 @@ bool RadioConfig::radioStart()
                 baStn[i]->writeRegisters("TX_RAM_A", 0,
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
-                    recipCalDlPilot = CommsLib::composeRefSymbol(
-                        _cfg->common_pilot, 2 * i + 1, _cfg->BF_ANT_NUM,
-                        _cfg->OFDM_CA_NUM, _cfg->OFDM_DATA_NUM,
-                        _cfg->OFDM_DATA_START, _cfg->CP_LEN);
+                    recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
+                        _cfg->common_pilot, (2 * i + 1) * kCalibScGroupSize,
+                        kCalibScGroupSize, _cfg->OFDM_CA_NUM,
+                        _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START,
+                        _cfg->CP_LEN, false);
                     baStn[i]->writeRegisters("TX_RAM_B", 0,
                         Utils::cfloat32_to_uint32(
                             recipCalDlPilot, false, "QI"));
@@ -469,7 +478,7 @@ int RadioConfig::radioTx(
     else if (flags == 2)
         txFlags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
     // long long frameTime(0);
-  
+
     int w;
     if (!kUseUHD) {
         w = baStn[r]->writeStream(this->txStreams[r], buffs,
@@ -512,10 +521,9 @@ int RadioConfig::radioRx(
         int ret = baStn[r]->readStream(this->rxStreams[r], buffs,
             _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
 
-        
         if (!kUseUHD) {
             // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
-            frameTime = frameTimeNs; 
+            frameTime = frameTimeNs;
         } else {
             // for UHD device recv using ticks
             frameTime = SoapySDR::timeNsToTicks(frameTimeNs, _cfg->rate);

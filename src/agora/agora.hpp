@@ -231,7 +231,8 @@ private:
 
     // 1st dimension: kFrameWnd
     // 2nd dimension: number of OFDM data subcarriers * number of antennas
-    Table<complex_float> calib_buffer_;
+    Table<complex_float> calib_ul_buffer_;
+    Table<complex_float> calib_dl_buffer_;
 
     // 1st dimension: kFrameWnd * number of data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs

@@ -693,7 +693,7 @@ void* Agora::worker(int tid)
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffers_,
-        calib_buffer_, phy_stats, stats);
+        calib_dl_buffer_, calib_ul_buffer_, phy_stats, stats);
 
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
@@ -701,7 +701,8 @@ void* Agora::worker(int tid)
 
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
-        calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
+        calib_dl_buffer_, calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+        stats);
 
     auto computeDemul = new DoDemul(config_, tid, freq_ghz,
         *get_conq(EventType::kDemul), complete_task_queue_,
@@ -752,7 +753,7 @@ void* Agora::worker_fft(int tid)
     auto computeFFT = new DoFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kFFT), complete_task_queue_, worker_ptoks_ptr[tid],
         socket_buffer_, socket_buffer_status_, data_buffer_, csi_buffers_,
-        calib_buffer_, phy_stats, stats);
+        calib_dl_buffer_, calib_ul_buffer_, phy_stats, stats);
     auto computeIFFT = new DoIFFT(config_, tid, freq_ghz,
         *get_conq(EventType::kIFFT), complete_task_queue_,
         worker_ptoks_ptr[tid], dl_ifft_buffer_, dl_socket_buffer_, stats);
@@ -773,7 +774,8 @@ void* Agora::worker_zf(int tid)
     /* Initialize ZF operator */
     auto computeZF = new DoZF(config_, tid, freq_ghz, *get_conq(EventType::kZF),
         complete_task_queue_, worker_ptoks_ptr[tid], csi_buffers_,
-        calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
+        calib_dl_buffer_, calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+        stats);
 
     while (true) {
         computeZF->try_launch();
@@ -1201,7 +1203,10 @@ void Agora::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    calib_buffer_.calloc(kFrameWnd, 2 * cfg->BF_ANT_NUM, 64);
+    calib_dl_buffer_.calloc(
+        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+    calib_ul_buffer_.calloc(
+        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
@@ -1237,7 +1242,8 @@ void Agora::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
-    calib_buffer_.free();
+    calib_dl_buffer_.free();
+    calib_ul_buffer_.free();
     dl_encoded_buffer_.free();
 
     encode_stats_.fini();
