@@ -161,6 +161,8 @@ Config::Config(std::string jsonfile)
     ULCalSymbols = Utils::loadSymbols(frames, 'L');
     DLCalSymbols = Utils::loadSymbols(frames, 'C');
     recipCalEn = (ULCalSymbols[0].size() == 1 and DLCalSymbols[0].size() == 1);
+    ant_per_group = std::min(OFDM_DATA_NUM / kCalibScGroupSize, BF_ANT_NUM);
+    ant_group_num = BF_ANT_NUM / ant_per_group;
 
     symbol_num_perframe = frames.at(0).size();
     beacon_symbol_num_perframe = beaconSymbols[0].size();

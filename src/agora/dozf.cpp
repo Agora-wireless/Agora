@@ -13,14 +13,16 @@ DoZF::DoZF(Config* config, int tid, double freq_ghz,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_buffer,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats_manager)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
     , csi_buffers_(csi_buffers)
-    , calib_buffer_(calib_buffer)
+    , calib_dl_buffer_(calib_dl_buffer)
+    , calib_ul_buffer_(calib_ul_buffer)
     , ul_zf_matrices_(ul_zf_matrices)
     , dl_zf_matrices_(dl_zf_matrices)
 {
@@ -176,18 +178,18 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                     cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
         }
         if (cfg->recipCalEn) {
-            arma::cx_fvec vec_calib_dl(
-                reinterpret_cast<arma::cx_float*>(calib_buffer_[frame_slot]),
-                cfg->BF_ANT_NUM, false);
-            arma::cx_fvec vec_calib_ul(
-                reinterpret_cast<arma::cx_float*>(
-                    &calib_buffer_[frame_slot][cfg->BF_ANT_NUM]),
-                cfg->BF_ANT_NUM, false);
-            arma::cx_fvec vec_calib(
+            arma::cx_fmat calib_dl_mat(
+                reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_slot]),
+                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            arma::cx_fmat calib_ul_mat(
+                reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_slot]),
+                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            arma::cx_fvec calib_vec(
                 reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
                 cfg->BF_ANT_NUM, false);
-
-            vec_calib = vec_calib_dl / vec_calib_ul;
+            arma::cx_fvec calib_dl_vec = calib_dl_mat.row(cur_sc_id).st();
+            arma::cx_fvec calib_ul_vec = calib_ul_mat.row(cur_sc_id).st();
+            calib_vec = calib_dl_vec / calib_ul_vec;
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
@@ -237,10 +239,17 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
             dst_csi_ptr, cfg->BS_ANT_NUM);
     }
     if (cfg->recipCalEn) {
-        // Gather reciprocal calibration data from partially-transposed buffer
-        float* dst_calib_ptr = (float*)calib_gather_buffer;
-        partial_transpose_gather(base_sc_id, (float*)calib_buffer_[frame_slot],
-            dst_calib_ptr, cfg->BS_ANT_NUM);
+        arma::cx_fmat calib_dl_mat(
+            reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_slot]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fvec calib_ul_mat(
+            reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_slot]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fvec vec_calib(
+            reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
+            cfg->BF_ANT_NUM, false);
+
+        vec_calib = calib_dl_mat.row(base_sc_id) / calib_ul_mat.row(base_sc_id);
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;

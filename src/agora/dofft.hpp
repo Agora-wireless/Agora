@@ -25,7 +25,8 @@ public:
         Table<char>& socket_buffer, Table<int>& socket_buffer_status,
         Table<complex_float>& data_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-        Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
+        Table<complex_float>& calib_dl_buffer,
+        Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
         Stats* stats_manager);
     ~DoFFT();
 
@@ -101,15 +102,16 @@ private:
     Table<int>& socket_buffer_status_;
     Table<complex_float>& data_buffer_;
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
-    Table<complex_float>& calib_buffer_;
+    Table<complex_float>& calib_dl_buffer_;
+    Table<complex_float>& calib_ul_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
-  
-    complex_float* chan_est_tmp; // Temp buffer for estimated channel
+
+    Table<complex_float> calib_dl_partial_;
 
     // Buffer for store 16-bit IQ converted from 12-bit IQ
     uint16_t* temp_16bits_iq;
-  
+
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
     PhyStats* phy_stats;

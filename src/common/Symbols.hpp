@@ -127,8 +127,8 @@ static constexpr bool kDebug12BitIQ = false;
 static constexpr bool kUsePartialTrans = true;
 
 static constexpr bool kExportConstellation = false;
-static constexpr bool kPrintPhyStats = false;
-static constexpr bool kCollectPhyStats = false;
+static constexpr bool kPrintPhyStats = true;
+static constexpr bool kCollectPhyStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
@@ -234,6 +234,13 @@ static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 static constexpr size_t kTransposeBlockSize = 8;
 static_assert(is_power_of_two(kTransposeBlockSize), ""); // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
+
+static constexpr size_t kCalibScGroupSize = 8;
+static_assert(kCalibScGroupSize % kSCsPerCacheline == 0, "");
+
+// Number of items in moving average
+static constexpr size_t kMovingMeanBatchSize = 4;
+static constexpr float kMovingMeanScaling = 1.f / kMovingMeanBatchSize;
 
 #ifdef USE_AVX2_ENCODER
 static constexpr bool kUseAVX2Encoder = true;

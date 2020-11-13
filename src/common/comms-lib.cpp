@@ -427,15 +427,16 @@ void CommsLib::FFT(complex_float* in, int fftsize)
     DftiFreeDescriptor(&mkl_handle);
 }
 
-std::vector<std::complex<float>> CommsLib::composeRefSymbol(
-    std::vector<std::complex<float>> pilot, size_t offset, size_t period,
+std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(
+    std::vector<std::complex<float>> pilot, size_t offset, size_t pilot_sc_num,
     size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,
-    bool timeDomain)
+    bool interleaved_pilot, bool timeDomain)
 {
     std::vector<std::complex<float>> fft_in(fftSize, 0);
-    size_t pilotNum = dataSize / period;
-    for (size_t i = 0; i < pilotNum; i++) {
-        size_t index = i * period + offset + dataStart;
+    size_t period = dataSize / pilot_sc_num;
+    for (size_t i = 0; i < pilot_sc_num; i++) {
+        size_t index = interleaved_pilot ? i * period + offset + dataStart
+                                         : i + offset + dataStart;
         fft_in[index] = pilot[index];
     }
     if (timeDomain) {

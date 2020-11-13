@@ -146,6 +146,8 @@ public:
     bool recipCalEn;
     bool external_ref_node;
     std::string channel;
+    size_t ant_group_num;
+    size_t ant_per_group;
 
     size_t core_offset;
     size_t worker_thread_num;
