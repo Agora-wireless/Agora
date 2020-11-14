@@ -54,10 +54,9 @@ public:
     }
 
 protected:
-    Doer(Config* in_config, int in_tid, double freq_ghz)
+    Doer(Config* in_config, int in_tid)
         : cfg(in_config)
         , tid(in_tid)
-        , freq_ghz(freq_ghz)
     {
     }
 
@@ -65,6 +64,5 @@ protected:
 
     Config* cfg;
     int tid; // Thread ID of this Doer
-    double freq_ghz; // RDTSC frequency in GHz
 };
 #endif /* DOER */

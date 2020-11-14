@@ -4,14 +4,13 @@
 
 static constexpr bool kUseSIMDGather = true;
 
-DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
-    Table<complex_float>& data_buffer,
+DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PhyStats* in_phy_stats, Stats* stats_manager)
-    : Doer(config, tid, freq_ghz)
+    : Doer(config, tid)
     , data_buffer_(data_buffer)
     , ul_zf_matrices_(ul_zf_matrices)
     , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)

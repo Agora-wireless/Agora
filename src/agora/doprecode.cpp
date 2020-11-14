@@ -4,12 +4,12 @@
 using namespace arma;
 static constexpr bool kUseSpatialLocality = true;
 
-DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
+DoPrecode::DoPrecode(Config* in_config, int in_tid,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz)
+    : Doer(in_config, in_tid)
     , dl_zf_matrices_(dl_zf_matrices)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_raw_data(dl_encoded_or_raw_data)

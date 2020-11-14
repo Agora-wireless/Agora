@@ -2,8 +2,7 @@
 using namespace std;
 
 Agora::Agora(Config* cfg)
-    : freq_ghz(measure_rdtsc_freq())
-    , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
+    : base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
     , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
     , ul_zf_matrices_(
           kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
@@ -16,7 +15,7 @@ Agora::Agora(Config* cfg)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
-        directory.c_str(), freq_ghz);
+        directory.c_str(), cfg->freq_ghz);
 
     this->config_ = cfg;
 
@@ -30,7 +29,7 @@ Agora::Agora(Config* cfg)
         initialize_downlink_buffers();
     }
 
-    stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
+    stats = new Stats(cfg);
     phy_stats = new PhyStats(cfg);
 
     /* Initialize TXRX threads */
@@ -235,9 +234,7 @@ void Agora::start()
         ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
 
     // Counters for printing summary
-    size_t demul_count = 0;
     size_t tx_count = 0;
-    double demul_begin = get_time_us();
     double tx_begin = get_time_us();
 
     bool is_turn_to_dequeue_from_io = true;
@@ -349,24 +346,6 @@ void Agora::start()
                         }
                         stats->master_set_tsc(TsType::kDemulDone, frame_id);
                         print_per_frame_done(PrintType::kDemul, frame_id);
-                    }
-
-                    demul_count++;
-                    if (demul_count
-                        == demul_counters_.max_symbol_count * 9000) {
-                        demul_count = 0;
-                        double diff = get_time_us() - demul_begin;
-                        int samples_num_per_UE = cfg->OFDM_DATA_NUM
-                            * demul_counters_.max_symbol_count * 1000;
-                        printf(
-                            "Frame %zu: RX %d samples (per-client) from %zu "
-                            "clients in %f secs, throughtput %f bps per-client "
-                            "(16QAM), current task queue length %zu\n",
-                            frame_id, samples_num_per_UE, cfg->UE_NUM, diff,
-                            samples_num_per_UE * log2(16.0f) / diff,
-                            get_conq(EventType::kFFT, frame_id & 0x1)
-                                ->size_approx());
-                        demul_begin = get_time_us();
                     }
                 }
             } break;
@@ -653,28 +632,27 @@ void Agora::worker(int tid)
         ThreadType::kWorker, base_worker_core_offset, tid, false /* quiet */);
 
     /* Initialize operators */
-    auto computeFFT = new DoFFT(config_, tid, freq_ghz, socket_buffer_,
-        socket_buffer_status_, data_buffer_, csi_buffers_, calib_buffer_,
-        phy_stats, stats);
+    auto computeFFT
+        = new DoFFT(config_, tid, socket_buffer_, socket_buffer_status_,
+            data_buffer_, csi_buffers_, calib_buffer_, phy_stats, stats);
 
-    auto computeIFFT = new DoIFFT(
-        config_, tid, freq_ghz, dl_ifft_buffer_, dl_socket_buffer_, stats);
+    auto computeIFFT
+        = new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, stats);
 
-    auto computeZF = new DoZF(config_, tid, freq_ghz, csi_buffers_,
-        calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
+    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_buffer_,
+        ul_zf_matrices_, dl_zf_matrices_, stats);
 
-    auto computeDemul = new DoDemul(config_, tid, freq_ghz, data_buffer_,
-        ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_,
-        phy_stats, stats);
+    auto computeDemul = new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
 
-    auto computePrecode = new DoPrecode(config_, tid, freq_ghz, dl_zf_matrices_,
+    auto computePrecode = new DoPrecode(config_, tid, dl_zf_matrices_,
         dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     auto computeEncoding = new DoEncode(
-        config_, tid, freq_ghz, config_->dl_bits, dl_encoded_buffer_, stats);
+        config_, tid, config_->dl_bits, dl_encoded_buffer_, stats);
 
-    auto computeDecoding = new DoDecode(config_, tid, freq_ghz, demod_buffers_,
-        decoded_buffer_, phy_stats, stats);
+    auto computeDecoding = new DoDecode(
+        config_, tid, demod_buffers_, decoded_buffer_, phy_stats, stats);
 
     std::vector<Doer*> computers_vec;
     std::vector<EventType> events_vec;
@@ -725,11 +703,11 @@ void Agora::worker_fft(int tid)
         ThreadType::kWorkerFFT, base_worker_core_offset, tid);
 
     /* Initialize IFFT operator */
-    auto computeFFT = new DoFFT(config_, tid, freq_ghz, socket_buffer_,
-        socket_buffer_status_, data_buffer_, csi_buffers_, calib_buffer_,
-        phy_stats, stats);
-    auto computeIFFT = new DoIFFT(
-        config_, tid, freq_ghz, dl_ifft_buffer_, dl_socket_buffer_, stats);
+    auto computeFFT
+        = new DoFFT(config_, tid, socket_buffer_, socket_buffer_status_,
+            data_buffer_, csi_buffers_, calib_buffer_, phy_stats, stats);
+    auto computeIFFT
+        = new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, stats);
 
     while (true) {
         if (computeFFT->try_launch(*get_conq(EventType::kFFT, 0),
@@ -747,8 +725,8 @@ void Agora::worker_zf(int tid)
         ThreadType::kWorkerZF, base_worker_core_offset, tid);
 
     /* Initialize ZF operator */
-    auto computeZF = new DoZF(config_, tid, freq_ghz, csi_buffers_,
-        calib_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
+    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_buffer_,
+        ul_zf_matrices_, dl_zf_matrices_, stats);
 
     while (true) {
         computeZF->try_launch(*get_conq(EventType::kZF, 0),
@@ -761,12 +739,11 @@ void Agora::worker_demul(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerDemul, base_worker_core_offset, tid);
 
-    auto computeDemul = new DoDemul(config_, tid, freq_ghz, data_buffer_,
-        ul_zf_matrices_, ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_,
-        phy_stats, stats);
+    auto computeDemul = new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
 
     /* Initialize Precode operator */
-    auto computePrecode = new DoPrecode(config_, tid, freq_ghz, dl_zf_matrices_,
+    auto computePrecode = new DoPrecode(config_, tid, dl_zf_matrices_,
         dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     while (true) {
@@ -786,10 +763,10 @@ void Agora::worker_decode(int tid)
         ThreadType::kWorkerDecode, base_worker_core_offset, tid);
 
     auto computeEncoding = new DoEncode(
-        config_, tid, freq_ghz, config_->dl_bits, dl_encoded_buffer_, stats);
+        config_, tid, config_->dl_bits, dl_encoded_buffer_, stats);
 
-    auto computeDecoding = new DoDecode(config_, tid, freq_ghz, demod_buffers_,
-        decoded_buffer_, phy_stats, stats);
+    auto computeDecoding = new DoDecode(
+        config_, tid, demod_buffers_, decoded_buffer_, phy_stats, stats);
 
     while (true) {
         if (config_->dl_data_symbol_num_perframe > 0) {

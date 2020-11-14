@@ -10,7 +10,6 @@
 #include "dofft.hpp"
 #include "doprecode.hpp"
 #include "dozf.hpp"
-#include "gettime.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
 #include "phy_stats.hpp"
@@ -128,8 +127,6 @@ private:
         ret << "]";
         return ret.str();
     }
-
-    const double freq_ghz; // RDTSC frequency in GHz
 
     // Worker thread i runs on core base_worker_core_offset + i
     const size_t base_worker_core_offset;

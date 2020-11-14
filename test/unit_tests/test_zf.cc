@@ -14,7 +14,6 @@ TEST(TestZF, Perf)
     cfg->genData();
 
     int tid = 0;
-    double freq_ghz = measure_rdtsc_freq();
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
@@ -28,9 +27,9 @@ TEST(TestZF, Perf)
     calib_buffer.rand_alloc_cx_float(
         kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
-    auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
+    auto stats = new Stats(cfg);
 
-    auto computeZF = new DoZF(cfg, tid, freq_ghz, csi_buffers, calib_buffer,
+    auto computeZF = new DoZF(cfg, tid, csi_buffers, calib_buffer,
         ul_zf_matrices, dl_zf_matrices, stats);
 
     FastRand fast_rand;
@@ -42,7 +41,7 @@ TEST(TestZF, Perf)
             * cfg->zf_block_size;
         computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
     }
-    double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
+    double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
 
     printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 }

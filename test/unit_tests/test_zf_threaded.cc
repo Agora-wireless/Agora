@@ -49,7 +49,7 @@ void MasterToWorkerDynamic_master(Config* cfg,
 }
 
 void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
-    double freq_ghz, moodycamel::ConcurrentQueue<Event_data>& event_queue,
+    moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -67,8 +67,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto computeZF = new DoZF(cfg, worker_id, freq_ghz, csi_buffers,
-        calib_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+    auto computeZF = new DoZF(cfg, worker_id, csi_buffers, calib_buffer,
+        ul_zf_matrices, dl_zf_matrices, stats);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -92,7 +92,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
             try_enqueue_fallback(&complete_task_queue, ptok, resp_event);
         }
     }
-    double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
+    double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
 
     printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
         num_tasks, ms / num_tasks);
@@ -105,8 +105,6 @@ TEST(TestZF, VaryingConfig)
     static constexpr size_t kNumIters = 10000;
     auto* cfg = new Config("data/tddconfig-sim-ul.json");
     cfg->genData();
-
-    double freq_ghz = measure_rdtsc_freq();
 
     auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
     moodycamel::ProducerToken* ptoks[kNumWorkers];
@@ -128,13 +126,13 @@ TEST(TestZF, VaryingConfig)
 
     calib_buffer.rand_alloc_cx_float(kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
 
-    auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
+    auto stats = new Stats(cfg);
 
     auto master = std::thread(MasterToWorkerDynamic_master, cfg,
         std::ref(event_queue), std::ref(complete_task_queue));
     std::thread workers[kNumWorkers];
     for (size_t i = 0; i < kNumWorkers; i++) {
-        workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i, freq_ghz,
+        workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
             std::ref(csi_buffers), std::ref(calib_buffer),
             std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats);
