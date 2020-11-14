@@ -5,15 +5,11 @@ using namespace arma;
 static constexpr bool kUseSpatialLocality = true;
 
 DoPrecode::DoPrecode(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
-          worker_producer_token)
+    : Doer(in_config, in_tid, freq_ghz)
     , dl_zf_matrices_(dl_zf_matrices)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_raw_data(dl_encoded_or_raw_data)
