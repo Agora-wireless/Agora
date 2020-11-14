@@ -16,10 +16,6 @@ TEST(TestZF, Perf)
     int tid = 0;
     double freq_ghz = measure_rdtsc_freq();
 
-    auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
-    auto comp_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
-    auto ptok = new moodycamel::ProducerToken(comp_queue);
-
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
 
@@ -34,8 +30,8 @@ TEST(TestZF, Perf)
 
     auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
 
-    auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffers, calib_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+    auto computeZF = new DoZF(cfg, tid, freq_ghz, csi_buffers, calib_buffer,
+        ul_zf_matrices, dl_zf_matrices, stats);
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();

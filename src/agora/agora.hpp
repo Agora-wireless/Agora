@@ -83,9 +83,6 @@ public:
     void send_snr_report(
         EventType event_type, size_t frame_id, size_t symbol_id);
 
-    void move_events_between_queues(
-        EventType event_type1, EventType event_type2);
-
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
@@ -107,15 +104,17 @@ public:
 
 private:
     /// Fetch the concurrent queue for this event type
-    moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)
+    moodycamel::ConcurrentQueue<Event_data>* get_conq(
+        EventType event_type, size_t qid)
     {
-        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q;
+        return &sched_info_arr[qid][static_cast<size_t>(event_type)]
+                    .concurrent_q;
     }
 
     /// Fetch the producer token for this event type
-    moodycamel::ProducerToken* get_ptok(EventType event_type)
+    moodycamel::ProducerToken* get_ptok(EventType event_type, size_t qid)
     {
-        return sched_info_arr[static_cast<size_t>(event_type)].ptok;
+        return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;
     }
 
     /// Return a string containing the sizes of the FFT queues
@@ -214,6 +213,15 @@ private:
     RxCounters rx_counters_;
     size_t zf_last_frame = SIZE_MAX;
     size_t rc_last_frame = SIZE_MAX;
+
+    // Agora schedules and processes a frame in FIFO order
+    // cur_proc_frame_id is the frame that is currently being processed.
+    // cur_sche_frame_id is the frame that is currently being scheduled.
+    // A frame's schduling finishes before processing ends, so the two
+    // variables are possible to have different values.
+    size_t cur_proc_frame_id = 0;
+    size_t cur_sche_frame_id = 0;
+
     // The frame index for a symbol whose FFT is done
     std::vector<size_t> fft_cur_frame_for_symbol;
     // The frame index for a symbol whose encode is done
@@ -267,7 +275,7 @@ private:
         moodycamel::ConcurrentQueue<Event_data> concurrent_q;
         moodycamel::ProducerToken* ptok;
     };
-    sched_info_t sched_info_arr[kNumEventTypes];
+    sched_info_t sched_info_arr[2][kNumEventTypes];
 
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
@@ -279,15 +287,11 @@ private:
     moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
 
     // Master thread's message queue for event completion from Doers;
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
-
-    // Master thread's message queue for event completion from DoDecode;
-    moodycamel::ConcurrentQueue<Event_data> complete_decode_task_queue_;
+    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_[2];
+    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads][2];
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 };
 
 #endif
