@@ -219,19 +219,6 @@ void Agora::schedule_users(
     }
 }
 
-void Agora::move_events_between_queues(
-    EventType event_type1, EventType event_type2)
-{
-    auto q1 = get_conq(event_type1, 0);
-    auto q2 = get_conq(event_type2, 0);
-    Event_data events_list[16];
-    // printf("%zu elements in decode queue\n", q1->size_approx());
-    while (q1->size_approx() > 0) {
-        size_t num_events = q1->try_dequeue_bulk(events_list, 16);
-        q2->try_enqueue_bulk(events_list, num_events);
-    }
-}
-
 void Agora::start()
 {
     auto& cfg = config_;
@@ -246,11 +233,6 @@ void Agora::start()
 
     pin_to_core_with_offset(
         ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
-
-    // Agora processes a frame after processing for previous frames is
-    // complete. cur_frame_id is the frame that is currently being processed.
-    size_t cur_proc_frame_id = 0;
-    size_t cur_sche_frame_id = 0;
 
     // Counters for printing summary
     size_t demul_count = 0;
@@ -369,10 +351,6 @@ void Agora::start()
                         if (!cfg->bigstation_mode) {
                             assert(cur_sche_frame_id == frame_id);
                             cur_sche_frame_id++;
-                            // move_events_between_queues(
-                            //     EventType::kDecode, EventType::kDecodeLast);
-                            // schedule_codeblocks(EventType::kDecodeLast,
-                            //     frame_id, symbol_idx_ul);
                         } else {
                             schedule_codeblocks(
                                 EventType::kDecode, frame_id, symbol_idx_ul);
@@ -706,10 +684,6 @@ void Agora::worker(int tid)
     auto computeDecoding = new DoDecode(config_, tid, freq_ghz, demod_buffers_,
         decoded_buffer_, phy_stats, stats);
 
-    // auto computeDecodingLast = new DoDecode(config_, tid, freq_ghz,
-    //     complete_decode_task_queue_, decode_ptoks_ptr[tid], demod_buffers_,
-    //     decoded_buffer_, phy_stats, stats);
-
     std::vector<Doer*> computers_vec;
     std::vector<EventType> events_vec;
     if (config_->dl_data_symbol_num_perframe > 0) {
@@ -725,20 +699,31 @@ void Agora::worker(int tid)
     }
 
     size_t cur_qid = 0;
-    bool empty_qeueus = true;
+    size_t empty_qeueu_itrs = 0;
+    bool empty_queue = true;
     while (true) {
         for (size_t i = 0; i < computers_vec.size(); i++) {
             if (computers_vec[i]->try_launch(*get_conq(events_vec[i], cur_qid),
                     complete_task_queue_[cur_qid],
                     worker_ptoks_ptr[tid][cur_qid])) {
-                empty_qeueus = false;
+                empty_queue = false;
                 break;
             }
         }
-        if (empty_qeueus) {
-            cur_qid ^= 0x1;
+        // If all queues in this set are empty for 5 iterations,
+        // check the other set of qeueus
+        if (empty_queue) {
+            empty_qeueu_itrs++;
+            if (empty_qeueu_itrs == 5) {
+                if (cur_sche_frame_id != cur_proc_frame_id)
+                    cur_qid ^= 0x1;
+                else
+                    cur_qid = cur_sche_frame_id & 0x1;
+                empty_qeueu_itrs = 0;
+            }
+        } else {
+            empty_queue = true;
         }
-        empty_qeueus = true;
     }
 }
 
