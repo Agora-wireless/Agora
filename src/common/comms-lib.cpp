@@ -435,9 +435,8 @@ std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(
     std::vector<std::complex<float>> fft_in(fftSize, 0);
     size_t period = dataSize / pilot_sc_num;
     for (size_t i = 0; i < pilot_sc_num; i++) {
-        size_t index = interleaved_pilot ? i * period + offset + dataStart
-                                         : i + offset + dataStart;
-        fft_in[index] = pilot[index];
+        size_t index = interleaved_pilot ? i * period + offset : i + offset;
+        fft_in[index + dataStart] = pilot[index];
     }
     if (timeDomain) {
         auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);

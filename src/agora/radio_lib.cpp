@@ -404,16 +404,16 @@ bool RadioConfig::radioStart()
                     _cfg->common_pilot, _cfg->nChannels * i * kCalibScGroupSize,
                     kCalibScGroupSize, _cfg->OFDM_CA_NUM, _cfg->OFDM_DATA_NUM,
                     _cfg->OFDM_DATA_START, _cfg->CP_LEN, false /*block type*/);
-                recipCalDlPilot.insert(
-                    recipCalDlPilot.begin(), pre.begin(), pre.end());
-                recipCalDlPilot.insert(
-                    recipCalDlPilot.end(), post.begin(), post.end());
                 if (kDebugPrintPilot) {
                     std::cout << "recipCalPilot[" << i << "]: ";
                     for (auto const& calP : recipCalDlPilot)
                         std::cout << real(calP) << ", ";
                     std::cout << std::endl;
                 }
+                recipCalDlPilot.insert(
+                    recipCalDlPilot.begin(), pre.begin(), pre.end());
+                recipCalDlPilot.insert(
+                    recipCalDlPilot.end(), post.begin(), post.end());
                 baStn[i]->writeRegisters("TX_RAM_A", 0,
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
