@@ -72,9 +72,9 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto computeDemul = new DoDemul(cfg, worker_id, freq_ghz, event_queue,
-        complete_task_queue, ptok, data_buffer, ul_zf_matrices,
-        ue_spec_pilot_buffer, equal_buffer, demod_buffers_, phy_stats, stats);
+    auto computeDemul = new DoDemul(cfg, worker_id, freq_ghz, data_buffer,
+        ul_zf_matrices, ue_spec_pilot_buffer, equal_buffer, demod_buffers_,
+        phy_stats, stats);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
