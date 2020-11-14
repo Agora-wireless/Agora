@@ -1097,7 +1097,6 @@ void Agora::initialize_queues()
     message_queue_ = mt_queue_t(512 * data_symbol_num_perframe);
     for (auto& c : complete_task_queue_)
         c = mt_queue_t(256 * data_symbol_num_perframe);
-    // complete_decode_task_queue_ = mt_queue_t(2048);
 
     // Create concurrent queues for each Doer
     for (auto& vec : sched_info_arr) {
@@ -1117,8 +1116,6 @@ void Agora::initialize_queues()
         for (size_t j = 0; j < 2; j++)
             worker_ptoks_ptr[i][j]
                 = new moodycamel::ProducerToken(complete_task_queue_[j]);
-        // decode_ptoks_ptr[i]
-        //     = new moodycamel::ProducerToken(complete_decode_task_queue_);
     }
 }
 
