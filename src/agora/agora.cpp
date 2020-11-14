@@ -258,14 +258,9 @@ void Agora::start()
             num_events += mac_response_queue_.try_dequeue_bulk(
                 events_list + num_events, kDequeueBulkSizeTXRX);
         } else {
-            // if (!cfg->downlink_mode)
-            //     num_events += complete_decode_task_queue_.try_dequeue_bulk(
-            //         events_list + num_events, max_events_needed);
-            // if (num_events == 0) {
             num_events += complete_task_queue_[cur_proc_frame_id & 0x1]
                               .try_dequeue_bulk(
                                   events_list + num_events, max_events_needed);
-            // }
         }
         is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
@@ -338,10 +333,7 @@ void Agora::start()
 
                 print_per_task_done(
                     PrintType::kDemul, frame_id, symbol_idx_ul, base_sc_id);
-                /* If this symbol is ready */
                 if (demul_counters_.last_task(frame_id, symbol_idx_ul)) {
-                    // if (demul_counters_.get_symbol_count(frame_id)
-                    //     < demul_counters_.max_symbol_count - 1)
                     schedule_codeblocks(
                         EventType::kDecode, frame_id, symbol_idx_ul);
                     print_per_symbol_done(
