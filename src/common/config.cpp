@@ -3,6 +3,7 @@
 #include <boost/range/algorithm/count.hpp>
 
 Config::Config(std::string jsonfile)
+    : freq_ghz(measure_rdtsc_freq())
 {
     set_cpu_layout_on_numa_nodes();
     std::string conf;

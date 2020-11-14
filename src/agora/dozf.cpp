@@ -8,13 +8,13 @@ static constexpr bool kUseSIMDGather = true;
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = true;
 
-DoZF::DoZF(Config* config, int tid, double freq_ghz,
+DoZF::DoZF(Config* config, int tid,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats_manager)
-    : Doer(config, tid, freq_ghz)
+    : Doer(config, tid)
     , csi_buffers_(csi_buffers)
     , calib_buffer_(calib_buffer)
     , ul_zf_matrices_(ul_zf_matrices)

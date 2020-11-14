@@ -8,10 +8,10 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
-DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
+DoEncode::DoEncode(Config* in_config, int in_tid,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz)
+    : Doer(in_config, in_tid)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
 {
@@ -70,19 +70,19 @@ Event_data DoEncode::launch(size_t tag)
     size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
-    if (cycles_to_us(duration, freq_ghz) > 500) {
+    if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
         printf("Thread %d Encode takes %.2f\n", tid,
-            cycles_to_us(duration, freq_ghz));
+            cycles_to_us(duration, cfg->freq_ghz));
     }
 
     return Event_data(EventType::kEncode, tag);
 }
 
-DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
+DoDecode::DoDecode(Config* in_config, int in_tid,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     PhyStats* in_phy_stats, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz)
+    : Doer(in_config, in_tid)
     , demod_buffers_(demod_buffers)
     , decoded_buffers_(decoded_buffers)
     , phy_stats(in_phy_stats)
@@ -190,9 +190,9 @@ Event_data DoDecode::launch(size_t tag)
     size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
-    if (cycles_to_us(duration, freq_ghz) > 500) {
+    if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
         printf("Thread %d Decode takes %.2f\n", tid,
-            cycles_to_us(duration, freq_ghz));
+            cycles_to_us(duration, cfg->freq_ghz));
     }
 
     return Event_data(EventType::kDecode, tag);

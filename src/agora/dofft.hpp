@@ -18,7 +18,7 @@
 
 class DoFFT : public Doer {
 public:
-    DoFFT(Config* config, int tid, double freq_ghz, Table<char>& socket_buffer,
+    DoFFT(Config* config, int tid, Table<char>& socket_buffer,
         Table<int>& socket_buffer_status, Table<complex_float>& data_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
@@ -109,7 +109,7 @@ private:
 
 class DoIFFT : public Doer {
 public:
-    DoIFFT(Config* in_config, int in_tid, double freq_ghz,
+    DoIFFT(Config* in_config, int in_tid,
         Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
         Stats* in_stats_manager);
     ~DoIFFT();

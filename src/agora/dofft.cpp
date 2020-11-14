@@ -11,13 +11,12 @@ static constexpr bool kPrintSocketOutput = false;
 static constexpr bool kUseOutOfPlaceIFFT = false;
 static constexpr bool kMemcpyBeforeIFFT = true;
 
-DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
-    Table<char>& socket_buffer, Table<int>& socket_buffer_status,
-    Table<complex_float>& data_buffer,
+DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
+    Table<int>& socket_buffer_status, Table<complex_float>& data_buffer,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
     Stats* stats_manager)
-    : Doer(config, tid, freq_ghz)
+    : Doer(config, tid)
     , socket_buffer_(socket_buffer)
     , socket_buffer_status_(socket_buffer_status)
     , data_buffer_(data_buffer)
@@ -232,10 +231,10 @@ void DoFFT::partial_transpose(
     }
 }
 
-DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
+DoIFFT::DoIFFT(Config* in_config, int in_tid,
     Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz)
+    : Doer(in_config, in_tid)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
 {

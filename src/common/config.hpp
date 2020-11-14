@@ -17,6 +17,7 @@
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
+#include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
@@ -60,6 +61,8 @@ public:
 
 class Config {
 public:
+    const double freq_ghz; // RDTSC frequency in GHz
+
     std::string modulation; // Modulation order as a string, e.g., "16QAM"
     size_t mod_order; // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
     size_t mod_order_bits; // Number of binary bits used for a modulation order
