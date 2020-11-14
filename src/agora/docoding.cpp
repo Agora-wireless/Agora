@@ -9,13 +9,9 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
-          worker_producer_token)
+    : Doer(in_config, in_tid, freq_ghz)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
 {
@@ -83,14 +79,10 @@ Event_data DoEncode::launch(size_t tag)
 }
 
 DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     PhyStats* in_phy_stats, Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
-          worker_producer_token)
+    : Doer(in_config, in_tid, freq_ghz)
     , demod_buffers_(demod_buffers)
     , decoded_buffers_(decoded_buffers)
     , phy_stats(in_phy_stats)

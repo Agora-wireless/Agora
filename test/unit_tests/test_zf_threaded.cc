@@ -67,9 +67,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto computeZF = new DoZF(cfg, worker_id, freq_ghz, event_queue,
-        complete_task_queue, ptok, csi_buffers, calib_buffer, ul_zf_matrices,
-        dl_zf_matrices, stats);
+    auto computeZF = new DoZF(cfg, worker_id, freq_ghz, csi_buffers,
+        calib_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
