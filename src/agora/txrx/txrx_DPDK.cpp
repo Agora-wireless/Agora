@@ -211,6 +211,7 @@ void* PacketTXRX::demod_thread(int tid)
             continue;
 
         for (size_t i = 0; i < nb_rx; i++) {
+            printf("Received packet!\n");
             rte_mbuf* dpdk_pkt = rx_bufs[i];
             auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
             auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
@@ -323,12 +324,12 @@ int PacketTXRX::recv_relocate(int tid)
         }
 
         if (ip_hdr->src_addr != bs_rru_addr) {
-            fprintf(stderr, "DPDK: Source addr does not match\n");
+            fprintf(stderr, "DPDK relocate: Source addr does not match (%x->%x)\n", ip_hdr->src_addr, ip_hdr->dst_addr);
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
         if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
-            fprintf(stderr, "DPDK: Destination addr does not match\n");
+            fprintf(stderr, "DPDK relocate: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
