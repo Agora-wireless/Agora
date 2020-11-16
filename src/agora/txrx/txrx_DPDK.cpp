@@ -281,7 +281,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
     while (cfg->running) {
         // Receive data
-        int res = recv_relocate(tid);
+        // int res = recv_relocate(tid);
+        int res = recv(tid);
         if (res == 0)
             continue;
 
@@ -355,6 +356,87 @@ int PacketTXRX::recv_relocate(int tid)
             if (!rx_status_->add_new_packet(pkt)) {
                 cfg->running = false;
             }
+        } else {
+            printf("Received unknown packet from rru\n");
+            exit(1);
+        }
+
+        rte_pktmbuf_free(rx_bufs[i]);
+
+        // if (kIsWorkerTimingEnabled) {
+        //     if (prev_frame_id == SIZE_MAX or pkt->frame_id > prev_frame_id) {
+        //         (*frame_start_)[tid][pkt->frame_id % kNumStatsFrames] = rdtsc();
+        //         prev_frame_id = pkt->frame_id;
+        //     }
+        // }
+    }
+    return nb_rx;
+}
+
+int PacketTXRX::recv(int tid)
+{
+    rte_mbuf* rx_bufs[kRxBatchSize];
+    uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+    if (unlikely(nb_rx == 0))
+        return 0;
+
+    for (size_t i = 0; i < nb_rx; i++) {
+        rte_mbuf* dpdk_pkt = rx_bufs[i];
+        auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+        auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+            reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+        uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+        if (kDebugDPDK) {
+            auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
+                reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
+            DpdkTransport::print_pkt(ip_hdr->src_addr, ip_hdr->dst_addr,
+                udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
+            printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
+                dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
+                RTE_ETHER_TYPE_IPV4);
+            printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
+        }
+
+        if (eth_type != RTE_ETHER_TYPE_IPV4
+            or ip_hdr->next_proto_id != IPPROTO_UDP) {
+            rte_pktmbuf_free(rx_bufs[i]);
+            continue;
+        }
+
+        auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
+        if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
+            char* rx_buffer = (*buffer_)[pkt->ant_id];
+            const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
+                    * cfg->symbol_num_perframe
+                + pkt->symbol_id;
+
+            size_t sc_offset = Packet::kOffsetOfData
+                + 2 * sizeof(unsigned short)
+                    * (cfg->OFDM_DATA_START
+                        + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
+            DpdkTransport::fastMemcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+            DpdkTransport::fastMemcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+                (uint8_t*)pkt + Packet::kOffsetOfData,
+                cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
+
+            // get the position in rx_buffer
+            if (!rx_status_->add_new_packet(pkt)) {
+                cfg->running = false;
+            }
+        } else if (pkt->pkt_type == Packet::PktType::kDemod) {
+            const size_t symbol_idx_ul
+                = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
+            const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+
+            int8_t* demod_ptr
+                = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                    pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+            DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+                cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+            decode_status_->receive_demod_data(
+                pkt->ue_id, pkt->frame_id, symbol_idx_ul);
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);
