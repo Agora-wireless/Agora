@@ -168,7 +168,7 @@ Event_data DoFFT::launch(size_t tag)
     } else if (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant) {
         // Only process uplink for antennas that also do downlink in this frame
         // for consistency with calib downlink processing.
-        if (ant_id / cfg->ant_per_group == frame_id % cfg->ant_per_group) {
+        if (ant_id / cfg->ant_per_group == frame_id % cfg->ant_group_num) {
             partial_transpose(
                 &calib_ul_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM],
                 ant_id, sym_type);
@@ -213,8 +213,7 @@ Event_data DoFFT::launch(size_t tag)
         for (size_t i = 0; i < cfg->BF_ANT_NUM; i++) {
             arma::cx_fvec tar_sc_vec(
                 reinterpret_cast<arma::cx_float*>(
-                    &calib_dl_buffer_[frame_grp_slot]
-                                     [ant_id * cfg->OFDM_DATA_NUM]),
+                    &calib_dl_buffer_[frame_grp_slot][i * cfg->OFDM_DATA_NUM]),
                 cfg->OFDM_DATA_NUM, false);
             size_t sc0 = kCalibScGroupSize * (i % cfg->ant_per_group);
             calib_regression_estimate(sc_mat.col(i), tar_sc_vec, sc0);
@@ -249,14 +248,14 @@ void DoFFT::partial_transpose(
 
             complex_float* dst = nullptr;
             if (symbol_type == SymbolType::kCalDL) {
-                if (sc_j / kCalibScGroupSize < cfg->ant_per_group)
+                if (sc_j < cfg->ant_per_group * kCalibScGroupSize) {
                     // copy this chunk to the corresponding anntea offset
-                    dst = &out_buf[(sc_j / kCalibScGroupSize)
-                        * kCalibScGroupSize];
+                    dst = &out_buf[sc_idx];
+                }
             } else if (symbol_type == SymbolType::kCalUL) {
                 //if (kSCsPerCacheLine * (ant_id % cfg->ant_per_group) == sc_j)
                 //    dst = out_buf[ant_id * kSCsPerCacheline];
-                dst = &out_buf[sc_j];
+                dst = &out_buf[sc_idx];
             } else {
                 dst = kUsePartialTrans
                     ? &out_buf[block_base_offset
