@@ -124,6 +124,7 @@ private:
     struct rte_mempool* mbuf_pool;
     std::vector<uint32_t> bs_server_addrs_;
     std::vector<rte_ether_addr> bs_server_mac_addrs_;
+    int recv(int tid);
 #endif
 
     RadioConfig* radioconfig_; // Used only in Argos mode
