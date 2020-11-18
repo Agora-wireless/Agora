@@ -431,15 +431,7 @@ int PacketTXRX::recv(int tid)
                 &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
                 (uint8_t*)pkt + Packet::kOffsetOfData,
                 cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
-
-            printf("Receive packet symbol %u ant %u\n", pkt->symbol_id, pkt->ant_id);
-            // short* ptr = reinterpret_cast<short*>((uint8_t*)pkt + Packet::kOffsetOfData);
-            // for (size_t i = 0; i < cfg->get_num_sc_per_server() * 2; i ++) {
-            //     printf("%u ", ptr[i]);
-            // }
-            // printf("\n");
-            // pkt->print_content(cfg->packet_length);
-            // exit(0);
+                
             // get the position in rx_buffer
             if (!rx_status_->add_new_packet(pkt)) {
                 cfg->running = false;
