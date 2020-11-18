@@ -508,45 +508,52 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     std::cout << "****************************************************\n";
 }
 
-bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
+void RadioConfig::adjustDelays(std::vector<int> offset)
+{
+    // adjust all trigger delay for all radios
+    // with respect to the first non-ref radio
+    size_t ref_offset = _cfg->ref_ant == 0 ? 1 : 0;
+    for (size_t i = 0; i < offset.size(); i++) {
+        if (i == _cfg->ref_ant)
+            continue;
+        int delta = offset[ref_offset] - offset[i];
+        std::cout << "sample_adjusting delay of node " << i << " by " << delta
+                  << std::endl;
+        int iter = delta < 0 ? -delta : delta;
+        for (int j = 0; j < iter; j++) {
+            if (delta < 0)
+                baStn[i]->writeSetting("ADJUST_DELAYS", "-1");
+            else
+                baStn[i]->writeSetting("ADJUST_DELAYS", "1");
+        }
+    }
+}
+
+bool RadioConfig::initial_calib(bool sample_adjust)
 {
     bool good_csi = true;
 
     size_t seq_len = _cfg->pilot_cf32.size();
-    size_t fft_len = _cfg->OFDM_CA_NUM;
-    std::cout << "calibration seq_len " << seq_len << " fft_len " << fft_len
-              << std::endl;
-    std::vector<std::complex<int16_t>> pilot_cs16;
-
-    for (size_t i = 0; i < seq_len; i++) {
-        std::complex<float> cf = _cfg->pilot_cf32[i];
-        pilot_cs16.push_back(std::complex<int16_t>(
-            (int16_t)(cf.real() * 32768), (int16_t)(cf.imag() * 32768)));
-    }
-
-    std::vector<std::complex<int16_t>> pre(_cfg->ofdm_tx_zero_prefix_, 0);
-    std::vector<std::complex<int16_t>> post(_cfg->ofdm_tx_zero_postfix_, 0);
-    pilot_cs16.insert(pilot_cs16.begin(), pre.begin(), pre.end());
-    pilot_cs16.insert(pilot_cs16.end(), post.begin(), post.end());
-    size_t read_len = pilot_cs16.size();
+    size_t read_len = _cfg->pilot_ci16.size();
 
     // Transmitting from only one chain, create a null vector for chainB
-    std::vector<std::complex<int16_t>> dummy_cs16(read_len, 0);
+    std::vector<std::complex<int16_t>> dummy_ci16(read_len, 0);
 
     std::vector<void*> txbuff0(2);
-    txbuff0[0] = pilot_cs16.data();
-    txbuff0[1] = dummy_cs16.data();
+    txbuff0[0] = _cfg->pilot_ci16.data();
+    txbuff0[1] = dummy_ci16.data();
 
     std::vector<std::vector<std::complex<int16_t>>> buff;
     // int ant = _cfg->nChannels;
     size_t M = _cfg->nAntennas;
     size_t R = _cfg->nRadios;
-    assert(M == R); // for now
+    // TODO: Support 2-channels
+    assert(M == R);
     buff.resize(M * M);
     for (size_t i = 0; i < M; i++) {
         for (size_t j = 0; j < M; j++) {
             if (i == j)
-                buff[i * M + j] = pilot_cs16;
+                buff[i * M + j] = _cfg->pilot_ci16;
             else
                 buff[i * M + j].resize(read_len);
         }
@@ -567,7 +574,7 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
     for (size_t i = 0; i < R; i++) {
         int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
         int ret = baStn[i]->writeStream(this->txStreams[i], txbuff0.data(),
-            pilot_cs16.size(), tx_flags, txTime, 1000000);
+            _cfg->pilot_ci16.size(), tx_flags, txTime, 1000000);
         if (ret < (int)read_len)
             std::cout << "bad write\n";
         for (size_t j = 0; j < R; j++) {
@@ -603,58 +610,58 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
         baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->txgainA); //[0,30]
     }
 
-    // int ref_ant = 0;
-    size_t ref_offset = ref_ant == 0 ? 1 : 0;
     std::vector<int> offset(R);
     std::vector<size_t> start_up(R);
     std::vector<size_t> start_dn(R);
 
+    std::vector<std::vector<std::complex<float>>> up(R);
+    std::vector<std::vector<std::complex<float>>> dn(R);
     for (size_t i = 0; i < R; i++) {
-        std::vector<std::complex<float>> up(read_len);
-        std::vector<std::complex<float>> dn(read_len);
-        std::transform(buff[ref_ant * R + i].begin(),
-            buff[ref_ant * R + i].end(), up.begin(),
+        up[i].resize(read_len);
+        dn[i].resize(read_len);
+        if (i == _cfg->ref_ant)
+            continue;
+        std::transform(buff[_cfg->ref_ant * R + i].begin(),
+            buff[_cfg->ref_ant * R + i].end(), up[i].begin(),
             [](std::complex<int16_t> ci) {
                 return std::complex<float>(
                     ci.real() / 32768.0, ci.imag() / 32768.0);
             });
-        std::transform(buff[i * R + ref_ant].begin(),
-            buff[i * R + ref_ant].end(), dn.begin(),
+        std::transform(buff[i * R + _cfg->ref_ant].begin(),
+            buff[i * R + _cfg->ref_ant].end(), dn[i].begin(),
             [](std::complex<int16_t> ci) {
                 return std::complex<float>(
                     ci.real() / 32768.0, ci.imag() / 32768.0);
             });
 
         size_t peak_up
-            = CommsLib::find_pilot_seq(up, _cfg->pilot_cf32, seq_len);
+            = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32, seq_len);
         size_t peak_dn
-            = CommsLib::find_pilot_seq(dn, _cfg->pilot_cf32, seq_len);
+            = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32, seq_len);
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
         std::cout << "receive starting position from/to node " << i << ": "
                   << start_up[i] << "/" << start_dn[i] << std::endl;
-        if (start_up[i] == 0 || start_dn[i] == 0)
+        if (start_up[i] == 0 || start_dn[i] == 0) {
             good_csi = false;
-        if (i == ref_offset) {
-            offset[i] = start_up[i];
-            offset[ref_ant] = start_dn[i];
-        } else if (i != ref_ant)
-            offset[i] = start_up[i];
+            break;
+        }
+        offset[i] = start_up[i];
 
 #if DEBUG_PLOT
         std::vector<double> up_I(read_len);
-        std::transform(up.begin(), up.end(), up_I.begin(),
+        std::transform(up[i].begin(), up[i].end(), up_I.begin(),
             [](std::complex<double> cd) { return cd.real(); });
 
         std::vector<double> dn_I(read_len);
-        std::transform(dn.begin(), dn.end(), dn_I.begin(),
+        std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
             [](std::complex<double> cd) { return cd.real(); });
 
         plt::figure_size(1200, 780);
         plt::plot(up_I);
         plt::xlim(0, read_len);
         plt::ylim(-1, 1);
-        plt::title("ant " + std::to_string(ref_ant) + " (ref) to ant "
+        plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
             + std::to_string(i));
         plt::legend();
         plt::save("up_" + std::to_string(i) + ".png");
@@ -664,52 +671,44 @@ bool RadioConfig::correctSampleOffset(size_t ref_ant, bool sample_adjust)
         plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(i) + " to ant (ref)"
-            + std::to_string(ref_ant));
+            + std::to_string(_cfg->ref_ant));
         plt::legend();
         plt::save("dn_" + std::to_string(i) + ".png");
 #endif
     }
-
     // sample_adjusting trigger delays based on lts peak index
     if (good_csi) {
         if (sample_adjust)
-            adjustDelays(offset, ref_offset);
-    }
+            adjustDelays(offset);
+    } else
+        return good_csi;
 
+    for (size_t i = 0; i < R; i++) {
+        // computing reciprocity calibration matrix
+        auto first_up = up[i].begin() + start_up[i];
+        auto last_up = up[i].begin() + start_up[i] + _cfg->OFDM_CA_NUM;
+        std::vector<std::complex<float>> up_ofdm(first_up, last_up);
+        assert(up_ofdm.size() == _cfg->OFDM_CA_NUM);
+
+        auto first_dn = dn[i].begin() + start_dn[i];
+        auto last_dn = dn[i].begin() + start_dn[i] + _cfg->OFDM_CA_NUM;
+        std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
+        assert(dn_ofdm.size() == _cfg->OFDM_CA_NUM);
+
+        auto dn_f = CommsLib::FFT(dn_ofdm, _cfg->OFDM_CA_NUM);
+        auto up_f = CommsLib::FFT(up_ofdm, _cfg->OFDM_CA_NUM);
+        arma::cx_fvec dn_vec(
+            reinterpret_cast<arma::cx_float*>(&dn_f[_cfg->OFDM_DATA_START]),
+            _cfg->OFDM_DATA_NUM, false);
+        arma::cx_fvec up_vec(
+            reinterpret_cast<arma::cx_float*>(&up_f[_cfg->OFDM_DATA_START]),
+            _cfg->OFDM_DATA_NUM, false);
+
+        arma::cx_fvec calib_vec(
+            reinterpret_cast<arma::cx_float*>(init_calib_mat_[i]),
+            _cfg->OFDM_DATA_NUM, false);
+
+        calib_vec = dn_vec / up_vec;
+    }
     return good_csi;
 }
-
-// void RadioConfig::calcReciprocityCalib()
-//{
-//    calib_mat.resize(R);
-//    for (size_t i = 0; i < R; i++) {
-//        std::vector<std::complex<float> > dn_t(fft_len);
-//        std::vector<std::complex<float> > up_t(fft_len);
-//        std::transform(buff[i * R + ref_ant].begin() + start_dn[i], buff[i * R
-//        + ref_ant].begin() + start_dn[i] + fft_len, dn_t.begin(),
-//            [](std::complex<int16_t> cf) { return
-//            std::complex<float>(cf.real() / 32768.0, cf.imag() / 32768.0); });
-//        std::transform(buff[ref_ant * R + i].begin() + start_up[i],
-//        buff[ref_ant * R + i].begin() + start_up[i] + fft_len, up_t.begin(),
-//            [](std::complex<int16_t> cf) { return
-//            std::complex<float>(cf.real() / 32768.0, cf.imag() / 32768.0); });
-//        std::vector<std::complex<float> > dn_f = CommsLib::FFT(dn_t, fft_len);
-//        std::vector<std::complex<float> > up_f = CommsLib::FFT(up_t, fft_len);
-//        for (size_t f = 0; f < fft_len; f++) {
-//            if (f < _cfg->OFDM_DATA_START || f >= _cfg->OFDM_DATA_START +
-//            _cfg->OFDM_DATA_NUM) {
-//    	    continue;
-//    	}
-//            float dre = dn_f[f].real();
-//            float dim = dn_f[f].imag();
-//            float ure = up_f[f].real();
-//            float uim = up_f[f].imag();
-//            float re = (dre * ure + dim * uim) / (ure * ure + uim * uim);
-//            float im = (dim * ure - dre * uim) / (ure * ure + uim * uim);
-//            if (i == ref_ant)
-//                calib_mat[i].push_back(1);
-//            else
-//                calib_mat[i].push_back(std::complex<float>(re, im));
-//        }
-//    }
-//}
