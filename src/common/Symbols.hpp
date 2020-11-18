@@ -238,10 +238,6 @@ static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 static constexpr size_t kCalibScGroupSize = 8;
 static_assert(kCalibScGroupSize % kSCsPerCacheline == 0, "");
 
-// Number of items in moving average
-static constexpr size_t kMovingMeanBatchSize = 4;
-static constexpr float kMovingMeanScaling = 1.f / kMovingMeanBatchSize;
-
 #ifdef USE_AVX2_ENCODER
 static constexpr bool kUseAVX2Encoder = true;
 #else

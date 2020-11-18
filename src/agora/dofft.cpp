@@ -40,10 +40,6 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    //calib_dl_rx_fft = reinterpret_cast<complex_float*>(memalign(
-    //    64, cfg->BF_ANT_NUM * kSCsPerCacheline * sizeof(complex_float)));
-    calib_dl_partial_.calloc(
-        kFrameWnd, cfg->BF_ANT_NUM * kCalibScGroupSize, 64);
     temp_16bits_iq
         = reinterpret_cast<uint16_t*>(memalign(64, 32 * sizeof(uint16_t)));
 }
@@ -169,55 +165,19 @@ Event_data DoFFT::launch(size_t tag)
         // Only process uplink for antennas that also do downlink in this frame
         // for consistency with calib downlink processing.
         if (ant_id / cfg->ant_per_group == frame_id % cfg->ant_group_num) {
-            partial_transpose(
-                &calib_ul_buffer_[frame_slot][ant_id * cfg->OFDM_DATA_NUM],
-                ant_id, sym_type);
-            size_t window_size
-                = std::min(frame_id, kMovingMeanBatchSize * cfg->ant_group_num);
             size_t frame_grp_id = frame_id / cfg->ant_group_num;
             size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-            arma::cx_fvec sc_vec(reinterpret_cast<arma::cx_float*>(
-                                     &calib_ul_buffer_[frame_grp_slot][ant_id
-                                         * cfg->OFDM_DATA_NUM]),
-                cfg->OFDM_DATA_NUM, false);
-            for (size_t w = 0; w < window_size - 1; w++) {
-                size_t prev_frame_grp = (frame_grp_id - w) % kFrameWnd;
-                arma::cx_fvec sc_vec_prev(
-                    reinterpret_cast<arma::cx_float*>(
-                        &calib_ul_buffer_[prev_frame_grp]
-                                         [ant_id * cfg->OFDM_DATA_NUM]),
-                    cfg->OFDM_DATA_NUM, false);
-                sc_vec += sc_vec_prev;
-            }
-            sc_vec *= kMovingMeanScaling;
+            partial_transpose(
+                &calib_ul_buffer_[frame_grp_slot][ant_id * cfg->OFDM_DATA_NUM],
+                ant_id, sym_type);
         }
     } else if (sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant) {
-        partial_transpose(calib_dl_partial_[frame_slot], ant_id, sym_type);
-        // average calib pilot subcarriers across frames
-        // TODO: be careful of averaging since not every antenna is updated in every frame
-        arma::cx_fmat sc_mat(
-            reinterpret_cast<arma::cx_float*>(calib_dl_partial_[frame_slot]),
-            kCalibScGroupSize, cfg->BF_ANT_NUM, false);
-        size_t window_size
-            = std::min(frame_id, kMovingMeanBatchSize * cfg->ant_group_num);
         size_t frame_grp_id = frame_id / cfg->ant_group_num;
         size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-        for (size_t w = 0; w < window_size - 1; w++) {
-            size_t prev_frame_slot = (frame_grp_id - w) % kFrameWnd;
-            arma::cx_fmat sc_mat_prev(reinterpret_cast<arma::cx_float*>(
-                                          calib_dl_partial_[prev_frame_slot]),
-                kCalibScGroupSize, cfg->BF_ANT_NUM, false);
-            sc_mat += sc_mat_prev;
-        }
-        sc_mat *= kMovingMeanScaling;
-        for (size_t i = 0; i < cfg->BF_ANT_NUM; i++) {
-            arma::cx_fvec tar_sc_vec(
-                reinterpret_cast<arma::cx_float*>(
-                    &calib_dl_buffer_[frame_grp_slot][i * cfg->OFDM_DATA_NUM]),
-                cfg->OFDM_DATA_NUM, false);
-            size_t sc0 = kCalibScGroupSize * (i % cfg->ant_per_group);
-            calib_regression_estimate(sc_mat.col(i), tar_sc_vec, sc0);
-        }
+        size_t cur_ant = frame_id - (frame_grp_id * cfg->ant_group_num);
+        complex_float* calib_dl_ptr
+            = &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg->OFDM_DATA_NUM];
+        partial_transpose(calib_dl_ptr, ant_id, sym_type);
     } else {
         rt_assert(false, "Unknown or unsupported symbol type");
     }
@@ -247,14 +207,8 @@ void DoFFT::partial_transpose(
                 = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
 
             complex_float* dst = nullptr;
-            if (symbol_type == SymbolType::kCalDL) {
-                if (sc_j < cfg->ant_per_group * kCalibScGroupSize) {
-                    // copy this chunk to the corresponding anntea offset
-                    dst = &out_buf[sc_idx];
-                }
-            } else if (symbol_type == SymbolType::kCalUL) {
-                //if (kSCsPerCacheLine * (ant_id % cfg->ant_per_group) == sc_j)
-                //    dst = out_buf[ant_id * kSCsPerCacheline];
+            if (symbol_type == SymbolType::kCalDL
+                || symbol_type == SymbolType::kCalUL) {
                 dst = &out_buf[sc_idx];
             } else {
                 dst = kUsePartialTrans

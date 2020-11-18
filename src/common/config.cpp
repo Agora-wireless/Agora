@@ -160,8 +160,8 @@ Config::Config(std::string jsonfile)
     DLSymbols = Utils::loadSymbols(frames, 'D');
     ULCalSymbols = Utils::loadSymbols(frames, 'L');
     DLCalSymbols = Utils::loadSymbols(frames, 'C');
-    recipCalEn = (ULCalSymbols[0].size() == 1 and DLCalSymbols[0].size() == 1);
-    ant_per_group = std::min(OFDM_DATA_NUM / kCalibScGroupSize, BF_ANT_NUM);
+    recipCalEn = (ULCalSymbols[0].size() > 0 and DLCalSymbols[0].size() > 0);
+    ant_per_group = DLCalSymbols[0].size();
     ant_group_num = BF_ANT_NUM / ant_per_group;
 
     symbol_num_perframe = frames.at(0).size();
@@ -176,6 +176,7 @@ Config::Config(std::string jsonfile)
         = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].front() : 0;
     dl_data_symbol_end
         = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].back() + 1 : 0;
+    recip_pilot_symbol_num_perframe = recipCalEn ? 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot
         and UE_ANT_NUM != pilot_symbol_num_perframe) {
