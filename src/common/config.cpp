@@ -55,8 +55,8 @@ Config::Config(std::string jsonfile)
     rxgainA = tddConf.value("rxgainA", 20);
     txgainB = tddConf.value("txgainB", 20);
     rxgainB = tddConf.value("rxgainB", 20);
-    calTxGainA = tddConf.value("calTxGainA", 10);
-    calTxGainB = tddConf.value("calTxGainB", 10);
+    calTxGainA = tddConf.value("calTxGainA", txgainA);
+    calTxGainB = tddConf.value("calTxGainB", txgainB);
     rate = tddConf.value("rate", 5e6);
     nco = tddConf.value("nco_frequency", 0.75 * rate);
     bwFilter = rate + 2 * nco;

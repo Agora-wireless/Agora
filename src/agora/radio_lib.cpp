@@ -296,13 +296,16 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    if (_cfg->sampleCalEn) {
-        std::cout << "start sample offset correction" << std::endl;
+    init_calib_mat_.calloc(_cfg->OFDM_DATA_NUM, _cfg->BS_ANT_NUM, 64);
+    // initialize init_calib_mat to a matrix of ones
+    for (size_t i = 0; i < _cfg->OFDM_DATA_NUM; i++)
+        for (size_t j = 0; j < _cfg->BS_ANT_NUM; j++)
+            init_calib_mat_[i][j] = 1;
+    if (_cfg->downlink_mode) {
         int iter = 0;
         int max_iter = 3;
-        size_t ref_ant = _cfg->ref_ant;
         while (!good_calib) {
-            good_calib = correctSampleOffset(ref_ant, _cfg->sampleCalEn);
+            good_calib = initial_calib(_cfg->sampleCalEn);
             iter++;
             if (iter == max_iter && !good_calib) {
                 std::cout << "attempted " << max_iter
@@ -561,24 +564,6 @@ void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs,
         i++;
     }
     // std::cout << "Number of reads needed to drain: " << i << std::endl;
-}
-
-void RadioConfig::adjustDelays(std::vector<int> offset, size_t ref_ant)
-{
-    size_t ref_offset = ref_ant == 0 ? 1 : 0;
-    size_t R = _cfg->nRadios;
-    for (size_t i = 0; i < R; i++) {
-        int delta = offset[ref_offset] - offset[i];
-        std::cout << "sample_adjusting delay of node " << i << " by " << delta
-                  << std::endl;
-        int iter = delta < 0 ? -delta : delta;
-        for (int j = 0; j < iter; j++) {
-            if (delta < 0)
-                baStn[i]->writeSetting("ADJUST_DELAYS", "-1");
-            else
-                baStn[i]->writeSetting("ADJUST_DELAYS", "1");
-        }
-    }
 }
 
 void RadioConfig::readSensors()
