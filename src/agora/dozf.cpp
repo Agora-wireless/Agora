@@ -73,23 +73,19 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
             cfg->BF_ANT_NUM, cfg->UE_NUM, false);
-        if (cfg->recipCalEn) {
-            arma::cx_fvec vec_calib(
-                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BF_ANT_NUM,
-                false);
+        arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
+            cfg->BF_ANT_NUM, false);
 
-            arma::cx_fmat mat_calib(cfg->BF_ANT_NUM, cfg->BF_ANT_NUM);
-            mat_calib = arma::diagmat(vec_calib);
-            try {
-                mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
-            } catch (std::runtime_error) {
-                MLPD_WARN("Failed to invert reference channel matrix, skip "
-                          "applying it\n");
-                Utils::print_vec(vec_calib, "vec_calib");
-                mat_dl_zf = mat_ul_zf.st();
-            }
-        } else
+        arma::cx_fmat mat_calib(cfg->BF_ANT_NUM, cfg->BF_ANT_NUM);
+        mat_calib = arma::diagmat(vec_calib);
+        try {
+            mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
+        } catch (std::runtime_error) {
+            MLPD_WARN("Failed to invert reference channel matrix, skip "
+                      "applying it\n");
+            Utils::print_vec(vec_calib, "vec_calib");
             mat_dl_zf = mat_ul_zf.st();
+        }
 
         // We should be scaling the beamforming matrix, so the IFFT
         // output can be scaled with OFDM_CA_NUM across all antennas.
