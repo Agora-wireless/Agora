@@ -672,7 +672,6 @@ void Agora::handle_event_fft(size_t tag)
         }
     } else if (sym_type == SymbolType::kCalDL
         or sym_type == SymbolType::kCalUL) {
-        print_per_symbol_done(PrintType::kFFTCal, frame_id, symbol_id);
         if (++fft_stats_.symbol_rc_count[frame_slot]
             == fft_stats_.max_symbol_rc_count) {
             print_per_frame_done(PrintType::kFFTCal, frame_id);
@@ -1047,7 +1046,7 @@ void Agora::print_per_symbol_done(
             tomac_stats_.get_symbol_count(frame_id) + 1);
         break;
     default:
-        printf("Wrong task type in frame done print!");
+        printf("Wrong task type in symbol done print!");
     }
 }
 
@@ -1096,7 +1095,7 @@ void Agora::print_per_task_done(PrintType print_type, size_t frame_id,
             tx_stats_.get_task_count(frame_id, symbol_id));
         break;
     default:
-        printf("Wrong task type in frame done print!");
+        printf("Wrong task type in task done print!");
     }
 }
 
@@ -1155,7 +1154,8 @@ void Agora::initialize_uplink_buffers()
         kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
-        * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
+        * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe
+              + cfg->recip_pilot_symbol_num_perframe);
     rx_counters_.num_pilot_pkts_per_frame
         = cfg->BS_ANT_NUM * cfg->pilot_symbol_num_perframe;
     rx_counters_.num_reciprocity_pkts_per_frame = cfg->BS_ANT_NUM;

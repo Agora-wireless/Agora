@@ -107,8 +107,6 @@ private:
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
 
-    Table<complex_float> calib_dl_partial_;
-
     // Buffer for store 16-bit IQ converted from 12-bit IQ
     uint16_t* temp_16bits_iq;
 

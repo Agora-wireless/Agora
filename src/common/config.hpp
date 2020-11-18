@@ -257,6 +257,9 @@ public:
     // and downlink data symbols
     size_t data_symbol_num_perframe;
 
+    // Total number of pilot symbols in a frame
+    size_t recip_pilot_symbol_num_perframe;
+
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
     bool downlink_mode; // If true, the frame contains downlink symbols
