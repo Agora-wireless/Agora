@@ -182,34 +182,48 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
         clStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg->radioRfFreq);
         clStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : cfg->nco);
 
-        if (!kUseUHD) {
-            if (info["frontend"].find("CBRS") != std::string::npos) {
-                if (cfg->freq > 3e9)
-                    clStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -6); //[-18,0]
-                else if (cfg->freq > 2e9 && cfg->freq < 3e9)
-                    clStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18); //[-18,0]
-                else
-                    clStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -12); //[-18,0]
-                clStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
-            }
-
-            clStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                ch ? cfg->rxgainB : cfg->rxgainA); //[0,30]
-            clStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
-            clStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
-
-            if (info["frontend"].find("CBRS") != std::string::npos) {
-                clStn[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6); //[-18,0] by 3
-                clStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
-            }
-            clStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
-            clStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                ch ? cfg->txgainB : cfg->txgainA); //[0,30]
+        // Unified gains for both lime and frontend
+        if (_cfg->single_gain()) {
+            // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
+            clStn[i]->setGain(
+                SOAPY_SDR_RX, ch, ch ? _cfg->rxgainB : _cfg->rxgainA);
+            // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
+            clStn[i]->setGain(
+                SOAPY_SDR_TX, ch, ch ? _cfg->txgainB : _cfg->txgainA);
         } else {
-            clStn[i]->setGain(
-                SOAPY_SDR_RX, ch, "PGA0", ch ? cfg->rxgainB : cfg->rxgainA);
-            clStn[i]->setGain(
-                SOAPY_SDR_TX, ch, "PGA0", ch ? cfg->txgainB : cfg->txgainA);
+            if (!kUseUHD) {
+                if (info["frontend"].find("CBRS") != std::string::npos) {
+                    if (cfg->freq > 3e9)
+                        clStn[i]->setGain(
+                            SOAPY_SDR_RX, ch, "ATTN", -6); //[-18,0]
+                    else if (cfg->freq > 2e9 && cfg->freq < 3e9)
+                        clStn[i]->setGain(
+                            SOAPY_SDR_RX, ch, "ATTN", -18); //[-18,0]
+                    else
+                        clStn[i]->setGain(
+                            SOAPY_SDR_RX, ch, "ATTN", -12); //[-18,0]
+                    clStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
+                }
+
+                clStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
+                    ch ? cfg->rxgainB : cfg->rxgainA); //[0,30]
+                clStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
+                clStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
+
+                if (info["frontend"].find("CBRS") != std::string::npos) {
+                    clStn[i]->setGain(
+                        SOAPY_SDR_TX, ch, "ATTN", -6); //[-18,0] by 3
+                    clStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
+                }
+                clStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
+                clStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
+                    ch ? cfg->txgainB : cfg->txgainA); //[0,30]
+            } else {
+                clStn[i]->setGain(
+                    SOAPY_SDR_RX, ch, "PGA0", ch ? cfg->rxgainB : cfg->rxgainA);
+                clStn[i]->setGain(
+                    SOAPY_SDR_TX, ch, "PGA0", ch ? cfg->txgainB : cfg->txgainA);
+            }
         }
     }
 
