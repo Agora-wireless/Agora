@@ -607,7 +607,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     for (size_t i = 0; i < R; i++) {
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->deactivateStream(this->rxStreams[i]);
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->txgainA); //[0,30]
+        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->txgainA);
     }
 
     std::vector<int> offset(R);
@@ -641,13 +641,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
         std::cout << "receive starting position from/to node " << i << ": "
-                  << start_up[i] << "/" << start_dn[i] << std::endl;
-        if (start_up[i] == 0 || start_dn[i] == 0) {
-            good_csi = false;
-            break;
-        }
-        offset[i] = start_up[i];
-
+                  << peak_up << "/" << peak_dn << std::endl;
 #if DEBUG_PLOT
         std::vector<double> up_I(read_len);
         std::transform(up[i].begin(), up[i].end(), up_I.begin(),
@@ -659,7 +653,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
 
         plt::figure_size(1200, 780);
         plt::plot(up_I);
-        plt::xlim(0, read_len);
+        //plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
             + std::to_string(i));
@@ -668,13 +662,18 @@ bool RadioConfig::initial_calib(bool sample_adjust)
 
         plt::figure_size(1200, 780);
         plt::plot(dn_I);
-        plt::xlim(0, read_len);
+        //plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(i) + " to ant (ref)"
             + std::to_string(_cfg->ref_ant));
         plt::legend();
         plt::save("dn_" + std::to_string(i) + ".png");
 #endif
+        if (start_up[i] == 0 || start_dn[i] == 0) {
+            good_csi = false;
+            break;
+        }
+        offset[i] = start_up[i];
     }
     // sample_adjusting trigger delays based on lts peak index
     if (good_csi) {
@@ -684,6 +683,11 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         return good_csi;
 
     for (size_t i = 0; i < R; i++) {
+        size_t id = i;
+        if (_cfg->external_ref_node && i == _cfg->ref_ant)
+            continue;
+        if (_cfg->external_ref_node && i > _cfg->ref_ant)
+            id = i - 1;
         // computing reciprocity calibration matrix
         auto first_up = up[i].begin() + start_up[i];
         auto last_up = up[i].begin() + start_up[i] + _cfg->OFDM_CA_NUM;
@@ -700,15 +704,20 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         arma::cx_fvec dn_vec(
             reinterpret_cast<arma::cx_float*>(&dn_f[_cfg->OFDM_DATA_START]),
             _cfg->OFDM_DATA_NUM, false);
+        arma::cx_fvec calib_dl_vec(
+            reinterpret_cast<arma::cx_float*>(
+                &init_calib_dl_[id * _cfg->OFDM_DATA_NUM]),
+            _cfg->OFDM_DATA_NUM, false);
+        calib_dl_vec = dn_vec;
+
         arma::cx_fvec up_vec(
             reinterpret_cast<arma::cx_float*>(&up_f[_cfg->OFDM_DATA_START]),
             _cfg->OFDM_DATA_NUM, false);
-
-        arma::cx_fvec calib_vec(
-            reinterpret_cast<arma::cx_float*>(init_calib_mat_[i]),
+        arma::cx_fvec calib_ul_vec(
+            reinterpret_cast<arma::cx_float*>(
+                &init_calib_ul_[id * _cfg->OFDM_DATA_NUM]),
             _cfg->OFDM_DATA_NUM, false);
-
-        calib_vec = dn_vec / up_vec;
+        calib_ul_vec = up_vec;
     }
     return good_csi;
 }

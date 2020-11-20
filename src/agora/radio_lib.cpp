@@ -296,11 +296,15 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    init_calib_mat_.calloc(_cfg->OFDM_DATA_NUM, _cfg->BS_ANT_NUM, 64);
-    // initialize init_calib_mat to a matrix of ones
-    for (size_t i = 0; i < _cfg->OFDM_DATA_NUM; i++)
-        for (size_t j = 0; j < _cfg->BS_ANT_NUM; j++)
-            init_calib_mat_[i][j] = 1;
+    alloc_buffer_1d(&init_calib_dl_,
+        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), 64, 1);
+    alloc_buffer_1d(&init_calib_ul_,
+        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), 64, 1);
+    // initialize init_calib to a matrix of ones
+    for (size_t i = 0; i < _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM; i++) {
+        init_calib_dl_[i] = 1;
+        init_calib_ul_[i] = 1;
+    }
     if (_cfg->downlink_mode) {
         int iter = 0;
         int max_iter = 3;
@@ -317,7 +321,13 @@ bool RadioConfig::radioStart()
         if (!good_calib)
             return good_calib;
         else
-            std::cout << "sample offset calibration successful!" << std::endl;
+            std::cout << "initial calibration successful!" << std::endl;
+        arma::cx_fmat calib_dl_mat(
+            init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        arma::cx_fmat calib_ul_mat(
+            init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        Utils::print_mat(calib_dl_mat);
+        Utils::print_mat(calib_ul_mat);
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
