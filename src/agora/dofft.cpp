@@ -164,20 +164,27 @@ Event_data DoFFT::launch(size_t tag)
     } else if (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant) {
         // Only process uplink for antennas that also do downlink in this frame
         // for consistency with calib downlink processing.
-        if (ant_id / cfg->ant_per_group == frame_id % cfg->ant_group_num) {
-            size_t frame_grp_id = frame_id / cfg->ant_group_num;
+        if (frame_id >= TX_FRAME_DELTA
+            && ant_id / cfg->ant_per_group
+                == (frame_id - TX_FRAME_DELTA) % cfg->ant_group_num) {
+            size_t frame_grp_id
+                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
             size_t frame_grp_slot = frame_grp_id % kFrameWnd;
             partial_transpose(
                 &calib_ul_buffer_[frame_grp_slot][ant_id * cfg->OFDM_DATA_NUM],
                 ant_id, sym_type);
         }
     } else if (sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant) {
-        size_t frame_grp_id = frame_id / cfg->ant_group_num;
-        size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-        size_t cur_ant = frame_id - (frame_grp_id * cfg->ant_group_num);
-        complex_float* calib_dl_ptr
-            = &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg->OFDM_DATA_NUM];
-        partial_transpose(calib_dl_ptr, ant_id, sym_type);
+        if (frame_id >= TX_FRAME_DELTA) {
+            size_t frame_grp_id
+                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
+            size_t frame_grp_slot = frame_grp_id % kFrameWnd;
+            size_t cur_ant = frame_id - (frame_grp_id * cfg->ant_group_num);
+            complex_float* calib_dl_ptr
+                = &calib_dl_buffer_[frame_grp_slot]
+                                   [cur_ant * cfg->OFDM_DATA_NUM];
+            partial_transpose(calib_dl_ptr, ant_id, sym_type);
+        }
     } else {
         rt_assert(false, "Unknown or unsupported symbol type");
     }

@@ -162,7 +162,7 @@ Config::Config(std::string jsonfile)
     DLCalSymbols = Utils::loadSymbols(frames, 'C');
     recipCalEn = (ULCalSymbols[0].size() > 0 and DLCalSymbols[0].size() > 0);
     ant_per_group = DLCalSymbols[0].size();
-    ant_group_num = BF_ANT_NUM / ant_per_group;
+    ant_group_num = recipCalEn ? BF_ANT_NUM / ant_per_group : 0;
 
     symbol_num_perframe = frames.at(0).size();
     beacon_symbol_num_perframe = beaconSymbols[0].size();

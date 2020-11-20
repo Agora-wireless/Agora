@@ -1207,10 +1207,10 @@ void Agora::initialize_downlink_buffers()
         kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     calib_ul_buffer_.calloc(
         kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
-    // initialize the content of the first window to 1
+    // initialize the content of the last window to 1
     for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM; i++) {
-        calib_dl_buffer_[0][i] = { 1, 0 };
-        calib_ul_buffer_[0][i] = { 1, 0 };
+        calib_dl_buffer_[kFrameWnd - 1][i] = { 1, 0 };
+        calib_ul_buffer_[kFrameWnd - 1][i] = { 1, 0 };
     }
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
