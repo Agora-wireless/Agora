@@ -96,6 +96,7 @@ Event_data DoFFT::launch(size_t tag)
     size_t frame_slot = frame_id % kFrameWnd;
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
+    SymbolType sym_type = cfg->get_symbol_type(frame_id, symbol_id);
 
     if (cfg->fft_in_rru) {
         simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
@@ -110,8 +111,12 @@ Event_data DoFFT::launch(size_t tag)
                 reinterpret_cast<float*>(fft_inout), temp_16bits_iq,
                 cfg->OFDM_CA_NUM * 3);
         } else {
-            simd_convert_short_to_float(
-                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_],
+            size_t sample_offset = cfg->ofdm_rx_zero_prefix_bs_;
+            if (sym_type == SymbolType::kCalDL)
+                sample_offset = cfg->ofdm_rx_zero_prefix_cal_dl_;
+            else if (sym_type == SymbolType::kCalUL)
+                sample_offset = cfg->ofdm_rx_zero_prefix_cal_ul_;
+            simd_convert_short_to_float(&pkt->data[2 * sample_offset],
                 reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
         }
 
@@ -130,7 +135,6 @@ Event_data DoFFT::launch(size_t tag)
 
     DurationStat dummy_duration_stat; // TODO: timing for calibration symbols
     DurationStat* duration_stat = nullptr;
-    SymbolType sym_type = cfg->get_symbol_type(frame_id, symbol_id);
     if (sym_type == SymbolType::kUL) {
         duration_stat = duration_stat_fft;
     } else if (sym_type == SymbolType::kPilot) {

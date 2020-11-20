@@ -92,6 +92,10 @@ Config::Config(std::string jsonfile)
         = tddConf.value("ofdm_rx_zero_prefix_bs", 0) + CP_LEN;
     ofdm_rx_zero_prefix_client_
         = tddConf.value("ofdm_rx_zero_prefix_client", 0);
+    ofdm_rx_zero_prefix_cal_ul_
+        = tddConf.value("ofdm_rx_zero_prefix_cal_ul", 0) + CP_LEN;
+    ofdm_rx_zero_prefix_cal_dl_
+        = tddConf.value("ofdm_rx_zero_prefix_cal_dl", 0) + CP_LEN;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,

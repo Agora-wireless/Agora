@@ -214,6 +214,9 @@ public:
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_bs_;
 
+    size_t ofdm_rx_zero_prefix_cal_ul_;
+    size_t ofdm_rx_zero_prefix_cal_dl_;
+
     // The number of IQ samples to skip from the beginning of symbol received by
     // Agora on the downlink at the client. Due to over-the-air and RF
     // delays, this can be different from (prefix + CP_LEN), and is currently
