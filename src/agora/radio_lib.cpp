@@ -322,12 +322,12 @@ bool RadioConfig::radioStart()
             return good_calib;
         else
             std::cout << "initial calibration successful!" << std::endl;
-        arma::cx_fmat calib_dl_mat(
-            init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-        arma::cx_fmat calib_ul_mat(
-            init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-        Utils::print_mat(calib_dl_mat);
-        Utils::print_mat(calib_ul_mat);
+        //arma::cx_fmat calib_dl_mat(
+        //    init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        //arma::cx_fmat calib_ul_mat(
+        //    init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        //Utils::print_mat(calib_dl_mat);
+        //Utils::print_mat(calib_ul_mat);
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);

@@ -2,6 +2,7 @@
 #include "radio_lib.hpp"
 
 namespace plt = matplotlibcpp;
+static constexpr size_t kMaxArraySampleOffset = 5;
 
 std::vector<std::complex<float>> RadioConfig::snoopSamples(
     SoapySDR::Device* dev, size_t channel, size_t readSize)
@@ -572,6 +573,8 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     long long txTime(0);
     long long rxTime(0);
     for (size_t i = 0; i < R; i++) {
+        if (good_csi == false)
+            break;
         int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
         int ret = baStn[i]->writeStream(this->txStreams[i], txbuff0.data(),
             _cfg->pilot_ci16.size(), tx_flags, txTime, 1000000);
@@ -598,9 +601,11 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             rxbuff[1] = dummybuff.data();
             ret = baStn[j]->readStream(this->rxStreams[j], rxbuff.data(),
                 read_len, flags, rxTime, 1000000);
-            if (ret < (int)read_len)
+            if (ret < (int)read_len) {
+                good_csi = false;
                 std::cout << "bad read (" << ret << ") at node " << j
                           << " from node " << i << std::endl;
+            }
         }
     }
 
@@ -617,6 +622,8 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     std::vector<std::vector<std::complex<float>>> up(R);
     std::vector<std::vector<std::complex<float>>> dn(R);
     for (size_t i = 0; i < R; i++) {
+        if (good_csi == false)
+            break;
         up[i].resize(read_len);
         dn[i].resize(read_len);
         if (i == _cfg->ref_ant)
@@ -670,6 +677,14 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         plt::save("dn_" + std::to_string(i) + ".png");
 #endif
         if (start_up[i] == 0 || start_dn[i] == 0) {
+            good_csi = false;
+            break;
+        }
+        if (i > 0
+            && (std::abs((int)start_up[i] - (int)start_up[i - 1])
+                       > kMaxArraySampleOffset
+                   || std::abs((int)start_dn[i] - (int)start_dn[i - 1])
+                       > kMaxArraySampleOffset)) { // make sure offsets are too different from each other
             good_csi = false;
             break;
         }
