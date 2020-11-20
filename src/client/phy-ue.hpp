@@ -292,6 +292,7 @@ private:
      *
      */
     std::vector<std::vector<uint8_t>> dl_decode_buffer_;
+    std::complex<float>* rx_samps_tmp; // Temp buffer for received samples
 
     int16_t* resp_var_nodes;
     std::vector<std::complex<float>> pilot_sc_val_;
