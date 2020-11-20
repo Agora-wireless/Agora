@@ -244,8 +244,8 @@ void Agora::start()
 
     // Start packet I/O
     if (!packet_tx_rx_->startTXRX(socket_buffer_, socket_buffer_status_,
-            socket_buffer_status_size_, stats->frame_start,
-            dl_socket_buffer_)) {
+            socket_buffer_status_size_, stats->frame_start, dl_socket_buffer_,
+            calib_dl_buffer_, calib_ul_buffer_)) {
         this->stop();
         return;
     }
@@ -1207,6 +1207,11 @@ void Agora::initialize_downlink_buffers()
         kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
     calib_ul_buffer_.calloc(
         kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+    // initialize the content of the first window to 1
+    for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM; i++) {
+        calib_dl_buffer_[0][i] = { 1, 0 };
+        calib_ul_buffer_[0][i] = { 1, 0 };
+    }
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
