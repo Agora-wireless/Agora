@@ -40,7 +40,8 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
     auto pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
 
     // Find all peaks
-    auto best_peak = *std::max_element(pilot_corr.begin(), pilot_corr.end());
+    auto best_peak = std::max_element(pilot_corr.begin(), pilot_corr.end())
+        - pilot_corr.begin();
     return best_peak;
 }
 
