@@ -53,12 +53,24 @@ Config::Config(std::string jsonfile)
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
     single_gain_ = tddConf.value("single_gain", true);
-    txgainA = tddConf.value("txgainA", 20);
-    rxgainA = tddConf.value("rxgainA", 20);
-    txgainB = tddConf.value("txgainB", 20);
-    rxgainB = tddConf.value("rxgainB", 20);
-    calTxGainA = tddConf.value("calTxGainA", txgainA);
-    calTxGainB = tddConf.value("calTxGainB", txgainB);
+    tx_gain_a = tddConf.value("tx_gain_a", 20);
+    rx_gain_a = tddConf.value("rx_gain_a", 20);
+    tx_gain_b = tddConf.value("tx_gain_b", 20);
+    rx_gain_b = tddConf.value("rx_gain_b", 20);
+    calib_tx_gain_a = tddConf.value("calib_tx_gain_a", tx_gain_a);
+    calib_tx_gain_b = tddConf.value("calib_tx_gain_b", tx_gain_b);
+    auto gain_adj_json_a = tddConf.value("client_gain_adjust_a", json::array());
+    if (gain_adj_json_a.empty())
+        client_gain_adj_a.resize(nRadios, 0);
+    else
+        client_gain_adj_a.assign(
+            gain_adj_json_a.begin(), gain_adj_json_a.end());
+    auto gain_adj_json_b = tddConf.value("client_gain_adjust_b", json::array());
+    if (gain_adj_json_b.empty())
+        client_gain_adj_b.resize(nRadios, 0);
+    else
+        client_gain_adj_b.assign(
+            gain_adj_json_b.begin(), gain_adj_json_b.end());
     rate = tddConf.value("rate", 5e6);
     nco = tddConf.value("nco_frequency", 0.75 * rate);
     bwFilter = rate + 2 * nco;

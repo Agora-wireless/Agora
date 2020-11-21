@@ -252,10 +252,10 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
             if (_cfg->single_gain()) {
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
                 baStn[i]->setGain(
-                    SOAPY_SDR_RX, ch, ch ? _cfg->rxgainB : _cfg->rxgainA);
+                    SOAPY_SDR_RX, ch, ch ? _cfg->rx_gain_b : _cfg->rx_gain_a);
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
                 baStn[i]->setGain(
-                    SOAPY_SDR_TX, ch, ch ? _cfg->txgainB : _cfg->txgainA);
+                    SOAPY_SDR_TX, ch, ch ? _cfg->tx_gain_b : _cfg->tx_gain_a);
             } else {
                 if (info["frontend"].find("CBRS") != std::string::npos) {
                     if (_cfg->freq > 3e9)
@@ -271,7 +271,7 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
                 }
 
                 baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                    ch ? _cfg->rxgainB : _cfg->rxgainA); //[0,30]
+                    ch ? _cfg->rx_gain_b : _cfg->rx_gain_a); //[0,30]
                 baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
                 baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
 
@@ -280,15 +280,15 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
                         SOAPY_SDR_TX, ch, "ATTN", -6); //[-18,0] by 3
                     baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
                 }
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
+                baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[-12,12]
                 baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                    ch ? _cfg->txgainB : _cfg->txgainA); //[0,30]
+                    ch ? _cfg->tx_gain_b : _cfg->tx_gain_a); //[0,30]
             }
         } else {
-            baStn[i]->setGain(
-                SOAPY_SDR_RX, ch, "PGA0", ch ? _cfg->rxgainB : _cfg->rxgainA);
-            baStn[i]->setGain(
-                SOAPY_SDR_TX, ch, "PGA0", ch ? _cfg->txgainB : _cfg->txgainA);
+            baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
+                ch ? _cfg->rx_gain_b : _cfg->rx_gain_a);
+            baStn[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
+                ch ? _cfg->tx_gain_b : _cfg->tx_gain_a);
         }
     }
 

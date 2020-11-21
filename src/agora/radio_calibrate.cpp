@@ -564,7 +564,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     drain_buffers();
 
     for (size_t i = 0; i < R; i++) {
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calTxGainA);
+        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calib_tx_gain_a);
         baStn[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
         baStn[i]->writeSetting("TDD_MODE", "false");
         baStn[i]->activateStream(this->txStreams[i]);
@@ -612,7 +612,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     for (size_t i = 0; i < R; i++) {
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->deactivateStream(this->rxStreams[i]);
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->txgainA);
+        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->tx_gain_a);
     }
 
     std::vector<int> offset(R);
