@@ -126,17 +126,20 @@ public:
     std::vector<std::complex<float>> common_pilot;
 
     double freq;
-    bool single_gain_;
-    double txgainA;
-    double rxgainA;
-    double txgainB;
-    double rxgainB;
-    double calTxGainA;
-    double calTxGainB;
     double rate;
     double nco;
     double radioRfFreq;
     double bwFilter;
+    bool single_gain_;
+    double tx_gain_a;
+    double rx_gain_a;
+    double tx_gain_b;
+    double rx_gain_b;
+    double calib_tx_gain_a;
+    double calib_tx_gain_b;
+    std::vector<double> client_gain_adj_a;
+    std::vector<double> client_gain_adj_b;
+
     size_t nCells;
     size_t nRadios;
     size_t nAntennas;
