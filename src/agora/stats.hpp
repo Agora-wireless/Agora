@@ -52,7 +52,7 @@ static constexpr size_t kNumTimestampTypes
 
 class Stats {
 public:
-    Stats(Config* cfg, size_t break_down_num, double freq_ghz);
+    Stats(Config* cfg);
     ~Stats();
 
     /// If worker stats collection is enabled, combine and update per-worker
@@ -235,7 +235,7 @@ private:
     const size_t zf_thread_num;
     const size_t demul_thread_num;
     const size_t decode_thread_num;
-    const size_t break_down_num;
+    const size_t break_down_num = kMaxStatBreakdown;
     const double freq_ghz;
     const size_t creation_tsc; // TSC at which this object was created
 

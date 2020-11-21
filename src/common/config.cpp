@@ -3,6 +3,7 @@
 #include <boost/range/algorithm/count.hpp>
 
 Config::Config(std::string jsonfile)
+    : freq_ghz(measure_rdtsc_freq())
 {
     set_cpu_layout_on_numa_nodes();
     std::string conf;
@@ -51,6 +52,7 @@ Config::Config(std::string jsonfile)
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
+    single_gain_ = tddConf.value("single_gain", true);
     txgainA = tddConf.value("txgainA", 20);
     rxgainA = tddConf.value("rxgainA", 20);
     txgainB = tddConf.value("txgainB", 20);

@@ -284,23 +284,74 @@ public:
     }
 };
 
-class Frame_stats {
+/**
+  * @brief This class stores the counters corresponding to a frame.
+  * Specifically, it contains a) the number of symbols per frame 
+  * and b) the number of tasks per symbol, per frame.
+  */
+class FrameCounters {
 public:
+    // Maximum number of symbols in a frame
     size_t max_symbol_count;
-    bool last_symbol(int frame_id)
+    // Maximum number of tasks in a symbol
+    size_t max_task_count;
+
+    void init(size_t max_symbol_count, size_t max_task_count = 0)
+    {
+        this->max_symbol_count = max_symbol_count;
+        this->max_task_count = max_task_count;
+        symbol_count.fill(0);
+    }
+
+    /**
+     * @brief Check whether the symbol is the last symbol for a given frame 
+     * while simultaneously incrementing the symbol count.
+     * @param frame id The frame id to check
+     */
+    bool last_symbol(size_t frame_id)
     {
         const size_t frame_slot = frame_id % kFrameWnd;
         if (++symbol_count[frame_slot] == max_symbol_count) {
+            // If the symbol is the last symbol, reset count to 0
             symbol_count[frame_slot] = 0;
             return true;
         }
         return false;
     }
 
-    void init(int _max_symbol_count)
+    /**
+     * @brief Check whether the task is the last task for a given frame and 
+     * symbol while simultaneously incrementing the task count.
+     * @param frame_id The frame id to check
+     * @param symbol_id The symbol id to check
+     */
+    bool last_task(size_t frame_id, size_t symbol_id)
     {
-        symbol_count.fill(0);
-        max_symbol_count = _max_symbol_count;
+        const size_t frame_slot = frame_id % kFrameWnd;
+        if (++task_count[frame_slot][symbol_id] == max_task_count) {
+            // If the task is the last task, reset count is to 0
+            task_count[frame_slot][symbol_id] = 0;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @brief Check whether the task is the last task for a given frame 
+     * while simultaneously incrementing the task count.
+     * This is used for tasks performed once per frame (e.g., ZF)
+     * @param frame_id The frame id to check
+     */
+    bool last_task(size_t frame_id)
+    {
+        const size_t frame_slot = frame_id % kFrameWnd;
+        // Number of tasks is stored as number of symbols
+        if (++symbol_count[frame_slot] == max_symbol_count) {
+            // If the task is the last task, reset count to 0
+            symbol_count[frame_slot] = 0;
+            return true;
+        }
+        return false;
     }
 
     size_t get_symbol_count(size_t frame_id)
@@ -308,87 +359,23 @@ public:
         return symbol_count[frame_id % kFrameWnd];
     }
 
-private:
-    std::array<size_t, kFrameWnd> symbol_count;
-};
-
-class ZF_stats : public Frame_stats {
-public:
-    size_t coded_frame;
-    size_t& max_task_count;
-    ZF_stats(void)
-        : max_task_count(max_symbol_count)
-    {
-    }
-    void init(int max_tasks)
-    {
-        Frame_stats::init(max_tasks);
-        coded_frame = SIZE_MAX;
-    }
-};
-
-class Data_stats : public Frame_stats {
-public:
-    size_t max_task_count;
-
-    void init(int _max_task_count, int max_symbols, int max_data_symbol)
-    {
-        Frame_stats::init(max_symbols);
-        for (size_t i = 0; i < kFrameWnd; i++)
-            task_count[i] = new size_t[max_data_symbol]();
-        max_task_count = _max_task_count;
-    }
-    void fini()
-    {
-        for (size_t i = 0; i < kFrameWnd; i++)
-            delete[] task_count[i];
-    }
-    bool last_task(size_t frame_id, size_t data_symbol_id)
-    {
-        const size_t frame_slot = frame_id % kFrameWnd;
-        if (++task_count[frame_slot][data_symbol_id] == max_task_count) {
-            task_count[frame_slot][data_symbol_id] = 0;
-            return true;
-        }
-        return false;
-    }
-
     size_t get_task_count(size_t frame_id, size_t symbol_id)
     {
         return task_count[frame_id % kFrameWnd][symbol_id];
     }
 
-private:
-    size_t* task_count[kFrameWnd];
-};
-
-class FFT_stats : public Data_stats {
-public:
-    size_t max_symbol_data_count;
-    std::array<size_t, kFrameWnd> symbol_rc_count;
-    size_t max_symbol_rc_count;
-
-    // cur_frame_for_symbol[i] is the current frame for the symbol whose
-    // index in the frame's uplink symbols is i
-    std::vector<size_t> cur_frame_for_symbol;
-};
-
-class Encode_stats : public Data_stats {
-public:
-    // cur_frame_for_symbol[i] is the current frame for the symbol whose
-    // index in the frame's uplink symbols is i
-    std::vector<size_t> cur_frame_for_symbol;
-};
-
-class RC_stats {
-public:
-    size_t max_task_count;
-    size_t last_frame;
-    RC_stats(void)
-        : max_task_count(1)
-        , last_frame(SIZE_MAX)
+    size_t get_task_count(size_t frame_id)
     {
+        return symbol_count[frame_id % kFrameWnd];
     }
+
+private:
+    // task_count[i][j] is the number of tasks completed for
+    // frame (i % kFrameWnd) and symbol j
+    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd> task_count;
+    // symbol_count[i] is the number of symbols completed for
+    // frame (i % kFrameWnd)
+    std::array<size_t, kFrameWnd> symbol_count;
 };
 
 #endif

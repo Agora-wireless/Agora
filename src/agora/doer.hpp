@@ -10,10 +10,12 @@ class Config;
 
 class Doer {
 public:
-    virtual bool try_launch(void)
+    virtual bool try_launch(moodycamel::ConcurrentQueue<Event_data>& task_queue,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_ptok)
     {
         Event_data req_event;
-        if (task_queue_.try_dequeue(req_event)) {
+        if (task_queue.try_dequeue(req_event)) {
             // We will enqueue one response event containing results for all
             // request tags in the request event
             Event_data resp_event;
@@ -26,8 +28,7 @@ public:
                 resp_event.event_type = resp_i.event_type;
             }
 
-            try_enqueue_fallback(
-                &complete_task_queue, worker_producer_token, resp_event);
+            try_enqueue_fallback(&complete_task_queue, worker_ptok, resp_event);
             return true;
         }
         return false;
@@ -53,16 +54,9 @@ public:
     }
 
 protected:
-    Doer(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token)
+    Doer(Config* in_config, int in_tid)
         : cfg(in_config)
         , tid(in_tid)
-        , freq_ghz(freq_ghz)
-        , task_queue_(in_task_queue)
-        , complete_task_queue(complete_task_queue)
-        , worker_producer_token(worker_producer_token)
     {
     }
 
@@ -70,9 +64,5 @@ protected:
 
     Config* cfg;
     int tid; // Thread ID of this Doer
-    double freq_ghz; // RDTSC frequency in GHz
-    moodycamel::ConcurrentQueue<Event_data>& task_queue_;
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue;
-    moodycamel::ProducerToken* worker_producer_token;
 };
 #endif /* DOER */

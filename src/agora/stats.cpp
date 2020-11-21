@@ -1,19 +1,16 @@
 #include "stats.hpp"
 #include <typeinfo>
 
-Stats::Stats(Config* cfg, size_t break_down_num, double freq_ghz)
+Stats::Stats(Config* cfg)
     : config_(cfg)
     , task_thread_num(cfg->worker_thread_num)
     , fft_thread_num(cfg->fft_thread_num)
     , zf_thread_num(cfg->zf_thread_num)
     , demul_thread_num(cfg->demul_thread_num)
     , decode_thread_num(cfg->decode_thread_num)
-    , break_down_num(break_down_num)
-    , freq_ghz(freq_ghz)
+    , freq_ghz(cfg->freq_ghz)
     , creation_tsc(rdtsc())
 {
-    rt_assert(
-        break_down_num <= kMaxStatBreakdown, "Statistics breakdown too high");
     frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, 64);
 }
 

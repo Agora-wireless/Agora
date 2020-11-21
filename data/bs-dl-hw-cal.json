@@ -4,6 +4,7 @@
  "cells" : 1,
  "channel" : "A",
  "frequency" : 3.56e9,
+ "single_gain" : false,
  "rxgainA" : 20,
  "txgainA" : 40,
  "rxgainB" : 20,
