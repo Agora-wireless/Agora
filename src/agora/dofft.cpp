@@ -290,27 +290,6 @@ void DoFFT::partial_transpose(
 #endif
         }
     }
-    // Do the 1st step of 2-step reciprocal calibration
-    // The 2nd step will be performed in dozf
-    //if (symbol_type == SymbolType::kCalUL) {
-    //    arma::cx_fvec vec_calib_ul(
-    //        reinterpret_cast<arma::cx_float*>(chan_est_tmp), cfg->OFDM_DATA_NUM,
-    //        false);
-    //    cx_float res = mean(vec_calib_ul);
-    //    out_buf[ant_id] = { res.real(), res.imag() };
-    //} else if (symbol_type == SymbolType::kCalDL) {
-    //    size_t sc_per_antenna = cfg->OFDM_DATA_NUM / cfg->BF_ANT_NUM;
-    //    for (size_t j = 0; j < cfg->BF_ANT_NUM; j++) {
-    //        out_buf[j] = { 0, 0 };
-    //        for (size_t i = 0; i < sc_per_antenna * cfg->BF_ANT_NUM;
-    //             i += cfg->BF_ANT_NUM)
-    //            out_buf[j] = { chan_est_tmp[i + j].re + out_buf[j].re,
-    //                chan_est_tmp[i + j].im + out_buf[j].im };
-    //    }
-    //    arma::cx_fvec vec_calib_dl(
-    //        reinterpret_cast<arma::cx_float*>(out_buf), cfg->BF_ANT_NUM, false);
-    //    vec_calib_dl /= sc_per_antenna;
-    //}
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
