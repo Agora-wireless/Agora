@@ -126,6 +126,7 @@ public:
     std::vector<std::complex<float>> pilotsF;
 
     double freq;
+    bool single_gain_;
     double txgainA;
     double rxgainA;
     double txgainB;
@@ -349,6 +350,9 @@ public:
     bool isCalUlPilot(size_t, size_t);
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
+
+    /// Return the single-gain control decision
+    inline bool single_gain(void) const { return this->single_gain_; }
 
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);

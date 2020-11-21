@@ -48,6 +48,7 @@ Config::Config(std::string jsonfile)
 
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
+    single_gain_ = tddConf.value("single_gain", true);
     txgainA = tddConf.value("txgainA", 20);
     rxgainA = tddConf.value("rxgainA", 20);
     txgainB = tddConf.value("txgainB", 20);

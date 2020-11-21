@@ -248,28 +248,42 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : _cfg->nco);
 
         if (!kUseUHD) {
-            if (info["frontend"].find("CBRS") != std::string::npos) {
-                if (_cfg->freq > 3e9)
-                    baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -6); //[-18,0]
-                else if (_cfg->freq > 2e9 && _cfg->freq < 3e9)
-                    baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18); //[-18,0]
-                else
-                    baStn[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -12); //[-18,0]
-                baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
-            }
+            // Unified gains for both lime and frontend
+            if (_cfg->single_gain()) {
+                // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
+                baStn[i]->setGain(
+                    SOAPY_SDR_RX, ch, ch ? _cfg->rxgainB : _cfg->rxgainA);
+                // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
+                baStn[i]->setGain(
+                    SOAPY_SDR_TX, ch, ch ? _cfg->txgainB : _cfg->txgainA);
+            } else {
+                if (info["frontend"].find("CBRS") != std::string::npos) {
+                    if (_cfg->freq > 3e9)
+                        baStn[i]->setGain(
+                            SOAPY_SDR_RX, ch, "ATTN", -6); //[-18,0]
+                    else if (_cfg->freq > 2e9 && _cfg->freq < 3e9)
+                        baStn[i]->setGain(
+                            SOAPY_SDR_RX, ch, "ATTN", -18); //[-18,0]
+                    else
+                        baStn[i]->setGain(
+                            SOAPY_SDR_RX, ch, "ATTN", -12); //[-18,0]
+                    baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17); //[0,17]
+                }
 
-            baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                ch ? _cfg->rxgainB : _cfg->rxgainA); //[0,30]
-            baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
-            baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
+                baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
+                    ch ? _cfg->rxgainB : _cfg->rxgainA); //[0,30]
+                baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
+                baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
 
-            if (info["frontend"].find("CBRS") != std::string::npos) {
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6); //[-18,0] by 3
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
+                if (info["frontend"].find("CBRS") != std::string::npos) {
+                    baStn[i]->setGain(
+                        SOAPY_SDR_TX, ch, "ATTN", -6); //[-18,0] by 3
+                    baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
+                }
+                baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
+                baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
+                    ch ? _cfg->txgainB : _cfg->txgainA); //[0,30]
             }
-            baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
-            baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                ch ? _cfg->txgainB : _cfg->txgainA); //[0,30]
         } else {
             baStn[i]->setGain(
                 SOAPY_SDR_RX, ch, "PGA0", ch ? _cfg->rxgainB : _cfg->rxgainA);
@@ -469,7 +483,7 @@ int RadioConfig::radioTx(
     else if (flags == 2)
         txFlags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
     // long long frameTime(0);
-  
+
     int w;
     if (!kUseUHD) {
         w = baStn[r]->writeStream(this->txStreams[r], buffs,
@@ -512,10 +526,9 @@ int RadioConfig::radioRx(
         int ret = baStn[r]->readStream(this->rxStreams[r], buffs,
             _cfg->sampsPerSymbol, flags, frameTimeNs, 1000000);
 
-        
         if (!kUseUHD) {
             // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
-            frameTime = frameTimeNs; 
+            frameTime = frameTimeNs;
         } else {
             // for UHD device recv using ticks
             frameTime = SoapySDR::timeNsToTicks(frameTimeNs, _cfg->rate);
