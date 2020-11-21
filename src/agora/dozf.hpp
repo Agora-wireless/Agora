@@ -16,10 +16,7 @@
 
 class DoZF : public Doer {
 public:
-    DoZF(Config* in_config, int tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
+    DoZF(Config* in_config, int tid,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_dl_buffer,
         Table<complex_float>& calib_ul_buffer,

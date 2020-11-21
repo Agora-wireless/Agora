@@ -68,6 +68,16 @@ void* pthread_fun_wrapper(void* context)
     return (obj->*run_thread)(id);
 }
 
+template <class C, void (C::*run_thread)(int)>
+void pthread_fun_wrapper(void* context)
+{
+    EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+    C* obj = reinterpret_cast<C*>(eh_context->obj_ptr);
+    int id = eh_context->id;
+    delete eh_context;
+    return (obj->*run_thread)(id);
+}
+
 class Utils {
 public:
     Utils();

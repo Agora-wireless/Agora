@@ -108,6 +108,7 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
     return 0;
 }
 
+// Reference: https://stackoverflow.com/a/44948720
 void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
 {
     // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,

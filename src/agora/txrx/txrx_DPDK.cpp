@@ -99,7 +99,7 @@ void PacketTXRX::send_beacon(int tid, size_t frame_id)
     _unused(frame_id);
 }
 
-void* PacketTXRX::loop_tx_rx(int tid)
+void PacketTXRX::loop_tx_rx(int tid)
 {
     size_t rx_offset = 0;
     size_t prev_frame_id = SIZE_MAX;
@@ -111,7 +111,6 @@ void* PacketTXRX::loop_tx_rx(int tid)
             continue;
         dpdk_recv(tid, port_id, queue_id, prev_frame_id, rx_offset);
     }
-    return 0;
 }
 
 uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,

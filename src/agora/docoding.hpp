@@ -23,12 +23,8 @@
 
 class DoEncode : public Doer {
 public:
-    DoEncode(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
-        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-        Stats* in_stats_manager);
+    DoEncode(Config* in_config, int in_tid, Table<int8_t>& in_raw_data_buffer,
+        Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
     ~DoEncode();
 
     Event_data launch(size_t tag);
@@ -45,10 +41,7 @@ private:
 
 class DoDecode : public Doer {
 public:
-    DoDecode(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
+    DoDecode(Config* in_config, int in_tid,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
         PhyStats* in_phy_stats, Stats* in_stats_manager);

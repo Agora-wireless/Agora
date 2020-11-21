@@ -10,7 +10,6 @@
 #include "dofft.hpp"
 #include "doprecode.hpp"
 #include "dozf.hpp"
-#include "gettime.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
 #include "phy_stats.hpp"
@@ -31,14 +30,11 @@
 
 class Agora {
 public:
-    /* optimization parameters for block transpose (see the slides for more
-     * details) */
-    static const int transpose_block_num = 256;
-
     // Dequeue batch size, used to reduce the overhead of dequeue in main thread
     static const int kDequeueBulkSizeTXRX = 8;
-
     static const int kDequeueBulkSizeWorker = 4;
+
+    static const int kMaxWorkerNum = 50; // Max number of worker threads allowed
 
     Agora(Config*); /// Create an Agora object and start the worker threads
     ~Agora();
@@ -46,14 +42,13 @@ public:
     void start(); /// The main Agora event loop
     void stop();
 
-    void* worker_fft(int tid);
-    void* worker_zf(int tid);
-    void* worker_demul(int tid);
-    void* worker_decode(int tid);
-    void* worker(int tid);
+    void worker_fft(int tid);
+    void worker_zf(int tid);
+    void worker_demul(int tid);
+    void worker_decode(int tid);
+    void worker(int tid);
 
-    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
-    void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+    void create_threads(); /// Launch worker threads
 
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id);
@@ -87,9 +82,6 @@ public:
     void send_snr_report(
         EventType event_type, size_t frame_id, size_t symbol_id);
 
-    void move_events_between_queues(
-        EventType event_type1, EventType event_type2);
-
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
@@ -111,15 +103,17 @@ public:
 
 private:
     /// Fetch the concurrent queue for this event type
-    moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)
+    moodycamel::ConcurrentQueue<Event_data>* get_conq(
+        EventType event_type, size_t qid)
     {
-        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q;
+        return &sched_info_arr[qid][static_cast<size_t>(event_type)]
+                    .concurrent_q;
     }
 
     /// Fetch the producer token for this event type
-    moodycamel::ProducerToken* get_ptok(EventType event_type)
+    moodycamel::ProducerToken* get_ptok(EventType event_type, size_t qid)
     {
-        return sched_info_arr[static_cast<size_t>(event_type)].ptok;
+        return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;
     }
 
     /// Return a string containing the sizes of the FFT queues
@@ -134,18 +128,17 @@ private:
         return ret.str();
     }
 
-    const double freq_ghz; // RDTSC frequency in GHz
-
     // Worker thread i runs on core base_worker_core_offset + i
     const size_t base_worker_core_offset;
 
     Config* config_;
     size_t fft_created_count;
-    int max_equaled_frame = 0;
+    size_t max_equaled_frame = SIZE_MAX;
     std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
+    std::thread worker_std_threads_[kMaxWorkerNum]; // Handle for worker threads
 
     Stats* stats;
     PhyStats* phy_stats;
@@ -202,18 +195,34 @@ private:
 
     Table<complex_float> ue_spec_pilot_buffer_;
 
+    //Counters related to various modules
+    FrameCounters fft_counters_;
+    FrameCounters zf_counters_;
+    FrameCounters demul_counters_;
+    FrameCounters decode_counters_;
+    FrameCounters encode_counters_;
+    FrameCounters precode_counters_;
+    FrameCounters ifft_counters_;
+    FrameCounters tx_counters_;
+    FrameCounters tomac_counters_;
+    FrameCounters frommac_counters_;
+    FrameCounters rc_counters_;
     RxCounters rx_counters_;
-    FFT_stats fft_stats_;
-    ZF_stats zf_stats_;
-    RC_stats rc_stats_;
-    Data_stats demul_stats_;
-    Data_stats decode_stats_;
-    Encode_stats encode_stats_;
-    Data_stats precode_stats_;
-    Data_stats ifft_stats_;
-    Data_stats tx_stats_;
-    Data_stats tomac_stats_;
-    Data_stats frommac_stats_;
+    size_t zf_last_frame = SIZE_MAX;
+    size_t rc_last_frame = SIZE_MAX;
+
+    // Agora schedules and processes a frame in FIFO order
+    // cur_proc_frame_id is the frame that is currently being processed.
+    // cur_sche_frame_id is the frame that is currently being scheduled.
+    // A frame's schduling finishes before processing ends, so the two
+    // variables are possible to have different values.
+    size_t cur_proc_frame_id = 0;
+    size_t cur_sche_frame_id = 0;
+
+    // The frame index for a symbol whose FFT is done
+    std::vector<size_t> fft_cur_frame_for_symbol;
+    // The frame index for a symbol whose encode is done
+    std::vector<size_t> encode_cur_frame_for_symbol;
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
@@ -264,7 +273,7 @@ private:
         moodycamel::ConcurrentQueue<Event_data> concurrent_q;
         moodycamel::ProducerToken* ptok;
     };
-    sched_info_t sched_info_arr[kNumEventTypes];
+    sched_info_t sched_info_arr[2][kNumEventTypes];
 
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
@@ -276,15 +285,11 @@ private:
     moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
 
     // Master thread's message queue for event completion from Doers;
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
-
-    // Master thread's message queue for event completion from DoDecode;
-    moodycamel::ConcurrentQueue<Event_data> complete_decode_task_queue_;
+    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_[2];
+    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads][2];
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* decode_ptoks_ptr[kMaxThreads];
 };
 
 #endif

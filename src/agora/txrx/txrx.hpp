@@ -45,6 +45,8 @@
  */
 class PacketTXRX {
 public:
+    static const int kMaxSocketNum = 10; // Max number of socket threads allowed
+
     PacketTXRX(Config* cfg, size_t in_core_offset = 1);
 
     PacketTXRX(Config* cfg, size_t core_offset,
@@ -79,17 +81,17 @@ public:
     void send_beacon(int tid, size_t frame_id);
 
 private:
-    void* loop_tx_rx(int tid); // The thread function for thread [tid]
+    void loop_tx_rx(int tid); // The thread function for thread [tid]
     int dequeue_send(int tid);
     struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
 
-    void* loop_tx_rx_argos(int tid);
+    void loop_tx_rx_argos(int tid);
     int dequeue_send_argos(int tid);
     struct Packet* recv_enqueue_argos(int tid, int radio_id, int rx_offset);
 
     long long rxTimeBs;
     long long txTimeBs;
-    void* loop_tx_rx_usrp(int tid);
+    void loop_tx_rx_usrp(int tid);
     int dequeue_send_usrp(int tid);
     int dequeue_send_usrp(int tid, int frame_id, int symbol_id);
     struct Packet* recv_enqueue_usrp(
@@ -104,6 +106,9 @@ private:
     const size_t ant_per_cell;
 
     const size_t socket_thread_num;
+
+    // Handle for socket threads
+    std::thread socket_std_threads_[kMaxSocketNum];
     Table<char>* buffer_;
     Table<int>* buffer_status_;
     size_t packet_num_in_buffer_;
