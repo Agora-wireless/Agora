@@ -177,40 +177,42 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                     cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
         }
 
-        arma::cx_fvec calib_vec(
-            reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
-            cfg->BF_ANT_NUM, false);
-        size_t frame_cal_slot = kFrameWnd - 1;
-        if (cfg->recipCalEn && frame_id >= TX_FRAME_DELTA) {
-            size_t frame_grp_id
-                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
-
-            // use the previous window which has a full set of calibration results
-            frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
-        }
-        arma::cx_fmat calib_dl_mat(
-            reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
-            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
-        arma::cx_fmat calib_ul_mat(
-            reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
-            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
-        arma::cx_fvec calib_dl_vec = calib_dl_mat.row(cur_sc_id).st();
-        arma::cx_fvec calib_ul_vec = calib_ul_mat.row(cur_sc_id).st();
-        calib_vec = calib_dl_vec / calib_ul_vec;
-
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
-        if (cfg->external_ref_node) {
-            mat_csi.shed_rows(cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+        if (cfg->dl_data_symbol_num_perframe > 0) {
+            arma::cx_fvec calib_vec(
+                reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
+                cfg->BF_ANT_NUM, false);
+            size_t frame_cal_slot = kFrameWnd - 1;
+            if (cfg->recipCalEn && frame_id >= TX_FRAME_DELTA) {
+                size_t frame_grp_id
+                    = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
+
+                // use the previous window which has a full set of calibration results
+                frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
+            }
+            arma::cx_fmat calib_dl_mat(reinterpret_cast<arma::cx_float*>(
+                                           calib_dl_buffer_[frame_cal_slot]),
+                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            arma::cx_fmat calib_ul_mat(reinterpret_cast<arma::cx_float*>(
+                                           calib_ul_buffer_[frame_cal_slot]),
+                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            arma::cx_fvec calib_dl_vec = calib_dl_mat.row(cur_sc_id).st();
+            arma::cx_fvec calib_ul_vec = calib_ul_mat.row(cur_sc_id).st();
+            calib_vec = calib_dl_vec / calib_ul_vec;
+            if (cfg->external_ref_node) {
+                mat_csi.shed_rows(
+                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+            }
         }
-        compute_precoder(mat_csi, calib_gather_buffer,
-            ul_zf_matrices_[frame_slot][cur_sc_id],
-            dl_zf_matrices_[frame_slot][cur_sc_id]);
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+        compute_precoder(mat_csi, calib_gather_buffer,
+            ul_zf_matrices_[frame_slot][cur_sc_id],
+            dl_zf_matrices_[frame_slot][cur_sc_id]);
 
         // cout<<"Precoder:" <<mat_output<<endl;
         double duration3 = worker_rdtsc() - start_tsc2;
