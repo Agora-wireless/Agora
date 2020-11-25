@@ -567,7 +567,7 @@ int PacketTXRX::recv(int tid)
                 &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
                 (uint8_t*)pkt + Packet::kOffsetOfData,
                 cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
-                
+
             // get the position in rx_buffer
             if (!rx_status_->add_new_packet(pkt)) {
                 cfg->running = false;
@@ -582,7 +582,6 @@ int PacketTXRX::recv(int tid)
                     pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
             DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
                 cfg->get_num_sc_per_server() * cfg->mod_order_bits);
-            printf("Receive demod data symbol %u ue %u\n", pkt->symbol_id, pkt->ue_id);
             decode_status_->receive_demod_data(
                 pkt->ue_id, pkt->frame_id, symbol_idx_ul);
         } else {
