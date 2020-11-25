@@ -22,27 +22,39 @@
 #include "shared_counters.hpp"
 #include "utils_ldpc.hpp"
 
-// class DoEncode : public Doer {
-// public:
-//     DoEncode(Config* in_config, int in_tid, double freq_ghz,
-//         moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-//         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-//         moodycamel::ProducerToken* worker_producer_token,
-//         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-//         Stats* in_stats_manager);
-//     ~DoEncode();
+class DoEncode : public Doer {
+public:
+    DoEncode(Config* in_config, int in_tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
+        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ProducerToken* worker_producer_token,
+        Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
+        Stats* in_stats_manager);
+    ~DoEncode();
 
-//     Event_data launch(size_t tag);
+    Event_data launch(size_t tag);
 
-// private:
-//     Table<int8_t>& raw_data_buffer_;
-//     int8_t* parity_buffer; // Intermediate buffer to hold LDPC encoding parity
+    void start_work();
 
-//     // Intermediate buffer to hold LDPC encoding output
-//     int8_t* encoded_buffer_temp;
-//     Table<int8_t>& encoded_buffer_;
-//     DurationStat* duration_stat;
-// };
+private:
+    Table<int8_t>& raw_data_buffer_;
+    int8_t* parity_buffer; // Intermediate buffer to hold LDPC encoding parity
+
+    // Intermediate buffer to hold LDPC encoding output
+    int8_t* encoded_buffer_temp;
+    Table<int8_t>& encoded_buffer_;
+    DurationStat* duration_stat;
+
+    RxStatus* rx_status_;
+    EncodeStatus* encode_status_;
+
+    size_t ue_id;
+
+    size_t cur_frame_ = 0;
+    size_t cur_symbol_ = 0;
+    size_t cur_cb_ = 0;
+    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+};
 
 class DoDecode : public Doer {
 public:

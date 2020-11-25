@@ -199,6 +199,7 @@ private:
     // distributed version
     Table<int8_t> demod_soft_buffer_to_decode_;
 
+
     // Data after LDPC decoding. Each buffer has [decoded bytes per UE] bytes.
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
 
@@ -238,6 +239,8 @@ private:
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<int8_t> dl_encoded_buffer_;
+
+    Table<int8_t> dl_encoded_buffer_to_precode_;
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs

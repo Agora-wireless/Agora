@@ -84,6 +84,7 @@ private:
 
     // A thread that sends and receives post-demodulation data
     void* demod_thread(int tid);
+    void* encode_thread(int tid);
 
     int dequeue_send(int tid);
     int recv_enqueue(int tid, int radio_id, size_t rx_offset);
@@ -134,6 +135,10 @@ private:
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_to_send_;
     DecodeStatus* decode_status_;
+
+    size_t encode_frame_to_send_ = 0;
+    size_t encode_symbol_dl_to_send_ = 0;
+    size_t encode_ue_to_send_;
 };
 
 #endif

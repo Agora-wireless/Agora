@@ -40,6 +40,7 @@ public:
 
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
         num_pkts_[frame_slot]++;
+        encode_ready_[frame_slot] = true;
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_data_symbol_per_frame_)) {
@@ -86,6 +87,14 @@ public:
             == num_pkts_per_symbol_;
     }
 
+    // Check whether encoding can proceed for a frame
+    bool is_encode_ready(size_t frame_id) {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+            return false;
+        }
+        return encode_ready_[frame_id % kFrameWnd];
+    }
+
     // When decoding is done for a frame from one decoder, call this function
     // This function will increase cur_frame when this frame is decoded so that
     // we can move on decoding the next frame and release the resources used by
@@ -97,7 +106,8 @@ public:
         num_decode_tasks_completed_++;
         if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
             cur_frame_++;
-	    size_t cur_cycle = worker_rdtsc();
+            encode_ready_[(cur_frame - 1) % kFrameWnd] = false;
+	        size_t cur_cycle = worker_rdtsc();
             num_decode_tasks_completed_ = 0;
             size_t frame_slot = frame_id % kFrameWnd;
             num_pkts_[frame_slot] = 0;
@@ -126,6 +136,10 @@ public:
     // packets received for frame i and symbol j
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_data_pkts_ = {};
+
+    // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
+    // for frame i
+    std::array<bool, kFrameWnd> encode_ready_;
 
     // cur_frame is the first frame for which decoding is incomplete
     size_t cur_frame_ = 0;
@@ -261,4 +275,49 @@ private:
 
     std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
+};
+
+class EncodeStatus
+{
+public:
+    EncodeStatus(Config* cfg) 
+        : cfg_(cfg)
+        , num_encode_tasks_required_(cfg->get_num_ues_to_process())
+    {
+        num_encode_tasks_completed_ = new 
+            std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>[cfg->get_num_ues_to_process()];
+    }
+
+    void encode_done(size_t ue_id, size_t frame_id, size_t symbol_id_dl) 
+    {
+        num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] ++;
+    }
+
+    void ready_to_precode(size_t ue_id, size_t frame_id, size_T symbol_id_dl)
+    {
+        if (num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl]
+            == num_encode_tasks_required_) {
+            num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] = 0;
+            printf("Encode is done for user %u frame %u symbol %u\n", ue_id, frame_id, symbol_id_dl);
+            return true;
+        }
+        return false;
+    }
+
+private:
+    Config* cfg_;
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd> *num_encode_tasks_completed_; 
+
+    const size_t num_encode_tasks_required_;
+};
+
+class PrecodeStatus
+{
+public:
+    PrecodeStatus(Config* cfg);
+
+    void receive_encoded_datd(size_t ue_id, size_t frame_id, size_t symbol_id_dl);
+
+private:
+
 };
