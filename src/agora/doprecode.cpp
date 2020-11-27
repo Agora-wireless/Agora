@@ -62,18 +62,18 @@ Event_data DoPrecode::launch(size_t tag)
     // In downlink pilot symbols, all subcarriers are used as pilots
     // In downlink data symbols, pilot subcarriers are every
     // OFDM_PILOT_SPACING subcarriers
-    //if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
-    //    memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
-    //} else {
-    //    // Find subcarriers used as pilot in this block
-    //    memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
-    //    size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
-    //    size_t first_pilot_sc
-    //        = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
-    //    for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
-    //         i += cfg->OFDM_PILOT_SPACING)
-    //        pilot_sc_flags[i] = 1;
-    //}
+    // if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
+    //     memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
+    // } else {
+    //     // Find subcarriers used as pilot in this block
+    //     memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
+    //     size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
+    //     size_t first_pilot_sc
+    //         = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
+    //     for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
+    //          i += cfg->OFDM_PILOT_SPACING)
+    //         pilot_sc_flags[i] = 1;
+    // }
 
     if (kDebugPrintInTask) {
         printf(
@@ -178,10 +178,7 @@ void DoPrecode::precoding_per_sc(
     my_cgemm(jitter, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
         (MKL_Complex8*)precoded_ptr);
 #else
-    cx_fmat mat_precoder(precoder_ptr, cfg->BF_ANT_NUM, cfg->UE_NUM, false);
-    if (cfg->external_ref_node)
-        mat_precoder.insert_rows(
-            cfg->ref_ant, cx_fmat(cfg->nChannels, cfg->UE_NUM, fill::zeros));
+    cx_fmat mat_precoder(precoder_ptr, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
     cx_fmat mat_data(data_ptr, cfg->UE_NUM, 1, false);
     cx_fmat mat_precoded(precoded_ptr, cfg->BS_ANT_NUM, 1, false);
     mat_precoded = mat_precoder * mat_data;

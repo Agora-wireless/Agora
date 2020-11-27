@@ -53,41 +53,61 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     complex_float* _mat_dl_zf)
 {
     arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
-        cfg->UE_NUM, cfg->BF_ANT_NUM, false);
+        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+    arma::cx_fmat mat_ul_zf_tmp;
     if (kUseInverseForZF) {
         try {
-            mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+            // mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+            mat_ul_zf_tmp
+                = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
         } catch (std::runtime_error) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
-            arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+            // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+            arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
         }
     } else {
-        arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+        // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+        arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
     }
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
-        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            cfg->BF_ANT_NUM, cfg->UE_NUM, false);
         arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
             cfg->BF_ANT_NUM, false);
 
         arma::cx_fmat mat_calib(cfg->BF_ANT_NUM, cfg->BF_ANT_NUM);
         mat_calib = arma::diagmat(vec_calib);
+        arma::cx_fmat mat_dl_zf_tmp;
         try {
-            mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
+            // mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
+            mat_dl_zf_tmp = arma::inv(mat_calib) * mat_ul_zf_tmp.st();
         } catch (std::runtime_error) {
             MLPD_WARN("Failed to invert reference channel matrix, skip "
                       "applying it\n");
             Utils::print_vec(vec_calib, "vec_calib");
-            mat_dl_zf = mat_ul_zf.st();
+            // mat_dl_zf = mat_ul_zf.st();
+            mat_dl_zf_tmp = mat_ul_zf_tmp.st();
         }
 
         // We should be scaling the beamforming matrix, so the IFFT
         // output can be scaled with OFDM_CA_NUM across all antennas.
         // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
-        mat_dl_zf /= abs(mat_dl_zf).max();
+        // mat_dl_zf /= abs(mat_dl_zf).max();
+        mat_dl_zf_tmp /= abs(mat_dl_zf_tmp).max();
+
+        if (cfg->external_ref_node) {
+            mat_dl_zf_tmp.insert_rows(cfg->ref_ant,
+                arma::cx_fmat(cfg->nChannels, cfg->UE_NUM, arma::fill::zeros));
+        }
+        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
+            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        mat_dl_zf = mat_dl_zf_tmp;
     }
+    if (cfg->external_ref_node) {
+        mat_ul_zf_tmp.insert_cols(cfg->ref_ant,
+            arma::cx_fmat(cfg->UE_NUM, cfg->nChannels, arma::fill::zeros));
+    }
+    mat_ul_zf = mat_ul_zf_tmp;
 }
 
 // Gather data of one symbol from partially-transposed buffer
