@@ -660,7 +660,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
 
         plt::figure_size(1200, 780);
         plt::plot(up_I);
-        //plt::xlim(0, read_len);
+        // plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
             + std::to_string(i));
@@ -669,7 +669,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
 
         plt::figure_size(1200, 780);
         plt::plot(dn_I);
-        //plt::xlim(0, read_len);
+        // plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(i) + " to ant (ref)"
             + std::to_string(_cfg->ref_ant));
