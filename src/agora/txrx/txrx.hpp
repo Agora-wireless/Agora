@@ -75,7 +75,8 @@ public:
      */
     bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         size_t packet_num_in_buffer, Table<size_t>& frame_start,
-        char* tx_buffer);
+        char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
+        Table<complex_float>& calib_ul_buffer_);
 
     void send_beacon(int tid, size_t frame_id);
 

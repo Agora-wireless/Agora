@@ -471,9 +471,6 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     pthread_mutex_lock(&mutex);
     printf("Thread %d: waiting for release\n", tid);
 
-    pthread_cond_wait(&cond, &mutex);
-    pthread_mutex_unlock(&mutex); // unlocking for all other threads
-
     ClientRadioConfig* radio = radioconfig_;
 
     int num_samps = c->sampsPerSymbol;
@@ -483,14 +480,14 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     std::vector<void*> frm_rx_buff(2);
     frm_rx_buff[0] = frm_buff0.data();
 
+    std::vector<std::complex<int16_t>> zeros0(c->sampsPerSymbol, 0);
+    std::vector<std::complex<int16_t>> zeros1(c->sampsPerSymbol, 0);
     pilot_buff0.resize(2);
     pilot_buff1.resize(2);
-    Table<std::complex<int16_t>> zeros;
-    zeros.calloc(2, c->sampsPerSymbol, 64);
     pilot_buff0[0] = c->pilot_ci16.data();
     if (c->nChannels == 2) {
-        pilot_buff0[1] = zeros[0];
-        pilot_buff1[0] = zeros[1];
+        pilot_buff0[1] = zeros0.data();
+        pilot_buff1[0] = zeros1.data();
         pilot_buff1[1] = c->pilot_ci16.data();
         frm_rx_buff[1] = frm_buff1.data();
     }
@@ -502,12 +499,15 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     size_t cursor(0);
     std::stringstream sout;
 
+    pthread_cond_wait(&cond, &mutex);
+    pthread_mutex_unlock(&mutex); // unlocking for all other threads
+
     // Keep receiving one frame of data until a beacon is found
     // Perform initial beacon detection every kBeaconDetectInterval frames
     while (c->running && sync_index < 0) {
         int r;
-        for (size_t find_beacon_retry = 0; find_beacon_retry < kBeaconDetectInterval;
-             find_beacon_retry++) {
+        for (size_t find_beacon_retry = 0;
+             find_beacon_retry < kBeaconDetectInterval; find_beacon_retry++) {
             r = radio->radioRx(
                 radio_id, frm_rx_buff.data(), frm_num_samps, rxTime);
 
@@ -544,6 +544,11 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     int resync_retry_max(100);
     rx_offset = 0;
     while (c->running) {
+
+        if (c->frames_to_test > 0 && frame_id > c->frames_to_test) {
+            c->running = false;
+            break;
+        }
 
         // recv corresponding to symbol_id = 0 (Beacon)
         int r = radio->radioRx(

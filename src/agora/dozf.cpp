@@ -10,13 +10,15 @@ static constexpr size_t kUseInverseForZF = true;
 
 DoZF::DoZF(Config* config, int tid,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_buffer,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats_manager)
     : Doer(config, tid)
     , csi_buffers_(csi_buffers)
-    , calib_buffer_(calib_buffer)
+    , calib_dl_buffer_(calib_dl_buffer)
+    , calib_ul_buffer_(calib_ul_buffer)
     , ul_zf_matrices_(ul_zf_matrices)
     , dl_zf_matrices_(dl_zf_matrices)
 {
@@ -52,38 +54,60 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
 {
     arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
         cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+    arma::cx_fmat mat_ul_zf_tmp;
     if (kUseInverseForZF) {
         try {
-            mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+            // mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+            mat_ul_zf_tmp
+                = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
         } catch (std::runtime_error) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
-            arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+            // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+            arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
         }
     } else {
-        arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+        // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+        arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
     }
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
-        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-        if (cfg->recipCalEn) {
-            arma::cx_fvec vec_calib(
-                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BS_ANT_NUM,
-                false);
+        arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
+            cfg->BF_ANT_NUM, false);
 
-            vec_calib = vec_calib / vec_calib(cfg->ref_ant);
-            arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
-            mat_calib = arma::diagmat(vec_calib);
-            mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
-        } else
-            mat_dl_zf = mat_ul_zf.st();
+        arma::cx_fmat mat_calib(cfg->BF_ANT_NUM, cfg->BF_ANT_NUM);
+        mat_calib = arma::diagmat(vec_calib);
+        arma::cx_fmat mat_dl_zf_tmp;
+        try {
+            // mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
+            mat_dl_zf_tmp = arma::inv(mat_calib) * mat_ul_zf_tmp.st();
+        } catch (std::runtime_error) {
+            MLPD_WARN("Failed to invert reference channel matrix, skip "
+                      "applying it\n");
+            Utils::print_vec(vec_calib, "vec_calib");
+            // mat_dl_zf = mat_ul_zf.st();
+            mat_dl_zf_tmp = mat_ul_zf_tmp.st();
+        }
 
         // We should be scaling the beamforming matrix, so the IFFT
         // output can be scaled with OFDM_CA_NUM across all antennas.
         // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
-        mat_dl_zf /= abs(mat_dl_zf).max();
+        // mat_dl_zf /= abs(mat_dl_zf).max();
+        mat_dl_zf_tmp /= abs(mat_dl_zf_tmp).max();
+
+        if (cfg->external_ref_node) {
+            mat_dl_zf_tmp.insert_rows(cfg->ref_ant,
+                arma::cx_fmat(cfg->nChannels, cfg->UE_NUM, arma::fill::zeros));
+        }
+        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
+            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        mat_dl_zf = mat_dl_zf_tmp;
     }
+    if (cfg->external_ref_node) {
+        mat_ul_zf_tmp.insert_cols(cfg->ref_ant,
+            arma::cx_fmat(cfg->UE_NUM, cfg->nChannels, arma::fill::zeros));
+    }
+    mat_ul_zf = mat_ul_zf_tmp;
 }
 
 // Gather data of one symbol from partially-transposed buffer
@@ -172,24 +196,43 @@ void DoZF::ZF_time_orthogonal(size_t tag)
                     (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
                     cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
         }
-        if (cfg->recipCalEn) {
-            // Gather reciprocal calibration data from partially-transposed buffer
-            float* dst_calib_ptr = (float*)calib_gather_buffer;
-            partial_transpose_gather(cur_sc_id,
-                (float*)calib_buffer_[frame_slot], dst_calib_ptr,
-                cfg->BS_ANT_NUM);
-        }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
-        compute_precoder(mat_csi, calib_gather_buffer,
-            ul_zf_matrices_[frame_slot][cur_sc_id],
-            dl_zf_matrices_[frame_slot][cur_sc_id]);
+        if (cfg->dl_data_symbol_num_perframe > 0) {
+            arma::cx_fvec calib_vec(
+                reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
+                cfg->BF_ANT_NUM, false);
+            size_t frame_cal_slot = kFrameWnd - 1;
+            if (cfg->recipCalEn && frame_id >= TX_FRAME_DELTA) {
+                size_t frame_grp_id
+                    = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
+
+                // use the previous window which has a full set of calibration results
+                frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
+            }
+            arma::cx_fmat calib_dl_mat(reinterpret_cast<arma::cx_float*>(
+                                           calib_dl_buffer_[frame_cal_slot]),
+                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            arma::cx_fmat calib_ul_mat(reinterpret_cast<arma::cx_float*>(
+                                           calib_ul_buffer_[frame_cal_slot]),
+                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            arma::cx_fvec calib_dl_vec = calib_dl_mat.row(cur_sc_id).st();
+            arma::cx_fvec calib_ul_vec = calib_ul_mat.row(cur_sc_id).st();
+            calib_vec = calib_dl_vec / calib_ul_vec;
+            if (cfg->external_ref_node) {
+                mat_csi.shed_rows(
+                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+            }
+        }
 
         double start_tsc2 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+        compute_precoder(mat_csi, calib_gather_buffer,
+            ul_zf_matrices_[frame_slot][cur_sc_id],
+            dl_zf_matrices_[frame_slot][cur_sc_id]);
 
         // cout<<"Precoder:" <<mat_output<<endl;
         double duration3 = worker_rdtsc() - start_tsc2;
@@ -224,10 +267,17 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
             dst_csi_ptr, cfg->BS_ANT_NUM);
     }
     if (cfg->recipCalEn) {
-        // Gather reciprocal calibration data from partially-transposed buffer
-        float* dst_calib_ptr = (float*)calib_gather_buffer;
-        partial_transpose_gather(base_sc_id, (float*)calib_buffer_[frame_slot],
-            dst_calib_ptr, cfg->BS_ANT_NUM);
+        arma::cx_fmat calib_dl_mat(
+            reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_slot]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fvec calib_ul_mat(
+            reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_slot]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fvec vec_calib(
+            reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
+            cfg->BF_ANT_NUM, false);
+
+        vec_calib = calib_dl_mat.row(base_sc_id) / calib_ul_mat.row(base_sc_id);
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;

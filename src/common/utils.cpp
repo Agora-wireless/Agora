@@ -300,3 +300,29 @@ void Utils::writeBinaryFile(
     fwrite(buff, elem_size, buffer_size, f_handle);
     fclose(f_handle);
 }
+
+void Utils::print_mat(arma::cx_fmat c)
+{
+    std::stringstream so;
+    for (size_t i = 0; i < c.n_cols; i++) {
+        so << "row" << i << " = [";
+        for (size_t j = 0; j < c.n_rows; j++)
+            so << std::fixed << std::setw(5) << std::setprecision(3)
+               << c.at(j, i).real() << "+" << c.at(j, i).imag() << "i ";
+        so << "];\n";
+    }
+    so << std::endl;
+    std::cout << so.str();
+}
+
+void Utils::print_vec(arma::cx_fvec c, std::string ss)
+{
+    std::stringstream so;
+    so << ss << " = [";
+    for (size_t j = 0; j < c.size(); j++)
+        so << std::fixed << std::setw(5) << std::setprecision(3)
+           << c.at(j).real() << "+" << c.at(j).imag() << "i ";
+    so << "];\n";
+    so << std::endl;
+    std::cout << so.str();
+}

@@ -156,9 +156,9 @@ Event_data DoDemul::launch(size_t tag)
             mkl_jit_cgemm(jitter, (MKL_Complex8*)ul_zf_ptr,
                 (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
 #else
-            const cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
-            const cx_fmat mat_ul_zf(
-                ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+
+            cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
             mat_equaled = mat_ul_zf * mat_data;
 #endif
 

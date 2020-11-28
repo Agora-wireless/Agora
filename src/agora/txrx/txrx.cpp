@@ -44,7 +44,9 @@ PacketTXRX::~PacketTXRX()
 }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
+    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer)
 {
     buffer_ = &buffer;
     buffer_status_ = &buffer_status;
@@ -58,6 +60,10 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
             fprintf(stderr, "Failed to start radio\n");
             return false;
         }
+        memcpy(calib_dl_buffer[0], radioconfig_->get_calib_dl(),
+            cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
+        memcpy(calib_ul_buffer[0], radioconfig_->get_calib_ul(),
+            cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
     }
 
     for (size_t i = 0; i < socket_thread_num; i++) {

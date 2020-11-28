@@ -18,6 +18,7 @@ Config::Config(std::string jsonfile)
     }
     std::string serial_file = tddConf.value("irises", "");
     ref_ant = tddConf.value("ref_ant", 0);
+    external_ref_node = tddConf.value("external_ref_node", false);
     nCells = tddConf.value("cells", 1);
     channel = tddConf.value("channel", "A");
     nChannels = std::min(channel.size(), (size_t)2);
@@ -41,6 +42,9 @@ Config::Config(std::string jsonfile)
         }
     } else
         nRadios = tddConf.value("radio_num", isUE ? UE_ANT_NUM : BS_ANT_NUM);
+    BF_ANT_NUM = BS_ANT_NUM;
+    if (external_ref_node)
+        BF_ANT_NUM = BS_ANT_NUM - nChannels;
 
     if (kUseArgos || kUseUHD) {
         rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
@@ -49,12 +53,24 @@ Config::Config(std::string jsonfile)
     /* radio configurations */
     freq = tddConf.value("frequency", 3.6e9);
     single_gain_ = tddConf.value("single_gain", true);
-    txgainA = tddConf.value("txgainA", 20);
-    rxgainA = tddConf.value("rxgainA", 20);
-    txgainB = tddConf.value("txgainB", 20);
-    rxgainB = tddConf.value("rxgainB", 20);
-    calTxGainA = tddConf.value("calTxGainA", 10);
-    calTxGainB = tddConf.value("calTxGainB", 10);
+    tx_gain_a = tddConf.value("tx_gain_a", 20);
+    rx_gain_a = tddConf.value("rx_gain_a", 20);
+    tx_gain_b = tddConf.value("tx_gain_b", 20);
+    rx_gain_b = tddConf.value("rx_gain_b", 20);
+    calib_tx_gain_a = tddConf.value("calib_tx_gain_a", tx_gain_a);
+    calib_tx_gain_b = tddConf.value("calib_tx_gain_b", tx_gain_b);
+    auto gain_adj_json_a = tddConf.value("client_gain_adjust_a", json::array());
+    if (gain_adj_json_a.empty())
+        client_gain_adj_a.resize(nRadios, 0);
+    else
+        client_gain_adj_a.assign(
+            gain_adj_json_a.begin(), gain_adj_json_a.end());
+    auto gain_adj_json_b = tddConf.value("client_gain_adjust_b", json::array());
+    if (gain_adj_json_b.empty())
+        client_gain_adj_b.resize(nRadios, 0);
+    else
+        client_gain_adj_b.assign(
+            gain_adj_json_b.begin(), gain_adj_json_b.end());
     rate = tddConf.value("rate", 5e6);
     nco = tddConf.value("nco_frequency", 0.75 * rate);
     bwFilter = rate + 2 * nco;
@@ -90,6 +106,10 @@ Config::Config(std::string jsonfile)
         = tddConf.value("ofdm_rx_zero_prefix_bs", 0) + CP_LEN;
     ofdm_rx_zero_prefix_client_
         = tddConf.value("ofdm_rx_zero_prefix_client", 0);
+    ofdm_rx_zero_prefix_cal_ul_
+        = tddConf.value("ofdm_rx_zero_prefix_cal_ul", 0) + CP_LEN;
+    ofdm_rx_zero_prefix_cal_dl_
+        = tddConf.value("ofdm_rx_zero_prefix_cal_dl", 0) + CP_LEN;
     rt_assert(OFDM_DATA_NUM % kSCsPerCacheline == 0,
         "OFDM_DATA_NUM must be a multiple of subcarriers per cacheline");
     rt_assert(OFDM_DATA_NUM % kTransposeBlockSize == 0,
@@ -158,7 +178,9 @@ Config::Config(std::string jsonfile)
     DLSymbols = Utils::loadSymbols(frames, 'D');
     ULCalSymbols = Utils::loadSymbols(frames, 'L');
     DLCalSymbols = Utils::loadSymbols(frames, 'C');
-    recipCalEn = (ULCalSymbols[0].size() == 1 and DLCalSymbols[0].size() == 1);
+    recipCalEn = (ULCalSymbols[0].size() > 0 and DLCalSymbols[0].size() > 0);
+    ant_per_group = DLCalSymbols[0].size();
+    ant_group_num = recipCalEn ? BF_ANT_NUM / ant_per_group : 0;
 
     symbol_num_perframe = frames.at(0).size();
     beacon_symbol_num_perframe = beaconSymbols[0].size();
@@ -172,6 +194,7 @@ Config::Config(std::string jsonfile)
         = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].front() : 0;
     dl_data_symbol_end
         = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].back() + 1 : 0;
+    recip_pilot_symbol_num_perframe = recipCalEn ? 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot
         and UE_ANT_NUM != pilot_symbol_num_perframe) {
@@ -332,7 +355,7 @@ void Config::genData()
     auto zc_seq_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_seq = Utils::double_to_cfloat(zc_seq_double);
-    auto common_pilot
+    common_pilot
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
 
     pilots_ = (complex_float*)aligned_alloc(

@@ -224,8 +224,8 @@ void Agora::start()
 
     // Start packet I/O
     if (!packet_tx_rx_->startTXRX(socket_buffer_, socket_buffer_status_,
-            socket_buffer_status_size_, stats->frame_start,
-            dl_socket_buffer_)) {
+            socket_buffer_status_size_, stats->frame_start, dl_socket_buffer_,
+            calib_dl_buffer_, calib_ul_buffer_)) {
         this->stop();
         return;
     }
@@ -632,15 +632,15 @@ void Agora::worker(int tid)
         ThreadType::kWorker, base_worker_core_offset, tid, false /* quiet */);
 
     /* Initialize operators */
-    auto computeFFT
-        = new DoFFT(config_, tid, socket_buffer_, socket_buffer_status_,
-            data_buffer_, csi_buffers_, calib_buffer_, phy_stats, stats);
+    auto computeFFT = new DoFFT(config_, tid, socket_buffer_,
+        socket_buffer_status_, data_buffer_, csi_buffers_, calib_dl_buffer_,
+        calib_ul_buffer_, phy_stats, stats);
 
     auto computeIFFT
         = new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, stats);
 
-    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_buffer_,
-        ul_zf_matrices_, dl_zf_matrices_, stats);
+    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_,
+        calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
     auto computeDemul = new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
         ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats, stats);
@@ -703,9 +703,9 @@ void Agora::worker_fft(int tid)
         ThreadType::kWorkerFFT, base_worker_core_offset, tid);
 
     /* Initialize IFFT operator */
-    auto computeFFT
-        = new DoFFT(config_, tid, socket_buffer_, socket_buffer_status_,
-            data_buffer_, csi_buffers_, calib_buffer_, phy_stats, stats);
+    auto computeFFT = new DoFFT(config_, tid, socket_buffer_,
+        socket_buffer_status_, data_buffer_, csi_buffers_, calib_dl_buffer_,
+        calib_ul_buffer_, phy_stats, stats);
     auto computeIFFT
         = new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, stats);
 
@@ -725,8 +725,8 @@ void Agora::worker_zf(int tid)
         ThreadType::kWorkerZF, base_worker_core_offset, tid);
 
     /* Initialize ZF operator */
-    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_buffer_,
-        ul_zf_matrices_, dl_zf_matrices_, stats);
+    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_,
+        calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_, stats);
 
     while (true) {
         computeZF->try_launch(*get_conq(EventType::kZF, 0),
@@ -1005,7 +1005,7 @@ void Agora::print_per_symbol_done(
             tomac_counters_.get_symbol_count(frame_id) + 1);
         break;
     default:
-        printf("Wrong task type in frame done print!");
+        printf("Wrong task type in symbol done print!");
     }
 }
 
@@ -1054,7 +1054,7 @@ void Agora::print_per_task_done(PrintType print_type, size_t frame_id,
             tx_counters_.get_task_count(frame_id, symbol_id));
         break;
     default:
-        printf("Wrong task type in frame done print!");
+        printf("Wrong task type in task done print!");
     }
 }
 
@@ -1114,7 +1114,8 @@ void Agora::initialize_uplink_buffers()
         kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
-        * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe);
+        * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe
+              + cfg->recip_pilot_symbol_num_perframe);
     rx_counters_.num_pilot_pkts_per_frame
         = cfg->BS_ANT_NUM * cfg->pilot_symbol_num_perframe;
     rx_counters_.num_reciprocity_pkts_per_frame = cfg->BS_ANT_NUM;
@@ -1159,7 +1160,15 @@ void Agora::initialize_downlink_buffers()
 
     dl_ifft_buffer_.calloc(
         cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    calib_buffer_.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+    calib_dl_buffer_.calloc(
+        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+    calib_ul_buffer_.calloc(
+        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+    // initialize the content of the last window to 1
+    for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM; i++) {
+        calib_dl_buffer_[kFrameWnd - 1][i] = { 1, 0 };
+        calib_ul_buffer_[kFrameWnd - 1][i] = { 1, 0 };
+    }
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
@@ -1188,7 +1197,8 @@ void Agora::free_downlink_buffers()
     free_buffer_1d(&dl_socket_buffer_status_);
 
     dl_ifft_buffer_.free();
-    calib_buffer_.free();
+    calib_dl_buffer_.free();
+    calib_ul_buffer_.free();
     dl_encoded_buffer_.free();
 }
 

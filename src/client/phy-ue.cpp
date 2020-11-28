@@ -145,7 +145,7 @@ Phy_UE::~Phy_UE()
     // release FFT_buffer
     fft_buffer_.free();
     ifft_buffer_.free();
-
+    free(rx_samps_tmp);
     if (kEnableMac)
         mac_std_thread_.join();
     delete mac_thread_;
@@ -251,8 +251,15 @@ void Phy_UE::start()
                     "window. This can happen if PHY is running "
                     "slowly, e.g., in debug mode");
 
-                if (symbol_id
-                    == 0) { // To send uplink pilots in simulation mode
+                size_t dl_symbol_id = 0;
+                if (config_->DLSymbols.size() > 0
+                    && config_->DLSymbols[0].size() > 0)
+                    dl_symbol_id = config_->DLSymbols[0][0];
+
+                if (symbol_id == 0 // Beacon in Sim mode!
+                    || (!config_->hw_framer && ul_data_symbol_perframe == 0
+                           && symbol_id
+                               == dl_symbol_id)) { // Send uplink pilots
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
                         gen_tag_t::frm_sym_ue(
                             frame_id, config_->pilotSymbols[0][ant_id], ant_id)
@@ -261,10 +268,6 @@ void Phy_UE::start()
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
                 }
 
-                size_t dl_symbol_id = 0;
-                if (config_->DLSymbols.size() > 0
-                    && config_->DLSymbols[0].size() > 0)
-                    dl_symbol_id = config_->DLSymbols[0][0];
                 if (ul_data_symbol_perframe > 0
                     && (symbol_id == 0 || symbol_id == dl_symbol_id)
                     && ant_id % config_->nChannels == 0) {
@@ -536,8 +539,12 @@ void Phy_UE::start()
                       << 1.0 * total_bit_errors / total_decoded_bits
                       << "), block errors (BLER) " << total_block_errors << "/"
                       << total_decoded_blocks << " ("
-                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                      << std::endl;
+                      << 1.0 * total_block_errors / total_decoded_blocks
+                      << "), symbol errors " << symbol_error_count_[ue_id]
+                      << "/" << decoded_symbol_count_[ue_id] << " ("
+                      << 1.0 * symbol_error_count_[ue_id]
+                    / decoded_symbol_count_[ue_id]
+                      << ")" << std::endl;
         }
     }
     this->stop();
@@ -609,31 +616,31 @@ void Phy_UE::doFFT(int tid, size_t tag)
             frame_id, symbol_id, ant_id);
     }
 
-    if (kPrintDownlinkPilotStats) {
-        size_t sym_offset = 0;
+    size_t sig_offset = config_->ofdm_rx_zero_prefix_client_;
+    if (kPrintDownlinkPilotStats && config_->UE_ANT_NUM == 1) {
         if (config_->isPilot(frame_id, symbol_id)) {
-            std::vector<std::complex<float>> samples_vec(
-                config_->sampsPerSymbol, 0);
             simd_convert_short_to_float(pkt->data,
-                reinterpret_cast<float*>(samples_vec.data()),
-                (config_->sampsPerSymbol * 2 / 16) * 16);
+                reinterpret_cast<float*>(rx_samps_tmp),
+                2 * config_->sampsPerSymbol);
+            std::vector<std::complex<float>> samples_vec(
+                rx_samps_tmp, rx_samps_tmp + config_->sampsPerSymbol);
             size_t seq_len = ue_pilot_vec[ant_id].size();
             std::vector<std::complex<float>> pilot_corr
                 = CommsLib::correlate_avx(samples_vec, ue_pilot_vec[ant_id]);
             std::vector<float> pilot_corr_abs = CommsLib::abs2_avx(pilot_corr);
-            size_t peak_offset = *std::max_element(
-                pilot_corr_abs.begin(), pilot_corr_abs.end());
-            sym_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
+            size_t peak_offset
+                = std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end())
+                - pilot_corr_abs.begin();
+            sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
             float noise_power = 0;
-            for (size_t i = 0; i < sym_offset; i++)
+            for (size_t i = 0; i < sig_offset; i++)
                 noise_power += std::pow(std::abs(samples_vec[i]), 2);
             float signal_power = 0;
-            for (size_t i = sym_offset; i < 2 * sym_offset; i++)
+            for (size_t i = sig_offset; i < 2 * sig_offset; i++)
                 signal_power += std::pow(std::abs(samples_vec[i]), 2);
             float SNR = 10 * std::log10(signal_power / noise_power);
-            printf(
-                "frame %zu symbol %zu ant %zu: corr offset %zu, SNR %2.1f \n",
-                frame_id, symbol_id, ant_id, peak_offset, SNR);
+            printf("frame %zu symbol %zu ant %zu: sig offset %zu, SNR %2.1f \n",
+                frame_id, symbol_id, ant_id, sig_offset, SNR);
             if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxpilot" + std::to_string(symbol_id) + ".bin";
@@ -662,8 +669,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
         = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
 
     // transfer ushort to float
-    size_t delay_offset
-        = (config_->ofdm_rx_zero_prefix_client_ + config_->CP_LEN) * 2;
+    sig_offset = (sig_offset / 16) * 16;
+    size_t delay_offset = (sig_offset + config_->CP_LEN) * 2;
     float* fft_buff = (float*)fft_buffer_[FFT_buffer_target_id];
 
     simd_convert_short_to_float(
@@ -857,6 +864,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
+    size_t block_error(0);
     for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
          cb_id++) {
         size_t demod_buffer_offset
@@ -872,11 +880,11 @@ void Phy_UE::doDecode(int tid, size_t tag)
         bblib_ldpc_decoder_5gnr(
             &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
-        if (kPrintPhyStats) {
+        if (kCollectPhyStats) {
             decoded_bits_count_[ant_id][total_dl_symbol_id]
                 += 8 * config_->num_bytes_per_cb;
             decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
-            size_t block_error(0);
+            size_t byte_error(0);
             for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
                 uint8_t rx_byte = decoded_buffer_ptr[i];
                 uint8_t tx_byte = (uint8_t)config_->get_info_bits(
@@ -888,10 +896,12 @@ void Phy_UE::doDecode(int tid, size_t tag)
                     xor_byte >>= 1;
                 }
                 if (rx_byte != tx_byte)
-                    block_error++;
+                    byte_error++;
+
                 bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
             }
-            block_error_count_[ant_id][total_dl_symbol_id] += (block_error > 0);
+            block_error_count_[ant_id][total_dl_symbol_id] += (byte_error > 0);
+            block_error += (byte_error > 0);
         }
 
         if (kPrintDecodedData) {
@@ -904,6 +914,10 @@ void Phy_UE::doDecode(int tid, size_t tag)
             }
             printf("\n");
         }
+    }
+    if (kCollectPhyStats) {
+        decoded_symbol_count_[ant_id]++;
+        symbol_error_count_[ant_id] += (block_error > 0);
     }
 
     size_t dec_duration_stat = rdtsc() - start_tsc;
@@ -1078,9 +1092,9 @@ void Phy_UE::initialize_vars_from_cfg(void)
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
-    rx_thread_num = (kUseArgos && config_->hw_framer)
-        ? std::min(config_->UE_NUM, config_->socket_thread_num)
-        : kUseArgos ? config_->UE_NUM : config_->socket_thread_num;
+    rx_thread_num = (kUseArgos && !config_->hw_framer)
+        ? config_->UE_NUM
+        : std::min(config_->UE_NUM, config_->socket_thread_num);
 
     tx_buffer_status_size
         = (ul_symbol_perframe * config_->UE_ANT_NUM * kFrameWnd);
@@ -1119,6 +1133,7 @@ void Phy_UE::initialize_downlink_buffers()
     // initialize rx buffer
     rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
     rx_buffer_status_.calloc(rx_thread_num, rx_buffer_status_size, 64);
+    alloc_buffer_1d(&rx_samps_tmp, config_->sampsPerSymbol, 64, 1);
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num
@@ -1159,6 +1174,10 @@ void Phy_UE::initialize_downlink_buffers()
             config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
         block_error_count_.calloc(
             config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
+        decoded_symbol_count_ = new size_t[config_->UE_ANT_NUM];
+        symbol_error_count_ = new size_t[config_->UE_ANT_NUM];
+        memset(decoded_symbol_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);
+        memset(symbol_error_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);
     }
 }
 

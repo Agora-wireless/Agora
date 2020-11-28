@@ -18,7 +18,8 @@ class DoZF : public Doer {
 public:
     DoZF(Config* in_config, int tid,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-        Table<complex_float>& calib_buffer,
+        Table<complex_float>& calib_dl_buffer,
+        Table<complex_float>& calib_ul_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
         Stats* stats_manager);
@@ -79,7 +80,8 @@ private:
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     complex_float* pred_csi_buffer;
-    Table<complex_float> calib_buffer_;
+    Table<complex_float> calib_dl_buffer_;
+    Table<complex_float> calib_ul_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
     DurationStat* duration_stat;

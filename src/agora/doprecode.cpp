@@ -21,7 +21,6 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
         &modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM, 64, 0);
     alloc_buffer_1d(
         &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
-    alloc_buffer_1d(&pilot_sc_flags, cfg->demul_block_size, 64, 1);
 
 #if USE_MKL_JIT
     MKL_Complex8 alpha = { 1, 0 };
@@ -63,18 +62,18 @@ Event_data DoPrecode::launch(size_t tag)
     // In downlink pilot symbols, all subcarriers are used as pilots
     // In downlink data symbols, pilot subcarriers are every
     // OFDM_PILOT_SPACING subcarriers
-    if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
-        memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
-    } else {
-        // Find subcarriers used as pilot in this block
-        memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
-        size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
-        size_t first_pilot_sc
-            = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
-        for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
-             i += cfg->OFDM_PILOT_SPACING)
-            pilot_sc_flags[i] = 1;
-    }
+    // if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
+    //     memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
+    // } else {
+    //     // Find subcarriers used as pilot in this block
+    //     memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
+    //     size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
+    //     size_t first_pilot_sc
+    //         = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
+    //     for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
+    //          i += cfg->OFDM_PILOT_SPACING)
+    //         pilot_sc_flags[i] = 1;
+    // }
 
     if (kDebugPrintInTask) {
         printf(
@@ -87,13 +86,12 @@ Event_data DoPrecode::launch(size_t tag)
 
     if (kUseSpatialLocality) {
         for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
+
             size_t start_tsc1 = worker_rdtsc();
-            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
-                for (size_t j = 0; j < kSCsPerCacheline; j++) {
+            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
+                for (size_t j = 0; j < kSCsPerCacheline; j++)
                     load_input_data(symbol_idx_dl, total_data_symbol_idx,
-                        user_id, base_sc_id + i + j, j, pilot_sc_flags[i + j]);
-                }
-            }
+                        user_id, base_sc_id + i + j, j);
 
             size_t start_tsc2 = worker_rdtsc();
             duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
@@ -109,7 +107,7 @@ Event_data DoPrecode::launch(size_t tag)
             int cur_sc_id = base_sc_id + i;
             for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++)
                 load_input_data(symbol_idx_dl, total_data_symbol_idx, user_id,
-                    cur_sc_id, 0, pilot_sc_flags[i]);
+                    cur_sc_id, 0);
             size_t start_tsc2 = worker_rdtsc();
             duration_stat->task_duration[1] += start_tsc2 - start_tsc1;
 
@@ -150,11 +148,12 @@ Event_data DoPrecode::launch(size_t tag)
 
 void DoPrecode::load_input_data(size_t symbol_idx_dl,
     size_t total_data_symbol_idx, size_t user_id, size_t sc_id,
-    size_t sc_id_in_block, size_t is_pilot_sc)
+    size_t sc_id_in_block)
 {
     complex_float* data_ptr
         = modulated_buffer_temp + sc_id_in_block * cfg->UE_NUM;
-    if (is_pilot_sc == 1) {
+    if (symbol_idx_dl < cfg->DL_PILOT_SYMS
+        || sc_id % cfg->OFDM_PILOT_SPACING == 0) {
         data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
     } else {
         int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
