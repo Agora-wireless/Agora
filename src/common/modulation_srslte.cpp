@@ -211,3 +211,64 @@ void demod_64qam_soft_sse(float* vec_in, int8_t* llr, int num)
             = 2 * SCALE_BYTE_CONV_QAM64 / sqrt(42) - abs(llr[6 * i + 3]);
     }
 }
+
+void demod_qpsk_soft_sse(float* x, int8_t* z, int len)
+{
+    int i = 0;
+
+    // Force the use of SSE here instead of AVX since the implementations requires too many permutes across 128-bit
+    // boundaries
+
+    __m128 s = _mm_set1_ps(-SCALE_BYTE_CONV_QPSK * M_SQRT2);
+    if (((size_t)(x)&0x0F) == 0 && ((size_t)(z)&0x0F) == 0) {
+        for (; i < len - 16 + 1; i += 16) {
+            __m128 a = _mm_load_ps(&x[i]);
+            __m128 b = _mm_load_ps(&x[i + 1 * 4]);
+            __m128 c = _mm_load_ps(&x[i + 2 * 4]);
+            __m128 d = _mm_load_ps(&x[i + 3 * 4]);
+
+            __m128 sa = _mm_mul_ps(a, s);
+            __m128 sb = _mm_mul_ps(b, s);
+            __m128 sc = _mm_mul_ps(c, s);
+            __m128 sd = _mm_mul_ps(d, s);
+
+            __m128i ai = _mm_cvttps_epi32(sa);
+            __m128i bi = _mm_cvttps_epi32(sb);
+            __m128i ci = _mm_cvttps_epi32(sc);
+            __m128i di = _mm_cvttps_epi32(sd);
+            __m128i ab = _mm_packs_epi32(ai, bi);
+            __m128i cd = _mm_packs_epi32(ci, di);
+
+            __m128i i8 = _mm_packs_epi16(ab, cd);
+
+            _mm_store_si128((__m128i*)&z[i], i8);
+        }
+    } else {
+        for (; i < len - 16 + 1; i += 16) {
+            __m128 a = _mm_load_ps(&x[i]);
+            __m128 b = _mm_load_ps(&x[i + 1 * 4]);
+            __m128 c = _mm_load_ps(&x[i + 2 * 4]);
+            __m128 d = _mm_load_ps(&x[i + 3 * 4]);
+
+            __m128 sa = _mm_mul_ps(a, s);
+            __m128 sb = _mm_mul_ps(b, s);
+            __m128 sc = _mm_mul_ps(c, s);
+            __m128 sd = _mm_mul_ps(d, s);
+
+            __m128i ai = _mm_cvttps_epi32(sa);
+            __m128i bi = _mm_cvttps_epi32(sb);
+            __m128i ci = _mm_cvttps_epi32(sc);
+            __m128i di = _mm_cvttps_epi32(sd);
+            __m128i ab = _mm_packs_epi32(ai, bi);
+            __m128i cd = _mm_packs_epi32(ci, di);
+
+            __m128i i8 = _mm_packs_epi16(ab, cd);
+
+            _mm_storeu_si128((__m128i*)&z[i], i8);
+        }
+    }
+
+    for (; i < len; i++) {
+        z[i] = (int8_t)(x[i] * -SCALE_BYTE_CONV_QPSK * M_SQRT2);
+    }
+}
