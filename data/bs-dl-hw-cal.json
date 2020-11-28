@@ -13,6 +13,8 @@
  "ofdm_tx_zero_prefix" : 160,
  "ofdm_tx_zero_postfix" : 160,
  "ofdm_rx_zero_prefix_bs" : 220,
+ "ofdm_rx_zero_prefix_cal_dl" : 288,
+ "ofdm_rx_zero_prefix_cal_ul" : 168,
  "ofdm_ca_num" : 512,
  "ofdm_data_num" : 304,
  "cp_len" : 32,
@@ -20,7 +22,7 @@
  "beamsweep" : false,
  "beacon_antenna" : 0,
  "frames" : [
-     "BGGGGGPGGGDDDGGGGGGG"
+     "BGCLGGPPGGDDDGGGGGGG"
  ],
  "ref_ant" : 8,
  "external_ref_node" : true,

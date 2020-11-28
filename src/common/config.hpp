@@ -123,20 +123,23 @@ public:
     Table<std::complex<int16_t>> ul_iq_t;
     Table<complex_float> ue_specific_pilot;
     Table<std::complex<int16_t>> ue_specific_pilot_t;
-    std::vector<std::complex<float>> pilotsF;
+    std::vector<std::complex<float>> common_pilot;
 
     double freq;
-    bool single_gain_;
-    double txgainA;
-    double rxgainA;
-    double txgainB;
-    double rxgainB;
-    double calTxGainA;
-    double calTxGainB;
     double rate;
     double nco;
     double radioRfFreq;
     double bwFilter;
+    bool single_gain_;
+    double tx_gain_a;
+    double rx_gain_a;
+    double tx_gain_b;
+    double rx_gain_b;
+    double calib_tx_gain_a;
+    double calib_tx_gain_b;
+    std::vector<double> client_gain_adj_a;
+    std::vector<double> client_gain_adj_b;
+
     size_t nCells;
     size_t nRadios;
     size_t nAntennas;
@@ -148,7 +151,10 @@ public:
     bool sampleCalEn;
     bool imbalanceCalEn;
     bool recipCalEn;
+    bool external_ref_node;
     std::string channel;
+    size_t ant_group_num;
+    size_t ant_per_group;
 
     size_t core_offset;
     size_t worker_thread_num;
@@ -176,7 +182,8 @@ public:
     size_t encode_block_size;
 
     bool freq_orthogonal_pilot;
-    size_t BS_ANT_NUM;
+    size_t BS_ANT_NUM; // Total number of BS antennas
+    size_t BF_ANT_NUM; // Number of antennas used in beamforming
     size_t UE_NUM;
     size_t UE_ANT_NUM;
 
@@ -213,6 +220,9 @@ public:
     // delays, this can be different from (prefix + CP_LEN), and is currently
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_bs_;
+
+    size_t ofdm_rx_zero_prefix_cal_ul_;
+    size_t ofdm_rx_zero_prefix_cal_dl_;
 
     // The number of IQ samples to skip from the beginning of symbol received by
     // Agora on the downlink at the client. Due to over-the-air and RF
@@ -256,6 +266,9 @@ public:
     // Total number of data symbols in a frame, including uplink data symbols
     // and downlink data symbols
     size_t data_symbol_num_perframe;
+
+    // Total number of pilot symbols in a frame
+    size_t recip_pilot_symbol_num_perframe;
 
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;

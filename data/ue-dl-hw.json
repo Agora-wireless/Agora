@@ -3,10 +3,13 @@
  "cells" : 1,
  "channel" : "A",
  "frequency" : 3.56e9,
- "rxgainA" : 20,
- "txgainA" : 40,
- "rxgainB" : 20,
- "txgainB" : 40,
+ "single_gain" : false,
+ "rx_gain_a" : 20,
+ "tx_gain_a" : 40,
+ "rx_gain_b" : 20,
+ "tx_gain_b" : 40,
+ "client_gain_adjust_a" : [0, 2],
+ "client_gain_adjust_b" : [0, 2],
  "rate" : 5e6,
  "ofdm_ca_num" : 512,
  "ofdm_data_num" : 304,
@@ -16,7 +19,7 @@
  "cp_len" : 32,
  "Zc" : 18,
  "frames" : [
-     "BGGGGGPGGGDDDGGGGGGG"
+     "BGGGGGPPGGDDDGGGGGGG"
  ],
  "UE" : true,
  "hw_framer": false,

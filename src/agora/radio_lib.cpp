@@ -252,10 +252,10 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
             if (_cfg->single_gain()) {
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
                 baStn[i]->setGain(
-                    SOAPY_SDR_RX, ch, ch ? _cfg->rxgainB : _cfg->rxgainA);
+                    SOAPY_SDR_RX, ch, ch ? _cfg->rx_gain_b : _cfg->rx_gain_a);
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
                 baStn[i]->setGain(
-                    SOAPY_SDR_TX, ch, ch ? _cfg->txgainB : _cfg->txgainA);
+                    SOAPY_SDR_TX, ch, ch ? _cfg->tx_gain_b : _cfg->tx_gain_a);
             } else {
                 if (info["frontend"].find("CBRS") != std::string::npos) {
                     if (_cfg->freq > 3e9)
@@ -271,7 +271,7 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
                 }
 
                 baStn[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                    ch ? _cfg->rxgainB : _cfg->rxgainA); //[0,30]
+                    ch ? _cfg->rx_gain_b : _cfg->rx_gain_a); //[0,30]
                 baStn[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0); //[0,12]
                 baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0); //[-12,19]
 
@@ -280,15 +280,15 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
                         SOAPY_SDR_TX, ch, "ATTN", -6); //[-18,0] by 3
                     baStn[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0); //[0|15]
                 }
-                baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
+                baStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[-12,12]
                 baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                    ch ? _cfg->txgainB : _cfg->txgainA); //[0,30]
+                    ch ? _cfg->tx_gain_b : _cfg->tx_gain_a); //[0,30]
             }
         } else {
-            baStn[i]->setGain(
-                SOAPY_SDR_RX, ch, "PGA0", ch ? _cfg->rxgainB : _cfg->rxgainA);
-            baStn[i]->setGain(
-                SOAPY_SDR_TX, ch, "PGA0", ch ? _cfg->txgainB : _cfg->txgainA);
+            baStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
+                ch ? _cfg->rx_gain_b : _cfg->rx_gain_a);
+            baStn[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
+                ch ? _cfg->tx_gain_b : _cfg->tx_gain_a);
         }
     }
 
@@ -310,13 +310,20 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    if (_cfg->sampleCalEn) {
-        std::cout << "start sample offset correction" << std::endl;
+    alloc_buffer_1d(&init_calib_dl_,
+        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), 64, 1);
+    alloc_buffer_1d(&init_calib_ul_,
+        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), 64, 1);
+    // initialize init_calib to a matrix of ones
+    for (size_t i = 0; i < _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM; i++) {
+        init_calib_dl_[i] = 1;
+        init_calib_ul_[i] = 1;
+    }
+    if (_cfg->downlink_mode) {
         int iter = 0;
         int max_iter = 3;
-        size_t ref_ant = _cfg->ref_ant;
         while (!good_calib) {
-            good_calib = correctSampleOffset(ref_ant, _cfg->sampleCalEn);
+            good_calib = initial_calib(_cfg->sampleCalEn);
             iter++;
             if (iter == max_iter && !good_calib) {
                 std::cout << "attempted " << max_iter
@@ -328,7 +335,13 @@ bool RadioConfig::radioStart()
         if (!good_calib)
             return good_calib;
         else
-            std::cout << "sample offset calibration successful!" << std::endl;
+            std::cout << "initial calibration successful!" << std::endl;
+        //arma::cx_fmat calib_dl_mat(
+        //    init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        //arma::cx_fmat calib_ul_mat(
+        //    init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        //Utils::print_mat(calib_dl_mat);
+        //Utils::print_mat(calib_ul_mat);
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
@@ -359,11 +372,11 @@ bool RadioConfig::radioStart()
             size_t schedSize = sched.size();
             for (size_t s = 0; s < schedSize; s++) {
                 char c = _cfg->frames[f].at(s);
-                if (c == 'C')
-                    sched.replace(s, 1, isRefAnt ? "R" : "P");
-                else if (c == 'L')
+                if (c == 'C') {
+                    sched.replace(s, 1, isRefAnt ? "R" : "T");
+                } else if (c == 'L') {
                     sched.replace(s, 1, isRefAnt ? "P" : "R");
-                else if (c == 'P')
+                } else if (c == 'P')
                     sched.replace(s, 1, "R");
                 else if (c == 'U')
                     sched.replace(s, 1, "R");
@@ -372,7 +385,8 @@ bool RadioConfig::radioStart()
                 else if (c != 'B')
                     sched.replace(s, 1, "G");
             }
-            std::cout << sched << std::endl;
+            std::cout << "Radio " << i << " Frame " << f << ": " << sched
+                      << std::endl;
             tddSched.push_back(sched);
         }
         conf["frames"] = tddSched;
@@ -407,26 +421,28 @@ bool RadioConfig::radioStart()
                     _cfg->ofdm_tx_zero_prefix_, 0);
                 std::vector<std::complex<float>> post(
                     _cfg->ofdm_tx_zero_postfix_, 0);
-                recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
-                    _cfg->nChannels * i, _cfg->BS_ANT_NUM, _cfg->OFDM_CA_NUM,
-                    _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START, _cfg->CP_LEN);
-                recipCalDlPilot.insert(
-                    recipCalDlPilot.begin(), pre.begin(), pre.end());
-                recipCalDlPilot.insert(
-                    recipCalDlPilot.end(), post.begin(), post.end());
+                recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
+                    _cfg->common_pilot, _cfg->nChannels * i * kCalibScGroupSize,
+                    kCalibScGroupSize, _cfg->OFDM_CA_NUM, _cfg->OFDM_DATA_NUM,
+                    _cfg->OFDM_DATA_START, _cfg->CP_LEN, false /*block type*/);
                 if (kDebugPrintPilot) {
                     std::cout << "recipCalPilot[" << i << "]: ";
                     for (auto const& calP : recipCalDlPilot)
                         std::cout << real(calP) << ", ";
                     std::cout << std::endl;
                 }
+                recipCalDlPilot.insert(
+                    recipCalDlPilot.begin(), pre.begin(), pre.end());
+                recipCalDlPilot.insert(
+                    recipCalDlPilot.end(), post.begin(), post.end());
                 baStn[i]->writeRegisters("TX_RAM_A", 0,
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
-                    recipCalDlPilot = CommsLib::composeRefSymbol(_cfg->pilotsF,
-                        2 * i + 1, _cfg->BS_ANT_NUM, _cfg->OFDM_CA_NUM,
+                    recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
+                        _cfg->common_pilot, (2 * i + 1) * kCalibScGroupSize,
+                        kCalibScGroupSize, _cfg->OFDM_CA_NUM,
                         _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START,
-                        _cfg->CP_LEN);
+                        _cfg->CP_LEN, false);
                     baStn[i]->writeRegisters("TX_RAM_B", 0,
                         Utils::cfloat32_to_uint32(
                             recipCalDlPilot, false, "QI"));
@@ -572,24 +588,6 @@ void RadioConfig::drain_rx_buffer(SoapySDR::Device* ibsSdrs,
         i++;
     }
     // std::cout << "Number of reads needed to drain: " << i << std::endl;
-}
-
-void RadioConfig::adjustDelays(std::vector<int> offset, size_t ref_ant)
-{
-    size_t ref_offset = ref_ant == 0 ? 1 : 0;
-    size_t R = _cfg->nRadios;
-    for (size_t i = 0; i < R; i++) {
-        int delta = offset[ref_offset] - offset[i];
-        std::cout << "sample_adjusting delay of node " << i << " by " << delta
-                  << std::endl;
-        int iter = delta < 0 ? -delta : delta;
-        for (int j = 0; j < iter; j++) {
-            if (delta < 0)
-                baStn[i]->writeSetting("ADJUST_DELAYS", "-1");
-            else
-                baStn[i]->writeSetting("ADJUST_DELAYS", "1");
-        }
-    }
 }
 
 void RadioConfig::readSensors()

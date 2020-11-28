@@ -83,9 +83,9 @@ public:
     static float measureTone(std::vector<std::complex<float>> const&,
         std::vector<float> const&, double, double, size_t,
         const size_t delta = 10);
-    static std::vector<std::complex<float>> composeRefSymbol(
+    static std::vector<std::complex<float>> compose_partial_pilot_sym(
         std::vector<std::complex<float>>, size_t, size_t, size_t, size_t,
-        size_t, size_t, bool timeDomain = true);
+        size_t, size_t, bool, bool timeDomain = true);
     static std::vector<std::complex<float>> seqCyclicShift(
         std::vector<std::complex<float>>, float);
     static float find_max_abs(complex_float*, size_t);

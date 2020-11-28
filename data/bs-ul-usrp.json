@@ -3,10 +3,10 @@
  "cells" : 1,
  "channel" : "AB",
  "frequency" : 3.6e9,
- "rxgainA" : 20,
- "txgainA" : 20,
- "rxgainB" : 20,
- "txgainB" : 20,
+ "rx_gain_a" : 20,
+ "tx_gain_a" : 20,
+ "rx_gain_b" : 20,
+ "tx_gain_b" : 20,
  "rate" : 5e6,
  "ofdm_tx_zero_prefix" : 160,
  "ofdm_tx_zero_postfix" : 160,
@@ -18,8 +18,6 @@
  "beamsweep" : true,
  "beacon_antenna" : 0,
  "sample_calibrate" : false,
- "calTxGainA" : 10,
- "calTxGainB" : 10,
  "frames" : [
      "BGGGGGPGGGUUUG"
  ],
