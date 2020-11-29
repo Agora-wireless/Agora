@@ -48,7 +48,9 @@ class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset = 1,
         RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr,
-        DecodeStatus* decode_status = nullptr);
+        DecodeStatus* decode_status = nullptr,
+        EncodeStatus* encode_status = nullptr,
+        PrecodeStatus* precode_status = nullptr);
 
     ~PacketTXRX();
 
@@ -73,7 +75,9 @@ public:
         char* tx_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
         = nullptr,
-        Table<int8_t>* demod_soft_buffer_to_decode = nullptr);
+        Table<int8_t>* demod_soft_buffer_to_decode = nullptr,
+        Table<int8_t>* encoded_buffer_ = nullptr,
+        Table<int8_t>* encoded_buffer_to_decode = nullptr);
 
     // TODO: Add documentation
     void send_beacon(int tid, size_t frame_id);
@@ -111,6 +115,10 @@ private:
     char* tx_buffer_;
     Table<size_t>* frame_start_;
 
+    // Downlink buffers
+    Table<int8_t>* encoded_buffer_;
+    Table<int8_t>* encoded_buffer_to_precode_;
+
     std::vector<struct sockaddr_in> bs_rru_sockaddr_;
     std::vector<int> socket_;
     std::vector<struct sockaddr_in> bs_server_sockaddrs_;
@@ -135,6 +143,8 @@ private:
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_to_send_;
     DecodeStatus* decode_status_;
+    EncodeStatus* encode_status_;
+    PrecodeStatus* precode_status_;
 
     size_t encode_frame_to_send_ = 0;
     size_t encode_symbol_dl_to_send_ = 0;

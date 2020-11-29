@@ -220,7 +220,8 @@ struct Packet {
     enum class PktType {
         kInvalid,
         kIQFromRRU, // A packet containing IQ samples from the RRU
-        kDemod // A packet generated after the demodulation stage
+        kDemod, // A packet generated after the demodulation stage
+        kEncode // A packet generated after the encode stage
     };
 
     static const char* pkt_type_str(PktType pkt_type)

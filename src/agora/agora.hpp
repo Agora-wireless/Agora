@@ -280,6 +280,12 @@ private:
 
     // Shared states between socket threads and dodecoders
     DecodeStatus demod_status_;
+
+    // Shared states between dosubcarriers and doencoders
+    EncodeStatus encode_status_;
+
+    // Shared states between dosubcarriers and socket threads
+    PrecodeStatus precode_status_;
 };
 
 #endif

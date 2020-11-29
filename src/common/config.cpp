@@ -242,8 +242,11 @@ Config::Config(std::string jsonfile)
         = 1 + (get_num_sc_per_server() - 1) / demul_block_size;
     zf_events_per_symbol = 1 + (get_num_sc_per_server() - 1) / zf_block_size;
 
-    demod_tx_port = tddConf.value("demod_tx_port", 0);
-    demod_rx_port = tddConf.value("demod_rx_port", 0);
+    demod_tx_port = tddConf.value("demod_tx_port", 8100);
+    demod_rx_port = tddConf.value("demod_rx_port", 8600);
+
+    encode_tx_port = tddConf.value("encode_tx_port", 7100);
+    encode_rx_port = tddConf.value("encode_rx_port", 7600);
 
     fft_block_size = tddConf.value("fft_block_size", 1);
 

@@ -10,13 +10,16 @@
 static constexpr bool kDebugDPDK = false;
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
-    DemulStatus* demul_status, DecodeStatus* decode_status)
+    DemulStatus* demul_status, DecodeStatus* decode_status, EncodeStatus* encode_status, 
+    PrecodeStatus* precode_status)
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
     , rx_status_(rx_status)
     , demul_status_(demul_status)
     , decode_status_(decode_status)
+    , encode_status_(encode_status)
+    , precode_status_(precode_status)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 1);
     mbuf_pool = DpdkTransport::create_mempool();
@@ -80,7 +83,8 @@ PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
 bool PacketTXRX::startTXRX(Table<char>& buffer,
     size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
-    Table<int8_t>* demod_soft_buffer_to_decode)
+    Table<int8_t>* demod_soft_buffer_to_decode, Table<int8_t>* encoded_buffer,
+    Table<int8_t>* encoded_buffer_to_precode)
 {
     buffer_ = &buffer;
     frame_start_ = &frame_start;
@@ -90,6 +94,9 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
 
     demod_buffers_ = demod_buffers;
     demod_soft_buffer_to_decode_ = demod_soft_buffer_to_decode;
+
+    encoded_buffer_ = encoded_buffer;
+    encoded_buffer_to_precode_ = encoded_buffer_to_precode;
 
     if (kUseArgos) {
         if (!radioconfig_->radioStart()) {
@@ -278,13 +285,13 @@ void* PacketTXRX::encode_thread(int tid)
         // 1. Try to send encoded data to dosubcarriers
         if (encode_status_->ready_to_precode(
                 encode_ue_to_send_, encode_frame_to_send_, encode_symbol_dl_to_send_)) {
-            int8_t* ptr = cfg->get_encoded_buf(encoded_buffer_, encode_frame_to_send_, 
+            int8_t* ptr = cfg->get_encoded_buf(*encoded_buffer_, encode_frame_to_send_, 
                 encode_symbol_dl_to_send_, encode_ue_to_send_, 0);
             
             for (size_t server_idx = 0; server_idx < cfg->bs_server_addr_list.size(); server_idx ++) {
                 int8_t* src_ptr = ptr + cfg->get_num_sc_per_server() * server_idx;
                 if (server_idx == cfg->bs_server_addr_idx) {
-                    int8_t* dst_ptr = cfg->get_encoded_buf(encoded_buffer_to_precode_, encode_frame_to_send_,
+                    int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
                         encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->get_num_sc_per_server() * server_idx;
                     memcpy(dst_ptr, src_ptr, cfg->get_num_sc_per_server());
                     precode_status_->receive_encoded_data(encode_ue_to_send_, encode_frame_to_send_, encode_symbol_dl_to_send_);
@@ -308,7 +315,7 @@ void* PacketTXRX::encode_thread(int tid)
                     struct rte_udp_hdr* udp_h
                         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
                     udp_h->src_port = rte_cpu_to_be_16(cfg->encode_tx_port);
-                    udp_h->dst_port = rte_cpu_to_be_16(cfg->enxode_rx_port);
+                    udp_h->dst_port = rte_cpu_to_be_16(cfg->encode_rx_port);
 
                     tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
                     tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
@@ -317,7 +324,7 @@ void* PacketTXRX::encode_thread(int tid)
                     auto* pkt = reinterpret_cast<Packet*>(payload);
                     pkt->pkt_type = Packet::PktType::kEncode;
                     pkt->frame_id = encode_frame_to_send_;
-                    pkt->symbol_id = encode_symbol_to_send_;
+                    pkt->symbol_id = encode_symbol_dl_to_send_;
                     pkt->ue_id = encode_ue_to_send_;
                     pkt->server_id = cfg->bs_server_addr_idx;
                     DpdkTransport::fastMemcpy(pkt->data, src_ptr,
@@ -386,7 +393,7 @@ void* PacketTXRX::encode_thread(int tid)
                 const size_t ue_id = pkt->ue_id;
 
                 int8_t* dst_ptr
-                    = cfg->get_encoded_buf(encoded_buffer_to_precode_,
+                    = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
                         pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
                 DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
                     cfg->get_num_sc_per_server());

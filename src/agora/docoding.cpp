@@ -82,11 +82,11 @@ Event_data DoEncode::launch(size_t tag)
     return Event_data(EventType::kEncode, tag);
 }
 
-void DeEncode::start_work() 
+void DoEncode::start_work() 
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
-            || rx_status_->encode_ready(cur_frame_)) {
+            || rx_status_->is_encode_ready(cur_frame_)) {
             printf("Start to encode user %lu frame %lu symbol %lu\n", ue_id, cur_frame_, cur_symbol_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
@@ -94,7 +94,7 @@ void DeEncode::start_work()
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
-                encode_status_->encode_done(cur_frame_, cur_symbol_);
+                encode_status_->encode_done(ue_id, cur_frame_, cur_symbol_);
                 cur_symbol_++;
                 if (cur_symbol_ == cfg->dl_data_symbol_num_perframe) {
                     cur_symbol_ = 0;

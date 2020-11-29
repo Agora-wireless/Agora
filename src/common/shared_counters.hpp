@@ -106,7 +106,7 @@ public:
         num_decode_tasks_completed_++;
         if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
             cur_frame_++;
-            encode_ready_[(cur_frame - 1) % kFrameWnd] = false;
+            encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
 	        size_t cur_cycle = worker_rdtsc();
             num_decode_tasks_completed_ = 0;
             size_t frame_slot = frame_id % kFrameWnd;
@@ -293,7 +293,7 @@ public:
         num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] ++;
     }
 
-    void ready_to_precode(size_t ue_id, size_t frame_id, size_T symbol_id_dl)
+    bool ready_to_precode(size_t ue_id, size_t frame_id, size_t symbol_id_dl)
     {
         if (num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl]
             == num_encode_tasks_required_) {
@@ -314,9 +314,13 @@ private:
 class PrecodeStatus
 {
 public:
-    PrecodeStatus(Config* cfg);
+    PrecodeStatus(Config* cfg) {
+        
+    }
 
-    void receive_encoded_datd(size_t ue_id, size_t frame_id, size_t symbol_id_dl);
+    void receive_encoded_data(size_t ue_id, size_t frame_id, size_t symbol_id_dl) {
+
+    }
 
 private:
 

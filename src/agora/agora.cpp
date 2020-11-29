@@ -16,6 +16,8 @@ Agora::Agora(Config* cfg)
     , rx_status_(cfg)
     , demul_status_(cfg)
     , demod_status_(cfg)
+    , encode_status_(cfg)
+    , precode_status_(cfg)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
@@ -44,7 +46,7 @@ Agora::Agora(Config* cfg)
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + 1,
-        &rx_status_, &demul_status_, &demod_status_));
+        &rx_status_, &demul_status_, &demod_status_, &encode_status_, &precode_status_));
 
     // if (kEnableMac) {
     //     const size_t mac_cpu_core = cfg->core_offset + cfg->socket_thread_num
@@ -113,7 +115,8 @@ void Agora::start()
     // Start packet I/O
     if (!packet_tx_rx_->startTXRX(socket_buffer_,
             socket_buffer_status_size_, stats->frame_start, dl_socket_buffer_,
-            &demod_buffers_, &demod_soft_buffer_to_decode_)) {
+            &demod_buffers_, &demod_soft_buffer_to_decode_, &dl_encoded_buffer_,
+            &dl_encoded_buffer_to_precode_)) {
         this->stop();
         return;
     }
@@ -534,6 +537,8 @@ void Agora::initialize_downlink_buffers()
     calib_buffer_.calloc(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
+        roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
+    dl_encoded_buffer_to_precode_.calloc(task_buffer_symbol_num,
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 
     frommac_stats_.init(config_->UE_NUM, cfg->dl_data_symbol_num_perframe,

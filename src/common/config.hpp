@@ -327,6 +327,9 @@ public:
     uint16_t demod_tx_port; // UDP port used to receive post-demodulation data
     uint16_t demod_rx_port; // UDP port used to send post-demodulation data
 
+    uint16_t encode_tx_port; // UDP port used to receive encoded data
+    uint16_t encode_rx_port; // UDP port used to send encoded data
+
     // The list of MAC addresses of all Agora servers 
     // Only used in distributed&DPDK version
     std::vector<std::string> bs_server_mac_list;
