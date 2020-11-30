@@ -287,6 +287,19 @@ Config::Config(std::string jsonfile)
     mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
+    // Simulator Parameters
+    sim_snr_db = tddConf.value("sim_snr_db", 10);
+    std::string sim_chan_model = tddConf.value("sim_chan_model", "AWGN");
+    if(sim_chan_model == "AWGN")
+        chan_model = AWGN;
+    else if(sim_chan_model == "RAYLEIGH")
+        chan_model = RAYLEIGH;
+    else if(sim_chan_model == "RAN_3GPP")
+        chan_model = RAN_3GPP;
+    else
+	chan_model = NONE;
+
+    // Done!
     running = true;
     std::printf(
         "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "

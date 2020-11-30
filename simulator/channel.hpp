@@ -1,0 +1,50 @@
+/*
+ * Channel Model
+ *
+ *
+ *
+ */
+
+#ifndef SIM_CHAN_MODEL
+#define SIM_CHAN_MODEL
+
+#include "Symbols.hpp"
+#include "buffer.hpp"
+#include "config.hpp"
+#include "gettime.h"
+#include "memory_manage.h"
+#include "signalHandler.hpp"
+#include <algorithm>
+#include <armadillo>
+#include <assert.h>
+#include <ctime>
+#include <math.h>
+#include <numeric>
+#include <iomanip>
+
+using namespace arma;
+
+class Channel {
+
+public:
+
+
+    Channel (Config* bscfg, Config* uecfg);
+    ~Channel ();
+    void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst);
+    void awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+    void rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+    void lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+
+private:
+
+    Config* bscfg;
+    Config* uecfg;
+
+    Channel* channel;
+
+    size_t bs_ant;
+    size_t ue_ant;
+};
+
+#endif /* SIM_CHAN_MODEL */
