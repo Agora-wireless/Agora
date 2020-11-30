@@ -471,6 +471,15 @@ public:
         return OFDM_DATA_NUM / OFDM_PILOT_SPACING;
     }
 
+    // Simulator
+    enum ChanModel {
+	    AWGN,
+	    RAYLEIGH,
+	    RAN_3GPP,
+	    NONE
+    } chan_model;
+    double sim_snr_db;
+
     Config(std::string);
     void genData();
     ~Config();

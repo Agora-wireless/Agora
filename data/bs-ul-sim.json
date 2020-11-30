@@ -6,6 +6,8 @@
  "socket_thread_num" : 1,
  "demul_block_size" : 48,
  "antenna_num": 8,
- "ue_num": 2
+ "ue_num": 2,
+ "sim_chan_model": "NONE",
+ "sim_snr_db": 10
 }
 
