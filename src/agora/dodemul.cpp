@@ -238,6 +238,9 @@ Event_data DoDemul::launch(size_t tag)
             + (cfg->mod_order_bits * base_sc_id);
 
         switch (cfg->mod_order_bits) {
+        case (CommsLib::QPSK):
+            demod_qpsk_soft_sse(equal_T_ptr, demod_ptr, max_sc_ite);
+            break;
         case (CommsLib::QAM16):
             demod_16qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
