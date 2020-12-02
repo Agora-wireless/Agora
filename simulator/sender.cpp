@@ -53,19 +53,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
-    size_t alignment = 64;
-    size_t size = (socket_thread_num * sizeof(moodycamel::ProducerToken*));
-    size_t padded_size = size;
-    //Check for power of 2 alignment
-    assert((alignment & (alignment - 1)) == 0);
-    size_t padding = alignment - (size % alignment);
-
-    if (padding < alignment) {
-        padded_size += padding;
-    }
-
-    task_ptok = (moodycamel::ProducerToken**)std::aligned_alloc(
-        alignment, padded_size);
+    task_ptok = reinterpret_cast<moodycamel::ProducerToken**>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 
+                                    (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
     for (size_t i = 0; i < socket_thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
@@ -263,7 +253,7 @@ void* Sender::worker_thread(int tid)
 
     UDPClient udp_client;
     auto fft_inout = reinterpret_cast<complex_float*>(
-        std::aligned_alloc(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, cfg->OFDM_CA_NUM * sizeof(complex_float)));
     auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
 
     double begin = get_time();
@@ -390,11 +380,11 @@ void Sender::init_iq_from_file(std::string filename)
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
     iq_data_short_.calloc(
-        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
+        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, Agora_memory::Alignment_t::k64Align);
 
     Table<float> iq_data_float;
     iq_data_float.calloc(
-        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
+        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, Agora_memory::Alignment_t::k64Align);
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
