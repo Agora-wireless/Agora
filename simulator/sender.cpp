@@ -53,8 +53,19 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
-    task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
-        64, socket_thread_num * sizeof(moodycamel::ProducerToken*));
+    size_t alignment = 64;
+    size_t size = (socket_thread_num * sizeof(moodycamel::ProducerToken*));
+    size_t padded_size = size;
+    //Check for power of 2 alignment
+    assert((alignment & (alignment - 1)) == 0);
+    size_t padding = alignment - (size % alignment);
+
+    if (padding < alignment) {
+        padded_size += padding;
+    }
+
+    task_ptok = (moodycamel::ProducerToken**)std::aligned_alloc(
+        alignment, padded_size);
     for (size_t i = 0; i < socket_thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 

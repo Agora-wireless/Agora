@@ -15,12 +15,30 @@ PhyStats::PhyStats(Config* cfg)
     uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
 
     evm_buffer_.calloc(kFrameWnd, cfg->UE_ANT_NUM, 64);
-    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
-    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-    ul_gt_mat = ul_iq_f_mat.st();
-    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
 
+    if (cfg->ul_data_symbol_num_perframe > 0)
+    {
+        auto ul_iq_f_ptr = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->UL_PILOT_SYMS]);
+        cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+        ul_gt_mat_ = ul_iq_f_mat.st(); /* Out of bounds read.... */
+        ul_gt_mat_ = ul_gt_mat_.cols(cfg->OFDM_DATA_START, (cfg->OFDM_DATA_STOP - 1));
+    }
     pilot_snr_.calloc(kFrameWnd, cfg->UE_ANT_NUM, 64);
+}
+
+PhyStats::~PhyStats( void )
+{
+    decoded_bits_count_.free();
+    bit_error_count_.free();
+
+    decoded_blocks_count_.free();
+    block_error_count_.free();
+
+    uncoded_bits_count_.free();
+    uncoded_bit_error_count_.free();
+
+    evm_buffer_.free();
+    pilot_snr_.free();
 }
 
 void PhyStats::print_phy_stats()
@@ -95,11 +113,13 @@ void PhyStats::update_pilot_snr(
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 {
-    //assert(eq.size() == ul_gt_mat.col(sc_id).size());
-    fmat evm = abs(eq - ul_gt_mat.col(sc_id));
-    fmat cur_evm_mat(
-        evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);
-    cur_evm_mat += evm % evm;
+    if (this->config_->ul_data_symbol_num_perframe > 0)
+    {
+        fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
+        fmat cur_evm_mat(
+            evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);
+        cur_evm_mat += evm % evm;
+    }
 }
 
 void PhyStats::update_bit_errors(
@@ -147,19 +167,4 @@ void PhyStats::update_uncoded_bits(
     size_t ue_id, size_t offset, size_t new_bits_num)
 {
     uncoded_bits_count_[ue_id][offset] += new_bits_num;
-}
-
-PhyStats::~PhyStats()
-{
-    decoded_bits_count_.free();
-    bit_error_count_.free();
-
-    decoded_blocks_count_.free();
-    block_error_count_.free();
-
-    uncoded_bits_count_.free();
-    uncoded_bit_error_count_.free();
-
-    evm_buffer_.free();
-    pilot_snr_.free();
 }
