@@ -111,10 +111,10 @@ int main(int argc, char* argv[])
         }
 
         Table<complex_float> modulated_codewords;
-        modulated_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 64);
+        modulated_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
         Table<int8_t> demod_data_all_symbols;
         demod_data_all_symbols.calloc(
-            num_codeblocks, cfg->OFDM_DATA_NUM * 8, 64);
+            num_codeblocks, cfg->OFDM_DATA_NUM * 8, Agora_memory::Alignment_t::k64Align);
         std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
 
         // Modulate, add noise, and demodulate the encoded codewords
@@ -175,11 +175,11 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
         ldpc_decoder_5gnr_response.numMsgBits = LDPC_config.cbLen;
         auto* resp_var_nodes
-            = (int16_t*)std::aligned_alloc(64, 1024 * 1024 * sizeof(int16_t));
+            = (int16_t*)Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t));
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
-        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, 64);
+        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
 
         double freq_ghz = measure_rdtsc_freq();
         size_t start_tsc = worker_rdtsc();

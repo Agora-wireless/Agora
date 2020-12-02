@@ -127,9 +127,9 @@ TEST(TestZF, VaryingConfig)
         kMaxUEs * kMaxAntennas);
 
     calib_dl_buffer.rand_alloc_cx_float(
-        kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
+        kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::k64Align);
     calib_ul_buffer.rand_alloc_cx_float(
-        kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
+        kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::k64Align);
 
     auto stats = new Stats(cfg);
 

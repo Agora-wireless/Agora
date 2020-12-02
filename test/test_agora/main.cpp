@@ -66,8 +66,8 @@ void check_correctness_ul(Config* cfg)
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
-    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
-    output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
+    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, Agora_memory::Alignment_t::k64Align);
+    output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, Agora_memory::Alignment_t::k64Align);
 
     int num_bytes_per_ue
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
@@ -121,9 +121,9 @@ void check_correctness_dl(Config* cfg)
     Table<short> raw_data;
     Table<short> tx_data;
     raw_data.calloc(
-        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
+        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, Agora_memory::Alignment_t::k64Align);
     tx_data.calloc(
-        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, 64);
+        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, Agora_memory::Alignment_t::k64Align);
 
     read_from_file_dl(raw_data_filename, raw_data, sampsPerSymbol, cfg);
     read_from_file_dl(tx_data_filename, tx_data, sampsPerSymbol, cfg);

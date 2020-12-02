@@ -44,7 +44,7 @@ void print128_epi8(__m128i var)
 void init_modulation_table(Table<complex_float>& mod_table, size_t mod_order)
 {
     if (!mod_table.is_allocated())
-        mod_table.malloc(1, pow(2, kMaxModType), 32);
+        mod_table.malloc(1, pow(2, kMaxModType), Agora_memory::Alignment_t::k32Align);
     // mod_table.malloc(pow(2, kMaxModType), 2, 32);
     switch (mod_order) {
     case 4:
