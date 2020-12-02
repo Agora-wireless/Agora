@@ -98,7 +98,7 @@ void demod_16qam_soft_sse(float* vec_in, int8_t* llr, int num)
     }
 
     // for (int i = 0; i < ue_num; i++) {
-    //     printf("sse: in: %.2f, %.2f, out: %i %i %i %i\n", vec_in[2*i],
+    //     std::printf("sse: in: %.2f, %.2f, out: %i %i %i %i\n", vec_in[2*i],
     //     vec_in[2*i+1], llr[4*i+0], llr[4*i+1], llr[4*i+2], llr[4*i+3]);
     // }
 }

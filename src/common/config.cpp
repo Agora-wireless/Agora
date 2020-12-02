@@ -165,7 +165,7 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-        printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
+        std::printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
             sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
@@ -238,7 +238,7 @@ Config::Config(std::string jsonfile)
     encode_block_size = tddConf.value("encode_block_size", 1);
 
     noise_level = tddConf.value("noise_level", 0.03); //default: 30 dB
-    printf("Noise level: %.2f\n", noise_level);
+    std::printf("Noise level: %.2f\n", noise_level);
     /* LDPC Coding configurations */
     LDPC_config.Bg = tddConf.value("base_graph", 1);
     LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
@@ -259,7 +259,7 @@ Config::Config(std::string jsonfile)
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
 
-    printf("Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
+    std::printf("Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
            "bits per encoding, %d bits per encoded code word, decoder "
            "iterations: %d, code rate %.3f (nRows = %zu)\n",
         LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen,
@@ -287,7 +287,7 @@ Config::Config(std::string jsonfile)
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
     running = true;
-    printf("Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
+    std::printf("Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
            "frame,\n\t"
            "%zu uplink data symbols per frame, %zu downlink data "
            "symbols per frame,\n\t"
@@ -429,9 +429,9 @@ void Config::genData()
     std::cout << "Config: Reading raw data from " << filename1 << std::endl;
     FILE* fd = fopen(filename1.c_str(), "rb");
     if (fd == nullptr) {
-        printf("Failed to open antenna file %s. Error %s.\n", filename1.c_str(),
+        std::printf("Failed to open antenna file %s. Error %s.\n", filename1.c_str(),
             strerror(errno));
-        exit(-1);
+        std::exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
@@ -440,7 +440,7 @@ void Config::genData()
             size_t r = fread(ul_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
-                printf("bad read from file %s (batch %zu) \n",
+                std::printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);
         }
         if (fseek(fd,
@@ -455,7 +455,7 @@ void Config::genData()
             size_t r = fread(dl_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
-                printf("bad read from file %s (batch %zu) \n",
+                std::printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);
         }
     }
@@ -616,11 +616,11 @@ void Config::genData()
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
             ofdm_tx_zero_prefix_, CP_LEN, scale);
         if (kDebugPrintPilot) {
-            printf("ue_specific_pilot%zu=[", i);
+            std::printf("ue_specific_pilot%zu=[", i);
             for (size_t j = 0; j < OFDM_CA_NUM; j++)
-                printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
+                std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
                     ue_pilot_ifft[i][j].im);
-            printf("]\n");
+            std::printf("]\n");
         }
     }
 
@@ -701,7 +701,7 @@ size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
         = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
     if (it != pilotSymbols[fid].end()) {
 #ifdef DEBUG3
-        printf("get_pilot_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
+        std::printf("get_pilot_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
             it - pilotSymbols[fid].begin());
 #endif
         return it - pilotSymbols[fid].begin();
@@ -716,7 +716,7 @@ size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
         = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
     if (it != ULSymbols[fid].end()) {
 #ifdef DEBUG3
-        printf("get_ul_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
+        std::printf("get_ul_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
             it - ULSymbols[fid].begin());
 #endif
         return it - ULSymbols[fid].begin();
@@ -730,7 +730,7 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
     size_t fid = frame_id % frames.size();
     char s = frames[fid].at(symbol_id);
 #ifdef DEBUG3
-    printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
+    std::printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     if (isUE) {
         std::vector<size_t>::iterator it;
@@ -766,7 +766,7 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
     assert(symbol_id < symbol_num_perframe);
     char s = frames[frame_id % frames.size()].at(symbol_id);
 #ifdef DEBUG3
-    printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
+    std::printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     return s == 'U';
 }
@@ -776,7 +776,7 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
     assert(symbol_id < symbol_num_perframe);
     char s = frames[frame_id % frames.size()].at(symbol_id);
 #ifdef DEBUG3
-    printf("isDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
+    std::printf("isDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     if (isUE)
         return s == 'D' && !this->isPilot(frame_id, symbol_id);

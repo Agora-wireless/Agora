@@ -43,7 +43,7 @@ void Stats::compute_avg_over_threads(
 
 void Stats::print_per_thread_per_task(FrameSummary s)
 {
-    printf("%zu tasks %.1f us (~ %.1f + %.1f + %.1f us), ", s.count_this_thread,
+    std::printf("%zu tasks %.1f us (~ %.1f + %.1f + %.1f us), ", s.count_this_thread,
         s.us_this_thread[0] / s.count_this_thread,
         s.us_this_thread[1] / s.count_this_thread,
         s.us_this_thread[2] / s.count_this_thread,
@@ -52,7 +52,7 @@ void Stats::print_per_thread_per_task(FrameSummary s)
 
 void Stats::print_per_frame(const char* doer_string, FrameSummary frame_summary)
 {
-    printf("%s (%zu tasks): %.3f ms (~ %.4f + %.3f + %.4f ms), ", doer_string,
+    std::printf("%s (%zu tasks): %.3f ms (~ %.4f + %.3f + %.4f ms), ", doer_string,
         frame_summary.count_all_threads,
         frame_summary.us_avg_threads[0] / 1000.0,
         frame_summary.us_avg_threads[1] / 1000.0,
@@ -104,13 +104,13 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
     }
 
     if (kStatsPrintFrameSummary) {
-        printf("Frame %zu summary: ", frame_id);
+        std::printf("Frame %zu summary: ", frame_id);
         print_per_frame("FFT", fft_frame_summary);
         print_per_frame("CSI", csi_frame_summary);
         print_per_frame("ZF", zf_frame_summary);
         print_per_frame("Demul", demul_frame_summary);
         print_per_frame("Decode", decode_frame_summary);
-        printf("Total: %.2f ms\n", sum_us_this_frame / 1000);
+        std::printf("Total: %.2f ms\n", sum_us_this_frame / 1000);
     }
 }
 
@@ -146,13 +146,13 @@ void Stats::update_stats_in_functions_downlink(size_t frame_id)
         + zf_us[frame_slot] + precode_us[frame_slot] + encode_us[frame_slot];
 
     if (kStatsPrintFrameSummary) {
-        printf("Frame %zu summary: ", frame_id);
+        std::printf("Frame %zu summary: ", frame_id);
         print_per_frame("CSI", csi_frame_summary);
         print_per_frame("IFFT", ifft_frame_summary);
         print_per_frame("ZF", zf_frame_summary);
         print_per_frame("Precode", precode_frame_summary);
         print_per_frame("Encode", encode_frame_summary);
-        printf("Total: %.2f ms\n", sum_us_this_frame / 1000.0);
+        std::printf("Total: %.2f ms\n", sum_us_this_frame / 1000.0);
     }
 }
 
@@ -169,12 +169,12 @@ void Stats::update_stats_in_dofft_bigstation(size_t frame_id, size_t thread_num,
             double sum_us_this_frame_this_thread
                 = fft_frame_summary->us_this_thread[0]
                 + csi_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("csi: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("csi: ");
             print_per_thread_per_task(*csi_frame_summary);
-            printf("fft: ");
+            std::printf("fft: ");
             print_per_thread_per_task(*fft_frame_summary);
-            printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(fft_frame_summary, thread_num, break_down_num);
@@ -191,10 +191,10 @@ void Stats::update_stats_in_dozf_bigstation(size_t frame_id, size_t thread_num,
         if (kDebugPrintStatsPerThread) {
             double sum_us_this_frame_this_thread
                 = zf_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("zf: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("zf: ");
             print_per_thread_per_task(*zf_frame_summary);
-            printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(zf_frame_summary, thread_num, break_down_num);
@@ -211,10 +211,10 @@ void Stats::update_stats_in_dodemul_bigstation(size_t frame_id,
         if (kDebugPrintStatsPerThread) {
             double sum_us_this_frame_this_thread
                 = demul_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("demul: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("demul: ");
             print_per_thread_per_task(*demul_frame_summary);
-            printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(demul_frame_summary, thread_num, break_down_num);
@@ -231,10 +231,10 @@ void Stats::update_stats_in_dodecode_bigstation(size_t frame_id,
         if (kDebugPrintStatsPerThread) {
             double sum_us_this_frame_this_thread
                 = decode_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("decode: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("decode: ");
             print_per_thread_per_task(*decode_frame_summary);
-            printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(decode_frame_summary, thread_num, break_down_num);
@@ -253,12 +253,12 @@ void Stats::update_stats_in_doifft_bigstation(size_t frame_id,
             double sum_time_this_frame_this_thread
                 = ifft_frame_summary->us_this_thread[0]
                 + csi_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("csi: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("csi: ");
             print_per_thread_per_task(*csi_frame_summary);
-            printf("ifft: ");
+            std::printf("ifft: ");
             print_per_thread_per_task(*ifft_frame_summary);
-            printf("sum: %.3f us\n", sum_time_this_frame_this_thread);
+            std::printf("sum: %.3f us\n", sum_time_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(ifft_frame_summary, thread_num, break_down_num);
@@ -276,10 +276,10 @@ void Stats::update_stats_in_doprecode_bigstation(size_t frame_id,
         if (kDebugPrintStatsPerThread) {
             double sum_us_this_frame_this_thread
                 = precode_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("precode: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("precode: ");
             print_per_thread_per_task(*precode_frame_summary);
-            printf("sum: %.3f\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(precode_frame_summary, thread_num, break_down_num);
@@ -296,10 +296,10 @@ void Stats::update_stats_in_doencode_bigstation(size_t frame_id,
         if (kDebugPrintStatsPerThread) {
             double sum_us_this_frame_this_thread
                 = encode_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("precode: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("precode: ");
             print_per_thread_per_task(*encode_frame_summary);
-            printf("sum: %.3f\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(encode_frame_summary, thread_num, break_down_num);
@@ -356,18 +356,18 @@ void Stats::update_stats_in_functions_uplink_agora(size_t frame_id,
                 + zf_frame_summary->us_this_thread[0]
                 + demul_frame_summary->us_this_thread[0]
                 + decode_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("csi: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("csi: ");
             print_per_thread_per_task(*csi_frame_summary);
-            printf("fft: ");
+            std::printf("fft: ");
             print_per_thread_per_task(*fft_frame_summary);
-            printf("zf: ");
+            std::printf("zf: ");
             print_per_thread_per_task(*zf_frame_summary);
-            printf("demul: ");
+            std::printf("demul: ");
             print_per_thread_per_task(*demul_frame_summary);
-            printf("decode: ");
+            std::printf("decode: ");
             print_per_thread_per_task(*decode_frame_summary);
-            printf("sum: %.3f\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(
@@ -401,18 +401,18 @@ void Stats::update_stats_in_functions_downlink_agora(size_t frame_id,
                 + zf_frame_summary->us_this_thread[0]
                 + precode_frame_summary->us_this_thread[0]
                 + encode_frame_summary->us_this_thread[0];
-            printf("In frame %zu, thread %zu, \t", frame_id, i);
-            printf("csi: ");
+            std::printf("In frame %zu, thread %zu, \t", frame_id, i);
+            std::printf("csi: ");
             print_per_thread_per_task(*csi_frame_summary);
-            printf("ifft: ");
+            std::printf("ifft: ");
             print_per_thread_per_task(*ifft_frame_summary);
-            printf("zf: ");
+            std::printf("zf: ");
             print_per_thread_per_task(*zf_frame_summary);
-            printf("precode: ");
+            std::printf("precode: ");
             print_per_thread_per_task(*precode_frame_summary);
-            printf("encode: ");
+            std::printf("encode: ");
             print_per_thread_per_task(*encode_frame_summary);
-            printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
+            std::printf("sum: %.3f us\n", sum_us_this_frame_this_thread);
         }
     }
     compute_avg_over_threads(
@@ -430,13 +430,13 @@ void Stats::save_to_file()
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
-    printf("Stats: Saving master timestamps to %s\n", filename.c_str());
+    std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr,
         std::string("Open file failed ") + std::to_string(errno));
 
     if (config_->downlink_mode) {
-        fprintf(fp_debug,
+        std::fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
             "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
@@ -446,7 +446,7 @@ void Stats::save_to_file()
             for (size_t j = 0; j < config_->socket_thread_num; j++) {
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
-            fprintf(fp_debug,
+            std::fprintf(fp_debug,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
                 cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
                 master_get_us_from_ref(TsType::kPilotRX, i, ref_tsc),
@@ -461,7 +461,7 @@ void Stats::save_to_file()
         }
     } else {
         // Print the header
-        fprintf(fp_debug,
+        std::fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
             "kZFDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
@@ -472,7 +472,7 @@ void Stats::save_to_file()
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
 
-            fprintf(fp_debug,
+            std::fprintf(fp_debug,
                 "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
                 "%.3f %.3f\n",
                 cycles_to_us(ref_tsc - creation_tsc, freq_ghz),
@@ -493,19 +493,19 @@ void Stats::save_to_file()
     if (kIsWorkerTimingEnabled) {
         std::string filename_detailed
             = cur_directory + "/data/timeresult_detail.txt";
-        printf("Stats: Printing detailed results to %s\n",
+        std::printf("Stats: Printing detailed results to %s\n",
             filename_detailed.c_str());
 
         FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
         rt_assert(fp_debug_detailed != nullptr,
             std::string("Open file failed ") + std::to_string(errno));
         // Print the header
-        fprintf(fp_debug_detailed,
+        std::fprintf(fp_debug_detailed,
             "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
             "decode_0, decode_1, decode_2\n");
 
         for (size_t i = 0; i < last_frame_id; i++) {
-            fprintf(fp_debug_detailed,
+            std::fprintf(fp_debug_detailed,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
                 fft_breakdown_us[0][i] + csi_breakdown_us[0][i],
                 fft_breakdown_us[1][i] + csi_breakdown_us[1][i],
@@ -531,9 +531,9 @@ size_t Stats::get_total_task_count(DoerType doer_type, size_t thread_num)
 
 void Stats::print_summary()
 {
-    printf("Stats: total processed frames %zu\n", last_frame_id + 1);
+    std::printf("Stats: total processed frames %zu\n", last_frame_id + 1);
     if (!kIsWorkerTimingEnabled) {
-        printf("Stats: Worker timing is disabled. Not printing summary\n");
+        std::printf("Stats: Worker timing is disabled. Not printing summary\n");
         return;
     }
 
@@ -565,13 +565,13 @@ void Stats::print_summary()
         double encode_frames = (double)num_encode_tasks
             / c->LDPC_config.nblocksInSymbol / c->UE_NUM
             / c->dl_data_symbol_num_perframe;
-        printf("Downlink totals (tasks, frames): ");
-        printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
-        printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
-        printf("Encode (%zu, %.2f), ", num_encode_tasks, encode_frames);
-        printf("Precode (%zu, %.2f), ", num_precode_tasks, precode_frames);
-        printf("IFFT (%zu, %.2f)", num_ifft_tasks, ifft_frames);
-        printf("\n");
+        std::printf("Downlink totals (tasks, frames): ");
+        std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
+        std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
+        std::printf("Encode (%zu, %.2f), ", num_encode_tasks, encode_frames);
+        std::printf("Precode (%zu, %.2f), ", num_precode_tasks, precode_frames);
+        std::printf("IFFT (%zu, %.2f)", num_ifft_tasks, ifft_frames);
+        std::printf("\n");
         for (size_t i = 0; i < task_thread_num; i++) {
             size_t num_csi_i = get_duration_stat(DoerType::kCSI, i)->task_count;
             size_t num_zf_i = get_duration_stat(DoerType::kZF, i)->task_count;
@@ -587,13 +587,13 @@ void Stats::print_summary()
             double percent_precode = num_precode_i * 100.0 / num_precode_tasks;
             double percent_ifft = num_ifft_i * 100.0 / num_ifft_tasks;
             double percent_encode = num_encode_i * 100.0 / num_encode_tasks;
-            printf("Thread %zu performed (tasks, fraction of tasks): ", i);
-            printf("CSI (%zu, %.2f%%), ", num_csi_i, percent_csi);
-            printf("ZF (%zu, %.2f%%), ", num_zf_i, percent_zf);
-            printf("Encode (%zu, %.2f%%), ", num_encode_i, percent_encode);
-            printf("Precode (%zu, %.2f%%), ", num_precode_i, percent_precode);
-            printf("IFFT (%zu, %.2f%%)", num_ifft_i, percent_ifft);
-            printf("\n");
+            std::printf("Thread %zu performed (tasks, fraction of tasks): ", i);
+            std::printf("CSI (%zu, %.2f%%), ", num_csi_i, percent_csi);
+            std::printf("ZF (%zu, %.2f%%), ", num_zf_i, percent_zf);
+            std::printf("Encode (%zu, %.2f%%), ", num_encode_i, percent_encode);
+            std::printf("Precode (%zu, %.2f%%), ", num_precode_i, percent_precode);
+            std::printf("IFFT (%zu, %.2f%%)", num_ifft_i, percent_ifft);
+            std::printf("\n");
         }
     } else {
         double fft_frames = (double)num_fft_tasks / c->BS_ANT_NUM
@@ -603,13 +603,13 @@ void Stats::print_summary()
         double decode_frames = (double)num_decode_tasks
             / c->LDPC_config.nblocksInSymbol / c->UE_NUM
             / c->ul_data_symbol_num_perframe;
-        printf("Uplink totals (tasks, frames): ");
-        printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
-        printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
-        printf("FFT (%zu, %.2f), ", num_fft_tasks, fft_frames);
-        printf("Demul (%zu, %.2f), ", num_demul_tasks, demul_frames);
-        printf("Decode (%zu, %.2f)", num_decode_tasks, decode_frames);
-        printf("\n");
+        std::printf("Uplink totals (tasks, frames): ");
+        std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
+        std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
+        std::printf("FFT (%zu, %.2f), ", num_fft_tasks, fft_frames);
+        std::printf("Demul (%zu, %.2f), ", num_demul_tasks, demul_frames);
+        std::printf("Decode (%zu, %.2f)", num_decode_tasks, decode_frames);
+        std::printf("\n");
         for (size_t i = 0; i < task_thread_num; i++) {
             size_t num_csi_i = get_duration_stat(DoerType::kCSI, i)->task_count;
             size_t num_fft_i = get_duration_stat(DoerType::kFFT, i)->task_count;
@@ -625,13 +625,13 @@ void Stats::print_summary()
             double percent_demul = num_demul_i * 100.0 / num_demul_tasks;
             double percent_decode = num_decode_i * 100.0 / num_decode_tasks;
 
-            printf("Thread %zu performed (tasks, fraction of tasks): ", i);
-            printf("CSI (%zu, %.1f%%), ", num_csi_i, percent_csi);
-            printf("ZF (%zu, %.1f%%), ", num_zf_i, percent_zf);
-            printf("FFT (%zu, %.1f%%), ", num_fft_i, percent_fft);
-            printf("Demul (%zu, %.1f%%), ", num_demul_i, percent_demul);
-            printf("Decode (%zu, %.1f%%) ", num_decode_i, percent_decode);
-            printf("\n");
+            std::printf("Thread %zu performed (tasks, fraction of tasks): ", i);
+            std::printf("CSI (%zu, %.1f%%), ", num_csi_i, percent_csi);
+            std::printf("ZF (%zu, %.1f%%), ", num_zf_i, percent_zf);
+            std::printf("FFT (%zu, %.1f%%), ", num_fft_i, percent_fft);
+            std::printf("Demul (%zu, %.1f%%), ", num_demul_i, percent_demul);
+            std::printf("Decode (%zu, %.1f%%) ", num_decode_i, percent_decode);
+            std::printf("\n");
         }
     }
 }

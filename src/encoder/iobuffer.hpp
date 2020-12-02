@@ -3,11 +3,6 @@
 
 #include "encoder.hpp"
 #include <immintrin.h>
-#include <math.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 namespace avx2enc {
 void adapter_2to64(int8_t* pBuff0, __int8_t* pBuff1, uint16_t zcSize,

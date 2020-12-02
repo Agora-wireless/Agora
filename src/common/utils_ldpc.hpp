@@ -6,8 +6,8 @@
 #include "iobuffer.hpp"
 #include "phy_ldpc_encoder_5gnr.h"
 #include "utils.h"
-#include <assert.h>
-#include <malloc.h>
+
+#include <cstdlib> /* for std::aligned_alloc */
 
 LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize, uint8_t num_ways);
 
@@ -18,7 +18,7 @@ T* aligned_malloc(const int size, const unsigned alignment)
     return (T*)rte_malloc(NULL, sizeof(T) * size, alignment);
 #else
 #ifndef _WIN64
-    return (T*)memalign(alignment, sizeof(T) * size);
+    return (T*)std::aligned_alloc(alignment, sizeof(T) * size);
 #else
     return (T*)_aligned_malloc(sizeof(T) * size, alignment);
 #endif
@@ -230,27 +230,26 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
     static size_t kNumPuncturedCols = 2;
     if (zc % 4 == 0) {
         // In this case, the start and end of punctured input bits is
-        // byte-aligned, so we can memcpy
+        // byte-aligned, so we can std::memcpy
         const size_t num_punctured_bytes
             = bits_to_bytes(zc * kNumPuncturedCols);
         const size_t num_input_bytes_to_copy
             = bits_to_bytes(num_input_bits) - num_punctured_bytes;
 
-        memcpy(encoded_buffer, input_buffer + num_punctured_bytes,
-            num_input_bytes_to_copy);
-        memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
+        std::memcpy(encoded_buffer, input_buffer + num_punctured_bytes, num_input_bytes_to_copy);
+        std::memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
             bits_to_bytes(num_parity_bits));
     } else {
-        // Otherwise, we need to memcpy from/to byte-unaligned locations. A
+        // Otherwise, we need to std::memcpy from/to byte-unaligned locations. A
         // simple but perhaps inefficient way to do this is to use the encoder's
         // internal scatter/gather functions. We don't have access to these
         // functions for FlexRAN's internal AVX-512 encoder.
         if (zc >= avx2enc::kProcBytes * 8) {
-            fprintf(stderr,
+            std::fprintf(stderr,
                 "Zc values >= %zu that are not multiples of four are not "
                 "supported yet.\n",
                 zc);
-            exit(-1);
+            std::exit(-1);
         }
 
         __attribute__((aligned(avx2enc::kProcBytes)))
@@ -271,11 +270,11 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
         adapter_func(parity_buffer, internal_buffer1, zc, num_parity_bits, 1);
 
         // Concactenate the chunks for input and parity
-        memcpy(internal_buffer2,
+        std::memcpy(internal_buffer2,
             internal_buffer0 + kNumPuncturedCols * avx2enc::kProcBytes,
             (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
                 * avx2enc::kProcBytes);
-        memcpy(internal_buffer2
+        std::memcpy(internal_buffer2
                 + (ldpc_num_input_cols(base_graph) - kNumPuncturedCols)
                     * avx2enc::kProcBytes,
             internal_buffer1,

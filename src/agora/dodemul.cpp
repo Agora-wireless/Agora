@@ -1,6 +1,5 @@
 #include "dodemul.hpp"
 #include "concurrent_queue_wrapper.hpp"
-#include <malloc.h>
 
 static constexpr bool kUseSIMDGather = true;
 
@@ -21,11 +20,11 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
     data_gather_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
+        std::aligned_alloc(64, kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
     equaled_buffer_temp = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+        std::aligned_alloc(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
     equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+        std::aligned_alloc(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
@@ -41,9 +40,9 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
         MKL_NOTRANS, MKL_NOTRANS, cfg->UE_NUM, 1, cfg->BS_ANT_NUM, &alpha,
         cfg->UE_NUM, cfg->BS_ANT_NUM, &beta, cfg->UE_NUM);
     if (MKL_JIT_ERROR == status) {
-        fprintf(stderr,
+        std::fprintf(stderr,
             "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-        exit(1);
+        std::exit(1);
     }
     mkl_jit_cgemm = mkl_jit_get_cgemm_ptr(jitter);
 #endif
@@ -51,9 +50,9 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
 
 DoDemul::~DoDemul()
 {
-    free(data_gather_buffer);
-    free(equaled_buffer_temp);
-    free(equaled_buffer_temp_transposed);
+    std::free(data_gather_buffer);
+    std::free(equaled_buffer_temp);
+    std::free(equaled_buffer_temp_transposed);
 }
 
 Event_data DoDemul::launch(size_t tag)
@@ -69,7 +68,7 @@ Event_data DoDemul::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
-        printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
+        std::printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
             tid, frame_id, symbol_idx_ul, base_sc_id);
     }
 
@@ -245,15 +244,15 @@ Event_data DoDemul::launch(size_t tag)
             demod_64qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
         default:
-            printf("Demodulation: modulation type %s not supported!\n",
+            std::printf("Demodulation: modulation type %s not supported!\n",
                 cfg->modulation.c_str());
         }
-        // printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
+        // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
         //     tid, frame_id, symbol_idx_ul, base_sc_id);
         // cout << "Demuled data : \n ";
         // cout << " UE " << i << ": ";
         // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits; k++)
-        //     printf("%i ", demul_ptr[k]);
+        //     std::printf("%i ", demul_ptr[k]);
         // cout << endl;
     }
 

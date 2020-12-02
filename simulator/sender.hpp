@@ -17,17 +17,11 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <iostream>
-#include <malloc.h>
 #include <numeric>
 #include <pthread.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <thread>
-#include <time.h>
 #include <unistd.h>
 #include <vector>
 

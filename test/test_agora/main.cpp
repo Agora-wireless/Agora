@@ -7,24 +7,24 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     size_t UE_NUM = cfg->UE_NUM;
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
-        printf("open file failed: %s\n", filename.c_str());
+        std::printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     } else {
-        printf("opening file %s\n", filename.c_str());
+        std::printf("opening file %s\n", filename.c_str());
     }
     int expect_num_bytes = num_bytes_per_ue * UE_NUM;
-    // printf("read data of %d byptes\n", expect_num_bytes);
+    // std::printf("read data of %d byptes\n", expect_num_bytes);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
         // if (i == 0) {
-        // printf("i: %d\n", i);
+        // std::printf("i: %d\n", i);
         // for (int j = 0; j < num_bytes; j++) {
-        //     printf("%u ", data[i][j]);
+        //     std::printf("%u ", data[i][j]);
         // }
-        // printf("\n");
+        // std::printf("\n");
         // }
         if (expect_num_bytes != num_bytes) {
-            printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
+            std::printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
                    "bytes\n",
                 filename.c_str(), i, expect_num_bytes, num_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -39,13 +39,13 @@ void read_from_file_dl(
     size_t BS_ANT_NUM = cfg->BS_ANT_NUM;
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
-        printf("open file failed: %s\n", filename.c_str());
+        std::printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < data_symbol_num_perframe * BS_ANT_NUM; i++) {
         if ((unsigned)ofdm_size * 2
             != fread(data[i], sizeof(short), ofdm_size * 2, fp)) {
-            printf("read file failed: %s\n", filename.c_str());
+            std::printf("read file failed: %s\n", filename.c_str());
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
     }
@@ -87,21 +87,21 @@ void check_correctness_ul(Config* cfg)
                 if (raw_data[i][offset_in_raw]
                     != output_data[i][offset_in_output]) {
                     error_cnt++;
-                    // printf("(%d, %d, %u, %u)\n", i, j,
+                    // std::printf("(%d, %d, %u, %u)\n", i, j,
                     //     raw_data[i][offset_in_raw],
                     //     output_data[i][offset_in_output]);
                 }
             }
         }
     }
-    printf("======================\n");
-    printf("Uplink test: \n\n");
+    std::printf("======================\n");
+    std::printf("Uplink test: \n\n");
     if (error_cnt == 0)
-        printf("Passed uplink test!\n");
+        std::printf("Passed uplink test!\n");
     else
-        printf(
+        std::printf(
             "Failed uplink test! Error rate: %d/%d\n", error_cnt, total_count);
-    printf("======================\n\n");
+    std::printf("======================\n\n");
     raw_data.free();
     output_data.free();
 }
@@ -133,7 +133,7 @@ void check_correctness_dl(Config* cfg)
     float sum_diff = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         for (int ant = 0; ant < BS_ANT_NUM; ant++) {
-            // printf("symbol %d, antenna %d\n", i, ant);
+            // std::printf("symbol %d, antenna %d\n", i, ant);
             sum_diff = 0;
             total_count++;
             for (int sc = 0; sc < sampsPerSymbol * 2; sc++) {
@@ -142,24 +142,24 @@ void check_correctness_dl(Config* cfg)
                     (raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
                 sum_diff += diff;
                 // if (i == 0)
-                // printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
+                // std::printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
                 //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
             }
             float avg_diff = sum_diff / sampsPerSymbol;
-            printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
+            std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
                 avg_diff);
             if (avg_diff > 0.03)
                 error_cnt++;
         }
     }
-    printf("======================\n");
-    printf("Downlink test: \n\n");
+    std::printf("======================\n");
+    std::printf("Downlink test: \n\n");
     if (error_cnt == 0)
-        printf("Passed downlink test!\n");
+        std::printf("Passed downlink test!\n");
     else
-        printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
+        std::printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
             total_count);
-    printf("======================\n\n");
+    std::printf("======================\n\n");
     raw_data.free();
     tx_data.free();
 }
@@ -184,7 +184,7 @@ int main(int argc, char* argv[])
         agora_cli->flags.enable_save_tx_data_to_file = true;
         agora_cli->start();
 
-        printf("Start correctness check\n");
+        std::printf("Start correctness check\n");
         if (cfg->downlink_mode)
             check_correctness_dl(cfg);
         else

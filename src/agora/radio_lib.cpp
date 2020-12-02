@@ -38,7 +38,7 @@ RadioConfig::RadioConfig(Config* cfg)
         if (pthread_create(&init_thread_, NULL, initBSRadio_launch, context)
             != 0) {
             perror("init thread create failed");
-            exit(0);
+            std::exit(0);
         }
 #else
         initBSRadio(context);
@@ -51,7 +51,7 @@ RadioConfig::RadioConfig(Config* cfg)
         size_t _num_radios_initialized = num_radios_initialized;
         num_checks++;
         if (num_checks > 1e9) {
-            printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
+            std::printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
                    "ready\n",
                 _num_radios_initialized, this->_radioNum);
             num_checks = 0;
@@ -76,7 +76,7 @@ RadioConfig::RadioConfig(Config* cfg)
                 RadioConfig::configureBSRadio_launch, context)
             != 0) {
             perror("init thread create failed");
-            exit(0);
+            std::exit(0);
         }
 #else
         configureBSRadio(context);
@@ -88,7 +88,7 @@ RadioConfig::RadioConfig(Config* cfg)
         size_t _num_radios_configured = num_radios_configured;
         num_checks++;
         if (num_checks > 1e9) {
-            printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
+            std::printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
                    "ready\n",
                 _num_radios_configured, this->_radioNum);
             num_checks = 0;
@@ -100,62 +100,62 @@ RadioConfig::RadioConfig(Config* cfg)
                   << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
         for (size_t c = 0; c < _cfg->nChannels; c++) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_RX)) {
-                printf("RX Channel %zu\n", c);
-                printf("Actual RX sample rate: %fMSps...\n",
+                std::printf("RX Channel %zu\n", c);
+                std::printf("Actual RX sample rate: %fMSps...\n",
                     (baStn[i]->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
-                printf("Actual RX frequency: %fGHz...\n",
+                std::printf("Actual RX frequency: %fGHz...\n",
                     (baStn[i]->getFrequency(SOAPY_SDR_RX, c) / 1e9));
-                printf("Actual RX gain: %f...\n",
+                std::printf("Actual RX gain: %f...\n",
                     (baStn[i]->getGain(SOAPY_SDR_RX, c)));
                 if (!kUseUHD) {
-                    printf("Actual RX LNA gain: %f...\n",
+                    std::printf("Actual RX LNA gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA")));
-                    printf("Actual RX PGA gain: %f...\n",
+                    std::printf("Actual RX PGA gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
-                    printf("Actual RX TIA gain: %f...\n",
+                    std::printf("Actual RX TIA gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
                     if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
                         == 0) {
-                        printf("Actual RX LNA1 gain: %f...\n",
+                        std::printf("Actual RX LNA1 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
-                        printf("Actual RX LNA2 gain: %f...\n",
+                        std::printf("Actual RX LNA2 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA2")));
                     }
                 }
-                printf("Actual RX bandwidth: %fM...\n",
+                std::printf("Actual RX bandwidth: %fM...\n",
                     (baStn[i]->getBandwidth(SOAPY_SDR_RX, c) / 1e6));
-                printf("Actual RX antenna: %s...\n",
+                std::printf("Actual RX antenna: %s...\n",
                     (baStn[i]->getAntenna(SOAPY_SDR_RX, c).c_str()));
             }
         }
 
         for (size_t c = 0; c < _cfg->nChannels; c++) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_TX)) {
-                printf("TX Channel %zu\n", c);
-                printf("Actual TX sample rate: %fMSps...\n",
+                std::printf("TX Channel %zu\n", c);
+                std::printf("Actual TX sample rate: %fMSps...\n",
                     (baStn[i]->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
-                printf("Actual TX frequency: %fGHz...\n",
+                std::printf("Actual TX frequency: %fGHz...\n",
                     (baStn[i]->getFrequency(SOAPY_SDR_TX, c) / 1e9));
-                printf("Actual TX gain: %f...\n",
+                std::printf("Actual TX gain: %f...\n",
                     (baStn[i]->getGain(SOAPY_SDR_TX, c)));
                 if (!kUseUHD) {
-                    printf("Actual TX PAD gain: %f...\n",
+                    std::printf("Actual TX PAD gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
-                    printf("Actual TX IAMP gain: %f...\n",
+                    std::printf("Actual TX IAMP gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
                     if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
                         == 0) {
-                        printf("Actual TX PA1 gain: %f...\n",
+                        std::printf("Actual TX PA1 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
-                        printf("Actual TX PA2 gain: %f...\n",
+                        std::printf("Actual TX PA2 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA2")));
-                        printf("Actual TX PA3 gain: %f...\n",
+                        std::printf("Actual TX PA3 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA3")));
                     }
                 }
-                printf("Actual TX bandwidth: %fM...\n",
+                std::printf("Actual TX bandwidth: %fM...\n",
                     (baStn[i]->getBandwidth(SOAPY_SDR_TX, c) / 1e6));
-                printf("Actual TX antenna: %s...\n",
+                std::printf("Actual TX antenna: %s...\n",
                     (baStn[i]->getAntenna(SOAPY_SDR_TX, c).c_str()));
             }
         }

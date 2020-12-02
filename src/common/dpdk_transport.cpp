@@ -87,7 +87,7 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
 
     struct rte_ether_addr addr;
     rte_eth_macaddr_get(port, &addr);
-    printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+    std::printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
            " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
         port, rte_eth_dev_socket_id(port), addr.addr_bytes[0],
         addr.addr_bytes[1], addr.addr_bytes[2], addr.addr_bytes[3],
@@ -96,12 +96,12 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
     struct rte_eth_link link;
     rte_eth_link_get_nowait(port, &link);
     while (!link.link_status) {
-        printf("Waiting for link up on NIC %" PRIu16 "\n", port);
+        std::printf("Waiting for link up on NIC %" PRIu16 "\n", port);
         sleep(1);
         rte_eth_link_get_nowait(port, &link);
     }
     if (!link.link_status) {
-        printf("Link down on NIC %" PRIx16 "\n", port);
+        std::printf("Link down on NIC %" PRIx16 "\n", port);
         return 0;
     }
 
@@ -111,7 +111,7 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
 // Reference: https://stackoverflow.com/a/44948720
 void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
 {
-    // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,
+    // std::printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,
     // %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31),
     // (intptr_t(pvSrc) & 31) ); assert(nBytes % 32 == 0);
     // assert((intptr_t(pvDest) & 31) == 0);
@@ -160,7 +160,7 @@ void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,
     b[10] = dst_port & 0xFF;
     b[11] = (dst_port >> 8) & 0xFF;
     dp = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
-    printf("In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n",
+    std::printf("In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n",
         tid, b[0], b[1], b[2], b[3], sp, b[6], b[7], b[8], b[9], dp, len);
 }
 
@@ -171,11 +171,11 @@ void DpdkTransport::install_flow_rule(uint16_t port_id, uint16_t rx_q,
     struct rte_flow_item pattern[4];
     struct rte_flow_action action[2];
     struct rte_flow_action_queue queue = { .index = rx_q };
-    memset(pattern, 0, sizeof(pattern));
-    memset(action, 0, sizeof(action));
+    std::memset(pattern, 0, sizeof(pattern));
+    std::memset(action, 0, sizeof(action));
 
     // Set the rule attribute. Only ingress packets will be checked.
-    memset(&attr, 0, sizeof(struct rte_flow_attr));
+    std::memset(&attr, 0, sizeof(struct rte_flow_attr));
     attr.ingress = 1;
     attr.priority = 0;
 
@@ -191,8 +191,8 @@ void DpdkTransport::install_flow_rule(uint16_t port_id, uint16_t rx_q,
     // Set the second level of the pattern (IP)
     struct rte_flow_item_ipv4 ip_spec;
     struct rte_flow_item_ipv4 ip_mask;
-    memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
-    memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
+    std::memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
+    std::memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
     ip_spec.hdr.dst_addr = dest_ip;
     ip_mask.hdr.dst_addr = 0xffffffff;
     ip_spec.hdr.src_addr = src_ip;
@@ -240,9 +240,9 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
 
     rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_buf, rte_ether_hdr*);
     eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-    memcpy(eth_hdr->s_addr.addr_bytes, src_mac_addr.addr_bytes,
+    std::memcpy(eth_hdr->s_addr.addr_bytes, src_mac_addr.addr_bytes,
         RTE_ETHER_ADDR_LEN);
-    memcpy(eth_hdr->d_addr.addr_bytes, dst_mac_addr.addr_bytes,
+    std::memcpy(eth_hdr->d_addr.addr_bytes, dst_mac_addr.addr_bytes,
         RTE_ETHER_ADDR_LEN);
 
     auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
@@ -291,7 +291,7 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
 rte_mempool* DpdkTransport::create_mempool(size_t packet_length)
 {
     unsigned int nb_ports = rte_eth_dev_count_avail();
-    printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
+    std::printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
 
     size_t mbuf_size = packet_length + MBUF_CACHE_SIZE;
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",

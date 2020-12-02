@@ -1,7 +1,6 @@
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "datatype_conversion.h"
-#include <malloc.h>
 
 using namespace arma;
 
@@ -34,15 +33,15 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
 
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+        std::aligned_alloc(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
     temp_16bits_iq
-        = reinterpret_cast<uint16_t*>(memalign(64, 32 * sizeof(uint16_t)));
+        = reinterpret_cast<uint16_t*>(std::aligned_alloc(64, 32 * sizeof(uint16_t)));
 }
 
 DoFFT::~DoFFT()
 {
     DftiFreeDescriptor(&mkl_handle);
-    free(fft_inout);
+    std::free(fft_inout);
     calib_ul_buffer_.free();
     calib_dl_buffer_.free();
 }
@@ -116,14 +115,14 @@ Event_data DoFFT::launch(size_t tag)
         }
 
         if (kDebugPrintInTask) {
-            printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
+            std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
                 tid, frame_id, symbol_id, ant_id);
             if (kPrintFFTInput) {
-                printf("FFT input\n");
+                std::printf("FFT input\n");
                 for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-                    printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
+                    std::printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
                 }
-                printf("\n");
+                std::printf("\n");
             }
         }
     }
@@ -304,7 +303,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
 
     // Aligned for SIMD
     ifft_out = reinterpret_cast<float*>(
-        memalign(64, 2 * cfg->OFDM_CA_NUM * sizeof(float)));
+        std::aligned_alloc(64, 2 * cfg->OFDM_CA_NUM * sizeof(float)));
 }
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
@@ -318,7 +317,7 @@ Event_data DoIFFT::launch(size_t tag)
     size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
 
     if (kDebugPrintInTask) {
-        printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
+        std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
             tid, frame_id, symbol_id, ant_id);
     }
 
@@ -334,10 +333,10 @@ Event_data DoIFFT::launch(size_t tag)
         = (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out : ifft_in_ptr;
 
     if (kMemcpyBeforeIFFT) {
-        memset(ifft_out_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
-        memset(ifft_out_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
+        std::memset(ifft_out_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
+        std::memset(ifft_out_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
             sizeof(float) * cfg->OFDM_DATA_START * 2);
-        memcpy(ifft_out_ptr + (cfg->OFDM_DATA_START) * 2,
+        std::memcpy(ifft_out_ptr + (cfg->OFDM_DATA_START) * 2,
             ifft_in_ptr + (cfg->OFDM_DATA_START) * 2,
             sizeof(float) * cfg->OFDM_DATA_NUM * 2);
         DftiComputeBackward(mkl_handle, ifft_out_ptr);
@@ -348,19 +347,19 @@ Event_data DoIFFT::launch(size_t tag)
             // to 0 since their values are not changed after IFFT
             DftiComputeBackward(mkl_handle, ifft_in_ptr, ifft_out_ptr);
         } else {
-            memset(ifft_in_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
-            memset(ifft_in_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
+            std::memset(ifft_in_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
+            std::memset(ifft_in_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
                 sizeof(float) * cfg->OFDM_DATA_START * 2);
             DftiComputeBackward(mkl_handle, ifft_in_ptr);
         }
     }
 
     if (kPrintIFFTOutput) {
-        printf("data after ifft\n");
+        std::printf("data after ifft\n");
         for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
-            printf("%.1f+%.1fj ", dl_ifft_buffer_[offset][i].re,
+            std::printf("%.1f+%.1fj ", dl_ifft_buffer_[offset][i].re,
                 dl_ifft_buffer_[offset][i].im);
-        printf("\n");
+        std::printf("\n");
     }
 
     size_t start_tsc2 = worker_rdtsc();
@@ -378,11 +377,11 @@ Event_data DoIFFT::launch(size_t tag)
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
     if (kPrintSocketOutput) {
-        printf("IFFT data in socket\n");
+        std::printf("IFFT data in socket\n");
         for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-            printf("%hi+%hij ", socket_ptr[i * 2], socket_ptr[i * 2 + 1]);
+            std::printf("%hi+%hij ", socket_ptr[i * 2], socket_ptr[i * 2 + 1]);
         }
-        printf("\n");
+        std::printf("\n");
     }
 
     duration_stat->task_count++;

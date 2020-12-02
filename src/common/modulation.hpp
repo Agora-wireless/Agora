@@ -9,7 +9,6 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <iostream>
-#include <stdio.h>
 
 #define SCALE_BYTE_CONV_QAM16 100
 #define SCALE_BYTE_CONV_QAM64 100

@@ -1,7 +1,6 @@
 #include "dozf.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "doer.hpp"
-#include <malloc.h>
 
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
@@ -24,18 +23,18 @@ DoZF::DoZF(Config* config, int tid,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
+        std::aligned_alloc(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     csi_gather_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
+        std::aligned_alloc(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     calib_gather_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, kMaxAntennas * sizeof(complex_float)));
+        std::aligned_alloc(64, kMaxAntennas * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
 {
-    free(pred_csi_buffer);
-    free(csi_gather_buffer);
-    free(calib_gather_buffer);
+    std::free(pred_csi_buffer);
+    std::free(csi_gather_buffer);
+    std::free(calib_gather_buffer);
 }
 
 Event_data DoZF::launch(size_t tag)
@@ -172,7 +171,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
-        printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
+        std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
             frame_id, base_sc_id);
     }
     size_t num_subcarriers
@@ -240,7 +239,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         duration_stat->task_count++;
         duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
         // if (duration > 500) {
-        //     printf("Thread %d ZF takes %.2f\n", tid, duration);
+        //     std::printf("Thread %d ZF takes %.2f\n", tid, duration);
         // }
     }
 }
@@ -251,7 +250,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
-        printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
+        std::printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
                "BS_ANT_NUM: %zu\n",
             tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM,
             cfg->BS_ANT_NUM);
@@ -297,7 +296,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
 
     // if (duration > 500) {
-    //     printf("Thread %d ZF takes %.2f\n", tid, duration);
+    //     std::printf("Thread %d ZF takes %.2f\n", tid, duration);
     // }
 }
 
@@ -314,7 +313,7 @@ void DoZF::Predict(size_t tag)
         = ((frame_id % kFrameWnd) * cfg->OFDM_DATA_NUM)
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
-    memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
+    std::memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
         sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
     arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 

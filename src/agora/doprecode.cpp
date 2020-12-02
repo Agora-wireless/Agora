@@ -33,9 +33,9 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
         cfg->BS_ANT_NUM, cfg->UE_NUM, &beta, cfg->BS_ANT_NUM);
 
     if (MKL_JIT_ERROR == status) {
-        fprintf(stderr,
+        std::fprintf(stderr,
             "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-        exit(1);
+        std::exit(1);
     }
     my_cgemm = mkl_jit_get_cgemm_ptr(jitter);
 #endif
@@ -63,10 +63,10 @@ Event_data DoPrecode::launch(size_t tag)
     // In downlink data symbols, pilot subcarriers are every
     // OFDM_PILOT_SPACING subcarriers
     // if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
-    //     memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
+    //     std::memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
     // } else {
     //     // Find subcarriers used as pilot in this block
-    //     memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
+    //     std::memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
     //     size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
     //     size_t first_pilot_sc
     //         = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
@@ -76,7 +76,7 @@ Event_data DoPrecode::launch(size_t tag)
     // }
 
     if (kDebugPrintInTask) {
-        printf(
+        std::printf(
             "In doPrecode thread %d: frame %zu, symbol %zu, subcarrier %zu\n",
             tid, frame_id, symbol_id, base_sc_id);
     }
@@ -139,7 +139,7 @@ Event_data DoPrecode::launch(size_t tag)
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     if (kDebugPrintInTask) {
-        printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
+        std::printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
                "subcarrier: %zu\n",
             tid, frame_id, symbol_id, base_sc_id);
     }

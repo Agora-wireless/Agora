@@ -15,7 +15,7 @@ void PacketTXRX::loop_tx_rx_usrp(int tid)
     int rx_offset = 0;
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    std::printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     // prepare BS beacon in host buffer
     std::vector<void*> beaconbuff(2);
@@ -131,7 +131,7 @@ struct Packet* PacketTXRX::recv_enqueue_usrp(
     for (int ch = 0; ch < nChannels; ++ch) {
         // if rx_buffer is full, exit
         if (rx_buffer_status[rx_offset + ch] == 1) {
-            printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
+            std::printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
                 rx_offset);
             cfg->running = false;
             break;
@@ -169,8 +169,8 @@ struct Packet* PacketTXRX::recv_enqueue_usrp(
                 EventType::kPacketRX, rx_tag_t(tid, rx_offset + ch)._tag);
 
             if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-                printf("socket message enqueue failed\n");
-                exit(0);
+                std::printf("socket message enqueue failed\n");
+                std::exit(0);
             }
         }
     }
@@ -185,7 +185,7 @@ int PacketTXRX::dequeue_send_usrp(int tid)
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
-    printf("tx queue length: %zu\n", task_queue_->size_approx());
+    std::printf("tx queue length: %zu\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
@@ -225,7 +225,7 @@ int PacketTXRX::dequeue_send_usrp(int tid)
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
     if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+        std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
@@ -245,7 +245,7 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
         return -1;
     std::cout << "DDD" << std::endl;
 
-    printf("tx queue length: %zu\n", task_queue_->size_approx());
+    std::printf("tx queue length: %zu\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
@@ -289,7 +289,7 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
     if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %d, symbol %d, "
+        std::printf("In TX thread %d: Transmitted frame %d, symbol %d, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());

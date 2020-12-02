@@ -15,7 +15,7 @@ void PacketTXRX::loop_tx_rx_argos(int tid)
     int rx_offset = 0;
     int radio_lo = tid * cfg->nRadios / socket_thread_num;
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    printf("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    std::printf("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int prev_frame_id = -1;
     int radio_id = radio_lo;
@@ -56,7 +56,7 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
     for (int ch = 0; ch < nChannels; ++ch) {
         // if rx_buffer is full, exit
         if (rx_buffer_status[rx_offset + ch] == 1) {
-            printf(
+            std::printf(
                 "TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
             cfg->running = false;
             break;
@@ -85,8 +85,8 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
             EventType::kPacketRX, rx_tag_t(tid, rx_offset + ch)._tag);
 
         if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
+            std::printf("socket message enqueue failed\n");
+            std::exit(0);
         }
     }
     return pkt[0];
@@ -99,7 +99,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
@@ -153,7 +153,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
     if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+        std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());

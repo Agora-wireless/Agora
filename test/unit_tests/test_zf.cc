@@ -47,7 +47,7 @@ TEST(TestZF, Perf)
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
 
-    printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
+    std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 }
 
 int main(int argc, char** argv)
