@@ -330,3 +330,31 @@ void Utils::print_vec(arma::cx_fvec c, std::string ss)
     so << std::endl;
     std::cout << so.str();
 }
+
+void Utils::print_rmat(arma::fmat c)
+{
+    size_t print_rows = std::min((size_t)c.n_rows, (size_t)NUM_ROWS_PRINT);
+    std::cout << "Printing only " << print_rows << " rows !!" << std::endl;
+    std::stringstream so;
+    for (size_t i = 0; i < c.n_cols; i++) {
+        so << "row" << i << " = [";
+        for (size_t j = 0; j < print_rows; j++)
+            so << std::fixed << std::setw(8) << std::setprecision(6)
+               << c.at(j, i) << " ";
+        so << "];\n";
+    }
+    so << std::endl;
+    std::cout << so.str();
+}
+
+void Utils::print_rvec(arma::frowvec c, std::string ss)
+{
+    std::stringstream so;
+    so << ss << " = [";
+    for (size_t j = 0; j < c.n_elem; j++)
+        so << std::fixed << std::setw(8) << std::setprecision(6)
+           << c.at(j);
+    so << "];\n";
+    so << std::endl;
+    std::cout << so.str();
+}

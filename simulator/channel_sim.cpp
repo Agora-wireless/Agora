@@ -462,8 +462,12 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
 
     // Apply Channel
     cx_fmat fmat_dst;
-    bool is_downlink = true;
+    bool is_downlink = false;
+    auto begin = std::chrono::high_resolution_clock::now();
     channel->apply_chan(fmat_src, fmat_dst, is_downlink);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+    printf("do_tx_BS - FrameID: %d, Time: %.9f seconds.\n", frame_id, elapsed.count() * 1e-9);
 
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
@@ -518,8 +522,12 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 
     // Apply Channel
     cx_fmat fmat_dst;
-    bool is_downlink = false; 
+    bool is_downlink = true;
+    auto begin = std::chrono::high_resolution_clock::now();
     channel->apply_chan(fmat_src, fmat_dst, is_downlink);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+    printf("do_tx_USER - FrameID: %d, Time: %.9f seconds.\n", frame_id, elapsed.count() * 1e-9);
 
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
