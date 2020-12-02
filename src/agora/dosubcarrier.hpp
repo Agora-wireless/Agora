@@ -18,8 +18,6 @@
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h>
-#include <string.h>
 #include <vector>
 
 using namespace arma;
@@ -145,7 +143,7 @@ public:
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             if (rx_status_->received_all_pilots(csi_cur_frame_)) {
                 run_csi(csi_cur_frame_, sc_range_.start);
-                printf(
+                std::printf(
                     "Main thread: pilot frame: %lu, finished CSI for all pilot "
                     "symbols\n",
                     csi_cur_frame_);
@@ -159,7 +157,7 @@ public:
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
                     n_zf_tasks_done_ = 0;
-                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    std::printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
                     zf_cur_frame_++;
                 }
             }
@@ -181,14 +179,14 @@ public:
                         int8_t* demul_ptr = demod_buffers_[demul_cur_frame_
                             % kFrameWnd][demul_cur_sym_
                             - cfg->pilot_symbol_num_perframe][i];
-                        printf("UE %zu: ", i);
+                        std::printf("UE %zu: ", i);
                         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
                             if (i % 20 == 0) {
-                                printf(
+                                std::printf(
                                     "%d ", demul_ptr[i * cfg->mod_order_bits]);
                             }
                         }
-                        printf("\n");
+                        std::printf("\n");
                     }
                     */
 
@@ -198,7 +196,7 @@ public:
                     demul_cur_sym_++;
                     if (demul_cur_sym_ == cfg->symbol_num_perframe) {
                         demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
-                        printf("Main thread: Demodulation done frame: %lu "
+                        std::printf("Main thread: Demodulation done frame: %lu "
                                "(%lu UL symbols)\n",
                             demul_cur_frame_,
                             cfg->symbol_num_perframe

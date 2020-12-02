@@ -26,7 +26,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     log_file_ = fopen(log_filename_.c_str(), "w");
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
 
-    printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
+    std::printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
         cfg_->get_frame_duration_sec() * 1000, tsc_delta_);
 
     // Set up buffers
@@ -79,7 +79,7 @@ void MacThread::process_snr_report_from_master(Event_data event)
     }
 
     float snr;
-    memcpy(&snr, &event.tags[1], sizeof(float));
+    std::memcpy(&snr, &event.tags[1], sizeof(float));
     server_.snr_[ue_id].push(snr);
 }
 
@@ -124,7 +124,7 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         // TODO: enable ARQ and ensure reliable data goes to app
         const size_t frame_data__offset
             = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
-        memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
+        std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
             cfg_->mac_payload_length);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
 
@@ -137,7 +137,7 @@ void MacThread::process_codeblocks_from_master(Event_data event)
 
             // Print information about the received symbol
             if (kLogMacPackets) {
-                fprintf(log_file_,
+                std::fprintf(log_file_,
                     "MAC thread received frame %zu, uplink symbol index %zu, "
                     "size %zu, copied to frame data offset %zu\n",
                     frame_id, symbol_idx_ul, cfg_->mac_payload_length,
@@ -151,11 +151,11 @@ void MacThread::process_codeblocks_from_master(Event_data event)
                 for (size_t i = 0; i < cfg_->mac_payload_length; i++) {
                     ss << std::to_string(ul_data_ptr[i]) << " ";
                 }
-                fprintf(log_file_, "%s\n", ss.str().c_str());
+                std::fprintf(log_file_, "%s\n", ss.str().c_str());
                 ss.str("");
             }
         } else {
-            printf("Bad Packet: CRC Check Failed! \n");
+            std::printf("Bad Packet: CRC Check Failed! \n");
         }
     }
 
@@ -166,13 +166,13 @@ void MacThread::process_codeblocks_from_master(Event_data event)
 
         udp_client->send(kRemoteHostname, kBaseRemotePort + ue_id,
             &server_.frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe);
-        fprintf(log_file_,
+        std::fprintf(log_file_,
             "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n", frame_id,
             ue_id, cfg_->mac_data_bytes_num_perframe);
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
             ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
         }
-        fprintf(log_file_, "%s\n", ss.str().c_str());
+        std::fprintf(log_file_, "%s\n", ss.str().c_str());
         ss.str("");
     }
 
@@ -196,7 +196,7 @@ void MacThread::send_control_information()
 
 void MacThread::process_control_information()
 {
-    memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
+    std::memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
     ssize_t ret = udp_control_channel->recv_nonblocking(
         &udp_control_buf_[0], udp_control_buf_.size());
     if (ret == 0) {
@@ -215,7 +215,7 @@ void MacThread::process_control_information()
 
 void MacThread::process_udp_packets_from_apps(RBIndicator ri)
 {
-    memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
+    std::memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
     ssize_t ret
         = udp_server->recv_nonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
     if (ret == 0) {
@@ -251,7 +251,7 @@ void MacThread::process_udp_packets_from_apps_server(
 
     for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
         (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
-    memcpy(
+    std::memcpy(
         &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->OFDM_DATA_NUM],
         pkt->data, udp_pkt_buf_.size());
 
@@ -269,7 +269,7 @@ void MacThread::process_udp_packets_from_apps_client(
     size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
 
     if ((*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
-        fprintf(stderr,
+        std::fprintf(stderr,
             "MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
             "packet.\n",
             radio_buf_id);
@@ -278,7 +278,7 @@ void MacThread::process_udp_packets_from_apps_client(
 
     if (kLogMacPackets) {
         std::stringstream ss;
-        fprintf(log_file_,
+        std::fprintf(log_file_,
             "MAC thread: Received data from app for frame %zu, ue %zu, size "
             "%zu:\n",
             next_frame_id_, next_radio_id_, cfg_->mac_data_bytes_num_perframe);
@@ -286,7 +286,7 @@ void MacThread::process_udp_packets_from_apps_client(
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++) {
             ss << std::to_string((uint8_t)(payload[i])) << " ";
         }
-        fprintf(log_file_, "%s\n", ss.str().c_str());
+        std::fprintf(log_file_, "%s\n", ss.str().c_str());
     }
 
     for (size_t pkt_id = 0; pkt_id < cfg_->mac_packets_perframe; pkt_id++) {
@@ -304,7 +304,7 @@ void MacThread::process_udp_packets_from_apps_client(
         pkt->crc = 0;
         pkt->rb_indicator = ri;
 
-        memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
+        std::memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
             cfg_->mac_payload_length);
         // Insert CRC
         pkt->crc
@@ -364,7 +364,7 @@ int PacketTXRX::dequeue_send(int tid)
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
@@ -376,7 +376,7 @@ int PacketTXRX::dequeue_send(int tid)
         + ant_id;
 
     if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+        std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, data_symbol_idx, ant_id,
             gen_tag_t(event.tags[0])._tag, offset,

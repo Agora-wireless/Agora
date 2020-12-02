@@ -17,10 +17,10 @@
 #include <map>
 #include <netdb.h>
 #include <stdexcept>
-#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 // Basic UDP client class based on OS sockets that supports sending messages
 // and caches remote addrinfo mappings
@@ -69,7 +69,7 @@ public:
             snprintf(port_str, sizeof(port_str), "%u", rem_port);
 
             struct addrinfo hints;
-            memset(&hints, 0, sizeof(hints));
+            std::memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_DGRAM;
             hints.ai_protocol = IPPROTO_UDP;
@@ -91,7 +91,7 @@ public:
             rem_addrinfo->ai_addrlen);
         if (ret != static_cast<ssize_t>(len)) {
             throw std::runtime_error(
-                "sendto() failed. errno = " + std::string(strerror(errno)));
+                "sendto() failed. errno = " + std::string(std::strerror(errno)));
         }
 
         if (enable_recording_flag) {

@@ -46,11 +46,11 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
         }
     }
 
-    // printf("pTempOut: \n");
+    // std::printf("pTempOut: \n");
     // for (int i = 0; i < BG1_ROW_TOTAL * kProcBytes; i++) {
-    //     printf("%i ", pTempOut[i]);
+    //     std::printf("%i ", pTempOut[i]);
     // }
-    // printf("\n");
+    // std::printf("\n");
 
     // Row Transform to resolve the small 4x4 parity matrix
     // lambdas
@@ -214,9 +214,9 @@ int32_t bblib_ldpc_encoder_5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
     // these values depend on the application
     uint16_t Zc = request->Zc;
     if (Zc > ZC_MAX) {
-        fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %d\n",
+        std::fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %d\n",
             ZC_MAX);
-        exit(-1);
+        std::exit(-1);
     }
 
     int numberCodeblocks = request->numberCodeblocks;

@@ -95,7 +95,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
 
-    printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
+    std::printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
         num_tasks, ms / num_tasks);
 }
 

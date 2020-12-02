@@ -50,12 +50,7 @@
 #ifndef _PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
 #define _PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
 #include <immintrin.h> // AVX
-#include <stdint.h>
 
 #include "common_typedef_sdk.h"
 

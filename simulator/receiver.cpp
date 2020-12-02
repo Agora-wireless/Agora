@@ -28,7 +28,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     buffer_status_ = &in_buffer_status;
     frame_start_ = &in_frame_start;
 
-    printf("start Recv thread\n");
+    std::printf("start Recv thread\n");
     std::vector<pthread_t> created_threads;
 
     for (size_t i = 0; i < rx_thread_num_; i++) {
@@ -40,7 +40,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
                 pthread_fun_wrapper<Receiver, &Receiver::loopRecv>, context)
             != 0) {
             perror("Socket recv thread create failed");
-            exit(0);
+            std::exit(0);
         }
         created_threads.push_back(recv_thread_);
     }
@@ -83,8 +83,8 @@ void* Receiver::loopRecv(int tid)
     while (true) {
         /* if buffer is full, exit */
         if (cur_buffer_status_ptr[0] == 1) {
-            printf("Receive thread %d buffer full, offset: %zu\n", tid, offset);
-            exit(0);
+            std::printf("Receive thread %d buffer full, offset: %zu\n", tid, offset);
+            std::exit(0);
         }
 
         int recvlen = -1;
@@ -95,7 +95,7 @@ void* Receiver::loopRecv(int tid)
                  &addrlen))
             < 0) {
             perror("recv failed");
-            exit(0);
+            std::exit(0);
         }
 
         // Read information from received packet
@@ -103,7 +103,7 @@ void* Receiver::loopRecv(int tid)
         int frame_id = pkt->frame_id;
 
         if (kDebugSenderReceiver) {
-            printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
+            std::printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
                 frame_id, pkt->symbol_id, pkt->ant_id);
         }
 
@@ -127,8 +127,8 @@ void* Receiver::loopRecv(int tid)
             EventType::kPacketRX, rx_tag_t(tid, offset)._tag);
 
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
+            std::printf("socket message enqueue failed\n");
+            std::exit(0);
         }
     }
 }

@@ -8,12 +8,12 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
     , CORE_OFFSET(in_core_offset)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
-    printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
-    printf("Main thread: on core %d\n", sched_getcpu());
+    std::printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
+    std::printf("Main thread: on core %d\n", sched_getcpu());
     // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
     // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
     //           << std::endl;
-    printf("enter constructor\n");
+    std::printf("enter constructor\n");
 
     this->config_ = cfg;
 
@@ -22,14 +22,14 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
 
     initialize_queues();
 
-    printf("initialize buffers\n");
+    std::printf("initialize buffers\n");
     initialize_uplink_buffers();
 
-    printf("new Sender\n");
+    std::printf("new Sender\n");
     sender_.reset(new Sender(
         config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true));
 
-    printf("new Receiver\n");
+    std::printf("new Receiver\n");
     receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
         &message_queue_, rx_ptoks_ptr));
 }
@@ -94,7 +94,7 @@ void Simulator::start()
                 int frame_id_in_buffer = (frame_id % kFrameWnd);
                 socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
-                // printf(
+                // std::printf(
                 //     "In main: received from frame %d %d, symbol %d, ant
                 //     %d\n", frame_id, frame_id_in_buffer, symbol_id,
                 //     ant_id);
@@ -104,8 +104,8 @@ void Simulator::start()
             } break;
 
             default:
-                printf("Wrong event type in message queue!");
-                exit(0);
+                std::printf("Wrong event type in message queue!");
+                std::exit(0);
             } /* end of switch */
         } /* end of for */
     } /* end of while */
@@ -114,17 +114,17 @@ void Simulator::start()
     std::string filename = cur_directory + "/data/timeresult_simulator.txt";
     FILE* fp = fopen(filename.c_str(), "w");
     if (fp == NULL) {
-        printf("open file faild\n");
+        std::printf("open file faild\n");
         std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(0);
+        std::exit(0);
     }
 
-    printf("Printing results to file......\n");
+    std::printf("Printing results to file......\n");
     for (int ii = 0; ii < frame_count_rx; ii++) {
-        fprintf(fp, "%.3f %.3f %.3f %.3f\n", frame_start[0][ii],
+        std::fprintf(fp, "%.3f %.3f %.3f %.3f\n", frame_start[0][ii],
             frame_start[1][ii], frame_start_receive[ii], frame_end_receive[ii]);
     }
-    exit(0);
+    std::exit(0);
 }
 
 inline void Simulator::update_frame_count(int* frame_count)
@@ -141,7 +141,7 @@ void Simulator::update_rx_counters(
     if (rx_counter_packets_[frame_id_in_buffer] == 1) {
         frame_start_receive[frame_id] = get_time();
         if (kDebugPrintPerFrameStart) {
-            printf("Main thread: data received from frame %zu, symbol %zu, ant "
+            std::printf("Main thread: data received from frame %zu, symbol %zu, ant "
                    "%zu, in %.2f since tx, in %.2f us since last frame\n",
                 frame_id, symbol_id, ant_id,
                 frame_start_receive[frame_id] - frame_start_tx[frame_id],
@@ -162,7 +162,7 @@ void Simulator::print_per_frame_done(PrintType print_type, size_t frame_id)
         return;
     switch (print_type) {
     case (PrintType::kPacketRX): {
-        printf(
+        std::printf(
             "Main thread: received all packets in frame: %zu, in %.2f us since "
             "tx, in %.2f us since rx, tx duration: %.2f us\n",
             frame_id, frame_end_receive[frame_id] - frame_start_tx[frame_id],
@@ -170,7 +170,7 @@ void Simulator::print_per_frame_done(PrintType print_type, size_t frame_id)
             frame_end_tx[frame_id] - frame_start_tx[frame_id]);
     } break;
     default:
-        printf("Wrong task type in frame done print!");
+        std::printf("Wrong task type in frame done print!");
     }
 }
 

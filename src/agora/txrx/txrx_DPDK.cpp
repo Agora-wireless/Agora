@@ -33,7 +33,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
-        printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+        std::printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
                "dst port: %zu, DPDK port %zu, queue: %zu\n",
             cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
             cfg->bs_rru_port + i, cfg->bs_server_port + i,
@@ -43,7 +43,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
             dst_port);
     }
 
-    printf("Number of DPDK cores: %d\n", rte_lcore_count());
+    std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
@@ -84,7 +84,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
                 context, lcore_id);
-            printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
+            std::printf("DPDK TXRX thread %zu: pinned to core %d\n", worker_id,
                 lcore_id);
         }
         worker_id++;
@@ -125,7 +125,7 @@ uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
         // If the RX buffer is full, it means that the base station processing
         // hasn't kept up, so exit.
         if ((*buffer_status_)[tid][rx_offset] == 1) {
-            printf(
+            std::printf(
                 "TXRX thread %d rx_buffer full, offset: %zu\n", tid, rx_offset);
             cfg->running = false;
             return 0;
@@ -141,10 +141,10 @@ uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
                 reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
             DpdkTransport::print_pkt(ip_hdr->src_addr, ip_hdr->dst_addr,
                 udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
-            printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
+            std::printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
                 dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
                 RTE_ETHER_TYPE_IPV4);
-            printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
+            std::printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
         }
 
         if (eth_type != RTE_ETHER_TYPE_IPV4
@@ -154,12 +154,12 @@ uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
         }
 
         if (ip_hdr->src_addr != bs_rru_addr) {
-            fprintf(stderr, "DPDK: Source addr does not match\n");
+            std::fprintf(stderr, "DPDK: Source addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
         if (ip_hdr->dst_addr != bs_server_addr) {
-            fprintf(stderr, "DPDK: Destination addr does not match\n");
+            std::fprintf(stderr, "DPDK: Destination addr does not match\n");
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
@@ -182,8 +182,8 @@ uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
         if (!message_queue_->enqueue(*rx_ptoks_[tid],
                 Event_data(
                     EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag))) {
-            printf("Failed to enqueue socket message\n");
-            exit(-1);
+            std::printf("Failed to enqueue socket message\n");
+            std::exit(-1);
         }
 
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
@@ -199,7 +199,7 @@ int PacketTXRX::dequeue_send(int tid)
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
@@ -213,7 +213,7 @@ int PacketTXRX::dequeue_send(int tid)
         + ant_id;
 
     if (kDebugPrintInTask) {
-        printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
+        std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
             offset, message_queue_->size_approx());
@@ -248,8 +248,8 @@ int PacketTXRX::dequeue_send(int tid)
     // Send data (one OFDM symbol)
     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
     if (unlikely(nb_tx_new != 1)) {
-        printf("rte_eth_tx_burst() failed\n");
-        exit(0);
+        std::printf("rte_eth_tx_burst() failed\n");
+        std::exit(0);
     }
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketTX, event.tags[0])),
