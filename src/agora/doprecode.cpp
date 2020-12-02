@@ -18,9 +18,9 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
 
     alloc_buffer_1d(
-        &modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM, 64, 0);
+        &modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align, 0);
     alloc_buffer_1d(
-        &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
+        &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align, 0);
 
 #if USE_MKL_JIT
     MKL_Complex8 alpha = { 1, 0 };

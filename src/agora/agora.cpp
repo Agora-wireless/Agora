@@ -1093,24 +1093,24 @@ void Agora::initialize_uplink_buffers()
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * kFrameWnd;
 
-    alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
+    alloc_buffer_1d(&task_threads, cfg->worker_thread_num, Agora_memory::Alignment_t::k64Align, 0);
 
     socket_buffer_status_size_
         = cfg->BS_ANT_NUM * kFrameWnd * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
     socket_buffer_.malloc(
-        cfg->socket_thread_num /* RX */, socket_buffer_size_, 64);
+        cfg->socket_thread_num /* RX */, socket_buffer_size_, Agora_memory::Alignment_t::k64Align);
     socket_buffer_status_.calloc(
-        cfg->socket_thread_num /* RX */, socket_buffer_status_size_, 64);
+        cfg->socket_thread_num /* RX */, socket_buffer_status_size_, Agora_memory::Alignment_t::k64Align);
 
     data_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
     equal_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align);
     ue_spec_pilot_buffer_.calloc(
-        kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_NUM, 64);
+        kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align);
 
     rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe
@@ -1147,29 +1147,29 @@ void Agora::initialize_downlink_buffers()
         = cfg->BS_ANT_NUM * kFrameWnd * cfg->dl_data_symbol_num_perframe;
     size_t dl_socket_buffer_size
         = cfg->dl_packet_length * dl_socket_buffer_status_size;
-    alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size, 64, 0);
+    alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size, Agora_memory::Alignment_t::k64Align, 0);
     alloc_buffer_1d(
-        &dl_socket_buffer_status_, dl_socket_buffer_status_size, 64, 1);
+        &dl_socket_buffer_status_, dl_socket_buffer_status_size, Agora_memory::Alignment_t::k64Align, 1);
 
     dl_bits_buffer_.calloc(
-        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align);
     size_t dl_bits_buffer_status_size
         = task_buffer_symbol_num * cfg->LDPC_config.nblocksInSymbol;
-    dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, 64);
+    dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size, Agora_memory::Alignment_t::k64Align);
 
     dl_ifft_buffer_.calloc(
-        cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
+        cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
     calib_dl_buffer_.calloc(
-        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
     calib_ul_buffer_.calloc(
-        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, 64);
+        kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
     // initialize the content of the last window to 1
     for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM; i++) {
         calib_dl_buffer_[kFrameWnd - 1][i] = { 1, 0 };
         calib_ul_buffer_[kFrameWnd - 1][i] = { 1, 0 };
     }
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
-        roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
+        roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align);
 
     frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->UE_NUM);
     encode_counters_.init(cfg->dl_data_symbol_num_perframe,

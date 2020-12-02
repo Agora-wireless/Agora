@@ -91,17 +91,17 @@ TEST(SIMD, float_32_to_16)
 {
     constexpr float allowed_error = 1e-3;
     float* in_buf
-        = reinterpret_cast<float*>(std::aligned_alloc(64, kSIMDTestNum * sizeof(float)));
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
     for (size_t i = 0; i < kSIMDTestNum; i++) {
         in_buf[i] = static_cast<float>(rand()) / (RAND_MAX * 1.0);
     }
 
-    float* medium = reinterpret_cast<float*>(
-        std::aligned_alloc(64, kSIMDTestNum / 2 * sizeof(float)));
+    float* medium = static_cast<float*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSIMDTestNum / 2 * sizeof(float)));
     simd_convert_float32_to_float16(medium, in_buf, kSIMDTestNum);
 
     float* out_buf
-        = reinterpret_cast<float*>(std::aligned_alloc(64, kSIMDTestNum * sizeof(float)));
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
     simd_convert_float16_to_float32(out_buf, medium, kSIMDTestNum);
 
     for (size_t i = 0; i < kSIMDTestNum; i++) {

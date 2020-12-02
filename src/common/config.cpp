@@ -371,16 +371,16 @@ void Config::genData()
         pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
     complex_float* pilot_ifft;
-    alloc_buffer_1d(&pilot_ifft, OFDM_CA_NUM, 64, 1);
+    alloc_buffer_1d(&pilot_ifft, OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align, 1);
     for (size_t j = 0; j < OFDM_DATA_NUM; j++)
         pilot_ifft[j + OFDM_DATA_START] = pilots_[j];
     CommsLib::IFFT(pilot_ifft, OFDM_CA_NUM, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
-    ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, 64);
-    ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, 64);
+    ue_specific_pilot.malloc(UE_ANT_NUM, OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+    ue_specific_pilot_t.calloc(UE_ANT_NUM, sampsPerSymbol, Agora_memory::Alignment_t::k64Align);
     Table<complex_float> ue_pilot_ifft;
-    ue_pilot_ifft.calloc(UE_ANT_NUM, OFDM_CA_NUM, 64);
+    ue_pilot_ifft.calloc(UE_ANT_NUM, OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
     auto zc_ue_pilot_double
         = CommsLib::getSequence(OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU);
     auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
@@ -400,16 +400,16 @@ void Config::genData()
     size_t num_bytes_per_ue_pad
         = roundup<64>(num_bytes_per_cb) * LDPC_config.nblocksInSymbol;
     dl_bits.malloc(
-        dl_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
-    dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
+        dl_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    dl_iq_f.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
     dl_iq_t.calloc(
-        dl_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
+        dl_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
     ul_bits.malloc(
-        ul_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, 64);
-    ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
+        ul_data_symbol_num_perframe, num_bytes_per_ue_pad * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    ul_iq_f.calloc(ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
     ul_iq_t.calloc(
-        ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
+        ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
@@ -470,7 +470,7 @@ void Config::genData()
 
     // Encode uplink bits
     ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block, 64);
+        encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
     int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
         LDPC_config.Bg, LDPC_config.Zc)];
@@ -484,7 +484,7 @@ void Config::genData()
     }
 
     ul_mod_input.calloc(
-        ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
+        ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
@@ -501,7 +501,7 @@ void Config::genData()
 
     Table<int8_t> dl_encoded_bits;
     dl_encoded_bits.malloc(dl_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block, 64);
+        encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
     // Encode downlink bits
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
@@ -514,7 +514,7 @@ void Config::genData()
     }
 
     dl_mod_input.calloc(
-        dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, 32);
+        dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM, Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
@@ -532,7 +532,7 @@ void Config::genData()
     // Generate freq-domain downlink symbols
     Table<complex_float> dl_iq_ifft;
     dl_iq_ifft.calloc(
-        dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
+        dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t u = 0; u < UE_ANT_NUM; u++) {
             size_t p = u * OFDM_DATA_NUM;
@@ -555,7 +555,7 @@ void Config::genData()
     // Generate freq-domain uplink symbols
     Table<complex_float> ul_iq_ifft;
     ul_iq_ifft.calloc(
-        ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, 64);
+        ul_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t u = 0; u < UE_ANT_NUM; u++) {
 

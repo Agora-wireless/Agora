@@ -25,11 +25,11 @@ TEST(TestZF, Perf)
 
     Table<complex_float> calib_dl_buffer;
     calib_dl_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
     Table<complex_float> calib_ul_buffer;
     calib_ul_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
     auto stats = new Stats(cfg);
 

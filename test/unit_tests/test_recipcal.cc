@@ -17,10 +17,10 @@ TEST(TestRecip, Correctness)
     double freq_ghz = measure_rdtsc_freq();
 
     Table<complex_float> calib_buffer, recip_buffer_0, recip_buffer_1;
-    recip_buffer_0.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    recip_buffer_1.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+    recip_buffer_0.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    recip_buffer_1.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
     calib_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
     std::printf("Reference antenna: %zu\n", cfg->ref_ant);
 

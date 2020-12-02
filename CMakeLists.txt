@@ -215,6 +215,7 @@ set(COMMON_SOURCES
   src/common/modulation_srslte.cpp
   src/common/net.cpp
   src/common/crc.cpp
+  src/common/memory_manage.cc
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)

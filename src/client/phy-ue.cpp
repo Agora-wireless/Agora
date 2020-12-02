@@ -947,9 +947,9 @@ void Phy_UE::doEncode(int tid, size_t tag)
     // size_t start_tsc = worker_rdtsc();
 
     int8_t* encoded_buffer_temp = reinterpret_cast<int8_t*>(
-        std::aligned_alloc(64, ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
     int8_t* parity_buffer = reinterpret_cast<int8_t*>(
-        std::aligned_alloc(64, ldpc_encoding_parity_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ldpc_encoding_parity_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
 
     size_t bytes_per_block = kEnableMac
         ? (LDPC_config.cbLen) >> 3
@@ -1107,36 +1107,36 @@ void Phy_UE::initialize_uplink_buffers()
 {
     // initialize ul data buffer
     ul_bits_buffer_size_ = kFrameWnd * config_->mac_bytes_num_perframe;
-    ul_bits_buffer_.malloc(config_->UE_ANT_NUM, ul_bits_buffer_size_, 64);
-    ul_bits_buffer_status_.calloc(config_->UE_ANT_NUM, kFrameWnd, 64);
+    ul_bits_buffer_.malloc(config_->UE_ANT_NUM, ul_bits_buffer_size_, Agora_memory::Alignment_t::k64Align);
+    ul_bits_buffer_status_.calloc(config_->UE_ANT_NUM, kFrameWnd, Agora_memory::Alignment_t::k64Align);
     ul_syms_buffer_size_
         = kFrameWnd * ul_data_symbol_perframe * config_->OFDM_DATA_NUM;
-    ul_syms_buffer_.calloc(config_->UE_ANT_NUM, ul_syms_buffer_size_, 64);
+    ul_syms_buffer_.calloc(config_->UE_ANT_NUM, ul_syms_buffer_size_, Agora_memory::Alignment_t::k64Align);
 
     // initialize modulation buffer
     modul_buffer_.calloc(ul_data_symbol_perframe * kFrameWnd,
-        config_->OFDM_DATA_NUM * config_->UE_ANT_NUM, 64);
+        config_->OFDM_DATA_NUM * config_->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
     // initialize IFFT buffer
     size_t ifft_buffer_block_num
         = config_->UE_ANT_NUM * ul_symbol_perframe * kFrameWnd;
-    ifft_buffer_.calloc(ifft_buffer_block_num, config_->OFDM_CA_NUM, 64);
+    ifft_buffer_.calloc(ifft_buffer_block_num, config_->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
 
-    alloc_buffer_1d(&tx_buffer_, tx_buffer_size, 64, 0);
-    alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, 64, 1);
+    alloc_buffer_1d(&tx_buffer_, tx_buffer_size, Agora_memory::Alignment_t::k64Align, 0);
+    alloc_buffer_1d(&tx_buffer_status_, tx_buffer_status_size, Agora_memory::Alignment_t::k64Align, 1);
 }
 
 void Phy_UE::initialize_downlink_buffers()
 {
     // initialize rx buffer
-    rx_buffer_.malloc(rx_thread_num, rx_buffer_size, 64);
-    rx_buffer_status_.calloc(rx_thread_num, rx_buffer_status_size, 64);
-    alloc_buffer_1d(&rx_samps_tmp, config_->sampsPerSymbol, 64, 1);
+    rx_buffer_.malloc(rx_thread_num, rx_buffer_size, Agora_memory::Alignment_t::k64Align);
+    rx_buffer_status_.calloc(rx_thread_num, rx_buffer_status_size, Agora_memory::Alignment_t::k64Align);
+    alloc_buffer_1d(&rx_samps_tmp, config_->sampsPerSymbol, Agora_memory::Alignment_t::k64Align, 1);
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num
         = config_->UE_ANT_NUM * dl_symbol_perframe * kFrameWnd;
-    fft_buffer_.calloc(FFT_buffer_block_num, config_->OFDM_CA_NUM, 64);
+    fft_buffer_.calloc(FFT_buffer_block_num, config_->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
 
     // initialize CSI buffer
     csi_buffer_.resize(config_->UE_ANT_NUM * kFrameWnd);
@@ -1154,24 +1154,24 @@ void Phy_UE::initialize_downlink_buffers()
 
         // initialize demod buffer
         dl_demod_buffer_.calloc(
-            buffer_size, config_->OFDM_DATA_NUM * kMaxModType, 64);
+            buffer_size, config_->OFDM_DATA_NUM * kMaxModType, Agora_memory::Alignment_t::k64Align);
 
         // initialize decode buffer
         dl_decode_buffer_.resize(buffer_size);
         for (size_t i = 0; i < dl_decode_buffer_.size(); i++)
             dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb)
                 * config_->LDPC_config.nblocksInSymbol);
-        resp_var_nodes = (int16_t*)std::aligned_alloc(64, 1024 * 1024 * sizeof(int16_t));
+        resp_var_nodes = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 
         decoded_bits_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
+            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
         bit_error_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
+            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
 
         decoded_blocks_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
+            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
         block_error_count_.calloc(
-            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, 64);
+            config_->UE_ANT_NUM, task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
         decoded_symbol_count_ = new size_t[config_->UE_ANT_NUM];
         symbol_error_count_ = new size_t[config_->UE_ANT_NUM];
         std::memset(decoded_symbol_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);

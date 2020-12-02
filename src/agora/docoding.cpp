@@ -7,19 +7,6 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
-static size_t padded_alloc_size(size_t alignment, size_t size) {
-    size_t padded_size, padding;
-    padded_size = size;
-    //Check for power of 2 alignment
-    assert((alignment & (alignment - 1)) == 0);
-    padding = alignment - (size % alignment);
-
-    if (padding < alignment) {
-        padded_size += padding;
-    }
-    return padded_size;
-}
-
 DoEncode::DoEncode(Config* in_config, int in_tid,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager)
@@ -27,15 +14,13 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
 {
-    static const size_t kAlignment = 64;
-
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
     parity_buffer = reinterpret_cast<int8_t*>(
-        std::aligned_alloc(kAlignment, padded_alloc_size( kAlignment, ldpc_encoding_parity_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc))));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ldpc_encoding_parity_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
     assert(parity_buffer != nullptr);
     encoded_buffer_temp = reinterpret_cast<int8_t*>(
-        std::aligned_alloc(kAlignment, padded_alloc_size( kAlignment, ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc))));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
     assert(encoded_buffer_temp != nullptr);
 }
 
@@ -104,7 +89,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
-    resp_var_nodes = reinterpret_cast<int16_t*>(std::aligned_alloc(64, 1024 * 1024 * sizeof(int16_t)));
+    resp_var_nodes = reinterpret_cast<int16_t*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }

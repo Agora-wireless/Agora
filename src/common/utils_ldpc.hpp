@@ -15,12 +15,12 @@ template <typename T>
 T* aligned_malloc(const int size, const unsigned alignment)
 {
 #ifdef _BBLIB_DPDK_
-    return (T*)rte_malloc(NULL, sizeof(T) * size, alignment);
+    return reinterpret_cast<T*>(rte_malloc(NULL, sizeof(T) * size, alignment));
 #else
 #ifndef _WIN64
-    return (T*)std::aligned_alloc(alignment, sizeof(T) * size);
+    return reinterpret_cast<T*>(std::aligned_alloc(alignment, sizeof(T) * size));
 #else
-    return (T*)_aligned_malloc(sizeof(T) * size, alignment);
+    return reinterpret_cast<T*>(_aligned_malloc(sizeof(T) * size, alignment));
 #endif
 #endif
 }

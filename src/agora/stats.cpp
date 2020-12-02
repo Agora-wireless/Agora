@@ -11,7 +11,7 @@ Stats::Stats(Config* cfg)
     , freq_ghz(cfg->freq_ghz)
     , creation_tsc(rdtsc())
 {
-    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, 64);
+    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, Agora_memory::Alignment_t::k64Align);
 }
 
 Stats::~Stats() {}
