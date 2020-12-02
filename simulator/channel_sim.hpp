@@ -12,7 +12,6 @@
 #include "udp_client.h"
 #include "udp_server.h"
 #include "channel.hpp"
-#include "sim_utils.hpp"
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
@@ -67,7 +66,6 @@ private:
 
     Config* bscfg;
     Config* uecfg;
-    cx_fmat channel_orig;
     Channel* channel;
 
     // Data buffer for symbols to be transmitted to BS antennas (uplink)

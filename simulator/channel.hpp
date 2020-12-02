@@ -11,6 +11,7 @@
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "config.hpp"
+#include "utils.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "signalHandler.hpp"
@@ -31,9 +32,9 @@ public:
 
     Channel (Config* bscfg, Config* uecfg);
     ~Channel ();
-    void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst);
+    void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst, const bool is_downlink);
     void awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
-    void rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+    void rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink);
     void lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
 
 private:

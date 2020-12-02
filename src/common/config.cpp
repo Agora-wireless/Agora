@@ -294,8 +294,11 @@ Config::Config(std::string jsonfile)
         chan_model = AWGN;
     else if(sim_chan_model == "RAYLEIGH")
         chan_model = RAYLEIGH;
-    else if(sim_chan_model == "RAN_3GPP")
+    else if(sim_chan_model == "RAN_3GPP") {
         chan_model = RAN_3GPP;
+        printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
+	chan_model = RAYLEIGH;
+    }
     else
 	chan_model = NONE;
 
@@ -307,11 +310,12 @@ Config::Config(std::string jsonfile)
         "%zu uplink data symbols per frame, %zu downlink data "
         "symbols per frame,\n\t"
         "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
-        "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
+        "%zu MAC data bytes per frame, %zu MAC bytes per frame\n\t"
+	"Channel sim set to %s \n",
         BS_ANT_NUM, UE_ANT_NUM, pilot_symbol_num_perframe,
         ul_data_symbol_num_perframe, dl_data_symbol_num_perframe, OFDM_CA_NUM,
         OFDM_DATA_NUM, modulation.c_str(), mac_data_bytes_num_perframe,
-        mac_bytes_num_perframe);
+        mac_bytes_num_perframe, sim_chan_model.c_str());
 }
 
 void Config::genData()

@@ -6,7 +6,6 @@
  */
 
 #include "channel.hpp"
-#include "sim_utils.hpp"
 
 static constexpr bool kPrintChannelOutput = true;
 
@@ -24,26 +23,36 @@ Channel::~Channel()
 
 }
 
-void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
+void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink)
 {
     /* 
      *
      *
-     * Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
+     * Dimensions of fmat_src:
+     * ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
      */
     
     // After applying channel
-    cx_fmat fmat_src_chan;
+    cx_fmat fmat_H;
+    cx_fmat H(ones<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
+		    zeros<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
 
     switch(bscfg->chan_model)
     {
         case Config::AWGN:
-            awgn(fmat_src, fmat_dst);
+	    printf("A - DL? %d, fmat_src: [%d, %d], H: [%d, %d]\n", is_downlink, fmat_src.n_rows, fmat_src.n_cols, H.n_rows, H.n_cols);
+            if (is_downlink)
+                fmat_H = fmat_src * H;
+            else
+                fmat_H = fmat_src * H.st();
+	    printf("B - DL? %d, fmat_H: [%d, %d]\n", is_downlink, fmat_H.n_rows, fmat_H.n_cols);
+            awgn(fmat_H, fmat_dst);
+            //fmat_dst = fmat_H;
 	    break;
 
         case Config::RAYLEIGH:
-	    rayleigh(fmat_src, fmat_src_chan);
-	    awgn(fmat_src_chan, fmat_dst);
+	    rayleigh(fmat_src, fmat_H, is_downlink);
+	    awgn(fmat_H, fmat_dst);
 	    break;
 
         case Config::RAN_3GPP:
@@ -51,33 +60,38 @@ void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
 	    break;
 
         case Config::NONE:
-	    {
-		// Mostly for debugging...
-		cx_fmat H(ones<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
-                          zeros<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
+            // Mostly for debugging...
+            if (is_downlink)
                 fmat_dst = fmat_src * H;
-	    }
+            else
+                fmat_dst = fmat_src * H.st();
 	    break;
     }
+    if (kPrintChannelOutput && !is_downlink){
+        printf("XXX SRC XXX \n");
+        Utils::print_mat(fmat_src);
+    }
 
-    if (kPrintChannelOutput)
-        print_cxmat(fmat_dst);
-     
+    if (kPrintChannelOutput && !is_downlink){
+        printf("YYY DST YYY \n");
+        Utils::print_mat(fmat_dst);
+    }
+ 
 }
 
-void Channel::awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
+void Channel::awgn(const cx_fmat& src, cx_fmat& dst)
 {
     /*
      * Additive White Gaussian Noise 
      */
-    // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
-    int n_row = fmat_src.n_rows;
-    int n_col = fmat_src.n_cols;
+    // Dimensions of src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
+    int n_row = src.n_rows;
+    int n_col = src.n_cols;
     float snr_lin = pow(10, bscfg->sim_snr_db/10);
 
     // Power spectral density of noise
-    fmat fmat_src_sq = square(abs(fmat_src));
-    frowvec pwr_vec = sum(fmat_src_sq, 0) / n_row;  //pwr = sum(abs(samps)ˆ2)/length(samps)
+    fmat src_sq = square(abs(src));
+    frowvec pwr_vec = sum(src_sq, 0) / n_row;  //pwr = sum(abs(samps)ˆ2)/length(samps)
     frowvec n0 = pwr_vec / snr_lin;
     frowvec n = sqrt(n0 / 2);
 
@@ -87,13 +101,11 @@ void Channel::awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
     noise = noise % n0_mat;  // Element-wise multiplication
 
     // Add noise to signal
-    cx_fmat s_n = fmat_src + noise;
-    fmat_dst = s_n;
-    //printf("S+N: \n");
-    //print_cxmat(s_n);
+    dst = src + noise;
+    //dst = src;
 }
 
-void Channel::rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
+void Channel::rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink)
 {
     /*
      * Simple Uncorrelated Rayleigh Channel
@@ -103,7 +115,11 @@ void Channel::rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
     cx_fmat H(randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
         randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
     H = (1/sqrt(2)) * H;
-    fmat_dst = fmat_src * H;
+
+    if (is_downlink)
+        fmat_dst = fmat_src * H;
+    else
+	fmat_dst = fmat_src * H.st();
 }
 
 void Channel::lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
@@ -120,5 +136,9 @@ void Channel::lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
      *
      */
 
-    // FIXME
+    // TODO - In progress (Use Rayleigh for now...)
+    cx_fmat H(randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
+        randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
+    H = (1/sqrt(2)) * H;
+    fmat_dst = fmat_src * H;
 }
