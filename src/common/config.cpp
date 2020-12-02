@@ -5,6 +5,8 @@
 Config::Config(std::string jsonfile)
     : freq_ghz(measure_rdtsc_freq())
 {
+    pilots_ = nullptr;
+    pilots_sgn_ = nullptr;
     set_cpu_layout_on_numa_nodes();
     std::string conf;
     Utils::loadTDDConfig(jsonfile, conf);
@@ -646,6 +648,9 @@ void Config::genData()
         std::cout << std::endl;
     }
 
+
+    delete [] temp_parity_buffer;
+    dl_encoded_bits.free();
     ul_iq_ifft.free();
     dl_iq_ifft.free();
     ue_pilot_ifft.free();
@@ -654,8 +659,14 @@ void Config::genData()
 
 Config::~Config()
 {
-    free_buffer_1d(&pilots_);
-    free_buffer_1d(&pilots_sgn_);
+    if (pilots_ != nullptr){
+        free_buffer_1d(&pilots_);
+        pilots_ = nullptr;
+    }
+    if (pilots_sgn_ != nullptr){
+        free_buffer_1d(&pilots_sgn_);
+        pilots_sgn_ = nullptr;
+    }
     mod_table.free();
     dl_bits.free();
     ul_bits.free();

@@ -60,7 +60,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             // mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
             mat_ul_zf_tmp
                 = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-        } catch (std::runtime_error) {
+        } catch (std::runtime_error &) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
             // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
@@ -81,7 +81,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         try {
             // mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
             mat_dl_zf_tmp = arma::inv(mat_calib) * mat_ul_zf_tmp.st();
-        } catch (std::runtime_error) {
+        } catch (std::runtime_error &) {
             MLPD_WARN("Failed to invert reference channel matrix, skip "
                       "applying it\n");
             Utils::print_vec(vec_calib, "vec_calib");

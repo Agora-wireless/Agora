@@ -1,12 +1,11 @@
 #ifndef MEMORY_MANAGE
 #define MEMORY_MANAGE
 #include <array>
-#include <assert.h>
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <malloc.h>
 #include <random>
-#include <stdio.h>
+#include <cstdio>
 
 template <typename T> class Table {
 private:
@@ -23,12 +22,14 @@ public:
     {
         aligned_bytes = (aligned_bytes) / 32 * 32;
         dimension = (dim2 * sizeof(T) + aligned_bytes - 1) & -aligned_bytes;
-        data = aligned_alloc(aligned_bytes, dim1 * dimension);
+        size_t alloc_size = (dim1 * dimension);
+        data = std::aligned_alloc(aligned_bytes, alloc_size);
     }
     void calloc(size_t dim1, size_t dim2, size_t aligned_bytes)
     {
-        malloc(dim1, dim2, aligned_bytes);
-        memset(data, 0, dim1 * dimension);
+        //assert(!((dim1 == 0) || (dim2 == 0)));
+        this->malloc(dim1, dim2, aligned_bytes);
+        std::memset(data, 0, dim1 * dimension);
     }
 
     // Allocate the table and fill it with random floating point values between
@@ -72,15 +73,25 @@ public:
 };
 
 template <typename T, typename U>
-static void alloc_buffer_1d(T** buffer, U dim, int aligned_bytes, int init_zero)
+static void alloc_buffer_1d(T** buffer, U dim, size_t aligned_bytes, int init_zero)
 {
-    aligned_bytes = (aligned_bytes) / 32 * 32;
-    *buffer = (T*)aligned_alloc(aligned_bytes, dim * sizeof(T));
-    if (init_zero)
-        memset(*buffer, 0, dim * sizeof(T));
+    //aligned_bytes = (aligned_bytes) / 32 * 32;
+    size_t size = dim * sizeof(T);
+    size_t padded_size = size;
+    //Check for power of 2 alignment
+    assert((aligned_bytes & (aligned_bytes - 1)) == 0);
+    size_t padding = aligned_bytes - (size % aligned_bytes);
+
+    if (padding < aligned_bytes) {
+        padded_size += padding;
+    }
+    *buffer = static_cast<T*>(std::aligned_alloc(aligned_bytes, padded_size));
+    if (init_zero) {
+        std::memset(*buffer, 0, padded_size);
+    }
 };
 
-template <typename T> static void free_buffer_1d(T** buffer) { free(*buffer); };
+template <typename T> static void free_buffer_1d(T** buffer) { std::free(*buffer); };
 
 // PtrGrid is a 2D grid of pointers with [ROWS] rows and [COLS] columns. Each
 // entry of the grid is a pointer to an array of [T].
@@ -102,18 +113,19 @@ public:
         alloc(n_rows, n_cols, n_entries);
     }
 
-    ~PtrGrid()
+    ~PtrGrid(void)
     {
-        if (is_allocated)
-            free(backing_buf);
+        if (is_allocated) {
+            std::free(backing_buf);
+        }
     }
 
     /// Allocate [n_entries] entries per pointer cell
     void alloc(size_t n_rows, size_t n_cols, size_t n_entries)
     {
         const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
-        backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
-        memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
+        backing_buf = reinterpret_cast<T*>(std::aligned_alloc(64, alloc_sz));
+        std::memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
         is_allocated = true;
 
         // Fill-in the grid with pointers into backing_buf
@@ -168,7 +180,7 @@ private:
 // array of [T].
 template <size_t DIM1, size_t DIM2, size_t DIM3, class T> class PtrCube {
 public:
-    PtrCube() {}
+    PtrCube(void) {}
 
     /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
     /// cube cell points to an array of [n_entries]
@@ -184,18 +196,19 @@ public:
         alloc(dim_1, dim_2, dim_3, n_entries);
     }
 
-    ~PtrCube()
+    ~PtrCube(void)
     {
-        if (is_allocated)
-            free(backing_buf);
+        if (is_allocated) {
+            std::free(backing_buf);
+        }
     }
 
     /// Allocate [n_entries] entries per pointer cell
     void alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
     {
         const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
-        backing_buf = reinterpret_cast<T*>(memalign(64, alloc_sz));
-        memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
+        backing_buf = reinterpret_cast<T*>(std::aligned_alloc(64, alloc_sz));
+        std::memset(reinterpret_cast<uint8_t*>(backing_buf), 0, alloc_sz);
         is_allocated = true;
 
         // Fill-in the grid with pointers into backing_buf

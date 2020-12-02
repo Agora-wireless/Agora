@@ -402,10 +402,17 @@ int main(int argc, char* argv[])
     // }
     // printf("\n");
 
+    /* Clean Up memory */
+    dl_ifft_data.free();
+    dl_tx_data.free();
+    dl_mod_data.free();
+    precoder.free();
+
     csi_matrices.free();
     tx_data_all_symbols.free();
     rx_data_all_symbols.free();
     ue_specific_pilot.free();
-
+    delete cfg;
+    
     return 0;
 }
