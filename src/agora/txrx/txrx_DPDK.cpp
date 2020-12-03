@@ -61,8 +61,12 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
+    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer)
 {
+    _unused(calib_dl_buffer);
+    _unused(calib_ul_buffer);
     buffer_ = &buffer;
     buffer_status_ = &buffer_status;
     frame_start_ = &frame_start;
