@@ -10,15 +10,16 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
 DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-    Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
+    Stats* in_stats_manager, RxStatus* rx_status,
+    EncodeStatus* encode_status)
+    : Doer(in_config, in_tid, freq_ghz, dummy_conq_, complete_task_queue,
           worker_producer_token)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
+    , rx_status_(rx_status)
+    , encode_status_(encode_status)
+    , ue_id(in_tid + in_config->ue_start)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
@@ -49,6 +50,7 @@ Event_data DoEncode::launch(size_t tag)
             "In doEncode thread %d: frame: %zu, symbol: %zu, code block %zu\n",
             tid, frame_id, symbol_id, cur_cb_id);
     }
+    printf("DoEncode frame %u symbol %u cb %u\n", frame_id, symbol_id, cur_cb_id);
 
     size_t start_tsc = worker_rdtsc();
 
@@ -87,7 +89,7 @@ void DoEncode::start_work()
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || rx_status_->is_encode_ready(cur_frame_)) {
-            printf("Start to encode user %lu frame %lu symbol %lu\n", ue_id, cur_frame_, cur_symbol_);
+            printf("Start to encode user %lu frame %lu symbol %lu cb %u\n", ue_id, cur_frame_, cur_symbol_, cur_cb_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);

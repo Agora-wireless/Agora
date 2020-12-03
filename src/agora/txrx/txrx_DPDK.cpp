@@ -123,9 +123,15 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
-            rte_eal_remote_launch((lcore_function_t*)
-                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
-                context, lcore_id);
+            if (cfg->downlink_mode) {
+                rte_eal_remote_launch((lcore_function_t*)
+                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
+                    context, lcore_id);
+            } else {
+                rte_eal_remote_launch((lcore_function_t*)
+                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+                    context, lcore_id);
+            }
         }
         worker_id++;
     }
@@ -213,63 +219,63 @@ void* PacketTXRX::demod_thread(int tid)
         }
 
         // 2. Try to receive demodulated data for decoding
-        rte_mbuf* rx_bufs[kRxBatchSize];
-        uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
-        if (unlikely(nb_rx == 0))
-            continue;
+        // rte_mbuf* rx_bufs[kRxBatchSize];
+        // uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+        // if (unlikely(nb_rx == 0))
+        //     continue;
 
-        for (size_t i = 0; i < nb_rx; i++) {
-            printf("Received packet!\n");
-            rte_mbuf* dpdk_pkt = rx_bufs[i];
-            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
-            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
-                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+        // for (size_t i = 0; i < nb_rx; i++) {
+        //     printf("Received packet!\n");
+        //     rte_mbuf* dpdk_pkt = rx_bufs[i];
+        //     auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+        //     auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+        //         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+        //     uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
 
-            if (eth_type != RTE_ETHER_TYPE_IPV4
-                or ip_hdr->next_proto_id != IPPROTO_UDP) {
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
+        //     if (eth_type != RTE_ETHER_TYPE_IPV4
+        //         or ip_hdr->next_proto_id != IPPROTO_UDP) {
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
 
-            bool found = false;
-            for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
-                if (ip_hdr->src_addr == bs_server_addrs_[j]) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                fprintf(stderr, "DPDK: Source addr does not match\n");
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
-            if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
-                fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
+        //     bool found = false;
+        //     for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
+        //         if (ip_hdr->src_addr == bs_server_addrs_[j]) {
+        //             found = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!found) {
+        //         fprintf(stderr, "DPDK: Source addr does not match\n");
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
+        //     if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
+        //         fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
 
-            auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
-            if (pkt->pkt_type == Packet::PktType::kDemod) {
-                const size_t symbol_idx_ul
-                    = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
-                const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+        //     auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+        //     if (pkt->pkt_type == Packet::PktType::kDemod) {
+        //         const size_t symbol_idx_ul
+        //             = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
+        //         const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
 
-                int8_t* demod_ptr
-                    = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
-                        pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
-                DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
-                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
-                decode_status_->receive_demod_data(
-                    pkt->ue_id, pkt->frame_id, symbol_idx_ul);
-            } else {
-                printf("Received unknown packet type in demod TX/RX thread\n");
-                exit(1);
-            }
+        //         int8_t* demod_ptr
+        //             = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+        //                 pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+        //         DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+        //             cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+        //         decode_status_->receive_demod_data(
+        //             pkt->ue_id, pkt->frame_id, symbol_idx_ul);
+        //     } else {
+        //         printf("Received unknown packet type in demod TX/RX thread\n");
+        //         exit(1);
+        //     }
 
-            rte_pktmbuf_free(rx_bufs[i]);
-        }
+        //     rte_pktmbuf_free(rx_bufs[i]);
+        // }
     }
 
     return 0;
@@ -287,14 +293,16 @@ void* PacketTXRX::encode_thread(int tid)
                 encode_ue_to_send_, encode_frame_to_send_, encode_symbol_dl_to_send_)) {
             int8_t* ptr = cfg->get_encoded_buf(*encoded_buffer_, encode_frame_to_send_, 
                 encode_symbol_dl_to_send_, encode_ue_to_send_, 0);
+            printf("Start to send encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
             
             for (size_t server_idx = 0; server_idx < cfg->bs_server_addr_list.size(); server_idx ++) {
                 int8_t* src_ptr = ptr + cfg->get_num_sc_per_server() * server_idx;
                 if (server_idx == cfg->bs_server_addr_idx) {
+                    printf("TXRX receive in situ encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
                     int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
                         encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->get_num_sc_per_server() * server_idx;
                     memcpy(dst_ptr, src_ptr, cfg->get_num_sc_per_server());
-                    precode_status_->receive_encoded_data(encode_ue_to_send_, encode_frame_to_send_, encode_symbol_dl_to_send_);
+                    precode_status_->receive_encoded_data(encode_frame_to_send_, encode_symbol_dl_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                     tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
@@ -351,61 +359,60 @@ void* PacketTXRX::encode_thread(int tid)
         }
 
         // 2. Try to receive demodulated data for decoding
-        rte_mbuf* rx_bufs[kRxBatchSize];
-        uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
-        if (unlikely(nb_rx == 0))
-            continue;
+        // rte_mbuf* rx_bufs[kRxBatchSize];
+        // uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+        // if (unlikely(nb_rx == 0))
+        //     continue;
 
-        for (size_t i = 0; i < nb_rx; i++) {
-            rte_mbuf* dpdk_pkt = rx_bufs[i];
-            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
-            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
-                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+        // for (size_t i = 0; i < nb_rx; i++) {
+        //     rte_mbuf* dpdk_pkt = rx_bufs[i];
+        //     auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+        //     auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+        //         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+        //     uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
 
-            if (eth_type != RTE_ETHER_TYPE_IPV4
-                or ip_hdr->next_proto_id != IPPROTO_UDP) {
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
+        //     if (eth_type != RTE_ETHER_TYPE_IPV4
+        //         or ip_hdr->next_proto_id != IPPROTO_UDP) {
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
 
-            bool found = false;
-            for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
-                if (ip_hdr->src_addr == bs_server_addrs_[j]) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                fprintf(stderr, "DPDK: Source addr does not match\n");
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
-            if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
-                fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
+        //     bool found = false;
+        //     for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
+        //         if (ip_hdr->src_addr == bs_server_addrs_[j]) {
+        //             found = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!found) {
+        //         fprintf(stderr, "DPDK: Source addr does not match\n");
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
+        //     if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
+        //         fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
 
-            auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
-            if (pkt->pkt_type == Packet::PktType::kEncode) {
-                const size_t symbol_idx_dl = pkt->symbol_id;
-                const size_t ue_id = pkt->ue_id;
+        //     auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+        //     if (pkt->pkt_type == Packet::PktType::kEncode) {
+        //         const size_t symbol_idx_dl = pkt->symbol_id;
+        //         const size_t ue_id = pkt->ue_id;
 
-                int8_t* dst_ptr
-                    = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
-                        pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
-                DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
-                    cfg->get_num_sc_per_server());
-                precode_status_->receive_encoded_data(
-                    pkt->ue_id, pkt->frame_id, symbol_idx_dl);
-            } else {
-                printf("Received unknown packet type in demod TX/RX thread\n");
-                exit(1);
-            }
+        //         int8_t* dst_ptr
+        //             = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
+        //                 pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
+        //         DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
+        //             cfg->get_num_sc_per_server());
+        //         precode_status_->receive_encoded_data(pkt->frame_id, symbol_idx_dl);
+        //     } else {
+        //         printf("Received unknown packet type in demod TX/RX thread\n");
+        //         exit(1);
+        //     }
 
-            rte_pktmbuf_free(rx_bufs[i]);
-        }
+        //     rte_pktmbuf_free(rx_bufs[i]);
+        // }
     }
     return 0;
 }
@@ -591,6 +598,13 @@ int PacketTXRX::recv(int tid)
                 cfg->get_num_sc_per_server() * cfg->mod_order_bits);
             decode_status_->receive_demod_data(
                 pkt->ue_id, pkt->frame_id, symbol_idx_ul);
+        } else if (pkt->pkt_type == Packet::PktType::kEncode) {
+            size_t total_data_symbol_idx = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
+            int8_t* encoded_ptr
+                = &(*encoded_buffer_to_precode_[total_data_symbol_idx][roundup<64>(cfg->get_num_sc_per_server()) * pkt->ue_id]);
+            DpdkTransport::fastMemcpy(encoded_ptr, pkt->data,
+                cfg->get_num_sc_per_server());
+            precode_status_->receive_encoded_data(pkt->frame_id, pkt->symbol_id);
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);

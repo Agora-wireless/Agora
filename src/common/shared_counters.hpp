@@ -17,7 +17,7 @@ public:
         : num_pilot_pkts_per_frame_(
               cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
-        , num_data_symbol_per_frame_(cfg->data_symbol_num_perframe)
+        , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
         , last_frame_cycles_(worker_rdtsc())
@@ -43,7 +43,7 @@ public:
         encode_ready_[frame_slot] = true;
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
-                * (num_pilot_symbols_per_frame_ + num_data_symbol_per_frame_)) {
+                * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
             printf("SharedCounters: received all packets in frame: %u. "
                    "Pilot pkts = %zu of %zu\n",
                 pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
@@ -161,7 +161,7 @@ public:
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame_;
     const size_t num_pilot_symbols_per_frame_;
-    const size_t num_data_symbol_per_frame_;
+    const size_t num_ul_data_symbol_per_frame_;
     const size_t num_pkts_per_symbol_;
     const size_t num_decode_tasks_per_frame_;
 };
@@ -282,7 +282,7 @@ class EncodeStatus
 public:
     EncodeStatus(Config* cfg) 
         : cfg_(cfg)
-        , num_encode_tasks_required_(cfg->get_num_ues_to_process())
+        , num_encode_tasks_required_(1)
     {
         num_encode_tasks_completed_ = new 
             std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>[cfg->get_num_ues_to_process()];
@@ -291,6 +291,9 @@ public:
     void encode_done(size_t ue_id, size_t frame_id, size_t symbol_id_dl) 
     {
         num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] ++;
+        // printf("Encode done ue %u frame %u symbol %u (%u:%u)\n", ue_id, frame_id, symbol_id_dl, 
+            // num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load(), 
+            // num_encode);
     }
 
     bool ready_to_precode(size_t ue_id, size_t frame_id, size_t symbol_id_dl)
@@ -314,14 +317,41 @@ private:
 class PrecodeStatus
 {
 public:
-    PrecodeStatus(Config* cfg) {
+    PrecodeStatus(Config* cfg) 
+    : cfg_(cfg)
+    , num_encoded_data_required_(cfg->UE_NUM) 
+    {
         
     }
 
-    void receive_encoded_data(size_t ue_id, size_t frame_id, size_t symbol_id_dl) {
+    void receive_encoded_data(size_t frame_id, size_t symbol_id_dl) {
+        if (frame_id > max_frame_) {
+            for (size_t i = 0; i < kMaxSymbols; i ++) {
+                num_encoded_data_received_[frame_id % kFrameWnd][i] = 0;
+            }
+            max_frame_ = frame_id;
+        }
+        num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] ++;
+        printf("Receive encoded data frame %u symbol %u (%u:%u)\n", frame_id, symbol_id_dl, 
+            num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl],
+            num_encoded_data_required_);
+    }
 
+    bool received_all_encoded_data(size_t frame_id, size_t symbol_id_dl) {
+        if (num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] == 
+            num_encoded_data_required_ && frame_id <= max_frame_ && frame_id + kFrameWnd > max_frame_) {
+            // num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] = 0;
+            // printf("Received all encoded data frame %u symbol %u\n", frame_id, symbol_id_dl);
+            return true;
+        }
+        return false;
     }
 
 private:
+    Config* cfg_;
+    const size_t num_encoded_data_required_;
 
+    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>
+        num_encoded_data_received_;
+    size_t max_frame_ = 0;
 };

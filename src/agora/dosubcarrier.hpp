@@ -75,7 +75,6 @@ public:
         Table<char>& socket_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
-        Table<complex_float>& data_buffer,
         // output buffers
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
         Table<complex_float>& dl_ifft_buffer,
@@ -85,7 +84,7 @@ public:
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
         PhyStats* phy_stats, Stats* stats, RxStatus* rx_status = nullptr,
-        DemulStatus* demul_status = nullptr)
+        DemulStatus* demul_status = nullptr, PrecodeStatus* precode_status = nullptr)
         : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
               nullptr /* tok */)
         , sc_range_(sc_range)
@@ -93,7 +92,6 @@ public:
         , csi_buffers_(csi_buffers)
         , calib_buffer_(calib_buffer)
         , dl_encoded_buffer_(dl_encoded_buffer)
-        , data_buffer_(data_buffer)
         , demod_buffers_(demod_buffers)
         , dl_ifft_buffer_(dl_ifft_buffer)
         , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
@@ -102,6 +100,7 @@ public:
         , dl_zf_matrices_(dl_zf_matrices)
         , rx_status_(rx_status)
         , demul_status_(demul_status)
+        , precode_status_(precode_status)
     {
         // Create the requisite Doers
         do_zf_ = new DoZF(this->cfg, tid, freq_ghz, dummy_conq_, dummy_conq_,
@@ -109,7 +108,7 @@ public:
             dl_zf_matrices_, stats);
 
         do_demul_ = new DoDemul(this->cfg, tid, freq_ghz, dummy_conq_,
-            dummy_conq_, nullptr /* ptok */, data_buffer_, ul_zf_matrices_,
+            dummy_conq_, nullptr /* ptok */, ul_zf_matrices_,
             ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats,
             stats, &socket_buffer_);
 
@@ -134,6 +133,8 @@ public:
         const size_t n_zf_tasks_reqd
             = (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
         const size_t n_demul_tasks_reqd
+            = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
+        const size_t n_precode_tasks_reqd
             = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
@@ -161,7 +162,7 @@ public:
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_)) {
-                do_demul_->independent_launch(demul_cur_frame_,
+                do_demul_->launch(demul_cur_frame_,
                     demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
                     sc_range_.start
                         + (n_demul_tasks_done_ * cfg->demul_block_size));
@@ -198,6 +199,27 @@ public:
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);
                         demul_cur_frame_++;
+                    }
+                }
+            }
+
+            if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 
+                && zf_cur_frame_ > precode_cur_frame_) {
+                size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
+                printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
+                    precode_cur_sym_dl_, base_sc_id);
+                do_precode_->launch(gen_tag_t::frm_sym_sc(precode_cur_frame_, precode_cur_sym_dl_, base_sc_id)._tag);
+                n_precode_tasks_done_ ++;
+                if (n_precode_tasks_done_ == n_precode_tasks_reqd) {
+                    n_precode_tasks_done_ = 0;
+                    precode_cur_sym_dl_ ++;
+                    if (precode_cur_sym_dl_ == cfg->dl_data_symbol_num_perframe) {
+                        precode_cur_sym_dl_ = 0;
+                        printf("Main thread: Precode done frame: %lu "
+                               "(%lu UL symbols)\n",
+                            precode_cur_frame_,
+                            cfg->dl_data_symbol_num_perframe);
+                        precode_cur_frame_ ++;
                     }
                 }
             }
@@ -301,7 +323,6 @@ private:
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     Table<complex_float>& calib_buffer_;
     Table<int8_t>& dl_encoded_buffer_;
-    Table<complex_float>& data_buffer_;
 
     // Output buffers
 
@@ -330,8 +351,16 @@ private:
     size_t demul_cur_sym_ = 0; // Current data symbol wait to process
     size_t n_demul_tasks_done_ = 0;
 
+    // Internal Precode states
+    size_t precode_cur_frame_ = 0;
+    size_t precode_cur_sym_dl_ = 0;
+    size_t n_precode_tasks_done_ = 0;
+
     // Shared status with Decode threads
     DemulStatus* demul_status_;
+
+    // Shared status with TXRX threads
+    PrecodeStatus* precode_status_;
 
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 };

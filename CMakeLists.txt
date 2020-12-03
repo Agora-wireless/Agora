@@ -297,6 +297,12 @@ add_executable(test_agora
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
 
+add_executable(test_distributed
+  test/test_distributed/main.cpp
+  $<TARGET_OBJECTS:agora_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_distributed ${COMMON_LIBS})
+
 add_executable(test_ldpc
   test/compute_kernels/ldpc/test_ldpc.cpp
   $<TARGET_OBJECTS:common_sources_lib>)

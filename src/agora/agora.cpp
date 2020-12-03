@@ -68,11 +68,18 @@ Agora::Agora(Config* cfg)
             = std::thread(&Agora::subcarrier_worker, this, i);
     }
 
-    do_decode_threads_.resize(cfg->get_num_ues_to_process());
-
-    for (size_t i = 0; i < do_decode_threads_.size(); i++) {
-        do_decode_threads_[i]
-            = std::thread(&Agora::decode_worker, this, i);
+    if (cfg->downlink_mode) {
+        do_encode_threads_.resize(cfg->get_num_ues_to_process());
+        for (size_t i = 0; i < do_encode_threads_.size(); i ++) {
+            do_encode_threads_[i]
+                = std::thread(&Agora::encode_worker, this, i);
+        }
+    } else {
+        do_decode_threads_.resize(cfg->get_num_ues_to_process());
+        for (size_t i = 0; i < do_decode_threads_.size(); i++) {
+            do_decode_threads_[i]
+                = std::thread(&Agora::decode_worker, this, i);
+        }
     }
 
     printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
@@ -80,7 +87,7 @@ Agora::Agora(Config* cfg)
         cfg->core_offset, cfg->core_offset + 1,
         cfg->core_offset + 1 + cfg->socket_thread_num - 1,
         base_worker_core_offset,
-        base_worker_core_offset + do_subcarrier_threads_.size() + do_decode_threads_.size() - 1);
+        base_worker_core_offset + do_subcarrier_threads_.size() + cfg->get_num_ues_to_process() - 1);
 }
 
 Agora::~Agora()
@@ -96,8 +103,13 @@ Agora::~Agora()
 
     for (auto& t : do_subcarrier_threads_)
         t.join();
-    for (auto& t : do_decode_threads_)
-        t.join();
+    if (config_->downlink_mode) {
+        for (auto& t : do_encode_threads_)
+            t.join();
+    } else {
+        for (auto& t : do_decode_threads_)
+            t.join();
+    }
 }
 
 void Agora::stop()
@@ -160,9 +172,9 @@ void* Agora::subcarrier_worker(int tid)
         Range(tid * config_->subcarrier_block_size,
             (tid + 1) * config_->subcarrier_block_size),
         socket_buffer_, csi_buffers_, calib_buffer_,
-        dl_encoded_buffer_, data_buffer_, demod_buffers_, dl_ifft_buffer_,
+        dl_encoded_buffer_, demod_buffers_, dl_ifft_buffer_,
         ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
-        phy_stats, stats, &rx_status_, &demul_status_);
+        phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
 
     computeSubcarrier->start_work();
     delete computeSubcarrier;
@@ -182,6 +194,21 @@ void* Agora::decode_worker(int tid)
 
     computeDecoding->start_work();
     delete computeDecoding;
+    return nullptr;
+}
+
+void* Agora::encode_worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset + 1,
+        tid
+            + config_->get_num_sc_per_server()
+                / config_->subcarrier_block_size);
+
+    auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
+        config_->dl_bits, dl_encoded_buffer_, stats, &rx_status_, &encode_status_);
+
+    computeEncoding->start_work();
+    delete computeEncoding;
     return nullptr;
 }
 
@@ -466,17 +493,14 @@ void Agora::initialize_uplink_buffers()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * TASK_BUFFER_FRAME_NUM;
+        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
 
     alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
 
-    socket_buffer_size_ = cfg->packet_length * SOCKET_BUFFER_FRAME_NUM * cfg->symbol_num_perframe;
+    socket_buffer_size_ = cfg->packet_length * kFrameWnd * cfg->symbol_num_perframe;
 
     socket_buffer_.malloc(cfg->BS_ANT_NUM,
         socket_buffer_size_, 64);
-    
-    data_buffer_.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     equal_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
@@ -556,7 +580,6 @@ void Agora::initialize_downlink_buffers()
 void Agora::free_uplink_buffers()
 {
     socket_buffer_.free();
-    data_buffer_.free();
     equal_buffer_.free();
 
     fft_stats_.fini();

@@ -32,7 +32,6 @@ public:
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& data_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer,
@@ -67,13 +66,11 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
 
-    void independent_launch(
+    void launch(
         size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id);
 
 private:
-    Table<complex_float>& data_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;

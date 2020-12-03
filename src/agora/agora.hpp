@@ -54,6 +54,7 @@ public:
     void* worker(int tid);
     void* subcarrier_worker(int tid);
     void* decode_worker(int tid);
+    void* encode_worker(int tid);
 
     /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
@@ -271,6 +272,9 @@ private:
 
     // Threads running the decoders
     std::vector<std::thread> do_decode_threads_;
+
+    // Threads running the encoders
+    std::vector<std::thread> do_encode_threads_;
 
     // Shared states between socket threads and dosubcarriers
     RxStatus rx_status_;
