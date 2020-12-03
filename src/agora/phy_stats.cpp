@@ -5,28 +5,38 @@ PhyStats::PhyStats(Config* cfg)
 {
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * kFrameWnd;
-    decoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, Agora_memory::Alignment_t::k64Align);
-    bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, Agora_memory::Alignment_t::k64Align);
+    decoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
+    bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
 
-    decoded_blocks_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, Agora_memory::Alignment_t::k64Align);
-    block_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, Agora_memory::Alignment_t::k64Align);
+    decoded_blocks_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
+    block_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
 
-    uncoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, Agora_memory::Alignment_t::k64Align);
-    uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, Agora_memory::Alignment_t::k64Align);
+    uncoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
+    uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
 
-    evm_buffer_.calloc(kFrameWnd, cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    evm_buffer_.calloc(
+        kFrameWnd, cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
-    if (cfg->ul_data_symbol_num_perframe > 0)
-    {
-        auto ul_iq_f_ptr = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->UL_PILOT_SYMS]);
-        cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+    if (cfg->ul_data_symbol_num_perframe > 0) {
+        auto ul_iq_f_ptr
+            = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->UL_PILOT_SYMS]);
+        cx_fmat ul_iq_f_mat(
+            ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
         ul_gt_mat_ = ul_iq_f_mat.st(); /* Out of bounds read.... */
-        ul_gt_mat_ = ul_gt_mat_.cols(cfg->OFDM_DATA_START, (cfg->OFDM_DATA_STOP - 1));
+        ul_gt_mat_
+            = ul_gt_mat_.cols(cfg->OFDM_DATA_START, (cfg->OFDM_DATA_STOP - 1));
     }
-    pilot_snr_.calloc(kFrameWnd, cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    pilot_snr_.calloc(
+        kFrameWnd, cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 }
 
-PhyStats::~PhyStats( void )
+PhyStats::~PhyStats(void)
 {
     decoded_bits_count_.free();
     bit_error_count_.free();
@@ -113,8 +123,7 @@ void PhyStats::update_pilot_snr(
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 {
-    if (this->config_->ul_data_symbol_num_perframe > 0)
-    {
+    if (this->config_->ul_data_symbol_num_perframe > 0) {
         fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
         fmat cur_evm_mat(
             evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);

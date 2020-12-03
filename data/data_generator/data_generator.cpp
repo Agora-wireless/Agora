@@ -81,7 +81,8 @@ int main(int argc, char* argv[])
         const std::string filename_input = cur_directory
             + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-        std::printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
+        std::printf(
+            "Saving raw data (using LDPC) to %s\n", filename_input.c_str());
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_codeblocks; i++) {
             fwrite(reinterpret_cast<uint8_t*>(&information[i][0]),
@@ -127,7 +128,8 @@ int main(int argc, char* argv[])
         CommsLib::getSequence(cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU));
     const std::vector<std::complex<float>> zc_common_pilot
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
-    ue_specific_pilot.malloc(cfg->UE_ANT_NUM, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+    ue_specific_pilot.malloc(cfg->UE_ANT_NUM, cfg->OFDM_DATA_NUM,
+        Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
         auto zc_ue_pilot_i
             = CommsLib::seqCyclicShift(zc_seq, i * M_PI / 6.0); // LTE DMRS
@@ -139,8 +141,9 @@ int main(int argc, char* argv[])
 
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;
-    tx_data_all_symbols.calloc(
-        cfg->symbol_num_perframe, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
+    tx_data_all_symbols.calloc(cfg->symbol_num_perframe,
+        cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM,
+        Agora_memory::Alignment_t::k64Align);
 
     if (cfg->freq_orthogonal_pilot) {
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
@@ -183,8 +186,8 @@ int main(int argc, char* argv[])
 
     // Generate CSI matrix
     Table<complex_float> csi_matrices;
-    csi_matrices.calloc(
-        cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
+    csi_matrices.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
+        Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
         complex_float csi
             = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
@@ -202,8 +205,9 @@ int main(int argc, char* argv[])
 
     // Generate RX data received by base station after going through channels
     Table<complex_float> rx_data_all_symbols;
-    rx_data_all_symbols.calloc(
-        cfg->symbol_num_perframe, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    rx_data_all_symbols.calloc(cfg->symbol_num_perframe,
+        cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM,
+        Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -254,7 +258,8 @@ int main(int argc, char* argv[])
 
     // Compute precoder
     Table<complex_float> precoder;
-    precoder.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
+    precoder.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
+        Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
         arma::cx_fmat mat_input(
             reinterpret_cast<arma::cx_float*>(csi_matrices[i]), cfg->BS_ANT_NUM,
@@ -282,7 +287,8 @@ int main(int argc, char* argv[])
     // Prepare downlink data from mod_output
     Table<complex_float> dl_mod_data;
     dl_mod_data.calloc(cfg->dl_data_symbol_num_perframe,
-        cfg->OFDM_CA_NUM * cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        cfg->OFDM_CA_NUM * cfg->UE_ANT_NUM,
+        Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
             if (cfg->DL_PILOT_SYMS > 0 and i <= cfg->DL_PILOT_SYMS - 1) {
@@ -320,10 +326,12 @@ int main(int argc, char* argv[])
     // Perform precoding and IFFT
     Table<complex_float> dl_ifft_data;
     dl_ifft_data.calloc(cfg->dl_data_symbol_num_perframe,
-        cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM,
+        Agora_memory::Alignment_t::k64Align);
     Table<short> dl_tx_data;
     dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe,
-        2 * cfg->sampsPerSymbol * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        2 * cfg->sampsPerSymbol * cfg->BS_ANT_NUM,
+        Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->OFDM_CA_NUM,
@@ -351,7 +359,8 @@ int main(int argc, char* argv[])
             CommsLib::IFFT(ptr_ifft, cfg->OFDM_CA_NUM, false);
 
             short* txSymbol = dl_tx_data[i] + j * cfg->sampsPerSymbol * 2;
-            std::memset(txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix_);
+            std::memset(
+                txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix_);
             for (size_t k = 0; k < cfg->OFDM_CA_NUM; k++) {
                 txSymbol[2 * (k + cfg->CP_LEN + cfg->ofdm_tx_zero_prefix_)]
                     = (short)(32768 * ptr_ifft[k].re);
@@ -406,6 +415,6 @@ int main(int argc, char* argv[])
     rx_data_all_symbols.free();
     ue_specific_pilot.free();
     delete cfg;
-    
+
     return 0;
 }

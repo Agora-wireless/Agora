@@ -14,12 +14,12 @@
 
 #pragma once
 
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 #include <fcntl.h>
 #include <netdb.h>
 #include <stdexcept>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 /// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServer {

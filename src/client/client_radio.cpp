@@ -43,8 +43,9 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
         size_t _num_client_radios_initialized = num_client_radios_initialized;
         num_checks++;
         if (num_checks > 1e9) {
-            std::printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
-                   "ready\n",
+            std::printf(
+                "RadioConfig: Waiting for radio initialization, %zu of %zu "
+                "ready\n",
                 _num_client_radios_initialized, this->_radioNum);
             num_checks = 0;
         }

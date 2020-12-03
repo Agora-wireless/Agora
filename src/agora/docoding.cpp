@@ -17,10 +17,14 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
     parity_buffer = reinterpret_cast<int8_t*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ldpc_encoding_parity_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            ldpc_encoding_parity_buf_size(
+                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
     assert(parity_buffer != nullptr);
     encoded_buffer_temp = reinterpret_cast<int8_t*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            ldpc_encoding_encoded_buf_size(
+                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
     assert(encoded_buffer_temp != nullptr);
 }
 
@@ -89,7 +93,9 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
-    resp_var_nodes = reinterpret_cast<int16_t*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
+    resp_var_nodes = reinterpret_cast<int16_t*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            1024 * 1024 * sizeof(int16_t)));
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
@@ -106,8 +112,9 @@ Event_data DoDecode::launch(size_t tag)
     const size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
-        std::printf("In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-               "%zu, ue: %zu\n",
+        std::printf(
+            "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
+            "%zu, ue: %zu\n",
             tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 

@@ -53,10 +53,11 @@ void run_test(size_t base_graph, size_t zc)
         if (memcmp(parity[n], parity_reference[n],
                 bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc)))
             != 0) {
-            std::fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n", zc,
-                base_graph);
+            std::fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n",
+                zc, base_graph);
         } else {
-            std::printf("Passed for Zc = %zu, base graph = %zu\n", zc, base_graph);
+            std::printf(
+                "Passed for Zc = %zu, base graph = %zu\n", zc, base_graph);
         }
     }
 

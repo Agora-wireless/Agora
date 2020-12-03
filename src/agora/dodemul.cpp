@@ -20,11 +20,14 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
     data_gather_buffer = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
     equaled_buffer_temp = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
     equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
@@ -68,7 +71,8 @@ Event_data DoDemul::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask) {
-        std::printf("In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
+        std::printf(
+            "In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n",
             tid, frame_id, symbol_idx_ul, base_sc_id);
     }
 

@@ -190,8 +190,8 @@ int RadioTXRX::dequeue_send(int tid)
              symbol_idx++) {
             if (kDebugPrintInTask) {
                 std::printf("In TX thread %d: Transmitted pilot in frame %zu, "
-                       "symbol %zu, "
-                       "ant %zu\n",
+                            "symbol %zu, "
+                            "ant %zu\n",
                     tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
             }
 
@@ -230,8 +230,9 @@ void* RadioTXRX::loop_tx_rx(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
             config_->ue_rru_port + radio_id, config_->bs_rru_addr.c_str());
-        std::printf("TXRX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%d \n",
+        std::printf(
+            "TXRX thread %d: set up UDP socket server listening to port %d"
+            " with remote address %s:%d \n",
             tid, local_port_id, config_->bs_rru_addr.c_str(),
             config_->ue_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
@@ -348,7 +349,8 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
 
     // if buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
-        std::printf("RX thread %d at rx_offset %zu buffer full\n", tid, rx_offset);
+        std::printf(
+            "RX thread %d at rx_offset %zu buffer full\n", tid, rx_offset);
         c->running = false;
         return NULL;
     }
@@ -381,8 +383,8 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
     }
     if (kDebugPrintInTask) {
         std::printf("downlink receive: thread %d, frame_id %zu, symbol_id "
-               "%zu, radio_id %zu "
-               "rxtime %llx\n",
+                    "%zu, radio_id %zu "
+                    "rxtime %llx\n",
             tid, frame_id, symbol_id, radio_id, rxTime);
     }
     size_t ant_id = radio_id * c->nChannels;
@@ -409,8 +411,8 @@ void* RadioTXRX::loop_tx_rx_argos(int tid)
     size_t num_radios = c->nRadios;
     size_t radio_lo = tid * num_radios / thread_num_;
     size_t radio_hi = (tid + 1) * num_radios / thread_num_;
-    std::printf("receiver thread %d has radios %zu to %zu (%zu)\n", tid, radio_lo,
-        radio_hi - 1, radio_hi - radio_lo);
+    std::printf("receiver thread %d has radios %zu to %zu (%zu)\n", tid,
+        radio_lo, radio_hi - 1, radio_hi - radio_lo);
 
     // Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);

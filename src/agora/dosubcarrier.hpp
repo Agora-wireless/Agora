@@ -157,7 +157,8 @@ public:
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
                     n_zf_tasks_done_ = 0;
-                    std::printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    std::printf(
+                        "Main thread: ZF done frame: %lu\n", zf_cur_frame_);
                     zf_cur_frame_++;
                 }
             }
@@ -197,7 +198,7 @@ public:
                     if (demul_cur_sym_ == cfg->symbol_num_perframe) {
                         demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
                         std::printf("Main thread: Demodulation done frame: %lu "
-                               "(%lu UL symbols)\n",
+                                    "(%lu UL symbols)\n",
                             demul_cur_frame_,
                             cfg->symbol_num_perframe
                                 - cfg->pilot_symbol_num_perframe);

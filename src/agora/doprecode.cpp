@@ -17,10 +17,11 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
 
-    alloc_buffer_1d(
-        &modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align, 0);
-    alloc_buffer_1d(
-        &precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align, 0);
+    alloc_buffer_1d(&modulated_buffer_temp, kSCsPerCacheline * cfg->UE_NUM,
+        Agora_memory::Alignment_t::k64Align, 0);
+    alloc_buffer_1d(&precoded_buffer_temp,
+        cfg->demul_block_size * cfg->BS_ANT_NUM,
+        Agora_memory::Alignment_t::k64Align, 0);
 
 #if USE_MKL_JIT
     MKL_Complex8 alpha = { 1, 0 };
@@ -140,7 +141,7 @@ Event_data DoPrecode::launch(size_t tag)
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     if (kDebugPrintInTask) {
         std::printf("In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
-               "subcarrier: %zu\n",
+                    "subcarrier: %zu\n",
             tid, frame_id, symbol_id, base_sc_id);
     }
     return Event_data(EventType::kPrecode, tag);

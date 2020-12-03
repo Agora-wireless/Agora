@@ -23,11 +23,14 @@ DoZF::DoZF(Config* config, int tid,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     csi_gather_buffer = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     calib_gather_buffer = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kMaxAntennas * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            kMaxAntennas * sizeof(complex_float)));
 }
 
 DoZF::~DoZF()
@@ -59,7 +62,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             // mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
             mat_ul_zf_tmp
                 = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-        } catch (std::runtime_error &) {
+        } catch (std::runtime_error&) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
             // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
@@ -80,7 +83,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         try {
             // mat_dl_zf = arma::inv(mat_calib) * mat_ul_zf.st();
             mat_dl_zf_tmp = arma::inv(mat_calib) * mat_ul_zf_tmp.st();
-        } catch (std::runtime_error &) {
+        } catch (std::runtime_error&) {
             MLPD_WARN("Failed to invert reference channel matrix, skip "
                       "applying it\n");
             Utils::print_vec(vec_calib, "vec_calib");
@@ -171,8 +174,8 @@ void DoZF::ZF_time_orthogonal(size_t tag)
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
-        std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
-            frame_id, base_sc_id);
+        std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n",
+            tid, frame_id, base_sc_id);
     }
     size_t num_subcarriers
         = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
@@ -250,8 +253,9 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
-        std::printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
-               "BS_ANT_NUM: %zu\n",
+        std::printf(
+            "In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
+            "BS_ANT_NUM: %zu\n",
             tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM,
             cfg->BS_ANT_NUM);
     }

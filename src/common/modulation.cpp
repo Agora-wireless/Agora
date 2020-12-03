@@ -18,8 +18,9 @@ void print256_epi16(__m256i var)
 void print256_epi8(__m256i var)
 {
     int8_t* val = (int8_t*)&var;
-    std::printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i "
-           "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
+    std::printf(
+        "Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i "
+        "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
         val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7], val[8],
         val[9], val[10], val[11], val[12], val[13], val[14], val[15], val[16],
         val[17], val[18], val[19], val[20], val[21], val[22], val[23], val[24],
@@ -44,7 +45,8 @@ void print128_epi8(__m128i var)
 void init_modulation_table(Table<complex_float>& mod_table, size_t mod_order)
 {
     if (!mod_table.is_allocated())
-        mod_table.malloc(1, pow(2, kMaxModType), Agora_memory::Alignment_t::k32Align);
+        mod_table.malloc(
+            1, pow(2, kMaxModType), Agora_memory::Alignment_t::k32Align);
     // mod_table.malloc(pow(2, kMaxModType), 2, 32);
     switch (mod_order) {
     case 4:

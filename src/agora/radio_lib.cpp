@@ -51,8 +51,9 @@ RadioConfig::RadioConfig(Config* cfg)
         size_t _num_radios_initialized = num_radios_initialized;
         num_checks++;
         if (num_checks > 1e9) {
-            std::printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
-                   "ready\n",
+            std::printf(
+                "RadioConfig: Waiting for radio initialization, %zu of %zu "
+                "ready\n",
                 _num_radios_initialized, this->_radioNum);
             num_checks = 0;
         }
@@ -88,8 +89,9 @@ RadioConfig::RadioConfig(Config* cfg)
         size_t _num_radios_configured = num_radios_configured;
         num_checks++;
         if (num_checks > 1e9) {
-            std::printf("RadioConfig: Waiting for radio initialization, %zu of %zu "
-                   "ready\n",
+            std::printf(
+                "RadioConfig: Waiting for radio initialization, %zu of %zu "
+                "ready\n",
                 _num_radios_configured, this->_radioNum);
             num_checks = 0;
         }
@@ -311,9 +313,11 @@ bool RadioConfig::radioStart()
 {
     bool good_calib = false;
     alloc_buffer_1d(&init_calib_dl_,
-        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), Agora_memory::Alignment_t::k64Align, 1);
+        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float),
+        Agora_memory::Alignment_t::k64Align, 1);
     alloc_buffer_1d(&init_calib_ul_,
-        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), Agora_memory::Alignment_t::k64Align, 1);
+        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float),
+        Agora_memory::Alignment_t::k64Align, 1);
     // initialize init_calib to a matrix of ones
     for (size_t i = 0; i < _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM; i++) {
         init_calib_dl_[i] = 1;

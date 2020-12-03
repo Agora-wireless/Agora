@@ -9,9 +9,9 @@
  */
 
 #include "comms-lib.h"
-#include <queue>
 #include <immintrin.h>
 #include <iomanip>
+#include <queue>
 
 #define USE_AVX
 #define ALIGNMENT 32

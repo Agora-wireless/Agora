@@ -141,8 +141,9 @@ void Simulator::update_rx_counters(
     if (rx_counter_packets_[frame_id_in_buffer] == 1) {
         frame_start_receive[frame_id] = get_time();
         if (kDebugPrintPerFrameStart) {
-            std::printf("Main thread: data received from frame %zu, symbol %zu, ant "
-                   "%zu, in %.2f since tx, in %.2f us since last frame\n",
+            std::printf(
+                "Main thread: data received from frame %zu, symbol %zu, ant "
+                "%zu, in %.2f since tx, in %.2f us since last frame\n",
                 frame_id, symbol_id, ant_id,
                 frame_start_receive[frame_id] - frame_start_tx[frame_id],
                 frame_start_receive[frame_id]
@@ -213,24 +214,33 @@ void Simulator::initialize_queues()
 
 void Simulator::initialize_uplink_buffers()
 {
-    alloc_buffer_1d(&task_threads, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
-    alloc_buffer_1d(&context, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
+    alloc_buffer_1d(
+        &task_threads, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
+    alloc_buffer_1d(
+        &context, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
 
     socket_buffer_size_ = (long long)packet_length * symbol_num_perframe
         * BS_ANT_NUM * kFrameWnd;
     socket_buffer_status_size_ = symbol_num_perframe * BS_ANT_NUM * kFrameWnd;
-    socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_, Agora_memory::Alignment_t::k64Align);
-    socket_buffer_status_.calloc(
-        SOCKET_RX_THREAD_NUM, socket_buffer_status_size_, Agora_memory::Alignment_t::k64Align);
+    socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_,
+        Agora_memory::Alignment_t::k64Align);
+    socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM,
+        socket_buffer_status_size_, Agora_memory::Alignment_t::k64Align);
 
     /* initilize all uplink status checkers */
-    alloc_buffer_1d(&rx_counter_packets_, kFrameWnd, Agora_memory::Alignment_t::k64Align, 1);
+    alloc_buffer_1d(&rx_counter_packets_, kFrameWnd,
+        Agora_memory::Alignment_t::k64Align, 1);
 
-    frame_start.calloc(SOCKET_RX_THREAD_NUM, kNumStatsFrames, Agora_memory::Alignment_t::k4096Align);
-    alloc_buffer_1d(&frame_start_receive, kNumStatsFrames, Agora_memory::Alignment_t::k4096Align, 1);
-    alloc_buffer_1d(&frame_end_receive, kNumStatsFrames, Agora_memory::Alignment_t::k4096Align, 1);
-    alloc_buffer_1d(&frame_start_tx, kNumStatsFrames, Agora_memory::Alignment_t::k4096Align, 1);
-    alloc_buffer_1d(&frame_end_tx, kNumStatsFrames, Agora_memory::Alignment_t::k4096Align, 1);
+    frame_start.calloc(SOCKET_RX_THREAD_NUM, kNumStatsFrames,
+        Agora_memory::Alignment_t::k4096Align);
+    alloc_buffer_1d(&frame_start_receive, kNumStatsFrames,
+        Agora_memory::Alignment_t::k4096Align, 1);
+    alloc_buffer_1d(&frame_end_receive, kNumStatsFrames,
+        Agora_memory::Alignment_t::k4096Align, 1);
+    alloc_buffer_1d(&frame_start_tx, kNumStatsFrames,
+        Agora_memory::Alignment_t::k4096Align, 1);
+    alloc_buffer_1d(&frame_end_tx, kNumStatsFrames,
+        Agora_memory::Alignment_t::k4096Align, 1);
 }
 
 void Simulator::free_uplink_buffers()

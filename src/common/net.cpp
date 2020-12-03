@@ -4,7 +4,6 @@
 #include <cstdlib> /* std::exit */
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
 
-
 void set_socket_buf_size(int socket_local, int sock_buf_size)
 {
     // use SO_REUSEPORT option, so that multiple sockets could receive packets

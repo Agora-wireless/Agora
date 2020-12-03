@@ -18,7 +18,8 @@ T* aligned_malloc(const int size, const unsigned alignment)
     return reinterpret_cast<T*>(rte_malloc(NULL, sizeof(T) * size, alignment));
 #else
 #ifndef _WIN64
-    return reinterpret_cast<T*>(std::aligned_alloc(alignment, sizeof(T) * size));
+    return reinterpret_cast<T*>(
+        std::aligned_alloc(alignment, sizeof(T) * size));
 #else
     return reinterpret_cast<T*>(_aligned_malloc(sizeof(T) * size, alignment));
 #endif
@@ -236,7 +237,8 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
         const size_t num_input_bytes_to_copy
             = bits_to_bytes(num_input_bits) - num_punctured_bytes;
 
-        std::memcpy(encoded_buffer, input_buffer + num_punctured_bytes, num_input_bytes_to_copy);
+        std::memcpy(encoded_buffer, input_buffer + num_punctured_bytes,
+            num_input_bytes_to_copy);
         std::memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
             bits_to_bytes(num_parity_bits));
     } else {

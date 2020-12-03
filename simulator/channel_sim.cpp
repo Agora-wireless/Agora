@@ -100,7 +100,8 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
     }
-    alloc_buffer_1d(&task_threads, worker_thread_num, Agora_memory::Alignment_t::k64Align, 0);
+    alloc_buffer_1d(&task_threads, worker_thread_num,
+        Agora_memory::Alignment_t::k64Align, 0);
 
     // create task threads (transmit to base station and client antennas)
     for (size_t i = 0; i < worker_thread_num; i++) {
@@ -233,10 +234,11 @@ void ChannelSim::start()
                     if (bs_rx_counter_[frame_offset] == bscfg->BS_ANT_NUM) {
                         bs_rx_counter_[frame_offset] = 0;
                         if (kDebugPrintPerSymbolDone)
-                            std::printf("Scheduling downlink transmission in frame "
-                                   "%zu, "
-                                   "symbol %zu, from %zu "
-                                   "BS to %zu user antennas\n",
+                            std::printf(
+                                "Scheduling downlink transmission in frame "
+                                "%zu, "
+                                "symbol %zu, from %zu "
+                                "BS to %zu user antennas\n",
                                 frame_id, symbol_id, bscfg->BS_ANT_NUM,
                                 uecfg->UE_ANT_NUM);
                         schedule_task(
@@ -255,8 +257,9 @@ void ChannelSim::start()
                     if (user_tx_counter_[offset]
                         == dl_data_plus_beacon_symbols) {
                         if (kDebugPrintPerFrameDone)
-                            std::printf("Finished downlink transmission %zu symbols "
-                                   "in frame %zu\n",
+                            std::printf(
+                                "Finished downlink transmission %zu symbols "
+                                "in frame %zu\n",
                                 dl_data_plus_beacon_symbols, frame_id);
                         user_tx_counter_[offset] = 0;
                     }
@@ -266,7 +269,7 @@ void ChannelSim::start()
                     if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols) {
                         if (kDebugPrintPerFrameDone)
                             std::printf("Finished uplink transmission of %zu "
-                                   "symbols in frame %zu\n",
+                                        "symbols in frame %zu\n",
                                 ul_data_plus_pilot_symbols, frame_id);
                         bs_tx_counter_[offset] = 0;
                     }
@@ -312,8 +315,9 @@ void* ChannelSim::bs_rx_loop(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_bs_[socket_id],
             bscfg->bs_server_port + socket_id, bscfg->bs_server_addr.c_str());
-        std::printf("BS RX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%zu\n",
+        std::printf(
+            "BS RX thread %d: set up UDP socket server listening to port %d"
+            " with remote address %s:%zu\n",
             tid, local_port_id, bscfg->bs_server_addr.c_str(),
             bscfg->bs_server_port + socket_id);
         fcntl(socket_bs_[socket_id], F_SETFL, O_NONBLOCK);
@@ -337,8 +341,9 @@ void* ChannelSim::bs_rx_loop(int tid)
         size_t symbol_id = pkt->symbol_id;
         size_t ant_id = pkt->ant_id;
         if (kDebugPrintInTask)
-            std::printf("Received BS packet for frame %zu, symbol %zu, ant %zu from "
-                   "socket %zu\n",
+            std::printf(
+                "Received BS packet for frame %zu, symbol %zu, ant %zu from "
+                "socket %zu\n",
                 frame_id, symbol_id, ant_id, socket_id);
         size_t dl_symbol_id = get_dl_symbol_idx(frame_id, symbol_id);
         size_t symbol_offset
@@ -376,8 +381,9 @@ void* ChannelSim::ue_rx_loop(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_ue_[socket_id],
             uecfg->ue_server_port + socket_id, uecfg->ue_server_addr.c_str());
-        std::printf("UE RX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%zu\n",
+        std::printf(
+            "UE RX thread %d: set up UDP socket server listening to port %d"
+            " with remote address %s:%zu\n",
             tid, local_port_id, uecfg->ue_server_addr.c_str(),
             uecfg->ue_server_port + socket_id);
         fcntl(socket_ue_[socket_id], F_SETFL, O_NONBLOCK);
@@ -409,8 +415,9 @@ void* ChannelSim::ue_rx_loop(int tid)
         if (pilot_symbol_id == SIZE_MAX)
             total_symbol_id = ul_symbol_id + bscfg->pilot_symbol_num_perframe;
         if (kDebugPrintInTask)
-            std::printf("Received UE packet for frame %zu, symbol %zu, ant %zu from "
-                   "socket %zu\n",
+            std::printf(
+                "Received UE packet for frame %zu, symbol %zu, ant %zu from "
+                "socket %zu\n",
                 frame_id, symbol_id, ant_id, socket_id);
         size_t symbol_offset
             = (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols

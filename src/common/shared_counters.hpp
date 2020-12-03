@@ -41,7 +41,7 @@ public:
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_data_symbol_per_frame_)) {
             std::printf("SharedCounters: received all packets in frame: %u. "
-                   "Pilot pkts = %zu of %zu\n",
+                        "Pilot pkts = %zu of %zu\n",
                 pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
                 num_pilot_pkts_per_frame_);
         }
@@ -49,7 +49,8 @@ public:
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
             num_pilot_pkts_[frame_slot]++;
             if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
-                std::printf("SharedCounters: received all pilots in frame: %u\n",
+                std::printf(
+                    "SharedCounters: received all pilots in frame: %u\n",
                     pkt->frame_id);
             }
         } else {
@@ -101,7 +102,8 @@ public:
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[frame_slot][j] = 0;
             }
-            std::printf("Main thread: Decode done frame: %lu\n", cur_frame_ - 1);
+            std::printf(
+                "Main thread: Decode done frame: %lu\n", cur_frame_ - 1);
         }
         decode_mutex_.unlock();
     }
@@ -206,9 +208,11 @@ public:
         , num_demod_data_required_(cfg->server_addr_list.size())
     {
         cur_frame_ = new size_t[cfg->get_num_ues_to_process()];
-        std::memset(cur_frame_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
+        std::memset(
+            cur_frame_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
         cur_symbol_ = new size_t[cfg->get_num_ues_to_process()];
-        std::memset(cur_symbol_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
+        std::memset(
+            cur_symbol_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
 
         num_demod_data_received_
             = new std::array<std::array<size_t, kMaxSymbols>,
