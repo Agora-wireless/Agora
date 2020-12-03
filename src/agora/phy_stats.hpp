@@ -35,7 +35,7 @@ private:
     Table<float> evm_buffer_;
     Table<float> pilot_snr_;
 
-    cx_fmat      ul_gt_mat_;
+    cx_fmat ul_gt_mat_;
 };
 
 #endif

@@ -38,8 +38,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     , ticks_wnd_2(
           15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
-    std::printf("Initializing sender, sending to base station server at %s, frame "
-           "duration = %.2f ms, slow start = %s\n",
+    std::printf(
+        "Initializing sender, sending to base station server at %s, frame "
+        "duration = %.2f ms, slow start = %s\n",
         cfg->bs_server_addr.c_str(), frame_duration / 1000.0,
         enable_slow_start == 1 ? "yes" : "no");
 
@@ -54,8 +55,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
         + ".bin");
 
     task_ptok = reinterpret_cast<moodycamel::ProducerToken**>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 
-                                    (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
     for (size_t i = 0; i < socket_thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
@@ -253,7 +254,8 @@ void* Sender::worker_thread(int tid)
 
     UDPClient udp_client;
     auto fft_inout = reinterpret_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            cfg->OFDM_CA_NUM * sizeof(complex_float)));
     auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
 
     double begin = get_time();
@@ -311,9 +313,10 @@ void* Sender::worker_thread(int tid)
 #endif
 
             if (kDebugSenderReceiver) {
-                std::printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
-                       "%d, "
-                       "TX time: %.3f us\n",
+                std::printf(
+                    "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
+                    "%d, "
+                    "TX time: %.3f us\n",
                     tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
                     pkt->symbol_id, pkt->ant_id,
                     cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
@@ -327,7 +330,8 @@ void* Sender::worker_thread(int tid)
                 double byte_len = cfg->packet_length * ant_num_this_thread
                     * max_symbol_id * 1000.f;
                 double diff = end - begin;
-                std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
+                std::printf(
+                    "Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
                     (size_t)tid,
                     total_tx_packets / (ant_num_this_thread * max_symbol_id),
                     diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
@@ -344,7 +348,7 @@ void* Sender::worker_thread(int tid)
             = rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
         if (unlikely(nb_tx_new != num_tags)) {
             std::printf("Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
-                   "num_tags: %zu\n",
+                        "num_tags: %zu\n",
                 tid, nb_tx_new, num_tags);
             keep_running = 0;
             break;
@@ -379,12 +383,14 @@ size_t Sender::get_max_symbol_id() const
 void Sender::init_iq_from_file(std::string filename)
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
-    iq_data_short_.calloc(
-        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, Agora_memory::Alignment_t::k64Align);
+    iq_data_short_.calloc(packets_per_frame,
+        (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2,
+        Agora_memory::Alignment_t::k64Align);
 
     Table<float> iq_data_float;
-    iq_data_float.calloc(
-        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, Agora_memory::Alignment_t::k64Align);
+    iq_data_float.calloc(packets_per_frame,
+        (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2,
+        Agora_memory::Alignment_t::k64Align);
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
@@ -433,7 +439,8 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
-    std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
+    std::printf(
+        "Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {

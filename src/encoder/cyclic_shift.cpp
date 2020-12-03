@@ -119,7 +119,8 @@ inline __m256i cycle_bit_shift_144to256(
         (zc_in_shorts - packed_shift) * sizeof(uint16_t));
     std::memcpy(p_out_0 + zc_in_shorts - packed_shift, p_in,
         packed_shift * sizeof(uint16_t));
-    std::memset(p_out_0 + zc_in_shorts, 0, 32 - zc_in_shorts * sizeof(uint16_t));
+    std::memset(
+        p_out_0 + zc_in_shorts, 0, 32 - zc_in_shorts * sizeof(uint16_t));
 
     x1 = _mm256_srli_si256(x0, 2);
 

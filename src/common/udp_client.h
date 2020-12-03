@@ -14,13 +14,13 @@
 
 #pragma once
 
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 #include <map>
 #include <netdb.h>
 #include <stdexcept>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
-#include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 // Basic UDP client class based on OS sockets that supports sending messages
 // and caches remote addrinfo mappings
@@ -90,8 +90,8 @@ public:
         ssize_t ret = sendto(sock_fd, msg, len, 0, rem_addrinfo->ai_addr,
             rem_addrinfo->ai_addrlen);
         if (ret != static_cast<ssize_t>(len)) {
-            throw std::runtime_error(
-                "sendto() failed. errno = " + std::string(std::strerror(errno)));
+            throw std::runtime_error("sendto() failed. errno = "
+                + std::string(std::strerror(errno)));
         }
 
         if (enable_recording_flag) {

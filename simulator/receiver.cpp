@@ -83,7 +83,8 @@ void* Receiver::loopRecv(int tid)
     while (true) {
         /* if buffer is full, exit */
         if (cur_buffer_status_ptr[0] == 1) {
-            std::printf("Receive thread %d buffer full, offset: %zu\n", tid, offset);
+            std::printf(
+                "Receive thread %d buffer full, offset: %zu\n", tid, offset);
             std::exit(0);
         }
 
@@ -103,8 +104,8 @@ void* Receiver::loopRecv(int tid)
         int frame_id = pkt->frame_id;
 
         if (kDebugSenderReceiver) {
-            std::printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
-                frame_id, pkt->symbol_id, pkt->ant_id);
+            std::printf("RX thread %d received frame %d symbol %d, ant %d\n ",
+                tid, frame_id, pkt->symbol_id, pkt->ant_id);
         }
 
         if (kIsWorkerTimingEnabled) {

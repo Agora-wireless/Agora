@@ -16,9 +16,10 @@ int main(int argc, char const* argv[])
         core_offset = 22;
         delay = 5000;
         std::printf("Wrong arguments (requires 4 arguments: 1. number of tx "
-               "threads, 2. "
-               "core offset, 3. frame duration, 4. config file)\n");
-        std::printf("Arguments set to default: 4, 22, 5000, %s\n", confFile.c_str());
+                    "threads, 2. "
+                    "core offset, 3. frame duration, 4. config file)\n");
+        std::printf(
+            "Arguments set to default: 4, 22, 5000, %s\n", confFile.c_str());
     }
     auto* cfg = new Config(confFile.c_str());
     cfg->genData();

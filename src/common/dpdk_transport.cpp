@@ -88,7 +88,7 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
     struct rte_ether_addr addr;
     rte_eth_macaddr_get(port, &addr);
     std::printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-           " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
+                " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
         port, rte_eth_dev_socket_id(port), addr.addr_bytes[0],
         addr.addr_bytes[1], addr.addr_bytes[2], addr.addr_bytes[3],
         addr.addr_bytes[4], addr.addr_bytes[5]);
@@ -160,7 +160,8 @@ void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,
     b[10] = dst_port & 0xFF;
     b[11] = (dst_port >> 8) & 0xFF;
     dp = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
-    std::printf("In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n",
+    std::printf(
+        "In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n",
         tid, b[0], b[1], b[2], b[3], sp, b[6], b[7], b[8], b[9], dp, len);
 }
 

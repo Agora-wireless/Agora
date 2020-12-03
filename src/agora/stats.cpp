@@ -11,7 +11,8 @@ Stats::Stats(Config* cfg)
     , freq_ghz(cfg->freq_ghz)
     , creation_tsc(rdtsc())
 {
-    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, Agora_memory::Alignment_t::k64Align);
+    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames,
+        Agora_memory::Alignment_t::k64Align);
 }
 
 Stats::~Stats() {}
@@ -43,8 +44,8 @@ void Stats::compute_avg_over_threads(
 
 void Stats::print_per_thread_per_task(FrameSummary s)
 {
-    std::printf("%zu tasks %.1f us (~ %.1f + %.1f + %.1f us), ", s.count_this_thread,
-        s.us_this_thread[0] / s.count_this_thread,
+    std::printf("%zu tasks %.1f us (~ %.1f + %.1f + %.1f us), ",
+        s.count_this_thread, s.us_this_thread[0] / s.count_this_thread,
         s.us_this_thread[1] / s.count_this_thread,
         s.us_this_thread[2] / s.count_this_thread,
         s.us_this_thread[3] / s.count_this_thread);
@@ -52,8 +53,8 @@ void Stats::print_per_thread_per_task(FrameSummary s)
 
 void Stats::print_per_frame(const char* doer_string, FrameSummary frame_summary)
 {
-    std::printf("%s (%zu tasks): %.3f ms (~ %.4f + %.3f + %.4f ms), ", doer_string,
-        frame_summary.count_all_threads,
+    std::printf("%s (%zu tasks): %.3f ms (~ %.4f + %.3f + %.4f ms), ",
+        doer_string, frame_summary.count_all_threads,
         frame_summary.us_avg_threads[0] / 1000.0,
         frame_summary.us_avg_threads[1] / 1000.0,
         frame_summary.us_avg_threads[2] / 1000.0,
@@ -591,7 +592,8 @@ void Stats::print_summary()
             std::printf("CSI (%zu, %.2f%%), ", num_csi_i, percent_csi);
             std::printf("ZF (%zu, %.2f%%), ", num_zf_i, percent_zf);
             std::printf("Encode (%zu, %.2f%%), ", num_encode_i, percent_encode);
-            std::printf("Precode (%zu, %.2f%%), ", num_precode_i, percent_precode);
+            std::printf(
+                "Precode (%zu, %.2f%%), ", num_precode_i, percent_precode);
             std::printf("IFFT (%zu, %.2f%%)", num_ifft_i, percent_ifft);
             std::printf("\n");
         }
